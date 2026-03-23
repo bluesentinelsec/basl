@@ -1,0 +1,15 @@
+name: Allocator
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  allocator-check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Check for raw allocator calls
+        run: python3 scripts/check_allocator.py
