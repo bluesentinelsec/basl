@@ -233,25 +233,32 @@ static int yaml_buf_append(yaml_parser_t *p, char **buf, size_t *len, size_t *ca
     return 1;
 }
 
+static int block_scalar_handle_blank_line(yaml_parser_t *p, size_t line_indent, char **buf, size_t *len, size_t *cap)
+{
+    size_t check = p->pos + line_indent;
+    if (check >= p->len || (p->src[check] != '\n' && p->src[check] != '\0'))
+        return 0;
+    while (peek(p) == ' ')
+        advance(p);
+    if (peek(p) != '\n')
+        return 0;
+    if (!yaml_buf_append(p, buf, len, cap, '\n'))
+        return -1;
+    advance(p);
+    return 1;
+}
+
 static vigil_status_t block_scalar_collect_lines(yaml_parser_t *p, char style, size_t block_indent, char **buf,
                                                  size_t *len, size_t *cap)
 {
     while (p->pos < p->len)
     {
         size_t line_indent = measure_indent(p);
-        size_t check = p->pos + line_indent;
-        if (check < p->len && (p->src[check] == '\n' || p->src[check] == '\0'))
-        {
-            while (peek(p) == ' ')
-                advance(p);
-            if (peek(p) == '\n')
-            {
-                if (!yaml_buf_append(p, buf, len, cap, '\n'))
-                    return VIGIL_STATUS_OUT_OF_MEMORY;
-                advance(p);
-                continue;
-            }
-        }
+        int blank = block_scalar_handle_blank_line(p, line_indent, buf, len, cap);
+        if (blank < 0)
+            return VIGIL_STATUS_OUT_OF_MEMORY;
+        if (blank > 0)
+            continue;
         if (line_indent < block_indent)
             break;
         for (size_t i = 0; i < block_indent && peek(p) == ' '; i++)
