@@ -7958,126 +7958,107 @@ static vigil_status_t vigil_parser_parse_postfix_dot(vigil_parser_state_t *state
 }
 
 // NOLINTNEXTLINE(readability-function-cognitive-complexity)
+static vigil_status_t parse_postfix_call(vigil_parser_state_t *state, vigil_expression_result_t *out_result)
+{
+    vigil_status_t status;
+    vigil_source_span_t span =
+        vigil_parser_previous(state) == NULL ? vigil_parser_fallback_span(state) : vigil_parser_previous(state)->span;
+    status =
+        vigil_parser_require_scalar_expression(state, span, out_result, "multi-value expressions do not support calls");
+    if (status != VIGIL_STATUS_OK)
+        return status;
+    if (!vigil_parser_type_is_function(out_result->type))
+        return VIGIL_STATUS_OK; /* not a call — caller will break */
+    return vigil_parser_parse_value_call(state, span, out_result->type, out_result);
+}
+
+static vigil_status_t parse_postfix_index(vigil_parser_state_t *state, vigil_expression_result_t *out_result)
+{
+    vigil_status_t status;
+    vigil_expression_result_t index_result;
+    vigil_parser_type_t indexed_type;
+    vigil_source_span_t span = vigil_parser_fallback_span(state);
+
+    vigil_expression_result_clear(&index_result);
+    status = vigil_parser_require_scalar_expression(state, span, out_result,
+                                                    "multi-value expressions do not support indexing");
+    if (status != VIGIL_STATUS_OK)
+        return status;
+    status = vigil_parser_parse_expression(state, &index_result);
+    if (status != VIGIL_STATUS_OK)
+        return status;
+    status = vigil_parser_require_scalar_expression(
+        state, vigil_parser_previous(state) == NULL ? span : vigil_parser_previous(state)->span, &index_result,
+        "index expressions must evaluate to a single value");
+    if (status != VIGIL_STATUS_OK)
+        return status;
+    status = vigil_parser_expect(state, VIGIL_TOKEN_RBRACKET, "expected ']' after index expression", NULL);
+    if (status != VIGIL_STATUS_OK)
+        return status;
+
+    indexed_type = vigil_binding_type_invalid();
+    if (vigil_parser_type_is_array(out_result->type))
+    {
+        status = vigil_parser_require_type(state, span, index_result.type, vigil_binding_type_primitive(VIGIL_TYPE_I32),
+                                           "array index must be i32");
+        if (status != VIGIL_STATUS_OK)
+            return status;
+        indexed_type = vigil_program_array_type_element(state->program, out_result->type);
+    }
+    else if (vigil_parser_type_is_map(out_result->type))
+    {
+        status = vigil_parser_require_type(state, span, index_result.type,
+                                           vigil_program_map_type_key(state->program, out_result->type),
+                                           "map index must match map key type");
+        if (status != VIGIL_STATUS_OK)
+            return status;
+        indexed_type = vigil_program_map_type_value(state->program, out_result->type);
+    }
+    else
+    {
+        return vigil_parser_report(state, span, "index access requires an array or map");
+    }
+
+    status = vigil_parser_emit_opcode(state, VIGIL_OPCODE_GET_INDEX, span);
+    if (status != VIGIL_STATUS_OK)
+        return status;
+    vigil_expression_result_set_type(out_result, indexed_type);
+    return VIGIL_STATUS_OK;
+}
+
 static vigil_status_t vigil_parser_parse_postfix_suffixes(vigil_parser_state_t *state,
                                                           vigil_expression_result_t *out_result)
 {
     vigil_status_t status;
     const vigil_token_t *field_token = NULL;
-    vigil_expression_result_t index_result;
-    vigil_parser_type_t indexed_type;
 
-    field_token = NULL;
-
-    vigil_expression_result_clear(&index_result);
     while (1)
     {
         if (vigil_parser_check(state, VIGIL_TOKEN_LPAREN))
         {
-            status = vigil_parser_require_scalar_expression(state,
-                                                            vigil_parser_previous(state) == NULL
-                                                                ? vigil_parser_fallback_span(state)
-                                                                : vigil_parser_previous(state)->span,
-                                                            out_result, "multi-value expressions do not support calls");
+            status = parse_postfix_call(state, out_result);
             if (status != VIGIL_STATUS_OK)
-            {
                 return status;
-            }
             if (!vigil_parser_type_is_function(out_result->type))
-            {
                 break;
-            }
-            status =
-                vigil_parser_parse_value_call(state,
-                                              vigil_parser_previous(state) == NULL ? vigil_parser_fallback_span(state)
-                                                                                   : vigil_parser_previous(state)->span,
-                                              out_result->type, out_result);
-            if (status != VIGIL_STATUS_OK)
-            {
-                return status;
-            }
             continue;
         }
-
         if (vigil_parser_match(state, VIGIL_TOKEN_DOT))
         {
             status = vigil_parser_parse_postfix_dot(state, field_token, out_result);
             if (status != VIGIL_STATUS_OK)
-            {
                 return status;
-            }
             continue;
         }
-
         if (vigil_parser_match(state, VIGIL_TOKEN_LBRACKET))
         {
-            vigil_expression_result_clear(&index_result);
-            status = vigil_parser_require_scalar_expression(state, vigil_parser_fallback_span(state), out_result,
-                                                            "multi-value expressions do not support indexing");
+            status = parse_postfix_index(state, out_result);
             if (status != VIGIL_STATUS_OK)
-            {
                 return status;
-            }
-            status = vigil_parser_parse_expression(state, &index_result);
-            if (status != VIGIL_STATUS_OK)
-            {
-                return status;
-            }
-            status = vigil_parser_require_scalar_expression(
-                state,
-                vigil_parser_previous(state) == NULL ? vigil_parser_fallback_span(state)
-                                                     : vigil_parser_previous(state)->span,
-                &index_result, "index expressions must evaluate to a single value");
-            if (status != VIGIL_STATUS_OK)
-            {
-                return status;
-            }
-            status = vigil_parser_expect(state, VIGIL_TOKEN_RBRACKET, "expected ']' after index expression", NULL);
-            if (status != VIGIL_STATUS_OK)
-            {
-                return status;
-            }
-
-            indexed_type = vigil_binding_type_invalid();
-            if (vigil_parser_type_is_array(out_result->type))
-            {
-                status =
-                    vigil_parser_require_type(state, vigil_parser_fallback_span(state), index_result.type,
-                                              vigil_binding_type_primitive(VIGIL_TYPE_I32), "array index must be i32");
-                if (status != VIGIL_STATUS_OK)
-                {
-                    return status;
-                }
-                indexed_type = vigil_program_array_type_element(state->program, out_result->type);
-            }
-            else if (vigil_parser_type_is_map(out_result->type))
-            {
-                status = vigil_parser_require_type(state, vigil_parser_fallback_span(state), index_result.type,
-                                                   vigil_program_map_type_key(state->program, out_result->type),
-                                                   "map index must match map key type");
-                if (status != VIGIL_STATUS_OK)
-                {
-                    return status;
-                }
-                indexed_type = vigil_program_map_type_value(state->program, out_result->type);
-            }
-            else
-            {
-                return vigil_parser_report(state, vigil_parser_fallback_span(state),
-                                           "index access requires an array or map");
-            }
-
-            status = vigil_parser_emit_opcode(state, VIGIL_OPCODE_GET_INDEX, vigil_parser_fallback_span(state));
-            if (status != VIGIL_STATUS_OK)
-            {
-                return status;
-            }
-            vigil_expression_result_set_type(out_result, indexed_type);
             continue;
         }
-
         break;
     }
-
     return VIGIL_STATUS_OK;
 }
 
@@ -8729,38 +8710,75 @@ static vigil_status_t vigil_parser_parse_primary_map_literal(vigil_parser_state_
     return VIGIL_STATUS_OK;
 }
 
+static vigil_status_t parse_primary_int_literal(vigil_parser_state_t *state, const vigil_token_t *token,
+                                                vigil_expression_result_t *out_result)
+{
+    vigil_status_t status;
+    vigil_value_t value;
+    vigil_parser_type_t local_type = vigil_binding_type_invalid();
+    vigil_parser_advance(state);
+    status = vigil_parser_parse_int_literal(state, token, &value, &local_type);
+    if (status != VIGIL_STATUS_OK)
+        return status;
+    status = vigil_chunk_write_constant(&state->chunk, &value, token->span, NULL, state->program->error);
+    vigil_value_release(&value);
+    if (status != VIGIL_STATUS_OK)
+        return status;
+    vigil_expression_result_set_type(out_result, local_type);
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t parse_primary_string_literal(vigil_parser_state_t *state, const vigil_token_t *token,
+                                                   vigil_expression_result_t *out_result)
+{
+    vigil_status_t status;
+    vigil_value_t string_value;
+    vigil_parser_advance(state);
+    vigil_value_init_nil(&string_value);
+    status = vigil_program_parse_string_literal_value(state->program, token, &string_value);
+    if (status != VIGIL_STATUS_OK)
+        return status;
+    status = vigil_chunk_write_constant(&state->chunk, &string_value, token->span, NULL, state->program->error);
+    vigil_value_release(&string_value);
+    if (status != VIGIL_STATUS_OK)
+        return status;
+    vigil_expression_result_set_type(out_result, vigil_binding_type_primitive(VIGIL_TYPE_STRING));
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t parse_primary_float_literal(vigil_parser_state_t *state, const vigil_token_t *token,
+                                                  vigil_expression_result_t *out_result)
+{
+    vigil_status_t status;
+    vigil_value_t float_value;
+    vigil_parser_advance(state);
+    vigil_value_init_nil(&float_value);
+    status = vigil_parser_parse_float_literal(state, token, &float_value);
+    if (status != VIGIL_STATUS_OK)
+        return status;
+    status = vigil_chunk_write_constant(&state->chunk, &float_value, token->span, NULL, state->program->error);
+    vigil_value_release(&float_value);
+    if (status != VIGIL_STATUS_OK)
+        return status;
+    vigil_expression_result_set_type(out_result, vigil_binding_type_primitive(VIGIL_TYPE_F64));
+    return VIGIL_STATUS_OK;
+}
+
 static vigil_status_t vigil_parser_parse_primary_base(vigil_parser_state_t *state,
                                                       vigil_expression_result_t *out_result)
 {
     vigil_status_t status;
     const vigil_token_t *token;
-    vigil_value_t value;
     vigil_parser_type_t local_type;
 
-    local_type = vigil_binding_type_invalid();
     token = vigil_parser_peek(state);
     if (token == NULL)
-    {
         return vigil_parser_report(state, vigil_parser_fallback_span(state), "expected expression");
-    }
 
     switch (token->kind)
     {
     case VIGIL_TOKEN_INT_LITERAL:
-        vigil_parser_advance(state);
-        status = vigil_parser_parse_int_literal(state, token, &value, &local_type);
-        if (status != VIGIL_STATUS_OK)
-        {
-            return status;
-        }
-        status = vigil_chunk_write_constant(&state->chunk, &value, token->span, NULL, state->program->error);
-        vigil_value_release(&value);
-        if (status != VIGIL_STATUS_OK)
-        {
-            return status;
-        }
-        vigil_expression_result_set_type(out_result, local_type);
-        return VIGIL_STATUS_OK;
+        return parse_primary_int_literal(state, token, out_result);
     case VIGIL_TOKEN_TRUE:
         vigil_parser_advance(state);
         vigil_expression_result_set_type(out_result, vigil_binding_type_primitive(VIGIL_TYPE_BOOL));
@@ -8774,11 +8792,10 @@ static vigil_status_t vigil_parser_parse_primary_base(vigil_parser_state_t *stat
         vigil_expression_result_set_type(out_result, vigil_binding_type_primitive(VIGIL_TYPE_NIL));
         return vigil_parser_emit_opcode(state, VIGIL_OPCODE_NIL, token->span);
     case VIGIL_TOKEN_FN:
+        local_type = vigil_binding_type_invalid();
         status = vigil_parser_parse_nested_function_value(state, 0, NULL, &local_type, NULL);
         if (status != VIGIL_STATUS_OK)
-        {
             return status;
-        }
         vigil_expression_result_set_type(out_result, local_type);
         return VIGIL_STATUS_OK;
     case VIGIL_TOKEN_IDENTIFIER:
@@ -8791,52 +8808,14 @@ static vigil_status_t vigil_parser_parse_primary_base(vigil_parser_state_t *stat
         vigil_parser_advance(state);
         status = vigil_parser_parse_expression(state, out_result);
         if (status != VIGIL_STATUS_OK)
-        {
             return status;
-        }
         return vigil_parser_expect(state, VIGIL_TOKEN_RPAREN, "expected ')' after expression", NULL);
     case VIGIL_TOKEN_STRING_LITERAL:
     case VIGIL_TOKEN_RAW_STRING_LITERAL:
     case VIGIL_TOKEN_CHAR_LITERAL:
-        vigil_parser_advance(state);
-        {
-            vigil_value_t string_value;
-
-            vigil_value_init_nil(&string_value);
-            status = vigil_program_parse_string_literal_value(state->program, token, &string_value);
-            if (status != VIGIL_STATUS_OK)
-            {
-                return status;
-            }
-            status = vigil_chunk_write_constant(&state->chunk, &string_value, token->span, NULL, state->program->error);
-            vigil_value_release(&string_value);
-            if (status != VIGIL_STATUS_OK)
-            {
-                return status;
-            }
-        }
-        vigil_expression_result_set_type(out_result, vigil_binding_type_primitive(VIGIL_TYPE_STRING));
-        return VIGIL_STATUS_OK;
+        return parse_primary_string_literal(state, token, out_result);
     case VIGIL_TOKEN_FLOAT_LITERAL:
-        vigil_parser_advance(state);
-        {
-            vigil_value_t float_value;
-
-            vigil_value_init_nil(&float_value);
-            status = vigil_parser_parse_float_literal(state, token, &float_value);
-            if (status != VIGIL_STATUS_OK)
-            {
-                return status;
-            }
-            status = vigil_chunk_write_constant(&state->chunk, &float_value, token->span, NULL, state->program->error);
-            vigil_value_release(&float_value);
-            if (status != VIGIL_STATUS_OK)
-            {
-                return status;
-            }
-        }
-        vigil_expression_result_set_type(out_result, vigil_binding_type_primitive(VIGIL_TYPE_F64));
-        return VIGIL_STATUS_OK;
+        return parse_primary_float_literal(state, token, out_result);
     case VIGIL_TOKEN_FSTRING_LITERAL:
         vigil_parser_advance(state);
         return vigil_parser_parse_fstring_literal(state, token, out_result);
@@ -13338,26 +13317,15 @@ static vigil_status_t emit_repl_synthetic_return(vigil_parser_state_t *state, vi
     return emit_opcode_u32(state, VIGIL_OPCODE_RETURN, 1U, span);
 }
 
-static vigil_status_t vigil_compile_function_with_parent(vigil_program_state_t *program, size_t function_index,
-                                                         const vigil_parser_state_t *parent_state)
+static vigil_status_t try_compile_constructor_or_extern(vigil_program_state_t *program, size_t function_index,
+                                                        int *handled)
 {
-    vigil_status_t status;
-    vigil_parser_state_t state;
-    vigil_function_decl_t *decl;
-    vigil_object_t *object;
-    vigil_statement_result_t body_result;
     size_t class_index;
-
-    decl = &program->functions.functions[function_index];
-    if (decl->object != NULL)
-        return VIGIL_STATUS_OK;
-
+    *handled = 0;
     for (class_index = 0U; class_index < program->class_count; class_index += 1U)
     {
-        const vigil_class_decl_t *class_decl;
+        const vigil_class_decl_t *class_decl = &program->classes[class_index];
         const vigil_class_method_t *init_method;
-
-        class_decl = &program->classes[class_index];
         if (class_decl->constructor_function_index != function_index)
             continue;
         init_method = NULL;
@@ -13366,14 +13334,28 @@ static vigil_status_t vigil_compile_function_with_parent(vigil_program_state_t *
             vigil_error_set_literal(program->error, VIGIL_STATUS_INTERNAL, "class init declaration is missing");
             return VIGIL_STATUS_INTERNAL;
         }
+        *handled = 1;
         return vigil_compile_synthetic_constructor(program, function_index, class_index, init_method->function_index);
     }
-
     for (size_t ei = 0; ei < program->extern_fn_count; ei++)
     {
         if (program->extern_fns[ei].function_index == function_index)
+        {
+            *handled = 1;
             return vigil_compile_extern_fn(program, function_index, &program->extern_fns[ei]);
+        }
     }
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t compile_function_body(vigil_program_state_t *program, size_t function_index,
+                                            const vigil_parser_state_t *parent_state)
+{
+    vigil_status_t status;
+    vigil_parser_state_t state;
+    vigil_function_decl_t *decl = &program->functions.functions[function_index];
+    vigil_object_t *object;
+    vigil_statement_result_t body_result;
 
     memset(&state, 0, sizeof(state));
     vigil_program_set_module_context(program, decl->source, decl->tokens);
@@ -13444,6 +13426,24 @@ cleanup:
     vigil_chunk_free(&state.chunk);
     vigil_parser_state_free(&state);
     return status;
+}
+
+static vigil_status_t vigil_compile_function_with_parent(vigil_program_state_t *program, size_t function_index,
+                                                         const vigil_parser_state_t *parent_state)
+{
+    vigil_status_t status;
+    vigil_function_decl_t *decl;
+    int handled = 0;
+
+    decl = &program->functions.functions[function_index];
+    if (decl->object != NULL)
+        return VIGIL_STATUS_OK;
+
+    status = try_compile_constructor_or_extern(program, function_index, &handled);
+    if (handled || status != VIGIL_STATUS_OK)
+        return status;
+
+    return compile_function_body(program, function_index, parent_state);
 }
 
 static vigil_status_t vigil_compile_function(vigil_program_state_t *program, size_t function_index)
