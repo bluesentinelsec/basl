@@ -3,6 +3,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "internal/vigil_internal.h"
+
 void vigil_native_registry_init(vigil_native_registry_t *registry)
 {
     if (registry == NULL)
@@ -10,6 +12,7 @@ void vigil_native_registry_init(vigil_native_registry_t *registry)
         return;
     }
     memset(registry, 0, sizeof(*registry));
+    registry->allocator = vigil_default_allocator();
 }
 
 void vigil_native_registry_free(vigil_native_registry_t *registry)
@@ -18,7 +21,7 @@ void vigil_native_registry_free(vigil_native_registry_t *registry)
     {
         return;
     }
-    free(registry->modules);
+    registry->allocator.deallocate(registry->allocator.user_data, registry->modules);
     memset(registry, 0, sizeof(*registry));
 }
 
@@ -36,7 +39,8 @@ vigil_status_t vigil_native_registry_add(vigil_native_registry_t *registry, cons
         const vigil_native_module_t **new_buf;
 
         new_cap = registry->module_capacity < 8U ? 8U : registry->module_capacity * 2U;
-        new_buf = (const vigil_native_module_t **)realloc(registry->modules, new_cap * sizeof(*new_buf));
+        new_buf = (const vigil_native_module_t **)registry->allocator.reallocate(
+            registry->allocator.user_data, registry->modules, new_cap * sizeof(*new_buf));
         if (new_buf == NULL)
         {
             return VIGIL_STATUS_OUT_OF_MEMORY;

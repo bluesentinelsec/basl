@@ -4155,13 +4155,16 @@ static vigil_status_t grow_extern_fn_table(vigil_program_state_t *program)
         return VIGIL_STATUS_OK;
     {
         size_t new_cap = program->extern_fn_capacity == 0U ? 4U : program->extern_fn_capacity * 2U;
-        vigil_extern_fn_decl_t *new_arr = realloc(program->extern_fns, new_cap * sizeof(*new_arr));
-        if (!new_arr)
-        {
-            vigil_error_set_literal(program->error, VIGIL_STATUS_OUT_OF_MEMORY, "extern fn table alloc failed");
-            return VIGIL_STATUS_OUT_OF_MEMORY;
-        }
-        program->extern_fns = new_arr;
+        size_t new_size = new_cap * sizeof(*program->extern_fns);
+        void *mem = program->extern_fns;
+        vigil_status_t s;
+        if (mem == NULL)
+            s = vigil_runtime_alloc(program->registry->runtime, new_size, &mem, program->error);
+        else
+            s = vigil_runtime_realloc(program->registry->runtime, &mem, new_size, program->error);
+        if (s != VIGIL_STATUS_OK)
+            return s;
+        program->extern_fns = mem;
         program->extern_fn_capacity = new_cap;
     }
     return VIGIL_STATUS_OK;
@@ -13190,12 +13193,12 @@ static vigil_status_t vigil_compile_extern_fn(vigil_program_state_t *program, si
         size_t name_len = strlen(ext->c_name);
         size_t sig_len = strlen(ext->sig);
         size_t desc_len = lib_len + 1 + name_len + 1 + sig_len;
-        char *desc = malloc(desc_len + 1);
-        if (!desc)
-        {
-            status = VIGIL_STATUS_OUT_OF_MEMORY;
+        char *desc = NULL;
+        void *desc_mem = NULL;
+        status = vigil_runtime_alloc(program->registry->runtime, desc_len + 1, &desc_mem, program->error);
+        if (status != VIGIL_STATUS_OK)
             goto cleanup;
-        }
+        desc = desc_mem;
         char *p = desc;
         memcpy(p, ext->lib_path, lib_len);
         p += lib_len;
@@ -13209,7 +13212,10 @@ static vigil_status_t vigil_compile_extern_fn(vigil_program_state_t *program, si
 
         vigil_object_t *str_obj = NULL;
         status = vigil_string_object_new(program->registry->runtime, desc, desc_len, &str_obj, program->error);
-        free(desc);
+        {
+            void *tmp = desc;
+            vigil_runtime_free(program->registry->runtime, &tmp);
+        }
         if (status != VIGIL_STATUS_OK)
             goto cleanup;
 

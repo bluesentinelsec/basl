@@ -3,6 +3,7 @@
 
 #include <stddef.h>
 
+#include "vigil/allocator.h"
 #include "vigil/debug_info.h"
 #include "vigil/diagnostic.h"
 #include "vigil/export.h"
@@ -30,18 +31,9 @@ extern "C"
     } vigil_native_type_t;
 
 /* Helper macros for defining native types */
-#define VIGIL_NATIVE_TYPE_PRIMITIVE(k)                                                                                 \
-    {                                                                                                                  \
-        (k), 0, 0, 0, 0                                                                                                \
-    }
-#define VIGIL_NATIVE_TYPE_ARRAY(elem)                                                                                  \
-    {                                                                                                                  \
-        VIGIL_TYPE_OBJECT, 4, (elem), 0, 0                                                                             \
-    }
-#define VIGIL_NATIVE_TYPE_MAP(k, v)                                                                                    \
-    {                                                                                                                  \
-        VIGIL_TYPE_OBJECT, 5, 0, (k), (v)                                                                              \
-    }
+#define VIGIL_NATIVE_TYPE_PRIMITIVE(k) {(k), 0, 0, 0, 0}
+#define VIGIL_NATIVE_TYPE_ARRAY(elem) {VIGIL_TYPE_OBJECT, 4, (elem), 0, 0}
+#define VIGIL_NATIVE_TYPE_MAP(k, v) {VIGIL_TYPE_OBJECT, 5, 0, (k), (v)}
 
     /**
      * Describes one function exported by a native module.
@@ -130,6 +122,7 @@ extern "C"
         const vigil_native_module_t **modules;
         size_t module_count;
         size_t module_capacity;
+        vigil_allocator_t allocator;
     } vigil_native_registry_t;
 
     VIGIL_API void vigil_native_registry_init(vigil_native_registry_t *registry);
@@ -145,7 +138,7 @@ extern "C"
 #define VIGIL_NATIVE_SOURCE_ID_BASE ((vigil_source_id_t)0xFFFF0000U)
 #define VIGIL_NATIVE_SOURCE_ID(idx) (VIGIL_NATIVE_SOURCE_ID_BASE + (vigil_source_id_t)(idx))
 #define VIGIL_IS_NATIVE_SOURCE_ID(id) ((id) >= VIGIL_NATIVE_SOURCE_ID_BASE)
-#define VIGIL_NATIVE_SOURCE_INDEX(id) ((size_t)((id)-VIGIL_NATIVE_SOURCE_ID_BASE))
+#define VIGIL_NATIVE_SOURCE_INDEX(id) ((size_t)((id) - VIGIL_NATIVE_SOURCE_ID_BASE))
 
     /**
      * Extended compile API that accepts a native module registry.

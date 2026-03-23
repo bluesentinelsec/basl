@@ -482,7 +482,19 @@ char *vigil_semantic_type_to_string(const vigil_semantic_index_t *index, vigil_s
     }
 
     len = strlen(name);
-    result = malloc(len + 1);
+    {
+        void *mem = NULL;
+        if (index != NULL && index->runtime != NULL)
+        {
+            if (vigil_runtime_alloc(index->runtime, len + 1, &mem, NULL) != VIGIL_STATUS_OK)
+                return NULL;
+        }
+        else
+        {
+            mem = malloc(len + 1);
+        }
+        result = mem;
+    }
     if (result != NULL)
     {
         memcpy(result, name, len + 1);
@@ -640,14 +652,20 @@ vigil_status_t vigil_semantic_index_references_at(const vigil_semantic_index_t *
                 if (ref_count >= ref_capacity)
                 {
                     size_t new_cap = ref_capacity == 0 ? 8 : ref_capacity * 2;
-                    vigil_semantic_reference_t *new_refs = realloc(refs, new_cap * sizeof(*refs));
-                    if (new_refs == NULL)
+                    size_t new_size = new_cap * sizeof(*refs);
+                    void *mem = refs;
+                    vigil_status_t s;
+                    if (mem == NULL)
+                        s = vigil_runtime_alloc(index->runtime, new_size, &mem, error);
+                    else
+                        s = vigil_runtime_realloc(index->runtime, &mem, new_size, error);
+                    if (s != VIGIL_STATUS_OK)
                     {
-                        free(refs);
-                        vigil_error_set_literal(error, VIGIL_STATUS_OUT_OF_MEMORY, "out of memory");
-                        return VIGIL_STATUS_OUT_OF_MEMORY;
+                        void *old = refs;
+                        vigil_runtime_free(index->runtime, &old);
+                        return s;
                     }
-                    refs = new_refs;
+                    refs = mem;
                     ref_capacity = new_cap;
                 }
 
