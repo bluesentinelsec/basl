@@ -6,9 +6,9 @@
 #include <string.h>
 
 #define WIN32_LEAN_AND_MEAN
+#include <windows.h>
 #include <direct.h>
 #include <wincrypt.h>
-#include <windows.h>
 
 #include "internal/vigil_internal.h"
 
