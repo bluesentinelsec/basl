@@ -8924,6 +8924,48 @@ static vigil_status_t emit_typed_binop(vigil_parser_state_t *state, vigil_opcode
                      : vigil_parser_emit_opcode(state, generic_op, span);
 }
 
+static vigil_status_t validate_binary_operands(vigil_parser_state_t *state, vigil_source_span_t operator_span,
+                                               vigil_expression_result_t *left, vigil_expression_result_t *right)
+{
+    vigil_status_t status;
+    status = vigil_parser_require_scalar_expression(state, operator_span, left,
+                                                    "multi-value expressions cannot be used with binary operators");
+    if (status != VIGIL_STATUS_OK)
+        return status;
+    return vigil_parser_require_scalar_expression(state, operator_span, right,
+                                                  "multi-value expressions cannot be used with binary operators");
+}
+
+static vigil_status_t factor_validate_operator(vigil_parser_state_t *state, vigil_token_kind_t operator_kind,
+                                               vigil_source_span_t operator_span, vigil_parser_type_t left_type,
+                                               vigil_parser_type_t right_type)
+{
+    if (operator_kind == VIGIL_TOKEN_PERCENT)
+        return vigil_parser_require_i32_operands(state, operator_span, left_type, right_type,
+                                                 VIGIL_BINARY_OPERATOR_MODULO,
+                                                 "modulo requires matching integer operands");
+    if (!vigil_parser_type_supports_binary_operator(operator_kind == VIGIL_TOKEN_STAR ? VIGIL_BINARY_OPERATOR_MULTIPLY
+                                                                                      : VIGIL_BINARY_OPERATOR_DIVIDE,
+                                                    left_type, right_type))
+        return vigil_parser_report(state, operator_span,
+                                   "arithmetic operators require matching integer or f64 operands");
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t factor_emit_op(vigil_parser_state_t *state, vigil_token_kind_t operator_kind,
+                                     vigil_parser_type_t left_type, vigil_parser_type_t right_type,
+                                     vigil_source_span_t span, size_t pre_left_size)
+{
+    if (operator_kind == VIGIL_TOKEN_STAR)
+        return emit_typed_binop(state, VIGIL_OPCODE_MULTIPLY_I64, VIGIL_OPCODE_MULTIPLY, left_type, right_type, span,
+                                pre_left_size);
+    if (operator_kind == VIGIL_TOKEN_SLASH)
+        return emit_typed_binop(state, VIGIL_OPCODE_DIVIDE_I64, VIGIL_OPCODE_DIVIDE, left_type, right_type, span,
+                                pre_left_size);
+    return emit_typed_binop(state, VIGIL_OPCODE_MODULO_I64, VIGIL_OPCODE_MODULO, left_type, right_type, span,
+                            pre_left_size);
+}
+
 static vigil_status_t vigil_parser_parse_factor(vigil_parser_state_t *state, vigil_expression_result_t *out_result)
 {
     vigil_status_t status;
@@ -8939,96 +8981,38 @@ static vigil_status_t vigil_parser_parse_factor(vigil_parser_state_t *state, vig
     pre_left_size = state->chunk.code.length;
     status = vigil_parser_parse_unary(state, &left_result);
     if (status != VIGIL_STATUS_OK)
-    {
         return status;
-    }
 
     while (1)
     {
         if (vigil_parser_check(state, VIGIL_TOKEN_STAR))
-        {
             operator_kind = VIGIL_TOKEN_STAR;
-        }
         else if (vigil_parser_check(state, VIGIL_TOKEN_SLASH))
-        {
             operator_kind = VIGIL_TOKEN_SLASH;
-        }
         else if (vigil_parser_check(state, VIGIL_TOKEN_PERCENT))
-        {
             operator_kind = VIGIL_TOKEN_PERCENT;
-        }
         else
-        {
             break;
-        }
 
         operator_span = vigil_parser_advance(state)->span;
         status = vigil_parser_parse_unary(state, &right_result);
         if (status != VIGIL_STATUS_OK)
-        {
             return status;
-        }
-        status = vigil_parser_require_scalar_expression(state, operator_span, &left_result,
-                                                        "multi-value expressions cannot be used with binary operators");
+        status = validate_binary_operands(state, operator_span, &left_result, &right_result);
         if (status != VIGIL_STATUS_OK)
-        {
             return status;
-        }
-        status = vigil_parser_require_scalar_expression(state, operator_span, &right_result,
-                                                        "multi-value expressions cannot be used with binary operators");
+        status = factor_validate_operator(state, operator_kind, operator_span, left_result.type, right_result.type);
         if (status != VIGIL_STATUS_OK)
-        {
             return status;
-        }
-        if (operator_kind == VIGIL_TOKEN_PERCENT)
-        {
-            status = vigil_parser_require_i32_operands(state, operator_span, left_result.type, right_result.type,
-                                                       VIGIL_BINARY_OPERATOR_MODULO,
-                                                       "modulo requires matching integer operands");
-        }
-        else if (!vigil_parser_type_supports_binary_operator(
-                     operator_kind == VIGIL_TOKEN_STAR ? VIGIL_BINARY_OPERATOR_MULTIPLY : VIGIL_BINARY_OPERATOR_DIVIDE,
-                     left_result.type, right_result.type))
-        {
-            status = vigil_parser_report(state, operator_span,
-                                         "arithmetic operators require matching integer or f64 operands");
-        }
-        else
-        {
-            status = VIGIL_STATUS_OK;
-        }
+        status =
+            factor_emit_op(state, operator_kind, left_result.type, right_result.type, operator_span, pre_left_size);
         if (status != VIGIL_STATUS_OK)
-        {
             return status;
-        }
-
-        if (operator_kind == VIGIL_TOKEN_STAR)
-        {
-            status = emit_typed_binop(state, VIGIL_OPCODE_MULTIPLY_I64, VIGIL_OPCODE_MULTIPLY, left_result.type,
-                                      right_result.type, operator_span, pre_left_size);
-        }
-        else if (operator_kind == VIGIL_TOKEN_SLASH)
-        {
-            status = emit_typed_binop(state, VIGIL_OPCODE_DIVIDE_I64, VIGIL_OPCODE_DIVIDE, left_result.type,
-                                      right_result.type, operator_span, pre_left_size);
-        }
-        else
-        {
-            status = emit_typed_binop(state, VIGIL_OPCODE_MODULO_I64, VIGIL_OPCODE_MODULO, left_result.type,
-                                      right_result.type, operator_span, pre_left_size);
-        }
-        if (status != VIGIL_STATUS_OK)
-        {
-            return status;
-        }
-        /* i32 opcodes already produce i32 results — skip the cast. */
         if (!vigil_parser_type_is_i32(left_result.type) || !vigil_parser_type_is_i32(right_result.type))
         {
             status = vigil_parser_emit_integer_cast(state, left_result.type, operator_span);
             if (status != VIGIL_STATUS_OK)
-            {
                 return status;
-            }
         }
     }
 
@@ -9051,43 +9035,24 @@ static vigil_status_t vigil_parser_parse_term(vigil_parser_state_t *state, vigil
     pre_left_size = state->chunk.code.length;
     status = vigil_parser_parse_factor(state, &left_result);
     if (status != VIGIL_STATUS_OK)
-    {
         return status;
-    }
 
     while (1)
     {
         if (vigil_parser_check(state, VIGIL_TOKEN_PLUS))
-        {
             operator_kind = VIGIL_TOKEN_PLUS;
-        }
         else if (vigil_parser_check(state, VIGIL_TOKEN_MINUS))
-        {
             operator_kind = VIGIL_TOKEN_MINUS;
-        }
         else
-        {
             break;
-        }
 
         operator_span = vigil_parser_advance(state)->span;
         status = vigil_parser_parse_factor(state, &right_result);
         if (status != VIGIL_STATUS_OK)
-        {
             return status;
-        }
-        status = vigil_parser_require_scalar_expression(state, operator_span, &left_result,
-                                                        "multi-value expressions cannot be used with binary operators");
+        status = validate_binary_operands(state, operator_span, &left_result, &right_result);
         if (status != VIGIL_STATUS_OK)
-        {
             return status;
-        }
-        status = vigil_parser_require_scalar_expression(state, operator_span, &right_result,
-                                                        "multi-value expressions cannot be used with binary operators");
-        if (status != VIGIL_STATUS_OK)
-        {
-            return status;
-        }
         if (!vigil_parser_type_supports_binary_operator(
                 operator_kind == VIGIL_TOKEN_PLUS ? VIGIL_BINARY_OPERATOR_ADD : VIGIL_BINARY_OPERATOR_SUBTRACT,
                 left_result.type, right_result.type))
@@ -9105,9 +9070,7 @@ static vigil_status_t vigil_parser_parse_term(vigil_parser_state_t *state, vigil
                 emit_typed_binop(state, op, gen_op, left_result.type, right_result.type, operator_span, pre_left_size);
         }
         if (status != VIGIL_STATUS_OK)
-        {
             return status;
-        }
         if (operator_kind == VIGIL_TOKEN_PLUS &&
             vigil_parser_type_equal(left_result.type, vigil_binding_type_primitive(VIGIL_TYPE_STRING)))
         {
@@ -9117,9 +9080,7 @@ static vigil_status_t vigil_parser_parse_term(vigil_parser_state_t *state, vigil
         {
             status = vigil_parser_emit_integer_cast(state, left_result.type, operator_span);
             if (status != VIGIL_STATUS_OK)
-            {
                 return status;
-            }
         }
     }
 
