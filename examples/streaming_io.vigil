@@ -1,0 +1,71 @@
+import "fmt";
+import "fs";
+
+fn main() -> i32 {
+    // ── Write a file line by line with fs.Writer ──────────────────
+    fs.Writer w, error open_err = fs.Writer.open("greetings.txt");
+    if (open_err.kind != error.ok) {
+        fmt.println(f"open writer: {open_err.message}");
+        return 1;
+    }
+
+    array<string> names = ["Alice", "Bob", "Carol"];
+    for name in names {
+        i32 n, error write_err = w.write_line(f"Hello, {name}!");
+        if (write_err.kind != error.ok) {
+            fmt.println(f"write: {write_err.message}");
+            w.close();
+            return 1;
+        }
+    }
+    w.close();
+
+    // ── Read it back line by line with fs.Reader ──────────────────
+    fs.Reader r, error read_open_err = fs.Reader.open("greetings.txt");
+    if (read_open_err.kind != error.ok) {
+        fmt.println(f"open reader: {read_open_err.message}");
+        return 1;
+    }
+
+    fmt.println("Lines from file:");
+    bool running = true;
+    while (running) {
+        string line, error line_err = r.read_line();
+        if (line_err.kind == error.eof) {
+            running = false;
+        } else if (line_err.kind != error.ok) {
+            fmt.println(f"read_line: {line_err.message}");
+            r.close();
+            return 1;
+        } else {
+            fmt.println(f"  {line}");
+        }
+    }
+    r.close();
+
+    // ── Append a footer and read the whole file ───────────────────
+    fs.Writer wa, error append_err = fs.Writer.open_append("greetings.txt");
+    if (append_err.kind != error.ok) {
+        fmt.println(f"open_append: {append_err.message}");
+        return 1;
+    }
+    wa.write_line("--- end of greetings ---");
+    wa.close();
+
+    fs.Reader r2, error r2_err = fs.Reader.open("greetings.txt");
+    if (r2_err.kind != error.ok) {
+        fmt.println(f"open reader2: {r2_err.message}");
+        return 1;
+    }
+    string all, error all_err = r2.read_all();
+    r2.close();
+
+    if (all_err.kind != error.ok) {
+        fmt.println(f"read_all: {all_err.message}");
+        return 1;
+    }
+    fmt.println(f"\nFull file:\n{all}");
+
+    fs.remove("greetings.txt");
+    return 0;
+}

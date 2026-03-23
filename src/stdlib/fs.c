@@ -18,6 +18,7 @@
 #include "vigil/value.h"
 #include "vigil/vm.h"
 
+#include "internal/vigil_internal.h"
 #include "internal/vigil_nanbox.h"
 
 /* ── Helpers ─────────────────────────────────────────────────────── */
@@ -1084,4 +1085,699 @@ static const vigil_native_module_function_t vigil_fs_functions[] = {
 
 #define FS_FUNCTION_COUNT (sizeof(vigil_fs_functions) / sizeof(vigil_fs_functions[0]))
 
-VIGIL_API const vigil_native_module_t vigil_stdlib_fs = {"fs", 2U, vigil_fs_functions, FS_FUNCTION_COUNT, NULL, 0U};
+/* ── Streaming I/O: Reader and Writer classes ─────────────────────
+ *
+ * Reader: buffered line-by-line and block reading from a file.
+ * Writer: buffered writing and appending to a file.
+ *
+ * Both use the handle-registry pattern from thread.c — opaque C structs
+ * owned by a global registry, with an i64 handle stored as the sole
+ * instance field.  This avoids exposing raw FILE* into the Vigil value
+ * system and makes cleanup straightforward.
+ */
+
+/* ── Error-kind constants (from compiler.c vigil_builtin_error_kind_by_name) */
+#define FS_ERR_NOT_FOUND 1
+#define FS_ERR_IO        5
+#define FS_ERR_EOF       4
+
+/* ── Reader ──────────────────────────────────────────────────────── */
+
+#define READER_LINE_BUF 65536 /* max line length for read_line() */
+
+typedef struct
+{
+    FILE  *fp;
+    char  *line_buf;     /* heap buffer used by read_line()  */
+    int    eof_reached;
+    int    closed;
+} fs_reader_t;
+
+enum { RF_HANDLE = 0, READER_FIELD_COUNT };
+
+/* ── Writer ──────────────────────────────────────────────────────── */
+
+typedef struct
+{
+    FILE *fp;
+    int   closed;
+} fs_writer_t;
+
+enum { WF_HANDLE = 0, WRITER_FIELD_COUNT };
+
+/* ── Shared registry (reuses thread.c handle_registry_t pattern) ── */
+
+#define FS_REGISTRY_INITIAL 64
+
+typedef struct
+{
+    void                   **items;
+    int64_t                  count;
+    int64_t                  capacity;
+    vigil_platform_mutex_t  *lock;
+} fs_handle_registry_t;
+
+static fs_handle_registry_t g_readers;
+static fs_handle_registry_t g_writers;
+static volatile int64_t     g_stream_registries_state = 0;
+
+static vigil_status_t fs_registry_init(fs_handle_registry_t *r, vigil_runtime_t *rt, vigil_error_t *error)
+{
+    vigil_status_t st;
+    r->capacity = FS_REGISTRY_INITIAL;
+    r->count    = 0;
+    st = vigil_runtime_alloc(rt, (size_t)r->capacity * sizeof(void *), (void **)&r->items, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    st = vigil_platform_mutex_create(&r->lock, error);
+    if (st != VIGIL_STATUS_OK)
+        vigil_runtime_free(rt, (void **)&r->items);
+    return st;
+}
+
+static vigil_status_t fs_registry_alloc(fs_handle_registry_t *r, vigil_runtime_t *rt, int64_t *out_handle,
+                                         vigil_error_t *error)
+{
+    vigil_platform_mutex_lock(r->lock);
+    if (r->count == r->capacity)
+    {
+        int64_t  new_cap   = r->capacity * 2;
+        void   **new_items = NULL;
+        vigil_status_t st  = vigil_runtime_alloc(rt, (size_t)new_cap * sizeof(void *), (void **)&new_items, error);
+        if (st != VIGIL_STATUS_OK)
+        {
+            vigil_platform_mutex_unlock(r->lock);
+            return st;
+        }
+        memcpy(new_items, r->items, (size_t)r->capacity * sizeof(void *));
+        vigil_runtime_free(rt, (void **)&r->items);
+        r->items    = new_items;
+        r->capacity = new_cap;
+    }
+    *out_handle = r->count++;
+    vigil_platform_mutex_unlock(r->lock);
+    return VIGIL_STATUS_OK;
+}
+
+static void *fs_registry_get(fs_handle_registry_t *r, int64_t handle)
+{
+    void *val = NULL;
+    vigil_platform_mutex_lock(r->lock);
+    if (handle >= 0 && handle < r->count)
+        val = r->items[handle];
+    vigil_platform_mutex_unlock(r->lock);
+    return val;
+}
+
+static void fs_registry_set(fs_handle_registry_t *r, int64_t handle, void *val)
+{
+    vigil_platform_mutex_lock(r->lock);
+    if (handle >= 0 && handle < r->count)
+        r->items[handle] = val;
+    vigil_platform_mutex_unlock(r->lock);
+}
+
+static vigil_status_t ensure_stream_registries(vigil_runtime_t *rt, vigil_error_t *error)
+{
+    for (;;)
+    {
+        int64_t state = vigil_atomic_load(&g_stream_registries_state);
+        if (state == 2)
+            return VIGIL_STATUS_OK;
+        if (state == 0 && vigil_atomic_cas(&g_stream_registries_state, 0, 1))
+        {
+            vigil_status_t st = fs_registry_init(&g_readers, rt, error);
+            if (st == VIGIL_STATUS_OK)
+                st = fs_registry_init(&g_writers, rt, error);
+            if (st != VIGIL_STATUS_OK)
+            {
+                vigil_atomic_store(&g_stream_registries_state, 0);
+                return st;
+            }
+            vigil_atomic_store(&g_stream_registries_state, 2);
+            return VIGIL_STATUS_OK;
+        }
+        vigil_platform_thread_yield();
+    }
+}
+
+/* ── Helpers shared by Reader and Writer ─────────────────────────── */
+
+static vigil_object_t *get_self_obj(vigil_vm_t *vm, size_t base)
+{
+    vigil_value_t v = vigil_vm_stack_get(vm, base);
+    return (vigil_object_t *)vigil_nanbox_decode_ptr(v);
+}
+
+static int64_t get_handle_field(vigil_object_t *self, size_t field_idx)
+{
+    vigil_value_t v;
+    vigil_instance_object_get_field(self, field_idx, &v);
+    return vigil_nanbox_decode_int(v);
+}
+
+/* Push a Vigil err value with the given kind onto the stack. */
+static vigil_status_t push_err_kind(vigil_vm_t *vm, const char *msg, int64_t kind, vigil_error_t *error)
+{
+    vigil_object_t *obj = NULL;
+    vigil_status_t  st  = vigil_error_object_new_cstr(vigil_vm_runtime(vm), msg, kind, &obj, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    vigil_value_t v;
+    vigil_value_init_object(&v, &obj);
+    st = vigil_vm_stack_push(vm, &v, error);
+    vigil_value_release(&v);
+    return st;
+}
+
+/* Push an empty string followed by an error kind — for (string, err) fail paths. */
+static vigil_status_t push_empty_str_and_err(vigil_vm_t *vm, const char *msg, int64_t kind, vigil_error_t *error)
+{
+    vigil_status_t st = push_string(vm, "", 0, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return push_err_kind(vm, msg, kind, error);
+}
+
+/* Push an i32 followed by an error kind — for (i32, err) fail paths. */
+static vigil_status_t push_zero_and_err(vigil_vm_t *vm, const char *msg, int64_t kind, vigil_error_t *error)
+{
+    vigil_status_t st = push_i64(vm, 0, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return push_err_kind(vm, msg, kind, error);
+}
+
+/* Push a nil object followed by an error kind — for (Reader/Writer, err) fail paths. */
+static vigil_status_t push_nil_and_err(vigil_vm_t *vm, const char *msg, int64_t kind, vigil_error_t *error)
+{
+    vigil_value_t nil;
+    vigil_value_init_nil(&nil);
+    vigil_status_t st = vigil_vm_stack_push(vm, &nil, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return push_err_kind(vm, msg, kind, error);
+}
+
+/* Push a string result followed by ok — success path for (string, err). */
+static vigil_status_t push_str_and_ok(vigil_vm_t *vm, const char *str, size_t len, vigil_error_t *error)
+{
+    vigil_status_t st = push_string(vm, str, len, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return vigil_runtime_push_ok_error(vigil_vm_runtime(vm), vm, error);
+}
+
+/* Push an i32 result followed by ok — success path for (i32, err). */
+static vigil_status_t push_i32_and_ok(vigil_vm_t *vm, int64_t n, vigil_error_t *error)
+{
+    vigil_status_t st = push_i64(vm, n, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return vigil_runtime_push_ok_error(vigil_vm_runtime(vm), vm, error);
+}
+
+/* ── Reader implementation ───────────────────────────────────────── */
+
+static vigil_status_t reader_open(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    /* Stack (is_static=1): [class_index, path_string] */
+    size_t         base = vigil_vm_stack_depth(vm) - arg_count;
+    size_t         ci   = (size_t)vigil_nanbox_decode_i32(vigil_vm_stack_get(vm, base));
+    vigil_runtime_t *rt = vigil_vm_runtime(vm);
+    vigil_status_t  st;
+    const char     *path;
+    size_t          path_len;
+    fs_reader_t    *rd   = NULL;
+    int64_t         handle;
+    vigil_value_t   field;
+    vigil_object_t *inst = NULL;
+    vigil_value_t   result;
+
+    st = ensure_stream_registries(rt, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+
+    if (!get_string_arg(vm, base, 1, &path, &path_len))
+    {
+        vigil_vm_stack_pop_n(vm, arg_count);
+        return push_nil_and_err(vm, "open_reader: invalid path argument", FS_ERR_IO, error);
+    }
+
+    st = vigil_runtime_alloc(rt, sizeof(fs_reader_t), (void **)&rd, error);
+    if (st != VIGIL_STATUS_OK)
+    {
+        vigil_vm_stack_pop_n(vm, arg_count);
+        return push_nil_and_err(vm, "open_reader: out of memory", FS_ERR_IO, error);
+    }
+
+    st = vigil_runtime_alloc(rt, READER_LINE_BUF, (void **)&rd->line_buf, error);
+    if (st != VIGIL_STATUS_OK)
+    {
+        vigil_runtime_free(rt, (void **)&rd);
+        vigil_vm_stack_pop_n(vm, arg_count);
+        return push_nil_and_err(vm, "open_reader: out of memory", FS_ERR_IO, error);
+    }
+
+#ifdef _WIN32
+    {
+        errno_t fe = fopen_s(&rd->fp, path, "r");
+        if (fe != 0)
+            rd->fp = NULL;
+    }
+#else
+    rd->fp = fopen(path, "r");
+#endif
+    if (rd->fp == NULL)
+    {
+        vigil_runtime_free(rt, (void **)&rd->line_buf);
+        vigil_runtime_free(rt, (void **)&rd);
+        vigil_vm_stack_pop_n(vm, arg_count);
+        return push_nil_and_err(vm, "open_reader: file not found", FS_ERR_NOT_FOUND, error);
+    }
+
+    st = fs_registry_alloc(&g_readers, rt, &handle, error);
+    if (st != VIGIL_STATUS_OK)
+    {
+        fclose(rd->fp);
+        vigil_runtime_free(rt, (void **)&rd->line_buf);
+        vigil_runtime_free(rt, (void **)&rd);
+        vigil_vm_stack_pop_n(vm, arg_count);
+        return push_nil_and_err(vm, "open_reader: registry alloc failed", FS_ERR_IO, error);
+    }
+    fs_registry_set(&g_readers, handle, rd);
+
+    vigil_value_init_int(&field, handle);
+    st = vigil_instance_object_new(rt, ci, &field, READER_FIELD_COUNT, &inst, error);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+
+    vigil_value_init_object(&result, &inst);
+    st = vigil_vm_stack_push(vm, &result, error);
+    vigil_value_release(&result);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return vigil_runtime_push_ok_error(rt, vm, error);
+}
+
+static vigil_status_t reader_read_line(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    /* Stack: [self] */
+    size_t         base = vigil_vm_stack_depth(vm) - arg_count;
+    vigil_object_t *self = get_self_obj(vm, base);
+    int64_t         handle;
+    fs_reader_t    *rd;
+    char           *got;
+    size_t          len;
+
+    vigil_vm_stack_pop_n(vm, arg_count);
+
+    if (self == NULL)
+        return push_empty_str_and_err(vm, "read_line: invalid reader", FS_ERR_IO, error);
+
+    handle = get_handle_field(self, RF_HANDLE);
+    rd     = (fs_reader_t *)fs_registry_get(&g_readers, handle);
+    if (rd == NULL || rd->closed)
+        return push_empty_str_and_err(vm, "read_line: reader is closed", FS_ERR_IO, error);
+    if (rd->eof_reached)
+        return push_empty_str_and_err(vm, "", FS_ERR_EOF, error);
+
+    got = fgets(rd->line_buf, READER_LINE_BUF, rd->fp);
+    if (got == NULL)
+    {
+        rd->eof_reached = 1;
+        return push_empty_str_and_err(vm, "", FS_ERR_EOF, error);
+    }
+
+    len = strlen(rd->line_buf);
+    /* Strip trailing newline so callers receive clean lines. */
+    if (len > 0 && rd->line_buf[len - 1] == '\n')
+    {
+        rd->line_buf[--len] = '\0';
+        if (len > 0 && rd->line_buf[len - 1] == '\r')
+            rd->line_buf[--len] = '\0';
+    }
+
+    return push_str_and_ok(vm, rd->line_buf, len, error);
+}
+
+static vigil_status_t reader_read_bytes(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    /* Stack: [self, n_i32] */
+    size_t         base = vigil_vm_stack_depth(vm) - arg_count;
+    vigil_object_t *self = get_self_obj(vm, base);
+    int64_t         n    = vigil_nanbox_decode_int(vigil_vm_stack_get(vm, base + 1));
+    int64_t         handle;
+    fs_reader_t    *rd;
+    char           *buf  = NULL;
+    size_t          nread;
+    vigil_status_t  st;
+
+    vigil_vm_stack_pop_n(vm, arg_count);
+
+    if (self == NULL || n <= 0)
+        return push_empty_str_and_err(vm, "read_bytes: invalid argument", FS_ERR_IO, error);
+
+    handle = get_handle_field(self, RF_HANDLE);
+    rd     = (fs_reader_t *)fs_registry_get(&g_readers, handle);
+    if (rd == NULL || rd->closed)
+        return push_empty_str_and_err(vm, "read_bytes: reader is closed", FS_ERR_IO, error);
+    if (rd->eof_reached)
+        return push_empty_str_and_err(vm, "", FS_ERR_EOF, error);
+
+    {
+        vigil_runtime_t *rt = vigil_vm_runtime(vm);
+        st = vigil_runtime_alloc(rt, (size_t)n + 1, (void **)&buf, error);
+        if (st != VIGIL_STATUS_OK)
+            return push_empty_str_and_err(vm, "read_bytes: out of memory", FS_ERR_IO, error);
+
+        nread = fread(buf, 1, (size_t)n, rd->fp);
+        if (nread == 0)
+        {
+            vigil_runtime_free(rt, (void **)&buf);
+            rd->eof_reached = 1;
+            return push_empty_str_and_err(vm, "", FS_ERR_EOF, error);
+        }
+        buf[nread] = '\0';
+        st = push_str_and_ok(vm, buf, nread, error);
+        vigil_runtime_free(rt, (void **)&buf);
+        return st;
+    }
+}
+
+static vigil_status_t reader_read_all(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    /* Stack: [self] */
+    size_t         base   = vigil_vm_stack_depth(vm) - arg_count;
+    vigil_object_t *self  = get_self_obj(vm, base);
+    int64_t         handle;
+    fs_reader_t    *rd;
+    char           *buf   = NULL;
+    size_t          len   = 0, cap = 4096;
+    size_t          nread;
+    vigil_status_t  st;
+
+    vigil_vm_stack_pop_n(vm, arg_count);
+
+    if (self == NULL)
+        return push_empty_str_and_err(vm, "read_all: invalid reader", FS_ERR_IO, error);
+
+    handle = get_handle_field(self, RF_HANDLE);
+    rd     = (fs_reader_t *)fs_registry_get(&g_readers, handle);
+    if (rd == NULL || rd->closed)
+        return push_empty_str_and_err(vm, "read_all: reader is closed", FS_ERR_IO, error);
+    if (rd->eof_reached)
+        return push_str_and_ok(vm, "", 0, error);
+
+    {
+        vigil_runtime_t *rt = vigil_vm_runtime(vm);
+        st = vigil_runtime_alloc(rt, cap, (void **)&buf, error);
+        if (st != VIGIL_STATUS_OK)
+            return push_empty_str_and_err(vm, "read_all: out of memory", FS_ERR_IO, error);
+
+        for (;;)
+        {
+            nread = fread(buf + len, 1, cap - len, rd->fp);
+            len  += nread;
+            if (nread == 0)
+            {
+                rd->eof_reached = 1;
+                break;
+            }
+            if (len == cap)
+            {
+                size_t new_cap = cap * 2;
+                st = vigil_runtime_realloc(rt, (void **)&buf, new_cap, error);
+                if (st != VIGIL_STATUS_OK)
+                {
+                    vigil_runtime_free(rt, (void **)&buf);
+                    return push_empty_str_and_err(vm, "read_all: out of memory", FS_ERR_IO, error);
+                }
+                cap = new_cap;
+            }
+        }
+
+        st = push_str_and_ok(vm, buf, len, error);
+        vigil_runtime_free(rt, (void **)&buf);
+        return st;
+    }
+}
+
+static vigil_status_t reader_close(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    /* Stack: [self] */
+    size_t         base   = vigil_vm_stack_depth(vm) - arg_count;
+    vigil_object_t *self  = get_self_obj(vm, base);
+    int64_t         handle;
+    fs_reader_t    *rd;
+
+    vigil_vm_stack_pop_n(vm, arg_count);
+
+    if (self == NULL)
+        return push_err_kind(vm, "close: invalid reader", FS_ERR_IO, error);
+
+    handle = get_handle_field(self, RF_HANDLE);
+    rd     = (fs_reader_t *)fs_registry_get(&g_readers, handle);
+    if (rd == NULL)
+        return push_err_kind(vm, "close: invalid reader handle", FS_ERR_IO, error);
+    if (!rd->closed)
+    {
+        vigil_runtime_t *rt = vigil_vm_runtime(vm);
+        fclose(rd->fp);
+        vigil_runtime_free(rt, (void **)&rd->line_buf);
+        rd->fp     = NULL;
+        rd->closed = 1;
+        fs_registry_set(&g_readers, handle, rd);
+    }
+    return vigil_runtime_push_ok_error(vigil_vm_runtime(vm), vm, error);
+}
+
+/* ── Writer implementation ───────────────────────────────────────── */
+
+static vigil_status_t writer_open_impl(vigil_vm_t *vm, size_t arg_count, const char *mode, vigil_error_t *error)
+{
+    size_t          base = vigil_vm_stack_depth(vm) - arg_count;
+    size_t          ci   = (size_t)vigil_nanbox_decode_i32(vigil_vm_stack_get(vm, base));
+    vigil_runtime_t *rt  = vigil_vm_runtime(vm);
+    vigil_status_t  st;
+    const char     *path;
+    size_t          path_len;
+    fs_writer_t    *wr  = NULL;
+    int64_t         handle;
+    vigil_value_t   field;
+    vigil_object_t *inst = NULL;
+    vigil_value_t   result;
+
+    st = ensure_stream_registries(rt, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+
+    if (!get_string_arg(vm, base, 1, &path, &path_len))
+    {
+        vigil_vm_stack_pop_n(vm, arg_count);
+        return push_nil_and_err(vm, "open_writer: invalid path argument", FS_ERR_IO, error);
+    }
+
+    st = vigil_runtime_alloc(rt, sizeof(fs_writer_t), (void **)&wr, error);
+    if (st != VIGIL_STATUS_OK)
+    {
+        vigil_vm_stack_pop_n(vm, arg_count);
+        return push_nil_and_err(vm, "open_writer: out of memory", FS_ERR_IO, error);
+    }
+
+#ifdef _WIN32
+    {
+        errno_t fe = fopen_s(&wr->fp, path, mode);
+        if (fe != 0)
+            wr->fp = NULL;
+    }
+#else
+    wr->fp = fopen(path, mode);
+#endif
+    if (wr->fp == NULL)
+    {
+        vigil_runtime_free(rt, (void **)&wr);
+        vigil_vm_stack_pop_n(vm, arg_count);
+        return push_nil_and_err(vm, "open_writer: cannot open file", FS_ERR_IO, error);
+    }
+
+    st = fs_registry_alloc(&g_writers, rt, &handle, error);
+    if (st != VIGIL_STATUS_OK)
+    {
+        fclose(wr->fp);
+        vigil_runtime_free(rt, (void **)&wr);
+        vigil_vm_stack_pop_n(vm, arg_count);
+        return push_nil_and_err(vm, "open_writer: registry alloc failed", FS_ERR_IO, error);
+    }
+    fs_registry_set(&g_writers, handle, wr);
+
+    vigil_value_init_int(&field, handle);
+    st = vigil_instance_object_new(rt, ci, &field, WRITER_FIELD_COUNT, &inst, error);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+
+    vigil_value_init_object(&result, &inst);
+    st = vigil_vm_stack_push(vm, &result, error);
+    vigil_value_release(&result);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return vigil_runtime_push_ok_error(rt, vm, error);
+}
+
+static vigil_status_t writer_open(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    return writer_open_impl(vm, arg_count, "w", error);
+}
+
+static vigil_status_t writer_open_append(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    return writer_open_impl(vm, arg_count, "a", error);
+}
+
+static vigil_status_t writer_write_impl(vigil_vm_t *vm, size_t arg_count, int newline, vigil_error_t *error)
+{
+    size_t         base = vigil_vm_stack_depth(vm) - arg_count;
+    vigil_object_t *self = get_self_obj(vm, base);
+    const char     *str;
+    size_t          str_len;
+    int64_t         handle;
+    fs_writer_t    *wr;
+    size_t          written;
+
+    vigil_vm_stack_pop_n(vm, arg_count);
+
+    if (self == NULL || !get_string_arg(vm, base, 1, &str, &str_len))
+        return push_zero_and_err(vm, "write: invalid argument", FS_ERR_IO, error);
+
+    handle = get_handle_field(self, WF_HANDLE);
+    wr     = (fs_writer_t *)fs_registry_get(&g_writers, handle);
+    if (wr == NULL || wr->closed)
+        return push_zero_and_err(vm, "write: writer is closed", FS_ERR_IO, error);
+
+    written = fwrite(str, 1, str_len, wr->fp);
+    if (newline && written == str_len)
+    {
+        fwrite("\n", 1, 1, wr->fp);
+        written++;
+    }
+
+    if (ferror(wr->fp))
+        return push_zero_and_err(vm, "write: I/O error", FS_ERR_IO, error);
+
+    return push_i32_and_ok(vm, (int64_t)written, error);
+}
+
+static vigil_status_t writer_write(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    return writer_write_impl(vm, arg_count, 0, error);
+}
+
+static vigil_status_t writer_write_line(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    return writer_write_impl(vm, arg_count, 1, error);
+}
+
+static vigil_status_t writer_flush(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t         base   = vigil_vm_stack_depth(vm) - arg_count;
+    vigil_object_t *self  = get_self_obj(vm, base);
+    int64_t         handle;
+    fs_writer_t    *wr;
+
+    vigil_vm_stack_pop_n(vm, arg_count);
+
+    if (self == NULL)
+        return push_err_kind(vm, "flush: invalid writer", FS_ERR_IO, error);
+
+    handle = get_handle_field(self, WF_HANDLE);
+    wr     = (fs_writer_t *)fs_registry_get(&g_writers, handle);
+    if (wr == NULL || wr->closed)
+        return push_err_kind(vm, "flush: writer is closed", FS_ERR_IO, error);
+
+    if (fflush(wr->fp) != 0)
+        return push_err_kind(vm, "flush: I/O error", FS_ERR_IO, error);
+
+    return vigil_runtime_push_ok_error(vigil_vm_runtime(vm), vm, error);
+}
+
+static vigil_status_t writer_close(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t         base  = vigil_vm_stack_depth(vm) - arg_count;
+    vigil_object_t *self = get_self_obj(vm, base);
+    int64_t         handle;
+    fs_writer_t    *wr;
+
+    vigil_vm_stack_pop_n(vm, arg_count);
+
+    if (self == NULL)
+        return push_err_kind(vm, "close: invalid writer", FS_ERR_IO, error);
+
+    handle = get_handle_field(self, WF_HANDLE);
+    wr     = (fs_writer_t *)fs_registry_get(&g_writers, handle);
+    if (wr == NULL)
+        return push_err_kind(vm, "close: invalid writer handle", FS_ERR_IO, error);
+    if (!wr->closed)
+    {
+        fflush(wr->fp);
+        fclose(wr->fp);
+        wr->fp     = NULL;
+        wr->closed = 1;
+        fs_registry_set(&g_writers, handle, wr);
+    }
+    return vigil_runtime_push_ok_error(vigil_vm_runtime(vm), vm, error);
+}
+
+/* ── Class descriptors ───────────────────────────────────────────── */
+
+static const vigil_native_class_field_t reader_fields[] = {
+    {"handle", 6U, VIGIL_TYPE_I64, VIGIL_NATIVE_FIELD_PRIMITIVE, NULL, 0U, 0},
+};
+
+static const vigil_native_class_field_t writer_fields[] = {
+    {"handle", 6U, VIGIL_TYPE_I64, VIGIL_NATIVE_FIELD_PRIMITIVE, NULL, 0U, 0},
+};
+
+static const int obj_err_returns[]  = {VIGIL_TYPE_OBJECT, VIGIL_TYPE_ERR};
+static const int str_err_returns[]  = {VIGIL_TYPE_STRING, VIGIL_TYPE_ERR};
+static const int i32_err_returns[]  = {VIGIL_TYPE_I32,    VIGIL_TYPE_ERR};
+static const int str1_param[]       = {VIGIL_TYPE_STRING};
+static const int i32_1_param[]      = {VIGIL_TYPE_I32};
+
+#define FS_STATIC(n, nl, fn, pc, pt, rt, rc, rts) \
+    {n, nl, fn, pc, pt, rt, rc, rts, 1, NULL, 0U, 0}
+#define FS_METHOD(n, nl, fn, pc, pt, rt, rc, rts) \
+    {n, nl, fn, pc, pt, rt, rc, rts, 0, NULL, 0U, 0}
+
+static const vigil_native_class_method_t reader_methods[] = {
+    FS_STATIC("open",       4U,  reader_open,       1U, str1_param,   VIGIL_TYPE_OBJECT, 2U, obj_err_returns),
+    FS_METHOD("read_line",  9U,  reader_read_line,  0U, NULL,         VIGIL_TYPE_STRING, 2U, str_err_returns),
+    FS_METHOD("read_bytes", 10U, reader_read_bytes, 1U, i32_1_param,  VIGIL_TYPE_STRING, 2U, str_err_returns),
+    FS_METHOD("read_all",   8U,  reader_read_all,   0U, NULL,         VIGIL_TYPE_STRING, 2U, str_err_returns),
+    FS_METHOD("close",      5U,  reader_close,      0U, NULL,         VIGIL_TYPE_ERR,    1U, NULL),
+};
+
+static const vigil_native_class_method_t writer_methods[] = {
+    FS_STATIC("open",        4U,  writer_open,        1U, str1_param,  VIGIL_TYPE_OBJECT, 2U, obj_err_returns),
+    FS_STATIC("open_append", 11U, writer_open_append, 1U, str1_param,  VIGIL_TYPE_OBJECT, 2U, obj_err_returns),
+    FS_METHOD("write",       5U,  writer_write,       1U, str1_param,  VIGIL_TYPE_I32,    2U, i32_err_returns),
+    FS_METHOD("write_line",  10U, writer_write_line,  1U, str1_param,  VIGIL_TYPE_I32,    2U, i32_err_returns),
+    FS_METHOD("flush",       5U,  writer_flush,       0U, NULL,         VIGIL_TYPE_ERR,    1U, NULL),
+    FS_METHOD("close",       5U,  writer_close,       0U, NULL,         VIGIL_TYPE_ERR,    1U, NULL),
+};
+
+#undef FS_STATIC
+#undef FS_METHOD
+
+static const vigil_native_class_t vigil_fs_classes[] = {
+    {"Reader", 6U, reader_fields, READER_FIELD_COUNT,
+     reader_methods, sizeof(reader_methods) / sizeof(reader_methods[0]), NULL},
+    {"Writer", 6U, writer_fields, WRITER_FIELD_COUNT,
+     writer_methods, sizeof(writer_methods) / sizeof(writer_methods[0]), NULL},
+};
+
+#define FS_CLASS_COUNT (sizeof(vigil_fs_classes) / sizeof(vigil_fs_classes[0]))
+
+VIGIL_API const vigil_native_module_t vigil_stdlib_fs = {
+    "fs", 2U, vigil_fs_functions, FS_FUNCTION_COUNT, vigil_fs_classes, FS_CLASS_COUNT};
