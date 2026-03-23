@@ -16,12 +16,24 @@
 #include <string.h>
 
 #include "vigil/native_module.h"
+#include "vigil/runtime.h"
 #include "vigil/type.h"
 #include "vigil/value.h"
 #include "vigil/vm.h"
 
+#include "internal/vigil_internal.h"
 #include "internal/vigil_nanbox.h"
 #include "vigil_crypto.h"
+
+/* ── Allocator helpers ───────────────────────────────────────────── */
+
+static vigil_allocator_t get_alloc(vigil_vm_t *vm)
+{
+    const vigil_allocator_t *a = vigil_runtime_allocator(vigil_vm_runtime(vm));
+    if (a != NULL)
+        return *a;
+    return vigil_default_allocator();
+}
 
 /* ── Helpers ─────────────────────────────────────────────────────── */
 
@@ -283,6 +295,8 @@ static vigil_status_t crypto_pbkdf2(vigil_vm_t *vm, size_t arg_count, vigil_erro
     size_t pass_len, salt_len;
     int32_t iterations, key_len;
 
+    vigil_allocator_t alloc = get_alloc(vm);
+
     if (!get_bytes_arg(vm, base, 0, &password, &pass_len) || !get_bytes_arg(vm, base, 1, &salt, &salt_len))
     {
         vigil_vm_stack_pop_n(vm, arg_count);
@@ -297,23 +311,23 @@ static vigil_status_t crypto_pbkdf2(vigil_vm_t *vm, size_t arg_count, vigil_erro
         return push_bytes(vm, (uint8_t *)"", 0, error);
     }
 
-    uint8_t *key = (uint8_t *)malloc((size_t)key_len);
+    uint8_t *key = (uint8_t *)alloc.allocate(alloc.user_data, (size_t)key_len);
     if (!key)
         return push_bytes(vm, (uint8_t *)"", 0, error);
 
     vigil_pbkdf2_sha256(password, pass_len, salt, salt_len, (uint32_t)iterations, key, (size_t)key_len);
 
-    char *hex = (char *)malloc((size_t)key_len * 2);
+    char *hex = (char *)alloc.allocate(alloc.user_data, (size_t)key_len * 2);
     if (!hex)
     {
-        free(key);
+        alloc.deallocate(alloc.user_data, key);
         return push_bytes(vm, (uint8_t *)"", 0, error);
     }
     bytes_to_hex(key, (size_t)key_len, hex);
 
     vigil_status_t s = push_bytes(vm, (uint8_t *)hex, (size_t)key_len * 2, error);
-    free(key);
-    free(hex);
+    alloc.deallocate(alloc.user_data, key);
+    alloc.deallocate(alloc.user_data, hex);
     return s;
 }
 
@@ -325,18 +339,20 @@ static vigil_status_t crypto_random_bytes(vigil_vm_t *vm, size_t arg_count, vigi
     int32_t len = get_i32_arg(vm, base, 0);
     vigil_vm_stack_pop_n(vm, arg_count);
 
+    vigil_allocator_t alloc = get_alloc(vm);
+
     if (len < 0 || len > 65536)
     {
         return push_bytes(vm, (uint8_t *)"", 0, error);
     }
 
-    uint8_t *buf = (uint8_t *)malloc((size_t)len);
+    uint8_t *buf = (uint8_t *)alloc.allocate(alloc.user_data, (size_t)len);
     if (!buf)
         return push_bytes(vm, (uint8_t *)"", 0, error);
 
     vigil_crypto_random_bytes(buf, (size_t)len);
     vigil_status_t s = push_bytes(vm, buf, (size_t)len, error);
-    free(buf);
+    alloc.deallocate(alloc.user_data, buf);
     return s;
 }
 
@@ -368,6 +384,8 @@ static vigil_status_t crypto_encrypt(vigil_vm_t *vm, size_t arg_count, vigil_err
     const uint8_t *key, *nonce, *plaintext, *aad = NULL;
     size_t key_len, nonce_len, pt_len, aad_len = 0;
 
+    vigil_allocator_t alloc = get_alloc(vm);
+
     if (!get_bytes_arg(vm, base, 0, &key, &key_len) || !get_bytes_arg(vm, base, 1, &nonce, &nonce_len) ||
         !get_bytes_arg(vm, base, 2, &plaintext, &pt_len))
     {
@@ -383,7 +401,7 @@ static vigil_status_t crypto_encrypt(vigil_vm_t *vm, size_t arg_count, vigil_err
 
     /* Output: nonce || ciphertext || tag */
     size_t out_len = nonce_len + pt_len + 16;
-    uint8_t *out = (uint8_t *)malloc(out_len);
+    uint8_t *out = (uint8_t *)alloc.allocate(alloc.user_data, out_len);
     if (!out)
         return push_bytes(vm, (uint8_t *)"", 0, error);
 
@@ -392,7 +410,7 @@ static vigil_status_t crypto_encrypt(vigil_vm_t *vm, size_t arg_count, vigil_err
                              out + nonce_len + pt_len);
 
     vigil_status_t s = push_bytes(vm, out, out_len, error);
-    free(out);
+    alloc.deallocate(alloc.user_data, out);
     return s;
 }
 
@@ -403,6 +421,8 @@ static vigil_status_t crypto_decrypt(vigil_vm_t *vm, size_t arg_count, vigil_err
     size_t base = vigil_vm_stack_depth(vm) - arg_count;
     const uint8_t *key, *ciphertext, *aad = NULL;
     size_t key_len, ct_len, aad_len = 0;
+
+    vigil_allocator_t alloc = get_alloc(vm);
 
     if (!get_bytes_arg(vm, base, 0, &key, &key_len) || !get_bytes_arg(vm, base, 1, &ciphertext, &ct_len))
     {
@@ -425,19 +445,19 @@ static vigil_status_t crypto_decrypt(vigil_vm_t *vm, size_t arg_count, vigil_err
     size_t pt_len = ct_len - 12 - 16;
     const uint8_t *tag = ciphertext + ct_len - 16;
 
-    uint8_t *plaintext = (uint8_t *)malloc(pt_len > 0 ? pt_len : 1);
+    uint8_t *plaintext = (uint8_t *)alloc.allocate(alloc.user_data, pt_len > 0 ? pt_len : 1);
     if (!plaintext)
         return push_bytes(vm, (uint8_t *)"", 0, error);
 
     int result = vigil_aes256_gcm_decrypt(key, nonce, nonce_len, ct, pt_len, aad, aad_len, tag, plaintext);
     if (result != 0)
     {
-        free(plaintext);
+        alloc.deallocate(alloc.user_data, plaintext);
         return push_bytes(vm, (uint8_t *)"", 0, error);
     }
 
     vigil_status_t s = push_bytes(vm, plaintext, pt_len, error);
-    free(plaintext);
+    alloc.deallocate(alloc.user_data, plaintext);
     return s;
 }
 
@@ -449,6 +469,8 @@ static vigil_status_t crypto_hex_encode(vigil_vm_t *vm, size_t arg_count, vigil_
     const uint8_t *data;
     size_t len;
 
+    vigil_allocator_t alloc = get_alloc(vm);
+
     if (!get_bytes_arg(vm, base, 0, &data, &len))
     {
         vigil_vm_stack_pop_n(vm, arg_count);
@@ -456,12 +478,12 @@ static vigil_status_t crypto_hex_encode(vigil_vm_t *vm, size_t arg_count, vigil_
     }
     vigil_vm_stack_pop_n(vm, arg_count);
 
-    char *hex = (char *)malloc(len * 2);
+    char *hex = (char *)alloc.allocate(alloc.user_data, len * 2);
     if (!hex)
         return push_bytes(vm, (uint8_t *)"", 0, error);
     bytes_to_hex(data, len, hex);
     vigil_status_t s = push_bytes(vm, (uint8_t *)hex, len * 2, error);
-    free(hex);
+    alloc.deallocate(alloc.user_data, hex);
     return s;
 }
 
@@ -473,6 +495,8 @@ static vigil_status_t crypto_hex_decode(vigil_vm_t *vm, size_t arg_count, vigil_
     const uint8_t *hex;
     size_t len;
 
+    vigil_allocator_t alloc = get_alloc(vm);
+
     if (!get_bytes_arg(vm, base, 0, &hex, &len))
     {
         vigil_vm_stack_pop_n(vm, arg_count);
@@ -483,16 +507,16 @@ static vigil_status_t crypto_hex_decode(vigil_vm_t *vm, size_t arg_count, vigil_
     if (len % 2 != 0)
         return push_bytes(vm, (uint8_t *)"", 0, error);
 
-    uint8_t *out = (uint8_t *)malloc(len / 2);
+    uint8_t *out = (uint8_t *)alloc.allocate(alloc.user_data, len / 2);
     if (!out)
         return push_bytes(vm, (uint8_t *)"", 0, error);
     if (hex_to_bytes((const char *)hex, len, out) != 0)
     {
-        free(out);
+        alloc.deallocate(alloc.user_data, out);
         return push_bytes(vm, (uint8_t *)"", 0, error);
     }
     vigil_status_t s = push_bytes(vm, out, len / 2, error);
-    free(out);
+    alloc.deallocate(alloc.user_data, out);
     return s;
 }
 
@@ -504,6 +528,8 @@ static vigil_status_t crypto_base64_encode(vigil_vm_t *vm, size_t arg_count, vig
     const uint8_t *data;
     size_t len;
 
+    vigil_allocator_t alloc = get_alloc(vm);
+
     if (!get_bytes_arg(vm, base, 0, &data, &len))
     {
         vigil_vm_stack_pop_n(vm, arg_count);
@@ -512,12 +538,12 @@ static vigil_status_t crypto_base64_encode(vigil_vm_t *vm, size_t arg_count, vig
     vigil_vm_stack_pop_n(vm, arg_count);
 
     size_t out_len = ((len + 2) / 3) * 4;
-    char *out = (char *)malloc(out_len);
+    char *out = (char *)alloc.allocate(alloc.user_data, out_len);
     if (!out)
         return push_bytes(vm, (uint8_t *)"", 0, error);
     size_t actual = base64_encode(data, len, out);
     vigil_status_t s = push_bytes(vm, (uint8_t *)out, actual, error);
-    free(out);
+    alloc.deallocate(alloc.user_data, out);
     return s;
 }
 
@@ -529,6 +555,8 @@ static vigil_status_t crypto_base64_decode(vigil_vm_t *vm, size_t arg_count, vig
     const uint8_t *data;
     size_t len;
 
+    vigil_allocator_t alloc = get_alloc(vm);
+
     if (!get_bytes_arg(vm, base, 0, &data, &len))
     {
         vigil_vm_stack_pop_n(vm, arg_count);
@@ -537,12 +565,12 @@ static vigil_status_t crypto_base64_decode(vigil_vm_t *vm, size_t arg_count, vig
     vigil_vm_stack_pop_n(vm, arg_count);
 
     size_t out_len = (len / 4) * 3;
-    uint8_t *out = (uint8_t *)malloc(out_len > 0 ? out_len : 1);
+    uint8_t *out = (uint8_t *)alloc.allocate(alloc.user_data, out_len > 0 ? out_len : 1);
     if (!out)
         return push_bytes(vm, (uint8_t *)"", 0, error);
     size_t actual = base64_decode((const char *)data, len, out);
     vigil_status_t s = push_bytes(vm, out, actual, error);
-    free(out);
+    alloc.deallocate(alloc.user_data, out);
     return s;
 }
 
@@ -554,6 +582,8 @@ static vigil_status_t crypto_password_encrypt(vigil_vm_t *vm, size_t arg_count, 
     const uint8_t *password, *plaintext;
     size_t pass_len, pt_len;
 
+    vigil_allocator_t alloc = get_alloc(vm);
+
     if (!get_bytes_arg(vm, base, 0, &password, &pass_len) || !get_bytes_arg(vm, base, 1, &plaintext, &pt_len))
     {
         vigil_vm_stack_pop_n(vm, arg_count);
@@ -561,19 +591,19 @@ static vigil_status_t crypto_password_encrypt(vigil_vm_t *vm, size_t arg_count, 
     }
     vigil_vm_stack_pop_n(vm, arg_count);
 
-    uint8_t *out = (uint8_t *)malloc(pt_len + 44);
+    uint8_t *out = (uint8_t *)alloc.allocate(alloc.user_data, pt_len + 44);
     if (!out)
         return push_bytes(vm, (uint8_t *)"", 0, error);
 
     size_t out_len = vigil_password_encrypt(password, pass_len, plaintext, pt_len, out);
     if (out_len == 0)
     {
-        free(out);
+        alloc.deallocate(alloc.user_data, out);
         return push_bytes(vm, (uint8_t *)"", 0, error);
     }
 
     vigil_status_t s = push_bytes(vm, out, out_len, error);
-    free(out);
+    alloc.deallocate(alloc.user_data, out);
     return s;
 }
 
@@ -585,6 +615,8 @@ static vigil_status_t crypto_password_decrypt(vigil_vm_t *vm, size_t arg_count, 
     const uint8_t *password, *ciphertext;
     size_t pass_len, ct_len;
 
+    vigil_allocator_t alloc = get_alloc(vm);
+
     if (!get_bytes_arg(vm, base, 0, &password, &pass_len) || !get_bytes_arg(vm, base, 1, &ciphertext, &ct_len))
     {
         vigil_vm_stack_pop_n(vm, arg_count);
@@ -595,19 +627,19 @@ static vigil_status_t crypto_password_decrypt(vigil_vm_t *vm, size_t arg_count, 
     if (ct_len < 44)
         return push_bytes(vm, (uint8_t *)"", 0, error);
 
-    uint8_t *out = (uint8_t *)malloc(ct_len);
+    uint8_t *out = (uint8_t *)alloc.allocate(alloc.user_data, ct_len);
     if (!out)
         return push_bytes(vm, (uint8_t *)"", 0, error);
 
     size_t pt_len = vigil_password_decrypt(password, pass_len, ciphertext, ct_len, out);
     if (pt_len == 0)
     {
-        free(out);
+        alloc.deallocate(alloc.user_data, out);
         return push_bytes(vm, (uint8_t *)"", 0, error);
     }
 
     vigil_status_t s = push_bytes(vm, out, pt_len, error);
-    free(out);
+    alloc.deallocate(alloc.user_data, out);
     return s;
 }
 

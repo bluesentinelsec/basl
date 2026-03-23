@@ -14,10 +14,12 @@
 #include <string.h>
 
 #include "vigil/native_module.h"
+#include "vigil/runtime.h"
 #include "vigil/type.h"
 #include "vigil/value.h"
 #include "vigil/vm.h"
 
+#include "internal/vigil_internal.h"
 #include "internal/vigil_nanbox.h"
 #include "platform/platform.h"
 
@@ -28,6 +30,47 @@
 #else
 #define HTTP_STATIC static
 #endif
+
+/* ── Allocator helpers ───────────────────────────────────────────── */
+
+static vigil_allocator_t get_alloc(vigil_vm_t *vm)
+{
+    const vigil_allocator_t *a = vigil_runtime_allocator(vigil_vm_runtime(vm));
+    if (a != NULL)
+        return *a;
+    return vigil_default_allocator();
+}
+
+/*
+ * File-level allocator for internal helpers that lack vm access.
+ * Set by each native entry point before calling internal helpers.
+ * The http module already uses extensive file-level global state
+ * (g_servers, g_clients, etc.) so this fits the existing pattern.
+ */
+static vigil_allocator_t g_http_alloc;
+static int g_http_alloc_set = 0;
+
+static void *http_alloc(size_t size)
+{
+    if (g_http_alloc_set)
+        return g_http_alloc.allocate(g_http_alloc.user_data, size);
+    return malloc(size);
+}
+
+static void *http_realloc(void *ptr, size_t size)
+{
+    if (g_http_alloc_set && g_http_alloc.reallocate)
+        return g_http_alloc.reallocate(g_http_alloc.user_data, ptr, size);
+    return realloc(ptr, size);
+}
+
+static void http_dealloc(void *ptr)
+{
+    if (g_http_alloc_set)
+        g_http_alloc.deallocate(g_http_alloc.user_data, ptr);
+    else
+        free(ptr);
+}
 
 /* ── VM helpers ──────────────────────────────────────────────────── */
 
@@ -154,8 +197,8 @@ typedef struct
 
 HTTP_STATIC void response_free(http_response_t *r)
 {
-    free(r->headers);
-    free(r->body);
+    http_dealloc(r->headers);
+    http_dealloc(r->body);
     memset(r, 0, sizeof(*r));
 }
 
@@ -192,7 +235,7 @@ static char *alloc_request_buf(const char *method, const char *path, const char 
 {
     size_t cap = strlen(method) + 1 + strlen(path) + 11 + 7 + strlen(host) + 2 + 19 + (headers ? strlen(headers) : 0) +
                  HTTP_MAX_REQUEST_OVERHEAD + 1;
-    char *buf = (char *)malloc(cap);
+    char *buf = (char *)http_alloc(cap);
     if (!buf)
         return NULL;
     int len = snprintf(buf, cap,
@@ -205,7 +248,7 @@ static char *alloc_request_buf(const char *method, const char *path, const char 
                        method, path, host, headers ? headers : "", body_len);
     if (len < 0 || (size_t)len >= cap)
     {
-        free(buf);
+        http_dealloc(buf);
         return NULL;
     }
     *out_len = (size_t)len;
@@ -228,7 +271,7 @@ HTTP_STATIC int parse_http_response(char *buf, size_t len, http_response_t *resp
     }
 
     size_t hdr_len = (size_t)(header_end - buf);
-    resp->headers = (char *)malloc(hdr_len + 1);
+    resp->headers = (char *)http_alloc(hdr_len + 1);
     if (!resp->headers)
         return -1;
     memcpy(resp->headers, buf, hdr_len);
@@ -236,10 +279,10 @@ HTTP_STATIC int parse_http_response(char *buf, size_t len, http_response_t *resp
 
     char *body_start = header_end + 4;
     resp->body_len = len - (size_t)(body_start - buf);
-    resp->body = (char *)malloc(resp->body_len + 1);
+    resp->body = (char *)http_alloc(resp->body_len + 1);
     if (!resp->body)
     {
-        free(resp->headers);
+        http_dealloc(resp->headers);
         resp->headers = NULL;
         return -1;
     }
@@ -254,15 +297,15 @@ static char *ensure_resp_capacity(char *buf, size_t *cap, size_t len)
 {
     if (len >= HTTP_MAX_RESPONSE_BODY_BYTES)
     {
-        free(buf);
+        http_dealloc(buf);
         return NULL;
     }
     if (len + 1 < *cap)
         return buf;
-    char *nb = (char *)realloc(buf, *cap * 2);
+    char *nb = (char *)http_realloc(buf, *cap * 2);
     if (!nb)
     {
-        free(buf);
+        http_dealloc(buf);
         return NULL;
     }
     *cap *= 2;
@@ -275,7 +318,7 @@ static char *ensure_resp_capacity(char *buf, size_t *cap, size_t len)
 static char *recv_tcp_response(vigil_socket_t sock, size_t *out_len)
 {
     size_t cap = 8192, len = 0;
-    char *buf = (char *)malloc(cap);
+    char *buf = (char *)http_alloc(cap);
     if (!buf)
         return NULL;
 
@@ -317,11 +360,11 @@ HTTP_STATIC int socket_request(const char *method, parsed_url_t *url, const char
 
     if (tcp_send_all(sock, req_buf, req_len) != 0)
     {
-        free(req_buf);
+        http_dealloc(req_buf);
         vigil_platform_tcp_close(sock, NULL);
         return -1;
     }
-    free(req_buf);
+    http_dealloc(req_buf);
 
     if (body && body_len > 0 && tcp_send_all(sock, body, body_len) != 0)
     {
@@ -336,7 +379,7 @@ HTTP_STATIC int socket_request(const char *method, parsed_url_t *url, const char
         return -1;
 
     int result = parse_http_response(buf, resp_len, resp);
-    free(buf);
+    http_dealloc(buf);
     return result;
 }
 
@@ -457,7 +500,7 @@ static int tls_copy_ec_key(br_x509_pkey *dst, br_x509_pkey *src)
 {
     dst->key_type = BR_KEYTYPE_EC;
     dst->key.ec.curve = src->key.ec.curve;
-    dst->key.ec.q = (unsigned char *)malloc(src->key.ec.qlen);
+    dst->key.ec.q = (unsigned char *)http_alloc(src->key.ec.qlen);
     if (!dst->key.ec.q)
         return 0;
     memcpy(dst->key.ec.q, src->key.ec.q, src->key.ec.qlen);
@@ -468,12 +511,12 @@ static int tls_copy_ec_key(br_x509_pkey *dst, br_x509_pkey *src)
 static int tls_copy_rsa_key(br_x509_pkey *dst, br_x509_pkey *src)
 {
     dst->key_type = BR_KEYTYPE_RSA;
-    dst->key.rsa.n = (unsigned char *)malloc(src->key.rsa.nlen);
-    dst->key.rsa.e = (unsigned char *)malloc(src->key.rsa.elen);
+    dst->key.rsa.n = (unsigned char *)http_alloc(src->key.rsa.nlen);
+    dst->key.rsa.e = (unsigned char *)http_alloc(src->key.rsa.elen);
     if (!dst->key.rsa.n || !dst->key.rsa.e)
     {
-        free(dst->key.rsa.n);
-        free(dst->key.rsa.e);
+        http_dealloc(dst->key.rsa.n);
+        http_dealloc(dst->key.rsa.e);
         return 0;
     }
     memcpy(dst->key.rsa.n, src->key.rsa.n, src->key.rsa.nlen);
@@ -499,7 +542,7 @@ static int tls_decode_ta(const unsigned char *der, size_t der_len, br_x509_trust
     if (!pk || dn_acc.dn_len == 0)
         return 0;
 
-    ta->dn.data = (unsigned char *)malloc(dn_acc.dn_len + 1);
+    ta->dn.data = (unsigned char *)http_alloc(dn_acc.dn_len + 1);
     if (!ta->dn.data)
         return 0;
     memcpy(ta->dn.data, dn_acc.dn, dn_acc.dn_len);
@@ -510,7 +553,7 @@ static int tls_decode_ta(const unsigned char *der, size_t der_len, br_x509_trust
         return tls_copy_ec_key(&ta->pkey, pk);
     if (pk->key_type == BR_KEYTYPE_RSA)
         return tls_copy_rsa_key(&ta->pkey, pk);
-    free(ta->dn.data);
+    http_dealloc(ta->dn.data);
     ta->dn.data = NULL;
     return 0;
 }
@@ -548,13 +591,13 @@ static void tls_free_tas(br_x509_trust_anchor *tas, size_t count)
     size_t i;
     for (i = 0; i < count; i++)
     {
-        free(tas[i].dn.data);
+        http_dealloc(tas[i].dn.data);
         if (tas[i].pkey.key_type == BR_KEYTYPE_EC)
-            free(tas[i].pkey.key.ec.q);
+            http_dealloc(tas[i].pkey.key.ec.q);
         else if (tas[i].pkey.key_type == BR_KEYTYPE_RSA)
         {
-            free(tas[i].pkey.key.rsa.n);
-            free(tas[i].pkey.key.rsa.e);
+            http_dealloc(tas[i].pkey.key.rsa.n);
+            http_dealloc(tas[i].pkey.key.rsa.e);
         }
     }
 }
@@ -579,7 +622,7 @@ static int tls_send_request(br_sslio_context *ioc, const tls_req_t *req)
     if (!req_buf)
         return -1;
     int ok = (br_sslio_write_all(ioc, req_buf, req_len) == 0);
-    free(req_buf);
+    http_dealloc(req_buf);
     if (!ok)
         return -1;
     if (req->body_len > 0 && req->body != NULL)
@@ -593,7 +636,7 @@ static int tls_send_request(br_sslio_context *ioc, const tls_req_t *req)
 static char *tls_recv_response(br_sslio_context *ioc, size_t *out_len)
 {
     size_t cap = 8192, len = 0;
-    char *buf = (char *)malloc(cap);
+    char *buf = (char *)http_alloc(cap);
     if (!buf)
         return NULL;
 
@@ -641,7 +684,7 @@ static int bearssl_do_https(const tls_req_t *req, http_response_t *resp, br_ssl_
 
     memset(resp, 0, sizeof(*resp));
     int result = parse_http_response(resp_buf, resp_len, resp);
-    free(resp_buf);
+    http_dealloc(resp_buf);
     return result;
 }
 
@@ -649,14 +692,14 @@ static int bearssl_do_https(const tls_req_t *req, http_response_t *resp, br_ssl_
 HTTP_STATIC int bearssl_https_request(const char *method, const parsed_url_t *url, const char *headers,
                                       const char *body, size_t body_len, http_response_t *resp)
 {
-    br_x509_trust_anchor *tas = (br_x509_trust_anchor *)malloc(TLS_MAX_TAS * sizeof(br_x509_trust_anchor));
+    br_x509_trust_anchor *tas = (br_x509_trust_anchor *)http_alloc(TLS_MAX_TAS * sizeof(br_x509_trust_anchor));
     if (!tas)
         return -1;
 
     int ta_count = tls_load_platform_cas(tas, TLS_MAX_TAS);
     if (ta_count <= 0)
     {
-        free(tas);
+        http_dealloc(tas);
         fprintf(stderr, "vigil: HTTPS: no system CA bundle found\n");
         return -1;
     }
@@ -668,7 +711,7 @@ HTTP_STATIC int bearssl_https_request(const char *method, const parsed_url_t *ur
     tls_req_t req = {method, url, headers, body, body_len};
     int result = bearssl_do_https(&req, resp, &sc);
     tls_free_tas(tas, (size_t)ta_count);
-    free(tas);
+    http_dealloc(tas);
     return result;
 }
 
@@ -707,7 +750,7 @@ HTTP_STATIC void cookie_jar_append(char **jar, const char *val, size_t vlen)
         return;
     size_t old = *jar ? strlen(*jar) : 0;
     size_t sep = (old > 0) ? 2U : 0U;
-    char *n = (char *)realloc(*jar, old + sep + vlen + 1);
+    char *n = (char *)http_realloc(*jar, old + sep + vlen + 1);
     if (!n)
         return;
     if (sep)
@@ -768,7 +811,7 @@ HTTP_STATIC char *build_request_headers(const char *cookie_jar, const char *exis
         return NULL;
     clen = strlen(cookie_jar);
     elen = existing ? strlen(existing) : 0;
-    out = (char *)malloc(9 + clen + 2 + elen + 1);
+    out = (char *)http_alloc(9 + clen + 2 + elen + 1);
     if (!out)
         return NULL;
     off = 0;
@@ -936,14 +979,14 @@ HTTP_STATIC int do_request(const char *method, const char *url_str, const char *
     {
         char *combined = build_request_headers(cookie_jar, headers);
         result = do_request_once(method, url_buf, combined ? combined : headers, body, body_len, resp);
-        free(combined);
+        http_dealloc(combined);
         if (result != 0)
             break;
         collect_cookies(resp->headers, &cookie_jar);
         if (!apply_redirect(resp, url_buf, sizeof(url_buf), &method, &body, &body_len))
             break;
     }
-    free(cookie_jar);
+    http_dealloc(cookie_jar);
     return result;
 }
 
@@ -1021,16 +1064,16 @@ static int64_t alloc_server(vigil_socket_t s)
 
 static void client_free_fields(http_conn_t *c)
 {
-    free(c->method);
+    http_dealloc(c->method);
     c->method = NULL;
-    free(c->path);
+    http_dealloc(c->path);
     c->path = NULL;
-    free(c->headers);
+    http_dealloc(c->headers);
     c->headers = NULL;
-    free(c->body);
+    http_dealloc(c->body);
     c->body = NULL;
     c->body_len = 0;
-    free(c->pending_cookies);
+    http_dealloc(c->pending_cookies);
     c->pending_cookies = NULL;
     c->cookies_len = 0;
 }
@@ -1066,16 +1109,16 @@ HTTP_STATIC char *ensure_hdr_capacity(char *buf, size_t *cap, size_t len)
         return buf;
     if (*cap >= HTTP_MAX_HEADER_BYTES)
     {
-        free(buf);
+        http_dealloc(buf);
         return NULL;
     }
     size_t new_cap = *cap * 2;
     if (new_cap > HTTP_MAX_HEADER_BYTES)
         new_cap = HTTP_MAX_HEADER_BYTES;
-    char *nb = (char *)realloc(buf, new_cap);
+    char *nb = (char *)http_realloc(buf, new_cap);
     if (!nb)
     {
-        free(buf);
+        http_dealloc(buf);
         return NULL;
     }
     *cap = new_cap;
@@ -1087,7 +1130,7 @@ HTTP_STATIC char *ensure_hdr_capacity(char *buf, size_t *cap, size_t len)
 HTTP_STATIC char *recv_request_headers(vigil_socket_t sock, size_t *out_len)
 {
     size_t cap = 8192, len = 0;
-    char *buf = (char *)malloc(cap);
+    char *buf = (char *)http_alloc(cap);
     if (!buf)
         return NULL;
 
@@ -1097,7 +1140,7 @@ HTTP_STATIC char *recv_request_headers(vigil_socket_t sock, size_t *out_len)
         vigil_status_t st = vigil_platform_tcp_recv(sock, buf + len, cap - len - 1, &n, NULL);
         if (st != VIGIL_STATUS_OK || n == 0)
         {
-            free(buf);
+            http_dealloc(buf);
             return NULL;
         }
         len += n;
@@ -1120,7 +1163,7 @@ HTTP_STATIC int parse_request_line(const char *buf, const char *line_end, char *
     const char *sp1 = strchr(buf, ' ');
     if (!sp1 || sp1 > line_end)
         return -1;
-    char *method = (char *)malloc((size_t)(sp1 - buf) + 1);
+    char *method = (char *)http_alloc((size_t)(sp1 - buf) + 1);
     if (!method)
         return -1;
     memcpy(method, buf, (size_t)(sp1 - buf));
@@ -1130,13 +1173,13 @@ HTTP_STATIC int parse_request_line(const char *buf, const char *line_end, char *
     const char *sp2 = strchr(path_start, ' ');
     if (!sp2 || sp2 > line_end)
     {
-        free(method);
+        http_dealloc(method);
         return -1;
     }
-    char *path = (char *)malloc((size_t)(sp2 - path_start) + 1);
+    char *path = (char *)http_alloc((size_t)(sp2 - path_start) + 1);
     if (!path)
     {
-        free(method);
+        http_dealloc(method);
         return -1;
     }
     memcpy(path, path_start, (size_t)(sp2 - path_start));
@@ -1197,12 +1240,12 @@ HTTP_STATIC char *recv_request_body(vigil_socket_t sock, const char *headers, co
 
     if (content_length > already)
     {
-        char *body = (char *)malloc(content_length + 1);
+        char *body = (char *)http_alloc(content_length + 1);
         if (!body)
             return NULL;
         if (recv_body_bytes(sock, body, bstart, already, content_length) != 0)
         {
-            free(body);
+            http_dealloc(body);
             return NULL;
         }
         *body_len_out = content_length;
@@ -1210,7 +1253,7 @@ HTTP_STATIC char *recv_request_body(vigil_socket_t sock, const char *headers, co
     }
 
     /* No Content-Length or body already fully buffered. */
-    char *body = (char *)malloc(already + 1);
+    char *body = (char *)http_alloc(already + 1);
     if (!body)
         return NULL;
     if (already > 0)
@@ -1230,26 +1273,26 @@ HTTP_STATIC int parse_incoming_request(http_conn_t *conn)
     char *line_end = strstr(buf, "\r\n");
     if (!line_end)
     {
-        free(buf);
+        http_dealloc(buf);
         return -1;
     }
 
     char *method = NULL, *path = NULL;
     if (parse_request_line(buf, line_end, &method, &path) != 0)
     {
-        free(buf);
+        http_dealloc(buf);
         return -1;
     }
 
     char *hdr_start = line_end + 2;
     char *hdr_end = strstr(buf, "\r\n\r\n");
     size_t hdr_len = (size_t)(hdr_end - hdr_start);
-    char *headers = (char *)malloc(hdr_len + 1);
+    char *headers = (char *)http_alloc(hdr_len + 1);
     if (!headers)
     {
-        free(method);
-        free(path);
-        free(buf);
+        http_dealloc(method);
+        http_dealloc(path);
+        http_dealloc(buf);
         return -1;
     }
     memcpy(headers, hdr_start, hdr_len);
@@ -1259,12 +1302,12 @@ HTTP_STATIC int parse_incoming_request(http_conn_t *conn)
     size_t already = hdr_buf_len - (size_t)(bstart - buf);
     size_t body_len = 0;
     char *body = recv_request_body(conn->sock, headers, bstart, already, &body_len);
-    free(buf);
+    http_dealloc(buf);
     if (!body)
     {
-        free(method);
-        free(path);
-        free(headers);
+        http_dealloc(method);
+        http_dealloc(path);
+        http_dealloc(headers);
         return -1;
     }
 
@@ -1280,6 +1323,8 @@ HTTP_STATIC int parse_incoming_request(http_conn_t *conn)
 
 static vigil_status_t http_listen(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
 {
+    g_http_alloc = get_alloc(vm);
+    g_http_alloc_set = 1;
     size_t base = vigil_vm_stack_depth(vm) - arg_count;
     const char *host = NULL;
     size_t host_len = 0;
@@ -1311,6 +1356,8 @@ static vigil_status_t http_listen(vigil_vm_t *vm, size_t arg_count, vigil_error_
 
 static vigil_status_t http_accept(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
 {
+    g_http_alloc = get_alloc(vm);
+    g_http_alloc_set = 1;
     size_t base = vigil_vm_stack_depth(vm) - arg_count;
     int64_t srv = get_i64_arg(vm, base, 0);
     vigil_vm_stack_pop_n(vm, arg_count);
@@ -1506,6 +1553,8 @@ static const char *http_reason_phrase(int code)
 
 static vigil_status_t http_respond(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
 {
+    g_http_alloc = get_alloc(vm);
+    g_http_alloc_set = 1;
     size_t base = vigil_vm_stack_depth(vm) - arg_count;
     int64_t ch = get_i64_arg(vm, base, 0);
     int64_t status_code = get_i64_arg(vm, base, 1);
@@ -1517,13 +1566,13 @@ static vigil_status_t http_respond(vigil_vm_t *vm, size_t arg_count, vigil_error
     char *hc = NULL, *bc = NULL;
     if (hdrs_len > 0)
     {
-        hc = (char *)malloc(hdrs_len + 1);
+        hc = (char *)http_alloc(hdrs_len + 1);
         memcpy(hc, hdrs, hdrs_len);
         hc[hdrs_len] = '\0';
     }
     if (body_len > 0)
     {
-        bc = (char *)malloc(body_len + 1);
+        bc = (char *)http_alloc(body_len + 1);
         memcpy(bc, body, body_len);
         bc[body_len] = '\0';
     }
@@ -1532,8 +1581,8 @@ static vigil_status_t http_respond(vigil_vm_t *vm, size_t arg_count, vigil_error
     http_conn_t *c = get_client(ch);
     if (!c || c->sock == VIGIL_INVALID_SOCKET)
     {
-        free(hc);
-        free(bc);
+        http_dealloc(hc);
+        http_dealloc(bc);
         return push_i64(vm, -1, error);
     }
 
@@ -1552,8 +1601,8 @@ static vigil_status_t http_respond(vigil_vm_t *vm, size_t arg_count, vigil_error
         if (vigil_platform_tcp_send(c->sock, bc, body_len, NULL, NULL) != VIGIL_STATUS_OK)
             rc = -1;
     }
-    free(hc);
-    free(bc);
+    http_dealloc(hc);
+    http_dealloc(bc);
 
     vigil_platform_tcp_close(c->sock, NULL);
     c->sock = VIGIL_INVALID_SOCKET;
@@ -1566,7 +1615,7 @@ static void server_free_routes(http_server_t *srv)
 {
     for (int i = 0; i < srv->route_count; i++)
     {
-        free(srv->routes[i].pattern);
+        http_dealloc(srv->routes[i].pattern);
         if (srv->routes[i].handler)
             vigil_object_release(&srv->routes[i].handler);
     }
@@ -1575,6 +1624,8 @@ static void server_free_routes(http_server_t *srv)
 
 static vigil_status_t http_server_close(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
 {
+    g_http_alloc = get_alloc(vm);
+    g_http_alloc_set = 1;
     size_t base = vigil_vm_stack_depth(vm) - arg_count;
     int64_t h = get_i64_arg(vm, base, 0);
     vigil_vm_stack_pop_n(vm, arg_count);
@@ -1675,11 +1726,13 @@ static void serve_thread_entry(void *arg)
     }
 
     vigil_object_release(&ctx->handler);
-    free(ctx);
+    http_dealloc(ctx);
 }
 
 static vigil_status_t http_handle(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
 {
+    g_http_alloc = get_alloc(vm);
+    g_http_alloc_set = 1;
     size_t base = vigil_vm_stack_depth(vm) - arg_count;
     int64_t srv_h = get_i64_arg(vm, base, 0);
     const char *pattern = NULL;
@@ -1691,7 +1744,7 @@ static vigil_status_t http_handle(vigil_vm_t *vm, size_t arg_count, vigil_error_
     char *pcopy = NULL;
     if (plen > 0)
     {
-        pcopy = (char *)malloc(plen + 1);
+        pcopy = (char *)http_alloc(plen + 1);
         memcpy(pcopy, pattern, plen);
         pcopy[plen] = '\0';
     }
@@ -1700,7 +1753,7 @@ static vigil_status_t http_handle(vigil_vm_t *vm, size_t arg_count, vigil_error_
     if (srv_h < 0 || srv_h >= HTTP_MAX_SERVERS || !g_servers[srv_h].in_use || !fn ||
         g_servers[srv_h].route_count >= HTTP_MAX_ROUTES)
     {
-        free(pcopy);
+        http_dealloc(pcopy);
         return push_i64(vm, -1, error);
     }
 
@@ -1735,6 +1788,8 @@ HTTP_STATIC int route_matches(const char *pattern, const char *path)
 
 static vigil_status_t http_serve(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
 {
+    g_http_alloc = get_alloc(vm);
+    g_http_alloc_set = 1;
     size_t base = vigil_vm_stack_depth(vm) - arg_count;
     int64_t srv_h = get_i64_arg(vm, base, 0);
     vigil_vm_stack_pop_n(vm, arg_count);
@@ -1781,7 +1836,7 @@ static vigil_status_t http_serve(vigil_vm_t *vm, size_t arg_count, vigil_error_t
 
         if (handler)
         {
-            serve_thread_ctx_t *ctx = (serve_thread_ctx_t *)malloc(sizeof(*ctx));
+            serve_thread_ctx_t *ctx = (serve_thread_ctx_t *)http_alloc(sizeof(*ctx));
             ctx->runtime = runtime;
             ctx->handler = handler;
             ctx->conn_handle = ch;
@@ -1798,7 +1853,7 @@ static vigil_status_t http_serve(vigil_vm_t *vm, size_t arg_count, vigil_error_t
             else
             {
                 vigil_object_release(&ctx->handler);
-                free(ctx);
+                http_dealloc(ctx);
                 vigil_platform_tcp_close(conn->sock, NULL);
                 conn->sock = VIGIL_INVALID_SOCKET;
                 client_free_fields(conn);
@@ -1835,6 +1890,8 @@ static vigil_status_t http_current_conn(vigil_vm_t *vm, size_t arg_count, vigil_
 
 static vigil_status_t http_write_header(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
 {
+    g_http_alloc = get_alloc(vm);
+    g_http_alloc_set = 1;
     size_t base = vigil_vm_stack_depth(vm) - arg_count;
     int64_t ch = get_i64_arg(vm, base, 0);
     int64_t status_code = get_i64_arg(vm, base, 1);
@@ -1846,7 +1903,7 @@ static vigil_status_t http_write_header(vigil_vm_t *vm, size_t arg_count, vigil_
     char *hc = NULL;
     if (hdrs_len > 0)
     {
-        hc = (char *)malloc(hdrs_len + 1);
+        hc = (char *)http_alloc(hdrs_len + 1);
         memcpy(hc, hdrs, hdrs_len);
         hc[hdrs_len] = '\0';
     }
@@ -1855,7 +1912,7 @@ static vigil_status_t http_write_header(vigil_vm_t *vm, size_t arg_count, vigil_
     http_conn_t *c = get_client(ch);
     if (!c || c->sock == VIGIL_INVALID_SOCKET)
     {
-        free(hc);
+        http_dealloc(hc);
         return push_i64(vm, -1, error);
     }
 
@@ -1888,7 +1945,7 @@ static vigil_status_t http_write_header(vigil_vm_t *vm, size_t arg_count, vigil_
     int hlen = snprintf(resp_hdr, sizeof(resp_hdr),
                         "HTTP/1.1 %d %s\r\n%s%sTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n",
                         (int)status_code, reason, hc ? hc : "", c->pending_cookies ? c->pending_cookies : "");
-    free(hc);
+    http_dealloc(hc);
 
     int rc = 0;
     if (vigil_platform_tcp_send(c->sock, resp_hdr, (size_t)hlen, NULL, NULL) != VIGIL_STATUS_OK)
@@ -1898,6 +1955,8 @@ static vigil_status_t http_write_header(vigil_vm_t *vm, size_t arg_count, vigil_
 
 static vigil_status_t http_write(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
 {
+    g_http_alloc = get_alloc(vm);
+    g_http_alloc_set = 1;
     size_t base = vigil_vm_stack_depth(vm) - arg_count;
     int64_t ch = get_i64_arg(vm, base, 0);
     const char *data = NULL;
@@ -1906,7 +1965,7 @@ static vigil_status_t http_write(vigil_vm_t *vm, size_t arg_count, vigil_error_t
     char *dc = NULL;
     if (dlen > 0)
     {
-        dc = (char *)malloc(dlen);
+        dc = (char *)http_alloc(dlen);
         memcpy(dc, data, dlen);
     }
     vigil_vm_stack_pop_n(vm, arg_count);
@@ -1914,7 +1973,7 @@ static vigil_status_t http_write(vigil_vm_t *vm, size_t arg_count, vigil_error_t
     http_conn_t *c = get_client(ch);
     if (!c || c->sock == VIGIL_INVALID_SOCKET || dlen == 0)
     {
-        free(dc);
+        http_dealloc(dc);
         return push_i64(vm, dlen == 0 ? 0 : -1, error);
     }
 
@@ -1928,12 +1987,14 @@ static vigil_status_t http_write(vigil_vm_t *vm, size_t arg_count, vigil_error_t
         rc = -1;
     if (rc == 0 && vigil_platform_tcp_send(c->sock, "\r\n", 2, NULL, NULL) != VIGIL_STATUS_OK)
         rc = -1;
-    free(dc);
+    http_dealloc(dc);
     return push_i64(vm, rc, error);
 }
 
 static vigil_status_t http_flush(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
 {
+    g_http_alloc = get_alloc(vm);
+    g_http_alloc_set = 1;
     size_t base = vigil_vm_stack_depth(vm) - arg_count;
     int64_t ch = get_i64_arg(vm, base, 0);
     vigil_vm_stack_pop_n(vm, arg_count);
@@ -1955,6 +2016,8 @@ static vigil_status_t http_flush(vigil_vm_t *vm, size_t arg_count, vigil_error_t
 
 static vigil_status_t http_redirect(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
 {
+    g_http_alloc = get_alloc(vm);
+    g_http_alloc_set = 1;
     size_t base = vigil_vm_stack_depth(vm) - arg_count;
     int64_t ch = get_i64_arg(vm, base, 0);
     const char *url = NULL;
@@ -1996,6 +2059,8 @@ static vigil_status_t http_redirect(vigil_vm_t *vm, size_t arg_count, vigil_erro
 
 static vigil_status_t http_set_cookie(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
 {
+    g_http_alloc = get_alloc(vm);
+    g_http_alloc_set = 1;
     size_t base = vigil_vm_stack_depth(vm) - arg_count;
     int64_t ch = get_i64_arg(vm, base, 0);
     const char *name = NULL, *value = NULL;
@@ -2022,7 +2087,7 @@ static vigil_status_t http_set_cookie(vigil_vm_t *vm, size_t arg_count, vigil_er
 
     /* Append to pending_cookies buffer */
     size_t new_len = c->cookies_len + (size_t)clen;
-    char *nb = (char *)realloc(c->pending_cookies, new_len + 1);
+    char *nb = (char *)http_realloc(c->pending_cookies, new_len + 1);
     if (!nb)
         return push_i64(vm, -1, error);
     memcpy(nb + c->cookies_len, cookie, (size_t)clen);
@@ -2034,6 +2099,8 @@ static vigil_status_t http_set_cookie(vigil_vm_t *vm, size_t arg_count, vigil_er
 
 static vigil_status_t http_req_cookies(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
 {
+    g_http_alloc = get_alloc(vm);
+    g_http_alloc_set = 1;
     size_t base = vigil_vm_stack_depth(vm) - arg_count;
     int64_t ch = get_i64_arg(vm, base, 0);
     vigil_vm_stack_pop_n(vm, arg_count);
@@ -2066,6 +2133,8 @@ static vigil_status_t http_req_cookies(vigil_vm_t *vm, size_t arg_count, vigil_e
 
 static vigil_status_t http_get(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
 {
+    g_http_alloc = get_alloc(vm);
+    g_http_alloc_set = 1;
     size_t base = vigil_vm_stack_depth(vm) - arg_count;
     const char *url = NULL;
     size_t url_len = 0;
@@ -2076,14 +2145,14 @@ static vigil_status_t http_get(vigil_vm_t *vm, size_t arg_count, vigil_error_t *
         push_string(vm, "", 0, error);
         return push_i64(vm, -1, error);
     }
-    char *uc = (char *)malloc(url_len + 1);
+    char *uc = (char *)http_alloc(url_len + 1);
     memcpy(uc, url, url_len);
     uc[url_len] = '\0';
     vigil_vm_stack_pop_n(vm, arg_count);
 
     http_response_t resp;
     int rc = do_request("GET", uc, NULL, NULL, 0, &resp);
-    free(uc);
+    http_dealloc(uc);
     if (rc != 0)
     {
         push_string(vm, "", 0, error);
@@ -2099,6 +2168,8 @@ static vigil_status_t http_get(vigil_vm_t *vm, size_t arg_count, vigil_error_t *
 
 static vigil_status_t http_post(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
 {
+    g_http_alloc = get_alloc(vm);
+    g_http_alloc_set = 1;
     size_t base = vigil_vm_stack_depth(vm) - arg_count;
     const char *url, *body, *ct = NULL;
     size_t url_len, body_len, ct_len = 0;
@@ -2111,10 +2182,10 @@ static vigil_status_t http_post(vigil_vm_t *vm, size_t arg_count, vigil_error_t 
     }
     if (arg_count >= 3)
         get_string_arg(vm, base, 2, &ct, &ct_len);
-    char *uc = (char *)malloc(url_len + 1);
+    char *uc = (char *)http_alloc(url_len + 1);
     memcpy(uc, url, url_len);
     uc[url_len] = '\0';
-    char *bc = (char *)malloc(body_len + 1);
+    char *bc = (char *)http_alloc(body_len + 1);
     memcpy(bc, body, body_len);
     bc[body_len] = '\0';
     char hdrs[512] = "";
@@ -2124,8 +2195,8 @@ static vigil_status_t http_post(vigil_vm_t *vm, size_t arg_count, vigil_error_t 
 
     http_response_t resp;
     int rc = do_request("POST", uc, hdrs, bc, body_len, &resp);
-    free(uc);
-    free(bc);
+    http_dealloc(uc);
+    http_dealloc(bc);
     if (rc != 0)
     {
         push_string(vm, "", 0, error);
@@ -2141,6 +2212,8 @@ static vigil_status_t http_post(vigil_vm_t *vm, size_t arg_count, vigil_error_t 
 
 static vigil_status_t http_request(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
 {
+    g_http_alloc = get_alloc(vm);
+    g_http_alloc_set = 1;
     size_t base = vigil_vm_stack_depth(vm) - arg_count;
     const char *method, *url, *headers = NULL, *body = NULL;
     size_t ml, ul, hl = 0, bl = 0;
@@ -2155,14 +2228,14 @@ static vigil_status_t http_request(vigil_vm_t *vm, size_t arg_count, vigil_error
         get_string_arg(vm, base, 2, &headers, &hl);
     if (arg_count >= 4)
         get_string_arg(vm, base, 3, &body, &bl);
-    char *mc = (char *)malloc(ml + 1);
+    char *mc = (char *)http_alloc(ml + 1);
     memcpy(mc, method, ml);
     mc[ml] = '\0';
-    char *uc = (char *)malloc(ul + 1);
+    char *uc = (char *)http_alloc(ul + 1);
     memcpy(uc, url, ul);
     uc[ul] = '\0';
-    char *hc = hl ? (char *)malloc(hl + 1) : NULL;
-    char *bc = bl ? (char *)malloc(bl + 1) : NULL;
+    char *hc = hl ? (char *)http_alloc(hl + 1) : NULL;
+    char *bc = bl ? (char *)http_alloc(bl + 1) : NULL;
     if (hc)
     {
         memcpy(hc, headers, hl);
@@ -2177,10 +2250,10 @@ static vigil_status_t http_request(vigil_vm_t *vm, size_t arg_count, vigil_error
 
     http_response_t resp;
     int rc = do_request(mc, uc, hc, bc, bl, &resp);
-    free(mc);
-    free(uc);
-    free(hc);
-    free(bc);
+    http_dealloc(mc);
+    http_dealloc(uc);
+    http_dealloc(hc);
+    http_dealloc(bc);
     if (rc != 0)
     {
         push_string(vm, "", 0, error);

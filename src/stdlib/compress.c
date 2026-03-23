@@ -7,14 +7,26 @@
 #include <string.h>
 
 #include "vigil/native_module.h"
+#include "vigil/runtime.h"
 #include "vigil/stdlib.h"
 #include "vigil/type.h"
 #include "vigil/value.h"
 #include "vigil/vm.h"
 
+#include "internal/vigil_internal.h"
 #include "internal/vigil_nanbox.h"
 #include "lz4.h"
 #include "miniz.h"
+
+/* ── Allocator helpers ───────────────────────────────────────────── */
+
+static vigil_allocator_t get_alloc(vigil_vm_t *vm)
+{
+    const vigil_allocator_t *a = vigil_runtime_allocator(vigil_vm_runtime(vm));
+    if (a != NULL)
+        return *a;
+    return vigil_default_allocator();
+}
 
 /* ── Helpers ─────────────────────────────────────────────────────── */
 
@@ -93,6 +105,8 @@ static vigil_status_t zlib_compress_fn(vigil_vm_t *vm, size_t arg_count, vigil_e
     size_t base = vigil_vm_stack_depth(vm) - arg_count;
     size_t src_len;
     const char *src;
+    vigil_allocator_t alloc = get_alloc(vm);
+
     mz_ulong dst_len;
     unsigned char *dst;
     int status;
@@ -107,7 +121,7 @@ static vigil_status_t zlib_compress_fn(vigil_vm_t *vm, size_t arg_count, vigil_e
     }
 
     dst_len = mz_compressBound((mz_ulong)src_len);
-    dst = (unsigned char *)malloc(dst_len);
+    dst = (unsigned char *)alloc.allocate(alloc.user_data, dst_len);
     if (!dst)
     {
         return push_empty_bytes(vm, error);
@@ -116,12 +130,12 @@ static vigil_status_t zlib_compress_fn(vigil_vm_t *vm, size_t arg_count, vigil_e
     status = mz_compress(dst, &dst_len, (const unsigned char *)src, (mz_ulong)src_len);
     if (status != MZ_OK)
     {
-        free(dst);
+        alloc.deallocate(alloc.user_data, dst);
         return push_empty_bytes(vm, error);
     }
 
     ret = push_bytes(vm, dst, dst_len, error);
-    free(dst);
+    alloc.deallocate(alloc.user_data, dst);
     return ret;
 }
 
@@ -132,6 +146,8 @@ static vigil_status_t zlib_compress_level_fn(vigil_vm_t *vm, size_t arg_count, v
     const char *src;
     int level;
 
+    vigil_allocator_t alloc = get_alloc(vm);
+
     src = get_bytes_data(vigil_vm_stack_get(vm, base), &src_len);
     level = clamp_level((int)vigil_nanbox_decode_int(vigil_vm_stack_get(vm, base + 1)));
     vigil_vm_stack_pop_n(vm, arg_count);
@@ -140,19 +156,19 @@ static vigil_status_t zlib_compress_level_fn(vigil_vm_t *vm, size_t arg_count, v
         return push_empty_bytes(vm, error);
 
     mz_ulong dst_len = mz_compressBound((mz_ulong)src_len);
-    unsigned char *dst = (unsigned char *)malloc(dst_len);
+    unsigned char *dst = (unsigned char *)alloc.allocate(alloc.user_data, dst_len);
     if (!dst)
         return push_empty_bytes(vm, error);
 
     int status = mz_compress2(dst, &dst_len, (const unsigned char *)src, (mz_ulong)src_len, level);
     if (status != MZ_OK)
     {
-        free(dst);
+        alloc.deallocate(alloc.user_data, dst);
         return push_empty_bytes(vm, error);
     }
 
     vigil_status_t ret = push_bytes(vm, dst, dst_len, error);
-    free(dst);
+    alloc.deallocate(alloc.user_data, dst);
     return ret;
 }
 
@@ -161,6 +177,8 @@ static vigil_status_t zlib_decompress_fn(vigil_vm_t *vm, size_t arg_count, vigil
     size_t base = vigil_vm_stack_depth(vm) - arg_count;
     size_t src_len;
     const char *src;
+    vigil_allocator_t alloc = get_alloc(vm);
+
     mz_ulong dst_len;
     unsigned char *dst;
     int status;
@@ -178,7 +196,7 @@ static vigil_status_t zlib_decompress_fn(vigil_vm_t *vm, size_t arg_count, vigil
     if (dst_len < 1024)
         dst_len = 1024;
 
-    dst = (unsigned char *)malloc(dst_len);
+    dst = (unsigned char *)alloc.allocate(alloc.user_data, dst_len);
     if (!dst)
     {
         return push_empty_bytes(vm, error);
@@ -191,17 +209,17 @@ static vigil_status_t zlib_decompress_fn(vigil_vm_t *vm, size_t arg_count, vigil
         if (status == MZ_OK)
         {
             vigil_status_t ret = push_bytes(vm, dst, try_len, error);
-            free(dst);
+            alloc.deallocate(alloc.user_data, dst);
             return ret;
         }
         if (status == MZ_BUF_ERROR)
         {
             /* Need more space */
             mz_ulong new_len = dst_len * 2;
-            unsigned char *new_dst = (unsigned char *)realloc(dst, new_len);
+            unsigned char *new_dst = (unsigned char *)alloc.reallocate(alloc.user_data, dst, new_len);
             if (!new_dst)
             {
-                free(dst);
+                alloc.deallocate(alloc.user_data, dst);
                 return push_empty_bytes(vm, error);
             }
             dst = new_dst;
@@ -209,7 +227,7 @@ static vigil_status_t zlib_decompress_fn(vigil_vm_t *vm, size_t arg_count, vigil
             continue;
         }
         /* Other error */
-        free(dst);
+        alloc.deallocate(alloc.user_data, dst);
         return push_empty_bytes(vm, error);
     }
 }
@@ -219,11 +237,13 @@ static vigil_status_t zlib_decompress_fn(vigil_vm_t *vm, size_t arg_count, vigil
 static vigil_status_t deflate_compress_impl(vigil_vm_t *vm, const char *src, size_t src_len, int level,
                                             vigil_error_t *error)
 {
+    vigil_allocator_t alloc = get_alloc(vm);
+
     if (!src || src_len == 0)
         return push_empty_bytes(vm, error);
 
     mz_ulong bound = mz_deflateBound(NULL, (mz_ulong)src_len);
-    unsigned char *dst = (unsigned char *)malloc(bound);
+    unsigned char *dst = (unsigned char *)alloc.allocate(alloc.user_data, bound);
     if (!dst)
         return push_empty_bytes(vm, error);
 
@@ -237,20 +257,20 @@ static vigil_status_t deflate_compress_impl(vigil_vm_t *vm, const char *src, siz
     /* Use negative window bits for raw deflate (no zlib header/trailer) */
     if (mz_deflateInit2(&stream, level, MZ_DEFLATED, -MZ_DEFAULT_WINDOW_BITS, 9, MZ_DEFAULT_STRATEGY) != MZ_OK)
     {
-        free(dst);
+        alloc.deallocate(alloc.user_data, dst);
         return push_empty_bytes(vm, error);
     }
     if (mz_deflate(&stream, MZ_FINISH) != MZ_STREAM_END)
     {
         mz_deflateEnd(&stream);
-        free(dst);
+        alloc.deallocate(alloc.user_data, dst);
         return push_empty_bytes(vm, error);
     }
     size_t out_len = stream.total_out;
     mz_deflateEnd(&stream);
 
     vigil_status_t ret = push_bytes(vm, dst, out_len, error);
-    free(dst);
+    alloc.deallocate(alloc.user_data, dst);
     return ret;
 }
 
@@ -278,6 +298,8 @@ static vigil_status_t deflate_decompress_fn(vigil_vm_t *vm, size_t arg_count, vi
     size_t base = vigil_vm_stack_depth(vm) - arg_count;
     size_t src_len;
     const char *src;
+    vigil_allocator_t alloc = get_alloc(vm);
+
     tinfl_decompressor decomp;
     size_t dst_cap = 1024 * 64;
     size_t dst_len = 0;
@@ -293,7 +315,7 @@ static vigil_status_t deflate_decompress_fn(vigil_vm_t *vm, size_t arg_count, vi
         return push_empty_bytes(vm, error);
     }
 
-    dst = (unsigned char *)malloc(dst_cap);
+    dst = (unsigned char *)alloc.allocate(alloc.user_data, dst_cap);
     if (!dst)
     {
         return push_empty_bytes(vm, error);
@@ -319,16 +341,16 @@ static vigil_status_t deflate_decompress_fn(vigil_vm_t *vm, size_t arg_count, vi
         }
         if (status < 0)
         {
-            free(dst);
+            alloc.deallocate(alloc.user_data, dst);
             return push_empty_bytes(vm, error);
         }
         if (status == TINFL_STATUS_HAS_MORE_OUTPUT || dst_len >= dst_cap)
         {
             size_t new_cap = dst_cap * 2;
-            unsigned char *new_dst = (unsigned char *)realloc(dst, new_cap);
+            unsigned char *new_dst = (unsigned char *)alloc.reallocate(alloc.user_data, dst, new_cap);
             if (!new_dst)
             {
-                free(dst);
+                alloc.deallocate(alloc.user_data, dst);
                 return push_empty_bytes(vm, error);
             }
             dst = new_dst;
@@ -338,7 +360,7 @@ static vigil_status_t deflate_decompress_fn(vigil_vm_t *vm, size_t arg_count, vi
 
     {
         vigil_status_t ret = push_bytes(vm, dst, dst_len, error);
-        free(dst);
+        alloc.deallocate(alloc.user_data, dst);
         return ret;
     }
 }
@@ -348,6 +370,8 @@ static vigil_status_t deflate_decompress_fn(vigil_vm_t *vm, size_t arg_count, vi
 static vigil_status_t gzip_compress_impl(vigil_vm_t *vm, const char *src, size_t src_len, int level,
                                          vigil_error_t *error)
 {
+    vigil_allocator_t alloc = get_alloc(vm);
+
     mz_ulong bound;
     unsigned char *out;
     size_t out_len;
@@ -363,7 +387,7 @@ static vigil_status_t gzip_compress_impl(vigil_vm_t *vm, const char *src, size_t
     }
 
     bound = mz_deflateBound(NULL, (mz_ulong)src_len);
-    out = (unsigned char *)malloc(10 + bound + 8);
+    out = (unsigned char *)alloc.allocate(alloc.user_data, 10 + bound + 8);
     if (!out)
         return push_empty_bytes(vm, error);
 
@@ -387,13 +411,13 @@ static vigil_status_t gzip_compress_impl(vigil_vm_t *vm, const char *src, size_t
 
     if (mz_deflateInit2(&stream, level, MZ_DEFLATED, -MZ_DEFAULT_WINDOW_BITS, 9, MZ_DEFAULT_STRATEGY) != MZ_OK)
     {
-        free(out);
+        alloc.deallocate(alloc.user_data, out);
         return push_empty_bytes(vm, error);
     }
     if (mz_deflate(&stream, MZ_FINISH) != MZ_STREAM_END)
     {
         mz_deflateEnd(&stream);
-        free(out);
+        alloc.deallocate(alloc.user_data, out);
         return push_empty_bytes(vm, error);
     }
 
@@ -411,7 +435,7 @@ static vigil_status_t gzip_compress_impl(vigil_vm_t *vm, const char *src, size_t
     out[out_len++] = (unsigned char)((src_len >> 24) & 0xff);
 
     ret = push_bytes(vm, out, out_len, error);
-    free(out);
+    alloc.deallocate(alloc.user_data, out);
     return ret;
 }
 
@@ -469,6 +493,8 @@ static vigil_status_t gzip_decompress_fn(vigil_vm_t *vm, size_t arg_count, vigil
     size_t src_len;
     const char *src;
 
+    vigil_allocator_t alloc = get_alloc(vm);
+
     src = get_bytes_data(vigil_vm_stack_get(vm, base), &src_len);
     vigil_vm_stack_pop_n(vm, arg_count);
 
@@ -486,7 +512,7 @@ static vigil_status_t gzip_decompress_fn(vigil_vm_t *vm, size_t arg_count, vigil
     size_t deflate_len = src_len - hdr_len - 8;
     size_t dst_cap = 1024 * 64;
     size_t dst_len = 0;
-    unsigned char *dst = (unsigned char *)malloc(dst_cap);
+    unsigned char *dst = (unsigned char *)alloc.allocate(alloc.user_data, dst_cap);
     if (!dst)
         return push_empty_bytes(vm, error);
 
@@ -507,16 +533,16 @@ static vigil_status_t gzip_decompress_fn(vigil_vm_t *vm, size_t arg_count, vigil
             break;
         if (status < 0)
         {
-            free(dst);
+            alloc.deallocate(alloc.user_data, dst);
             return push_empty_bytes(vm, error);
         }
         if (status == TINFL_STATUS_HAS_MORE_OUTPUT || dst_len >= dst_cap)
         {
             size_t new_cap = dst_cap * 2;
-            unsigned char *new_dst = (unsigned char *)realloc(dst, new_cap);
+            unsigned char *new_dst = (unsigned char *)alloc.reallocate(alloc.user_data, dst, new_cap);
             if (!new_dst)
             {
-                free(dst);
+                alloc.deallocate(alloc.user_data, dst);
                 return push_empty_bytes(vm, error);
             }
             dst = new_dst;
@@ -525,7 +551,7 @@ static vigil_status_t gzip_decompress_fn(vigil_vm_t *vm, size_t arg_count, vigil
     }
 
     vigil_status_t ret = push_bytes(vm, dst, dst_len, error);
-    free(dst);
+    alloc.deallocate(alloc.user_data, dst);
     return ret;
 }
 
@@ -540,6 +566,8 @@ static vigil_status_t lz4_compress_fn(vigil_vm_t *vm, size_t arg_count, vigil_er
     char *dst;
     vigil_status_t ret;
 
+    vigil_allocator_t alloc = get_alloc(vm);
+
     src = get_bytes_data(vigil_vm_stack_get(vm, base), &src_len);
     vigil_vm_stack_pop_n(vm, arg_count);
 
@@ -549,7 +577,7 @@ static vigil_status_t lz4_compress_fn(vigil_vm_t *vm, size_t arg_count, vigil_er
     }
 
     dst_cap = LZ4_compressBound((int)src_len);
-    dst = (char *)malloc((size_t)dst_cap);
+    dst = (char *)alloc.allocate(alloc.user_data, (size_t)dst_cap);
     if (!dst)
     {
         return push_empty_bytes(vm, error);
@@ -558,12 +586,12 @@ static vigil_status_t lz4_compress_fn(vigil_vm_t *vm, size_t arg_count, vigil_er
     compressed_size = LZ4_compress_default(src, dst, (int)src_len, dst_cap);
     if (compressed_size <= 0)
     {
-        free(dst);
+        alloc.deallocate(alloc.user_data, dst);
         return push_empty_bytes(vm, error);
     }
 
     ret = push_bytes(vm, dst, (size_t)compressed_size, error);
-    free(dst);
+    alloc.deallocate(alloc.user_data, dst);
     return ret;
 }
 
@@ -574,6 +602,8 @@ static vigil_status_t lz4_decompress_fn(vigil_vm_t *vm, size_t arg_count, vigil_
     const char *src;
     int dst_cap, decompressed_size;
     char *dst;
+
+    vigil_allocator_t alloc = get_alloc(vm);
 
     src = get_bytes_data(vigil_vm_stack_get(vm, base), &src_len);
     vigil_vm_stack_pop_n(vm, arg_count);
@@ -588,7 +618,7 @@ static vigil_status_t lz4_decompress_fn(vigil_vm_t *vm, size_t arg_count, vigil_
     if (dst_cap < 1024)
         dst_cap = 1024;
 
-    dst = (char *)malloc((size_t)dst_cap);
+    dst = (char *)alloc.allocate(alloc.user_data, (size_t)dst_cap);
     if (!dst)
     {
         return push_empty_bytes(vm, error);
@@ -600,28 +630,28 @@ static vigil_status_t lz4_decompress_fn(vigil_vm_t *vm, size_t arg_count, vigil_
         if (decompressed_size > 0)
         {
             vigil_status_t ret = push_bytes(vm, dst, (size_t)decompressed_size, error);
-            free(dst);
+            alloc.deallocate(alloc.user_data, dst);
             return ret;
         }
         if (decompressed_size == 0)
         {
             /* Empty result */
-            free(dst);
+            alloc.deallocate(alloc.user_data, dst);
             return push_empty_bytes(vm, error);
         }
         /* Negative = error, try larger buffer */
         if (dst_cap > 256 * 1024 * 1024)
         {
             /* Give up after 256MB */
-            free(dst);
+            alloc.deallocate(alloc.user_data, dst);
             return push_empty_bytes(vm, error);
         }
         {
             int new_cap = dst_cap * 2;
-            char *new_dst = (char *)realloc(dst, (size_t)new_cap);
+            char *new_dst = (char *)alloc.reallocate(alloc.user_data, dst, (size_t)new_cap);
             if (!new_dst)
             {
-                free(dst);
+                alloc.deallocate(alloc.user_data, dst);
                 return push_empty_bytes(vm, error);
             }
             dst = new_dst;
@@ -1083,8 +1113,15 @@ static vigil_status_t tar_read_fn(vigil_vm_t *vm, size_t arg_count, vigil_error_
     return push_empty_bytes(vm, error);
 }
 
-static int tar_append_entry(const char *name, size_t name_len, const char *data, size_t data_len,
-                            unsigned char **tar_data, size_t *tar_size, size_t *tar_cap)
+typedef struct
+{
+    unsigned char *data;
+    size_t size;
+    size_t cap;
+} tar_buf_t;
+
+static int tar_append_entry(const vigil_allocator_t *alloc, const char *name, size_t name_len, const char *data,
+                            size_t data_len, tar_buf_t *tb)
 {
     tar_header_t h;
     if (name_len > 100)
@@ -1107,25 +1144,25 @@ static int tar_append_entry(const char *name, size_t name_len, const char *data,
     h.checksum[7] = ' ';
 
     size_t padded_size = (data_len + 511) & ~511;
-    size_t needed = *tar_size + 512 + padded_size;
-    if (needed > *tar_cap)
+    size_t needed = tb->size + 512 + padded_size;
+    if (needed > tb->cap)
     {
-        size_t new_cap = *tar_cap ? *tar_cap * 2 : 4096;
+        size_t new_cap = tb->cap ? tb->cap * 2 : 4096;
         while (new_cap < needed)
             new_cap *= 2;
-        unsigned char *new_data = (unsigned char *)realloc(*tar_data, new_cap);
+        unsigned char *new_data = (unsigned char *)alloc->reallocate(alloc->user_data, tb->data, new_cap);
         if (!new_data)
             return 0;
-        *tar_data = new_data;
-        *tar_cap = new_cap;
+        tb->data = new_data;
+        tb->cap = new_cap;
     }
-    memcpy(*tar_data + *tar_size, &h, 512);
-    *tar_size += 512;
+    memcpy(tb->data + tb->size, &h, 512);
+    tb->size += 512;
     if (data && data_len > 0)
-        memcpy(*tar_data + *tar_size, data, data_len);
+        memcpy(tb->data + tb->size, data, data_len);
     if (padded_size > data_len)
-        memset(*tar_data + *tar_size + data_len, 0, padded_size - data_len);
-    *tar_size += padded_size;
+        memset(tb->data + tb->size + data_len, 0, padded_size - data_len);
+    tb->size += padded_size;
     return 1;
 }
 
@@ -1136,8 +1173,9 @@ static vigil_status_t tar_create_fn(vigil_vm_t *vm, size_t arg_count, vigil_erro
     vigil_value_t contents_val = vigil_vm_stack_get(vm, base + 1);
     const vigil_object_t *names_obj, *contents_obj;
     size_t i, count;
-    unsigned char *tar_data = NULL;
-    size_t tar_size = 0, tar_cap = 0;
+    vigil_allocator_t alloc = get_alloc(vm);
+
+    tar_buf_t tb = {NULL, 0, 0};
     vigil_status_t ret;
 
     vigil_vm_stack_pop_n(vm, arg_count);
@@ -1183,9 +1221,9 @@ static vigil_status_t tar_create_fn(vigil_vm_t *vm, size_t arg_count, vigil_erro
             continue;
         }
 
-        if (!tar_append_entry(name, name_len, data, data_len, &tar_data, &tar_size, &tar_cap))
+        if (!tar_append_entry(&alloc, name, name_len, data, data_len, &tb))
         {
-            free(tar_data);
+            alloc.deallocate(alloc.user_data, tb.data);
             vigil_value_release(&name_val);
             vigil_value_release(&content_val);
             return push_empty_bytes(vm, error);
@@ -1196,23 +1234,23 @@ static vigil_status_t tar_create_fn(vigil_vm_t *vm, size_t arg_count, vigil_erro
 
     /* Add two empty blocks at end */
     {
-        size_t needed = tar_size + 1024;
-        if (needed > tar_cap)
+        size_t needed = tb.size + 1024;
+        if (needed > tb.cap)
         {
-            unsigned char *new_data = (unsigned char *)realloc(tar_data, needed);
+            unsigned char *new_data = (unsigned char *)alloc.reallocate(alloc.user_data, tb.data, needed);
             if (!new_data)
             {
-                free(tar_data);
+                alloc.deallocate(alloc.user_data, tb.data);
                 return push_empty_bytes(vm, error);
             }
-            tar_data = new_data;
+            tb.data = new_data;
         }
-        memset(tar_data + tar_size, 0, 1024);
-        tar_size += 1024;
+        memset(tb.data + tb.size, 0, 1024);
+        tb.size += 1024;
     }
 
-    ret = push_bytes(vm, tar_data, tar_size, error);
-    free(tar_data);
+    ret = push_bytes(vm, tb.data, tb.size, error);
+    alloc.deallocate(alloc.user_data, tb.data);
     return ret;
 }
 
@@ -1220,6 +1258,8 @@ static vigil_status_t tar_create_fn(vigil_vm_t *vm, size_t arg_count, vigil_erro
 
 static vigil_status_t tar_gz_create_fn(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
 {
+    vigil_allocator_t alloc = get_alloc(vm);
+
     /* Build tar in memory, then gzip it.
      * We call tar_create_fn which pops our args and pushes the tar bytes. */
     vigil_status_t s = tar_create_fn(vm, arg_count, error);
@@ -1235,14 +1275,14 @@ static vigil_status_t tar_gz_create_fn(vigil_vm_t *vm, size_t arg_count, vigil_e
     char *tar_copy = NULL;
     if (tar_data && tar_len > 0)
     {
-        tar_copy = (char *)malloc(tar_len);
+        tar_copy = (char *)alloc.allocate(alloc.user_data, tar_len);
         if (tar_copy)
             memcpy(tar_copy, tar_data, tar_len);
     }
     vigil_vm_stack_pop_n(vm, 1);
 
     s = gzip_compress_impl(vm, tar_copy, tar_copy ? tar_len : 0, MZ_DEFAULT_COMPRESSION, error);
-    free(tar_copy);
+    alloc.deallocate(alloc.user_data, tar_copy);
     return s;
 }
 
@@ -1255,6 +1295,8 @@ static vigil_status_t gzip_decompress_max_fn(vigil_vm_t *vm, size_t arg_count, v
     const char *src = get_bytes_data(vigil_vm_stack_get(vm, base), &src_len);
     int64_t max_bytes = vigil_nanbox_decode_int(vigil_vm_stack_get(vm, base + 1));
     vigil_vm_stack_pop_n(vm, arg_count);
+
+    vigil_allocator_t alloc = get_alloc(vm);
 
     if (max_bytes <= 0 || !src || src_len < 18)
         return push_empty_bytes(vm, error);
@@ -1293,7 +1335,7 @@ static vigil_status_t gzip_decompress_max_fn(vigil_vm_t *vm, size_t arg_count, v
 
     size_t deflate_len = src_len - hdr_len - 8;
     size_t cap = (size_t)max_bytes;
-    unsigned char *dst = (unsigned char *)malloc(cap);
+    unsigned char *dst = (unsigned char *)alloc.allocate(alloc.user_data, cap);
     if (!dst)
         return push_empty_bytes(vm, error);
 
@@ -1307,7 +1349,7 @@ static vigil_status_t gzip_decompress_max_fn(vigil_vm_t *vm, size_t arg_count, v
 
     if (mz_inflateInit2(&stream, -MZ_DEFAULT_WINDOW_BITS) != MZ_OK)
     {
-        free(dst);
+        alloc.deallocate(alloc.user_data, dst);
         return push_empty_bytes(vm, error);
     }
 
@@ -1316,7 +1358,7 @@ static vigil_status_t gzip_decompress_max_fn(vigil_vm_t *vm, size_t arg_count, v
     mz_inflateEnd(&stream);
 
     vigil_status_t ret = push_bytes(vm, dst, out_len, error);
-    free(dst);
+    alloc.deallocate(alloc.user_data, dst);
     return ret;
 }
 
