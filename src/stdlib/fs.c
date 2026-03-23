@@ -1768,10 +1768,12 @@ static const int i32_err_returns[] = {VIGIL_TYPE_I32, VIGIL_TYPE_ERR};
 static const int str1_param[] = {VIGIL_TYPE_STRING};
 static const int i32_1_param[] = {VIGIL_TYPE_I32};
 
+// clang-format off
 #define FS_STATIC(n, nl, fn, pc, pt, rt, rc, rts) \
     {n, nl, fn, pc, pt, rt, rc, rts, 1, NULL, 0U, 0}
 #define FS_METHOD(n, nl, fn, pc, pt, rt, rc, rts) \
     {n, nl, fn, pc, pt, rt, rc, rts, 0, NULL, 0U, 0}
+// clang-format on
 
 static const vigil_native_class_method_t reader_methods[] = {
     FS_STATIC("open", 4U, reader_open, 1U, str1_param, VIGIL_TYPE_OBJECT, 2U, obj_err_returns),
