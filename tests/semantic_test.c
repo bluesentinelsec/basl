@@ -207,6 +207,65 @@ TEST(SemanticTest, AnalyzeInvalidSource)
     vigil_runtime_close(&runtime);
 }
 
+TEST(SemanticTest, TypeToStringWithRuntime)
+{
+    vigil_runtime_t *runtime = NULL;
+    vigil_source_registry_t registry;
+    vigil_semantic_index_t *index = NULL;
+    vigil_source_id_t source_id = 0;
+    vigil_error_t error = {0};
+
+    vigil_runtime_open(&runtime, NULL, &error);
+    vigil_source_registry_init(&registry, runtime);
+    vigil_source_registry_register_cstr(&registry, "test.vigil", "fn main() -> i32 { return 0; }", &source_id, &error);
+    vigil_semantic_index_create(&index, runtime, &registry, &error);
+    vigil_semantic_index_analyze(index, source_id, &error);
+
+    vigil_semantic_type_t i32_type = vigil_semantic_type_primitive(VIGIL_TYPE_I32);
+    char *str = vigil_semantic_type_to_string(index, i32_type);
+    ASSERT_NE(str, NULL);
+    EXPECT_STREQ(str, "i32");
+
+    const vigil_allocator_t *alloc = vigil_runtime_allocator(runtime);
+    alloc->deallocate(alloc->user_data, str);
+
+    vigil_semantic_index_destroy(&index);
+    vigil_source_registry_free(&registry);
+    vigil_runtime_close(&runtime);
+}
+
+TEST(SemanticTest, ReferencesAtIdentifier)
+{
+    vigil_runtime_t *runtime = NULL;
+    vigil_source_registry_t registry;
+    vigil_semantic_index_t *index = NULL;
+    vigil_source_id_t source_id = 0;
+    vigil_error_t error = {0};
+    vigil_semantic_reference_t *refs = NULL;
+    size_t ref_count = 0;
+
+    vigil_runtime_open(&runtime, NULL, &error);
+    vigil_source_registry_init(&registry, runtime);
+    vigil_source_registry_register_cstr(&registry, "test.vigil", "let x: i32 = 1;\nfn main() -> i32 { return x; }",
+                                        &source_id, &error);
+    vigil_semantic_index_create(&index, runtime, &registry, &error);
+    vigil_semantic_index_analyze(index, source_id, &error);
+
+    /* 'x' at offset 4 in "let x: i32 = 1;" */
+    vigil_status_t status = vigil_semantic_index_references_at(index, source_id, 4, &refs, &ref_count, &error);
+    ASSERT_EQ(status, VIGIL_STATUS_OK);
+
+    if (refs != NULL)
+    {
+        void *tmp = refs;
+        vigil_runtime_free(runtime, &tmp);
+    }
+
+    vigil_semantic_index_destroy(&index);
+    vigil_source_registry_free(&registry);
+    vigil_runtime_close(&runtime);
+}
+
 /* ── Test registration ────────────────────────────────────── */
 
 void register_semantic_tests(void)
@@ -222,4 +281,6 @@ void register_semantic_tests(void)
     REGISTER_TEST(SemanticTest, TypeToStringInvalid);
     REGISTER_TEST(SemanticTest, AnalyzeValidSource);
     REGISTER_TEST(SemanticTest, AnalyzeInvalidSource);
+    REGISTER_TEST(SemanticTest, TypeToStringWithRuntime);
+    REGISTER_TEST(SemanticTest, ReferencesAtIdentifier);
 }

@@ -11,6 +11,7 @@
  */
 
 #include "vigil/fmt.h"
+#include "vigil/allocator.h"
 
 #include <ctype.h>
 #include <stdbool.h>
@@ -19,6 +20,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "internal/vigil_internal.h"
 #include "vigil/token.h"
 
 /* ── dynamic buffer ──────────────────────────────────────────────── */
@@ -28,13 +30,18 @@ typedef struct
     char *data;
     size_t len;
     size_t cap;
+    vigil_allocator_t alloc;
 } buf_t;
 
-static void buf_init(buf_t *b)
+static void buf_init(buf_t *b, const vigil_allocator_t *a)
 {
     b->data = NULL;
     b->len = 0;
     b->cap = 0;
+    if (a != NULL && a->allocate != NULL)
+        b->alloc = *a;
+    else
+        b->alloc = vigil_default_allocator();
 }
 
 static void buf_grow(buf_t *b, size_t need)
@@ -44,7 +51,7 @@ static void buf_grow(buf_t *b, size_t need)
     size_t cap = b->cap ? b->cap : 256;
     while (cap < b->len + need)
         cap *= 2;
-    b->data = realloc(b->data, cap);
+    b->data = (char *)b->alloc.reallocate(b->alloc.user_data, b->data, cap);
     b->cap = cap;
 }
 
@@ -394,7 +401,8 @@ static size_t fmt_collect_imports(fmt_state_t *f, import_info_t **out_imports, s
         if (count == cap)
         {
             cap = cap ? cap * 2 : 8;
-            imports = realloc(imports, cap * sizeof(import_info_t));
+            imports =
+                (import_info_t *)f->out.alloc.reallocate(f->out.alloc.user_data, imports, cap * sizeof(import_info_t));
         }
         imports[count++] = imp;
     }
@@ -702,8 +710,8 @@ static void fmt_finalize_output(fmt_state_t *f)
 
 /* ── public entry point ──────────────────────────────────────────── */
 
-vigil_status_t vigil_fmt(const char *source_text, size_t source_length, const vigil_token_list_t *tokens,
-                         char **out_text, size_t *out_length, vigil_error_t *error)
+vigil_status_t vigil_fmt(const vigil_allocator_t *allocator, const char *source_text, size_t source_length,
+                         const vigil_token_list_t *tokens, char **out_text, size_t *out_length, vigil_error_t *error)
 {
     (void)error;
     fmt_state_t f;
@@ -711,13 +719,15 @@ vigil_status_t vigil_fmt(const char *source_text, size_t source_length, const vi
     f.src_len = source_length;
     f.tokens = tokens;
     f.count = vigil_token_list_count(tokens);
-    buf_init(&f.out);
+    buf_init(&f.out, allocator);
     f.indent = 0;
     f.at_line_start = true;
 
     if (f.count == 0 || (f.count == 1 && vigil_token_list_get(tokens, 0)->kind == VIGIL_TOKEN_EOF))
     {
-        *out_text = calloc(1, 1);
+        *out_text = (char *)f.out.alloc.allocate(f.out.alloc.user_data, 1);
+        if (*out_text)
+            (*out_text)[0] = '\0';
         *out_length = 0;
         return VIGIL_STATUS_OK;
     }
@@ -750,7 +760,7 @@ vigil_status_t vigil_fmt(const char *source_text, size_t source_length, const vi
     }
 
     fmt_finalize_output(&f);
-    free(imports);
+    f.out.alloc.deallocate(f.out.alloc.user_data, imports);
 
     buf_push(&f.out, '\0');
     *out_text = f.out.data;

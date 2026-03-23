@@ -11,11 +11,23 @@
 
 #include "internal/vigil_internal.h"
 
+/* ── Allocator resolution ────────────────────────────────────────── */
+
+static vigil_allocator_t url_resolve_alloc(const vigil_allocator_t *a)
+{
+    if (a != NULL && vigil_allocator_is_valid(a))
+        return *a;
+    return vigil_default_allocator();
+}
+
+#define URL_ALLOC(a, sz) (a)->allocate((a)->user_data, (sz))
+#define URL_FREE(a, p) (a)->deallocate((a)->user_data, (p))
+
 /* ── Helpers ─────────────────────────────────────────────────────── */
 
-static char *str_ndup(const char *s, size_t n)
+static char *str_ndup_a(const vigil_allocator_t *a, const char *s, size_t n)
 {
-    char *r = malloc(n + 1);
+    char *r = (char *)URL_ALLOC(a, n + 1);
     if (r)
     {
         memcpy(r, s, n);
@@ -42,11 +54,12 @@ static int is_unreserved(char c)
 
 /* ── Percent Encoding/Decoding ───────────────────────────────────── */
 
-vigil_status_t vigil_url_unescape(const char *input, size_t input_length, char **out_decoded, size_t *out_length,
-                                  vigil_error_t *error)
+vigil_status_t vigil_url_unescape(const vigil_allocator_t *allocator, const char *input, size_t input_length,
+                                  char **out_decoded, size_t *out_length, vigil_error_t *error)
 {
     char *result;
     size_t i, j;
+    vigil_allocator_t a = url_resolve_alloc(allocator);
 
     if (!input || !out_decoded)
     {
@@ -55,7 +68,7 @@ vigil_status_t vigil_url_unescape(const char *input, size_t input_length, char *
         return VIGIL_STATUS_INVALID_ARGUMENT;
     }
 
-    result = malloc(input_length + 1);
+    result = (char *)a.allocate(a.user_data, input_length + 1);
     if (!result)
     {
         if (error)
@@ -93,7 +106,22 @@ vigil_status_t vigil_url_unescape(const char *input, size_t input_length, char *
     return VIGIL_STATUS_OK;
 }
 
-static vigil_status_t percent_encode(const char *input, size_t input_length, int encode_slash, int encode_plus,
+/* flags for percent_encode */
+#define PE_ENCODE_SLASH 1
+#define PE_ENCODE_PLUS 2
+
+static int pe_should_encode(unsigned char c, int flags)
+{
+    if (is_unreserved((char)c))
+        return 0;
+    if (!(flags & PE_ENCODE_SLASH) && c == '/')
+        return 0;
+    if (!(flags & PE_ENCODE_PLUS) && c == ' ')
+        return 0;
+    return 1;
+}
+
+static vigil_status_t percent_encode(const vigil_allocator_t *a, const char *input, size_t input_length, int flags,
                                      char **out_escaped, size_t *out_length, vigil_error_t *error)
 {
     static const char hex[] = "0123456789ABCDEF";
@@ -110,15 +138,9 @@ static vigil_status_t percent_encode(const char *input, size_t input_length, int
     /* Calculate needed size */
     needed = 0;
     for (i = 0; i < input_length; i++)
-    {
-        unsigned char c = (unsigned char)input[i];
-        if (is_unreserved((char)c) || (!encode_slash && c == '/') || (!encode_plus && c == ' '))
-            needed++;
-        else
-            needed += 3;
-    }
+        needed += pe_should_encode((unsigned char)input[i], flags) ? 3 : 1;
 
-    result = malloc(needed + 1);
+    result = (char *)a->allocate(a->user_data, needed + 1);
     if (!result)
     {
         if (error)
@@ -129,13 +151,9 @@ static vigil_status_t percent_encode(const char *input, size_t input_length, int
     for (i = 0, j = 0; i < input_length; i++)
     {
         unsigned char c = (unsigned char)input[i];
-        if (is_unreserved((char)c) || (!encode_slash && c == '/'))
+        if (!pe_should_encode(c, flags))
         {
-            result[j++] = (char)c;
-        }
-        else if (!encode_plus && c == ' ')
-        {
-            result[j++] = '+';
+            result[j++] = (!(flags & PE_ENCODE_PLUS) && c == ' ') ? '+' : (char)c;
         }
         else
         {
@@ -152,39 +170,41 @@ static vigil_status_t percent_encode(const char *input, size_t input_length, int
     return VIGIL_STATUS_OK;
 }
 
-vigil_status_t vigil_url_path_escape(const char *input, size_t input_length, char **out_escaped, size_t *out_length,
-                                     vigil_error_t *error)
+vigil_status_t vigil_url_path_escape(const vigil_allocator_t *allocator, const char *input, size_t input_length,
+                                     char **out_escaped, size_t *out_length, vigil_error_t *error)
 {
-    return percent_encode(input, input_length, 1, 1, out_escaped, out_length, error);
+    vigil_allocator_t a = url_resolve_alloc(allocator);
+    return percent_encode(&a, input, input_length, PE_ENCODE_SLASH | PE_ENCODE_PLUS, out_escaped, out_length, error);
 }
 
-vigil_status_t vigil_url_query_escape(const char *input, size_t input_length, char **out_escaped, size_t *out_length,
-                                      vigil_error_t *error)
+vigil_status_t vigil_url_query_escape(const vigil_allocator_t *allocator, const char *input, size_t input_length,
+                                      char **out_escaped, size_t *out_length, vigil_error_t *error)
 {
-    return percent_encode(input, input_length, 1, 0, out_escaped, out_length, error);
+    vigil_allocator_t a = url_resolve_alloc(allocator);
+    return percent_encode(&a, input, input_length, PE_ENCODE_SLASH, out_escaped, out_length, error);
 }
 
 /* ── URL Parsing ─────────────────────────────────────────────────── */
 
-static vigil_status_t url_unescape_into(const char *input, size_t length, char **out_field)
+static vigil_status_t url_unescape_into(const vigil_allocator_t *a, const char *input, size_t length, char **out_field)
 {
     *out_field = NULL;
-    return vigil_url_unescape(input, length, out_field, NULL, NULL);
+    return vigil_url_unescape(a, input, length, out_field, NULL, NULL);
 }
 
-static vigil_status_t url_escape_append(char *buf, size_t cap, size_t *len, const char *prefix, const char *input,
-                                        size_t input_len)
+static vigil_status_t url_escape_append(const vigil_allocator_t *a, char *buf, size_t cap, size_t *len,
+                                        const char *prefix, const char *input, size_t input_len)
 {
     char *escaped = NULL;
-    vigil_status_t s = vigil_url_path_escape(input, input_len, &escaped, NULL, NULL);
+    vigil_status_t s = vigil_url_path_escape(a, input, input_len, &escaped, NULL, NULL);
     if (s != VIGIL_STATUS_OK)
         return s;
     *len += (size_t)snprintf(buf + *len, cap - *len, "%s%s", prefix, escaped);
-    free(escaped);
+    a->deallocate(a->user_data, escaped);
     return VIGIL_STATUS_OK;
 }
 
-static const char *parse_url_scheme(const char *p, const char *end, vigil_url_t *out_url)
+static const char *parse_url_scheme(const vigil_allocator_t *a, const char *p, const char *end, vigil_url_t *out_url)
 {
     const char *scheme_end = NULL;
     for (const char *s = p; s < end; s++)
@@ -203,13 +223,14 @@ static const char *parse_url_scheme(const char *p, const char *end, vigil_url_t 
     }
     if (scheme_end)
     {
-        out_url->scheme = str_ndup(p, (size_t)(scheme_end - p));
+        out_url->scheme = str_ndup_a(a, p, (size_t)(scheme_end - p));
         return scheme_end + 1;
     }
     return p;
 }
 
-static void parse_url_userinfo(const char *authority_start, const char *userinfo_end, vigil_url_t *out_url)
+static void parse_url_userinfo(const vigil_allocator_t *a, const char *authority_start, const char *userinfo_end,
+                               vigil_url_t *out_url)
 {
     const char *colon = NULL;
     for (const char *s = authority_start; s < userinfo_end; s++)
@@ -222,16 +243,17 @@ static void parse_url_userinfo(const char *authority_start, const char *userinfo
     }
     if (colon)
     {
-        url_unescape_into(authority_start, (size_t)(colon - authority_start), &out_url->username);
-        url_unescape_into(colon + 1, (size_t)(userinfo_end - colon - 1), &out_url->password);
+        url_unescape_into(a, authority_start, (size_t)(colon - authority_start), &out_url->username);
+        url_unescape_into(a, colon + 1, (size_t)(userinfo_end - colon - 1), &out_url->password);
     }
     else
     {
-        url_unescape_into(authority_start, (size_t)(userinfo_end - authority_start), &out_url->username);
+        url_unescape_into(a, authority_start, (size_t)(userinfo_end - authority_start), &out_url->username);
     }
 }
 
-static void parse_url_host_port(const char *host_start, const char *authority_end, vigil_url_t *out_url)
+static void parse_url_host_port(const vigil_allocator_t *a, const char *host_start, const char *authority_end,
+                                vigil_url_t *out_url)
 {
     const char *host_end = authority_end;
     const char *port_start = NULL;
@@ -262,15 +284,15 @@ static void parse_url_host_port(const char *host_start, const char *authority_en
     if (host_start < host_end)
     {
         if (*host_start == '[' && *(host_end - 1) == ']')
-            out_url->host = str_ndup(host_start + 1, (size_t)(host_end - host_start - 2));
+            out_url->host = str_ndup_a(a, host_start + 1, (size_t)(host_end - host_start - 2));
         else
-            url_unescape_into(host_start, (size_t)(host_end - host_start), &out_url->host);
+            url_unescape_into(a, host_start, (size_t)(host_end - host_start), &out_url->host);
     }
     if (port_start && port_start < authority_end)
-        out_url->port = str_ndup(port_start, (size_t)(authority_end - port_start));
+        out_url->port = str_ndup_a(a, port_start, (size_t)(authority_end - port_start));
 }
 
-static const char *parse_url_authority(const char *p, const char *end, vigil_url_t *out_url)
+static const char *parse_url_authority(const vigil_allocator_t *a, const char *p, const char *end, vigil_url_t *out_url)
 {
     const char *authority_start, *authority_end, *userinfo_end, *host_start;
 
@@ -297,7 +319,7 @@ static const char *parse_url_authority(const char *p, const char *end, vigil_url
 
     if (userinfo_end)
     {
-        parse_url_userinfo(authority_start, userinfo_end, out_url);
+        parse_url_userinfo(a, authority_start, userinfo_end, out_url);
         host_start = userinfo_end + 1;
     }
     else
@@ -305,11 +327,12 @@ static const char *parse_url_authority(const char *p, const char *end, vigil_url
         host_start = authority_start;
     }
 
-    parse_url_host_port(host_start, authority_end, out_url);
+    parse_url_host_port(a, host_start, authority_end, out_url);
     return authority_end;
 }
 
-vigil_status_t vigil_url_parse(const char *url_string, size_t url_length, vigil_url_t *out_url, vigil_error_t *error)
+vigil_status_t vigil_url_parse(const vigil_allocator_t *allocator, const char *url_string, size_t url_length,
+                               vigil_url_t *out_url, vigil_error_t *error)
 {
     const char *p, *end, *path_start, *path_end;
 
@@ -321,11 +344,14 @@ vigil_status_t vigil_url_parse(const char *url_string, size_t url_length, vigil_
     }
 
     memset(out_url, 0, sizeof(*out_url));
+    out_url->allocator = url_resolve_alloc(allocator);
+    const vigil_allocator_t *a = &out_url->allocator;
+
     p = url_string;
     end = url_string + url_length;
 
-    p = parse_url_scheme(p, end, out_url);
-    p = parse_url_authority(p, end, out_url);
+    p = parse_url_scheme(a, p, end, out_url);
+    p = parse_url_authority(a, p, end, out_url);
 
     /* Parse path */
     path_start = p;
@@ -335,7 +361,7 @@ vigil_status_t vigil_url_parse(const char *url_string, size_t url_length, vigil_
             break;
     }
     if (path_start < path_end)
-        url_unescape_into(path_start, (size_t)(path_end - path_start), &out_url->path);
+        url_unescape_into(a, path_start, (size_t)(path_end - path_start), &out_url->path);
     p = path_end;
 
     /* Parse query */
@@ -349,7 +375,7 @@ vigil_status_t vigil_url_parse(const char *url_string, size_t url_length, vigil_
             if (*query_end == '#')
                 break;
         }
-        out_url->raw_query = str_ndup(query_start, (size_t)(query_end - query_start));
+        out_url->raw_query = str_ndup_a(a, query_start, (size_t)(query_end - query_start));
         p = query_end;
     }
 
@@ -357,7 +383,7 @@ vigil_status_t vigil_url_parse(const char *url_string, size_t url_length, vigil_
     if (p < end && *p == '#')
     {
         p++;
-        url_unescape_into(p, (size_t)(end - p), &out_url->fragment);
+        url_unescape_into(a, p, (size_t)(end - p), &out_url->fragment);
     }
 
     return VIGIL_STATUS_OK;
@@ -367,14 +393,15 @@ void vigil_url_free(vigil_url_t *url)
 {
     if (!url)
         return;
-    free(url->scheme);
-    free(url->username);
-    free(url->password);
-    free(url->host);
-    free(url->port);
-    free(url->path);
-    free(url->raw_query);
-    free(url->fragment);
+    vigil_allocator_t a = url->allocator;
+    a.deallocate(a.user_data, url->scheme);
+    a.deallocate(a.user_data, url->username);
+    a.deallocate(a.user_data, url->password);
+    a.deallocate(a.user_data, url->host);
+    a.deallocate(a.user_data, url->port);
+    a.deallocate(a.user_data, url->path);
+    a.deallocate(a.user_data, url->raw_query);
+    a.deallocate(a.user_data, url->fragment);
     memset(url, 0, sizeof(*url));
 }
 
@@ -382,6 +409,7 @@ void vigil_url_free(vigil_url_t *url)
 
 static void url_string_append_authority(const vigil_url_t *url, char *result, size_t cap, size_t *len)
 {
+    const vigil_allocator_t *a = &url->allocator;
     if (!url->host || !url->host[0])
         return;
 
@@ -389,9 +417,9 @@ static void url_string_append_authority(const vigil_url_t *url, char *result, si
 
     if (url->username && url->username[0])
     {
-        url_escape_append(result, cap, len, "", url->username, strlen(url->username));
+        url_escape_append(a, result, cap, len, "", url->username, strlen(url->username));
         if (url->password)
-            url_escape_append(result, cap, len, ":", url->password, strlen(url->password));
+            url_escape_append(a, result, cap, len, ":", url->password, strlen(url->password));
         *len += (size_t)snprintf(result + *len, cap - *len, "@");
     }
 
@@ -403,10 +431,12 @@ static void url_string_append_authority(const vigil_url_t *url, char *result, si
     if (url->port && url->port[0])
         *len += (size_t)snprintf(result + *len, cap - *len, ":%s", url->port);
 }
+
 vigil_status_t vigil_url_string(const vigil_url_t *url, char **out_string, size_t *out_length, vigil_error_t *error)
 {
     char *result;
     size_t len, cap;
+    const vigil_allocator_t *a;
 
     if (!url || !out_string)
     {
@@ -415,8 +445,9 @@ vigil_status_t vigil_url_string(const vigil_url_t *url, char **out_string, size_
         return VIGIL_STATUS_INVALID_ARGUMENT;
     }
 
+    a = &url->allocator;
     cap = 256;
-    result = malloc(cap);
+    result = (char *)a->allocate(a->user_data, cap);
     if (!result)
     {
         if (error)
@@ -436,7 +467,7 @@ vigil_status_t vigil_url_string(const vigil_url_t *url, char **out_string, size_
         /* Ensure path starts with / if we have authority */
         if (url->host && url->host[0] && url->path[0] != '/')
             len += (size_t)snprintf(result + len, cap - len, "/");
-        url_escape_append(result, cap, &len, "", url->path, strlen(url->path));
+        url_escape_append(a, result, cap, &len, "", url->path, strlen(url->path));
     }
 
     /* Query */
@@ -448,7 +479,7 @@ vigil_status_t vigil_url_string(const vigil_url_t *url, char **out_string, size_
     /* Fragment */
     if (url->fragment && url->fragment[0])
     {
-        url_escape_append(result, cap, &len, "#", url->fragment, strlen(url->fragment));
+        url_escape_append(a, result, cap, &len, "#", url->fragment, strlen(url->fragment));
     }
 
     *out_string = result;

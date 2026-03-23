@@ -60,7 +60,7 @@ TEST(DocRegistryTest, RenderEntry)
     size_t len = 0;
     vigil_error_t error = {0};
 
-    ASSERT_EQ(vigil_doc_entry_render(entry, &text, &len, &error), VIGIL_STATUS_OK);
+    ASSERT_EQ(vigil_doc_entry_render(NULL, entry, &text, &len, &error), VIGIL_STATUS_OK);
     ASSERT_NE(text, NULL);
     EXPECT_GT(len, 0u);
     free(text);

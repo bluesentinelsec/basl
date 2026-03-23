@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "internal/vigil_internal.h"
 #include "platform/platform.h"
 #include "vigil/pkg.h"
 #include "vigil/toml.h"
@@ -19,6 +20,30 @@
 #else
 #define pkg_strdup strdup
 #endif
+
+/* ── Allocator resolution ────────────────────────────────────────── */
+
+static vigil_allocator_t pkg_resolve_alloc(const vigil_allocator_t *a)
+{
+    if (a != NULL && vigil_allocator_is_valid(a))
+        return *a;
+    return vigil_default_allocator();
+}
+
+#define PKG_ALLOC(a, sz) (a)->allocate((a)->user_data, (sz))
+#define PKG_FREE(a, p) (a)->deallocate((a)->user_data, (p))
+
+static char *pkg_strdup_a(const vigil_allocator_t *a, const char *s)
+{
+    size_t len = strlen(s);
+    char *d = (char *)PKG_ALLOC(a, len + 1);
+    if (d)
+    {
+        memcpy(d, s, len);
+        d[len] = '\0';
+    }
+    return d;
+}
 
 /* ── Helpers ─────────────────────────────────────────────────────── */
 
@@ -52,13 +77,15 @@ void vigil_pkg_spec_free(vigil_pkg_spec_t *spec)
 {
     if (spec == NULL)
         return;
-    free(spec->url);
-    free(spec->version);
+    vigil_allocator_t a = spec->allocator;
+    a.deallocate(a.user_data, spec->url);
+    a.deallocate(a.user_data, spec->version);
     spec->url = NULL;
     spec->version = NULL;
 }
 
-vigil_status_t vigil_pkg_parse_spec(const char *input, vigil_pkg_spec_t *out_spec, vigil_error_t *error)
+vigil_status_t vigil_pkg_parse_spec(const vigil_allocator_t *allocator, const char *input, vigil_pkg_spec_t *out_spec,
+                                    vigil_error_t *error)
 {
     const char *at;
     size_t url_len;
@@ -70,12 +97,14 @@ vigil_status_t vigil_pkg_parse_spec(const char *input, vigil_pkg_spec_t *out_spe
     }
 
     memset(out_spec, 0, sizeof(*out_spec));
+    out_spec->allocator = pkg_resolve_alloc(allocator);
+    const vigil_allocator_t *a = &out_spec->allocator;
     at = strchr(input, '@');
 
     if (at != NULL)
     {
         url_len = (size_t)(at - input);
-        out_spec->url = malloc(url_len + 1);
+        out_spec->url = (char *)PKG_ALLOC(a, url_len + 1);
         if (out_spec->url == NULL)
         {
             set_error(error, VIGIL_STATUS_OUT_OF_MEMORY, "out of memory");
@@ -84,10 +113,10 @@ vigil_status_t vigil_pkg_parse_spec(const char *input, vigil_pkg_spec_t *out_spe
         memcpy(out_spec->url, input, url_len);
         out_spec->url[url_len] = '\0';
 
-        out_spec->version = pkg_strdup(at + 1);
+        out_spec->version = pkg_strdup_a(a, at + 1);
         if (out_spec->version == NULL)
         {
-            free(out_spec->url);
+            PKG_FREE(a, out_spec->url);
             out_spec->url = NULL;
             set_error(error, VIGIL_STATUS_OUT_OF_MEMORY, "out of memory");
             return VIGIL_STATUS_OUT_OF_MEMORY;
@@ -95,7 +124,7 @@ vigil_status_t vigil_pkg_parse_spec(const char *input, vigil_pkg_spec_t *out_spe
     }
     else
     {
-        out_spec->url = pkg_strdup(input);
+        out_spec->url = pkg_strdup_a(a, input);
         if (out_spec->url == NULL)
         {
             set_error(error, VIGIL_STATUS_OUT_OF_MEMORY, "out of memory");
@@ -109,13 +138,12 @@ vigil_status_t vigil_pkg_parse_spec(const char *input, vigil_pkg_spec_t *out_spe
 
 /* ── Lock file ───────────────────────────────────────────────────── */
 
-void vigil_pkg_lock_init(vigil_pkg_lock_t *lock)
+void vigil_pkg_lock_init(vigil_pkg_lock_t *lock, const vigil_allocator_t *allocator)
 {
     if (lock == NULL)
         return;
-    lock->entries = NULL;
-    lock->count = 0;
-    lock->capacity = 0;
+    memset(lock, 0, sizeof(*lock));
+    lock->allocator = pkg_resolve_alloc(allocator);
 }
 
 void vigil_pkg_lock_free(vigil_pkg_lock_t *lock)
@@ -123,13 +151,14 @@ void vigil_pkg_lock_free(vigil_pkg_lock_t *lock)
     size_t i;
     if (lock == NULL)
         return;
+    vigil_allocator_t a = lock->allocator;
     for (i = 0; i < lock->count; i++)
     {
-        free(lock->entries[i].name);
-        free(lock->entries[i].version);
-        free(lock->entries[i].commit);
+        a.deallocate(a.user_data, lock->entries[i].name);
+        a.deallocate(a.user_data, lock->entries[i].version);
+        a.deallocate(a.user_data, lock->entries[i].commit);
     }
-    free(lock->entries);
+    a.deallocate(a.user_data, lock->entries);
     lock->entries = NULL;
     lock->count = 0;
     lock->capacity = 0;
@@ -138,6 +167,7 @@ void vigil_pkg_lock_free(vigil_pkg_lock_t *lock)
 vigil_status_t vigil_pkg_lock_add(vigil_pkg_lock_t *lock, const char *name, const char *version, const char *commit,
                                   vigil_error_t *error)
 {
+    const vigil_allocator_t *a = &lock->allocator;
     vigil_pkg_lock_entry_t *entry;
     size_t i;
 
@@ -152,10 +182,10 @@ vigil_status_t vigil_pkg_lock_add(vigil_pkg_lock_t *lock, const char *name, cons
     {
         if (strcmp(lock->entries[i].name, name) == 0)
         {
-            free(lock->entries[i].version);
-            free(lock->entries[i].commit);
-            lock->entries[i].version = version ? pkg_strdup(version) : NULL;
-            lock->entries[i].commit = pkg_strdup(commit);
+            a->deallocate(a->user_data, lock->entries[i].version);
+            a->deallocate(a->user_data, lock->entries[i].commit);
+            lock->entries[i].version = version ? pkg_strdup_a(a, version) : NULL;
+            lock->entries[i].commit = pkg_strdup_a(a, commit);
             return VIGIL_STATUS_OK;
         }
     }
@@ -164,7 +194,8 @@ vigil_status_t vigil_pkg_lock_add(vigil_pkg_lock_t *lock, const char *name, cons
     if (lock->count >= lock->capacity)
     {
         size_t new_cap = lock->capacity == 0 ? 8 : lock->capacity * 2;
-        vigil_pkg_lock_entry_t *new_entries = realloc(lock->entries, new_cap * sizeof(vigil_pkg_lock_entry_t));
+        vigil_pkg_lock_entry_t *new_entries = (vigil_pkg_lock_entry_t *)a->reallocate(
+            a->user_data, lock->entries, new_cap * sizeof(vigil_pkg_lock_entry_t));
         if (new_entries == NULL)
         {
             set_error(error, VIGIL_STATUS_OUT_OF_MEMORY, "out of memory");
@@ -175,15 +206,15 @@ vigil_status_t vigil_pkg_lock_add(vigil_pkg_lock_t *lock, const char *name, cons
     }
 
     entry = &lock->entries[lock->count];
-    entry->name = pkg_strdup(name);
-    entry->version = version ? pkg_strdup(version) : NULL;
-    entry->commit = pkg_strdup(commit);
+    entry->name = pkg_strdup_a(a, name);
+    entry->version = version ? pkg_strdup_a(a, version) : NULL;
+    entry->commit = pkg_strdup_a(a, commit);
 
     if (entry->name == NULL || entry->commit == NULL)
     {
-        free(entry->name);
-        free(entry->version);
-        free(entry->commit);
+        a->deallocate(a->user_data, entry->name);
+        a->deallocate(a->user_data, entry->version);
+        a->deallocate(a->user_data, entry->commit);
         set_error(error, VIGIL_STATUS_OUT_OF_MEMORY, "out of memory");
         return VIGIL_STATUS_OUT_OF_MEMORY;
     }
@@ -209,7 +240,8 @@ const vigil_pkg_lock_entry_t *vigil_pkg_lock_find(const vigil_pkg_lock_t *lock, 
 
 /* ── Lock file I/O ───────────────────────────────────────────────── */
 
-vigil_status_t vigil_pkg_lock_read(const char *path, vigil_pkg_lock_t *out_lock, vigil_error_t *error)
+vigil_status_t vigil_pkg_lock_read(const vigil_allocator_t *allocator, const char *path, vigil_pkg_lock_t *out_lock,
+                                   vigil_error_t *error)
 {
     char *data = NULL;
     size_t length;
@@ -224,7 +256,7 @@ vigil_status_t vigil_pkg_lock_read(const char *path, vigil_pkg_lock_t *out_lock,
         return VIGIL_STATUS_INVALID_ARGUMENT;
     }
 
-    vigil_pkg_lock_init(out_lock);
+    vigil_pkg_lock_init(out_lock, allocator);
 
     status = vigil_platform_read_file(NULL, path, &data, &length, error);
     if (status != VIGIL_STATUS_OK)
@@ -282,6 +314,7 @@ vigil_status_t vigil_pkg_lock_read(const char *path, vigil_pkg_lock_t *out_lock,
 
 vigil_status_t vigil_pkg_lock_write(const char *path, const vigil_pkg_lock_t *lock, vigil_error_t *error)
 {
+    vigil_allocator_t a = lock->allocator;
     char *buf = NULL;
     size_t buf_size = 4096;
     size_t buf_len = 0;
@@ -294,7 +327,7 @@ vigil_status_t vigil_pkg_lock_write(const char *path, const vigil_pkg_lock_t *lo
         return VIGIL_STATUS_INVALID_ARGUMENT;
     }
 
-    buf = malloc(buf_size);
+    buf = (char *)a.allocate(a.user_data, buf_size);
     if (buf == NULL)
     {
         set_error(error, VIGIL_STATUS_OUT_OF_MEMORY, "out of memory");
@@ -311,10 +344,10 @@ vigil_status_t vigil_pkg_lock_write(const char *path, const vigil_pkg_lock_t *lo
         if (buf_len + needed >= buf_size)
         {
             buf_size = buf_size * 2 + needed;
-            char *new_buf = realloc(buf, buf_size);
+            char *new_buf = (char *)a.reallocate(a.user_data, buf, buf_size);
             if (new_buf == NULL)
             {
-                free(buf);
+                a.deallocate(a.user_data, buf);
                 set_error(error, VIGIL_STATUS_OUT_OF_MEMORY, "out of memory");
                 return VIGIL_STATUS_OUT_OF_MEMORY;
             }
@@ -331,7 +364,7 @@ vigil_status_t vigil_pkg_lock_write(const char *path, const vigil_pkg_lock_t *lo
     }
 
     status = vigil_platform_write_file(path, buf, buf_len, error);
-    free(buf);
+    a.deallocate(a.user_data, buf);
     return status;
 }
 
@@ -357,8 +390,10 @@ vigil_status_t vigil_pkg_git_available(vigil_error_t *error)
     return VIGIL_STATUS_OK;
 }
 
-vigil_status_t vigil_pkg_git_clone(const char *url, const char *dest, vigil_error_t *error)
+vigil_status_t vigil_pkg_git_clone(const vigil_allocator_t *allocator, const char *url, const char *dest,
+                                   vigil_error_t *error)
 {
+    vigil_allocator_t a = pkg_resolve_alloc(allocator);
     char git_url[1024];
     const char *argv[] = {"git", "clone", git_url, dest, NULL};
     char *out = NULL, *err_out = NULL;
@@ -385,30 +420,31 @@ vigil_status_t vigil_pkg_git_clone(const char *url, const char *dest, vigil_erro
         }
     }
 
-    status = vigil_platform_exec(NULL, argv, &out, &err_out, &exit_code, error);
+    status = vigil_platform_exec(&a, argv, &out, &err_out, &exit_code, error);
 
     if (status != VIGIL_STATUS_OK)
     {
-        free(out);
-        free(err_out);
+        a.deallocate(a.user_data, out);
+        a.deallocate(a.user_data, err_out);
         return status;
     }
 
     if (exit_code != 0)
     {
-        free(out);
-        free(err_out);
+        a.deallocate(a.user_data, out);
+        a.deallocate(a.user_data, err_out);
         set_error(error, VIGIL_STATUS_INTERNAL, "git clone failed");
         return VIGIL_STATUS_INTERNAL;
     }
 
-    free(out);
-    free(err_out);
+    a.deallocate(a.user_data, out);
+    a.deallocate(a.user_data, err_out);
     return VIGIL_STATUS_OK;
 }
 
-vigil_status_t vigil_pkg_git_fetch(const char *repo_path, vigil_error_t *error)
+vigil_status_t vigil_pkg_git_fetch(const vigil_allocator_t *allocator, const char *repo_path, vigil_error_t *error)
 {
+    vigil_allocator_t a = pkg_resolve_alloc(allocator);
     const char *argv[] = {"git", "-C", repo_path, "fetch", "--tags", NULL};
     char *out = NULL, *err_out = NULL;
     int exit_code;
@@ -420,9 +456,9 @@ vigil_status_t vigil_pkg_git_fetch(const char *repo_path, vigil_error_t *error)
         return VIGIL_STATUS_INVALID_ARGUMENT;
     }
 
-    status = vigil_platform_exec(NULL, argv, &out, &err_out, &exit_code, error);
-    free(out);
-    free(err_out);
+    status = vigil_platform_exec(&a, argv, &out, &err_out, &exit_code, error);
+    a.deallocate(a.user_data, out);
+    a.deallocate(a.user_data, err_out);
 
     if (status != VIGIL_STATUS_OK)
         return status;
@@ -435,8 +471,10 @@ vigil_status_t vigil_pkg_git_fetch(const char *repo_path, vigil_error_t *error)
     return VIGIL_STATUS_OK;
 }
 
-vigil_status_t vigil_pkg_git_checkout(const char *repo_path, const char *version, vigil_error_t *error)
+vigil_status_t vigil_pkg_git_checkout(const vigil_allocator_t *allocator, const char *repo_path, const char *version,
+                                      vigil_error_t *error)
 {
+    vigil_allocator_t a = pkg_resolve_alloc(allocator);
     const char *argv[] = {"git", "-C", repo_path, "checkout", version, NULL};
     char *out = NULL, *err_out = NULL;
     int exit_code;
@@ -448,30 +486,32 @@ vigil_status_t vigil_pkg_git_checkout(const char *repo_path, const char *version
         return VIGIL_STATUS_INVALID_ARGUMENT;
     }
 
-    status = vigil_platform_exec(NULL, argv, &out, &err_out, &exit_code, error);
+    status = vigil_platform_exec(&a, argv, &out, &err_out, &exit_code, error);
 
     if (status != VIGIL_STATUS_OK)
     {
-        free(out);
-        free(err_out);
+        a.deallocate(a.user_data, out);
+        a.deallocate(a.user_data, err_out);
         return status;
     }
 
     if (exit_code != 0)
     {
-        free(out);
-        free(err_out);
+        a.deallocate(a.user_data, out);
+        a.deallocate(a.user_data, err_out);
         set_error(error, VIGIL_STATUS_INVALID_ARGUMENT, "version not found");
         return VIGIL_STATUS_INVALID_ARGUMENT;
     }
 
-    free(out);
-    free(err_out);
+    a.deallocate(a.user_data, out);
+    a.deallocate(a.user_data, err_out);
     return VIGIL_STATUS_OK;
 }
 
-vigil_status_t vigil_pkg_git_head(const char *repo_path, char *out_commit, size_t commit_size, vigil_error_t *error)
+vigil_status_t vigil_pkg_git_head(const vigil_allocator_t *allocator, const char *repo_path, char *out_commit,
+                                  size_t commit_size, vigil_error_t *error)
 {
+    vigil_allocator_t a = pkg_resolve_alloc(allocator);
     const char *argv[] = {"git", "-C", repo_path, "rev-parse", "HEAD", NULL};
     char *out = NULL, *err_out = NULL;
     int exit_code;
@@ -484,20 +524,20 @@ vigil_status_t vigil_pkg_git_head(const char *repo_path, char *out_commit, size_
         return VIGIL_STATUS_INVALID_ARGUMENT;
     }
 
-    status = vigil_platform_exec(NULL, argv, &out, &err_out, &exit_code, error);
+    status = vigil_platform_exec(&a, argv, &out, &err_out, &exit_code, error);
 
     if (status != VIGIL_STATUS_OK)
     {
-        free(out);
-        free(err_out);
+        a.deallocate(a.user_data, out);
+        a.deallocate(a.user_data, err_out);
         return status;
     }
 
     if (exit_code != 0 || out == NULL)
     {
         set_error(error, VIGIL_STATUS_INTERNAL, "failed to get HEAD commit");
-        free(out);
-        free(err_out);
+        a.deallocate(a.user_data, out);
+        a.deallocate(a.user_data, err_out);
         return VIGIL_STATUS_INTERNAL;
     }
 
@@ -506,15 +546,15 @@ vigil_status_t vigil_pkg_git_head(const char *repo_path, char *out_commit, size_
         size_t len = strlen(trimmed);
         if (len >= commit_size)
         {
-            free(out);
+            a.deallocate(a.user_data, out);
             free(err_out);
             set_error(error, VIGIL_STATUS_INVALID_ARGUMENT, "commit buffer too small");
             return VIGIL_STATUS_INVALID_ARGUMENT;
         }
         memcpy(out_commit, trimmed, len + 1);
     }
-    free(out);
-    free(err_out);
+    a.deallocate(a.user_data, out);
+    a.deallocate(a.user_data, err_out);
     return VIGIL_STATUS_OK;
 }
 
@@ -613,6 +653,7 @@ static vigil_status_t install_package(const char *project_root, const char *pkg_
                                       vigil_pkg_lock_t *lock, char *out_commit, size_t commit_size,
                                       vigil_error_t *error)
 {
+    const vigil_allocator_t *a = &lock->allocator;
     char deps_path[4096];
     char pkg_path[4096];
     int pkg_exists = 0;
@@ -636,14 +677,14 @@ static vigil_status_t install_package(const char *project_root, const char *pkg_
 
     if (pkg_exists)
     {
-        status = vigil_pkg_git_fetch(pkg_path, error);
+        status = vigil_pkg_git_fetch(a, pkg_path, error);
         if (status != VIGIL_STATUS_OK)
             return status;
     }
     else
     {
         ensure_parent_dir(pkg_path, error);
-        status = vigil_pkg_git_clone(pkg_url, pkg_path, error);
+        status = vigil_pkg_git_clone(a, pkg_url, pkg_path, error);
         if (status != VIGIL_STATUS_OK)
             return status;
     }
@@ -651,13 +692,13 @@ static vigil_status_t install_package(const char *project_root, const char *pkg_
     /* Checkout specific version if requested */
     if (version != NULL && strlen(version) > 0)
     {
-        status = vigil_pkg_git_checkout(pkg_path, version, error);
+        status = vigil_pkg_git_checkout(a, pkg_path, version, error);
         if (status != VIGIL_STATUS_OK)
             return status;
     }
 
     /* Get current commit */
-    status = vigil_pkg_git_head(pkg_path, out_commit, commit_size, error);
+    status = vigil_pkg_git_head(a, pkg_path, out_commit, commit_size, error);
     if (status != VIGIL_STATUS_OK)
         return status;
 
@@ -744,8 +785,10 @@ static vigil_status_t install_transitive_deps(const char *project_root, const ch
 
 /* ── High-level: vigil_pkg_get ────────────────────────────────────── */
 
-vigil_status_t vigil_pkg_get(const char *project_root, const char *specifier, vigil_error_t *error)
+vigil_status_t vigil_pkg_get(const vigil_allocator_t *allocator, const char *project_root, const char *specifier,
+                             vigil_error_t *error)
 {
+    vigil_allocator_t a = pkg_resolve_alloc(allocator);
     vigil_pkg_spec_t spec = {0};
     vigil_pkg_lock_t lock = {0};
     vigil_toml_value_t *root = NULL;
@@ -768,7 +811,7 @@ vigil_status_t vigil_pkg_get(const char *project_root, const char *specifier, vi
         return status;
 
     /* Parse specifier */
-    status = vigil_pkg_parse_spec(specifier, &spec, error);
+    status = vigil_pkg_parse_spec(&a, specifier, &spec, error);
     if (status != VIGIL_STATUS_OK)
         return status;
 
@@ -779,8 +822,8 @@ vigil_status_t vigil_pkg_get(const char *project_root, const char *specifier, vi
     }
 
     /* Read existing lock file (ignore errors - may not exist) */
-    vigil_pkg_lock_init(&lock);
-    vigil_pkg_lock_read(lock_path, &lock, NULL);
+    vigil_pkg_lock_init(&lock, &a);
+    vigil_pkg_lock_read(&a, lock_path, &lock, NULL);
 
     /* Install package and transitive deps */
     status = install_package(project_root, spec.url, spec.version, &lock, commit, sizeof(commit), error);
@@ -827,8 +870,9 @@ cleanup:
 
 /* ── High-level: vigil_pkg_sync ───────────────────────────────────── */
 
-vigil_status_t vigil_pkg_sync(const char *project_root, vigil_error_t *error)
+vigil_status_t vigil_pkg_sync(const vigil_allocator_t *allocator, const char *project_root, vigil_error_t *error)
 {
+    vigil_allocator_t a = pkg_resolve_alloc(allocator);
     vigil_toml_value_t *root = NULL;
     const vigil_toml_value_t *deps;
     vigil_pkg_lock_t lock = {0};
@@ -863,8 +907,8 @@ vigil_status_t vigil_pkg_sync(const char *project_root, vigil_error_t *error)
         return error->type;
     }
 
-    vigil_pkg_lock_init(&lock);
-    vigil_pkg_lock_read(lock_path, &lock, NULL);
+    vigil_pkg_lock_init(&lock, &a);
+    vigil_pkg_lock_read(&a, lock_path, &lock, NULL);
 
     count = vigil_toml_table_count(deps);
     for (i = 0; i < count; i++)
@@ -955,8 +999,10 @@ static void lock_remove_entry(vigil_pkg_lock_t *lock, const char *name)
     }
 }
 
-vigil_status_t vigil_pkg_remove(const char *project_root, const char *package_url, vigil_error_t *error)
+vigil_status_t vigil_pkg_remove(const vigil_allocator_t *allocator, const char *project_root, const char *package_url,
+                                vigil_error_t *error)
 {
+    vigil_allocator_t a = pkg_resolve_alloc(allocator);
     vigil_toml_value_t *root = NULL;
     vigil_toml_value_t *deps = NULL;
     vigil_pkg_lock_t lock = {0};
@@ -1003,8 +1049,8 @@ vigil_status_t vigil_pkg_remove(const char *project_root, const char *package_ur
         return status;
 
     /* Remove from vigil.lock */
-    vigil_pkg_lock_init(&lock);
-    if (vigil_pkg_lock_read(lock_path, &lock, NULL) == VIGIL_STATUS_OK)
+    vigil_pkg_lock_init(&lock, &a);
+    if (vigil_pkg_lock_read(&a, lock_path, &lock, NULL) == VIGIL_STATUS_OK)
     {
         lock_remove_entry(&lock, package_url);
         vigil_pkg_lock_write(lock_path, &lock, error);

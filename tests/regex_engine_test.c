@@ -1,12 +1,12 @@
-#include "vigil_test.h"
 #include "../src/stdlib/regex.h"
+#include "vigil_test.h"
 
 /* ── vigil_regex_find ─────────────────────────────────────────── */
 
 TEST(RegexEngine, FindNoMatch)
 {
     char err[64];
-    vigil_regex_t *re = vigil_regex_compile("xyz", 3, err, sizeof(err));
+    vigil_regex_t *re = vigil_regex_compile(NULL, "xyz", 3, err, sizeof(err));
     ASSERT_NE(re, NULL);
 
     vigil_regex_result_t r;
@@ -19,7 +19,7 @@ TEST(RegexEngine, FindNoMatch)
 TEST(RegexEngine, FindResultNull)
 {
     char err[64];
-    vigil_regex_t *re = vigil_regex_compile("[0-9]+", 6, err, sizeof(err));
+    vigil_regex_t *re = vigil_regex_compile(NULL, "[0-9]+", 6, err, sizeof(err));
     ASSERT_NE(re, NULL);
 
     /* result=NULL must not crash */
@@ -32,7 +32,7 @@ TEST(RegexEngine, FindResultNull)
 TEST(RegexEngine, FindMatch)
 {
     char err[64];
-    vigil_regex_t *re = vigil_regex_compile("[a-z]+", 6, err, sizeof(err));
+    vigil_regex_t *re = vigil_regex_compile(NULL, "[a-z]+", 6, err, sizeof(err));
     ASSERT_NE(re, NULL);
 
     vigil_regex_result_t r;
@@ -47,7 +47,7 @@ TEST(RegexEngine, FindMatch)
 TEST(RegexEngine, FindAllMultiple)
 {
     char err[64];
-    vigil_regex_t *re = vigil_regex_compile("[0-9]+", 6, err, sizeof(err));
+    vigil_regex_t *re = vigil_regex_compile(NULL, "[0-9]+", 6, err, sizeof(err));
     ASSERT_NE(re, NULL);
 
     vigil_regex_result_t results[8];
@@ -60,7 +60,7 @@ TEST(RegexEngine, FindAllMultiple)
 TEST(RegexEngine, FindAllNoMatch)
 {
     char err[64];
-    vigil_regex_t *re = vigil_regex_compile("[0-9]+", 6, err, sizeof(err));
+    vigil_regex_t *re = vigil_regex_compile(NULL, "[0-9]+", 6, err, sizeof(err));
     ASSERT_NE(re, NULL);
 
     vigil_regex_result_t results[8];
@@ -73,7 +73,7 @@ TEST(RegexEngine, FindAllNoMatch)
 TEST(RegexEngine, CompileInvalid)
 {
     char err[64];
-    vigil_regex_t *re = vigil_regex_compile("*bad", 4, err, sizeof(err));
+    vigil_regex_t *re = vigil_regex_compile(NULL, "*bad", 4, err, sizeof(err));
     EXPECT_EQ(re, NULL);
 }
 

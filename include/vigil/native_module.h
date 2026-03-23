@@ -30,10 +30,21 @@ extern "C"
         int value_type;   /* For maps: value vigil_type_kind_t */
     } vigil_native_type_t;
 
-/* Helper macros for defining native types */
-#define VIGIL_NATIVE_TYPE_PRIMITIVE(k) {(k), 0, 0, 0, 0}
-#define VIGIL_NATIVE_TYPE_ARRAY(elem) {VIGIL_TYPE_OBJECT, 4, (elem), 0, 0}
-#define VIGIL_NATIVE_TYPE_MAP(k, v) {VIGIL_TYPE_OBJECT, 5, 0, (k), (v)}
+    /* Helper macros for defining native types */
+    /* clang-format off */
+#define VIGIL_NATIVE_TYPE_PRIMITIVE(k)                                                                                 \
+    {                                                                                                                  \
+        (k), 0, 0, 0, 0                                                                                               \
+    }
+#define VIGIL_NATIVE_TYPE_ARRAY(elem)                                                                                  \
+    {                                                                                                                  \
+        VIGIL_TYPE_OBJECT, 4, (elem), 0, 0                                                                             \
+    }
+#define VIGIL_NATIVE_TYPE_MAP(k, v)                                                                                    \
+    {                                                                                                                  \
+        VIGIL_TYPE_OBJECT, 5, 0, (k), (v)                                                                              \
+    }
+    /* clang-format on */
 
     /**
      * Describes one function exported by a native module.
