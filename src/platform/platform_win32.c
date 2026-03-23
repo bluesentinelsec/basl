@@ -1,12 +1,12 @@
 #include "platform.h"
 
+#include <direct.h>
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #define WIN32_LEAN_AND_MEAN
-#include <direct.h>
 #include <windows.h>
 #include <wincrypt.h>
 
