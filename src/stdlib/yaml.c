@@ -15,6 +15,17 @@
 #include "vigil/yaml.h"
 
 #include "internal/vigil_nanbox.h"
+#include "internal/vigil_internal.h"
+
+/* ── Allocator helpers ────────────────────────────────────────────── */
+
+static vigil_allocator_t get_alloc(vigil_vm_t *vm)
+{
+    const vigil_allocator_t *a = vigil_runtime_allocator(vigil_vm_runtime(vm));
+    if (a != NULL)
+        return *a;
+    return vigil_default_allocator();
+}
 
 /* ── Helpers ─────────────────────────────────────────────────────── */
 
@@ -62,7 +73,9 @@ static vigil_status_t vigil_yaml_parse_fn(vigil_vm_t *vm, size_t arg_count, vigi
         return push_string(vm, "", 0, error);
     }
 
-    s = vigil_yaml_parse(yaml_str, yaml_len, NULL, &json, error);
+    vigil_allocator_t alloc = get_alloc(vm);
+
+    s = vigil_yaml_parse(yaml_str, yaml_len, &alloc, &json, error);
     if (s != VIGIL_STATUS_OK)
     {
         vigil_vm_stack_pop_n(vm, arg_count);
@@ -80,7 +93,7 @@ static vigil_status_t vigil_yaml_parse_fn(vigil_vm_t *vm, size_t arg_count, vigi
 
     vigil_vm_stack_pop_n(vm, arg_count);
     s = push_string(vm, json_str, json_len, error);
-    free(json_str);
+    alloc.deallocate(alloc.user_data, json_str);
     return s;
 }
 
@@ -141,8 +154,9 @@ static vigil_status_t yaml_value_to_string(vigil_vm_t *vm, const vigil_json_valu
         vigil_status_t s = vigil_json_emit(val, &result_str, &result_len, error);
         if (s == VIGIL_STATUS_OK)
         {
+            vigil_allocator_t alloc = get_alloc(vm);
             s = push_string(vm, result_str, result_len, error);
-            free(result_str);
+            alloc.deallocate(alloc.user_data, result_str);
         }
         return s;
     }
@@ -163,14 +177,15 @@ static vigil_status_t vigil_yaml_get_fn(vigil_vm_t *vm, size_t arg_count, vigil_
         return push_string(vm, "", 0, error);
     }
 
-    s = vigil_yaml_parse(yaml_str, yaml_len, NULL, &json, error);
+    vigil_allocator_t alloc = get_alloc(vm);
+    s = vigil_yaml_parse(yaml_str, yaml_len, &alloc, &json, error);
     if (s != VIGIL_STATUS_OK)
     {
         vigil_vm_stack_pop_n(vm, arg_count);
         return push_string(vm, "", 0, error);
     }
 
-    char *path_copy = malloc(path_len + 1);
+    char *path_copy = (char *)alloc.allocate(alloc.user_data, path_len + 1);
     if (!path_copy)
     {
         vigil_json_free(&json);
@@ -181,7 +196,7 @@ static vigil_status_t vigil_yaml_get_fn(vigil_vm_t *vm, size_t arg_count, vigil_
     path_copy[path_len] = '\0';
 
     const vigil_json_value_t *current = yaml_navigate_path(json, path_copy);
-    free(path_copy);
+    alloc.deallocate(alloc.user_data, path_copy);
     vigil_vm_stack_pop_n(vm, arg_count);
 
     if (!current)

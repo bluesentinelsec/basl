@@ -12,11 +12,23 @@
 #include <string.h>
 
 #include "vigil/native_module.h"
+#include "vigil/runtime.h"
 #include "vigil/type.h"
 #include "vigil/value.h"
 #include "vigil/vm.h"
 
+#include "internal/vigil_internal.h"
 #include "internal/vigil_nanbox.h"
+
+/* ── Allocator helpers ───────────────────────────────────────────── */
+
+static vigil_allocator_t get_alloc(vigil_vm_t *vm)
+{
+    const vigil_allocator_t *a = vigil_runtime_allocator(vigil_vm_runtime(vm));
+    if (a != NULL)
+        return *a;
+    return vigil_default_allocator();
+}
 
 /* ── Helpers ─────────────────────────────────────────────────────── */
 
@@ -78,14 +90,15 @@ static int csv_is_field_end(int c)
 {
     return c == ',' || c == '\r' || c == '\n';
 }
-static bool csv_field_spill(char **buf, char **heap_buf, size_t len, size_t *cap)
+static bool csv_field_spill(const vigil_allocator_t *alloc, char **buf, char **heap_buf, size_t len, size_t *cap)
 {
     size_t new_cap = (*cap + 1U) * 2U;
-    char *h = (char *)malloc(new_cap + 1U);
+    char *h = (char *)alloc->allocate(alloc->user_data, new_cap + 1U);
     if (!h)
         return false;
     memcpy(h, *buf, len);
-    free(*heap_buf);
+    if (*heap_buf)
+        alloc->deallocate(alloc->user_data, *heap_buf);
     *heap_buf = h;
     *buf = h;
     *cap = new_cap;
@@ -96,8 +109,8 @@ static bool csv_field_spill(char **buf, char **heap_buf, size_t len, size_t *cap
  * Uses stack_buf (stack_cap bytes) when the field fits; otherwise heap-allocates
  * into *heap_buf (caller must free if *heap_buf != NULL on return).
  * Returns false on allocation failure. */
-static bool csv_parse_field_buf(csv_reader_t *r, char *stack_buf, size_t stack_cap, char **heap_buf,
-                                const char **out_data, size_t *out_len)
+static bool csv_parse_field_buf(const vigil_allocator_t *alloc, csv_reader_t *r, char *stack_buf, size_t stack_cap,
+                                char **heap_buf, const char **out_data, size_t *out_len)
 {
     char *buf = stack_buf;
     size_t cap = stack_cap - 1U;
@@ -132,7 +145,7 @@ static bool csv_parse_field_buf(csv_reader_t *r, char *stack_buf, size_t stack_c
             csv_next(r);
         }
 
-        if (len >= cap && !csv_field_spill(&buf, heap_buf, len, &cap))
+        if (len >= cap && !csv_field_spill(alloc, &buf, heap_buf, len, &cap))
             return false;
         buf[len++] = (char)c;
     }
@@ -167,6 +180,8 @@ static vigil_status_t csv_parse(vigil_vm_t *vm, size_t arg_count, vigil_error_t 
     }
     vigil_vm_stack_pop_n(vm, arg_count);
 
+    vigil_allocator_t alloc = get_alloc(vm);
+
     csv_reader_t reader = {data, data_len, 0};
 
     /* Create outer array */
@@ -197,14 +212,16 @@ static vigil_status_t csv_parse(vigil_vm_t *vm, size_t arg_count, vigil_error_t 
             char *field_heap;
             const char *field;
             size_t field_len;
-            if (!csv_parse_field_buf(&reader, field_stack, sizeof(field_stack), &field_heap, &field, &field_len))
+            if (!csv_parse_field_buf(&alloc, &reader, field_stack, sizeof(field_stack), &field_heap, &field,
+                                     &field_len))
             {
                 return VIGIL_STATUS_INTERNAL;
             }
 
             vigil_object_t *str_obj = NULL;
             s = vigil_string_object_new(vigil_vm_runtime(vm), field, field_len, &str_obj, error);
-            free(field_heap);
+            if (field_heap)
+                alloc.deallocate(alloc.user_data, field_heap);
             if (s != VIGIL_STATUS_OK)
                 return s;
 
@@ -257,6 +274,8 @@ static vigil_status_t csv_parse_row(vigil_vm_t *vm, size_t arg_count, vigil_erro
     }
     vigil_vm_stack_pop_n(vm, arg_count);
 
+    vigil_allocator_t alloc = get_alloc(vm);
+
     csv_reader_t reader = {data, data_len, 0};
 
     s = vigil_array_object_new(vigil_vm_runtime(vm), NULL, 0, &row_arr, error);
@@ -277,14 +296,15 @@ static vigil_status_t csv_parse_row(vigil_vm_t *vm, size_t arg_count, vigil_erro
         char *field_heap;
         const char *field;
         size_t field_len;
-        if (!csv_parse_field_buf(&reader, field_stack, sizeof(field_stack), &field_heap, &field, &field_len))
+        if (!csv_parse_field_buf(&alloc, &reader, field_stack, sizeof(field_stack), &field_heap, &field, &field_len))
         {
             return VIGIL_STATUS_INTERNAL;
         }
 
         vigil_object_t *str_obj = NULL;
         s = vigil_string_object_new(vigil_vm_runtime(vm), field, field_len, &str_obj, error);
-        free(field_heap);
+        if (field_heap)
+            alloc.deallocate(alloc.user_data, field_heap);
         if (s != VIGIL_STATUS_OK)
             return s;
 
@@ -316,7 +336,8 @@ static int csv_needs_quote(const char *s, size_t len)
 }
 
 /* Write a field to buffer, quoting if needed */
-static void csv_write_field(char **buf, size_t *cap, size_t *len, const char *field, size_t field_len)
+static void csv_write_field(const vigil_allocator_t *alloc, char **buf, size_t *cap, size_t *len, const char *field,
+                            size_t field_len)
 {
     int need_quote = csv_needs_quote(field, field_len);
     size_t needed = field_len + (need_quote ? 2 : 0);
@@ -335,7 +356,7 @@ static void csv_write_field(char **buf, size_t *cap, size_t *len, const char *fi
     while (*len + needed + 1 > *cap)
     {
         *cap = *cap ? *cap * 2 : 256;
-        *buf = (char *)realloc(*buf, *cap);
+        *buf = (char *)alloc->reallocate(alloc->user_data, *buf, *cap);
     }
 
     if (need_quote)
@@ -369,6 +390,7 @@ static vigil_status_t csv_stringify(vigil_vm_t *vm, size_t arg_count, vigil_erro
         return push_string(vm, "", 0, error);
     }
 
+    vigil_allocator_t alloc = get_alloc(vm);
     char *buf = NULL;
     size_t cap = 0, len = 0;
     size_t row_count = vigil_array_object_length(rows_arr);
@@ -400,7 +422,7 @@ static vigil_status_t csv_stringify(vigil_vm_t *vm, size_t arg_count, vigil_erro
                 if (len + 1 >= cap)
                 {
                     cap = cap ? cap * 2 : 256;
-                    buf = (char *)realloc(buf, cap);
+                    buf = (char *)alloc.reallocate(alloc.user_data, buf, cap);
                 }
                 buf[len++] = ',';
             }
@@ -416,7 +438,7 @@ static vigil_status_t csv_stringify(vigil_vm_t *vm, size_t arg_count, vigil_erro
                 {
                     const char *s = vigil_string_object_c_str(str_obj);
                     size_t slen = vigil_string_object_length(str_obj);
-                    csv_write_field(&buf, &cap, &len, s, slen);
+                    csv_write_field(&alloc, &buf, &cap, &len, s, slen);
                 }
             }
             vigil_value_release(&cell_val);
@@ -427,14 +449,15 @@ static vigil_status_t csv_stringify(vigil_vm_t *vm, size_t arg_count, vigil_erro
         if (len + 2 >= cap)
         {
             cap = cap ? cap * 2 : 256;
-            buf = (char *)realloc(buf, cap);
+            buf = (char *)alloc.reallocate(alloc.user_data, buf, cap);
         }
         buf[len++] = '\r';
         buf[len++] = '\n';
     }
 
     vigil_status_t s = push_string(vm, buf ? buf : "", len, error);
-    free(buf);
+    if (buf)
+        alloc.deallocate(alloc.user_data, buf);
     return s;
 }
 
@@ -457,6 +480,7 @@ static vigil_status_t csv_stringify_row(vigil_vm_t *vm, size_t arg_count, vigil_
         return push_string(vm, "", 0, error);
     }
 
+    vigil_allocator_t alloc = get_alloc(vm);
     char *buf = NULL;
     size_t cap = 0, len = 0;
     size_t col_count = vigil_array_object_length(row_arr);
@@ -468,7 +492,7 @@ static vigil_status_t csv_stringify_row(vigil_vm_t *vm, size_t arg_count, vigil_
             if (len + 1 >= cap)
             {
                 cap = cap ? cap * 2 : 256;
-                buf = (char *)realloc(buf, cap);
+                buf = (char *)alloc.reallocate(alloc.user_data, buf, cap);
             }
             buf[len++] = ',';
         }
@@ -484,14 +508,15 @@ static vigil_status_t csv_stringify_row(vigil_vm_t *vm, size_t arg_count, vigil_
             {
                 const char *s = vigil_string_object_c_str(str_obj);
                 size_t slen = vigil_string_object_length(str_obj);
-                csv_write_field(&buf, &cap, &len, s, slen);
+                csv_write_field(&alloc, &buf, &cap, &len, s, slen);
             }
         }
         vigil_value_release(&cell_val);
     }
 
     vigil_status_t s = push_string(vm, buf ? buf : "", len, error);
-    free(buf);
+    if (buf)
+        alloc.deallocate(alloc.user_data, buf);
     return s;
 }
 
