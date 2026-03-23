@@ -457,45 +457,6 @@ static const char *parser_extract_key(const char *arg, char *key_buf, size_t key
     return arg + 1;
 }
 
-static int parser_handle_value_opt(const char *name, const char *typ, const char *inline_val, const char *const *argv,
-                                   size_t argc, int64_t *pos, vigil_object_t *vals_arr, vigil_runtime_t *rt,
-                                   char *err_buf, size_t err_size, vigil_status_t *out_s, vigil_error_t *error)
-{
-    const char *val = inline_val;
-    if (val == NULL)
-    {
-        (*pos)++;
-        if ((size_t)*pos >= argc)
-        {
-            snprintf(err_buf, err_size, "option --%s requires a value", name);
-            return -1; /* error */
-        }
-        val = argv[*pos];
-    }
-    if (strcmp(typ, "int") == 0)
-    {
-        char *end = NULL;
-        errno = 0;
-        (void)strtol(val, &end, 10);
-        if (errno != 0 || end == val || *end != '\0')
-        {
-            snprintf(err_buf, err_size, "option --%s requires an integer, got: %s", name, val);
-            return -1;
-        }
-    }
-    if (strcmp(typ, "multi") == 0)
-    {
-        char buf[512];
-        snprintf(buf, sizeof(buf), "__multi__%s=%s", name, val);
-        *out_s = array_push_str(vals_arr, rt, buf, error);
-    }
-    else
-    {
-        *out_s = parser_update_vals_entry(vals_arr, rt, name, val, error);
-    }
-    return (*out_s == VIGIL_STATUS_OK) ? 0 : 1; /* 0=ok, 1=fail */
-}
-
 static vigil_status_t parser_parse(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
 {
     /* stack: [self, start_i32] */
@@ -597,12 +558,43 @@ static vigil_status_t parser_parse(vigil_vm_t *vm, size_t arg_count, vigil_error
         }
         else
         {
-            int rc = parser_handle_value_opt(name, typ, inline_val, argv, argc, &pos, vals_arr, rt, err_buf,
-                                             sizeof(err_buf), &s, error);
-            if (rc < 0)
-                goto err_out;
-            if (rc > 0)
-                goto fail;
+            /* string, int, or multi — needs a value */
+            const char *val = inline_val;
+            if (val == NULL)
+            {
+                pos++;
+                if ((size_t)pos >= argc)
+                {
+                    snprintf(err_buf, sizeof(err_buf), "option --%s requires a value", name);
+                    goto err_out;
+                }
+                val = argv[pos];
+            }
+            if (strcmp(typ, "int") == 0)
+            {
+                char *end = NULL;
+                errno = 0;
+                (void)strtol(val, &end, 10);
+                if (errno != 0 || end == val || *end != '\0')
+                {
+                    snprintf(err_buf, sizeof(err_buf), "option --%s requires an integer, got: %s", name, val);
+                    goto err_out;
+                }
+            }
+            if (strcmp(typ, "multi") == 0)
+            {
+                char buf[512];
+                snprintf(buf, sizeof(buf), "__multi__%s=%s", name, val);
+                s = array_push_str(vals_arr, rt, buf, error);
+                if (s != VIGIL_STATUS_OK)
+                    goto fail;
+            }
+            else
+            {
+                s = parser_update_vals_entry(vals_arr, rt, name, val, error);
+                if (s != VIGIL_STATUS_OK)
+                    goto fail;
+            }
             pos++;
         }
     }
@@ -903,12 +895,26 @@ static const vigil_native_module_function_t vigil_args_functions[] = {
 
 /* ── Parser class descriptor ─────────────────────────────────────── */
 
-#define VIGIL_PFIELD(n, nl, t) {n, nl, t, 0, NULL, 0U, 0}
-#define VIGIL_AFIELD(n, nl, elem) {n, nl, VIGIL_TYPE_OBJECT, VIGIL_NATIVE_FIELD_ARRAY, NULL, 0U, elem}
-#define VIGIL_METHOD(n, nl, fn, pc, pt, rt, rc, rts) {n, nl, fn, pc, pt, rt, rc, rts, 0, NULL, 0U, 0}
+#define VIGIL_PFIELD(n, nl, t)                                                                                         \
+    {                                                                                                                  \
+        n, nl, t, 0, NULL, 0U, 0                                                                                       \
+    }
+#define VIGIL_AFIELD(n, nl, elem)                                                                                      \
+    {                                                                                                                  \
+        n, nl, VIGIL_TYPE_OBJECT, VIGIL_NATIVE_FIELD_ARRAY, NULL, 0U, elem                                             \
+    }
+#define VIGIL_METHOD(n, nl, fn, pc, pt, rt, rc, rts)                                                                   \
+    {                                                                                                                  \
+        n, nl, fn, pc, pt, rt, rc, rts, 0, NULL, 0U, 0                                                                 \
+    }
 #define VIGIL_METHOD_ARR(n, nl, fn, pc, pt, rc, rts, elem)                                                             \
-    {n, nl, fn, pc, pt, VIGIL_TYPE_OBJECT, rc, rts, 0, NULL, 0U, elem}
-#define VIGIL_STATIC(n, nl, fn, pc, pt, rt, rc, rts) {n, nl, fn, pc, pt, rt, rc, rts, 1, NULL, 0U, 0}
+    {                                                                                                                  \
+        n, nl, fn, pc, pt, VIGIL_TYPE_OBJECT, rc, rts, 0, NULL, 0U, elem                                               \
+    }
+#define VIGIL_STATIC(n, nl, fn, pc, pt, rt, rc, rts)                                                                   \
+    {                                                                                                                  \
+        n, nl, fn, pc, pt, rt, rc, rts, 1, NULL, 0U, 0                                                                 \
+    }
 
 static const vigil_native_class_field_t parser_fields[] = {
     VIGIL_PFIELD("prog", 4U, VIGIL_TYPE_STRING),      VIGIL_PFIELD("desc", 4U, VIGIL_TYPE_STRING),

@@ -10854,6 +10854,16 @@ typedef struct
     vigil_parser_type_t value_type;
 } for_in_types_t;
 
+typedef struct
+{
+    size_t collection_slot;
+    size_t index_slot;
+    size_t condition_start;
+    size_t exit_jump_offset;
+    size_t body_jump_offset;
+    size_t increment_start;
+} for_in_loop_state_t;
+
 static vigil_status_t validate_for_in_iterable(vigil_parser_state_t *state, const vigil_token_t *for_token,
                                                const vigil_token_t *first_name, const vigil_token_t *second_name,
                                                vigil_parser_type_t iterable_type, for_in_types_t *types)
@@ -10877,13 +10887,11 @@ static vigil_status_t validate_for_in_iterable(vigil_parser_state_t *state, cons
 }
 
 static vigil_status_t for_in_emit_scaffolding(vigil_parser_state_t *state, const vigil_token_t *for_token,
-                                              vigil_parser_type_t iterable_type, size_t *collection_slot,
-                                              size_t *index_slot, size_t *condition_start, size_t *exit_jump_offset,
-                                              size_t *body_jump_offset, size_t *increment_start)
+                                              vigil_parser_type_t iterable_type, for_in_loop_state_t *ls)
 {
     vigil_status_t status;
     vigil_parser_begin_scope(state);
-    status = vigil_binding_scope_stack_declare_hidden_local(&state->locals, iterable_type, 0, collection_slot,
+    status = vigil_binding_scope_stack_declare_hidden_local(&state->locals, iterable_type, 0, &ls->collection_slot,
                                                             state->program->error);
     if (status != VIGIL_STATUS_OK)
         return status;
@@ -10891,40 +10899,41 @@ static vigil_status_t for_in_emit_scaffolding(vigil_parser_state_t *state, const
     if (status != VIGIL_STATUS_OK)
         return status;
     status = vigil_binding_scope_stack_declare_hidden_local(
-        &state->locals, vigil_binding_type_primitive(VIGIL_TYPE_I32), 0, index_slot, state->program->error);
+        &state->locals, vigil_binding_type_primitive(VIGIL_TYPE_I32), 0, &ls->index_slot, state->program->error);
     if (status != VIGIL_STATUS_OK)
         return status;
 
-    *condition_start = vigil_chunk_code_size(&state->chunk);
-    status = emit_for_in_condition(state, for_token->span, *index_slot, *collection_slot, exit_jump_offset,
-                                   body_jump_offset);
+    ls->condition_start = vigil_chunk_code_size(&state->chunk);
+    status = emit_for_in_condition(state, for_token->span, ls->index_slot, ls->collection_slot, &ls->exit_jump_offset,
+                                   &ls->body_jump_offset);
     if (status != VIGIL_STATUS_OK)
         return status;
 
-    *increment_start = vigil_chunk_code_size(&state->chunk);
-    status = emit_for_in_increment(state, for_token->span, *index_slot, *condition_start);
+    ls->increment_start = vigil_chunk_code_size(&state->chunk);
+    status = emit_for_in_increment(state, for_token->span, ls->index_slot, ls->condition_start);
     if (status != VIGIL_STATUS_OK)
         return status;
 
-    status = vigil_parser_patch_jump(state, *body_jump_offset);
+    status = vigil_parser_patch_jump(state, ls->body_jump_offset);
     return status;
 }
 
 static vigil_status_t for_in_parse_body(vigil_parser_state_t *state, const vigil_token_t *for_token,
-                                        vigil_parser_type_t iterable_type, size_t collection_slot, size_t index_slot,
+                                        vigil_parser_type_t iterable_type, const for_in_loop_state_t *ls,
                                         const vigil_token_t *first_name, const vigil_token_t *second_name,
-                                        const for_in_types_t *types, size_t increment_start, size_t exit_jump_offset)
+                                        const for_in_types_t *types)
 {
     vigil_status_t status;
     vigil_parser_begin_scope(state);
     if (vigil_parser_type_is_array(iterable_type))
-        status = emit_for_in_bind_array(state, for_token->span, collection_slot, index_slot, first_name,
+        status = emit_for_in_bind_array(state, for_token->span, ls->collection_slot, ls->index_slot, first_name,
                                         types->element_type);
     else
     {
         for_in_binding_t key_bind = {first_name, types->key_type};
         for_in_binding_t val_bind = {second_name, types->value_type};
-        status = emit_for_in_bind_map(state, for_token->span, collection_slot, index_slot, &key_bind, &val_bind);
+        status =
+            emit_for_in_bind_map(state, for_token->span, ls->collection_slot, ls->index_slot, &key_bind, &val_bind);
     }
     if (status != VIGIL_STATUS_OK)
         return status;
@@ -10937,10 +10946,10 @@ static vigil_status_t for_in_parse_body(vigil_parser_state_t *state, const vigil
     if (status != VIGIL_STATUS_OK)
         return status;
 
-    status = vigil_parser_emit_loop(state, increment_start, for_token->span);
+    status = vigil_parser_emit_loop(state, ls->increment_start, for_token->span);
     if (status != VIGIL_STATUS_OK)
         return status;
-    status = vigil_parser_patch_jump(state, exit_jump_offset);
+    status = vigil_parser_patch_jump(state, ls->exit_jump_offset);
     if (status != VIGIL_STATUS_OK)
         return status;
     status = vigil_parser_emit_opcode(state, VIGIL_OPCODE_POP, for_token->span);
@@ -10958,8 +10967,7 @@ static vigil_status_t vigil_parser_parse_for_in_statement(vigil_parser_state_t *
     vigil_expression_result_t iterable_result;
     vigil_parser_type_t iterable_type;
     for_in_types_t types;
-    size_t collection_slot = 0U, index_slot = 0U;
-    size_t condition_start, exit_jump_offset = 0U, body_jump_offset = 0U, increment_start = 0U;
+    for_in_loop_state_t ls = {0};
 
     vigil_expression_result_clear(&iterable_result);
     iterable_type = vigil_binding_type_invalid();
@@ -10995,18 +11003,16 @@ static vigil_status_t vigil_parser_parse_for_in_statement(vigil_parser_state_t *
         return status;
 
     /* Emit scaffolding. */
-    status = for_in_emit_scaffolding(state, for_token, iterable_type, &collection_slot, &index_slot, &condition_start,
-                                     &exit_jump_offset, &body_jump_offset, &increment_start);
+    status = for_in_emit_scaffolding(state, for_token, iterable_type, &ls);
     if (status != VIGIL_STATUS_OK)
         return status;
 
-    status = vigil_parser_push_loop(state, increment_start);
+    status = vigil_parser_push_loop(state, ls.increment_start);
     if (status != VIGIL_STATUS_OK)
         return status;
 
     /* Bind loop variables and parse body. */
-    status = for_in_parse_body(state, for_token, iterable_type, collection_slot, index_slot, first_name, second_name,
-                               &types, increment_start, exit_jump_offset);
+    status = for_in_parse_body(state, for_token, iterable_type, &ls, first_name, second_name, &types);
 
     vigil_parser_pop_loop(state);
     if (status == VIGIL_STATUS_OK)
