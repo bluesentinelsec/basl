@@ -20,6 +20,7 @@
 #include <string.h>
 
 #include "vigil/native_module.h"
+#include "vigil/runtime.h"
 #include "vigil/type.h"
 #include "vigil/value.h"
 #include "vigil/vm.h"
@@ -48,6 +49,16 @@ static vigil_status_t push_f64(vigil_vm_t *vm, double v, vigil_error_t *error)
     return vigil_vm_stack_push(vm, &val, error);
 }
 #endif
+
+/* ── Allocator helpers ───────────────────────────────────────────── */
+
+static vigil_allocator_t get_alloc(vigil_vm_t *vm)
+{
+    const vigil_allocator_t *a = vigil_runtime_allocator(vigil_vm_runtime(vm));
+    if (a != NULL)
+        return *a;
+    return vigil_default_allocator();
+}
 
 static int64_t pop_i64(vigil_vm_t *vm, size_t base, size_t idx)
 {
@@ -237,31 +248,33 @@ typedef struct
     void *avalues_s[16];
 } ffi_call_bufs_t;
 
-static int ffi_call_bufs_init(ffi_call_bufs_t *b, int nargs)
+static int ffi_call_bufs_init(ffi_call_bufs_t *b, int nargs, const vigil_allocator_t *alloc)
 {
-    b->atypes = nargs <= 16 ? b->atypes_s : malloc((size_t)nargs * sizeof(*b->atypes));
-    b->args_i = nargs <= 16 ? b->args_i_s : malloc((size_t)nargs * sizeof(*b->args_i));
-    b->args_d = nargs <= 16 ? b->args_d_s : malloc((size_t)nargs * sizeof(*b->args_d));
-    b->args_p = nargs <= 16 ? b->args_p_s : malloc((size_t)nargs * sizeof(*b->args_p));
-    b->avalues = nargs <= 16 ? b->avalues_s : malloc((size_t)nargs * sizeof(*b->avalues));
+    b->atypes = nargs <= 16 ? b->atypes_s : alloc->allocate(alloc->user_data, (size_t)nargs * sizeof(*b->atypes));
+    b->args_i = nargs <= 16 ? b->args_i_s : alloc->allocate(alloc->user_data, (size_t)nargs * sizeof(*b->args_i));
+    b->args_d = nargs <= 16 ? b->args_d_s : alloc->allocate(alloc->user_data, (size_t)nargs * sizeof(*b->args_d));
+    b->args_p = nargs <= 16 ? b->args_p_s : alloc->allocate(alloc->user_data, (size_t)nargs * sizeof(*b->args_p));
+    b->avalues =
+        nargs <= 16 ? b->avalues_s : alloc->allocate(alloc->user_data, (size_t)nargs * sizeof(*b->avalues));
     return b->atypes && b->args_i && b->args_d && b->args_p && b->avalues;
 }
 
-static void ffi_call_bufs_free(ffi_call_bufs_t *b)
+static void ffi_call_bufs_free(ffi_call_bufs_t *b, const vigil_allocator_t *alloc)
 {
     if (b->atypes != b->atypes_s)
-        free(b->atypes);
+        alloc->deallocate(alloc->user_data, b->atypes);
     if (b->args_i != b->args_i_s)
-        free(b->args_i);
+        alloc->deallocate(alloc->user_data, b->args_i);
     if (b->args_d != b->args_d_s)
-        free(b->args_d);
+        alloc->deallocate(alloc->user_data, b->args_d);
     if (b->args_p != b->args_p_s)
-        free(b->args_p);
+        alloc->deallocate(alloc->user_data, b->args_p);
     if (b->avalues != b->avalues_s)
-        free(b->avalues);
+        alloc->deallocate(alloc->user_data, b->avalues);
 }
 
-static int64_t ffi_call_generic(void *fn, const char *sig, const int64_t *args, int nargs_avail)
+static int64_t ffi_call_generic(const vigil_allocator_t *alloc, void *fn, const char *sig, const int64_t *args,
+                                int nargs_avail)
 {
     ffi_abi abi = FFI_DEFAULT_ABI;
     const char *s = sig;
@@ -304,9 +317,9 @@ static int64_t ffi_call_generic(void *fn, const char *sig, const int64_t *args, 
         nargs = nargs_avail;
 
     ffi_call_bufs_t b;
-    if (!ffi_call_bufs_init(&b, nargs))
+    if (!ffi_call_bufs_init(&b, nargs, alloc))
     {
-        ffi_call_bufs_free(&b);
+        ffi_call_bufs_free(&b, alloc);
         return 0;
     }
 
@@ -369,7 +382,7 @@ static int64_t ffi_call_generic(void *fn, const char *sig, const int64_t *args, 
     }
 
 done:
-    ffi_call_bufs_free(&b);
+    ffi_call_bufs_free(&b, alloc);
     return result;
 }
 
@@ -381,10 +394,12 @@ static vigil_status_t vigil_ffi_call(vigil_vm_t *vm, size_t arg_count, vigil_err
 {
     size_t base = vigil_vm_stack_depth(vm) - arg_count;
     int idx = (int)pop_i64(vm, base, 0);
+    vigil_allocator_t alloc = get_alloc(vm);
+
     /* Remaining args (after the handle) are the C function args. */
     int nargs = (int)arg_count - 1;
     int64_t args_s[16];
-    int64_t *args = nargs <= 16 ? args_s : malloc((size_t)nargs * sizeof(*args));
+    int64_t *args = nargs <= 16 ? args_s : alloc.allocate(alloc.user_data, (size_t)nargs * sizeof(*args));
     if (!args)
     {
         vigil_vm_stack_pop_n(vm, arg_count);
@@ -398,21 +413,21 @@ static vigil_status_t vigil_ffi_call(vigil_vm_t *vm, size_t arg_count, vigil_err
     if (idx < 0 || idx >= g_bound_count)
     {
         if (args != args_s)
-            free(args);
+            alloc.deallocate(alloc.user_data, args);
         vigil_error_set_literal(error, VIGIL_STATUS_INTERNAL, "ffi.call: invalid handle");
         return VIGIL_STATUS_INTERNAL;
     }
 
 #ifdef VIGIL_HAS_LIBFFI
     {
-        int64_t rv = ffi_call_generic(g_bound[idx].fn, g_bound[idx].sig, args, nargs);
+        int64_t rv = ffi_call_generic(&alloc, g_bound[idx].fn, g_bound[idx].sig, args, nargs);
         if (args != args_s)
-            free(args);
+            alloc.deallocate(alloc.user_data, args);
         return push_i64(vm, rv, error);
     }
 #else
     if (args != args_s)
-        free(args);
+        alloc.deallocate(alloc.user_data, args);
     vigil_error_set_literal(error, VIGIL_STATUS_INTERNAL, "ffi.call: not supported on this platform");
     return VIGIL_STATUS_INTERNAL;
 #endif
@@ -426,7 +441,9 @@ static vigil_status_t vigil_ffi_call_f(vigil_vm_t *vm, size_t arg_count, vigil_e
     int idx = (int)pop_i64(vm, base, 0);
     int nargs = (int)arg_count - 1;
     int64_t args_s[16];
-    int64_t *args = nargs <= 16 ? args_s : malloc((size_t)nargs * sizeof(*args));
+    vigil_allocator_t alloc = get_alloc(vm);
+    int64_t *args = nargs <= 16 ? args_s : alloc.allocate(alloc.user_data, (size_t)nargs * sizeof(*args));
+
     if (!args)
     {
         vigil_vm_stack_pop_n(vm, arg_count);
@@ -443,23 +460,23 @@ static vigil_status_t vigil_ffi_call_f(vigil_vm_t *vm, size_t arg_count, vigil_e
     if (idx < 0 || idx >= g_bound_count)
     {
         if (args != args_s)
-            free(args);
+            alloc.deallocate(alloc.user_data, args);
         vigil_error_set_literal(error, VIGIL_STATUS_INTERNAL, "ffi.call_f: invalid handle");
         return VIGIL_STATUS_INTERNAL;
     }
 
 #ifdef VIGIL_HAS_LIBFFI
     {
-        int64_t rbits = ffi_call_generic(g_bound[idx].fn, g_bound[idx].sig, args, nargs);
+        int64_t rbits = ffi_call_generic(&alloc, g_bound[idx].fn, g_bound[idx].sig, args, nargs);
         if (args != args_s)
-            free(args);
+            alloc.deallocate(alloc.user_data, args);
         double rv;
         memcpy(&rv, &rbits, sizeof(rv));
         return push_f64(vm, rv, error);
     }
 #else
     if (args != args_s)
-        free(args);
+        alloc.deallocate(alloc.user_data, args);
     vigil_error_set_literal(error, VIGIL_STATUS_INTERNAL, "ffi.call_f: not supported on this platform");
     return VIGIL_STATUS_INTERNAL;
 #endif
@@ -473,7 +490,9 @@ static vigil_status_t vigil_ffi_call_s(vigil_vm_t *vm, size_t arg_count, vigil_e
     int idx = (int)pop_i64(vm, base, 0);
     int nargs = (int)arg_count - 1;
     int64_t args_s[16];
-    int64_t *args = nargs <= 16 ? args_s : malloc((size_t)nargs * sizeof(*args));
+    vigil_allocator_t alloc = get_alloc(vm);
+    int64_t *args = nargs <= 16 ? args_s : alloc.allocate(alloc.user_data, (size_t)nargs * sizeof(*args));
+
     if (!args)
     {
         vigil_vm_stack_pop_n(vm, arg_count);
@@ -487,22 +506,22 @@ static vigil_status_t vigil_ffi_call_s(vigil_vm_t *vm, size_t arg_count, vigil_e
     if (idx < 0 || idx >= g_bound_count)
     {
         if (args != args_s)
-            free(args);
+            alloc.deallocate(alloc.user_data, args);
         vigil_error_set_literal(error, VIGIL_STATUS_INTERNAL, "ffi.call_s: invalid handle");
         return VIGIL_STATUS_INTERNAL;
     }
 
 #ifdef VIGIL_HAS_LIBFFI
     {
-        int64_t rbits = ffi_call_generic(g_bound[idx].fn, g_bound[idx].sig, args, nargs);
+        int64_t rbits = ffi_call_generic(&alloc, g_bound[idx].fn, g_bound[idx].sig, args, nargs);
         if (args != args_s)
-            free(args);
+            alloc.deallocate(alloc.user_data, args);
         const char *r = (const char *)(intptr_t)rbits;
         return push_string(vm, r, error);
     }
 #else
     if (args != args_s)
-        free(args);
+        alloc.deallocate(alloc.user_data, args);
     vigil_error_set_literal(error, VIGIL_STATUS_INTERNAL, "ffi.call_s: not supported on this platform");
     return VIGIL_STATUS_INTERNAL;
 #endif
@@ -606,9 +625,10 @@ VIGIL_API vigil_status_t vigil_extern_call(vigil_vm_t *vm, const char *desc, siz
 
 #ifdef VIGIL_HAS_LIBFFI
     {
+        vigil_allocator_t alloc = get_alloc(vm);
         size_t base = vigil_vm_stack_depth(vm) - arg_count;
         int64_t args_s[16] = {0};
-        int64_t *args = arg_count <= 16 ? args_s : malloc(arg_count * sizeof(*args));
+        int64_t *args = arg_count <= 16 ? args_s : alloc.allocate(alloc.user_data, arg_count * sizeof(*args));
         if (!args)
         {
             vigil_vm_stack_pop_n(vm, arg_count);
@@ -630,9 +650,9 @@ VIGIL_API vigil_status_t vigil_extern_call(vigil_vm_t *vm, const char *desc, siz
         }
         vigil_vm_stack_pop_n(vm, arg_count);
 
-        int64_t result = ffi_call_generic(entry->fn_ptr, entry->sig, args, (int)arg_count);
+        int64_t result = ffi_call_generic(&alloc, entry->fn_ptr, entry->sig, args, (int)arg_count);
         if (args != args_s)
-            free(args);
+            alloc.deallocate(alloc.user_data, args);
 
         /* Determine return type from sig. */
         const char *paren = strchr(entry->sig, '(');
