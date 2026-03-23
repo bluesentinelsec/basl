@@ -1304,7 +1304,7 @@ static int cmd_doc_builtin(const char *name)
     entry = vigil_doc_lookup(name);
     if (entry != NULL)
     {
-        if (vigil_doc_entry_render(entry, &output, &output_len, &error) == VIGIL_STATUS_OK)
+        if (vigil_doc_entry_render(NULL, entry, &output, &output_len, &error) == VIGIL_STATUS_OK)
         {
             fwrite(output, 1, output_len, stdout);
             free(output);
@@ -1525,7 +1525,7 @@ static int try_run_packaged(int argc, char **argv)
     vigil_status_t status;
     const char *entry_src = NULL;
 
-    status = vigil_package_read_self(&bundle, &error);
+    status = vigil_package_read_self(NULL, &bundle, &error);
     if (status != VIGIL_STATUS_OK)
     {
         if (error.value != NULL && (strcmp(vigil_error_message(&error), "not a packaged binary") == 0 ||
@@ -1647,7 +1647,7 @@ static int fmt_one_file(const char *file_path, int check_only)
     }
 
     /* Format. */
-    if (vigil_fmt(vigil_string_c_str(&source->text), vigil_string_length(&source->text), &tokens, &formatted,
+    if (vigil_fmt(NULL, vigil_string_c_str(&source->text), vigil_string_length(&source->text), &tokens, &formatted,
                   &formatted_len, &error) != VIGIL_STATUS_OK)
     {
         fprintf(stderr, "error[fmt]: %s: %s\n", file_path, vigil_error_message(&error));
@@ -1881,14 +1881,15 @@ static int cmd_embed(int argc, char **argv)
         int is_dir = 0;
         vigil_platform_is_directory(targets[0], &is_dir);
         if (!is_dir)
-            status = vigil_embed_single(fl.paths[0], &text, &text_len, &error);
+            status = vigil_embed_single(NULL, fl.paths[0], &text, &text_len, &error);
         else
-            status =
-                vigil_embed_multi((const char **)fl.paths, (const char **)fl.rels, fl.count, &text, &text_len, &error);
+            status = vigil_embed_multi(NULL, (const char **)fl.paths, (const char **)fl.rels, fl.count, &text,
+                                       &text_len, &error);
     }
     else
     {
-        status = vigil_embed_multi((const char **)fl.paths, (const char **)fl.rels, fl.count, &text, &text_len, &error);
+        status = vigil_embed_multi(NULL, (const char **)fl.paths, (const char **)fl.rels, fl.count, &text, &text_len,
+                                   &error);
     }
 
     if (status != VIGIL_STATUS_OK)
@@ -2460,7 +2461,7 @@ static void repl_handle_doc(const char *input_data, vigil_error_t *error)
     {
         char *text = NULL;
         size_t len = 0;
-        if (vigil_doc_entry_render(entry, &text, &len, error) == VIGIL_STATUS_OK)
+        if (vigil_doc_entry_render(NULL, entry, &text, &len, error) == VIGIL_STATUS_OK)
         {
             printf("%s", text);
             free(text);
@@ -2740,7 +2741,7 @@ static int cmd_get(int argc, char **argv)
     if (!found_pkg)
     {
         printf("syncing dependencies...\n");
-        if (vigil_pkg_sync(project_root, &error) != VIGIL_STATUS_OK)
+        if (vigil_pkg_sync(NULL, project_root, &error) != VIGIL_STATUS_OK)
         {
             fprintf(stderr, "error: %s\n", vigil_error_message(&error));
             return 1;
@@ -2758,7 +2759,7 @@ static int cmd_get(int argc, char **argv)
         if (remove_mode)
         {
             printf("removing %s...\n", argv[i]);
-            if (vigil_pkg_remove(project_root, argv[i], &error) != VIGIL_STATUS_OK)
+            if (vigil_pkg_remove(NULL, project_root, argv[i], &error) != VIGIL_STATUS_OK)
             {
                 fprintf(stderr, "error: %s\n", vigil_error_message(&error));
                 return 1;
@@ -2767,7 +2768,7 @@ static int cmd_get(int argc, char **argv)
         else
         {
             printf("getting %s...\n", argv[i]);
-            if (vigil_pkg_get(project_root, argv[i], &error) != VIGIL_STATUS_OK)
+            if (vigil_pkg_get(NULL, project_root, argv[i], &error) != VIGIL_STATUS_OK)
             {
                 fprintf(stderr, "error: %s\n", vigil_error_message(&error));
                 return 1;
@@ -2792,7 +2793,7 @@ static int package_inspect_mode(const char *entry_path, const char *output_path,
         fprintf(stderr, "error: --inspect requires a binary path\n");
         return 2;
     }
-    if (vigil_package_read(target, &bundle, error) != VIGIL_STATUS_OK)
+    if (vigil_package_read(NULL, target, &bundle, error) != VIGIL_STATUS_OK)
     {
         fprintf(stderr, "error[package]: %s\n", vigil_error_message(error));
         return 1;
@@ -2931,7 +2932,8 @@ static int cmd_package(const char *entry_path, const char *output_path, const ch
             return 1;
         }
 
-        if (vigil_package_build(out_path, pkg_files, pkg_count, key, key ? strlen(key) : 0, &error) != VIGIL_STATUS_OK)
+        if (vigil_package_build(NULL, out_path, pkg_files, pkg_count, key, key ? strlen(key) : 0, &error) !=
+            VIGIL_STATUS_OK)
         {
             fprintf(stderr, "error[package]: %s\n", vigil_error_message(&error));
             free(pkg_files);

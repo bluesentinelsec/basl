@@ -157,6 +157,7 @@ typedef struct
     lsp_sem_token_t *data;
     size_t count;
     size_t capacity;
+    vigil_runtime_t *runtime;
 } sem_token_list_t;
 
 static int sem_token_cmp(const void *a, const void *b)
@@ -223,10 +224,16 @@ static int sem_token_list_push(sem_token_list_t *list, lsp_sem_token_t tok)
     if (list->count == list->capacity)
     {
         size_t new_cap = (list->capacity == 0) ? 64u : list->capacity * 2u;
-        lsp_sem_token_t *tmp = realloc(list->data, new_cap * sizeof(*list->data));
-        if (tmp == NULL)
+        size_t new_size = new_cap * sizeof(*list->data);
+        void *mem = list->data;
+        vigil_status_t s;
+        if (mem == NULL)
+            s = vigil_runtime_alloc(list->runtime, new_size, &mem, NULL);
+        else
+            s = vigil_runtime_realloc(list->runtime, &mem, new_size, NULL);
+        if (s != VIGIL_STATUS_OK)
             return 0;
-        list->data = tmp;
+        list->data = mem;
         list->capacity = new_cap;
     }
     list->data[list->count++] = tok;
@@ -822,7 +829,10 @@ static vigil_status_t handle_references(vigil_lsp_server_t *server, const vigil_
 
             vigil_json_array_push(result, loc, error);
         }
-        free(refs);
+        {
+            void *tmp = refs;
+            vigil_runtime_free(server->runtime, &tmp);
+        }
     }
 
     return lsp_make_response(a, id, result, out, error);
@@ -870,8 +880,8 @@ static vigil_status_t handle_formatting(vigil_lsp_server_t *server, const vigil_
         return lsp_make_response(a, id, NULL, out, error);
     }
 
-    if (vigil_fmt(vigil_string_c_str(&src->text), vigil_string_length(&src->text), &tokens, &formatted, &formatted_len,
-                  error) != VIGIL_STATUS_OK)
+    if (vigil_fmt(&server->runtime->allocator, vigil_string_c_str(&src->text), vigil_string_length(&src->text), &tokens,
+                  &formatted, &formatted_len, error) != VIGIL_STATUS_OK)
     {
         vigil_token_list_free(&tokens);
         return lsp_make_response(a, id, NULL, out, error);
@@ -911,7 +921,7 @@ static vigil_status_t handle_formatting(vigil_lsp_server_t *server, const vigil_
         vigil_json_array_push(result, edit, error);
     }
 
-    free(formatted);
+    server->runtime->allocator.deallocate(server->runtime->allocator.user_data, formatted);
     return lsp_make_response(a, id, result, out, error);
 }
 
@@ -1019,12 +1029,7 @@ static vigil_status_t handle_rename(vigil_lsp_server_t *server, const vigil_json
                                     const vigil_json_value_t *params, vigil_json_value_t **out, vigil_error_t *error)
 {
     const vigil_allocator_t *a = &server->allocator;
-    const vigil_json_value_t *text_doc;
-    const vigil_json_value_t *position;
-    const vigil_json_value_t *new_name_val;
-    const vigil_json_value_t *uri_val;
-    const vigil_json_value_t *line_val;
-    const vigil_json_value_t *char_val;
+    const vigil_json_value_t *text_doc, *position, *new_name_val, *uri_val, *line_val, *char_val;
     const vigil_source_file_t *src;
     vigil_semantic_reference_t *refs = NULL;
     size_t ref_count = 0;
@@ -1129,7 +1134,10 @@ static vigil_status_t handle_rename(vigil_lsp_server_t *server, const vigil_json
 
             vigil_json_array_push(edits_array, edit, error);
         }
-        free(refs);
+        {
+            void *tmp = refs;
+            vigil_runtime_free(server->runtime, &tmp);
+        }
     }
 
     jset_obj(result, "changes", changes, error);
@@ -1458,7 +1466,7 @@ static vigil_status_t handle_hover(vigil_lsp_server_t *server, const vigil_json_
             const vigil_doc_entry_t *doc = vigil_doc_lookup(name);
             if (doc != NULL)
             {
-                vigil_doc_entry_render(doc, &hover_text, NULL, error);
+                vigil_doc_entry_render(&server->runtime->allocator, doc, &hover_text, NULL, error);
             }
         }
     }
@@ -1485,7 +1493,10 @@ static vigil_status_t handle_hover(vigil_lsp_server_t *server, const vigil_json_
         jset_str(contents, "value", hover_text, a, error);
         jset_obj(result, "contents", contents, error);
 
-        free(hover_text);
+        {
+            void *tmp = hover_text;
+            vigil_runtime_free(server->runtime, &tmp);
+        }
         return lsp_make_response(a, id, result, out, error);
     }
 
@@ -1508,7 +1519,7 @@ static vigil_status_t handle_semantic_tokens_full(vigil_lsp_server_t *server, co
     vigil_source_id_t source_id;
     const vigil_source_file_t *src;
     const vigil_semantic_file_t *sem_file;
-    sem_token_list_t list = {NULL, 0, 0};
+    sem_token_list_t list = {NULL, 0, 0, server->runtime};
     vigil_json_value_t *result = NULL;
     vigil_json_value_t *data_array = NULL;
 
@@ -1537,12 +1548,17 @@ static vigil_status_t handle_semantic_tokens_full(vigil_lsp_server_t *server, co
     vigil_json_object_new(a, &result, error);
     vigil_json_array_new(a, &data_array, error);
     encode_tokens_to_json(&list, src, a, data_array, error);
-    free(list.data);
+    {
+        void *tmp = list.data;
+        vigil_runtime_free(server->runtime, &tmp);
+    }
     jset_obj(result, "data", data_array, error);
     return lsp_make_response(a, id, result, out, error);
 
-empty:
-    free(list.data);
+empty: {
+    void *tmp = list.data;
+    vigil_runtime_free(server->runtime, &tmp);
+}
     vigil_json_object_new(a, &result, error);
     vigil_json_array_new(a, &data_array, error);
     jset_obj(result, "data", data_array, error);
@@ -1733,6 +1749,7 @@ vigil_status_t vigil_lsp_server_create(vigil_lsp_server_t **out, FILE *in, FILE 
 {
     vigil_lsp_server_t *server;
     vigil_status_t status;
+    vigil_allocator_t a;
 
     if (out == NULL || in == NULL || out_stream == NULL)
     {
@@ -1740,27 +1757,24 @@ vigil_status_t vigil_lsp_server_create(vigil_lsp_server_t **out, FILE *in, FILE 
         return VIGIL_STATUS_INVALID_ARGUMENT;
     }
 
-    server = calloc(1, sizeof(vigil_lsp_server_t));
-    if (server == NULL)
+    a = (allocator != NULL && vigil_allocator_is_valid(allocator)) ? *allocator : vigil_default_allocator();
+
     {
-        return VIGIL_STATUS_OUT_OF_MEMORY;
+        void *mem = a.allocate(a.user_data, sizeof(vigil_lsp_server_t));
+        if (mem == NULL)
+            return VIGIL_STATUS_OUT_OF_MEMORY;
+        memset(mem, 0, sizeof(vigil_lsp_server_t));
+        server = mem;
     }
 
-    if (allocator != NULL && vigil_allocator_is_valid(allocator))
-    {
-        server->allocator = *allocator;
-    }
-    else
-    {
-        server->allocator = vigil_default_allocator();
-    }
+    server->allocator = a;
 
     vigil_jsonrpc_transport_init(&server->transport, in, out_stream, &server->allocator);
 
     status = vigil_runtime_open(&server->runtime, NULL, error);
     if (status != VIGIL_STATUS_OK)
     {
-        free(server);
+        a.deallocate(a.user_data, server);
         return status;
     }
 
@@ -1771,7 +1785,7 @@ vigil_status_t vigil_lsp_server_create(vigil_lsp_server_t **out, FILE *in, FILE 
     {
         vigil_source_registry_free(&server->sources);
         vigil_runtime_close(&server->runtime);
-        free(server);
+        a.deallocate(a.user_data, server);
         return status;
     }
 
@@ -1790,7 +1804,7 @@ void vigil_lsp_server_destroy(vigil_lsp_server_t **server)
     vigil_semantic_index_destroy(&s->index);
     vigil_source_registry_free(&s->sources);
     vigil_runtime_close(&s->runtime);
-    free(s);
+    s->allocator.deallocate(s->allocator.user_data, s);
     *server = NULL;
 }
 

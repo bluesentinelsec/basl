@@ -60,7 +60,8 @@ static vigil_status_t vigil_url_parse_fn(vigil_vm_t *vm, size_t arg_count, vigil
         return push_string(vm, "", 0, error);
     }
 
-    if (vigil_url_parse(url_str, url_len, &url, error) != VIGIL_STATUS_OK)
+    if (vigil_url_parse(vigil_runtime_allocator(vigil_vm_runtime(vm)), url_str, url_len, &url, error) !=
+        VIGIL_STATUS_OK)
     {
         vigil_vm_stack_pop_n(vm, arg_count);
         return push_string(vm, "", 0, error);
@@ -92,7 +93,8 @@ static vigil_status_t vigil_url_scheme_fn(vigil_vm_t *vm, size_t arg_count, vigi
         return push_string(vm, "", 0, error);
     }
 
-    if (vigil_url_parse(url_str, url_len, &url, error) != VIGIL_STATUS_OK)
+    if (vigil_url_parse(vigil_runtime_allocator(vigil_vm_runtime(vm)), url_str, url_len, &url, error) !=
+        VIGIL_STATUS_OK)
     {
         vigil_vm_stack_pop_n(vm, arg_count);
         return push_string(vm, "", 0, error);
@@ -120,7 +122,8 @@ static vigil_status_t vigil_url_host_fn(vigil_vm_t *vm, size_t arg_count, vigil_
         return push_string(vm, "", 0, error);
     }
 
-    if (vigil_url_parse(url_str, url_len, &url, error) != VIGIL_STATUS_OK)
+    if (vigil_url_parse(vigil_runtime_allocator(vigil_vm_runtime(vm)), url_str, url_len, &url, error) !=
+        VIGIL_STATUS_OK)
     {
         vigil_vm_stack_pop_n(vm, arg_count);
         return push_string(vm, "", 0, error);
@@ -148,7 +151,8 @@ static vigil_status_t vigil_url_port_fn(vigil_vm_t *vm, size_t arg_count, vigil_
         return push_string(vm, "", 0, error);
     }
 
-    if (vigil_url_parse(url_str, url_len, &url, error) != VIGIL_STATUS_OK)
+    if (vigil_url_parse(vigil_runtime_allocator(vigil_vm_runtime(vm)), url_str, url_len, &url, error) !=
+        VIGIL_STATUS_OK)
     {
         vigil_vm_stack_pop_n(vm, arg_count);
         return push_string(vm, "", 0, error);
@@ -176,7 +180,8 @@ static vigil_status_t vigil_url_path_fn(vigil_vm_t *vm, size_t arg_count, vigil_
         return push_string(vm, "", 0, error);
     }
 
-    if (vigil_url_parse(url_str, url_len, &url, error) != VIGIL_STATUS_OK)
+    if (vigil_url_parse(vigil_runtime_allocator(vigil_vm_runtime(vm)), url_str, url_len, &url, error) !=
+        VIGIL_STATUS_OK)
     {
         vigil_vm_stack_pop_n(vm, arg_count);
         return push_string(vm, "", 0, error);
@@ -204,7 +209,8 @@ static vigil_status_t vigil_url_query_fn(vigil_vm_t *vm, size_t arg_count, vigil
         return push_string(vm, "", 0, error);
     }
 
-    if (vigil_url_parse(url_str, url_len, &url, error) != VIGIL_STATUS_OK)
+    if (vigil_url_parse(vigil_runtime_allocator(vigil_vm_runtime(vm)), url_str, url_len, &url, error) !=
+        VIGIL_STATUS_OK)
     {
         vigil_vm_stack_pop_n(vm, arg_count);
         return push_string(vm, "", 0, error);
@@ -232,7 +238,8 @@ static vigil_status_t vigil_url_fragment_fn(vigil_vm_t *vm, size_t arg_count, vi
         return push_string(vm, "", 0, error);
     }
 
-    if (vigil_url_parse(url_str, url_len, &url, error) != VIGIL_STATUS_OK)
+    if (vigil_url_parse(vigil_runtime_allocator(vigil_vm_runtime(vm)), url_str, url_len, &url, error) !=
+        VIGIL_STATUS_OK)
     {
         vigil_vm_stack_pop_n(vm, arg_count);
         return push_string(vm, "", 0, error);
@@ -261,7 +268,8 @@ static vigil_status_t vigil_url_encode_fn(vigil_vm_t *vm, size_t arg_count, vigi
         return push_string(vm, "", 0, error);
     }
 
-    if (vigil_url_query_escape(input, input_len, &encoded, &encoded_len, error) != VIGIL_STATUS_OK)
+    const vigil_allocator_t *a = vigil_runtime_allocator(vigil_vm_runtime(vm));
+    if (vigil_url_query_escape(a, input, input_len, &encoded, &encoded_len, error) != VIGIL_STATUS_OK)
     {
         vigil_vm_stack_pop_n(vm, arg_count);
         return push_string(vm, "", 0, error);
@@ -269,7 +277,7 @@ static vigil_status_t vigil_url_encode_fn(vigil_vm_t *vm, size_t arg_count, vigi
     vigil_vm_stack_pop_n(vm, arg_count);
 
     s = push_string(vm, encoded, encoded_len, error);
-    free(encoded);
+    a->deallocate(a->user_data, encoded);
     return s;
 }
 
@@ -290,7 +298,8 @@ static vigil_status_t vigil_url_decode_fn(vigil_vm_t *vm, size_t arg_count, vigi
         return push_string(vm, "", 0, error);
     }
 
-    if (vigil_url_unescape(input, input_len, &decoded, &decoded_len, error) != VIGIL_STATUS_OK)
+    const vigil_allocator_t *a = vigil_runtime_allocator(vigil_vm_runtime(vm));
+    if (vigil_url_unescape(a, input, input_len, &decoded, &decoded_len, error) != VIGIL_STATUS_OK)
     {
         vigil_vm_stack_pop_n(vm, arg_count);
         return push_string(vm, "", 0, error);
@@ -298,7 +307,7 @@ static vigil_status_t vigil_url_decode_fn(vigil_vm_t *vm, size_t arg_count, vigi
     vigil_vm_stack_pop_n(vm, arg_count);
 
     s = push_string(vm, decoded, decoded_len, error);
-    free(decoded);
+    a->deallocate(a->user_data, decoded);
     return s;
 }
 

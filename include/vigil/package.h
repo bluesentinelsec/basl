@@ -4,6 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "vigil/allocator.h"
 #include "vigil/export.h"
 #include "vigil/status.h"
 
@@ -30,14 +31,9 @@ extern "C"
 
     /* ── Build a packaged binary ─────────────────────────────────────── */
 
-    /*
-     * Build a standalone binary by copying the current executable and
-     * appending a zip bundle of the given files.
-     * If key is non-NULL and key_length > 0, the zip payload is XOR-encrypted.
-     */
-    VIGIL_API vigil_status_t vigil_package_build(const char *output_path, const vigil_package_file_t *files,
-                                                 size_t file_count, const char *key, size_t key_length,
-                                                 vigil_error_t *error);
+    VIGIL_API vigil_status_t vigil_package_build(const vigil_allocator_t *allocator, const char *output_path,
+                                                 const vigil_package_file_t *files, size_t file_count, const char *key,
+                                                 size_t key_length, vigil_error_t *error);
 
     /* ── Read bundle from a binary ───────────────────────────────────── */
 
@@ -47,21 +43,16 @@ extern "C"
         char **contents;
         size_t *content_lengths;
         size_t file_count;
+        vigil_allocator_t allocator;
     } vigil_package_bundle_t;
 
-    /*
-     * Read the appended bundle from a binary file.
-     * Returns VIGIL_STATUS_INTERNAL if no bundle is present.
-     */
-    VIGIL_API vigil_status_t vigil_package_read(const char *binary_path, vigil_package_bundle_t *out_bundle,
-                                                vigil_error_t *error);
+    VIGIL_API vigil_status_t vigil_package_read(const vigil_allocator_t *allocator, const char *binary_path,
+                                                vigil_package_bundle_t *out_bundle, vigil_error_t *error);
 
     VIGIL_API void vigil_package_bundle_free(vigil_package_bundle_t *bundle);
 
-    /*
-     * Check if the current executable has an appended bundle.
-     */
-    VIGIL_API vigil_status_t vigil_package_read_self(vigil_package_bundle_t *out_bundle, vigil_error_t *error);
+    VIGIL_API vigil_status_t vigil_package_read_self(const vigil_allocator_t *allocator,
+                                                     vigil_package_bundle_t *out_bundle, vigil_error_t *error);
 
 #ifdef __cplusplus
 }

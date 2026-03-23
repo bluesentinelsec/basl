@@ -4,7 +4,20 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "internal/vigil_internal.h"
 #include "platform/platform.h"
+
+/* ── Allocator resolution ────────────────────────────────────────── */
+
+static vigil_allocator_t pkg_resolve_alloc(const vigil_allocator_t *a)
+{
+    if (a != NULL && vigil_allocator_is_valid(a))
+        return *a;
+    return vigil_default_allocator();
+}
+
+#define PKG_ALLOC(a, sz) (a)->allocate((a)->user_data, (sz))
+#define PKG_FREE(a, p) (a)->deallocate((a)->user_data, (p))
 
 /* ── XOR cipher ──────────────────────────────────────────────────── */
 
@@ -93,7 +106,86 @@ static uint32_t crc32_compute(const unsigned char *data, size_t len)
 }
 
 /* Build a ZIP archive in memory (store-only). */
-static unsigned char *zip_build(const vigil_package_file_t *files, size_t count, size_t *out_size)
+static unsigned char *zip_write_local_entry(unsigned char *p, const vigil_package_file_t *f, uint32_t *out_offset,
+                                            const unsigned char *buf_start)
+{
+    uint32_t crc = crc32_compute((const unsigned char *)f->data, f->data_length);
+    *out_offset = (uint32_t)(p - buf_start);
+
+    write_u32_le(p, 0x04034B50);
+    p += 4; /* local file header sig */
+    write_u16_le(p, 20);
+    p += 2; /* version needed */
+    write_u16_le(p, 0);
+    p += 2; /* flags */
+    write_u16_le(p, 0);
+    p += 2; /* compression: store */
+    write_u16_le(p, 0);
+    p += 2; /* mod time */
+    write_u16_le(p, 0);
+    p += 2; /* mod date */
+    write_u32_le(p, crc);
+    p += 4; /* crc-32 */
+    write_u32_le(p, (uint32_t)f->data_length);
+    p += 4; /* compressed size */
+    write_u32_le(p, (uint32_t)f->data_length);
+    p += 4; /* uncompressed size */
+    write_u16_le(p, (uint16_t)f->path_length);
+    p += 2; /* filename length */
+    write_u16_le(p, 0);
+    p += 2; /* extra field length */
+    memcpy(p, f->path, f->path_length);
+    p += f->path_length;
+    memcpy(p, f->data, f->data_length);
+    p += f->data_length;
+    return p;
+}
+
+static unsigned char *zip_write_cd_entry(unsigned char *p, const vigil_package_file_t *f, uint32_t offset)
+{
+    uint32_t crc = crc32_compute((const unsigned char *)f->data, f->data_length);
+
+    write_u32_le(p, 0x02014B50);
+    p += 4; /* central dir sig */
+    write_u16_le(p, 20);
+    p += 2; /* version made by */
+    write_u16_le(p, 20);
+    p += 2; /* version needed */
+    write_u16_le(p, 0);
+    p += 2; /* flags */
+    write_u16_le(p, 0);
+    p += 2; /* compression */
+    write_u16_le(p, 0);
+    p += 2; /* mod time */
+    write_u16_le(p, 0);
+    p += 2; /* mod date */
+    write_u32_le(p, crc);
+    p += 4;
+    write_u32_le(p, (uint32_t)f->data_length);
+    p += 4;
+    write_u32_le(p, (uint32_t)f->data_length);
+    p += 4;
+    write_u16_le(p, (uint16_t)f->path_length);
+    p += 2;
+    write_u16_le(p, 0);
+    p += 2; /* extra field length */
+    write_u16_le(p, 0);
+    p += 2; /* comment length */
+    write_u16_le(p, 0);
+    p += 2; /* disk number */
+    write_u16_le(p, 0);
+    p += 2; /* internal attrs */
+    write_u32_le(p, 0);
+    p += 4; /* external attrs */
+    write_u32_le(p, offset);
+    p += 4; /* local header offset */
+    memcpy(p, f->path, f->path_length);
+    p += f->path_length;
+    return p;
+}
+
+static unsigned char *zip_build(const vigil_allocator_t *a, const vigil_package_file_t *files, size_t count,
+                                size_t *out_size)
 {
     /* Calculate total size. */
     size_t total = 0;
@@ -109,17 +201,17 @@ static unsigned char *zip_build(const vigil_package_file_t *files, size_t count,
     }
     total += cd_size + 22; /* end of central directory */
 
-    buf = (unsigned char *)malloc(total);
+    buf = (unsigned char *)PKG_ALLOC(a, total);
     if (buf == NULL)
     {
         *out_size = 0;
         return NULL;
     }
 
-    offsets = (uint32_t *)malloc(count * sizeof(uint32_t));
+    offsets = (uint32_t *)PKG_ALLOC(a, count * sizeof(uint32_t));
     if (offsets == NULL)
     {
-        free(buf);
+        PKG_FREE(a, buf);
         *out_size = 0;
         return NULL;
     }
@@ -128,81 +220,12 @@ static unsigned char *zip_build(const vigil_package_file_t *files, size_t count,
 
     /* Write local file headers + data. */
     for (i = 0; i < count; i++)
-    {
-        uint32_t crc = crc32_compute((const unsigned char *)files[i].data, files[i].data_length);
-        offsets[i] = (uint32_t)(p - buf);
-
-        write_u32_le(p, 0x04034B50);
-        p += 4; /* local file header sig */
-        write_u16_le(p, 20);
-        p += 2; /* version needed */
-        write_u16_le(p, 0);
-        p += 2; /* flags */
-        write_u16_le(p, 0);
-        p += 2; /* compression: store */
-        write_u16_le(p, 0);
-        p += 2; /* mod time */
-        write_u16_le(p, 0);
-        p += 2; /* mod date */
-        write_u32_le(p, crc);
-        p += 4; /* crc-32 */
-        write_u32_le(p, (uint32_t)files[i].data_length);
-        p += 4; /* compressed size */
-        write_u32_le(p, (uint32_t)files[i].data_length);
-        p += 4; /* uncompressed size */
-        write_u16_le(p, (uint16_t)files[i].path_length);
-        p += 2; /* filename length */
-        write_u16_le(p, 0);
-        p += 2; /* extra field length */
-        memcpy(p, files[i].path, files[i].path_length);
-        p += files[i].path_length;
-        memcpy(p, files[i].data, files[i].data_length);
-        p += files[i].data_length;
-    }
+        p = zip_write_local_entry(p, &files[i], &offsets[i], buf);
 
     /* Write central directory. */
     cd_start = p;
     for (i = 0; i < count; i++)
-    {
-        uint32_t crc = crc32_compute((const unsigned char *)files[i].data, files[i].data_length);
-
-        write_u32_le(p, 0x02014B50);
-        p += 4; /* central dir sig */
-        write_u16_le(p, 20);
-        p += 2; /* version made by */
-        write_u16_le(p, 20);
-        p += 2; /* version needed */
-        write_u16_le(p, 0);
-        p += 2; /* flags */
-        write_u16_le(p, 0);
-        p += 2; /* compression */
-        write_u16_le(p, 0);
-        p += 2; /* mod time */
-        write_u16_le(p, 0);
-        p += 2; /* mod date */
-        write_u32_le(p, crc);
-        p += 4;
-        write_u32_le(p, (uint32_t)files[i].data_length);
-        p += 4;
-        write_u32_le(p, (uint32_t)files[i].data_length);
-        p += 4;
-        write_u16_le(p, (uint16_t)files[i].path_length);
-        p += 2;
-        write_u16_le(p, 0);
-        p += 2; /* extra field length */
-        write_u16_le(p, 0);
-        p += 2; /* comment length */
-        write_u16_le(p, 0);
-        p += 2; /* disk number */
-        write_u16_le(p, 0);
-        p += 2; /* internal attrs */
-        write_u32_le(p, 0);
-        p += 4; /* external attrs */
-        write_u32_le(p, offsets[i]);
-        p += 4; /* local header offset */
-        memcpy(p, files[i].path, files[i].path_length);
-        p += files[i].path_length;
-    }
+        p = zip_write_cd_entry(p, &files[i], offsets[i]);
 
     /* End of central directory. */
     {
@@ -227,14 +250,14 @@ static unsigned char *zip_build(const vigil_package_file_t *files, size_t count,
     }
 
     *out_size = (size_t)(p - buf);
-    free(offsets);
+    PKG_FREE(a, offsets);
     return buf;
 }
 
 /* ── ZIP reader (minimal, store-only) ────────────────────────────── */
 
-static int zip_read(const unsigned char *data, size_t data_len, char ***out_paths, char ***out_contents,
-                    size_t **out_lengths, size_t *out_count)
+static int zip_read(const vigil_allocator_t *a, const unsigned char *data, size_t data_len, char ***out_paths,
+                    char ***out_contents, size_t **out_lengths, size_t *out_count)
 {
     /* Find end of central directory. */
     size_t eocd_pos;
@@ -268,16 +291,19 @@ static int zip_read(const unsigned char *data, size_t data_len, char ***out_path
     if (cd_offset >= data_len)
         return 0;
 
-    paths = (char **)calloc(entry_count, sizeof(char *));
-    contents = (char **)calloc(entry_count, sizeof(char *));
-    lengths = (size_t *)calloc(entry_count, sizeof(size_t));
+    paths = (char **)PKG_ALLOC(a, entry_count * sizeof(char *));
+    contents = (char **)PKG_ALLOC(a, entry_count * sizeof(char *));
+    lengths = (size_t *)PKG_ALLOC(a, entry_count * sizeof(size_t));
     if (!paths || !contents || !lengths)
     {
-        free(paths);
-        free(contents);
-        free(lengths);
+        PKG_FREE(a, paths);
+        PKG_FREE(a, contents);
+        PKG_FREE(a, lengths);
         return 0;
     }
+    memset(paths, 0, entry_count * sizeof(char *));
+    memset(contents, 0, entry_count * sizeof(char *));
+    memset(lengths, 0, entry_count * sizeof(size_t));
 
     cd = data + cd_offset;
     for (i = 0; i < entry_count; i++)
@@ -298,7 +324,7 @@ static int zip_read(const unsigned char *data, size_t data_len, char ***out_path
         comp_size = read_u32_le(cd + 20);
         local_offset = read_u32_le(cd + 42);
 
-        paths[i] = (char *)malloc(name_len + 1);
+        paths[i] = (char *)PKG_ALLOC(a, name_len + 1);
         if (!paths[i])
             goto fail;
         memcpy(paths[i], cd + 46, name_len);
@@ -311,7 +337,7 @@ static int zip_read(const unsigned char *data, size_t data_len, char ***out_path
         local_name_len = read_u16_le(local + 26);
         local_extra_len = read_u16_le(local + 28);
 
-        contents[i] = (char *)malloc(comp_size + 1);
+        contents[i] = (char *)PKG_ALLOC(a, comp_size + 1);
         if (!contents[i])
             goto fail;
         memcpy(contents[i], local + 30 + local_name_len + local_extra_len, comp_size);
@@ -330,19 +356,20 @@ static int zip_read(const unsigned char *data, size_t data_len, char ***out_path
 fail:
     for (i = 0; i < entry_count; i++)
     {
-        free(paths[i]);
-        free(contents[i]);
+        PKG_FREE(a, paths[i]);
+        PKG_FREE(a, contents[i]);
     }
-    free(paths);
-    free(contents);
-    free(lengths);
+    PKG_FREE(a, paths);
+    PKG_FREE(a, contents);
+    PKG_FREE(a, lengths);
     return 0;
 }
 
 /* ── vigil_package_build ──────────────────────────────────────────── */
 
-vigil_status_t vigil_package_build(const char *output_path, const vigil_package_file_t *files, size_t file_count,
-                                   const char *key, size_t key_length, vigil_error_t *error)
+vigil_status_t vigil_package_build(const vigil_allocator_t *allocator, const char *output_path,
+                                   const vigil_package_file_t *files, size_t file_count, const char *key,
+                                   size_t key_length, vigil_error_t *error)
 {
     char self_path[4096];
     char *exe_data = NULL;
@@ -352,6 +379,7 @@ vigil_status_t vigil_package_build(const char *output_path, const vigil_package_
     unsigned char trailer[VIGIL_PACKAGE_TRAILER_LEN];
     FILE *out = NULL;
     vigil_status_t status;
+    vigil_allocator_t a = pkg_resolve_alloc(allocator);
 
     /* Get path to current executable. */
     status = vigil_platform_self_exe(self_path, sizeof(self_path), error);
@@ -359,15 +387,15 @@ vigil_status_t vigil_package_build(const char *output_path, const vigil_package_
         return status;
 
     /* Read current executable. */
-    status = vigil_platform_read_file(NULL, self_path, &exe_data, &exe_len, error);
+    status = vigil_platform_read_file(&a, self_path, &exe_data, &exe_len, error);
     if (status != VIGIL_STATUS_OK)
         return status;
 
     /* Build ZIP archive. */
-    zip_data = zip_build(files, file_count, &zip_len);
+    zip_data = zip_build(&a, files, file_count, &zip_len);
     if (zip_data == NULL)
     {
-        free(exe_data);
+        a.deallocate(a.user_data, exe_data);
         if (error)
         {
             error->type = VIGIL_STATUS_OUT_OF_MEMORY;
@@ -400,8 +428,8 @@ vigil_status_t vigil_package_build(const char *output_path, const vigil_package_
 #endif
     if (out == NULL)
     {
-        free(exe_data);
-        free(zip_data);
+        a.deallocate(a.user_data, exe_data);
+        a.deallocate(a.user_data, zip_data);
         if (error)
         {
             error->type = VIGIL_STATUS_INTERNAL;
@@ -415,8 +443,8 @@ vigil_status_t vigil_package_build(const char *output_path, const vigil_package_
         fwrite(trailer, 1, VIGIL_PACKAGE_TRAILER_LEN, out) != VIGIL_PACKAGE_TRAILER_LEN)
     {
         fclose(out);
-        free(exe_data);
-        free(zip_data);
+        a.deallocate(a.user_data, exe_data);
+        a.deallocate(a.user_data, zip_data);
         if (error)
         {
             error->type = VIGIL_STATUS_INTERNAL;
@@ -427,8 +455,8 @@ vigil_status_t vigil_package_build(const char *output_path, const vigil_package_
     }
 
     fclose(out);
-    free(exe_data);
-    free(zip_data);
+    a.deallocate(a.user_data, exe_data);
+    a.deallocate(a.user_data, zip_data);
 
     vigil_platform_make_executable(output_path, NULL);
 
@@ -437,7 +465,8 @@ vigil_status_t vigil_package_build(const char *output_path, const vigil_package_
 
 /* ── vigil_package_read ───────────────────────────────────────────── */
 
-static vigil_status_t read_bundle_from_file(const char *path, vigil_package_bundle_t *out_bundle, vigil_error_t *error)
+static vigil_status_t read_bundle_from_file(const vigil_allocator_t *a, const char *path,
+                                            vigil_package_bundle_t *out_bundle, vigil_error_t *error)
 {
     char *file_data = NULL;
     size_t file_len = 0;
@@ -448,14 +477,15 @@ static vigil_status_t read_bundle_from_file(const char *path, vigil_package_bund
     vigil_status_t status;
 
     memset(out_bundle, 0, sizeof(*out_bundle));
+    out_bundle->allocator = *a;
 
-    status = vigil_platform_read_file(NULL, path, &file_data, &file_len, error);
+    status = vigil_platform_read_file(a, path, &file_data, &file_len, error);
     if (status != VIGIL_STATUS_OK)
         return status;
 
     if (file_len < VIGIL_PACKAGE_TRAILER_LEN)
     {
-        free(file_data);
+        a->deallocate(a->user_data, file_data);
         if (error)
         {
             error->type = VIGIL_STATUS_INTERNAL;
@@ -470,7 +500,7 @@ static vigil_status_t read_bundle_from_file(const char *path, vigil_package_bund
     /* Check magic. */
     if (memcmp(trailer + 8 + VIGIL_PACKAGE_KEY_LEN, VIGIL_PACKAGE_MAGIC, VIGIL_PACKAGE_MAGIC_LEN) != 0)
     {
-        free(file_data);
+        a->deallocate(a->user_data, file_data);
         if (error)
         {
             error->type = VIGIL_STATUS_INTERNAL;
@@ -485,7 +515,7 @@ static vigil_status_t read_bundle_from_file(const char *path, vigil_package_bund
 
     if (payload_len == 0 || payload_len > file_len - VIGIL_PACKAGE_TRAILER_LEN)
     {
-        free(file_data);
+        a->deallocate(a->user_data, file_data);
         if (error)
         {
             error->type = VIGIL_STATUS_INTERNAL;
@@ -496,14 +526,14 @@ static vigil_status_t read_bundle_from_file(const char *path, vigil_package_bund
     }
 
     /* Extract and decrypt zip data. */
-    zip_data = (unsigned char *)malloc((size_t)payload_len);
+    zip_data = (unsigned char *)PKG_ALLOC(a, (size_t)payload_len);
     if (zip_data == NULL)
     {
-        free(file_data);
+        a->deallocate(a->user_data, file_data);
         return VIGIL_STATUS_OUT_OF_MEMORY;
     }
     memcpy(zip_data, file_data + file_len - VIGIL_PACKAGE_TRAILER_LEN - payload_len, (size_t)payload_len);
-    free(file_data);
+    a->deallocate(a->user_data, file_data);
 
     if (!key_is_zero(key))
     {
@@ -511,10 +541,10 @@ static vigil_status_t read_bundle_from_file(const char *path, vigil_package_bund
     }
 
     /* Parse ZIP. */
-    if (!zip_read(zip_data, (size_t)payload_len, &out_bundle->paths, &out_bundle->contents,
+    if (!zip_read(a, zip_data, (size_t)payload_len, &out_bundle->paths, &out_bundle->contents,
                   &out_bundle->content_lengths, &out_bundle->file_count))
     {
-        free(zip_data);
+        a->deallocate(a->user_data, zip_data);
         if (error)
         {
             error->type = VIGIL_STATUS_INTERNAL;
@@ -524,27 +554,31 @@ static vigil_status_t read_bundle_from_file(const char *path, vigil_package_bund
         return VIGIL_STATUS_INTERNAL;
     }
 
-    free(zip_data);
+    a->deallocate(a->user_data, zip_data);
     return VIGIL_STATUS_OK;
 }
 
-vigil_status_t vigil_package_read(const char *binary_path, vigil_package_bundle_t *out_bundle, vigil_error_t *error)
+vigil_status_t vigil_package_read(const vigil_allocator_t *allocator, const char *binary_path,
+                                  vigil_package_bundle_t *out_bundle, vigil_error_t *error)
 {
     if (binary_path == NULL || out_bundle == NULL)
         return VIGIL_STATUS_INVALID_ARGUMENT;
-    return read_bundle_from_file(binary_path, out_bundle, error);
+    vigil_allocator_t a = pkg_resolve_alloc(allocator);
+    return read_bundle_from_file(&a, binary_path, out_bundle, error);
 }
 
-vigil_status_t vigil_package_read_self(vigil_package_bundle_t *out_bundle, vigil_error_t *error)
+vigil_status_t vigil_package_read_self(const vigil_allocator_t *allocator, vigil_package_bundle_t *out_bundle,
+                                       vigil_error_t *error)
 {
     char self_path[4096];
     vigil_status_t status;
     if (out_bundle == NULL)
         return VIGIL_STATUS_INVALID_ARGUMENT;
+    vigil_allocator_t a = pkg_resolve_alloc(allocator);
     status = vigil_platform_self_exe(self_path, sizeof(self_path), error);
     if (status != VIGIL_STATUS_OK)
         return status;
-    return read_bundle_from_file(self_path, out_bundle, error);
+    return read_bundle_from_file(&a, self_path, out_bundle, error);
 }
 
 void vigil_package_bundle_free(vigil_package_bundle_t *bundle)
@@ -552,13 +586,14 @@ void vigil_package_bundle_free(vigil_package_bundle_t *bundle)
     size_t i;
     if (bundle == NULL)
         return;
+    vigil_allocator_t a = bundle->allocator;
     for (i = 0; i < bundle->file_count; i++)
     {
-        free(bundle->paths[i]);
-        free(bundle->contents[i]);
+        a.deallocate(a.user_data, bundle->paths[i]);
+        a.deallocate(a.user_data, bundle->contents[i]);
     }
-    free(bundle->paths);
-    free(bundle->contents);
-    free(bundle->content_lengths);
+    a.deallocate(a.user_data, bundle->paths);
+    a.deallocate(a.user_data, bundle->contents);
+    a.deallocate(a.user_data, bundle->content_lengths);
     memset(bundle, 0, sizeof(*bundle));
 }

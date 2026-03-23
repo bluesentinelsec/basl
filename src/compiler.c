@@ -4155,13 +4155,15 @@ static vigil_status_t grow_extern_fn_table(vigil_program_state_t *program)
         return VIGIL_STATUS_OK;
     {
         size_t new_cap = program->extern_fn_capacity == 0U ? 4U : program->extern_fn_capacity * 2U;
-        vigil_extern_fn_decl_t *new_arr = realloc(program->extern_fns, new_cap * sizeof(*new_arr));
-        if (!new_arr)
+        size_t new_size = new_cap * sizeof(*program->extern_fns);
+        const vigil_allocator_t *alloc = vigil_runtime_allocator(program->registry->runtime);
+        void *mem = alloc->reallocate(alloc->user_data, program->extern_fns, new_size);
+        if (mem == NULL)
         {
             vigil_error_set_literal(program->error, VIGIL_STATUS_OUT_OF_MEMORY, "extern fn table alloc failed");
             return VIGIL_STATUS_OUT_OF_MEMORY;
         }
-        program->extern_fns = new_arr;
+        program->extern_fns = mem;
         program->extern_fn_capacity = new_cap;
     }
     return VIGIL_STATUS_OK;
@@ -13190,8 +13192,10 @@ static vigil_status_t vigil_compile_extern_fn(vigil_program_state_t *program, si
         size_t name_len = strlen(ext->c_name);
         size_t sig_len = strlen(ext->sig);
         size_t desc_len = lib_len + 1 + name_len + 1 + sig_len;
-        char *desc = malloc(desc_len + 1);
-        if (!desc)
+        char *desc = NULL;
+        const vigil_allocator_t *alloc = vigil_runtime_allocator(program->registry->runtime);
+        desc = (char *)alloc->allocate(alloc->user_data, desc_len + 1);
+        if (desc == NULL)
         {
             status = VIGIL_STATUS_OUT_OF_MEMORY;
             goto cleanup;
@@ -13209,7 +13213,7 @@ static vigil_status_t vigil_compile_extern_fn(vigil_program_state_t *program, si
 
         vigil_object_t *str_obj = NULL;
         status = vigil_string_object_new(program->registry->runtime, desc, desc_len, &str_obj, program->error);
-        free(desc);
+        alloc->deallocate(alloc->user_data, desc);
         if (status != VIGIL_STATUS_OK)
             goto cleanup;
 

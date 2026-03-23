@@ -47,10 +47,10 @@ extern "C"
 
     /*
      * Render a doc entry to formatted text.
-     * Caller must free *out_text.
+     * Caller must free *out_text with the same allocator.
      */
-    VIGIL_API vigil_status_t vigil_doc_entry_render(const vigil_doc_entry_t *entry, char **out_text, size_t *out_length,
-                                                    vigil_error_t *error);
+    VIGIL_API vigil_status_t vigil_doc_entry_render(const vigil_allocator_t *allocator, const vigil_doc_entry_t *entry,
+                                                    char **out_text, size_t *out_length, vigil_error_t *error);
 
 #ifdef __cplusplus
 }

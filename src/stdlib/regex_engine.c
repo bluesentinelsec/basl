@@ -4,6 +4,9 @@
  * Based on Russ Cox's articles on regular expression matching.
  */
 #include "regex.h"
+#include "vigil/allocator.h"
+
+#include "internal/vigil_internal.h"
 
 #include <ctype.h>
 #include <stdio.h>
@@ -76,7 +79,30 @@ struct vigil_regex
     bool has_first_bytes;                        /* true if first_bytes filter is usable */
     char_class_t class_run[REGEX_CLASS_RUN_MAX]; /* Fast-path class segments */
     size_t class_run_count;                      /* 0 = no fast path */
+    vigil_allocator_t allocator;
 };
+
+static vigil_allocator_t re_resolve_alloc(const vigil_allocator_t *a)
+{
+    if (a != NULL && vigil_allocator_is_valid(a))
+        return *a;
+    return vigil_default_allocator();
+}
+
+/* Shorthand macros for allocator calls via re->allocator */
+#define RE_ALLOC(re, sz) (re)->allocator.allocate((re)->allocator.user_data, (sz))
+#define RE_CALLOC(re, n, sz) re_calloc_helper(&(re)->allocator, (n), (sz))
+#define RE_REALLOC(re, p, sz) (re)->allocator.reallocate((re)->allocator.user_data, (p), (sz))
+#define RE_FREE(re, p) (re)->allocator.deallocate((re)->allocator.user_data, (p))
+
+static void *re_calloc_helper(const vigil_allocator_t *a, size_t n, size_t sz)
+{
+    size_t total = n * sz;
+    void *p = a->allocate(a->user_data, total);
+    if (p)
+        memset(p, 0, total);
+    return p;
+}
 
 /* ── Parser State ───────────────────────────────────────────── */
 
@@ -98,6 +124,7 @@ typedef struct
     nfa_state_t ***patch_list; /* Array of pointers to out fields to patch */
     size_t patch_count;
     size_t patch_capacity;
+    vigil_allocator_t *alloc;
 } fragment_t;
 
 /* ── Memory Management ──────────────────────────────────────── */
@@ -107,7 +134,8 @@ static nfa_state_t *alloc_state(vigil_regex_t *re, nfa_type_t type)
     if (re->state_count >= re->state_capacity)
     {
         size_t new_cap = re->state_capacity == 0 ? 64 : re->state_capacity * 2;
-        nfa_state_t *new_states = realloc(re->states, new_cap * sizeof(nfa_state_t));
+        nfa_state_t *new_states =
+            (nfa_state_t *)re->allocator.reallocate(re->allocator.user_data, re->states, new_cap * sizeof(nfa_state_t));
         if (!new_states)
             return NULL;
         re->states = new_states;
@@ -126,7 +154,8 @@ static char_class_t *alloc_class(vigil_regex_t *re)
     if (re->class_count >= re->class_capacity)
     {
         size_t new_cap = re->class_capacity == 0 ? 16 : re->class_capacity * 2;
-        char_class_t *new_classes = realloc(re->classes, new_cap * sizeof(char_class_t));
+        char_class_t *new_classes = (char_class_t *)re->allocator.reallocate(re->allocator.user_data, re->classes,
+                                                                             new_cap * sizeof(char_class_t));
         if (!new_classes)
             return NULL;
         re->classes = new_classes;
@@ -137,17 +166,18 @@ static char_class_t *alloc_class(vigil_regex_t *re)
     return c;
 }
 
-static void fragment_init(fragment_t *f)
+static void fragment_init(fragment_t *f, vigil_allocator_t *alloc)
 {
     f->start = NULL;
     f->patch_list = NULL;
     f->patch_count = 0;
     f->patch_capacity = 0;
+    f->alloc = alloc;
 }
 
 static void fragment_free(fragment_t *f)
 {
-    free(f->patch_list);
+    f->alloc->deallocate(f->alloc->user_data, f->patch_list);
     f->patch_list = NULL;
     f->patch_count = 0;
     f->patch_capacity = 0;
@@ -158,7 +188,8 @@ static bool fragment_add_patch(fragment_t *f, nfa_state_t **ptr)
     if (f->patch_count >= f->patch_capacity)
     {
         size_t new_cap = f->patch_capacity == 0 ? 8 : f->patch_capacity * 2;
-        nfa_state_t ***new_list = realloc(f->patch_list, new_cap * sizeof(nfa_state_t **));
+        nfa_state_t ***new_list =
+            (nfa_state_t ***)f->alloc->reallocate(f->alloc->user_data, f->patch_list, new_cap * sizeof(nfa_state_t **));
         if (!new_list)
             return false;
         f->patch_list = new_list;
@@ -387,7 +418,7 @@ static bool parse_char_class(parser_t *p, fragment_t *out)
     }
     s->data.cclass = c;
 
-    fragment_init(out);
+    fragment_init(out, &p->re->allocator);
     out->start = s;
     fragment_add_patch(out, &s->out1);
     return true;
@@ -485,7 +516,7 @@ static bool parse_escape(parser_t *p, fragment_t *out)
         return false;
     }
 
-    fragment_init(out);
+    fragment_init(out, &p->re->allocator);
     out->start = s;
     fragment_add_patch(out, &s->out1);
     return true;
@@ -551,7 +582,7 @@ static bool parse_group(parser_t *p, fragment_t *out)
         fragment_patch(&inner, save_end);
         fragment_free(&inner);
 
-        fragment_init(out);
+        fragment_init(out, &p->re->allocator);
         out->start = save_start;
         fragment_add_patch(out, &save_end->out1);
     }
@@ -590,7 +621,7 @@ static bool parse_atom(parser_t *p, fragment_t *out)
             parser_error(p, "out of memory");
             return false;
         }
-        fragment_init(out);
+        fragment_init(out, &p->re->allocator);
         out->start = s;
         fragment_add_patch(out, &s->out1);
         return true;
@@ -604,7 +635,7 @@ static bool parse_atom(parser_t *p, fragment_t *out)
             parser_error(p, "out of memory");
             return false;
         }
-        fragment_init(out);
+        fragment_init(out, &p->re->allocator);
         out->start = s;
         fragment_add_patch(out, &s->out1);
         return true;
@@ -618,7 +649,7 @@ static bool parse_atom(parser_t *p, fragment_t *out)
             parser_error(p, "out of memory");
             return false;
         }
-        fragment_init(out);
+        fragment_init(out, &p->re->allocator);
         out->start = s;
         fragment_add_patch(out, &s->out1);
         return true;
@@ -639,7 +670,7 @@ static bool parse_atom(parser_t *p, fragment_t *out)
         return false;
     }
     s->data.literal = (uint8_t)ch;
-    fragment_init(out);
+    fragment_init(out, &p->re->allocator);
     out->start = s;
     fragment_add_patch(out, &s->out1);
     return true;
@@ -664,7 +695,7 @@ static bool build_empty_quantifier_fragment(parser_t *p, fragment_t *out)
         return false;
     }
 
-    fragment_init(out);
+    fragment_init(out, &p->re->allocator);
     out->start = jump;
     fragment_add_patch(out, &jump->out1);
     return true;
@@ -688,7 +719,7 @@ static bool build_loop_quantifier(parser_t *p, fragment_t *atom, fragment_t *out
 
     exit_patch = greedy ? &split->out2 : &split->out1;
     fragment_patch(atom, split);
-    fragment_init(out);
+    fragment_init(out, &p->re->allocator);
     out->start = allow_empty ? split : atom->start;
     fragment_add_patch(out, exit_patch);
     fragment_free(atom);
@@ -712,7 +743,7 @@ static bool build_optional_quantifier(parser_t *p, fragment_t *atom, fragment_t 
         split->out2 = atom->start;
 
     skip_patch = greedy ? &split->out2 : &split->out1;
-    fragment_init(out);
+    fragment_init(out, &p->re->allocator);
     out->start = split;
     fragment_add_patch(out, skip_patch);
     fragment_append(out, atom);
@@ -859,7 +890,7 @@ static bool parse_quantifier(parser_t *p, fragment_t *atom, fragment_t *out)
 static bool parse_concatenation(parser_t *p, fragment_t *out)
 {
     fragment_t result;
-    fragment_init(&result);
+    fragment_init(&result, &p->re->allocator);
 
     while (!parser_eof(p))
     {
@@ -879,7 +910,7 @@ static bool parse_concatenation(parser_t *p, fragment_t *out)
                     parser_error(p, "out of memory");
                     return false;
                 }
-                fragment_init(out);
+                fragment_init(out, &p->re->allocator);
                 out->start = jump;
                 fragment_add_patch(out, &jump->out1);
                 return true;
@@ -903,7 +934,7 @@ static bool parse_concatenation(parser_t *p, fragment_t *out)
         {
             nfa_state_t *saved_start = result.start;
             fragment_patch(&result, quantified.start);
-            free(result.patch_list);
+            result.alloc->deallocate(result.alloc->user_data, result.patch_list);
             result.start = saved_start;
             result.patch_list = quantified.patch_list;
             result.patch_count = quantified.patch_count;
@@ -922,7 +953,7 @@ static bool parse_concatenation(parser_t *p, fragment_t *out)
             parser_error(p, "out of memory");
             return false;
         }
-        fragment_init(out);
+        fragment_init(out, &p->re->allocator);
         out->start = jump;
         fragment_add_patch(out, &jump->out1);
         return true;
@@ -960,7 +991,7 @@ static bool parse_alternation(parser_t *p, fragment_t *out)
         split->out2 = right.start;
 
         fragment_t combined;
-        fragment_init(&combined);
+        fragment_init(&combined, &p->re->allocator);
         combined.start = split;
         fragment_append(&combined, &left);
         fragment_append(&combined, &right);
@@ -984,14 +1015,14 @@ typedef struct
     size_t save_count;
 } state_list_t;
 
-static bool state_list_init(state_list_t *l, size_t cap, size_t save_slots)
+static bool state_list_init(state_list_t *l, const vigil_regex_t *re, size_t cap, size_t save_slots)
 {
-    l->states = malloc(cap * sizeof(nfa_state_t *));
-    l->saves = calloc(cap * save_slots, sizeof(size_t));
+    l->states = (nfa_state_t **)RE_ALLOC(re, cap * sizeof(nfa_state_t *));
+    l->saves = (size_t *)RE_CALLOC(re, cap * save_slots, sizeof(size_t));
     if (!l->states || !l->saves)
     {
-        free(l->states);
-        free(l->saves);
+        RE_FREE(re, l->states);
+        RE_FREE(re, l->saves);
         return false;
     }
     l->count = 0;
@@ -1000,10 +1031,10 @@ static bool state_list_init(state_list_t *l, size_t cap, size_t save_slots)
     return true;
 }
 
-static void state_list_free(state_list_t *l)
+static void state_list_free(state_list_t *l, const vigil_regex_t *re)
 {
-    free(l->states);
-    free(l->saves);
+    RE_FREE(re, l->states);
+    RE_FREE(re, l->saves);
 }
 
 static void state_list_clear(state_list_t *l)
@@ -1191,11 +1222,11 @@ static bool compute_first_bytes_walk(nfa_state_t *state, char_class_t *out, uint
 
 static void regex_init_first_bytes(vigil_regex_t *re)
 {
-    uint8_t *fb_visited = calloc(re->state_count + 1, 1);
+    uint8_t *fb_visited = (uint8_t *)RE_CALLOC(re, re->state_count + 1, 1);
     if (fb_visited)
     {
         re->has_first_bytes = compute_first_bytes_walk(re->start, &re->first_bytes, fb_visited);
-        free(fb_visited);
+        RE_FREE(re, fb_visited);
     }
 }
 
@@ -1267,15 +1298,18 @@ static void regex_detect_class_run(vigil_regex_t *re)
 
 /* ── Public API ─────────────────────────────────────────────── */
 
-vigil_regex_t *vigil_regex_compile(const char *pattern, size_t pattern_len, char *error_buf, size_t error_buf_size)
+vigil_regex_t *vigil_regex_compile(const vigil_allocator_t *allocator, const char *pattern, size_t pattern_len,
+                                   char *error_buf, size_t error_buf_size)
 {
-    vigil_regex_t *re = calloc(1, sizeof(vigil_regex_t));
+    vigil_allocator_t a = re_resolve_alloc(allocator);
+    vigil_regex_t *re = (vigil_regex_t *)re_calloc_helper(&a, 1, sizeof(vigil_regex_t));
     if (!re)
     {
         if (error_buf)
             snprintf(error_buf, error_buf_size, "out of memory");
         return NULL;
     }
+    re->allocator = a;
 
     parser_t p = {
         .pattern = pattern,
@@ -1358,9 +1392,10 @@ void vigil_regex_free(vigil_regex_t *re)
 {
     if (!re)
         return;
-    free(re->states);
-    free(re->classes);
-    free(re);
+    RE_FREE(re, re->states);
+    RE_FREE(re, re->classes);
+    vigil_allocator_t a = re->allocator;
+    a.deallocate(a.user_data, re);
 }
 
 bool vigil_regex_match(const vigil_regex_t *re, const char *input, size_t input_len, vigil_regex_result_t *result)
@@ -1370,28 +1405,28 @@ bool vigil_regex_match(const vigil_regex_t *re, const char *input, size_t input_
 
     size_t save_slots = re->group_count * 2;
     state_list_t curr, next;
-    if (!state_list_init(&curr, re->state_count + 1, save_slots))
+    if (!state_list_init(&curr, re, re->state_count + 1, save_slots))
         return false;
-    if (!state_list_init(&next, re->state_count + 1, save_slots))
+    if (!state_list_init(&next, re, re->state_count + 1, save_slots))
     {
-        state_list_free(&curr);
+        state_list_free(&curr, re);
         return false;
     }
 
-    uint8_t *visited = calloc(re->state_count + 1, 1);
+    uint8_t *visited = (uint8_t *)RE_CALLOC(re, re->state_count + 1, 1);
     if (!visited)
     {
-        state_list_free(&curr);
-        state_list_free(&next);
+        state_list_free(&curr, re);
+        state_list_free(&next, re);
         return false;
     }
 
-    size_t *init_saves = calloc(save_slots, sizeof(size_t));
+    size_t *init_saves = (size_t *)RE_CALLOC(re, save_slots, sizeof(size_t));
     if (!init_saves)
     {
-        free(visited);
-        state_list_free(&curr);
-        state_list_free(&next);
+        RE_FREE(re, visited);
+        state_list_free(&curr, re);
+        state_list_free(&next, re);
         return false;
     }
     for (size_t i = 0; i < save_slots; i++)
@@ -1412,10 +1447,10 @@ bool vigil_regex_match(const vigil_regex_t *re, const char *input, size_t input_
 
     bool matched = check_match(&curr, result, re->group_count);
 
-    free(init_saves);
-    free(visited);
-    state_list_free(&curr);
-    state_list_free(&next);
+    RE_FREE(re, init_saves);
+    RE_FREE(re, visited);
+    state_list_free(&curr, re);
+    state_list_free(&next, re);
     return matched;
 }
 
@@ -1433,32 +1468,32 @@ static bool regex_sim_init(regex_sim_t *sim, const vigil_regex_t *re)
 {
     sim->save_slots = re->group_count * 2;
     size_t state_cap = re->state_count + 1;
-    if (!state_list_init(&sim->curr, state_cap, sim->save_slots))
+    if (!state_list_init(&sim->curr, re, state_cap, sim->save_slots))
         return false;
-    if (!state_list_init(&sim->next, state_cap, sim->save_slots))
+    if (!state_list_init(&sim->next, re, state_cap, sim->save_slots))
     {
-        state_list_free(&sim->curr);
+        state_list_free(&sim->curr, re);
         return false;
     }
-    sim->visited = calloc(state_cap, 1);
-    sim->init_saves = malloc(sim->save_slots * sizeof(size_t));
+    sim->visited = (uint8_t *)RE_CALLOC(re, state_cap, 1);
+    sim->init_saves = (size_t *)RE_ALLOC(re, sim->save_slots * sizeof(size_t));
     if (!sim->visited || !sim->init_saves)
     {
-        free(sim->visited);
-        free(sim->init_saves);
-        state_list_free(&sim->curr);
-        state_list_free(&sim->next);
+        RE_FREE(re, sim->visited);
+        RE_FREE(re, sim->init_saves);
+        state_list_free(&sim->curr, re);
+        state_list_free(&sim->next, re);
         return false;
     }
     return true;
 }
 
-static void regex_sim_free(regex_sim_t *sim)
+static void regex_sim_free(regex_sim_t *sim, const vigil_regex_t *re)
 {
-    free(sim->init_saves);
-    free(sim->visited);
-    state_list_free(&sim->curr);
-    state_list_free(&sim->next);
+    RE_FREE(re, sim->init_saves);
+    RE_FREE(re, sim->visited);
+    state_list_free(&sim->curr, re);
+    state_list_free(&sim->next, re);
 }
 
 /* Searches for the first match starting at or after position 'start_pos'.
@@ -1590,7 +1625,7 @@ bool vigil_regex_find(const vigil_regex_t *re, const char *input, size_t input_l
     vigil_regex_result_t dummy;
     bool found = regex_find_reuse(re, input, input_len, 0, &sim, result ? result : &dummy);
 
-    regex_sim_free(&sim);
+    regex_sim_free(&sim, re);
     return found;
 }
 
@@ -1629,7 +1664,7 @@ size_t vigil_regex_find_all(const vigil_regex_t *re, const char *input, size_t i
             pos = match_end;
     }
 
-    regex_sim_free(&sim);
+    regex_sim_free(&sim, re);
     return count;
 }
 
@@ -1640,7 +1675,7 @@ vigil_status_t vigil_regex_replace(const vigil_regex_t *re, const char *input, s
     if (!vigil_regex_find(re, input, input_len, &r))
     {
         /* No match - return copy of input */
-        *output = malloc(input_len + 1);
+        *output = (char *)RE_ALLOC(re, input_len + 1);
         if (!*output)
             return VIGIL_STATUS_OUT_OF_MEMORY;
         memcpy(*output, input, input_len);
@@ -1653,7 +1688,7 @@ vigil_status_t vigil_regex_replace(const vigil_regex_t *re, const char *input, s
     size_t match_end = r.groups[0].end;
     size_t new_len = match_start + replacement_len + (input_len - match_end);
 
-    *output = malloc(new_len + 1);
+    *output = (char *)RE_ALLOC(re, new_len + 1);
     if (!*output)
         return VIGIL_STATUS_OUT_OF_MEMORY;
 
@@ -1676,7 +1711,7 @@ vigil_status_t vigil_regex_replace_all(const vigil_regex_t *re, const char *inpu
 
     if (match_count == 0)
     {
-        *output = malloc(input_len + 1);
+        *output = (char *)RE_ALLOC(re, input_len + 1);
         if (!*output)
             return VIGIL_STATUS_OUT_OF_MEMORY;
         memcpy(*output, input, input_len);
@@ -1693,7 +1728,7 @@ vigil_status_t vigil_regex_replace_all(const vigil_regex_t *re, const char *inpu
         new_len = new_len - match_len + replacement_len;
     }
 
-    *output = malloc(new_len + 1);
+    *output = (char *)RE_ALLOC(re, new_len + 1);
     if (!*output)
         return VIGIL_STATUS_OUT_OF_MEMORY;
 
@@ -1732,12 +1767,12 @@ vigil_status_t vigil_regex_split(const vigil_regex_t *re, const char *input, siz
     size_t match_count = vigil_regex_find_all(re, input, input_len, results, 256);
 
     *part_count = match_count + 1;
-    *parts = malloc(*part_count * sizeof(char *));
-    *part_lens = malloc(*part_count * sizeof(size_t));
+    *parts = (char **)RE_ALLOC(re, *part_count * sizeof(char *));
+    *part_lens = (size_t *)RE_ALLOC(re, *part_count * sizeof(size_t));
     if (!*parts || !*part_lens)
     {
-        free(*parts);
-        free(*part_lens);
+        RE_FREE(re, *parts);
+        RE_FREE(re, *part_lens);
         return VIGIL_STATUS_OUT_OF_MEMORY;
     }
 
@@ -1747,13 +1782,13 @@ vigil_status_t vigil_regex_split(const vigil_regex_t *re, const char *input, siz
         size_t match_start = results[i].groups[0].start;
         size_t len = match_start - pos;
 
-        (*parts)[i] = malloc(len + 1);
+        (*parts)[i] = (char *)RE_ALLOC(re, len + 1);
         if (!(*parts)[i])
         {
             for (size_t j = 0; j < i; j++)
-                free((*parts)[j]);
-            free(*parts);
-            free(*part_lens);
+                RE_FREE(re, (*parts)[j]);
+            RE_FREE(re, *parts);
+            RE_FREE(re, *part_lens);
             return VIGIL_STATUS_OUT_OF_MEMORY;
         }
         memcpy((*parts)[i], input + pos, len);
@@ -1765,13 +1800,13 @@ vigil_status_t vigil_regex_split(const vigil_regex_t *re, const char *input, siz
 
     /* Last part */
     size_t len = input_len - pos;
-    (*parts)[match_count] = malloc(len + 1);
+    (*parts)[match_count] = (char *)RE_ALLOC(re, len + 1);
     if (!(*parts)[match_count])
     {
         for (size_t j = 0; j < match_count; j++)
-            free((*parts)[j]);
-        free(*parts);
-        free(*part_lens);
+            RE_FREE(re, (*parts)[j]);
+        RE_FREE(re, *parts);
+        RE_FREE(re, *part_lens);
         return VIGIL_STATUS_OUT_OF_MEMORY;
     }
     memcpy((*parts)[match_count], input + pos, len);

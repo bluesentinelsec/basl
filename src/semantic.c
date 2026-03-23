@@ -482,7 +482,10 @@ char *vigil_semantic_type_to_string(const vigil_semantic_index_t *index, vigil_s
     }
 
     len = strlen(name);
-    result = malloc(len + 1);
+    result = (index != NULL && index->runtime != NULL)
+                 ? (char *)vigil_runtime_allocator(index->runtime)
+                       ->allocate(vigil_runtime_allocator(index->runtime)->user_data, len + 1)
+                 : malloc(len + 1);
     if (result != NULL)
     {
         memcpy(result, name, len + 1);

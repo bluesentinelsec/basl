@@ -1360,12 +1360,13 @@ const vigil_doc_entry_t *vigil_doc_list_module(const char *module_name, size_t *
     return NULL;
 }
 
-vigil_status_t vigil_doc_entry_render(const vigil_doc_entry_t *entry, char **out_text, size_t *out_length,
-                                      vigil_error_t *error)
+vigil_status_t vigil_doc_entry_render(const vigil_allocator_t *allocator, const vigil_doc_entry_t *entry,
+                                      char **out_text, size_t *out_length, vigil_error_t *error)
 {
     char *buf;
     size_t len = 0;
     size_t cap = 1024;
+    vigil_allocator_t a;
 
     if (entry == NULL || out_text == NULL)
     {
@@ -1373,7 +1374,12 @@ vigil_status_t vigil_doc_entry_render(const vigil_doc_entry_t *entry, char **out
         return VIGIL_STATUS_INVALID_ARGUMENT;
     }
 
-    buf = malloc(cap);
+    if (allocator != NULL && vigil_allocator_is_valid(allocator))
+        a = *allocator;
+    else
+        a = vigil_default_allocator();
+
+    buf = (char *)a.allocate(a.user_data, cap);
     if (buf == NULL)
     {
         vigil_error_set_literal(error, VIGIL_STATUS_OUT_OF_MEMORY, "out of memory");

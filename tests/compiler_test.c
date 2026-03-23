@@ -3004,10 +3004,40 @@ TEST(VigilCompilerTest, ReportsSyntaxErrorsForUnsupportedShape)
     vigil_runtime_close(&runtime);
 }
 
+TEST(VigilCompilerTest, CompilesExternFnDeclaration)
+{
+    vigil_runtime_t *runtime = NULL;
+    vigil_error_t error = {0};
+    vigil_source_registry_t registry;
+    vigil_diagnostic_list_t diagnostics;
+    vigil_object_t *function = NULL;
+    vigil_source_id_t source_id;
+    vigil_status_t status;
+
+    ASSERT_EQ(vigil_runtime_open(&runtime, NULL, &error), VIGIL_STATUS_OK);
+    vigil_source_registry_init(&registry, runtime);
+    vigil_diagnostic_list_init(&diagnostics, runtime);
+
+    source_id = RegisterSource(vigil_test_failed_, &registry, "main.vigil",
+                               "extern fn add(i32 a, i32 b) -> i32 from \"libm\";\n"
+                               "fn main() -> i32 { return 0; }",
+                               &error);
+    status = vigil_compile_source(&registry, source_id, &function, &diagnostics, &error);
+    EXPECT_EQ(status, VIGIL_STATUS_OK);
+    EXPECT_EQ(vigil_diagnostic_list_count(&diagnostics), 0U);
+
+    if (function != NULL)
+        vigil_object_release(&function);
+    vigil_diagnostic_list_free(&diagnostics);
+    vigil_source_registry_free(&registry);
+    vigil_runtime_close(&runtime);
+}
+
 static void register_compiler_defer_tests(void)
 {
     REGISTER_TEST(VigilCompilerTest, CompilesAndExecutesDeferredFunctionValues);
     REGISTER_TEST(VigilCompilerTest, CompilesAndExecutesDeferredConstructorsWithoutInit);
+    REGISTER_TEST(VigilCompilerTest, CompilesExternFnDeclaration);
 }
 
 void register_compiler_tests(void)

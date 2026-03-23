@@ -17,6 +17,11 @@
 
 #include "regex.h"
 
+static const vigil_allocator_t *re_get_alloc(vigil_vm_t *vm)
+{
+    return vigil_runtime_allocator(vigil_vm_runtime(vm));
+}
+
 /* ── Pattern cache ──────────────────────────────────────────────────
  * Looks up a compiled regex for `pattern` in the runtime cache.
  * On hit: returns the cached vigil_regex_t* (do NOT free it).
@@ -47,8 +52,8 @@ static size_t regex_cache_find_slot(vigil_regex_cache_t *cache, const char *patt
     return lru_slot; /* evict LRU */
 }
 
-static vigil_regex_t *regex_cache_get(vigil_runtime_t *runtime, const char *pattern, size_t pattern_len,
-                                      char *err_buf, size_t err_buf_size)
+static vigil_regex_t *regex_cache_get(vigil_runtime_t *runtime, const char *pattern, size_t pattern_len, char *err_buf,
+                                      size_t err_buf_size)
 {
     vigil_regex_cache_t *cache = &runtime->regex_cache;
     size_t h = 2166136261UL;
@@ -72,7 +77,7 @@ static vigil_regex_t *regex_cache_get(vigil_runtime_t *runtime, const char *patt
     }
 
     /* Cache miss — compile */
-    vigil_regex_t *re = vigil_regex_compile(pattern, pattern_len, err_buf, err_buf_size);
+    vigil_regex_t *re = vigil_regex_compile(&runtime->allocator, pattern, pattern_len, err_buf, err_buf_size);
     if (re == NULL)
         return NULL;
 
@@ -260,7 +265,10 @@ static vigil_status_t vigil_regex_find_all_fn(vigil_vm_t *vm, size_t arg_count, 
     vigil_value_t *items = NULL;
     if (count > 0)
     {
-        items = malloc(count * sizeof(vigil_value_t));
+        {
+            const vigil_allocator_t *a = re_get_alloc(vm);
+            items = (vigil_value_t *)a->allocate(a->user_data, count * sizeof(vigil_value_t));
+        }
         if (!items)
         {
             vigil_vm_stack_pop_n(vm, arg_count);
@@ -276,7 +284,10 @@ static vigil_status_t vigil_regex_find_all_fn(vigil_vm_t *vm, size_t arg_count, 
             {
                 for (size_t j = 0; j < i; j++)
                     vigil_value_release(&items[j]);
-                free(items);
+                {
+                    const vigil_allocator_t *a = re_get_alloc(vm);
+                    a->deallocate(a->user_data, items);
+                }
                 vigil_vm_stack_pop_n(vm, arg_count);
                 return s;
             }
@@ -290,7 +301,10 @@ static vigil_status_t vigil_regex_find_all_fn(vigil_vm_t *vm, size_t arg_count, 
     s = vigil_array_object_new(vigil_vm_runtime(vm), items, count, &arr, error);
     for (size_t i = 0; i < count; i++)
         vigil_value_release(&items[i]);
-    free(items);
+    {
+        const vigil_allocator_t *a = re_get_alloc(vm);
+        a->deallocate(a->user_data, items);
+    }
     if (s != VIGIL_STATUS_OK)
         return s;
 
@@ -337,7 +351,10 @@ static vigil_status_t vigil_regex_replace_fn(vigil_vm_t *vm, size_t arg_count, v
     }
 
     s = push_string(vm, output, output_len, error);
-    free(output);
+    {
+        const vigil_allocator_t *a = re_get_alloc(vm);
+        a->deallocate(a->user_data, output);
+    }
     return s;
 }
 
@@ -377,7 +394,10 @@ static vigil_status_t vigil_regex_replace_all_fn(vigil_vm_t *vm, size_t arg_coun
     }
 
     s = push_string(vm, output, output_len, error);
-    free(output);
+    {
+        const vigil_allocator_t *a = re_get_alloc(vm);
+        a->deallocate(a->user_data, output);
+    }
     return s;
 }
 
@@ -441,13 +461,14 @@ static vigil_status_t vigil_regex_split_fn(vigil_vm_t *vm, size_t arg_count, vig
     }
 
     /* Build array */
-    vigil_value_t *items = malloc(part_count * sizeof(vigil_value_t));
+    const vigil_allocator_t *alloc = re_get_alloc(vm);
+    vigil_value_t *items = (vigil_value_t *)alloc->allocate(alloc->user_data, part_count * sizeof(vigil_value_t));
     if (!items)
     {
         for (size_t i = 0; i < part_count; i++)
-            free(parts[i]);
-        free(parts);
-        free(part_lens);
+            alloc->deallocate(alloc->user_data, parts[i]);
+        alloc->deallocate(alloc->user_data, parts);
+        alloc->deallocate(alloc->user_data, part_lens);
         return VIGIL_STATUS_OUT_OF_MEMORY;
     }
 
@@ -455,28 +476,34 @@ static vigil_status_t vigil_regex_split_fn(vigil_vm_t *vm, size_t arg_count, vig
     {
         vigil_object_t *str_obj = NULL;
         s = vigil_string_object_new(vigil_vm_runtime(vm), parts[i], part_lens[i], &str_obj, error);
-        free(parts[i]);
+        alloc->deallocate(alloc->user_data, parts[i]);
         if (s != VIGIL_STATUS_OK)
         {
             for (size_t j = 0; j < i; j++)
                 vigil_value_release(&items[j]);
             for (size_t j = i + 1; j < part_count; j++)
-                free(parts[j]);
-            free(parts);
-            free(part_lens);
-            free(items);
+                alloc->deallocate(alloc->user_data, parts[j]);
+            alloc->deallocate(alloc->user_data, parts);
+            alloc->deallocate(alloc->user_data, part_lens);
+            {
+                const vigil_allocator_t *a = re_get_alloc(vm);
+                a->deallocate(a->user_data, items);
+            }
             return s;
         }
         vigil_value_init_object(&items[i], &str_obj);
     }
-    free(parts);
-    free(part_lens);
+    alloc->deallocate(alloc->user_data, parts);
+    alloc->deallocate(alloc->user_data, part_lens);
 
     vigil_object_t *arr = NULL;
     s = vigil_array_object_new(vigil_vm_runtime(vm), items, part_count, &arr, error);
     for (size_t i = 0; i < part_count; i++)
         vigil_value_release(&items[i]);
-    free(items);
+    {
+        const vigil_allocator_t *a = re_get_alloc(vm);
+        a->deallocate(a->user_data, items);
+    }
     if (s != VIGIL_STATUS_OK)
         return s;
 

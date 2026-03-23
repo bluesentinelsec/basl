@@ -10,6 +10,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "vigil/allocator.h"
 #include "vigil/status.h"
 
 #ifdef __cplusplus
@@ -39,7 +40,8 @@ extern "C"
     } vigil_regex_result_t;
 
     /* Compile a regex pattern. Returns NULL on error, sets error message. */
-    vigil_regex_t *vigil_regex_compile(const char *pattern, size_t pattern_len, char *error_buf, size_t error_buf_size);
+    vigil_regex_t *vigil_regex_compile(const vigil_allocator_t *allocator, const char *pattern, size_t pattern_len,
+                                       char *error_buf, size_t error_buf_size);
 
     /* Free a compiled regex */
     void vigil_regex_free(vigil_regex_t *re);
