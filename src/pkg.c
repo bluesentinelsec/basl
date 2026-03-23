@@ -603,7 +603,7 @@ static vigil_status_t write_project_toml(const char *project_root, vigil_toml_va
         return status;
 
     status = vigil_platform_write_file(toml_path, output, output_len, error);
-    free(output);
+    free(output); /* alloc-check: exempt — allocated by vigil_toml_emit */
     return status;
 }
 

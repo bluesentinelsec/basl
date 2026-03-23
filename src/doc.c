@@ -10,14 +10,14 @@ static void *doc_alloc(const vigil_allocator_t *a, size_t size)
 {
     if (a != NULL && a->allocate != NULL)
         return a->allocate(a->user_data, size);
-    return malloc(size);
+    return malloc(size); /* alloc-check: exempt — NULL-allocator fallback */
 }
 
 static void *doc_realloc(const vigil_allocator_t *a, void *p, size_t size)
 {
     if (a != NULL && a->reallocate != NULL)
         return a->reallocate(a->user_data, p, size);
-    return realloc(p, size);
+    return realloc(p, size); /* alloc-check: exempt — NULL-allocator fallback */
 }
 
 static void doc_free_ptr(const vigil_allocator_t *a, void *p)
@@ -29,7 +29,7 @@ static void doc_free_ptr(const vigil_allocator_t *a, void *p)
         a->deallocate(a->user_data, p);
         return;
     }
-    free(p);
+    free(p); /* alloc-check: exempt — NULL-allocator fallback */
 }
 
 static char *doc_strdup(const vigil_allocator_t *a, const char *s, size_t len)
