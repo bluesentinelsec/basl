@@ -258,12 +258,12 @@ vigil_status_t vigil_pkg_lock_read(const vigil_allocator_t *allocator, const cha
 
     vigil_pkg_lock_init(out_lock, allocator);
 
-    status = vigil_platform_read_file(NULL, path, &data, &length, error);
+    status = vigil_platform_read_file(&out_lock->allocator, path, &data, &length, error);
     if (status != VIGIL_STATUS_OK)
         return status;
 
     status = vigil_toml_parse(NULL, data, length, &root, error);
-    free(data);
+    PKG_FREE(&out_lock->allocator, data);
     if (status != VIGIL_STATUS_OK)
         return status;
 
@@ -375,11 +375,12 @@ vigil_status_t vigil_pkg_git_available(vigil_error_t *error)
     const char *argv[] = {"git", "--version", NULL};
     char *out = NULL, *err_out = NULL;
     int exit_code;
+    vigil_allocator_t da = vigil_default_allocator();
     vigil_status_t status;
 
-    status = vigil_platform_exec(NULL, argv, &out, &err_out, &exit_code, error);
-    free(out);
-    free(err_out);
+    status = vigil_platform_exec(&da, argv, &out, &err_out, &exit_code, error);
+    PKG_FREE(&da, out);
+    PKG_FREE(&da, err_out);
 
     if (status != VIGIL_STATUS_OK || exit_code != 0)
     {
@@ -547,7 +548,7 @@ vigil_status_t vigil_pkg_git_head(const vigil_allocator_t *allocator, const char
         if (len >= commit_size)
         {
             a.deallocate(a.user_data, out);
-            free(err_out);
+            a.deallocate(a.user_data, err_out);
             set_error(error, VIGIL_STATUS_INVALID_ARGUMENT, "commit buffer too small");
             return VIGIL_STATUS_INVALID_ARGUMENT;
         }
@@ -560,7 +561,8 @@ vigil_status_t vigil_pkg_git_head(const vigil_allocator_t *allocator, const char
 
 /* ── TOML helpers ────────────────────────────────────────────────── */
 
-static vigil_status_t read_project_toml(const char *project_root, vigil_toml_value_t **out_root, vigil_error_t *error)
+static vigil_status_t read_project_toml(const vigil_allocator_t *a, const char *project_root,
+                                        vigil_toml_value_t **out_root, vigil_error_t *error)
 {
     char toml_path[4096];
     char *data = NULL;
@@ -572,7 +574,7 @@ static vigil_status_t read_project_toml(const char *project_root, vigil_toml_val
         return error->type;
     }
 
-    status = vigil_platform_read_file(NULL, toml_path, &data, &length, error);
+    status = vigil_platform_read_file(a, toml_path, &data, &length, error);
     if (status != VIGIL_STATUS_OK)
     {
         set_error(error, VIGIL_STATUS_INVALID_ARGUMENT, "vigil.toml not found");
@@ -580,7 +582,7 @@ static vigil_status_t read_project_toml(const char *project_root, vigil_toml_val
     }
 
     status = vigil_toml_parse(NULL, data, length, out_root, error);
-    free(data);
+    PKG_FREE(a, data);
     return status;
 }
 
@@ -723,6 +725,8 @@ static vigil_status_t install_transitive_deps(const char *project_root, const ch
     size_t i, count;
     int exists = 0;
 
+    const vigil_allocator_t *la = &lock->allocator;
+
     /* Check if package has vigil.toml */
     if (vigil_platform_path_join(pkg_path, "vigil.toml", toml_path, sizeof(toml_path), error) != VIGIL_STATUS_OK)
     {
@@ -733,17 +737,17 @@ static vigil_status_t install_transitive_deps(const char *project_root, const ch
     if (!exists)
         return VIGIL_STATUS_OK;
 
-    if (vigil_platform_read_file(NULL, toml_path, &data, &length, error) != VIGIL_STATUS_OK)
+    if (vigil_platform_read_file(la, toml_path, &data, &length, error) != VIGIL_STATUS_OK)
     {
         return VIGIL_STATUS_OK; /* Not fatal */
     }
 
     if (vigil_toml_parse(NULL, data, length, &root, error) != VIGIL_STATUS_OK)
     {
-        free(data);
+        PKG_FREE(la, data);
         return VIGIL_STATUS_OK; /* Not fatal */
     }
-    free(data);
+    PKG_FREE(la, data);
 
     deps = vigil_toml_table_get(root, "deps");
     if (deps == NULL || vigil_toml_type(deps) != VIGIL_TOML_TABLE)
@@ -836,7 +840,7 @@ vigil_status_t vigil_pkg_get(const vigil_allocator_t *allocator, const char *pro
         goto cleanup;
 
     /* Update vigil.toml */
-    status = read_project_toml(project_root, &root, error);
+    status = read_project_toml(&a, project_root, &root, error);
     if (status != VIGIL_STATUS_OK)
         goto cleanup;
 
@@ -890,7 +894,7 @@ vigil_status_t vigil_pkg_sync(const vigil_allocator_t *allocator, const char *pr
     if (status != VIGIL_STATUS_OK)
         return status;
 
-    status = read_project_toml(project_root, &root, error);
+    status = read_project_toml(&a, project_root, &root, error);
     if (status != VIGIL_STATUS_OK)
         return status;
 
@@ -980,14 +984,15 @@ static vigil_status_t remove_directory_recursive(const char *path, vigil_error_t
 
 static void lock_remove_entry(vigil_pkg_lock_t *lock, const char *name)
 {
+    const vigil_allocator_t *la = &lock->allocator;
     size_t i;
     for (i = 0; i < lock->count; i++)
     {
         if (strcmp(lock->entries[i].name, name) == 0)
         {
-            free(lock->entries[i].name);
-            free(lock->entries[i].version);
-            free(lock->entries[i].commit);
+            PKG_FREE(la, lock->entries[i].name);
+            PKG_FREE(la, lock->entries[i].version);
+            PKG_FREE(la, lock->entries[i].commit);
             if (i + 1 < lock->count)
             {
                 memmove(&lock->entries[i], &lock->entries[i + 1],
@@ -1033,7 +1038,7 @@ vigil_status_t vigil_pkg_remove(const vigil_allocator_t *allocator, const char *
     }
 
     /* Remove from vigil.toml */
-    status = read_project_toml(project_root, &root, error);
+    status = read_project_toml(&a, project_root, &root, error);
     if (status != VIGIL_STATUS_OK)
         return status;
 

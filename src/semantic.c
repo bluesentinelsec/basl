@@ -643,10 +643,14 @@ vigil_status_t vigil_semantic_index_references_at(const vigil_semantic_index_t *
                 if (ref_count >= ref_capacity)
                 {
                     size_t new_cap = ref_capacity == 0 ? 8 : ref_capacity * 2;
-                    vigil_semantic_reference_t *new_refs = realloc(refs, new_cap * sizeof(*refs));
+                    vigil_semantic_reference_t *new_refs =
+                        vigil_runtime_allocator(index->runtime)
+                            ->reallocate(vigil_runtime_allocator(index->runtime)->user_data, refs,
+                                         new_cap * sizeof(*refs));
                     if (new_refs == NULL)
                     {
-                        free(refs);
+                        vigil_runtime_allocator(index->runtime)
+                            ->deallocate(vigil_runtime_allocator(index->runtime)->user_data, refs);
                         vigil_error_set_literal(error, VIGIL_STATUS_OUT_OF_MEMORY, "out of memory");
                         return VIGIL_STATUS_OUT_OF_MEMORY;
                     }
