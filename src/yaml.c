@@ -215,126 +215,91 @@ static vigil_status_t parse_quoted_string(yaml_parser_t *p, char quote, vigil_js
     return s;
 }
 
+static int yaml_buf_append(yaml_parser_t *p, char **buf, size_t *len, size_t *cap, char ch)
+{
+    if (*len + 1 >= *cap)
+    {
+        *cap *= 2;
+        char *newbuf = (char *)p->alloc.reallocate(p->alloc.user_data, *buf, *cap);
+        if (!newbuf)
+        {
+            yaml_dealloc(p, *buf);
+            *buf = NULL;
+            return 0;
+        }
+        *buf = newbuf;
+    }
+    (*buf)[(*len)++] = ch;
+    return 1;
+}
+
+static vigil_status_t block_scalar_collect_lines(yaml_parser_t *p, char style, size_t block_indent, char **buf,
+                                                 size_t *len, size_t *cap)
+{
+    while (p->pos < p->len)
+    {
+        size_t line_indent = measure_indent(p);
+        size_t check = p->pos + line_indent;
+        if (check < p->len && (p->src[check] == '\n' || p->src[check] == '\0'))
+        {
+            while (peek(p) == ' ')
+                advance(p);
+            if (peek(p) == '\n')
+            {
+                if (!yaml_buf_append(p, buf, len, cap, '\n'))
+                    return VIGIL_STATUS_OUT_OF_MEMORY;
+                advance(p);
+                continue;
+            }
+        }
+        if (line_indent < block_indent)
+            break;
+        for (size_t i = 0; i < block_indent && peek(p) == ' '; i++)
+            advance(p);
+        while (peek(p) && peek(p) != '\n')
+        {
+            if (!yaml_buf_append(p, buf, len, cap, peek(p)))
+                return VIGIL_STATUS_OUT_OF_MEMORY;
+            advance(p);
+        }
+        if (peek(p) == '\n')
+        {
+            if (!yaml_buf_append(p, buf, len, cap, style == '|' ? '\n' : ' '))
+                return VIGIL_STATUS_OUT_OF_MEMORY;
+            advance(p);
+        }
+    }
+    return VIGIL_STATUS_OK;
+}
+
 static vigil_status_t parse_block_scalar(yaml_parser_t *p, char style, vigil_json_value_t **out)
 {
-    advance(p); /* skip | or > */
+    vigil_status_t s;
+    size_t block_indent, cap = 256, len = 0;
+    char *buf;
+
+    advance(p);
     skip_spaces(p);
     skip_comment(p);
     if (peek(p) == '\n')
         advance(p);
 
-    /* Determine block indent from first non-empty line */
     skip_blank_lines(p);
-    size_t block_indent = measure_indent(p);
+    block_indent = measure_indent(p);
     if (block_indent == 0)
-    {
         return vigil_json_string_new(&p->alloc, "", 0, out, p->error);
-    }
 
-    /* Collect lines */
-    size_t cap = 256;
-    size_t len = 0;
-    char *buf = (char *)yaml_alloc(p, cap);
+    buf = (char *)yaml_alloc(p, cap);
     if (!buf)
     {
         set_error(p, "out of memory");
         return VIGIL_STATUS_OUT_OF_MEMORY;
     }
 
-    while (p->pos < p->len)
-    {
-        size_t line_indent = measure_indent(p);
+    s = block_scalar_collect_lines(p, style, block_indent, &buf, &len, &cap);
+    if (s != VIGIL_STATUS_OK)
+        return s;
 
-        /* Check for blank line */
-        size_t check = p->pos + line_indent;
-        if (check < p->len && (p->src[check] == '\n' || p->src[check] == '\0'))
-        {
-            /* Blank line - include it */
-            while (peek(p) == ' ')
-                advance(p);
-            if (peek(p) == '\n')
-            {
-                if (len + 1 >= cap)
-                {
-                    cap *= 2;
-                    char *newbuf = (char *)p->alloc.reallocate(p->alloc.user_data, buf, cap);
-                    if (!newbuf)
-                    {
-                        yaml_dealloc(p, buf);
-                        return VIGIL_STATUS_OUT_OF_MEMORY;
-                    }
-                    buf = newbuf;
-                }
-                buf[len++] = '\n';
-                advance(p);
-                continue;
-            }
-        }
-
-        if (line_indent < block_indent)
-            break;
-
-        /* Skip the block indent */
-        for (size_t i = 0; i < block_indent && peek(p) == ' '; i++)
-            advance(p);
-
-        /* Copy line content */
-        while (peek(p) && peek(p) != '\n')
-        {
-            if (len + 1 >= cap)
-            {
-                cap *= 2;
-                char *newbuf = (char *)p->alloc.reallocate(p->alloc.user_data, buf, cap);
-                if (!newbuf)
-                {
-                    yaml_dealloc(p, buf);
-                    return VIGIL_STATUS_OUT_OF_MEMORY;
-                }
-                buf = newbuf;
-            }
-            buf[len++] = peek(p);
-            advance(p);
-        }
-
-        if (peek(p) == '\n')
-        {
-            if (style == '|')
-            {
-                /* Literal: preserve newline */
-                if (len + 1 >= cap)
-                {
-                    cap *= 2;
-                    char *newbuf = (char *)p->alloc.reallocate(p->alloc.user_data, buf, cap);
-                    if (!newbuf)
-                    {
-                        yaml_dealloc(p, buf);
-                        return VIGIL_STATUS_OUT_OF_MEMORY;
-                    }
-                    buf = newbuf;
-                }
-                buf[len++] = '\n';
-            }
-            else
-            {
-                /* Folded: convert to space (unless followed by blank) */
-                if (len + 1 >= cap)
-                {
-                    cap *= 2;
-                    char *newbuf = (char *)p->alloc.reallocate(p->alloc.user_data, buf, cap);
-                    if (!newbuf)
-                    {
-                        yaml_dealloc(p, buf);
-                        return VIGIL_STATUS_OUT_OF_MEMORY;
-                    }
-                    buf = newbuf;
-                }
-                buf[len++] = ' ';
-            }
-            advance(p);
-        }
-    }
-
-    /* Trim trailing whitespace for folded, single trailing newline for literal */
     if (style == '>')
     {
         while (len > 0 && (buf[len - 1] == ' ' || buf[len - 1] == '\n'))
@@ -347,7 +312,7 @@ static vigil_status_t parse_block_scalar(yaml_parser_t *p, char style, vigil_jso
     }
 
     buf[len] = '\0';
-    vigil_status_t s = vigil_json_string_new(&p->alloc, buf, len, out, p->error);
+    s = vigil_json_string_new(&p->alloc, buf, len, out, p->error);
     yaml_dealloc(p, buf);
     return s;
 }
