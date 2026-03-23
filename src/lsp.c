@@ -126,28 +126,28 @@ static vigil_status_t lsp_make_response(const vigil_allocator_t *alloc, const vi
  * Token type indices — must match the order advertised in handle_initialize.
  * Clients map these indices to colours via their active colour theme.
  */
-#define VIGIL_STOKEN_TYPE_NAMESPACE    0u
-#define VIGIL_STOKEN_TYPE_TYPE         1u
-#define VIGIL_STOKEN_TYPE_CLASS        2u
-#define VIGIL_STOKEN_TYPE_ENUM         3u
-#define VIGIL_STOKEN_TYPE_INTERFACE    4u
-#define VIGIL_STOKEN_TYPE_FUNCTION     5u
-#define VIGIL_STOKEN_TYPE_VARIABLE     6u
-#define VIGIL_STOKEN_TYPE_PROPERTY     7u
-#define VIGIL_STOKEN_TYPE_ENUM_MEMBER  8u
-#define VIGIL_STOKEN_TYPE_METHOD       9u
-#define VIGIL_STOKEN_TYPE_PARAMETER   10u
+#define VIGIL_STOKEN_TYPE_NAMESPACE 0u
+#define VIGIL_STOKEN_TYPE_TYPE 1u
+#define VIGIL_STOKEN_TYPE_CLASS 2u
+#define VIGIL_STOKEN_TYPE_ENUM 3u
+#define VIGIL_STOKEN_TYPE_INTERFACE 4u
+#define VIGIL_STOKEN_TYPE_FUNCTION 5u
+#define VIGIL_STOKEN_TYPE_VARIABLE 6u
+#define VIGIL_STOKEN_TYPE_PROPERTY 7u
+#define VIGIL_STOKEN_TYPE_ENUM_MEMBER 8u
+#define VIGIL_STOKEN_TYPE_METHOD 9u
+#define VIGIL_STOKEN_TYPE_PARAMETER 10u
 
 /* Token modifier bitmasks — must match the order advertised in handle_initialize. */
-#define VIGIL_STOKEN_MOD_DECLARATION  0x01u
-#define VIGIL_STOKEN_MOD_DEFINITION   0x02u
-#define VIGIL_STOKEN_MOD_READONLY     0x04u
-#define VIGIL_STOKEN_MOD_STATIC       0x08u
+#define VIGIL_STOKEN_MOD_DECLARATION 0x01u
+#define VIGIL_STOKEN_MOD_DEFINITION 0x02u
+#define VIGIL_STOKEN_MOD_READONLY 0x04u
+#define VIGIL_STOKEN_MOD_STATIC 0x08u
 
 typedef struct
 {
-    size_t   start_offset;
-    size_t   length;
+    size_t start_offset;
+    size_t length;
     uint32_t token_type;
     uint32_t token_modifiers;
 } lsp_sem_token_t;
@@ -155,8 +155,8 @@ typedef struct
 typedef struct
 {
     lsp_sem_token_t *data;
-    size_t           count;
-    size_t           capacity;
+    size_t count;
+    size_t capacity;
 } sem_token_list_t;
 
 static int sem_token_cmp(const void *a, const void *b)
@@ -222,11 +222,11 @@ static int sem_token_list_push(sem_token_list_t *list, lsp_sem_token_t tok)
 {
     if (list->count == list->capacity)
     {
-        size_t           new_cap = (list->capacity == 0) ? 64u : list->capacity * 2u;
-        lsp_sem_token_t *tmp     = realloc(list->data, new_cap * sizeof(*list->data));
+        size_t new_cap = (list->capacity == 0) ? 64u : list->capacity * 2u;
+        lsp_sem_token_t *tmp = realloc(list->data, new_cap * sizeof(*list->data));
         if (tmp == NULL)
             return 0;
-        list->data     = tmp;
+        list->data = tmp;
         list->capacity = new_cap;
     }
     list->data[list->count++] = tok;
@@ -242,14 +242,14 @@ static int collect_declaration_tokens(sem_token_list_t *list, const vigil_semant
     for (i = 0; i < sym_count; i++)
     {
         const vigil_debug_symbol_t *sym = vigil_debug_symbol_table_get(&index->symbols, i);
-        lsp_sem_token_t             tok;
+        lsp_sem_token_t tok;
 
         if (sym->span.source_id != source_id || sym->name_length == 0)
             continue;
 
         symbol_kind_to_sem_token(sym->kind, &tok.token_type, &tok.token_modifiers);
         tok.start_offset = sym->span.start_offset;
-        tok.length       = sym->name_length;
+        tok.length = sym->name_length;
         if (!sem_token_list_push(list, tok))
             return 0;
     }
@@ -263,15 +263,15 @@ static int collect_reference_tokens(sem_token_list_t *list, const vigil_semantic
     for (i = 0; i < sem_file->reference_count; i++)
     {
         const vigil_semantic_reference_t *ref = &sem_file->references[i];
-        lsp_sem_token_t                   tok;
+        lsp_sem_token_t tok;
 
         if (ref->span.end_offset <= ref->span.start_offset)
             continue;
 
         symbol_kind_to_sem_token(ref->symbol_kind, &tok.token_type, &tok.token_modifiers);
         tok.token_modifiers = 0; /* references carry no declaration/definition flags */
-        tok.start_offset    = ref->span.start_offset;
-        tok.length          = ref->span.end_offset - ref->span.start_offset;
+        tok.start_offset = ref->span.start_offset;
+        tok.length = ref->span.end_offset - ref->span.start_offset;
         if (!sem_token_list_push(list, tok))
             return 0;
     }
@@ -340,13 +340,9 @@ static vigil_status_t handle_initialize(vigil_lsp_server_t *server, const vigil_
 
     /* Semantic tokens. */
     {
-        static const char *type_names[] = {
-            "namespace", "type", "class", "enum", "interface",
-            "function", "variable", "property", "enumMember", "method", "parameter"
-        };
-        static const char *mod_names[] = {
-            "declaration", "definition", "readonly", "static"
-        };
+        static const char *type_names[] = {"namespace", "type",     "class",      "enum",   "interface", "function",
+                                           "variable",  "property", "enumMember", "method", "parameter"};
+        static const char *mod_names[] = {"declaration", "definition", "readonly", "static"};
         vigil_json_value_t *st_opts = NULL;
         vigil_json_value_t *legend = NULL;
         vigil_json_value_t *token_types = NULL;
@@ -389,8 +385,7 @@ static vigil_status_t handle_initialize(vigil_lsp_server_t *server, const vigil_
 }
 
 static vigil_status_t handle_shutdown(vigil_lsp_server_t *server, const vigil_json_value_t *id,
-                                      const vigil_json_value_t *params, vigil_json_value_t **out,
-                                      vigil_error_t *error)
+                                      const vigil_json_value_t *params, vigil_json_value_t **out, vigil_error_t *error)
 {
     (void)params;
     server->shutdown_requested = 1;
@@ -473,25 +468,25 @@ static vigil_status_t encode_tokens_to_json(const sem_token_list_t *list, const 
                                             const vigil_allocator_t *a, vigil_json_value_t *data_array,
                                             vigil_error_t *error)
 {
-    const char *text      = vigil_string_c_str(&src->text);
-    size_t      text_len  = vigil_string_length(&src->text);
-    size_t      prev_line = 0, prev_col = 0;
-    size_t      i;
+    const char *text = vigil_string_c_str(&src->text);
+    size_t text_len = vigil_string_length(&src->text);
+    size_t prev_line = 0, prev_col = 0;
+    size_t i;
 
     for (i = 0; i < list->count; i++)
     {
-        size_t             line, col, delta_line, delta_col;
+        size_t line, col, delta_line, delta_col;
         vigil_json_value_t *n = NULL;
 
         offset_to_line_col(text, text_len, list->data[i].start_offset, &line, &col);
         delta_line = line - prev_line;
-        delta_col  = (delta_line == 0) ? (col - prev_col) : col;
+        delta_col = (delta_line == 0) ? (col - prev_col) : col;
 
         /* Each token is 5 uint32 values: deltaLine, deltaStartChar, length, tokenType, tokenModifiers */
-#define PUSH_UINT(v)                                       \
-        vigil_json_number_new(a, (double)(v), &n, error); \
-        vigil_json_array_push(data_array, n, error);       \
-        n = NULL
+#define PUSH_UINT(v)                                                                                                   \
+    vigil_json_number_new(a, (double)(v), &n, error);                                                                  \
+    vigil_json_array_push(data_array, n, error);                                                                       \
+    n = NULL
 
         PUSH_UINT(delta_line);
         PUSH_UINT(delta_col);
@@ -502,7 +497,7 @@ static vigil_status_t encode_tokens_to_json(const sem_token_list_t *list, const 
 #undef PUSH_UINT
 
         prev_line = line;
-        prev_col  = col;
+        prev_col = col;
     }
     return VIGIL_STATUS_OK;
 }
@@ -625,8 +620,7 @@ static vigil_status_t publish_diagnostics(vigil_lsp_server_t *server, const char
 }
 
 static vigil_status_t handle_did_open(vigil_lsp_server_t *server, const vigil_json_value_t *id,
-                                      const vigil_json_value_t *params, vigil_json_value_t **out,
-                                      vigil_error_t *err)
+                                      const vigil_json_value_t *params, vigil_json_value_t **out, vigil_error_t *err)
 {
     const vigil_json_value_t *text_doc;
     const vigil_json_value_t *uri_val;
@@ -646,17 +640,17 @@ static vigil_status_t handle_did_open(vigil_lsp_server_t *server, const vigil_js
     if (text_doc == NULL)
         return VIGIL_STATUS_OK;
 
-    uri_val  = vigil_json_object_get(text_doc, "uri");
+    uri_val = vigil_json_object_get(text_doc, "uri");
     text_val = vigil_json_object_get(text_doc, "text");
     if (uri_val == NULL || text_val == NULL)
         return VIGIL_STATUS_OK;
 
-    uri  = vigil_json_string_value(uri_val);
+    uri = vigil_json_string_value(uri_val);
     text = vigil_json_string_value(text_val);
     if (uri == NULL || text == NULL)
         return VIGIL_STATUS_OK;
 
-    uri_len  = vigil_json_string_length(uri_val);
+    uri_len = vigil_json_string_length(uri_val);
     text_len = vigil_json_string_length(text_val);
 
     /* Register source and analyze. */
@@ -670,8 +664,7 @@ static vigil_status_t handle_did_open(vigil_lsp_server_t *server, const vigil_js
 }
 
 static vigil_status_t handle_did_change(vigil_lsp_server_t *server, const vigil_json_value_t *id,
-                                        const vigil_json_value_t *params, vigil_json_value_t **out,
-                                        vigil_error_t *err)
+                                        const vigil_json_value_t *params, vigil_json_value_t **out, vigil_error_t *err)
 {
     const vigil_json_value_t *text_doc;
     const vigil_json_value_t *uri_val;
@@ -690,7 +683,7 @@ static vigil_status_t handle_did_change(vigil_lsp_server_t *server, const vigil_
     (void)err;
 
     text_doc = vigil_json_object_get(params, "textDocument");
-    changes  = vigil_json_object_get(params, "contentChanges");
+    changes = vigil_json_object_get(params, "contentChanges");
     if (text_doc == NULL || changes == NULL)
         return VIGIL_STATUS_OK;
 
@@ -709,12 +702,12 @@ static vigil_status_t handle_did_change(vigil_lsp_server_t *server, const vigil_
     if (text_val == NULL)
         return VIGIL_STATUS_OK;
 
-    uri  = vigil_json_string_value(uri_val);
+    uri = vigil_json_string_value(uri_val);
     text = vigil_json_string_value(text_val);
     if (uri == NULL || text == NULL)
         return VIGIL_STATUS_OK;
 
-    uri_len  = vigil_json_string_length(uri_val);
+    uri_len = vigil_json_string_length(uri_val);
     text_len = vigil_json_string_length(text_val);
 
     /* Re-register and re-analyze */
@@ -728,8 +721,7 @@ static vigil_status_t handle_did_change(vigil_lsp_server_t *server, const vigil_
 }
 
 static vigil_status_t handle_did_close(vigil_lsp_server_t *server, const vigil_json_value_t *id,
-                                       const vigil_json_value_t *params, vigil_json_value_t **out,
-                                       vigil_error_t *error)
+                                       const vigil_json_value_t *params, vigil_json_value_t **out, vigil_error_t *error)
 {
     (void)server;
     (void)id;
@@ -1509,27 +1501,27 @@ static vigil_status_t handle_semantic_tokens_full(vigil_lsp_server_t *server, co
                                                   const vigil_json_value_t *params, vigil_json_value_t **out,
                                                   vigil_error_t *error)
 {
-    const vigil_allocator_t      *a = &server->allocator;
-    const vigil_json_value_t     *td, *uri_val;
-    const char                   *uri;
-    size_t                        uri_len;
-    vigil_source_id_t             source_id;
-    const vigil_source_file_t    *src;
-    const vigil_semantic_file_t  *sem_file;
-    sem_token_list_t              list = {NULL, 0, 0};
-    vigil_json_value_t           *result = NULL;
-    vigil_json_value_t           *data_array = NULL;
+    const vigil_allocator_t *a = &server->allocator;
+    const vigil_json_value_t *td, *uri_val;
+    const char *uri;
+    size_t uri_len;
+    vigil_source_id_t source_id;
+    const vigil_source_file_t *src;
+    const vigil_semantic_file_t *sem_file;
+    sem_token_list_t list = {NULL, 0, 0};
+    vigil_json_value_t *result = NULL;
+    vigil_json_value_t *data_array = NULL;
 
     /* Parse URI and resolve to a tracked source file. */
-    td      = vigil_json_object_get(params, "textDocument");
+    td = vigil_json_object_get(params, "textDocument");
     uri_val = (td != NULL) ? vigil_json_object_get(td, "uri") : NULL;
-    uri     = (uri_val != NULL) ? vigil_json_string_value(uri_val) : NULL;
+    uri = (uri_val != NULL) ? vigil_json_string_value(uri_val) : NULL;
     if (uri == NULL)
         goto empty;
-    uri_len   = vigil_json_string_length(uri_val);
+    uri_len = vigil_json_string_length(uri_val);
     source_id = find_source_by_uri(server, uri, uri_len);
-    src       = (source_id != 0) ? vigil_source_registry_get(&server->sources, source_id) : NULL;
-    sem_file  = (src != NULL) ? find_semantic_file(server, source_id) : NULL;
+    src = (source_id != 0) ? vigil_source_registry_get(&server->sources, source_id) : NULL;
+    sem_file = (src != NULL) ? find_semantic_file(server, source_id) : NULL;
     if (sem_file == NULL)
         goto empty;
 
@@ -1649,31 +1641,30 @@ static vigil_status_t handle_document_symbol(vigil_lsp_server_t *server, const v
  * All request and notification handlers share the same signature so they
  * can be stored in a flat dispatch table, keeping lsp_handle_message simple.
  */
-typedef vigil_status_t (*lsp_handler_fn)(vigil_lsp_server_t *, const vigil_json_value_t *,
-                                         const vigil_json_value_t *, vigil_json_value_t **,
-                                         vigil_error_t *);
+typedef vigil_status_t (*lsp_handler_fn)(vigil_lsp_server_t *, const vigil_json_value_t *, const vigil_json_value_t *,
+                                         vigil_json_value_t **, vigil_error_t *);
 
 typedef struct
 {
-    const char    *method;
+    const char *method;
     lsp_handler_fn handler;
 } lsp_dispatch_entry_t;
 
 static const lsp_dispatch_entry_t lsp_dispatch_table[] = {
-    { "initialize",                       handle_initialize        },
-    { "shutdown",                         handle_shutdown          },
-    { "textDocument/didOpen",             handle_did_open          },
-    { "textDocument/didChange",           handle_did_change        },
-    { "textDocument/didClose",            handle_did_close         },
-    { "textDocument/documentSymbol",      handle_document_symbol   },
-    { "textDocument/hover",               handle_hover             },
-    { "textDocument/definition",          handle_definition        },
-    { "textDocument/completion",          handle_completion        },
-    { "textDocument/references",          handle_references        },
-    { "textDocument/rename",              handle_rename            },
-    { "textDocument/formatting",          handle_formatting        },
-    { "textDocument/signatureHelp",       handle_signature_help    },
-    { "textDocument/semanticTokens/full", handle_semantic_tokens_full },
+    {"initialize", handle_initialize},
+    {"shutdown", handle_shutdown},
+    {"textDocument/didOpen", handle_did_open},
+    {"textDocument/didChange", handle_did_change},
+    {"textDocument/didClose", handle_did_close},
+    {"textDocument/documentSymbol", handle_document_symbol},
+    {"textDocument/hover", handle_hover},
+    {"textDocument/definition", handle_definition},
+    {"textDocument/completion", handle_completion},
+    {"textDocument/references", handle_references},
+    {"textDocument/rename", handle_rename},
+    {"textDocument/formatting", handle_formatting},
+    {"textDocument/signatureHelp", handle_signature_help},
+    {"textDocument/semanticTokens/full", handle_semantic_tokens_full},
 };
 
 #define LSP_DISPATCH_COUNT (sizeof(lsp_dispatch_table) / sizeof(lsp_dispatch_table[0]))
@@ -1684,11 +1675,11 @@ static vigil_status_t lsp_handle_message(vigil_lsp_server_t *server, const vigil
     const vigil_json_value_t *method_val;
     const vigil_json_value_t *id;
     const vigil_json_value_t *params;
-    vigil_json_value_t       *response = NULL;
-    const char               *method;
-    size_t                    method_len;
-    vigil_status_t            status = VIGIL_STATUS_OK;
-    size_t                    i;
+    vigil_json_value_t *response = NULL;
+    const char *method;
+    size_t method_len;
+    vigil_status_t status = VIGIL_STATUS_OK;
+    size_t i;
 
     method_val = vigil_json_object_get(message, "method");
     if (method_val == NULL)
@@ -1706,13 +1697,13 @@ static vigil_status_t lsp_handle_message(vigil_lsp_server_t *server, const vigil
         return VIGIL_STATUS_OK;
     }
 
-    id     = vigil_json_object_get(message, "id");
+    id = vigil_json_object_get(message, "id");
     params = vigil_json_object_get(message, "params");
 
     for (i = 0; i < LSP_DISPATCH_COUNT; i++)
     {
         const char *entry_method = lsp_dispatch_table[i].method;
-        size_t      entry_len    = strlen(entry_method);
+        size_t entry_len = strlen(entry_method);
         if (method_len == entry_len && strncmp(method, entry_method, method_len) == 0)
         {
             status = lsp_dispatch_table[i].handler(server, id, params, &response, error);

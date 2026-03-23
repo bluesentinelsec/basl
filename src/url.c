@@ -126,7 +126,7 @@ static vigil_status_t percent_encode(const char *input, size_t input_length, int
         return VIGIL_STATUS_OUT_OF_MEMORY;
     }
 
-    for (i = 0, j = 0; i < input_length && j < needed; i++)
+    for (i = 0, j = 0; i < input_length; i++)
     {
         unsigned char c = (unsigned char)input[i];
         if (is_unreserved((char)c) || (!encode_slash && c == '/'))
@@ -137,7 +137,7 @@ static vigil_status_t percent_encode(const char *input, size_t input_length, int
         {
             result[j++] = '+';
         }
-        else if (j + 3 <= needed)
+        else
         {
             result[j++] = '%';
             result[j++] = hex[c >> 4];

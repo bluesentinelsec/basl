@@ -1194,12 +1194,6 @@ static vigil_status_t tar_create_fn(vigil_vm_t *vm, size_t arg_count, vigil_erro
             tar_cap = new_cap;
         }
 
-        if (tar_data == NULL)
-        {
-            vigil_value_release(&name_val);
-            vigil_value_release(&content_val);
-            return push_empty_bytes(vm, error);
-        }
         memcpy(tar_data + tar_size, &h, 512);
         tar_size += 512;
         if (data && data_len > 0)
