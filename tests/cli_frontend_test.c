@@ -286,7 +286,7 @@ static int verify_absolute_import_registration(const char *root, vigil_error_t *
     ok = 0;
     source_id = 0U;
     remove_cli_frontend_project(root, "helper", error);
-    if (vigil_platform_getcwd(&cwd, error) != VIGIL_STATUS_OK)
+    if (vigil_platform_getcwd(NULL, &cwd, error) != VIGIL_STATUS_OK)
         return 0;
     snprintf(helper_path, sizeof(helper_path), "%s/%s/lib/helper.vigil", cwd, root);
     snprintf(main_source, sizeof(main_source), "import \"%s\";\nfn main() -> i32 { return helper.value(); }\n",

@@ -344,7 +344,7 @@ vigil_status_t vigil_pkg_git_available(vigil_error_t *error)
     int exit_code;
     vigil_status_t status;
 
-    status = vigil_platform_exec(argv, &out, &err_out, &exit_code, error);
+    status = vigil_platform_exec(NULL, argv, &out, &err_out, &exit_code, error);
     free(out);
     free(err_out);
 
@@ -385,7 +385,7 @@ vigil_status_t vigil_pkg_git_clone(const char *url, const char *dest, vigil_erro
         }
     }
 
-    status = vigil_platform_exec(argv, &out, &err_out, &exit_code, error);
+    status = vigil_platform_exec(NULL, argv, &out, &err_out, &exit_code, error);
 
     if (status != VIGIL_STATUS_OK)
     {
@@ -420,7 +420,7 @@ vigil_status_t vigil_pkg_git_fetch(const char *repo_path, vigil_error_t *error)
         return VIGIL_STATUS_INVALID_ARGUMENT;
     }
 
-    status = vigil_platform_exec(argv, &out, &err_out, &exit_code, error);
+    status = vigil_platform_exec(NULL, argv, &out, &err_out, &exit_code, error);
     free(out);
     free(err_out);
 
@@ -448,7 +448,7 @@ vigil_status_t vigil_pkg_git_checkout(const char *repo_path, const char *version
         return VIGIL_STATUS_INVALID_ARGUMENT;
     }
 
-    status = vigil_platform_exec(argv, &out, &err_out, &exit_code, error);
+    status = vigil_platform_exec(NULL, argv, &out, &err_out, &exit_code, error);
 
     if (status != VIGIL_STATUS_OK)
     {
@@ -484,7 +484,7 @@ vigil_status_t vigil_pkg_git_head(const char *repo_path, char *out_commit, size_
         return VIGIL_STATUS_INVALID_ARGUMENT;
     }
 
-    status = vigil_platform_exec(argv, &out, &err_out, &exit_code, error);
+    status = vigil_platform_exec(NULL, argv, &out, &err_out, &exit_code, error);
 
     if (status != VIGIL_STATUS_OK)
     {

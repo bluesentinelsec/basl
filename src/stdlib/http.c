@@ -837,7 +837,7 @@ HTTP_STATIC int do_request_once(const char *method, const char *url_str, const c
 
     /* Try native HTTP library first (supports HTTPS). */
     vigil_http_response_t native_resp;
-    vigil_status_t st = vigil_platform_http_request(method, url_str, headers, body, body_len, &native_resp, NULL);
+    vigil_status_t st = vigil_platform_http_request(NULL, method, url_str, headers, body, body_len, &native_resp, NULL);
 
     if (st == VIGIL_STATUS_OK)
     {

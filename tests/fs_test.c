@@ -10,7 +10,7 @@
 static void make_temp_path(char *buf, size_t bufsize, const char *name)
 {
     char *tmp = NULL;
-    vigil_platform_temp_dir(&tmp, NULL);
+    vigil_platform_temp_dir(NULL, &tmp, NULL);
     snprintf(buf, bufsize, "%s/%s", tmp ? tmp : ".", name);
     free(tmp);
 }
@@ -72,7 +72,7 @@ TEST(VigilFsTest, FileExists)
 TEST(VigilFsTest, IsDirectory)
 {
     char *tmp = NULL;
-    vigil_platform_temp_dir(&tmp, NULL);
+    vigil_platform_temp_dir(NULL, &tmp, NULL);
     int is_dir = 0;
     vigil_platform_is_directory(tmp, &is_dir);
     EXPECT_EQ(is_dir, 1);
@@ -89,7 +89,7 @@ TEST(VigilFsTest, IsDirectory)
 TEST(VigilFsTest, IsFile)
 {
     char *tmp = NULL;
-    vigil_platform_temp_dir(&tmp, NULL);
+    vigil_platform_temp_dir(NULL, &tmp, NULL);
     int is_file = 0;
     vigil_platform_is_file(tmp, &is_file);
     EXPECT_EQ(is_file, 0);
@@ -214,7 +214,7 @@ TEST(VigilFsTest, FileMtime)
 TEST(VigilFsTest, TempDir)
 {
     char *path = NULL;
-    vigil_status_t s = vigil_platform_temp_dir(&path, NULL);
+    vigil_status_t s = vigil_platform_temp_dir(NULL, &path, NULL);
     ASSERT_EQ(s, VIGIL_STATUS_OK);
     ASSERT_NE(path, NULL);
     EXPECT_TRUE(strlen(path) > 0);
@@ -224,7 +224,7 @@ TEST(VigilFsTest, TempDir)
 TEST(VigilFsTest, HomeDir)
 {
     char *path = NULL;
-    vigil_status_t s = vigil_platform_home_dir(&path, NULL);
+    vigil_status_t s = vigil_platform_home_dir(NULL, &path, NULL);
     ASSERT_EQ(s, VIGIL_STATUS_OK);
     ASSERT_NE(path, NULL);
     EXPECT_TRUE(strlen(path) > 0);
@@ -234,7 +234,7 @@ TEST(VigilFsTest, HomeDir)
 TEST(VigilFsTest, ConfigDir)
 {
     char *path = NULL;
-    vigil_status_t s = vigil_platform_config_dir(&path, NULL);
+    vigil_status_t s = vigil_platform_config_dir(NULL, &path, NULL);
     ASSERT_EQ(s, VIGIL_STATUS_OK);
     ASSERT_NE(path, NULL);
     EXPECT_TRUE(strlen(path) > 0);
@@ -244,7 +244,7 @@ TEST(VigilFsTest, ConfigDir)
 TEST(VigilFsTest, TempFile)
 {
     char *path = NULL;
-    vigil_status_t s = vigil_platform_temp_file("vigil", &path, NULL);
+    vigil_status_t s = vigil_platform_temp_file(NULL, "vigil", &path, NULL);
     ASSERT_EQ(s, VIGIL_STATUS_OK);
     ASSERT_NE(path, NULL);
 
@@ -279,7 +279,7 @@ TEST(VigilFsTest, SymlinkCreateAndRead)
     EXPECT_EQ(is_sym_target, 0);
 
     char *read_target = NULL;
-    s = vigil_platform_readlink(link, &read_target, NULL);
+    s = vigil_platform_readlink(NULL, link, &read_target, NULL);
     ASSERT_EQ(s, VIGIL_STATUS_OK);
     EXPECT_STREQ(read_target, target);
     free(read_target);

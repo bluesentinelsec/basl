@@ -341,7 +341,8 @@ vigil_status_t vigil_platform_list_dir(const char *path, vigil_platform_dir_call
 
 /* ── Environment variables ───────────────────────────────────────── */
 
-VIGIL_API vigil_status_t vigil_platform_getenv(const char *name, char **out_value, int *out_found, vigil_error_t *error)
+VIGIL_API vigil_status_t vigil_platform_getenv(const vigil_allocator_t *allocator, const char *name, char **out_value,
+                                                   int *out_found, vigil_error_t *error)
 {
     char buf[32767]; /* max env var size on Windows */
     DWORD len;
@@ -402,7 +403,7 @@ VIGIL_API const char *vigil_platform_os_name(void)
     return "windows";
 }
 
-VIGIL_API vigil_status_t vigil_platform_getcwd(char **out_path, vigil_error_t *error)
+VIGIL_API vigil_status_t vigil_platform_getcwd(const vigil_allocator_t *allocator, char **out_path, vigil_error_t *error)
 {
     char buf[4096];
     if (!out_path)
@@ -429,7 +430,7 @@ VIGIL_API vigil_status_t vigil_platform_getcwd(char **out_path, vigil_error_t *e
     return VIGIL_STATUS_OK;
 }
 
-VIGIL_API vigil_status_t vigil_platform_temp_dir(char **out_path, vigil_error_t *error)
+VIGIL_API vigil_status_t vigil_platform_temp_dir(const vigil_allocator_t *allocator, char **out_path, vigil_error_t *error)
 {
     char buf[MAX_PATH + 1];
     DWORD len;
@@ -461,7 +462,7 @@ VIGIL_API vigil_status_t vigil_platform_temp_dir(char **out_path, vigil_error_t 
     return VIGIL_STATUS_OK;
 }
 
-VIGIL_API vigil_status_t vigil_platform_hostname(char **out_name, vigil_error_t *error)
+VIGIL_API vigil_status_t vigil_platform_hostname(const vigil_allocator_t *allocator, char **out_name, vigil_error_t *error)
 {
     char buf[256];
     DWORD size = sizeof(buf);
@@ -831,7 +832,8 @@ VIGIL_API vigil_status_t vigil_platform_hardlink(const char *target, const char 
     return VIGIL_STATUS_OK;
 }
 
-VIGIL_API vigil_status_t vigil_platform_readlink(const char *path, char **out_target, vigil_error_t *error)
+VIGIL_API vigil_status_t vigil_platform_readlink(const vigil_allocator_t *allocator, const char *path, char **out_target,
+                                                     vigil_error_t *error)
 {
     (void)path;
     vigil_error_set_literal(error, VIGIL_STATUS_UNSUPPORTED, "readlink not fully supported on Windows");
@@ -931,7 +933,7 @@ VIGIL_API int vigil_platform_glob_match(const char *pattern, const char *name)
     return *pattern == '\0' && *name == '\0';
 }
 
-VIGIL_API vigil_status_t vigil_platform_home_dir(char **out_path, vigil_error_t *error)
+VIGIL_API vigil_status_t vigil_platform_home_dir(const vigil_allocator_t *allocator, char **out_path, vigil_error_t *error)
 {
     char *userprofile = getenv("USERPROFILE");
     if (userprofile)
@@ -945,7 +947,7 @@ VIGIL_API vigil_status_t vigil_platform_home_dir(char **out_path, vigil_error_t 
     return VIGIL_STATUS_INTERNAL;
 }
 
-VIGIL_API vigil_status_t vigil_platform_config_dir(char **out_path, vigil_error_t *error)
+VIGIL_API vigil_status_t vigil_platform_config_dir(const vigil_allocator_t *allocator, char **out_path, vigil_error_t *error)
 {
     char *appdata = getenv("APPDATA");
     if (appdata)
@@ -959,7 +961,7 @@ VIGIL_API vigil_status_t vigil_platform_config_dir(char **out_path, vigil_error_
     return VIGIL_STATUS_INTERNAL;
 }
 
-VIGIL_API vigil_status_t vigil_platform_cache_dir(char **out_path, vigil_error_t *error)
+VIGIL_API vigil_status_t vigil_platform_cache_dir(const vigil_allocator_t *allocator, char **out_path, vigil_error_t *error)
 {
     char *localappdata = getenv("LOCALAPPDATA");
     if (localappdata)
@@ -973,12 +975,13 @@ VIGIL_API vigil_status_t vigil_platform_cache_dir(char **out_path, vigil_error_t
     return VIGIL_STATUS_INTERNAL;
 }
 
-VIGIL_API vigil_status_t vigil_platform_data_dir(char **out_path, vigil_error_t *error)
+VIGIL_API vigil_status_t vigil_platform_data_dir(const vigil_allocator_t *allocator, char **out_path, vigil_error_t *error)
 {
-    return vigil_platform_config_dir(out_path, error);
+    return vigil_platform_config_dir(allocator, out_path, error);
 }
 
-VIGIL_API vigil_status_t vigil_platform_temp_file(const char *prefix, char **out_path, vigil_error_t *error)
+VIGIL_API vigil_status_t vigil_platform_temp_file(const vigil_allocator_t *allocator, const char *prefix, char **out_path,
+                                                      vigil_error_t *error)
 {
     char tmpdir[MAX_PATH];
     if (!GetTempPathA(MAX_PATH, tmpdir))
@@ -2052,7 +2055,8 @@ static void winhttp_read_body(HINTERNET req, vigil_http_response_t *out)
     }
 }
 
-VIGIL_API vigil_status_t vigil_platform_http_request(const char *method, const char *url, const char *headers,
+VIGIL_API vigil_status_t vigil_platform_http_request(const vigil_allocator_t *allocator, const char *method, const char *url,
+                                                         const char *headers,
                                                      const char *body, size_t body_len, vigil_http_response_t *out,
                                                      vigil_error_t *error)
 {

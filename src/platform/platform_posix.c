@@ -31,6 +31,15 @@ static vigil_allocator_t resolve_alloc(const vigil_allocator_t *a)
     return vigil_default_allocator();
 }
 
+static char *alloc_strdup(vigil_allocator_t a, const char *s)
+{
+    size_t len = strlen(s);
+    char *d = (char *)a.allocate(a.user_data, len + 1);
+    if (d)
+        memcpy(d, s, len + 1);
+    return d;
+}
+
 /* ── File I/O ────────────────────────────────────────────────────── */
 
 vigil_status_t vigil_platform_read_file(const vigil_allocator_t *allocator, const char *path, char **out_data,
@@ -351,9 +360,11 @@ vigil_status_t vigil_platform_list_dir(const char *path, vigil_platform_dir_call
 
 /* ── Environment variables ───────────────────────────────────────── */
 
-VIGIL_API vigil_status_t vigil_platform_getenv(const char *name, char **out_value, int *out_found, vigil_error_t *error)
+VIGIL_API vigil_status_t vigil_platform_getenv(const vigil_allocator_t *allocator, const char *name, char **out_value,
+                                               int *out_found, vigil_error_t *error)
 {
     const char *val;
+    vigil_allocator_t a = resolve_alloc(allocator);
     (void)error;
     if (!name || !out_value || !out_found)
     {
@@ -368,7 +379,7 @@ VIGIL_API vigil_status_t vigil_platform_getenv(const char *name, char **out_valu
     val = getenv(name);
     if (val)
     {
-        *out_value = strdup(val);
+        *out_value = alloc_strdup(a, val);
         *out_found = 1;
     }
     else
@@ -425,9 +436,11 @@ VIGIL_API const char *vigil_platform_os_name(void)
 #endif
 }
 
-VIGIL_API vigil_status_t vigil_platform_getcwd(char **out_path, vigil_error_t *error)
+VIGIL_API vigil_status_t vigil_platform_getcwd(const vigil_allocator_t *allocator, char **out_path,
+                                               vigil_error_t *error)
 {
     char buf[4096];
+    vigil_allocator_t a = resolve_alloc(allocator);
     if (!out_path)
     {
         if (error)
@@ -448,13 +461,15 @@ VIGIL_API vigil_status_t vigil_platform_getcwd(char **out_path, vigil_error_t *e
         }
         return VIGIL_STATUS_INTERNAL;
     }
-    *out_path = strdup(buf);
+    *out_path = alloc_strdup(a, buf);
     return VIGIL_STATUS_OK;
 }
 
-VIGIL_API vigil_status_t vigil_platform_temp_dir(char **out_path, vigil_error_t *error)
+VIGIL_API vigil_status_t vigil_platform_temp_dir(const vigil_allocator_t *allocator, char **out_path,
+                                                 vigil_error_t *error)
 {
     const char *tmp;
+    vigil_allocator_t a = resolve_alloc(allocator);
     if (!out_path)
     {
         if (error)
@@ -468,13 +483,15 @@ VIGIL_API vigil_status_t vigil_platform_temp_dir(char **out_path, vigil_error_t 
     tmp = getenv("TMPDIR");
     if (!tmp)
         tmp = "/tmp";
-    *out_path = strdup(tmp);
+    *out_path = alloc_strdup(a, tmp);
     return VIGIL_STATUS_OK;
 }
 
-VIGIL_API vigil_status_t vigil_platform_hostname(char **out_name, vigil_error_t *error)
+VIGIL_API vigil_status_t vigil_platform_hostname(const vigil_allocator_t *allocator, char **out_name,
+                                                 vigil_error_t *error)
 {
     char buf[256];
+    vigil_allocator_t a = resolve_alloc(allocator);
     if (!out_name)
     {
         if (error)
@@ -496,14 +513,15 @@ VIGIL_API vigil_status_t vigil_platform_hostname(char **out_name, vigil_error_t 
         return VIGIL_STATUS_INTERNAL;
     }
     buf[sizeof(buf) - 1] = '\0';
-    *out_name = strdup(buf);
+    *out_name = alloc_strdup(a, buf);
     return VIGIL_STATUS_OK;
 }
 
 /* ── Process execution ───────────────────────────────────────────── */
 
-VIGIL_API vigil_status_t vigil_platform_exec(const char *const *argv, char **out_stdout, char **out_stderr,
-                                             int *out_exit_code, vigil_error_t *error)
+VIGIL_API vigil_status_t vigil_platform_exec(const vigil_allocator_t *allocator, const char *const *argv,
+                                             char **out_stdout, char **out_stderr, int *out_exit_code,
+                                             vigil_error_t *error)
 {
     int stdout_pipe[2], stderr_pipe[2];
     pid_t pid;
@@ -565,6 +583,7 @@ VIGIL_API vigil_status_t vigil_platform_exec(const char *const *argv, char **out
 
     {
         /* Read both pipes. Simple sequential read (sufficient for test harness). */
+        vigil_allocator_t a = resolve_alloc(allocator);
         char *bufs[2] = {NULL, NULL};
         size_t lens[2] = {0, 0};
         size_t caps[2] = {0, 0};
@@ -581,14 +600,14 @@ VIGIL_API vigil_status_t vigil_platform_exec(const char *const *argv, char **out
                 if (lens[i] + (size_t)n >= caps[i])
                 {
                     caps[i] = (lens[i] + (size_t)n) * 2 + 1;
-                    bufs[i] = realloc(bufs[i], caps[i]);
+                    bufs[i] = a.reallocate(a.user_data, bufs[i], caps[i]);
                 }
                 memcpy(bufs[i] + lens[i], tmp, (size_t)n);
                 lens[i] += (size_t)n;
             }
             close(fds[i]);
             if (!bufs[i])
-                bufs[i] = calloc(1, 1);
+                bufs[i] = (char *)a.allocate(a.user_data, 1);
             bufs[i][lens[i]] = '\0';
         }
 
@@ -841,9 +860,11 @@ VIGIL_API vigil_status_t vigil_platform_hardlink(const char *target, const char 
     return VIGIL_STATUS_OK;
 }
 
-VIGIL_API vigil_status_t vigil_platform_readlink(const char *path, char **out_target, vigil_error_t *error)
+VIGIL_API vigil_status_t vigil_platform_readlink(const vigil_allocator_t *allocator, const char *path,
+                                                 char **out_target, vigil_error_t *error)
 {
     char buf[PATH_MAX];
+    vigil_allocator_t a = resolve_alloc(allocator);
     ssize_t len = readlink(path, buf, sizeof(buf) - 1);
     if (len < 0)
     {
@@ -851,7 +872,7 @@ VIGIL_API vigil_status_t vigil_platform_readlink(const char *path, char **out_ta
         return VIGIL_STATUS_INTERNAL;
     }
     buf[len] = '\0';
-    *out_target = strdup(buf);
+    *out_target = alloc_strdup(a, buf);
     if (!*out_target)
         return VIGIL_STATUS_OUT_OF_MEMORY;
     return VIGIL_STATUS_OK;
@@ -949,26 +970,30 @@ VIGIL_API int vigil_platform_glob_match(const char *pattern, const char *name)
     return *pattern == '\0' && *name == '\0';
 }
 
-VIGIL_API vigil_status_t vigil_platform_home_dir(char **out_path, vigil_error_t *error)
+VIGIL_API vigil_status_t vigil_platform_home_dir(const vigil_allocator_t *allocator, char **out_path,
+                                                 vigil_error_t *error)
 {
     const char *home = getenv("HOME");
+    vigil_allocator_t a = resolve_alloc(allocator);
     if (!home)
     {
         vigil_error_set_literal(error, VIGIL_STATUS_INTERNAL, "HOME not set");
         return VIGIL_STATUS_INTERNAL;
     }
-    *out_path = strdup(home);
+    *out_path = alloc_strdup(a, home);
     if (!*out_path)
         return VIGIL_STATUS_OUT_OF_MEMORY;
     return VIGIL_STATUS_OK;
 }
 
-VIGIL_API vigil_status_t vigil_platform_config_dir(char **out_path, vigil_error_t *error)
+VIGIL_API vigil_status_t vigil_platform_config_dir(const vigil_allocator_t *allocator, char **out_path,
+                                                   vigil_error_t *error)
 {
     const char *xdg = getenv("XDG_CONFIG_HOME");
+    vigil_allocator_t a = resolve_alloc(allocator);
     if (xdg && xdg[0])
     {
-        *out_path = strdup(xdg);
+        *out_path = alloc_strdup(a, xdg);
         if (!*out_path)
             return VIGIL_STATUS_OUT_OF_MEMORY;
         return VIGIL_STATUS_OK;
@@ -981,7 +1006,7 @@ VIGIL_API vigil_status_t vigil_platform_config_dir(char **out_path, vigil_error_
         return VIGIL_STATUS_INTERNAL;
     }
     size_t len = strlen(home) + 32;
-    *out_path = malloc(len);
+    *out_path = (char *)a.allocate(a.user_data, len);
     if (!*out_path)
         return VIGIL_STATUS_OUT_OF_MEMORY;
     snprintf(*out_path, len, "%s/Library/Application Support", home);
@@ -993,7 +1018,7 @@ VIGIL_API vigil_status_t vigil_platform_config_dir(char **out_path, vigil_error_
         return VIGIL_STATUS_INTERNAL;
     }
     size_t len = strlen(home) + 16;
-    *out_path = malloc(len);
+    *out_path = (char *)a.allocate(a.user_data, len);
     if (!*out_path)
         return VIGIL_STATUS_OUT_OF_MEMORY;
     snprintf(*out_path, len, "%s/.config", home);
@@ -1001,12 +1026,14 @@ VIGIL_API vigil_status_t vigil_platform_config_dir(char **out_path, vigil_error_
     return VIGIL_STATUS_OK;
 }
 
-VIGIL_API vigil_status_t vigil_platform_cache_dir(char **out_path, vigil_error_t *error)
+VIGIL_API vigil_status_t vigil_platform_cache_dir(const vigil_allocator_t *allocator, char **out_path,
+                                                  vigil_error_t *error)
 {
     const char *xdg = getenv("XDG_CACHE_HOME");
+    vigil_allocator_t a = resolve_alloc(allocator);
     if (xdg && xdg[0])
     {
-        *out_path = strdup(xdg);
+        *out_path = alloc_strdup(a, xdg);
         if (!*out_path)
             return VIGIL_STATUS_OUT_OF_MEMORY;
         return VIGIL_STATUS_OK;
@@ -1019,7 +1046,7 @@ VIGIL_API vigil_status_t vigil_platform_cache_dir(char **out_path, vigil_error_t
         return VIGIL_STATUS_INTERNAL;
     }
     size_t len = strlen(home) + 20;
-    *out_path = malloc(len);
+    *out_path = (char *)a.allocate(a.user_data, len);
     if (!*out_path)
         return VIGIL_STATUS_OUT_OF_MEMORY;
     snprintf(*out_path, len, "%s/Library/Caches", home);
@@ -1031,7 +1058,7 @@ VIGIL_API vigil_status_t vigil_platform_cache_dir(char **out_path, vigil_error_t
         return VIGIL_STATUS_INTERNAL;
     }
     size_t len = strlen(home) + 16;
-    *out_path = malloc(len);
+    *out_path = (char *)a.allocate(a.user_data, len);
     if (!*out_path)
         return VIGIL_STATUS_OUT_OF_MEMORY;
     snprintf(*out_path, len, "%s/.cache", home);
@@ -1039,12 +1066,14 @@ VIGIL_API vigil_status_t vigil_platform_cache_dir(char **out_path, vigil_error_t
     return VIGIL_STATUS_OK;
 }
 
-VIGIL_API vigil_status_t vigil_platform_data_dir(char **out_path, vigil_error_t *error)
+VIGIL_API vigil_status_t vigil_platform_data_dir(const vigil_allocator_t *allocator, char **out_path,
+                                                 vigil_error_t *error)
 {
     const char *xdg = getenv("XDG_DATA_HOME");
+    vigil_allocator_t a = resolve_alloc(allocator);
     if (xdg && xdg[0])
     {
-        *out_path = strdup(xdg);
+        *out_path = alloc_strdup(a, xdg);
         if (!*out_path)
             return VIGIL_STATUS_OUT_OF_MEMORY;
         return VIGIL_STATUS_OK;
@@ -1057,7 +1086,7 @@ VIGIL_API vigil_status_t vigil_platform_data_dir(char **out_path, vigil_error_t 
         return VIGIL_STATUS_INTERNAL;
     }
     size_t len = strlen(home) + 32;
-    *out_path = malloc(len);
+    *out_path = (char *)a.allocate(a.user_data, len);
     if (!*out_path)
         return VIGIL_STATUS_OUT_OF_MEMORY;
     snprintf(*out_path, len, "%s/Library/Application Support", home);
@@ -1069,7 +1098,7 @@ VIGIL_API vigil_status_t vigil_platform_data_dir(char **out_path, vigil_error_t 
         return VIGIL_STATUS_INTERNAL;
     }
     size_t len = strlen(home) + 20;
-    *out_path = malloc(len);
+    *out_path = (char *)a.allocate(a.user_data, len);
     if (!*out_path)
         return VIGIL_STATUS_OUT_OF_MEMORY;
     snprintf(*out_path, len, "%s/.local/share", home);
@@ -1077,27 +1106,29 @@ VIGIL_API vigil_status_t vigil_platform_data_dir(char **out_path, vigil_error_t 
     return VIGIL_STATUS_OK;
 }
 
-VIGIL_API vigil_status_t vigil_platform_temp_file(const char *prefix, char **out_path, vigil_error_t *error)
+VIGIL_API vigil_status_t vigil_platform_temp_file(const vigil_allocator_t *allocator, const char *prefix,
+                                                  char **out_path, vigil_error_t *error)
 {
     char *tmpdir = NULL;
-    vigil_status_t s = vigil_platform_temp_dir(&tmpdir, error);
+    vigil_allocator_t a = resolve_alloc(allocator);
+    vigil_status_t s = vigil_platform_temp_dir(allocator, &tmpdir, error);
     if (s != VIGIL_STATUS_OK)
         return s;
 
     size_t len = strlen(tmpdir) + strlen(prefix ? prefix : "tmp") + 16;
-    char *path = malloc(len);
+    char *path = (char *)a.allocate(a.user_data, len);
     if (!path)
     {
-        free(tmpdir);
+        a.deallocate(a.user_data, tmpdir);
         return VIGIL_STATUS_OUT_OF_MEMORY;
     }
     snprintf(path, len, "%s/%sXXXXXX", tmpdir, prefix ? prefix : "tmp");
-    free(tmpdir);
+    a.deallocate(a.user_data, tmpdir);
 
     int fd = mkstemp(path);
     if (fd < 0)
     {
-        free(path);
+        a.deallocate(a.user_data, path);
         vigil_error_set_literal(error, VIGIL_STATUS_INTERNAL, "mkstemp failed");
         return VIGIL_STATUS_INTERNAL;
     }
@@ -1975,10 +2006,12 @@ static size_t curl_write_cb(char *ptr, size_t size, size_t nmemb, void *ud)
     return total;
 }
 
-VIGIL_API vigil_status_t vigil_platform_http_request(const char *method, const char *url, const char *headers,
-                                                     const char *body, size_t body_len, vigil_http_response_t *out,
-                                                     vigil_error_t *error)
+VIGIL_API vigil_status_t vigil_platform_http_request(const vigil_allocator_t *allocator, const char *method,
+                                                     const char *url, const char *headers, const char *body,
+                                                     size_t body_len, vigil_http_response_t *out, vigil_error_t *error)
 {
+    /* curl_write_cb has a fixed signature; response buffers use default allocator. */
+    (void)allocator;
     if (!method || !url || !out)
     {
         if (error)

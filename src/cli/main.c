@@ -2702,7 +2702,7 @@ static int cmd_get(int argc, char **argv)
     }
 
     /* Get current directory */
-    if (vigil_platform_getcwd(&cwd, &error) != VIGIL_STATUS_OK)
+    if (vigil_platform_getcwd(NULL, &cwd, &error) != VIGIL_STATUS_OK)
     {
         fprintf(stderr, "error: failed to get current directory\n");
         return 1;
