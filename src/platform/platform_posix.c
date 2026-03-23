@@ -154,7 +154,7 @@ vigil_status_t vigil_platform_mkdir(const char *path, vigil_error_t *error)
         vigil_error_set_literal(error, VIGIL_STATUS_INVALID_ARGUMENT, "platform: NULL path");
         return VIGIL_STATUS_INVALID_ARGUMENT;
     }
-    if (mkdir(path, 0755) != 0 && errno != EEXIST)
+    if (mkdir(path, 0750) != 0 && errno != EEXIST)
     {
         vigil_error_set_literal(error, VIGIL_STATUS_INTERNAL, "platform: mkdir failed");
         return VIGIL_STATUS_INTERNAL;
@@ -188,7 +188,7 @@ vigil_status_t vigil_platform_mkdir_p(const char *path, vigil_error_t *error)
         {
             char saved = buf[i];
             buf[i] = '\0';
-            if (mkdir(buf, 0755) != 0 && errno != EEXIST)
+            if (mkdir(buf, 0750) != 0 && errno != EEXIST)
             {
                 vigil_error_set_literal(error, VIGIL_STATUS_INTERNAL, "platform: mkdir_p failed");
                 return VIGIL_STATUS_INTERNAL;
@@ -295,7 +295,7 @@ vigil_status_t vigil_platform_self_exe(char *out_buf, size_t buf_size, vigil_err
     return VIGIL_STATUS_OK;
 #else
     ssize_t len = readlink("/proc/self/exe", out_buf, buf_size - 1);
-    if (len < 0 || (size_t)len >= buf_size)
+    if (len < 0 || (size_t)len >= buf_size - 1)
     {
         if (error)
         {
@@ -305,7 +305,7 @@ vigil_status_t vigil_platform_self_exe(char *out_buf, size_t buf_size, vigil_err
         }
         return VIGIL_STATUS_INTERNAL;
     }
-    out_buf[len] = '\0';
+    out_buf[(size_t)len] = '\0';
     return VIGIL_STATUS_OK;
 #endif
 }

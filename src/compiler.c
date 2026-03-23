@@ -2456,7 +2456,7 @@ int vigil_program_parse_optional_pub(const vigil_program_state_t *program, size_
 
 static int vigil_program_is_global_variable_declaration_start(const vigil_program_state_t *program, size_t cursor)
 {
-    const vigil_token_t *name_token;
+    const vigil_token_t *name_token = NULL;
     const vigil_token_t *assign_token;
     size_t lookahead;
 
@@ -2992,7 +2992,7 @@ static vigil_status_t parse_constant_import_member(vigil_program_state_t *progra
                                                    const vigil_token_t *token, vigil_source_id_t source_id,
                                                    vigil_constant_result_t *out_result)
 {
-    const vigil_token_t *member_token;
+    const vigil_token_t *member_token = NULL;
     const vigil_token_t *enum_member_token;
     const vigil_enum_member_t *enum_member;
     const vigil_global_constant_t *constant;
@@ -3043,7 +3043,7 @@ static vigil_status_t parse_constant_local_enum(vigil_program_state_t *program, 
                                                 const vigil_token_t *token, const char *name_text, size_t name_length,
                                                 vigil_constant_result_t *out_result)
 {
-    const vigil_token_t *member_token;
+    const vigil_token_t *member_token = NULL;
     const vigil_enum_member_t *enum_member;
     const char *member_text;
     size_t member_length;
@@ -4066,7 +4066,7 @@ vigil_status_t vigil_program_parse_constant_expression(vigil_program_state_t *pr
     vigil_constant_result_t then_result;
     vigil_constant_result_t else_result;
     const vigil_token_t *question_token;
-    const vigil_token_t *colon_token;
+    const vigil_token_t *colon_token = NULL;
     int take_then_branch;
 
     vigil_constant_result_clear(&condition_result);
@@ -4270,7 +4270,7 @@ static vigil_status_t vigil_program_parse_extern_fn(vigil_program_state_t *progr
 {
     vigil_status_t status;
     const vigil_token_t *token;
-    const vigil_token_t *name_token;
+    const vigil_token_t *name_token = NULL;
     const vigil_token_t *lib_token = NULL;
     vigil_function_decl_t *decl;
     vigil_extern_fn_decl_t *ext;
@@ -4543,7 +4543,7 @@ static vigil_status_t parse_fn_body_bounds(vigil_program_state_t *program, size_
 static vigil_status_t parse_fn_declaration(vigil_program_state_t *program, size_t *cursor, int is_public)
 {
     vigil_status_t status;
-    const vigil_token_t *name_token;
+    const vigil_token_t *name_token = NULL;
     vigil_function_decl_t *decl;
     const char *name_text;
     size_t name_length;
@@ -5749,7 +5749,7 @@ static vigil_status_t vigil_parser_parse_binding_target_list(vigil_parser_state_
 {
     vigil_status_t status;
     vigil_parser_type_t declared_type;
-    const vigil_token_t *name_token;
+    const vigil_token_t *name_token = NULL;
     const vigil_token_t *type_token;
 
     if (state == NULL || targets == NULL)
@@ -6246,7 +6246,7 @@ static vigil_status_t vigil_parser_lookup_field(vigil_parser_state_t *state, vig
                                                 const vigil_class_field_t **out_field)
 {
     const vigil_class_decl_t *class_decl;
-    const vigil_class_field_t *field;
+    const vigil_class_field_t *field = NULL;
     const char *field_name;
     size_t field_length;
 
@@ -7572,7 +7572,7 @@ static vigil_status_t vigil_parser_parse_qualified_symbol(vigil_parser_state_t *
                                                           vigil_expression_result_t *out_result)
 {
     vigil_status_t status;
-    const vigil_token_t *member_token;
+    const vigil_token_t *member_token = NULL;
     const char *module_name;
     const char *member_name;
     size_t module_name_length;
@@ -7865,6 +7865,8 @@ static vigil_status_t parse_postfix_dot_class_method(vigil_parser_state_t *state
                                                          out_result->type.object_index, out_result);
         }
     }
+    if (class_method == NULL)
+        return vigil_parser_report(state, field_token->span, "unknown class method");
     return vigil_parser_parse_method_call(state, field_token, class_method, out_result);
 }
 
@@ -7949,7 +7951,7 @@ static vigil_status_t vigil_parser_parse_postfix_dot(vigil_parser_state_t *state
                                                      vigil_expression_result_t *out_result)
 {
     vigil_status_t status;
-    const vigil_class_field_t *field;
+    const vigil_class_field_t *field = NULL;
     size_t field_index;
 
     status = vigil_parser_require_scalar_expression(state, vigil_parser_fallback_span(state), out_result,
@@ -7981,7 +7983,7 @@ static vigil_status_t vigil_parser_parse_postfix_suffixes(vigil_parser_state_t *
                                                           vigil_expression_result_t *out_result)
 {
     vigil_status_t status;
-    const vigil_token_t *field_token;
+    const vigil_token_t *field_token = NULL;
     vigil_expression_result_t index_result;
     vigil_parser_type_t indexed_type;
 
@@ -8204,8 +8206,8 @@ static vigil_status_t vigil_parser_parse_nested_function_value(vigil_parser_stat
                                                                size_t *out_function_index)
 {
     vigil_status_t status;
-    const vigil_token_t *fn_token;
-    const vigil_token_t *name_token;
+    const vigil_token_t *fn_token = NULL;
+    const vigil_token_t *name_token = NULL;
     vigil_function_decl_t *decl;
     vigil_parser_type_t function_type;
     size_t function_index;
@@ -8277,7 +8279,7 @@ static vigil_status_t vigil_parser_parse_local_function_declaration(vigil_parser
 {
     vigil_status_t status;
     vigil_parser_type_t function_type;
-    const vigil_token_t *name_token;
+    const vigil_token_t *name_token = NULL;
 
     function_type = vigil_binding_type_invalid();
     name_token = vigil_program_token_at(state->program, state->current + 1U);
@@ -8424,7 +8426,7 @@ static vigil_status_t parse_identifier_enum_member(vigil_parser_state_t *state, 
                                                    vigil_expression_result_t *out_result)
 {
     vigil_status_t status;
-    const vigil_token_t *member_token;
+    const vigil_token_t *member_token = NULL;
     const vigil_enum_member_t *enum_member;
     const char *member_text;
     size_t member_length;
@@ -9815,7 +9817,7 @@ static vigil_status_t vigil_parser_parse_ternary(vigil_parser_state_t *state, vi
     vigil_expression_result_t then_result;
     vigil_expression_result_t else_result;
     const vigil_token_t *question_token;
-    const vigil_token_t *colon_token;
+    const vigil_token_t *colon_token = NULL;
     size_t false_jump_offset;
     size_t end_jump_offset;
 
@@ -11970,7 +11972,7 @@ static vigil_status_t vigil_parser_resolve_import_assignment_target(vigil_parser
                                                                     import_assignment_result_t *out)
 {
     vigil_status_t status;
-    const vigil_token_t *member_token;
+    const vigil_token_t *member_token = NULL;
     const char *member_text;
     size_t member_length;
 
@@ -12332,7 +12334,7 @@ static int at_assignment_operator(const vigil_parser_state_t *state)
 static vigil_status_t parse_assignment_dot_chain(vigil_parser_state_t *state, assignment_target_t *t)
 {
     vigil_status_t status;
-    const vigil_token_t *field_token;
+    const vigil_token_t *field_token = NULL;
 
     t->is_field_assignment = 1;
     t->is_index_assignment = 0;
@@ -12859,8 +12861,8 @@ static vigil_status_t vigil_parser_parse_const_declaration(vigil_parser_state_t 
                                                            vigil_statement_result_t *out_result)
 {
     vigil_status_t status;
-    const vigil_token_t *const_token;
-    const vigil_token_t *name_token;
+    const vigil_token_t *const_token = NULL;
+    const vigil_token_t *name_token = NULL;
     vigil_parser_type_t declared_type;
     vigil_expression_result_t initializer_result;
 

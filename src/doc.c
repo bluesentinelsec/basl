@@ -86,6 +86,8 @@ static void buf_append(doc_buf_t *b, const char *s, size_t len)
         return;
     if (!buf_grow(b, len))
         return;
+    if (b->data == NULL)
+        return;
     memcpy(b->data + b->length, s, len);
     b->length += len;
     b->data[b->length] = '\0';

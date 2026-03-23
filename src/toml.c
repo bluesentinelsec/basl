@@ -1818,9 +1818,15 @@ static vigil_status_t parse_array_table_header(toml_document_parser_t *doc, key_
     vigil_toml_value_t *new_table = NULL;
     vigil_status_t s;
 
+    if (kp->count == 0)
+        return parser_error(doc->parser, "empty key path in array-of-tables header", doc->error);
+
     parent_kp.count = kp->count - 1;
-    memcpy(parent_kp.segments, kp->segments, parent_kp.count * sizeof(char *));
-    memcpy(parent_kp.lengths, kp->lengths, parent_kp.count * sizeof(size_t));
+    if (parent_kp.count > 0)
+    {
+        memcpy(parent_kp.segments, kp->segments, parent_kp.count * sizeof(char *));
+        memcpy(parent_kp.lengths, kp->lengths, parent_kp.count * sizeof(size_t));
+    }
 
     parent = navigate_to_table(doc->root, &parent_kp, doc->allocator, doc->error);
     if (!parent)
@@ -1959,6 +1965,11 @@ static vigil_status_t parse_key_value_entry(toml_document_parser_t *doc)
     if (s != VIGIL_STATUS_OK)
         goto cleanup;
 
+    if (kp.count == 0)
+    {
+        s = parser_error(doc->parser, "empty key path", doc->error);
+        goto cleanup;
+    }
     s = vigil_toml_table_set(target, kp.segments[kp.count - 1], kp.lengths[kp.count - 1], val, doc->error);
     if (s == VIGIL_STATUS_OK)
         val = NULL;

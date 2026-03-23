@@ -540,7 +540,7 @@ static vigil_status_t vigil_program_parse_enum_header(vigil_program_state_t *pro
         "enum name conflicts with global variable",
     };
     const vigil_token_t *enum_token;
-    const vigil_token_t *name_token;
+    const vigil_token_t *name_token = NULL;
     const char *name_text;
     size_t name_length;
     vigil_enum_decl_t *decl;
@@ -851,7 +851,7 @@ static vigil_status_t vigil_program_parse_interface_header(vigil_program_state_t
     };
     vigil_status_t status;
     const vigil_token_t *interface_token;
-    const vigil_token_t *name_token;
+    const vigil_token_t *name_token = NULL;
     const char *name_text;
     size_t name_length;
     vigil_interface_decl_t *decl;
@@ -934,7 +934,7 @@ static vigil_status_t vigil_program_parse_interface_method_header(vigil_program_
 {
     vigil_status_t status;
     const vigil_token_t *token;
-    const vigil_token_t *method_name_token;
+    const vigil_token_t *method_name_token = NULL;
     const char *name_text;
     size_t name_length;
     vigil_interface_method_t *method;
@@ -1056,7 +1056,7 @@ static vigil_status_t vigil_program_parse_interface_method(vigil_program_state_t
                                                            vigil_interface_decl_t *decl)
 {
     vigil_status_t status;
-    const vigil_token_t *method_name_token;
+    const vigil_token_t *method_name_token = NULL;
     vigil_interface_method_t *method;
 
     method_name_token = NULL;
@@ -1115,6 +1115,10 @@ vigil_status_t vigil_program_parse_interface_declaration(vigil_program_state_t *
     if (status != VIGIL_STATUS_OK)
     {
         return status;
+    }
+    if (decl == NULL)
+    {
+        return vigil_compile_report(program, vigil_program_eof_span(program), "interface declaration is missing");
     }
     status = vigil_program_expect_interface_body_start(program, cursor, decl);
     if (status != VIGIL_STATUS_OK)
@@ -1322,8 +1326,8 @@ vigil_status_t vigil_program_parse_class_declaration(vigil_program_state_t *prog
 {
     vigil_status_t status;
     const vigil_token_t *class_token;
-    const vigil_token_t *name_token;
-    const vigil_token_t *type_token;
+    const vigil_token_t *name_token = NULL;
+    const vigil_token_t *type_token = NULL;
     const vigil_token_t *field_name_token;
     const vigil_token_t *param_name_token;
     const char *name_text;

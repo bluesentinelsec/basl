@@ -1381,6 +1381,20 @@ static vigil_status_t http_req_headers(vigil_vm_t *vm, size_t arg_count, vigil_e
     return push_string(vm, h, strlen(h), error);
 }
 
+static size_t copy_name_to_buf(const char *name, size_t name_len, char *buf, size_t buf_size)
+{
+    if (name == NULL || name_len == 0)
+    {
+        buf[0] = '\0';
+        return 0;
+    }
+    if (name_len >= buf_size)
+        name_len = buf_size - 1;
+    memcpy(buf, name, name_len);
+    buf[name_len] = '\0';
+    return name_len;
+}
+
 static vigil_status_t http_req_header(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
 {
     size_t base = vigil_vm_stack_depth(vm) - arg_count;
@@ -1389,10 +1403,7 @@ static vigil_status_t http_req_header(vigil_vm_t *vm, size_t arg_count, vigil_er
     size_t name_len = 0;
     get_string_arg(vm, base, 1, &name, &name_len);
     char nbuf[256];
-    if (name_len >= sizeof(nbuf))
-        name_len = sizeof(nbuf) - 1;
-    memcpy(nbuf, name, name_len);
-    nbuf[name_len] = '\0';
+    name_len = copy_name_to_buf(name, name_len, nbuf, sizeof(nbuf));
     vigil_vm_stack_pop_n(vm, arg_count);
 
     http_conn_t *c = get_client(ch);
@@ -1962,10 +1973,7 @@ static vigil_status_t http_redirect(vigil_vm_t *vm, size_t arg_count, vigil_erro
     int64_t status_code = arg_count >= 3 ? get_i64_arg(vm, base, 2) : 302;
 
     char ubuf[2048];
-    if (url_len >= sizeof(ubuf))
-        url_len = sizeof(ubuf) - 1;
-    memcpy(ubuf, url, url_len);
-    ubuf[url_len] = '\0';
+    url_len = copy_name_to_buf(url, url_len, ubuf, sizeof(ubuf));
     vigil_vm_stack_pop_n(vm, arg_count);
 
     http_conn_t *c = get_client(ch);

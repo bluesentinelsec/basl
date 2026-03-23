@@ -959,7 +959,7 @@ static void emit_raw(json_emitter_t *e, const char *s, size_t n)
     if (n == 0)
         return;
     emit_grow(e, n);
-    if (e->status != VIGIL_STATUS_OK)
+    if (e->status != VIGIL_STATUS_OK || e->buf == NULL)
         return;
     memcpy(e->buf + e->len, s, n);
     e->len += n;

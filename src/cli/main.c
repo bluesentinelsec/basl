@@ -2440,7 +2440,10 @@ static void repl_update_declarations(repl_decl_list_t *decls, const char *input_
 /* Handle :doc command. */
 static void repl_handle_doc(const char *input_data, vigil_error_t *error)
 {
-    const char *arg = input_data + 4;
+    const char *arg;
+    if (strlen(input_data) < 4)
+        return;
+    arg = input_data + 4;
     while (*arg == ' ')
         arg++;
     if (*arg == '\0')
