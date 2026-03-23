@@ -1322,25 +1322,260 @@ vigil_status_t vigil_program_synthesize_class_constructor(vigil_program_state_t 
     return VIGIL_STATUS_OK;
 }
 
+static vigil_status_t class_check_name_conflicts(vigil_program_state_t *program, const vigil_token_t *name_token,
+                                                 const char *name_text, size_t name_length)
+{
+    if (program->compile_mode == VIGIL_COMPILE_MODE_REPL)
+        return VIGIL_STATUS_OK;
+    if (vigil_program_find_class_in_source(program, program->source->id, name_text, name_length, NULL, NULL))
+        return vigil_compile_report(program, name_token->span, "class is already declared");
+    if (vigil_program_find_constant_in_source(program, program->source->id, name_text, name_length, NULL))
+        return vigil_compile_report(program, name_token->span, "class name conflicts with global constant");
+    if (vigil_program_find_enum_in_source(program, program->source->id, name_text, name_length, NULL, NULL))
+        return vigil_compile_report(program, name_token->span, "class name conflicts with enum");
+    if (vigil_program_find_global_in_source(program, program->source->id, name_text, name_length, NULL, NULL))
+        return vigil_compile_report(program, name_token->span, "class name conflicts with global variable");
+    if (vigil_program_find_top_level_function_name_in_source(program, program->source->id, name_text, name_length, NULL,
+                                                             NULL))
+        return vigil_compile_report(program, name_token->span, "class name conflicts with function");
+    if (vigil_program_find_interface_in_source(program, program->source->id, name_text, name_length, NULL, NULL))
+        return vigil_compile_report(program, name_token->span, "class name conflicts with interface");
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t class_parse_implements(vigil_program_state_t *program, size_t *cursor,
+                                             const vigil_token_t *name_token, vigil_class_decl_t *decl)
+{
+    const vigil_token_t *tok = vigil_program_cursor_peek(program, *cursor);
+    if (!vigil_program_token_is_identifier_text(program, tok, "implements", 10U))
+        return VIGIL_STATUS_OK;
+    vigil_program_cursor_advance(program, cursor);
+    while (1)
+    {
+        vigil_parser_type_t iface_type;
+        vigil_status_t status = vigil_program_parse_type_reference(program, cursor, "unknown interface", &iface_type);
+        if (status != VIGIL_STATUS_OK)
+            return status;
+        if (!vigil_parser_type_is_interface(iface_type))
+        {
+            tok = vigil_program_cursor_peek(program, *cursor);
+            return vigil_compile_report(program, tok == NULL ? name_token->span : tok->span, "unknown interface");
+        }
+        if (vigil_class_decl_implements_interface(decl, iface_type.object_index))
+            return vigil_compile_report(program, vigil_program_cursor_peek(program, *cursor - 1U)->span,
+                                        "interface is already implemented");
+        status = vigil_class_decl_grow_implemented_interfaces(program, decl, decl->implemented_interface_count + 1U);
+        if (status != VIGIL_STATUS_OK)
+            return status;
+        decl->implemented_interfaces[decl->implemented_interface_count] = iface_type.object_index;
+        decl->implemented_interface_count += 1U;
+        tok = vigil_program_cursor_peek(program, *cursor);
+        if (tok == NULL || tok->kind != VIGIL_TOKEN_COMMA)
+            break;
+        vigil_program_cursor_advance(program, cursor);
+    }
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t class_parse_method_params(vigil_program_state_t *program, size_t *cursor,
+                                                const vigil_token_t *name_token, vigil_function_decl_t *method_decl)
+{
+    const vigil_token_t *tok = vigil_program_token_at(program, *cursor);
+    if (tok != NULL && tok->kind != VIGIL_TOKEN_RPAREN)
+    {
+        while (1)
+        {
+            vigil_parser_type_t param_type;
+            vigil_status_t status =
+                vigil_program_parse_type_reference(program, cursor, "unsupported function parameter type", &param_type);
+            if (status != VIGIL_STATUS_OK)
+                return status;
+            status = vigil_program_require_non_void_type(program, tok == NULL ? name_token->span : tok->span,
+                                                         param_type, "function parameters cannot use type void");
+            if (status != VIGIL_STATUS_OK)
+                return status;
+            const vigil_token_t *param_name_token = vigil_program_token_at(program, *cursor);
+            if (param_name_token == NULL || param_name_token->kind != VIGIL_TOKEN_IDENTIFIER)
+                return vigil_compile_report(program, tok->span, "expected parameter name");
+            status = vigil_program_add_param(program, method_decl, param_type, param_name_token);
+            if (status != VIGIL_STATUS_OK)
+                return status;
+            cursor[0] += 1U;
+            tok = vigil_program_token_at(program, *cursor);
+            if (tok != NULL && tok->kind == VIGIL_TOKEN_COMMA)
+            {
+                cursor[0] += 1U;
+                tok = vigil_program_token_at(program, *cursor);
+                continue;
+            }
+            break;
+        }
+    }
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t class_skip_method_body(vigil_program_state_t *program, size_t *cursor,
+                                             const vigil_token_t *name_token, vigil_function_decl_t *method_decl)
+{
+    const vigil_token_t *tok = vigil_program_token_at(program, *cursor);
+    if (tok == NULL || tok->kind != VIGIL_TOKEN_LBRACE)
+        return vigil_compile_report(program, name_token->span, "expected '{' before method body");
+    cursor[0] += 1U;
+    method_decl->body_start = *cursor;
+    size_t depth = 1U;
+    while (depth > 0U)
+    {
+        tok = vigil_program_token_at(program, *cursor);
+        if (tok == NULL || tok->kind == VIGIL_TOKEN_EOF)
+            return vigil_compile_report(program, vigil_program_eof_span(program), "expected '}' after method body");
+        if (tok->kind == VIGIL_TOKEN_LBRACE)
+            depth += 1U;
+        else if (tok->kind == VIGIL_TOKEN_RBRACE)
+        {
+            depth -= 1U;
+            if (depth == 0U)
+            {
+                method_decl->body_end = *cursor;
+                cursor[0] += 1U;
+                break;
+            }
+        }
+        cursor[0] += 1U;
+    }
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t class_parse_method(vigil_program_state_t *program, size_t *cursor, vigil_class_decl_t *decl,
+                                         size_t class_index, int member_is_public)
+{
+    vigil_status_t status;
+    const vigil_token_t *fn_token = vigil_program_cursor_peek(program, *cursor);
+    vigil_program_cursor_advance(program, cursor);
+
+    const vigil_token_t *name_token = vigil_program_cursor_peek(program, *cursor);
+    if (name_token == NULL || name_token->kind != VIGIL_TOKEN_IDENTIFIER)
+        return vigil_compile_report(program, fn_token->span, "expected method name");
+    size_t name_length;
+    const char *name_text = vigil_program_token_text(program, name_token, &name_length);
+    if (vigil_class_decl_find_method(decl, name_text, name_length, NULL, NULL))
+        return vigil_compile_report(program, name_token->span, "class method is already declared");
+    if (vigil_class_decl_find_field(decl, name_text, name_length, NULL, NULL))
+        return vigil_compile_report(program, name_token->span, "class method conflicts with field");
+
+    status = vigil_program_grow_functions(program, program->functions.count + 1U);
+    if (status != VIGIL_STATUS_OK)
+        return status;
+    vigil_function_decl_t *method_decl = &program->functions.functions[program->functions.count];
+    vigil_binding_function_init(method_decl);
+    method_decl->name = name_text;
+    method_decl->name_length = name_length;
+    method_decl->name_span = name_token->span;
+    method_decl->is_public = member_is_public;
+    method_decl->owner_class_index = class_index;
+    method_decl->source = program->source;
+    method_decl->tokens = program->tokens;
+    cursor[0] += 1U;
+
+    status = vigil_program_add_binding_param(program, method_decl, "self", 4U, name_token->span,
+                                             vigil_binding_type_class(class_index));
+    if (status != VIGIL_STATUS_OK)
+        return status;
+
+    const vigil_token_t *tok = vigil_program_token_at(program, *cursor);
+    if (tok == NULL || tok->kind != VIGIL_TOKEN_LPAREN)
+        return vigil_compile_report(program, name_token->span, "expected '(' after method name");
+    cursor[0] += 1U;
+
+    status = class_parse_method_params(program, cursor, name_token, method_decl);
+    if (status != VIGIL_STATUS_OK)
+        return status;
+
+    tok = vigil_program_token_at(program, *cursor);
+    if (tok == NULL || tok->kind != VIGIL_TOKEN_RPAREN)
+        return vigil_compile_report(program, name_token->span, "expected ')' after parameter list");
+    cursor[0] += 1U;
+
+    tok = vigil_program_token_at(program, *cursor);
+    if (tok == NULL || tok->kind != VIGIL_TOKEN_ARROW)
+        return vigil_compile_report(program, name_token->span, "expected '->' after method signature");
+    cursor[0] += 1U;
+
+    status =
+        vigil_program_parse_function_return_types(program, cursor, "unsupported function return type", method_decl);
+    if (status != VIGIL_STATUS_OK)
+        return status;
+
+    status = class_skip_method_body(program, cursor, name_token, method_decl);
+    if (status != VIGIL_STATUS_OK)
+        return status;
+
+    status = vigil_class_decl_grow_methods(program, decl, decl->method_count + 1U);
+    if (status != VIGIL_STATUS_OK)
+        return status;
+    vigil_class_method_t *method = &decl->methods[decl->method_count];
+    memset(method, 0, sizeof(*method));
+    method->name = name_text;
+    method->name_length = name_length;
+    method->name_span = name_token->span;
+    method->is_public = member_is_public;
+    method->function_index = program->functions.count;
+    decl->method_count += 1U;
+    program->functions.count += 1U;
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t class_parse_field(vigil_program_state_t *program, size_t *cursor, vigil_class_decl_t *decl,
+                                        const vigil_token_t *name_token, int member_is_public)
+{
+    const vigil_token_t *type_token = vigil_program_cursor_peek(program, *cursor);
+    vigil_parser_type_t field_type;
+    vigil_status_t status =
+        vigil_program_parse_type_reference(program, cursor, "unsupported class field type", &field_type);
+    if (status != VIGIL_STATUS_OK)
+        return status;
+    status = vigil_program_require_non_void_type(program, type_token == NULL ? name_token->span : type_token->span,
+                                                 field_type, "class fields cannot use type void");
+    if (status != VIGIL_STATUS_OK)
+        return status;
+
+    const vigil_token_t *field_name_token = vigil_program_cursor_peek(program, *cursor);
+    if (field_name_token == NULL || field_name_token->kind != VIGIL_TOKEN_IDENTIFIER)
+        return vigil_compile_report(program, type_token->span, "expected field name");
+    size_t fname_length;
+    const char *fname_text = vigil_program_token_text(program, field_name_token, &fname_length);
+    if (vigil_class_decl_find_field(decl, fname_text, fname_length, NULL, NULL))
+        return vigil_compile_report(program, field_name_token->span, "class field is already declared");
+    vigil_program_cursor_advance(program, cursor);
+
+    const vigil_token_t *semi = vigil_program_cursor_peek(program, *cursor);
+    if (semi == NULL || semi->kind != VIGIL_TOKEN_SEMICOLON)
+        return vigil_compile_report(program, field_name_token->span, "expected ';' after class field");
+    vigil_program_cursor_advance(program, cursor);
+
+    status = vigil_class_decl_grow_fields(program, decl, decl->field_count + 1U);
+    if (status != VIGIL_STATUS_OK)
+        return status;
+    vigil_class_field_t *field = &decl->fields[decl->field_count];
+    memset(field, 0, sizeof(*field));
+    field->name = fname_text;
+    field->name_length = fname_length;
+    field->name_span = field_name_token->span;
+    field->is_public = member_is_public;
+    field->type = field_type;
+    decl->field_count += 1U;
+    return VIGIL_STATUS_OK;
+}
+
 vigil_status_t vigil_program_parse_class_declaration(vigil_program_state_t *program, size_t *cursor, int is_public)
 {
     vigil_status_t status;
     const vigil_token_t *class_token;
-    const vigil_token_t *name_token = NULL;
-    const vigil_token_t *type_token = NULL;
-    const vigil_token_t *field_name_token;
-    const vigil_token_t *param_name_token;
+    const vigil_token_t *name_token;
+    const vigil_token_t *type_token;
     const char *name_text;
     size_t name_length;
     size_t class_index;
-    size_t interface_index;
-    size_t body_depth;
     vigil_class_decl_t *decl;
-    vigil_class_field_t *field;
-    vigil_class_method_t *method;
-    vigil_function_decl_t *method_decl;
-    vigil_parser_type_t field_type;
-    int member_is_public;
 
     class_token = vigil_program_cursor_peek(program, *cursor);
     if (class_token == NULL || class_token->kind != VIGIL_TOKEN_CLASS)
@@ -1352,44 +1587,16 @@ vigil_status_t vigil_program_parse_class_declaration(vigil_program_state_t *prog
 
     name_token = vigil_program_cursor_peek(program, *cursor);
     if (name_token == NULL || name_token->kind != VIGIL_TOKEN_IDENTIFIER)
-    {
         return vigil_compile_report(program, class_token->span, "expected class name");
-    }
     name_text = vigil_program_token_text(program, name_token, &name_length);
-    if (program->compile_mode != VIGIL_COMPILE_MODE_REPL)
-    {
-        if (vigil_program_find_class_in_source(program, program->source->id, name_text, name_length, NULL, NULL))
-        {
-            return vigil_compile_report(program, name_token->span, "class is already declared");
-        }
-        if (vigil_program_find_constant_in_source(program, program->source->id, name_text, name_length, NULL))
-        {
-            return vigil_compile_report(program, name_token->span, "class name conflicts with global constant");
-        }
-        if (vigil_program_find_enum_in_source(program, program->source->id, name_text, name_length, NULL, NULL))
-        {
-            return vigil_compile_report(program, name_token->span, "class name conflicts with enum");
-        }
-        if (vigil_program_find_global_in_source(program, program->source->id, name_text, name_length, NULL, NULL))
-        {
-            return vigil_compile_report(program, name_token->span, "class name conflicts with global variable");
-        }
-        if (vigil_program_find_top_level_function_name_in_source(program, program->source->id, name_text, name_length,
-                                                                 NULL, NULL))
-        {
-            return vigil_compile_report(program, name_token->span, "class name conflicts with function");
-        }
-        if (vigil_program_find_interface_in_source(program, program->source->id, name_text, name_length, NULL, NULL))
-        {
-            return vigil_compile_report(program, name_token->span, "class name conflicts with interface");
-        }
-    } /* end REPL redefinition guard */
+
+    status = class_check_name_conflicts(program, name_token, name_text, name_length);
+    if (status != VIGIL_STATUS_OK)
+        return status;
 
     status = vigil_program_grow_classes(program, program->class_count + 1U);
     if (status != VIGIL_STATUS_OK)
-    {
         return status;
-    }
 
     class_index = program->class_count;
     decl = &program->classes[program->class_count];
@@ -1403,294 +1610,49 @@ vigil_status_t vigil_program_parse_class_declaration(vigil_program_state_t *prog
     program->class_count += 1U;
     vigil_program_cursor_advance(program, cursor);
 
-    type_token = vigil_program_cursor_peek(program, *cursor);
-    if (vigil_program_token_is_identifier_text(program, type_token, "implements", 10U))
-    {
-        vigil_program_cursor_advance(program, cursor);
-        while (1)
-        {
-            status = vigil_program_parse_type_reference(program, cursor, "unknown interface", &field_type);
-            if (status != VIGIL_STATUS_OK)
-            {
-                return status;
-            }
-            if (!vigil_parser_type_is_interface(field_type))
-            {
-                type_token = vigil_program_cursor_peek(program, *cursor);
-                return vigil_compile_report(program, type_token == NULL ? name_token->span : type_token->span,
-                                            "unknown interface");
-            }
-            interface_index = field_type.object_index;
-            if (vigil_class_decl_implements_interface(decl, interface_index))
-            {
-                return vigil_compile_report(program, vigil_program_cursor_peek(program, *cursor - 1U)->span,
-                                            "interface is already implemented");
-            }
-            status =
-                vigil_class_decl_grow_implemented_interfaces(program, decl, decl->implemented_interface_count + 1U);
-            if (status != VIGIL_STATUS_OK)
-            {
-                return status;
-            }
-            decl->implemented_interfaces[decl->implemented_interface_count] = interface_index;
-            decl->implemented_interface_count += 1U;
-
-            type_token = vigil_program_cursor_peek(program, *cursor);
-            if (type_token == NULL || type_token->kind != VIGIL_TOKEN_COMMA)
-            {
-                break;
-            }
-            vigil_program_cursor_advance(program, cursor);
-        }
-    }
+    status = class_parse_implements(program, cursor, name_token, decl);
+    if (status != VIGIL_STATUS_OK)
+        return status;
 
     type_token = vigil_program_cursor_peek(program, *cursor);
     if (type_token == NULL || type_token->kind != VIGIL_TOKEN_LBRACE)
-    {
         return vigil_compile_report(program, name_token->span, "expected '{' after class name");
-    }
     vigil_program_cursor_advance(program, cursor);
 
     while (1)
     {
         type_token = vigil_program_cursor_peek(program, *cursor);
         if (type_token == NULL)
-        {
             return vigil_compile_report(program, vigil_program_eof_span(program), "expected '}' after class body");
-        }
         if (type_token->kind == VIGIL_TOKEN_RBRACE)
         {
             vigil_program_cursor_advance(program, cursor);
             break;
         }
 
-        member_is_public = vigil_program_parse_optional_pub(program, cursor);
+        int member_is_public = vigil_program_parse_optional_pub(program, cursor);
         type_token = vigil_program_cursor_peek(program, *cursor);
         if (type_token == NULL)
-        {
             return vigil_compile_report(program, vigil_program_eof_span(program), "expected class member declaration");
-        }
 
         if (type_token->kind == VIGIL_TOKEN_FN && vigil_program_token_at(program, *cursor + 1U) != NULL &&
             vigil_program_token_at(program, *cursor + 1U)->kind == VIGIL_TOKEN_IDENTIFIER &&
             vigil_program_token_at(program, *cursor + 2U) != NULL &&
             vigil_program_token_at(program, *cursor + 2U)->kind == VIGIL_TOKEN_LPAREN)
         {
-            vigil_program_cursor_advance(program, cursor);
-
-            name_token = vigil_program_cursor_peek(program, *cursor);
-            if (name_token == NULL || name_token->kind != VIGIL_TOKEN_IDENTIFIER)
-            {
-                return vigil_compile_report(program, type_token->span, "expected method name");
-            }
-            name_text = vigil_program_token_text(program, name_token, &name_length);
-            if (vigil_class_decl_find_method(decl, name_text, name_length, NULL, NULL))
-            {
-                return vigil_compile_report(program, name_token->span, "class method is already declared");
-            }
-            if (vigil_class_decl_find_field(decl, name_text, name_length, NULL, NULL))
-            {
-                return vigil_compile_report(program, name_token->span, "class method conflicts with field");
-            }
-
-            status = vigil_program_grow_functions(program, program->functions.count + 1U);
-            if (status != VIGIL_STATUS_OK)
-            {
-                return status;
-            }
-            method_decl = &program->functions.functions[program->functions.count];
-            vigil_binding_function_init(method_decl);
-            method_decl->name = name_text;
-            method_decl->name_length = name_length;
-            method_decl->name_span = name_token->span;
-            method_decl->is_public = member_is_public;
-            method_decl->owner_class_index = class_index;
-            method_decl->source = program->source;
-            method_decl->tokens = program->tokens;
-            cursor[0] += 1U;
-
-            status = vigil_program_add_binding_param(program, method_decl, "self", 4U, name_token->span,
-                                                     vigil_binding_type_class(class_index));
-            if (status != VIGIL_STATUS_OK)
-            {
-                return status;
-            }
-
-            type_token = vigil_program_token_at(program, *cursor);
-            if (type_token == NULL || type_token->kind != VIGIL_TOKEN_LPAREN)
-            {
-                return vigil_compile_report(program, name_token->span, "expected '(' after method name");
-            }
-            cursor[0] += 1U;
-
-            type_token = vigil_program_token_at(program, *cursor);
-            if (type_token != NULL && type_token->kind != VIGIL_TOKEN_RPAREN)
-            {
-                while (1)
-                {
-                    status = vigil_program_parse_type_reference(program, cursor, "unsupported function parameter type",
-                                                                &field_type);
-                    if (status != VIGIL_STATUS_OK)
-                    {
-                        return status;
-                    }
-                    status = vigil_program_require_non_void_type(
-                        program, type_token == NULL ? name_token->span : type_token->span, field_type,
-                        "function parameters cannot use type void");
-                    if (status != VIGIL_STATUS_OK)
-                    {
-                        return status;
-                    }
-
-                    param_name_token = vigil_program_token_at(program, *cursor);
-                    if (param_name_token == NULL || param_name_token->kind != VIGIL_TOKEN_IDENTIFIER)
-                    {
-                        return vigil_compile_report(program, type_token->span, "expected parameter name");
-                    }
-
-                    status = vigil_program_add_param(program, method_decl, field_type, param_name_token);
-                    if (status != VIGIL_STATUS_OK)
-                    {
-                        return status;
-                    }
-                    cursor[0] += 1U;
-
-                    type_token = vigil_program_token_at(program, *cursor);
-                    if (type_token != NULL && type_token->kind == VIGIL_TOKEN_COMMA)
-                    {
-                        cursor[0] += 1U;
-                        type_token = vigil_program_token_at(program, *cursor);
-                        continue;
-                    }
-                    break;
-                }
-            }
-
-            type_token = vigil_program_token_at(program, *cursor);
-            if (type_token == NULL || type_token->kind != VIGIL_TOKEN_RPAREN)
-            {
-                return vigil_compile_report(program, name_token->span, "expected ')' after parameter list");
-            }
-            cursor[0] += 1U;
-
-            type_token = vigil_program_token_at(program, *cursor);
-            if (type_token == NULL || type_token->kind != VIGIL_TOKEN_ARROW)
-            {
-                return vigil_compile_report(program, name_token->span, "expected '->' after method signature");
-            }
-            cursor[0] += 1U;
-
-            status = vigil_program_parse_function_return_types(program, cursor, "unsupported function return type",
-                                                               method_decl);
-            if (status != VIGIL_STATUS_OK)
-            {
-                return status;
-            }
-
-            type_token = vigil_program_token_at(program, *cursor);
-            if (type_token == NULL || type_token->kind != VIGIL_TOKEN_LBRACE)
-            {
-                return vigil_compile_report(program, name_token->span, "expected '{' before method body");
-            }
-            cursor[0] += 1U;
-            method_decl->body_start = *cursor;
-
-            body_depth = 1U;
-            while (body_depth > 0U)
-            {
-                type_token = vigil_program_token_at(program, *cursor);
-                if (type_token == NULL || type_token->kind == VIGIL_TOKEN_EOF)
-                {
-                    return vigil_compile_report(program, vigil_program_eof_span(program),
-                                                "expected '}' after method body");
-                }
-
-                if (type_token->kind == VIGIL_TOKEN_LBRACE)
-                {
-                    body_depth += 1U;
-                }
-                else if (type_token->kind == VIGIL_TOKEN_RBRACE)
-                {
-                    body_depth -= 1U;
-                    if (body_depth == 0U)
-                    {
-                        method_decl->body_end = *cursor;
-                        cursor[0] += 1U;
-                        break;
-                    }
-                }
-                cursor[0] += 1U;
-            }
-
-            status = vigil_class_decl_grow_methods(program, decl, decl->method_count + 1U);
-            if (status != VIGIL_STATUS_OK)
-            {
-                return status;
-            }
-            method = &decl->methods[decl->method_count];
-            memset(method, 0, sizeof(*method));
-            method->name = name_text;
-            method->name_length = name_length;
-            method->name_span = name_token->span;
-            method->is_public = member_is_public;
-            method->function_index = program->functions.count;
-            decl->method_count += 1U;
-            program->functions.count += 1U;
-            continue;
+            status = class_parse_method(program, cursor, decl, class_index, member_is_public);
         }
-
-        status = vigil_program_parse_type_reference(program, cursor, "unsupported class field type", &field_type);
+        else
+        {
+            status = class_parse_field(program, cursor, decl, name_token, member_is_public);
+        }
         if (status != VIGIL_STATUS_OK)
-        {
             return status;
-        }
-        status = vigil_program_require_non_void_type(program, type_token == NULL ? name_token->span : type_token->span,
-                                                     field_type, "class fields cannot use type void");
-        if (status != VIGIL_STATUS_OK)
-        {
-            return status;
-        }
-
-        field_name_token = vigil_program_cursor_peek(program, *cursor);
-        if (field_name_token == NULL || field_name_token->kind != VIGIL_TOKEN_IDENTIFIER)
-        {
-            return vigil_compile_report(program, type_token->span, "expected field name");
-        }
-        name_text = vigil_program_token_text(program, field_name_token, &name_length);
-        if (vigil_class_decl_find_field(decl, name_text, name_length, NULL, NULL))
-        {
-            return vigil_compile_report(program, field_name_token->span, "class field is already declared");
-        }
-        vigil_program_cursor_advance(program, cursor);
-
-        type_token = vigil_program_cursor_peek(program, *cursor);
-        if (type_token == NULL || type_token->kind != VIGIL_TOKEN_SEMICOLON)
-        {
-            return vigil_compile_report(program, field_name_token->span, "expected ';' after class field");
-        }
-        vigil_program_cursor_advance(program, cursor);
-
-        status = vigil_class_decl_grow_fields(program, decl, decl->field_count + 1U);
-        if (status != VIGIL_STATUS_OK)
-        {
-            return status;
-        }
-
-        field = &decl->fields[decl->field_count];
-        memset(field, 0, sizeof(*field));
-        field->name = name_text;
-        field->name_length = name_length;
-        field->name_span = field_name_token->span;
-        field->is_public = member_is_public;
-        field->type = field_type;
-        decl->field_count += 1U;
     }
 
     status = vigil_program_validate_class_interface_conformance(program, decl);
     if (status != VIGIL_STATUS_OK)
-    {
         return status;
-    }
 
     return vigil_program_synthesize_class_constructor(program, decl);
 }

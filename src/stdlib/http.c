@@ -1467,6 +1467,43 @@ static vigil_status_t http_req_query(vigil_vm_t *vm, size_t arg_count, vigil_err
     return push_string(vm, "", 0, error);
 }
 
+static const char *http_reason_phrase(int code)
+{
+    switch (code)
+    {
+    case 200:
+        return "OK";
+    case 201:
+        return "Created";
+    case 204:
+        return "No Content";
+    case 301:
+        return "Moved Permanently";
+    case 302:
+        return "Found";
+    case 304:
+        return "Not Modified";
+    case 400:
+        return "Bad Request";
+    case 401:
+        return "Unauthorized";
+    case 403:
+        return "Forbidden";
+    case 404:
+        return "Not Found";
+    case 405:
+        return "Method Not Allowed";
+    case 500:
+        return "Internal Server Error";
+    case 502:
+        return "Bad Gateway";
+    case 503:
+        return "Service Unavailable";
+    default:
+        return "OK";
+    }
+}
+
 static vigil_status_t http_respond(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
 {
     size_t base = vigil_vm_stack_depth(vm) - arg_count;
@@ -1500,54 +1537,7 @@ static vigil_status_t http_respond(vigil_vm_t *vm, size_t arg_count, vigil_error
         return push_i64(vm, -1, error);
     }
 
-    const char *reason = "OK";
-    switch ((int)status_code)
-    {
-    case 200:
-        reason = "OK";
-        break;
-    case 201:
-        reason = "Created";
-        break;
-    case 204:
-        reason = "No Content";
-        break;
-    case 301:
-        reason = "Moved Permanently";
-        break;
-    case 302:
-        reason = "Found";
-        break;
-    case 304:
-        reason = "Not Modified";
-        break;
-    case 400:
-        reason = "Bad Request";
-        break;
-    case 401:
-        reason = "Unauthorized";
-        break;
-    case 403:
-        reason = "Forbidden";
-        break;
-    case 404:
-        reason = "Not Found";
-        break;
-    case 405:
-        reason = "Method Not Allowed";
-        break;
-    case 500:
-        reason = "Internal Server Error";
-        break;
-    case 502:
-        reason = "Bad Gateway";
-        break;
-    case 503:
-        reason = "Service Unavailable";
-        break;
-    default:
-        break;
-    }
+    const char *reason = http_reason_phrase((int)status_code);
 
     char resp_hdr[4096];
     int hlen =

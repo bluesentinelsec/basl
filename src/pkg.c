@@ -1023,12 +1023,28 @@ vigil_status_t vigil_pkg_remove(const char *project_root, const char *package_ur
 
 /* ── Import resolution ───────────────────────────────────────────── */
 
+static int pkg_try_candidate(const char *candidate, char *out_path, size_t path_size, vigil_error_t *error)
+{
+    int exists = 0;
+    if (vigil_platform_file_exists(candidate, &exists) == VIGIL_STATUS_OK && exists)
+    {
+        size_t len = strlen(candidate);
+        if (len >= path_size)
+        {
+            set_error(error, VIGIL_STATUS_INVALID_ARGUMENT, "path buffer too small");
+            return -1;
+        }
+        memcpy(out_path, candidate, len + 1);
+        return 1;
+    }
+    return 0;
+}
+
 vigil_status_t vigil_pkg_resolve_import(const char *project_root, const char *import_path, char *out_path,
                                         size_t path_size, vigil_error_t *error)
 {
     char deps_path[4096];
     char candidate[4096];
-    int exists = 0;
 
     if (project_root == NULL || import_path == NULL || out_path == NULL)
     {
@@ -1065,16 +1081,10 @@ vigil_status_t vigil_pkg_resolve_import(const char *project_root, const char *im
             memcpy(candidate + len, ".vigil", 6);
         }
     }
-    if (vigil_platform_file_exists(candidate, &exists) == VIGIL_STATUS_OK && exists)
     {
-        size_t len = strlen(candidate);
-        if (len >= path_size)
-        {
-            set_error(error, VIGIL_STATUS_INVALID_ARGUMENT, "path buffer too small");
-            return VIGIL_STATUS_INVALID_ARGUMENT;
-        }
-        memcpy(out_path, candidate, len + 1);
-        return VIGIL_STATUS_OK;
+        int rc = pkg_try_candidate(candidate, out_path, path_size, error);
+        if (rc != 0)
+            return rc > 0 ? VIGIL_STATUS_OK : VIGIL_STATUS_INVALID_ARGUMENT;
     }
 
     /* Try deps/<package>/lib/<module>.vigil */
@@ -1113,18 +1123,9 @@ vigil_status_t vigil_pkg_resolve_import(const char *project_root, const char *im
                 vigil_platform_path_join(candidate, "lib", lib_path, sizeof(lib_path), error) == VIGIL_STATUS_OK &&
                 vigil_platform_path_join(lib_path, module_file, candidate, sizeof(candidate), error) == VIGIL_STATUS_OK)
             {
-
-                if (vigil_platform_file_exists(candidate, &exists) == VIGIL_STATUS_OK && exists)
-                {
-                    size_t len = strlen(candidate);
-                    if (len >= path_size)
-                    {
-                        set_error(error, VIGIL_STATUS_INVALID_ARGUMENT, "path buffer too small");
-                        return VIGIL_STATUS_INVALID_ARGUMENT;
-                    }
-                    memcpy(out_path, candidate, len + 1);
-                    return VIGIL_STATUS_OK;
-                }
+                int rc = pkg_try_candidate(candidate, out_path, path_size, error);
+                if (rc != 0)
+                    return rc > 0 ? VIGIL_STATUS_OK : VIGIL_STATUS_INVALID_ARGUMENT;
             }
         }
     }
@@ -1137,17 +1138,9 @@ vigil_status_t vigil_pkg_resolve_import(const char *project_root, const char *im
         if (vigil_platform_path_join(candidate, "lib", entry, sizeof(entry), error) == VIGIL_STATUS_OK &&
             vigil_platform_path_join(entry, "mod.vigil", mod_path, sizeof(mod_path), error) == VIGIL_STATUS_OK)
         {
-            if (vigil_platform_file_exists(mod_path, &exists) == VIGIL_STATUS_OK && exists)
-            {
-                size_t len = strlen(mod_path);
-                if (len >= path_size)
-                {
-                    set_error(error, VIGIL_STATUS_INVALID_ARGUMENT, "path buffer too small");
-                    return VIGIL_STATUS_INVALID_ARGUMENT;
-                }
-                memcpy(out_path, mod_path, len + 1);
-                return VIGIL_STATUS_OK;
-            }
+            int rc = pkg_try_candidate(mod_path, out_path, path_size, error);
+            if (rc != 0)
+                return rc > 0 ? VIGIL_STATUS_OK : VIGIL_STATUS_INVALID_ARGUMENT;
         }
     }
 

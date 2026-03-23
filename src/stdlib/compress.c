@@ -434,88 +434,75 @@ static vigil_status_t gzip_compress_level_fn(vigil_vm_t *vm, size_t arg_count, v
     return gzip_compress_impl(vm, src, src_len, level, error);
 }
 
+static size_t gzip_skip_header(const unsigned char *usrc, size_t src_len)
+{
+    size_t hdr_len = 10;
+    unsigned char flags = usrc[3];
+    if (flags & 0x04)
+    {
+        if (hdr_len + 2 > src_len)
+            return 0;
+        hdr_len += 2 + (usrc[hdr_len] | (usrc[hdr_len + 1] << 8));
+    }
+    if (flags & 0x08)
+    {
+        while (hdr_len < src_len && usrc[hdr_len])
+            hdr_len++;
+        hdr_len++;
+    }
+    if (flags & 0x10)
+    {
+        while (hdr_len < src_len && usrc[hdr_len])
+            hdr_len++;
+        hdr_len++;
+    }
+    if (flags & 0x02)
+        hdr_len += 2;
+    if (hdr_len + 8 > src_len)
+        return 0;
+    return hdr_len;
+}
+
 static vigil_status_t gzip_decompress_fn(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
 {
     size_t base = vigil_vm_stack_depth(vm) - arg_count;
     size_t src_len;
     const char *src;
-    size_t hdr_len = 10;
-    const unsigned char *usrc;
-    size_t deflate_len;
-    tinfl_decompressor decomp;
-    size_t dst_cap = 1024 * 64;
-    size_t dst_len = 0;
-    unsigned char *dst;
-    size_t in_pos = 0;
-    tinfl_status status;
 
     src = get_bytes_data(vigil_vm_stack_get(vm, base), &src_len);
     vigil_vm_stack_pop_n(vm, arg_count);
 
     if (!src || src_len < 18)
-    {
         return push_empty_bytes(vm, error);
-    }
 
-    usrc = (const unsigned char *)src;
-
-    /* Verify gzip magic */
+    const unsigned char *usrc = (const unsigned char *)src;
     if (usrc[0] != 0x1f || usrc[1] != 0x8b)
-    {
         return push_empty_bytes(vm, error);
-    }
 
-    /* Skip optional fields */
-    {
-        unsigned char flags = usrc[3];
-        if (flags & 0x04)
-        {
-            if (hdr_len + 2 > src_len)
-                return push_empty_bytes(vm, error);
-            hdr_len += 2 + (usrc[hdr_len] | (usrc[hdr_len + 1] << 8));
-        }
-        if (flags & 0x08)
-        {
-            while (hdr_len < src_len && usrc[hdr_len])
-                hdr_len++;
-            hdr_len++;
-        }
-        if (flags & 0x10)
-        {
-            while (hdr_len < src_len && usrc[hdr_len])
-                hdr_len++;
-            hdr_len++;
-        }
-        if (flags & 0x02)
-            hdr_len += 2;
-    }
-
-    if (hdr_len + 8 > src_len)
-    {
+    size_t hdr_len = gzip_skip_header(usrc, src_len);
+    if (hdr_len == 0)
         return push_empty_bytes(vm, error);
-    }
 
-    deflate_len = src_len - hdr_len - 8;
-
-    dst = (unsigned char *)malloc(dst_cap);
+    size_t deflate_len = src_len - hdr_len - 8;
+    size_t dst_cap = 1024 * 64;
+    size_t dst_len = 0;
+    unsigned char *dst = (unsigned char *)malloc(dst_cap);
     if (!dst)
-    {
         return push_empty_bytes(vm, error);
-    }
 
+    tinfl_decompressor decomp;
     tinfl_init(&decomp);
+    size_t in_pos = 0;
 
     while (in_pos < deflate_len)
     {
         size_t in_bytes = deflate_len - in_pos;
         size_t out_bytes = dst_cap - dst_len;
         int flags = (in_pos + in_bytes < deflate_len) ? TINFL_FLAG_HAS_MORE_INPUT : 0;
-
-        status = tinfl_decompress(&decomp, usrc + hdr_len + in_pos, &in_bytes, dst, dst + dst_len, &out_bytes, flags);
-
+        tinfl_status status =
+            tinfl_decompress(&decomp, usrc + hdr_len + in_pos, &in_bytes, dst, dst + dst_len, &out_bytes, flags);
         in_pos += in_bytes;
         dst_len += out_bytes;
-
         if (status == TINFL_STATUS_DONE)
             break;
         if (status < 0)
@@ -537,11 +524,9 @@ static vigil_status_t gzip_decompress_fn(vigil_vm_t *vm, size_t arg_count, vigil
         }
     }
 
-    {
-        vigil_status_t ret = push_bytes(vm, dst, dst_len, error);
-        free(dst);
-        return ret;
-    }
+    vigil_status_t ret = push_bytes(vm, dst, dst_len, error);
+    free(dst);
+    return ret;
 }
 
 /* ── LZ4 ─────────────────────────────────────────────────────────── */
@@ -1098,6 +1083,52 @@ static vigil_status_t tar_read_fn(vigil_vm_t *vm, size_t arg_count, vigil_error_
     return push_empty_bytes(vm, error);
 }
 
+static int tar_append_entry(const char *name, size_t name_len, const char *data, size_t data_len,
+                            unsigned char **tar_data, size_t *tar_size, size_t *tar_cap)
+{
+    tar_header_t h;
+    if (name_len > 100)
+        name_len = 100;
+    memset(&h, 0, sizeof(h));
+    memcpy(h.name, name, name_len);
+    memcpy(h.mode, "0000644", 7);
+    memcpy(h.uid, "0000000", 7);
+    memcpy(h.gid, "0000000", 7);
+    tar_write_octal(h.size, 12, data_len);
+    tar_write_octal(h.mtime, 12, 0);
+    h.typeflag = '0';
+    memcpy(h.magic, "ustar", 5);
+    h.version[0] = '0';
+    h.version[1] = '0';
+    memset(h.checksum, ' ', 8);
+    unsigned int cksum = tar_checksum(&h);
+    snprintf(h.checksum, 8, "%06o", cksum);
+    h.checksum[6] = '\0';
+    h.checksum[7] = ' ';
+
+    size_t padded_size = (data_len + 511) & ~511;
+    size_t needed = *tar_size + 512 + padded_size;
+    if (needed > *tar_cap)
+    {
+        size_t new_cap = *tar_cap ? *tar_cap * 2 : 4096;
+        while (new_cap < needed)
+            new_cap *= 2;
+        unsigned char *new_data = (unsigned char *)realloc(*tar_data, new_cap);
+        if (!new_data)
+            return 0;
+        *tar_data = new_data;
+        *tar_cap = new_cap;
+    }
+    memcpy(*tar_data + *tar_size, &h, 512);
+    *tar_size += 512;
+    if (data && data_len > 0)
+        memcpy(*tar_data + *tar_size, data, data_len);
+    if (padded_size > data_len)
+        memset(*tar_data + *tar_size + data_len, 0, padded_size - data_len);
+    *tar_size += padded_size;
+    return 1;
+}
+
 static vigil_status_t tar_create_fn(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
 {
     size_t base = vigil_vm_stack_depth(vm) - arg_count;
@@ -1134,9 +1165,6 @@ static vigil_status_t tar_create_fn(vigil_vm_t *vm, size_t arg_count, vigil_erro
         vigil_value_t name_val, content_val;
         size_t name_len, data_len;
         const char *name, *data;
-        tar_header_t h;
-        size_t padded_size, needed;
-        unsigned int cksum;
 
         if (!vigil_array_object_get(names_obj, i, &name_val))
             continue;
@@ -1154,57 +1182,14 @@ static vigil_status_t tar_create_fn(vigil_vm_t *vm, size_t arg_count, vigil_erro
             vigil_value_release(&content_val);
             continue;
         }
-        if (name_len > 100)
-            name_len = 100;
 
-        memset(&h, 0, sizeof(h));
-        memcpy(h.name, name, name_len);
-        memcpy(h.mode, "0000644", 7);
-        memcpy(h.uid, "0000000", 7);
-        memcpy(h.gid, "0000000", 7);
-        tar_write_octal(h.size, 12, data_len);
-        tar_write_octal(h.mtime, 12, 0);
-        h.typeflag = '0';
-        memcpy(h.magic, "ustar", 5);
-        h.version[0] = '0';
-        h.version[1] = '0';
-
-        memset(h.checksum, ' ', 8);
-        cksum = tar_checksum(&h);
-        snprintf(h.checksum, 8, "%06o", cksum);
-        h.checksum[6] = '\0';
-        h.checksum[7] = ' ';
-
-        padded_size = (data_len + 511) & ~511;
-        needed = tar_size + 512 + padded_size;
-        if (needed > tar_cap)
+        if (!tar_append_entry(name, name_len, data, data_len, &tar_data, &tar_size, &tar_cap))
         {
-            size_t new_cap = tar_cap ? tar_cap * 2 : 4096;
-            while (new_cap < needed)
-                new_cap *= 2;
-            unsigned char *new_data = (unsigned char *)realloc(tar_data, new_cap);
-            if (!new_data)
-            {
-                free(tar_data);
-                vigil_value_release(&name_val);
-                vigil_value_release(&content_val);
-                return push_empty_bytes(vm, error);
-            }
-            tar_data = new_data;
-            tar_cap = new_cap;
+            free(tar_data);
+            vigil_value_release(&name_val);
+            vigil_value_release(&content_val);
+            return push_empty_bytes(vm, error);
         }
-
-        memcpy(tar_data + tar_size, &h, 512);
-        tar_size += 512;
-        if (data && data_len > 0)
-        {
-            memcpy(tar_data + tar_size, data, data_len);
-        }
-        if (padded_size > data_len)
-        {
-            memset(tar_data + tar_size + data_len, 0, padded_size - data_len);
-        }
-        tar_size += padded_size;
         vigil_value_release(&name_val);
         vigil_value_release(&content_val);
     }

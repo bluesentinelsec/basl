@@ -184,26 +184,9 @@ static vigil_status_t url_escape_append(char *buf, size_t cap, size_t *len, cons
     return VIGIL_STATUS_OK;
 }
 
-vigil_status_t vigil_url_parse(const char *url_string, size_t url_length, vigil_url_t *out_url, vigil_error_t *error)
+static const char *parse_url_scheme(const char *p, const char *end, vigil_url_t *out_url)
 {
-    const char *p, *end, *scheme_end, *authority_start, *authority_end;
-    const char *userinfo_end, *host_start, *host_end, *port_start;
-    const char *path_start, *path_end, *query_start, *query_end;
-    const char *fragment_start;
-
-    if (!url_string || !out_url)
-    {
-        if (error)
-            vigil_error_set_literal(error, VIGIL_STATUS_INVALID_ARGUMENT, "null argument");
-        return VIGIL_STATUS_INVALID_ARGUMENT;
-    }
-
-    memset(out_url, 0, sizeof(*out_url));
-    p = url_string;
-    end = url_string + url_length;
-
-    /* Parse scheme (if present) */
-    scheme_end = NULL;
+    const char *scheme_end = NULL;
     for (const char *s = p; s < end; s++)
     {
         if (*s == ':')
@@ -218,137 +201,147 @@ vigil_status_t vigil_url_parse(const char *url_string, size_t url_length, vigil_
         if (s > p && !isalnum((unsigned char)*s) && *s != '+' && *s != '-' && *s != '.')
             break;
     }
-
     if (scheme_end)
     {
         out_url->scheme = str_ndup(p, (size_t)(scheme_end - p));
-        p = scheme_end + 1;
+        return scheme_end + 1;
     }
+    return p;
+}
 
-    /* Parse authority (if present) */
-    authority_start = NULL;
-    authority_end = NULL;
-    if (p + 1 < end && p[0] == '/' && p[1] == '/')
+static void parse_url_userinfo(const char *authority_start, const char *userinfo_end, vigil_url_t *out_url)
+{
+    const char *colon = NULL;
+    for (const char *s = authority_start; s < userinfo_end; s++)
     {
-        p += 2;
-        authority_start = p;
-        /* Find end of authority */
-        for (authority_end = p; authority_end < end; authority_end++)
+        if (*s == ':')
         {
-            if (*authority_end == '/' || *authority_end == '?' || *authority_end == '#')
-                break;
+            colon = s;
+            break;
         }
-
-        /* Parse userinfo (if present) */
-        userinfo_end = NULL;
-        for (const char *s = authority_start; s < authority_end; s++)
-        {
-            if (*s == '@')
-            {
-                userinfo_end = s;
-                break;
-            }
-        }
-
-        if (userinfo_end)
-        {
-            /* Parse username:password */
-            const char *colon = NULL;
-            for (const char *s = authority_start; s < userinfo_end; s++)
-            {
-                if (*s == ':')
-                {
-                    colon = s;
-                    break;
-                }
-            }
-            if (colon)
-            {
-                url_unescape_into(authority_start, (size_t)(colon - authority_start), &out_url->username);
-                url_unescape_into(colon + 1, (size_t)(userinfo_end - colon - 1), &out_url->password);
-            }
-            else
-            {
-                url_unescape_into(authority_start, (size_t)(userinfo_end - authority_start), &out_url->username);
-            }
-            host_start = userinfo_end + 1;
-        }
-        else
-        {
-            host_start = authority_start;
-        }
-
-        /* Parse host:port */
-        host_end = authority_end;
-        port_start = NULL;
-
-        /* Handle IPv6 addresses */
-        if (host_start < authority_end && *host_start == '[')
-        {
-            const char *bracket = memchr(host_start, ']', (size_t)(authority_end - host_start));
-            if (bracket)
-            {
-                host_end = bracket + 1;
-                if (host_end < authority_end && *host_end == ':')
-                {
-                    port_start = host_end + 1;
-                }
-            }
-        }
-        else
-        {
-            /* Find port separator */
-            for (const char *s = host_start; s < authority_end; s++)
-            {
-                if (*s == ':')
-                {
-                    host_end = s;
-                    port_start = s + 1;
-                    break;
-                }
-            }
-        }
-
-        if (host_start < host_end)
-        {
-            /* Remove brackets from IPv6 */
-            if (*host_start == '[' && *(host_end - 1) == ']')
-            {
-                out_url->host = str_ndup(host_start + 1, (size_t)(host_end - host_start - 2));
-            }
-            else
-            {
-                url_unescape_into(host_start, (size_t)(host_end - host_start), &out_url->host);
-            }
-        }
-
-        if (port_start && port_start < authority_end)
-        {
-            out_url->port = str_ndup(port_start, (size_t)(authority_end - port_start));
-        }
-
-        p = authority_end;
     }
+    if (colon)
+    {
+        url_unescape_into(authority_start, (size_t)(colon - authority_start), &out_url->username);
+        url_unescape_into(colon + 1, (size_t)(userinfo_end - colon - 1), &out_url->password);
+    }
+    else
+    {
+        url_unescape_into(authority_start, (size_t)(userinfo_end - authority_start), &out_url->username);
+    }
+}
+
+static void parse_url_host_port(const char *host_start, const char *authority_end, vigil_url_t *out_url)
+{
+    const char *host_end = authority_end;
+    const char *port_start = NULL;
+
+    if (host_start < authority_end && *host_start == '[')
+    {
+        const char *bracket = memchr(host_start, ']', (size_t)(authority_end - host_start));
+        if (bracket)
+        {
+            host_end = bracket + 1;
+            if (host_end < authority_end && *host_end == ':')
+                port_start = host_end + 1;
+        }
+    }
+    else
+    {
+        for (const char *s = host_start; s < authority_end; s++)
+        {
+            if (*s == ':')
+            {
+                host_end = s;
+                port_start = s + 1;
+                break;
+            }
+        }
+    }
+
+    if (host_start < host_end)
+    {
+        if (*host_start == '[' && *(host_end - 1) == ']')
+            out_url->host = str_ndup(host_start + 1, (size_t)(host_end - host_start - 2));
+        else
+            url_unescape_into(host_start, (size_t)(host_end - host_start), &out_url->host);
+    }
+    if (port_start && port_start < authority_end)
+        out_url->port = str_ndup(port_start, (size_t)(authority_end - port_start));
+}
+
+static const char *parse_url_authority(const char *p, const char *end, vigil_url_t *out_url)
+{
+    const char *authority_start, *authority_end, *userinfo_end, *host_start;
+
+    if (!(p + 1 < end && p[0] == '/' && p[1] == '/'))
+        return p;
+
+    p += 2;
+    authority_start = p;
+    for (authority_end = p; authority_end < end; authority_end++)
+    {
+        if (*authority_end == '/' || *authority_end == '?' || *authority_end == '#')
+            break;
+    }
+
+    userinfo_end = NULL;
+    for (const char *s = authority_start; s < authority_end; s++)
+    {
+        if (*s == '@')
+        {
+            userinfo_end = s;
+            break;
+        }
+    }
+
+    if (userinfo_end)
+    {
+        parse_url_userinfo(authority_start, userinfo_end, out_url);
+        host_start = userinfo_end + 1;
+    }
+    else
+    {
+        host_start = authority_start;
+    }
+
+    parse_url_host_port(host_start, authority_end, out_url);
+    return authority_end;
+}
+
+vigil_status_t vigil_url_parse(const char *url_string, size_t url_length, vigil_url_t *out_url, vigil_error_t *error)
+{
+    const char *p, *end, *path_start, *path_end;
+
+    if (!url_string || !out_url)
+    {
+        if (error)
+            vigil_error_set_literal(error, VIGIL_STATUS_INVALID_ARGUMENT, "null argument");
+        return VIGIL_STATUS_INVALID_ARGUMENT;
+    }
+
+    memset(out_url, 0, sizeof(*out_url));
+    p = url_string;
+    end = url_string + url_length;
+
+    p = parse_url_scheme(p, end, out_url);
+    p = parse_url_authority(p, end, out_url);
 
     /* Parse path */
     path_start = p;
-    path_end = p;
-    for (; path_end < end; path_end++)
+    for (path_end = p; path_end < end; path_end++)
     {
         if (*path_end == '?' || *path_end == '#')
             break;
     }
     if (path_start < path_end)
-    {
         url_unescape_into(path_start, (size_t)(path_end - path_start), &out_url->path);
-    }
     p = path_end;
 
     /* Parse query */
-    query_start = NULL;
-    query_end = NULL;
     if (p < end && *p == '?')
     {
+        const char *query_start, *query_end;
         p++;
         query_start = p;
         for (query_end = p; query_end < end; query_end++)
@@ -364,8 +357,7 @@ vigil_status_t vigil_url_parse(const char *url_string, size_t url_length, vigil_
     if (p < end && *p == '#')
     {
         p++;
-        fragment_start = p;
-        url_unescape_into(fragment_start, (size_t)(end - fragment_start), &out_url->fragment);
+        url_unescape_into(p, (size_t)(end - p), &out_url->fragment);
     }
 
     return VIGIL_STATUS_OK;
@@ -388,6 +380,29 @@ void vigil_url_free(vigil_url_t *url)
 
 /* ── URL String Building ─────────────────────────────────────────── */
 
+static void url_string_append_authority(const vigil_url_t *url, char *result, size_t cap, size_t *len)
+{
+    if (!url->host || !url->host[0])
+        return;
+
+    *len += (size_t)snprintf(result + *len, cap - *len, "//");
+
+    if (url->username && url->username[0])
+    {
+        url_escape_append(result, cap, len, "", url->username, strlen(url->username));
+        if (url->password)
+            url_escape_append(result, cap, len, ":", url->password, strlen(url->password));
+        *len += (size_t)snprintf(result + *len, cap - *len, "@");
+    }
+
+    if (strchr(url->host, ':'))
+        *len += (size_t)snprintf(result + *len, cap - *len, "[%s]", url->host);
+    else
+        *len += (size_t)snprintf(result + *len, cap - *len, "%s", url->host);
+
+    if (url->port && url->port[0])
+        *len += (size_t)snprintf(result + *len, cap - *len, ":%s", url->port);
+}
 vigil_status_t vigil_url_string(const vigil_url_t *url, char **out_string, size_t *out_length, vigil_error_t *error)
 {
     char *result;
@@ -410,42 +425,10 @@ vigil_status_t vigil_url_string(const vigil_url_t *url, char **out_string, size_
     }
     len = 0;
 
-    /* Scheme */
     if (url->scheme && url->scheme[0])
-    {
         len += (size_t)snprintf(result + len, cap - len, "%s:", url->scheme);
-    }
 
-    /* Authority */
-    if (url->host && url->host[0])
-    {
-        len += (size_t)snprintf(result + len, cap - len, "//");
-
-        /* Userinfo */
-        if (url->username && url->username[0])
-        {
-            url_escape_append(result, cap, &len, "", url->username, strlen(url->username));
-            if (url->password)
-                url_escape_append(result, cap, &len, ":", url->password, strlen(url->password));
-            len += (size_t)snprintf(result + len, cap - len, "@");
-        }
-
-        /* Host (check for IPv6) */
-        if (strchr(url->host, ':'))
-        {
-            len += (size_t)snprintf(result + len, cap - len, "[%s]", url->host);
-        }
-        else
-        {
-            len += (size_t)snprintf(result + len, cap - len, "%s", url->host);
-        }
-
-        /* Port */
-        if (url->port && url->port[0])
-        {
-            len += (size_t)snprintf(result + len, cap - len, ":%s", url->port);
-        }
-    }
+    url_string_append_authority(url, result, cap, &len);
 
     /* Path */
     if (url->path && url->path[0])

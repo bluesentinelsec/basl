@@ -215,126 +215,98 @@ static vigil_status_t parse_quoted_string(yaml_parser_t *p, char quote, vigil_js
     return s;
 }
 
+static int yaml_buf_append(yaml_parser_t *p, char **buf, size_t *len, size_t *cap, char ch)
+{
+    if (*len + 1 >= *cap)
+    {
+        *cap *= 2;
+        char *newbuf = (char *)p->alloc.reallocate(p->alloc.user_data, *buf, *cap);
+        if (!newbuf)
+        {
+            yaml_dealloc(p, *buf);
+            *buf = NULL;
+            return 0;
+        }
+        *buf = newbuf;
+    }
+    (*buf)[(*len)++] = ch;
+    return 1;
+}
+
+static int block_scalar_handle_blank_line(yaml_parser_t *p, size_t line_indent, char **buf, size_t *len, size_t *cap)
+{
+    size_t check = p->pos + line_indent;
+    if (check >= p->len || (p->src[check] != '\n' && p->src[check] != '\0'))
+        return 0;
+    while (peek(p) == ' ')
+        advance(p);
+    if (peek(p) != '\n')
+        return 0;
+    if (!yaml_buf_append(p, buf, len, cap, '\n'))
+        return -1;
+    advance(p);
+    return 1;
+}
+
+static vigil_status_t block_scalar_collect_lines(yaml_parser_t *p, char style, size_t block_indent, char **buf,
+                                                 size_t *len, size_t *cap)
+{
+    while (p->pos < p->len)
+    {
+        size_t line_indent = measure_indent(p);
+        int blank = block_scalar_handle_blank_line(p, line_indent, buf, len, cap);
+        if (blank < 0)
+            return VIGIL_STATUS_OUT_OF_MEMORY;
+        if (blank > 0)
+            continue;
+        if (line_indent < block_indent)
+            break;
+        for (size_t i = 0; i < block_indent && peek(p) == ' '; i++)
+            advance(p);
+        while (peek(p) && peek(p) != '\n')
+        {
+            if (!yaml_buf_append(p, buf, len, cap, peek(p)))
+                return VIGIL_STATUS_OUT_OF_MEMORY;
+            advance(p);
+        }
+        if (peek(p) == '\n')
+        {
+            if (!yaml_buf_append(p, buf, len, cap, style == '|' ? '\n' : ' '))
+                return VIGIL_STATUS_OUT_OF_MEMORY;
+            advance(p);
+        }
+    }
+    return VIGIL_STATUS_OK;
+}
+
 static vigil_status_t parse_block_scalar(yaml_parser_t *p, char style, vigil_json_value_t **out)
 {
-    advance(p); /* skip | or > */
+    vigil_status_t s;
+    size_t block_indent, cap = 256, len = 0;
+    char *buf;
+
+    advance(p);
     skip_spaces(p);
     skip_comment(p);
     if (peek(p) == '\n')
         advance(p);
 
-    /* Determine block indent from first non-empty line */
     skip_blank_lines(p);
-    size_t block_indent = measure_indent(p);
+    block_indent = measure_indent(p);
     if (block_indent == 0)
-    {
         return vigil_json_string_new(&p->alloc, "", 0, out, p->error);
-    }
 
-    /* Collect lines */
-    size_t cap = 256;
-    size_t len = 0;
-    char *buf = (char *)yaml_alloc(p, cap);
+    buf = (char *)yaml_alloc(p, cap);
     if (!buf)
     {
         set_error(p, "out of memory");
         return VIGIL_STATUS_OUT_OF_MEMORY;
     }
 
-    while (p->pos < p->len)
-    {
-        size_t line_indent = measure_indent(p);
+    s = block_scalar_collect_lines(p, style, block_indent, &buf, &len, &cap);
+    if (s != VIGIL_STATUS_OK)
+        return s;
 
-        /* Check for blank line */
-        size_t check = p->pos + line_indent;
-        if (check < p->len && (p->src[check] == '\n' || p->src[check] == '\0'))
-        {
-            /* Blank line - include it */
-            while (peek(p) == ' ')
-                advance(p);
-            if (peek(p) == '\n')
-            {
-                if (len + 1 >= cap)
-                {
-                    cap *= 2;
-                    char *newbuf = (char *)p->alloc.reallocate(p->alloc.user_data, buf, cap);
-                    if (!newbuf)
-                    {
-                        yaml_dealloc(p, buf);
-                        return VIGIL_STATUS_OUT_OF_MEMORY;
-                    }
-                    buf = newbuf;
-                }
-                buf[len++] = '\n';
-                advance(p);
-                continue;
-            }
-        }
-
-        if (line_indent < block_indent)
-            break;
-
-        /* Skip the block indent */
-        for (size_t i = 0; i < block_indent && peek(p) == ' '; i++)
-            advance(p);
-
-        /* Copy line content */
-        while (peek(p) && peek(p) != '\n')
-        {
-            if (len + 1 >= cap)
-            {
-                cap *= 2;
-                char *newbuf = (char *)p->alloc.reallocate(p->alloc.user_data, buf, cap);
-                if (!newbuf)
-                {
-                    yaml_dealloc(p, buf);
-                    return VIGIL_STATUS_OUT_OF_MEMORY;
-                }
-                buf = newbuf;
-            }
-            buf[len++] = peek(p);
-            advance(p);
-        }
-
-        if (peek(p) == '\n')
-        {
-            if (style == '|')
-            {
-                /* Literal: preserve newline */
-                if (len + 1 >= cap)
-                {
-                    cap *= 2;
-                    char *newbuf = (char *)p->alloc.reallocate(p->alloc.user_data, buf, cap);
-                    if (!newbuf)
-                    {
-                        yaml_dealloc(p, buf);
-                        return VIGIL_STATUS_OUT_OF_MEMORY;
-                    }
-                    buf = newbuf;
-                }
-                buf[len++] = '\n';
-            }
-            else
-            {
-                /* Folded: convert to space (unless followed by blank) */
-                if (len + 1 >= cap)
-                {
-                    cap *= 2;
-                    char *newbuf = (char *)p->alloc.reallocate(p->alloc.user_data, buf, cap);
-                    if (!newbuf)
-                    {
-                        yaml_dealloc(p, buf);
-                        return VIGIL_STATUS_OUT_OF_MEMORY;
-                    }
-                    buf = newbuf;
-                }
-                buf[len++] = ' ';
-            }
-            advance(p);
-        }
-    }
-
-    /* Trim trailing whitespace for folded, single trailing newline for literal */
     if (style == '>')
     {
         while (len > 0 && (buf[len - 1] == ' ' || buf[len - 1] == '\n'))
@@ -347,7 +319,7 @@ static vigil_status_t parse_block_scalar(yaml_parser_t *p, char style, vigil_jso
     }
 
     buf[len] = '\0';
-    vigil_status_t s = vigil_json_string_new(&p->alloc, buf, len, out, p->error);
+    s = vigil_json_string_new(&p->alloc, buf, len, out, p->error);
     yaml_dealloc(p, buf);
     return s;
 }
@@ -413,6 +385,36 @@ static vigil_status_t parse_plain_scalar(yaml_parser_t *p, vigil_json_value_t **
 
 /* ── Sequence parsing ────────────────────────────────────────────── */
 
+static vigil_status_t parse_inline_value(yaml_parser_t *p, vigil_json_value_t **out)
+{
+    char c = peek(p);
+    vigil_status_t s;
+    if (c == '"' || c == '\'')
+        s = parse_quoted_string(p, c, out);
+    else if (c == '|' || c == '>')
+        s = parse_block_scalar(p, c, out);
+    else
+        s = parse_plain_scalar(p, out);
+    if (s != VIGIL_STATUS_OK)
+        return s;
+    skip_spaces(p);
+    skip_comment(p);
+    if (peek(p) == '\n')
+        advance(p);
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t parse_next_line_value(yaml_parser_t *p, size_t parent_indent, vigil_json_value_t **out)
+{
+    if (peek(p) == '\n')
+        advance(p);
+    skip_blank_lines(p);
+    size_t val_indent = measure_indent(p);
+    if (val_indent > parent_indent)
+        return parse_value(p, val_indent, out);
+    return vigil_json_null_new(&p->alloc, out, p->error);
+}
+
 static vigil_status_t parse_sequence(yaml_parser_t *p, size_t seq_indent, vigil_json_value_t **out)
 {
     vigil_status_t s = vigil_json_array_new(&p->alloc, out, p->error);
@@ -449,41 +451,11 @@ static vigil_status_t parse_sequence(yaml_parser_t *p, size_t seq_indent, vigil_
 
         if (peek(p) == '\n' || peek(p) == '\0')
         {
-            /* Value on next line */
-            if (peek(p) == '\n')
-                advance(p);
-            skip_blank_lines(p);
-            size_t item_indent = measure_indent(p);
-            if (item_indent > seq_indent)
-            {
-                s = parse_value(p, item_indent, &item);
-            }
-            else
-            {
-                s = vigil_json_null_new(&p->alloc, &item, p->error);
-            }
+            s = parse_next_line_value(p, seq_indent, &item);
         }
         else
         {
-            /* Inline value - parse directly without indent check */
-            char c = peek(p);
-            if (c == '"' || c == '\'')
-            {
-                s = parse_quoted_string(p, c, &item);
-            }
-            else if (c == '|' || c == '>')
-            {
-                s = parse_block_scalar(p, c, &item);
-            }
-            else
-            {
-                s = parse_plain_scalar(p, &item);
-            }
-            /* Skip rest of line (trailing spaces and comments) */
-            skip_spaces(p);
-            skip_comment(p);
-            if (peek(p) == '\n')
-                advance(p);
+            s = parse_inline_value(p, &item);
         }
 
         if (s != VIGIL_STATUS_OK)
@@ -554,41 +526,11 @@ static vigil_status_t parse_mapping(yaml_parser_t *p, size_t map_indent, vigil_j
 
         if (peek(p) == '\n' || peek(p) == '\0')
         {
-            /* Value on next line */
-            if (peek(p) == '\n')
-                advance(p);
-            skip_blank_lines(p);
-            size_t val_indent = measure_indent(p);
-            if (val_indent > map_indent)
-            {
-                s = parse_value(p, val_indent, &value);
-            }
-            else
-            {
-                s = vigil_json_null_new(&p->alloc, &value, p->error);
-            }
+            s = parse_next_line_value(p, map_indent, &value);
         }
         else
         {
-            /* Inline value - parse directly without indent check */
-            char c = peek(p);
-            if (c == '"' || c == '\'')
-            {
-                s = parse_quoted_string(p, c, &value);
-            }
-            else if (c == '|' || c == '>')
-            {
-                s = parse_block_scalar(p, c, &value);
-            }
-            else
-            {
-                s = parse_plain_scalar(p, &value);
-            }
-            /* Skip rest of line (trailing spaces and comments) */
-            skip_spaces(p);
-            skip_comment(p);
-            if (peek(p) == '\n')
-                advance(p);
+            s = parse_inline_value(p, &value);
         }
 
         if (s != VIGIL_STATUS_OK)

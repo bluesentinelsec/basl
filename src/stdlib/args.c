@@ -372,6 +372,91 @@ static int find_opt_idx(vigil_object_t *names_arr, vigil_object_t *shorts_arr, c
     return -1;
 }
 
+static vigil_status_t parser_update_vals_entry(vigil_object_t *vals_arr, vigil_runtime_t *rt, const char *name,
+                                               const char *val, vigil_error_t *error)
+{
+    char buf[512];
+    snprintf(buf, sizeof(buf), "%s=%s", name, val);
+    size_t nlen = strlen(name);
+    size_t vlen = vigil_array_object_length(vals_arr);
+    for (size_t vi = 0; vi < vlen; vi++)
+    {
+        const char *entry = array_get_str(vals_arr, vi);
+        if (strncmp(entry, name, nlen) == 0 && entry[nlen] == '=')
+        {
+            vigil_value_t sv;
+            vigil_status_t s = make_string(rt, buf, &sv, error);
+            if (s != VIGIL_STATUS_OK)
+                return s;
+            s = vigil_array_object_set(vals_arr, vi, &sv, error);
+            vigil_value_release(&sv);
+            return s;
+        }
+    }
+    return VIGIL_STATUS_OK;
+}
+
+static int parser_check_required(vigil_object_t *vals_arr, vigil_object_t *names_arr, vigil_object_t *types_arr,
+                                 vigil_object_t *req_arr, size_t opt_count, char *err_buf, size_t err_size)
+{
+    for (size_t i = 0; i < opt_count; i++)
+    {
+        const char *req = array_get_str(req_arr, i);
+        if (strcmp(req, "true") != 0)
+            continue;
+        const char *name = array_get_str(names_arr, i);
+        const char *typ = array_get_str(types_arr, i);
+        if (strcmp(typ, "bool") == 0)
+            continue;
+
+        char prefix[280];
+        if (strcmp(typ, "multi") == 0)
+            snprintf(prefix, sizeof(prefix), "__multi__%s=", name);
+        else
+            snprintf(prefix, sizeof(prefix), "%s=", name);
+        size_t plen = strlen(prefix);
+        int found = 0;
+        size_t vlen = vigil_array_object_length(vals_arr);
+        for (size_t vi = 0; vi < vlen; vi++)
+        {
+            const char *entry = array_get_str(vals_arr, vi);
+            if (strncmp(entry, prefix, plen) == 0)
+            {
+                if (strcmp(typ, "multi") == 0 || entry[plen] != '\0')
+                    found = 1;
+                break;
+            }
+        }
+        if (!found)
+        {
+            snprintf(err_buf, err_size, "required option --%s not provided", name);
+            return 0;
+        }
+    }
+    return 1;
+}
+
+static const char *parser_extract_key(const char *arg, char *key_buf, size_t key_size, const char **inline_val)
+{
+    *inline_val = NULL;
+    if (arg[0] == '-' && arg[1] == '-')
+    {
+        const char *eq = strchr(arg + 2, '=');
+        if (eq != NULL)
+        {
+            size_t klen = (size_t)(eq - (arg + 2));
+            if (klen >= key_size)
+                klen = key_size - 1;
+            memcpy(key_buf, arg + 2, klen);
+            key_buf[klen] = '\0';
+            *inline_val = eq + 1;
+            return key_buf;
+        }
+        return arg + 2;
+    }
+    return arg + 1;
+}
+
 static vigil_status_t parser_parse(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
 {
     /* stack: [self, start_i32] */
@@ -450,32 +535,9 @@ static vigil_status_t parser_parse(vigil_vm_t *vm, size_t arg_count, vigil_error
         }
 
         /* Extract key and optional inline value from --key=value */
-        const char *key = NULL;
         const char *inline_val = NULL;
         char key_buf[256];
-
-        if (arg[0] == '-' && arg[1] == '-')
-        {
-            const char *eq = strchr(arg + 2, '=');
-            if (eq != NULL)
-            {
-                size_t klen = (size_t)(eq - (arg + 2));
-                if (klen >= sizeof(key_buf))
-                    klen = sizeof(key_buf) - 1;
-                memcpy(key_buf, arg + 2, klen);
-                key_buf[klen] = '\0';
-                key = key_buf;
-                inline_val = eq + 1;
-            }
-            else
-            {
-                key = arg + 2;
-            }
-        }
-        else
-        {
-            key = arg + 1;
-        }
+        const char *key = parser_extract_key(arg, key_buf, sizeof(key_buf), &inline_val);
 
         int idx = find_opt_idx(names_arr, shorts_arr, key);
         if (idx < 0)
@@ -489,40 +551,16 @@ static vigil_status_t parser_parse(vigil_vm_t *vm, size_t arg_count, vigil_error
 
         if (strcmp(typ, "bool") == 0)
         {
-            /* Update the existing entry in vals_arr */
-            char buf[512];
-            snprintf(buf, sizeof(buf), "%s=true", name);
-            /* Find and replace in vals_arr */
-            size_t vi;
-            size_t vlen = vigil_array_object_length(vals_arr);
-            size_t nlen = strlen(name);
-            for (vi = 0; vi < vlen; vi++)
-            {
-                const char *entry = array_get_str(vals_arr, vi);
-                if (strncmp(entry, name, nlen) == 0 && entry[nlen] == '=')
-                {
-                    vigil_value_t sv;
-                    s = make_string(rt, buf, &sv, error);
-                    if (s != VIGIL_STATUS_OK)
-                        goto fail;
-                    s = vigil_array_object_set(vals_arr, vi, &sv, error);
-                    vigil_value_release(&sv);
-                    if (s != VIGIL_STATUS_OK)
-                        goto fail;
-                    break;
-                }
-            }
+            s = parser_update_vals_entry(vals_arr, rt, name, "true", error);
+            if (s != VIGIL_STATUS_OK)
+                goto fail;
             pos++;
         }
         else
         {
             /* string, int, or multi — needs a value */
-            const char *val = NULL;
-            if (inline_val != NULL)
-            {
-                val = inline_val;
-            }
-            else
+            const char *val = inline_val;
+            if (val == NULL)
             {
                 pos++;
                 if ((size_t)pos >= argc)
@@ -532,8 +570,6 @@ static vigil_status_t parser_parse(vigil_vm_t *vm, size_t arg_count, vigil_error
                 }
                 val = argv[pos];
             }
-
-            /* int validation */
             if (strcmp(typ, "int") == 0)
             {
                 char *end = NULL;
@@ -545,10 +581,8 @@ static vigil_status_t parser_parse(vigil_vm_t *vm, size_t arg_count, vigil_error
                     goto err_out;
                 }
             }
-
             if (strcmp(typ, "multi") == 0)
             {
-                /* Append as __multi__name=value */
                 char buf[512];
                 snprintf(buf, sizeof(buf), "__multi__%s=%s", name, val);
                 s = array_push_str(vals_arr, rt, buf, error);
@@ -557,91 +591,17 @@ static vigil_status_t parser_parse(vigil_vm_t *vm, size_t arg_count, vigil_error
             }
             else
             {
-                /* Update existing entry */
-                char buf[512];
-                snprintf(buf, sizeof(buf), "%s=%s", name, val);
-                size_t vi;
-                size_t vlen = vigil_array_object_length(vals_arr);
-                size_t nlen = strlen(name);
-                for (vi = 0; vi < vlen; vi++)
-                {
-                    const char *entry = array_get_str(vals_arr, vi);
-                    if (strncmp(entry, name, nlen) == 0 && entry[nlen] == '=')
-                    {
-                        vigil_value_t sv;
-                        s = make_string(rt, buf, &sv, error);
-                        if (s != VIGIL_STATUS_OK)
-                            goto fail;
-                        s = vigil_array_object_set(vals_arr, vi, &sv, error);
-                        vigil_value_release(&sv);
-                        if (s != VIGIL_STATUS_OK)
-                            goto fail;
-                        break;
-                    }
-                }
+                s = parser_update_vals_entry(vals_arr, rt, name, val, error);
+                if (s != VIGIL_STATUS_OK)
+                    goto fail;
             }
             pos++;
         }
     }
 
     /* Check required options */
-    for (i = 0; i < opt_count; i++)
-    {
-        const char *req = array_get_str(req_arr, i);
-        if (strcmp(req, "true") != 0)
-            continue;
-        const char *name = array_get_str(names_arr, i);
-        const char *typ = array_get_str(types_arr, i);
-        if (strcmp(typ, "bool") == 0)
-            continue;
-
-        if (strcmp(typ, "multi") == 0)
-        {
-            /* Check if any __multi__name= entry exists */
-            char prefix[280];
-            snprintf(prefix, sizeof(prefix), "__multi__%s=", name);
-            size_t plen = strlen(prefix);
-            int found = 0;
-            size_t vi;
-            size_t vlen = vigil_array_object_length(vals_arr);
-            for (vi = 0; vi < vlen; vi++)
-            {
-                const char *entry = array_get_str(vals_arr, vi);
-                if (strncmp(entry, prefix, plen) == 0)
-                {
-                    found = 1;
-                    break;
-                }
-            }
-            if (!found)
-            {
-                snprintf(err_buf, sizeof(err_buf), "required option --%s not provided", name);
-                goto err_out;
-            }
-        }
-        else
-        {
-            /* Check if value is non-empty */
-            char prefix[280];
-            snprintf(prefix, sizeof(prefix), "%s=", name);
-            size_t plen = strlen(prefix);
-            size_t vi;
-            size_t vlen = vigil_array_object_length(vals_arr);
-            for (vi = 0; vi < vlen; vi++)
-            {
-                const char *entry = array_get_str(vals_arr, vi);
-                if (strncmp(entry, prefix, plen) == 0)
-                {
-                    if (entry[plen] == '\0')
-                    {
-                        snprintf(err_buf, sizeof(err_buf), "required option --%s not provided", name);
-                        goto err_out;
-                    }
-                    break;
-                }
-            }
-        }
-    }
+    if (!parser_check_required(vals_arr, names_arr, types_arr, req_arr, opt_count, err_buf, sizeof(err_buf)))
+        goto err_out;
 
     /* Store results in instance fields */
     {

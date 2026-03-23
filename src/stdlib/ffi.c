@@ -223,6 +223,44 @@ static ffi_type *sig_to_ffi_type(const char *t, size_t len)
 /* Parse "[stdcall:]ret(p1,p2,...)" and call fn via ffi_call.
  * Returns raw i64 bits.  Prefix "stdcall:" selects FFI_STDCALL on
  * platforms that support it (32-bit x86 Windows); ignored elsewhere. */
+typedef struct
+{
+    ffi_type **atypes;
+    int64_t *args_i;
+    double *args_d;
+    void **args_p;
+    void **avalues;
+    ffi_type *atypes_s[16];
+    int64_t args_i_s[16];
+    double args_d_s[16];
+    void *args_p_s[16];
+    void *avalues_s[16];
+} ffi_call_bufs_t;
+
+static int ffi_call_bufs_init(ffi_call_bufs_t *b, int nargs)
+{
+    b->atypes = nargs <= 16 ? b->atypes_s : malloc((size_t)nargs * sizeof(*b->atypes));
+    b->args_i = nargs <= 16 ? b->args_i_s : malloc((size_t)nargs * sizeof(*b->args_i));
+    b->args_d = nargs <= 16 ? b->args_d_s : malloc((size_t)nargs * sizeof(*b->args_d));
+    b->args_p = nargs <= 16 ? b->args_p_s : malloc((size_t)nargs * sizeof(*b->args_p));
+    b->avalues = nargs <= 16 ? b->avalues_s : malloc((size_t)nargs * sizeof(*b->avalues));
+    return b->atypes && b->args_i && b->args_d && b->args_p && b->avalues;
+}
+
+static void ffi_call_bufs_free(ffi_call_bufs_t *b)
+{
+    if (b->atypes != b->atypes_s)
+        free(b->atypes);
+    if (b->args_i != b->args_i_s)
+        free(b->args_i);
+    if (b->args_d != b->args_d_s)
+        free(b->args_d);
+    if (b->args_p != b->args_p_s)
+        free(b->args_p);
+    if (b->avalues != b->avalues_s)
+        free(b->avalues);
+}
+
 static int64_t ffi_call_generic(void *fn, const char *sig, const int64_t *args, int nargs_avail)
 {
     ffi_abi abi = FFI_DEFAULT_ABI;
@@ -249,7 +287,6 @@ static int64_t ffi_call_generic(void *fn, const char *sig, const int64_t *args, 
     if (!end)
         end = p + strlen(p);
 
-    /* Count params in signature. */
     int nargs = 0;
     {
         const char *q = p;
@@ -266,35 +303,13 @@ static int64_t ffi_call_generic(void *fn, const char *sig, const int64_t *args, 
     if (nargs > nargs_avail)
         nargs = nargs_avail;
 
-    /* Allocate on the stack for typical sizes, heap for large. */
-    ffi_type *atypes_s[16];
-    int64_t args_i_s[16];
-    double args_d_s[16];
-    void *args_p_s[16];
-    void *avalues_s[16];
-
-    ffi_type **atypes = nargs <= 16 ? atypes_s : malloc((size_t)nargs * sizeof(*atypes));
-    int64_t *args_i = nargs <= 16 ? args_i_s : malloc((size_t)nargs * sizeof(*args_i));
-    double *args_d = nargs <= 16 ? args_d_s : malloc((size_t)nargs * sizeof(*args_d));
-    void **args_p = nargs <= 16 ? args_p_s : malloc((size_t)nargs * sizeof(*args_p));
-    void **avalues = nargs <= 16 ? avalues_s : malloc((size_t)nargs * sizeof(*avalues));
-
-    if (!atypes || !args_i || !args_d || !args_p || !avalues)
+    ffi_call_bufs_t b;
+    if (!ffi_call_bufs_init(&b, nargs))
     {
-        if (atypes != atypes_s)
-            free(atypes);
-        if (args_i != args_i_s)
-            free(args_i);
-        if (args_d != args_d_s)
-            free(args_d);
-        if (args_p != args_p_s)
-            free(args_p);
-        if (avalues != avalues_s)
-            free(avalues);
+        ffi_call_bufs_free(&b);
         return 0;
     }
 
-    /* Parse param types. */
     int idx = 0;
     p = paren + 1;
     while (p < end && idx < nargs)
@@ -304,66 +319,57 @@ static int64_t ffi_call_generic(void *fn, const char *sig, const int64_t *args, 
             comma++;
         size_t tlen = (size_t)(comma - p);
         if (tlen > 0)
-            atypes[idx++] = sig_to_ffi_type(p, tlen);
+            b.atypes[idx++] = sig_to_ffi_type(p, tlen);
         p = comma + 1;
     }
 
     ffi_cif cif;
     int64_t result = 0;
-    if (ffi_prep_cif(&cif, abi, (unsigned)nargs, rtype, nargs ? atypes : NULL) != FFI_OK)
+    if (ffi_prep_cif(&cif, abi, (unsigned)nargs, rtype, nargs ? b.atypes : NULL) != FFI_OK)
         goto done;
 
     for (int i = 0; i < nargs; i++)
     {
-        args_i[i] = args[i];
-        if (atypes[i] == &ffi_type_double)
+        b.args_i[i] = args[i];
+        if (b.atypes[i] == &ffi_type_double)
         {
-            memcpy(&args_d[i], &args_i[i], sizeof(double));
-            avalues[i] = &args_d[i];
+            memcpy(&b.args_d[i], &b.args_i[i], sizeof(double));
+            b.avalues[i] = &b.args_d[i];
         }
-        else if (atypes[i] == &ffi_type_pointer)
+        else if (b.atypes[i] == &ffi_type_pointer)
         {
-            args_p[i] = (void *)(intptr_t)args_i[i];
-            avalues[i] = &args_p[i];
+            b.args_p[i] = (void *)(intptr_t)b.args_i[i];
+            b.avalues[i] = &b.args_p[i];
         }
         else
         {
-            avalues[i] = &args_i[i];
+            b.avalues[i] = &b.args_i[i];
         }
     }
 
     if (rtype == &ffi_type_void)
     {
-        ffi_call(&cif, fn_to_fnptr(fn), NULL, avalues);
+        ffi_call(&cif, fn_to_fnptr(fn), NULL, b.avalues);
     }
     else if (rtype == &ffi_type_double)
     {
         double rv;
-        ffi_call(&cif, fn_to_fnptr(fn), &rv, avalues);
+        ffi_call(&cif, fn_to_fnptr(fn), &rv, b.avalues);
         memcpy(&result, &rv, sizeof(result));
     }
     else if (rtype == &ffi_type_pointer)
     {
         void *rv;
-        ffi_call(&cif, fn_to_fnptr(fn), &rv, avalues);
+        ffi_call(&cif, fn_to_fnptr(fn), &rv, b.avalues);
         result = (int64_t)(intptr_t)rv;
     }
     else
     {
-        ffi_call(&cif, fn_to_fnptr(fn), &result, avalues);
+        ffi_call(&cif, fn_to_fnptr(fn), &result, b.avalues);
     }
 
 done:
-    if (atypes != atypes_s)
-        free(atypes);
-    if (args_i != args_i_s)
-        free(args_i);
-    if (args_d != args_d_s)
-        free(args_d);
-    if (args_p != args_p_s)
-        free(args_p);
-    if (avalues != avalues_s)
-        free(avalues);
+    ffi_call_bufs_free(&b);
     return result;
 }
 

@@ -618,7 +618,8 @@ static const vigil_doc_entry_t fs_docs[] = {
      "fs.Reader r, error err = fs.Reader.open(\"data.txt\")"},
     {"fs.Reader.handle", "fs.Reader.handle: i64", "Internal file handle.",
      "Opaque integer handle used by the runtime to track the underlying file. "
-     "Not intended for direct use.", "i64 h = r.handle"},
+     "Not intended for direct use.",
+     "i64 h = r.handle"},
     {"fs.Reader.open", "fs.Reader.open(path: string) -> (fs.Reader, err)", "Open a file for reading.",
      "Opens the file at path for sequential reading. Returns a Reader and an error value.",
      "fs.Reader r, error err = fs.Reader.open(\"input.txt\")"},
@@ -629,11 +630,9 @@ static const vigil_doc_entry_t fs_docs[] = {
      "Reads up to n raw bytes from the file. Returns an eof error when no more data.",
      "string chunk, error err = r.read_bytes(4096)"},
     {"fs.Reader.read_all", "fs.Reader.read_all() -> (string, err)", "Read entire file contents.",
-     "Reads the remaining contents of the file into a single string.",
-     "string contents, error err = r.read_all()"},
+     "Reads the remaining contents of the file into a single string.", "string contents, error err = r.read_all()"},
     {"fs.Reader.close", "fs.Reader.close() -> err", "Close the file.",
-     "Closes the underlying file handle. Subsequent reads will return an error.",
-     "error err = r.close()"},
+     "Closes the underlying file handle. Subsequent reads will return an error.", "error err = r.close()"},
     /* ── fs.Writer class ── */
     {"fs.Writer", "class fs.Writer", "Buffered file writer.",
      "Provides string and line writing to an open file. "
@@ -641,12 +640,12 @@ static const vigil_doc_entry_t fs_docs[] = {
      "fs.Writer w, error err = fs.Writer.open(\"out.txt\")"},
     {"fs.Writer.handle", "fs.Writer.handle: i64", "Internal file handle.",
      "Opaque integer handle used by the runtime to track the underlying file. "
-     "Not intended for direct use.", "i64 h = w.handle"},
+     "Not intended for direct use.",
+     "i64 h = w.handle"},
     {"fs.Writer.open", "fs.Writer.open(path: string) -> (fs.Writer, err)", "Open a file for writing.",
      "Opens the file at path for writing, creating or truncating it. Returns a Writer and an error value.",
      "fs.Writer w, error err = fs.Writer.open(\"output.txt\")"},
-    {"fs.Writer.open_append", "fs.Writer.open_append(path: string) -> (fs.Writer, err)",
-     "Open a file for appending.",
+    {"fs.Writer.open_append", "fs.Writer.open_append(path: string) -> (fs.Writer, err)", "Open a file for appending.",
      "Opens the file at path for appending, creating it if it does not exist. Returns a Writer and an error value.",
      "fs.Writer w, error err = fs.Writer.open_append(\"log.txt\")"},
     {"fs.Writer.write", "fs.Writer.write(s: string) -> (i32, err)", "Write a string.",
@@ -658,8 +657,7 @@ static const vigil_doc_entry_t fs_docs[] = {
     {"fs.Writer.flush", "fs.Writer.flush() -> err", "Flush buffered data.",
      "Flushes any buffered data to the underlying file system.", "error err = w.flush()"},
     {"fs.Writer.close", "fs.Writer.close() -> err", "Close the file.",
-     "Flushes and closes the underlying file handle. Subsequent writes will return an error.",
-     "error err = w.close()"},
+     "Flushes and closes the underlying file handle. Subsequent writes will return an error.", "error err = w.close()"},
 };
 
 #define FS_COUNT (sizeof(fs_docs) / sizeof(fs_docs[0]))
@@ -1281,231 +1279,57 @@ static const char *module_names[] = {
 
 /* ── Lookup Implementation ────────────────────────────────── */
 
+typedef struct
+{
+    const char *name;
+    const vigil_doc_entry_t *entries;
+    size_t count;
+} doc_module_table_entry_t;
+
+static const doc_module_table_entry_t doc_module_table[] = {
+    {"builtins", builtin_docs, BUILTIN_COUNT},
+    {"fmt", fmt_docs, FMT_COUNT},
+    {"math", math_docs, MATH_COUNT},
+    {"args", args_docs, ARGS_COUNT},
+    {"test", test_docs, TEST_COUNT},
+    {"strings", strings_docs, STRINGS_COUNT},
+    {"regex", regex_docs, REGEX_COUNT},
+    {"random", random_docs, RANDOM_COUNT},
+    {"url", url_docs, URL_COUNT},
+    {"yaml", yaml_docs, YAML_COUNT},
+    {"fs", fs_docs, FS_COUNT},
+    {"log", log_docs, LOG_COUNT},
+    {"thread", thread_docs, THREAD_COUNT},
+    {"atomic", atomic_docs, ATOMIC_COUNT},
+    {"compress", compress_docs, COMPRESS_COUNT},
+    {"crypto", crypto_docs, CRYPTO_COUNT},
+    {"http", http_docs, HTTP_COUNT},
+    {"csv", csv_docs, CSV_COUNT},
+    {"net", net_docs, NET_COUNT},
+    {"time", time_docs, TIME_COUNT},
+    {"ffi", ffi_docs, FFI_COUNT},
+    {"unsafe", unsafe_docs, UNSAFE_COUNT},
+    {"parse", parse_docs, PARSE_COUNT},
+    {"readline", readline_docs, READLINE_COUNT},
+};
+
+#define DOC_MODULE_TABLE_COUNT (sizeof(doc_module_table) / sizeof(doc_module_table[0]))
+
 const vigil_doc_entry_t *vigil_doc_lookup(const char *name)
 {
-    size_t i, len;
+    size_t m, i;
 
     if (name == NULL)
         return NULL;
-    len = strlen(name);
 
-    /* Check builtins */
-    for (i = 0; i < BUILTIN_COUNT; i++)
+    for (m = 0; m < DOC_MODULE_TABLE_COUNT; m++)
     {
-        if (strcmp(builtin_docs[i].name, name) == 0)
+        for (i = 0; i < doc_module_table[m].count; i++)
         {
-            return &builtin_docs[i];
+            if (strcmp(doc_module_table[m].entries[i].name, name) == 0)
+                return &doc_module_table[m].entries[i];
         }
     }
-
-    /* Check fmt */
-    for (i = 0; i < FMT_COUNT; i++)
-    {
-        if (strcmp(fmt_docs[i].name, name) == 0)
-        {
-            return &fmt_docs[i];
-        }
-    }
-
-    /* Check math */
-    for (i = 0; i < MATH_COUNT; i++)
-    {
-        if (strcmp(math_docs[i].name, name) == 0)
-        {
-            return &math_docs[i];
-        }
-    }
-
-    /* Check args */
-    for (i = 0; i < ARGS_COUNT; i++)
-    {
-        if (strcmp(args_docs[i].name, name) == 0)
-        {
-            return &args_docs[i];
-        }
-    }
-
-    /* Check test */
-    for (i = 0; i < TEST_COUNT; i++)
-    {
-        if (strcmp(test_docs[i].name, name) == 0)
-        {
-            return &test_docs[i];
-        }
-    }
-
-    /* Check strings */
-    for (i = 0; i < STRINGS_COUNT; i++)
-    {
-        if (strcmp(strings_docs[i].name, name) == 0)
-        {
-            return &strings_docs[i];
-        }
-    }
-
-    /* Check regex */
-    for (i = 0; i < REGEX_COUNT; i++)
-    {
-        if (strcmp(regex_docs[i].name, name) == 0)
-        {
-            return &regex_docs[i];
-        }
-    }
-
-    /* Check random */
-    for (i = 0; i < RANDOM_COUNT; i++)
-    {
-        if (strcmp(random_docs[i].name, name) == 0)
-        {
-            return &random_docs[i];
-        }
-    }
-
-    /* Check url */
-    for (i = 0; i < URL_COUNT; i++)
-    {
-        if (strcmp(url_docs[i].name, name) == 0)
-        {
-            return &url_docs[i];
-        }
-    }
-
-    /* Check yaml */
-    for (i = 0; i < YAML_COUNT; i++)
-    {
-        if (strcmp(yaml_docs[i].name, name) == 0)
-        {
-            return &yaml_docs[i];
-        }
-    }
-
-    /* Check fs */
-    for (i = 0; i < FS_COUNT; i++)
-    {
-        if (strcmp(fs_docs[i].name, name) == 0)
-        {
-            return &fs_docs[i];
-        }
-    }
-
-    /* Check log */
-    for (i = 0; i < LOG_COUNT; i++)
-    {
-        if (strcmp(log_docs[i].name, name) == 0)
-        {
-            return &log_docs[i];
-        }
-    }
-
-    /* Check thread */
-    for (i = 0; i < THREAD_COUNT; i++)
-    {
-        if (strcmp(thread_docs[i].name, name) == 0)
-        {
-            return &thread_docs[i];
-        }
-    }
-
-    /* Check atomic */
-    for (i = 0; i < ATOMIC_COUNT; i++)
-    {
-        if (strcmp(atomic_docs[i].name, name) == 0)
-        {
-            return &atomic_docs[i];
-        }
-    }
-
-    /* Check compress */
-    for (i = 0; i < COMPRESS_COUNT; i++)
-    {
-        if (strcmp(compress_docs[i].name, name) == 0)
-        {
-            return &compress_docs[i];
-        }
-    }
-
-    /* Check crypto */
-    for (i = 0; i < CRYPTO_COUNT; i++)
-    {
-        if (strcmp(crypto_docs[i].name, name) == 0)
-        {
-            return &crypto_docs[i];
-        }
-    }
-
-    /* Check http */
-    for (i = 0; i < HTTP_COUNT; i++)
-    {
-        if (strcmp(http_docs[i].name, name) == 0)
-        {
-            return &http_docs[i];
-        }
-    }
-
-    /* Check csv */
-    for (i = 0; i < CSV_COUNT; i++)
-    {
-        if (strcmp(csv_docs[i].name, name) == 0)
-        {
-            return &csv_docs[i];
-        }
-    }
-
-    /* Check net */
-    for (i = 0; i < NET_COUNT; i++)
-    {
-        if (strcmp(net_docs[i].name, name) == 0)
-        {
-            return &net_docs[i];
-        }
-    }
-
-    /* Check time */
-    for (i = 0; i < TIME_COUNT; i++)
-    {
-        if (strcmp(time_docs[i].name, name) == 0)
-        {
-            return &time_docs[i];
-        }
-    }
-
-    /* Check ffi */
-    for (i = 0; i < FFI_COUNT; i++)
-    {
-        if (strcmp(ffi_docs[i].name, name) == 0)
-        {
-            return &ffi_docs[i];
-        }
-    }
-
-    /* Check unsafe */
-    for (i = 0; i < UNSAFE_COUNT; i++)
-    {
-        if (strcmp(unsafe_docs[i].name, name) == 0)
-        {
-            return &unsafe_docs[i];
-        }
-    }
-
-    /* Check parse */
-    for (i = 0; i < PARSE_COUNT; i++)
-    {
-        if (strcmp(parse_docs[i].name, name) == 0)
-        {
-            return &parse_docs[i];
-        }
-    }
-
-    /* Check readline */
-    for (i = 0; i < READLINE_COUNT; i++)
-    {
-        if (strcmp(readline_docs[i].name, name) == 0)
-        {
-            return &readline_docs[i];
-        }
-    }
-
-    (void)len;
     return NULL;
 }
 
@@ -1520,154 +1344,19 @@ const char **vigil_doc_list_modules(size_t *count)
 
 const vigil_doc_entry_t *vigil_doc_list_module(const char *module_name, size_t *count)
 {
+    size_t m;
     if (module_name == NULL)
         return NULL;
 
-    if (strcmp(module_name, "builtins") == 0)
+    for (m = 0; m < DOC_MODULE_TABLE_COUNT; m++)
     {
-        if (count)
-            *count = BUILTIN_COUNT;
-        return builtin_docs;
+        if (strcmp(doc_module_table[m].name, module_name) == 0)
+        {
+            if (count)
+                *count = doc_module_table[m].count;
+            return doc_module_table[m].entries;
+        }
     }
-    if (strcmp(module_name, "fmt") == 0)
-    {
-        if (count)
-            *count = FMT_COUNT;
-        return fmt_docs;
-    }
-    if (strcmp(module_name, "math") == 0)
-    {
-        if (count)
-            *count = MATH_COUNT;
-        return math_docs;
-    }
-    if (strcmp(module_name, "args") == 0)
-    {
-        if (count)
-            *count = ARGS_COUNT;
-        return args_docs;
-    }
-    if (strcmp(module_name, "test") == 0)
-    {
-        if (count)
-            *count = TEST_COUNT;
-        return test_docs;
-    }
-    if (strcmp(module_name, "strings") == 0)
-    {
-        if (count)
-            *count = STRINGS_COUNT;
-        return strings_docs;
-    }
-    if (strcmp(module_name, "regex") == 0)
-    {
-        if (count)
-            *count = REGEX_COUNT;
-        return regex_docs;
-    }
-    if (strcmp(module_name, "random") == 0)
-    {
-        if (count)
-            *count = RANDOM_COUNT;
-        return random_docs;
-    }
-    if (strcmp(module_name, "url") == 0)
-    {
-        if (count)
-            *count = URL_COUNT;
-        return url_docs;
-    }
-    if (strcmp(module_name, "yaml") == 0)
-    {
-        if (count)
-            *count = YAML_COUNT;
-        return yaml_docs;
-    }
-    if (strcmp(module_name, "fs") == 0)
-    {
-        if (count)
-            *count = FS_COUNT;
-        return fs_docs;
-    }
-    if (strcmp(module_name, "log") == 0)
-    {
-        if (count)
-            *count = LOG_COUNT;
-        return log_docs;
-    }
-    if (strcmp(module_name, "thread") == 0)
-    {
-        if (count)
-            *count = THREAD_COUNT;
-        return thread_docs;
-    }
-    if (strcmp(module_name, "atomic") == 0)
-    {
-        if (count)
-            *count = ATOMIC_COUNT;
-        return atomic_docs;
-    }
-    if (strcmp(module_name, "compress") == 0)
-    {
-        if (count)
-            *count = COMPRESS_COUNT;
-        return compress_docs;
-    }
-    if (strcmp(module_name, "crypto") == 0)
-    {
-        if (count)
-            *count = CRYPTO_COUNT;
-        return crypto_docs;
-    }
-    if (strcmp(module_name, "http") == 0)
-    {
-        if (count)
-            *count = HTTP_COUNT;
-        return http_docs;
-    }
-    if (strcmp(module_name, "csv") == 0)
-    {
-        if (count)
-            *count = CSV_COUNT;
-        return csv_docs;
-    }
-    if (strcmp(module_name, "net") == 0)
-    {
-        if (count)
-            *count = NET_COUNT;
-        return net_docs;
-    }
-    if (strcmp(module_name, "time") == 0)
-    {
-        if (count)
-            *count = TIME_COUNT;
-        return time_docs;
-    }
-    if (strcmp(module_name, "ffi") == 0)
-    {
-        if (count)
-            *count = FFI_COUNT;
-        return ffi_docs;
-    }
-    if (strcmp(module_name, "unsafe") == 0)
-    {
-        if (count)
-            *count = UNSAFE_COUNT;
-        return unsafe_docs;
-    }
-    if (strcmp(module_name, "parse") == 0)
-    {
-        if (count)
-            *count = PARSE_COUNT;
-        return parse_docs;
-    }
-    if (strcmp(module_name, "readline") == 0)
-    {
-        if (count)
-            *count = READLINE_COUNT;
-        return readline_docs;
-    }
-
     return NULL;
 }
 
