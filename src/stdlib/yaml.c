@@ -14,8 +14,8 @@
 #include "vigil/vm.h"
 #include "vigil/yaml.h"
 
-#include "internal/vigil_nanbox.h"
 #include "internal/vigil_internal.h"
+#include "internal/vigil_nanbox.h"
 
 /* ── Allocator helpers ────────────────────────────────────────────── */
 

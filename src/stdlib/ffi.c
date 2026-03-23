@@ -254,8 +254,7 @@ static int ffi_call_bufs_init(ffi_call_bufs_t *b, int nargs, const vigil_allocat
     b->args_i = nargs <= 16 ? b->args_i_s : alloc->allocate(alloc->user_data, (size_t)nargs * sizeof(*b->args_i));
     b->args_d = nargs <= 16 ? b->args_d_s : alloc->allocate(alloc->user_data, (size_t)nargs * sizeof(*b->args_d));
     b->args_p = nargs <= 16 ? b->args_p_s : alloc->allocate(alloc->user_data, (size_t)nargs * sizeof(*b->args_p));
-    b->avalues =
-        nargs <= 16 ? b->avalues_s : alloc->allocate(alloc->user_data, (size_t)nargs * sizeof(*b->avalues));
+    b->avalues = nargs <= 16 ? b->avalues_s : alloc->allocate(alloc->user_data, (size_t)nargs * sizeof(*b->avalues));
     return b->atypes && b->args_i && b->args_d && b->args_p && b->avalues;
 }
 
@@ -271,6 +270,87 @@ static void ffi_call_bufs_free(ffi_call_bufs_t *b, const vigil_allocator_t *allo
         alloc->deallocate(alloc->user_data, b->args_p);
     if (b->avalues != b->avalues_s)
         alloc->deallocate(alloc->user_data, b->avalues);
+}
+
+static int ffi_parse_arg_types(const char *paren, const char *end, ffi_type **atypes, int max_args)
+{
+    int nargs = 0;
+    const char *p = paren + 1;
+    while (p < end && nargs < max_args)
+    {
+        const char *comma = p;
+        while (comma < end && *comma != ',')
+            comma++;
+        size_t tlen = (size_t)(comma - p);
+        if (tlen > 0)
+            atypes[nargs++] = sig_to_ffi_type(p, tlen);
+        p = comma + 1;
+    }
+    return nargs;
+}
+
+static int ffi_count_params(const char *p, const char *end)
+{
+    int n = 0;
+    const char *q = p;
+    while (q < end)
+    {
+        const char *c = q;
+        while (c < end && *c != ',')
+            c++;
+        if ((size_t)(c - q) > 0)
+            n++;
+        q = c + 1;
+    }
+    return n;
+}
+
+static void ffi_setup_avalues(ffi_call_bufs_t *b, const int64_t *args, int nargs)
+{
+    for (int i = 0; i < nargs; i++)
+    {
+        b->args_i[i] = args[i];
+        if (b->atypes[i] == &ffi_type_double)
+        {
+            memcpy(&b->args_d[i], &b->args_i[i], sizeof(double));
+            b->avalues[i] = &b->args_d[i];
+        }
+        else if (b->atypes[i] == &ffi_type_pointer)
+        {
+            b->args_p[i] = (void *)(intptr_t)b->args_i[i];
+            b->avalues[i] = &b->args_p[i];
+        }
+        else
+        {
+            b->avalues[i] = &b->args_i[i];
+        }
+    }
+}
+
+static int64_t ffi_invoke(ffi_cif *cif, void *fn, ffi_type *rtype, void **avalues)
+{
+    int64_t result = 0;
+    if (rtype == &ffi_type_void)
+    {
+        ffi_call(cif, fn_to_fnptr(fn), NULL, avalues);
+    }
+    else if (rtype == &ffi_type_double)
+    {
+        double rv;
+        ffi_call(cif, fn_to_fnptr(fn), &rv, avalues);
+        memcpy(&result, &rv, sizeof(result));
+    }
+    else if (rtype == &ffi_type_pointer)
+    {
+        void *rv;
+        ffi_call(cif, fn_to_fnptr(fn), &rv, avalues);
+        result = (int64_t)(intptr_t)rv;
+    }
+    else
+    {
+        ffi_call(cif, fn_to_fnptr(fn), &result, avalues);
+    }
+    return result;
 }
 
 static int64_t ffi_call_generic(const vigil_allocator_t *alloc, void *fn, const char *sig, const int64_t *args,
@@ -295,24 +375,11 @@ static int64_t ffi_call_generic(const vigil_allocator_t *alloc, void *fn, const 
     size_t ret_len = (size_t)(paren - s);
     ffi_type *rtype = sig_to_ffi_type(s, ret_len);
 
-    const char *p = paren + 1;
-    const char *end = strchr(p, ')');
+    const char *end = strchr(paren + 1, ')');
     if (!end)
-        end = p + strlen(p);
+        end = paren + 1 + strlen(paren + 1);
 
-    int nargs = 0;
-    {
-        const char *q = p;
-        while (q < end)
-        {
-            const char *c = q;
-            while (c < end && *c != ',')
-                c++;
-            if ((size_t)(c - q) > 0)
-                nargs++;
-            q = c + 1;
-        }
-    }
+    int nargs = ffi_count_params(paren + 1, end);
     if (nargs > nargs_avail)
         nargs = nargs_avail;
 
@@ -323,65 +390,14 @@ static int64_t ffi_call_generic(const vigil_allocator_t *alloc, void *fn, const 
         return 0;
     }
 
-    int idx = 0;
-    p = paren + 1;
-    while (p < end && idx < nargs)
-    {
-        const char *comma = p;
-        while (comma < end && *comma != ',')
-            comma++;
-        size_t tlen = (size_t)(comma - p);
-        if (tlen > 0)
-            b.atypes[idx++] = sig_to_ffi_type(p, tlen);
-        p = comma + 1;
-    }
+    ffi_parse_arg_types(paren, end, b.atypes, nargs);
+    ffi_setup_avalues(&b, args, nargs);
 
     ffi_cif cif;
     int64_t result = 0;
-    if (ffi_prep_cif(&cif, abi, (unsigned)nargs, rtype, nargs ? b.atypes : NULL) != FFI_OK)
-        goto done;
+    if (ffi_prep_cif(&cif, abi, (unsigned)nargs, rtype, nargs ? b.atypes : NULL) == FFI_OK)
+        result = ffi_invoke(&cif, fn, rtype, b.avalues);
 
-    for (int i = 0; i < nargs; i++)
-    {
-        b.args_i[i] = args[i];
-        if (b.atypes[i] == &ffi_type_double)
-        {
-            memcpy(&b.args_d[i], &b.args_i[i], sizeof(double));
-            b.avalues[i] = &b.args_d[i];
-        }
-        else if (b.atypes[i] == &ffi_type_pointer)
-        {
-            b.args_p[i] = (void *)(intptr_t)b.args_i[i];
-            b.avalues[i] = &b.args_p[i];
-        }
-        else
-        {
-            b.avalues[i] = &b.args_i[i];
-        }
-    }
-
-    if (rtype == &ffi_type_void)
-    {
-        ffi_call(&cif, fn_to_fnptr(fn), NULL, b.avalues);
-    }
-    else if (rtype == &ffi_type_double)
-    {
-        double rv;
-        ffi_call(&cif, fn_to_fnptr(fn), &rv, b.avalues);
-        memcpy(&result, &rv, sizeof(result));
-    }
-    else if (rtype == &ffi_type_pointer)
-    {
-        void *rv;
-        ffi_call(&cif, fn_to_fnptr(fn), &rv, b.avalues);
-        result = (int64_t)(intptr_t)rv;
-    }
-    else
-    {
-        ffi_call(&cif, fn_to_fnptr(fn), &result, b.avalues);
-    }
-
-done:
     ffi_call_bufs_free(&b, alloc);
     return result;
 }

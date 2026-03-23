@@ -97,8 +97,7 @@ static bool csv_field_spill(const vigil_allocator_t *alloc, char **buf, char **h
     if (!h)
         return false;
     memcpy(h, *buf, len);
-    if (*heap_buf)
-        alloc->deallocate(alloc->user_data, *heap_buf);
+    alloc->deallocate(alloc->user_data, *heap_buf);
     *heap_buf = h;
     *buf = h;
     *cap = new_cap;
@@ -220,8 +219,7 @@ static vigil_status_t csv_parse(vigil_vm_t *vm, size_t arg_count, vigil_error_t 
 
             vigil_object_t *str_obj = NULL;
             s = vigil_string_object_new(vigil_vm_runtime(vm), field, field_len, &str_obj, error);
-            if (field_heap)
-                alloc.deallocate(alloc.user_data, field_heap);
+            alloc.deallocate(alloc.user_data, field_heap);
             if (s != VIGIL_STATUS_OK)
                 return s;
 
@@ -303,8 +301,7 @@ static vigil_status_t csv_parse_row(vigil_vm_t *vm, size_t arg_count, vigil_erro
 
         vigil_object_t *str_obj = NULL;
         s = vigil_string_object_new(vigil_vm_runtime(vm), field, field_len, &str_obj, error);
-        if (field_heap)
-            alloc.deallocate(alloc.user_data, field_heap);
+        alloc.deallocate(alloc.user_data, field_heap);
         if (s != VIGIL_STATUS_OK)
             return s;
 
@@ -456,8 +453,7 @@ static vigil_status_t csv_stringify(vigil_vm_t *vm, size_t arg_count, vigil_erro
     }
 
     vigil_status_t s = push_string(vm, buf ? buf : "", len, error);
-    if (buf)
-        alloc.deallocate(alloc.user_data, buf);
+    alloc.deallocate(alloc.user_data, buf);
     return s;
 }
 
@@ -515,8 +511,7 @@ static vigil_status_t csv_stringify_row(vigil_vm_t *vm, size_t arg_count, vigil_
     }
 
     vigil_status_t s = push_string(vm, buf ? buf : "", len, error);
-    if (buf)
-        alloc.deallocate(alloc.user_data, buf);
+    alloc.deallocate(alloc.user_data, buf);
     return s;
 }
 

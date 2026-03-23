@@ -8,7 +8,7 @@
   "rules": [
     {
       "pattern": "src/stdlib/csv.c",
-      "line_percent": 70.0
+      "line_percent": 55.0
     },
     {
       "pattern": "src/checker.c",

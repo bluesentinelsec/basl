@@ -1113,8 +1113,15 @@ static vigil_status_t tar_read_fn(vigil_vm_t *vm, size_t arg_count, vigil_error_
     return push_empty_bytes(vm, error);
 }
 
+typedef struct
+{
+    unsigned char *data;
+    size_t size;
+    size_t cap;
+} tar_buf_t;
+
 static int tar_append_entry(const vigil_allocator_t *alloc, const char *name, size_t name_len, const char *data,
-                            size_t data_len, unsigned char **tar_data, size_t *tar_size, size_t *tar_cap)
+                            size_t data_len, tar_buf_t *tb)
 {
     tar_header_t h;
     if (name_len > 100)
@@ -1137,25 +1144,25 @@ static int tar_append_entry(const vigil_allocator_t *alloc, const char *name, si
     h.checksum[7] = ' ';
 
     size_t padded_size = (data_len + 511) & ~511;
-    size_t needed = *tar_size + 512 + padded_size;
-    if (needed > *tar_cap)
+    size_t needed = tb->size + 512 + padded_size;
+    if (needed > tb->cap)
     {
-        size_t new_cap = *tar_cap ? *tar_cap * 2 : 4096;
+        size_t new_cap = tb->cap ? tb->cap * 2 : 4096;
         while (new_cap < needed)
             new_cap *= 2;
-        unsigned char *new_data = (unsigned char *)alloc->reallocate(alloc->user_data, *tar_data, new_cap);
+        unsigned char *new_data = (unsigned char *)alloc->reallocate(alloc->user_data, tb->data, new_cap);
         if (!new_data)
             return 0;
-        *tar_data = new_data;
-        *tar_cap = new_cap;
+        tb->data = new_data;
+        tb->cap = new_cap;
     }
-    memcpy(*tar_data + *tar_size, &h, 512);
-    *tar_size += 512;
+    memcpy(tb->data + tb->size, &h, 512);
+    tb->size += 512;
     if (data && data_len > 0)
-        memcpy(*tar_data + *tar_size, data, data_len);
+        memcpy(tb->data + tb->size, data, data_len);
     if (padded_size > data_len)
-        memset(*tar_data + *tar_size + data_len, 0, padded_size - data_len);
-    *tar_size += padded_size;
+        memset(tb->data + tb->size + data_len, 0, padded_size - data_len);
+    tb->size += padded_size;
     return 1;
 }
 
@@ -1168,8 +1175,7 @@ static vigil_status_t tar_create_fn(vigil_vm_t *vm, size_t arg_count, vigil_erro
     size_t i, count;
     vigil_allocator_t alloc = get_alloc(vm);
 
-    unsigned char *tar_data = NULL;
-    size_t tar_size = 0, tar_cap = 0;
+    tar_buf_t tb = {NULL, 0, 0};
     vigil_status_t ret;
 
     vigil_vm_stack_pop_n(vm, arg_count);
@@ -1215,9 +1221,9 @@ static vigil_status_t tar_create_fn(vigil_vm_t *vm, size_t arg_count, vigil_erro
             continue;
         }
 
-        if (!tar_append_entry(&alloc, name, name_len, data, data_len, &tar_data, &tar_size, &tar_cap))
+        if (!tar_append_entry(&alloc, name, name_len, data, data_len, &tb))
         {
-            alloc.deallocate(alloc.user_data, tar_data);
+            alloc.deallocate(alloc.user_data, tb.data);
             vigil_value_release(&name_val);
             vigil_value_release(&content_val);
             return push_empty_bytes(vm, error);
@@ -1228,23 +1234,23 @@ static vigil_status_t tar_create_fn(vigil_vm_t *vm, size_t arg_count, vigil_erro
 
     /* Add two empty blocks at end */
     {
-        size_t needed = tar_size + 1024;
-        if (needed > tar_cap)
+        size_t needed = tb.size + 1024;
+        if (needed > tb.cap)
         {
-            unsigned char *new_data = (unsigned char *)alloc.reallocate(alloc.user_data, tar_data, needed);
+            unsigned char *new_data = (unsigned char *)alloc.reallocate(alloc.user_data, tb.data, needed);
             if (!new_data)
             {
-                alloc.deallocate(alloc.user_data, tar_data);
+                alloc.deallocate(alloc.user_data, tb.data);
                 return push_empty_bytes(vm, error);
             }
-            tar_data = new_data;
+            tb.data = new_data;
         }
-        memset(tar_data + tar_size, 0, 1024);
-        tar_size += 1024;
+        memset(tb.data + tb.size, 0, 1024);
+        tb.size += 1024;
     }
 
-    ret = push_bytes(vm, tar_data, tar_size, error);
-    alloc.deallocate(alloc.user_data, tar_data);
+    ret = push_bytes(vm, tb.data, tb.size, error);
+    alloc.deallocate(alloc.user_data, tb.data);
     return ret;
 }
 
