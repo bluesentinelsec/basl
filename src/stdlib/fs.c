@@ -1141,41 +1141,36 @@ static fs_handle_registry_t g_readers;
 static fs_handle_registry_t g_writers;
 static volatile int64_t     g_stream_registries_state = 0;
 
-static vigil_status_t fs_registry_init(fs_handle_registry_t *r, vigil_error_t *error)
+static vigil_status_t fs_registry_init(fs_handle_registry_t *r, vigil_runtime_t *rt, vigil_error_t *error)
 {
     vigil_status_t st;
     r->capacity = FS_REGISTRY_INITIAL;
-    r->items    = calloc((size_t)r->capacity, sizeof(void *));
     r->count    = 0;
-    if (r->items == NULL)
-    {
-        vigil_error_set_literal(error, VIGIL_STATUS_OUT_OF_MEMORY, "fs stream registry alloc failed");
-        return VIGIL_STATUS_OUT_OF_MEMORY;
-    }
+    st = vigil_runtime_alloc(rt, (size_t)r->capacity * sizeof(void *), (void **)&r->items, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
     st = vigil_platform_mutex_create(&r->lock, error);
     if (st != VIGIL_STATUS_OK)
-    {
-        free(r->items);
-        r->items = NULL;
-    }
+        vigil_runtime_free(rt, (void **)&r->items);
     return st;
 }
 
-static vigil_status_t fs_registry_alloc(fs_handle_registry_t *r, int64_t *out_handle, vigil_error_t *error)
+static vigil_status_t fs_registry_alloc(fs_handle_registry_t *r, vigil_runtime_t *rt, int64_t *out_handle,
+                                         vigil_error_t *error)
 {
     vigil_platform_mutex_lock(r->lock);
     if (r->count == r->capacity)
     {
         int64_t  new_cap   = r->capacity * 2;
-        void   **new_items = calloc((size_t)new_cap, sizeof(void *));
-        if (new_items == NULL)
+        void   **new_items = NULL;
+        vigil_status_t st  = vigil_runtime_alloc(rt, (size_t)new_cap * sizeof(void *), (void **)&new_items, error);
+        if (st != VIGIL_STATUS_OK)
         {
             vigil_platform_mutex_unlock(r->lock);
-            vigil_error_set_literal(error, VIGIL_STATUS_OUT_OF_MEMORY, "fs stream registry grow failed");
-            return VIGIL_STATUS_OUT_OF_MEMORY;
+            return st;
         }
         memcpy(new_items, r->items, (size_t)r->capacity * sizeof(void *));
-        free(r->items);
+        vigil_runtime_free(rt, (void **)&r->items);
         r->items    = new_items;
         r->capacity = new_cap;
     }
@@ -1202,7 +1197,7 @@ static void fs_registry_set(fs_handle_registry_t *r, int64_t handle, void *val)
     vigil_platform_mutex_unlock(r->lock);
 }
 
-static vigil_status_t ensure_stream_registries(vigil_error_t *error)
+static vigil_status_t ensure_stream_registries(vigil_runtime_t *rt, vigil_error_t *error)
 {
     for (;;)
     {
@@ -1211,9 +1206,9 @@ static vigil_status_t ensure_stream_registries(vigil_error_t *error)
             return VIGIL_STATUS_OK;
         if (state == 0 && vigil_atomic_cas(&g_stream_registries_state, 0, 1))
         {
-            vigil_status_t st = fs_registry_init(&g_readers, error);
+            vigil_status_t st = fs_registry_init(&g_readers, rt, error);
             if (st == VIGIL_STATUS_OK)
-                st = fs_registry_init(&g_writers, error);
+                st = fs_registry_init(&g_writers, rt, error);
             if (st != VIGIL_STATUS_OK)
             {
                 vigil_atomic_store(&g_stream_registries_state, 0);
@@ -1319,7 +1314,7 @@ static vigil_status_t reader_open(vigil_vm_t *vm, size_t arg_count, vigil_error_
     vigil_object_t *inst = NULL;
     vigil_value_t   result;
 
-    st = ensure_stream_registries(error);
+    st = ensure_stream_registries(rt, error);
     if (st != VIGIL_STATUS_OK)
         return st;
 
@@ -1329,36 +1324,44 @@ static vigil_status_t reader_open(vigil_vm_t *vm, size_t arg_count, vigil_error_
         return push_nil_and_err(vm, "open_reader: invalid path argument", FS_ERR_IO, error);
     }
 
-    rd = calloc(1, sizeof(fs_reader_t));
-    if (rd == NULL)
+    st = vigil_runtime_alloc(rt, sizeof(fs_reader_t), (void **)&rd, error);
+    if (st != VIGIL_STATUS_OK)
     {
         vigil_vm_stack_pop_n(vm, arg_count);
         return push_nil_and_err(vm, "open_reader: out of memory", FS_ERR_IO, error);
     }
 
-    rd->line_buf = malloc(READER_LINE_BUF);
-    if (rd->line_buf == NULL)
+    st = vigil_runtime_alloc(rt, READER_LINE_BUF, (void **)&rd->line_buf, error);
+    if (st != VIGIL_STATUS_OK)
     {
-        free(rd);
+        vigil_runtime_free(rt, (void **)&rd);
         vigil_vm_stack_pop_n(vm, arg_count);
         return push_nil_and_err(vm, "open_reader: out of memory", FS_ERR_IO, error);
     }
 
+#ifdef _WIN32
+    {
+        errno_t fe = fopen_s(&rd->fp, path, "r");
+        if (fe != 0)
+            rd->fp = NULL;
+    }
+#else
     rd->fp = fopen(path, "r");
+#endif
     if (rd->fp == NULL)
     {
-        free(rd->line_buf);
-        free(rd);
+        vigil_runtime_free(rt, (void **)&rd->line_buf);
+        vigil_runtime_free(rt, (void **)&rd);
         vigil_vm_stack_pop_n(vm, arg_count);
         return push_nil_and_err(vm, "open_reader: file not found", FS_ERR_NOT_FOUND, error);
     }
 
-    st = fs_registry_alloc(&g_readers, &handle, error);
+    st = fs_registry_alloc(&g_readers, rt, &handle, error);
     if (st != VIGIL_STATUS_OK)
     {
         fclose(rd->fp);
-        free(rd->line_buf);
-        free(rd);
+        vigil_runtime_free(rt, (void **)&rd->line_buf);
+        vigil_runtime_free(rt, (void **)&rd);
         vigil_vm_stack_pop_n(vm, arg_count);
         return push_nil_and_err(vm, "open_reader: registry alloc failed", FS_ERR_IO, error);
     }
@@ -1443,21 +1446,24 @@ static vigil_status_t reader_read_bytes(vigil_vm_t *vm, size_t arg_count, vigil_
     if (rd->eof_reached)
         return push_empty_str_and_err(vm, "", FS_ERR_EOF, error);
 
-    buf = malloc((size_t)n + 1);
-    if (buf == NULL)
-        return push_empty_str_and_err(vm, "read_bytes: out of memory", FS_ERR_IO, error);
-
-    nread = fread(buf, 1, (size_t)n, rd->fp);
-    if (nread == 0)
     {
-        free(buf);
-        rd->eof_reached = 1;
-        return push_empty_str_and_err(vm, "", FS_ERR_EOF, error);
+        vigil_runtime_t *rt = vigil_vm_runtime(vm);
+        st = vigil_runtime_alloc(rt, (size_t)n + 1, (void **)&buf, error);
+        if (st != VIGIL_STATUS_OK)
+            return push_empty_str_and_err(vm, "read_bytes: out of memory", FS_ERR_IO, error);
+
+        nread = fread(buf, 1, (size_t)n, rd->fp);
+        if (nread == 0)
+        {
+            vigil_runtime_free(rt, (void **)&buf);
+            rd->eof_reached = 1;
+            return push_empty_str_and_err(vm, "", FS_ERR_EOF, error);
+        }
+        buf[nread] = '\0';
+        st = push_str_and_ok(vm, buf, nread, error);
+        vigil_runtime_free(rt, (void **)&buf);
+        return st;
     }
-    buf[nread] = '\0';
-    st = push_str_and_ok(vm, buf, nread, error);
-    free(buf);
-    return st;
 }
 
 static vigil_status_t reader_read_all(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
@@ -1484,35 +1490,38 @@ static vigil_status_t reader_read_all(vigil_vm_t *vm, size_t arg_count, vigil_er
     if (rd->eof_reached)
         return push_str_and_ok(vm, "", 0, error);
 
-    buf = malloc(cap);
-    if (buf == NULL)
-        return push_empty_str_and_err(vm, "read_all: out of memory", FS_ERR_IO, error);
-
-    for (;;)
     {
-        nread = fread(buf + len, 1, cap - len, rd->fp);
-        len  += nread;
-        if (nread == 0)
-        {
-            rd->eof_reached = 1;
-            break;
-        }
-        if (len == cap)
-        {
-            char *tmp = realloc(buf, cap * 2);
-            if (tmp == NULL)
-            {
-                free(buf);
-                return push_empty_str_and_err(vm, "read_all: out of memory", FS_ERR_IO, error);
-            }
-            buf  = tmp;
-            cap *= 2;
-        }
-    }
+        vigil_runtime_t *rt = vigil_vm_runtime(vm);
+        st = vigil_runtime_alloc(rt, cap, (void **)&buf, error);
+        if (st != VIGIL_STATUS_OK)
+            return push_empty_str_and_err(vm, "read_all: out of memory", FS_ERR_IO, error);
 
-    st = push_str_and_ok(vm, buf, len, error);
-    free(buf);
-    return st;
+        for (;;)
+        {
+            nread = fread(buf + len, 1, cap - len, rd->fp);
+            len  += nread;
+            if (nread == 0)
+            {
+                rd->eof_reached = 1;
+                break;
+            }
+            if (len == cap)
+            {
+                size_t new_cap = cap * 2;
+                st = vigil_runtime_realloc(rt, (void **)&buf, new_cap, error);
+                if (st != VIGIL_STATUS_OK)
+                {
+                    vigil_runtime_free(rt, (void **)&buf);
+                    return push_empty_str_and_err(vm, "read_all: out of memory", FS_ERR_IO, error);
+                }
+                cap = new_cap;
+            }
+        }
+
+        st = push_str_and_ok(vm, buf, len, error);
+        vigil_runtime_free(rt, (void **)&buf);
+        return st;
+    }
 }
 
 static vigil_status_t reader_close(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
@@ -1534,11 +1543,11 @@ static vigil_status_t reader_close(vigil_vm_t *vm, size_t arg_count, vigil_error
         return push_err_kind(vm, "close: invalid reader handle", FS_ERR_IO, error);
     if (!rd->closed)
     {
+        vigil_runtime_t *rt = vigil_vm_runtime(vm);
         fclose(rd->fp);
-        free(rd->line_buf);
-        rd->fp          = NULL;
-        rd->line_buf    = NULL;
-        rd->closed      = 1;
+        vigil_runtime_free(rt, (void **)&rd->line_buf);
+        rd->fp     = NULL;
+        rd->closed = 1;
         fs_registry_set(&g_readers, handle, rd);
     }
     return vigil_runtime_push_ok_error(vigil_vm_runtime(vm), vm, error);
@@ -1560,7 +1569,7 @@ static vigil_status_t writer_open_impl(vigil_vm_t *vm, size_t arg_count, const c
     vigil_object_t *inst = NULL;
     vigil_value_t   result;
 
-    st = ensure_stream_registries(error);
+    st = ensure_stream_registries(rt, error);
     if (st != VIGIL_STATUS_OK)
         return st;
 
@@ -1570,26 +1579,34 @@ static vigil_status_t writer_open_impl(vigil_vm_t *vm, size_t arg_count, const c
         return push_nil_and_err(vm, "open_writer: invalid path argument", FS_ERR_IO, error);
     }
 
-    wr = calloc(1, sizeof(fs_writer_t));
-    if (wr == NULL)
+    st = vigil_runtime_alloc(rt, sizeof(fs_writer_t), (void **)&wr, error);
+    if (st != VIGIL_STATUS_OK)
     {
         vigil_vm_stack_pop_n(vm, arg_count);
         return push_nil_and_err(vm, "open_writer: out of memory", FS_ERR_IO, error);
     }
 
+#ifdef _WIN32
+    {
+        errno_t fe = fopen_s(&wr->fp, path, mode);
+        if (fe != 0)
+            wr->fp = NULL;
+    }
+#else
     wr->fp = fopen(path, mode);
+#endif
     if (wr->fp == NULL)
     {
-        free(wr);
+        vigil_runtime_free(rt, (void **)&wr);
         vigil_vm_stack_pop_n(vm, arg_count);
         return push_nil_and_err(vm, "open_writer: cannot open file", FS_ERR_IO, error);
     }
 
-    st = fs_registry_alloc(&g_writers, &handle, error);
+    st = fs_registry_alloc(&g_writers, rt, &handle, error);
     if (st != VIGIL_STATUS_OK)
     {
         fclose(wr->fp);
-        free(wr);
+        vigil_runtime_free(rt, (void **)&wr);
         vigil_vm_stack_pop_n(vm, arg_count);
         return push_nil_and_err(vm, "open_writer: registry alloc failed", FS_ERR_IO, error);
     }
