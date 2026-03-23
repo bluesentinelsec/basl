@@ -85,11 +85,12 @@ extern "C"
 
     /**
      * Get an environment variable.  Returns VIGIL_STATUS_OK and sets
-     * *out_value to the value (caller must free with free()) and
-     * *out_found to 1 if found, or *out_found to 0 if not found.
+     * *out_value to the value (caller must free with the matching
+     * allocator) and *out_found to 1 if found, or *out_found to 0 if
+     * not found.
      */
-    VIGIL_API vigil_status_t vigil_platform_getenv(const char *name, char **out_value, int *out_found,
-                                                   vigil_error_t *error);
+    VIGIL_API vigil_status_t vigil_platform_getenv(const vigil_allocator_t *allocator, const char *name,
+                                                   char **out_value, int *out_found, vigil_error_t *error);
 
     /**
      * Set an environment variable.  Uses setenv on POSIX, _putenv_s on
@@ -103,13 +104,16 @@ extern "C"
     VIGIL_API const char *vigil_platform_os_name(void);
 
     /** Get the current working directory.  Caller must free *out_path. */
-    VIGIL_API vigil_status_t vigil_platform_getcwd(char **out_path, vigil_error_t *error);
+    VIGIL_API vigil_status_t vigil_platform_getcwd(const vigil_allocator_t *allocator, char **out_path,
+                                                   vigil_error_t *error);
 
     /** Get the system temporary directory path.  Caller must free *out_path. */
-    VIGIL_API vigil_status_t vigil_platform_temp_dir(char **out_path, vigil_error_t *error);
+    VIGIL_API vigil_status_t vigil_platform_temp_dir(const vigil_allocator_t *allocator, char **out_path,
+                                                     vigil_error_t *error);
 
     /** Get the machine hostname.  Caller must free *out_name. */
-    VIGIL_API vigil_status_t vigil_platform_hostname(char **out_name, vigil_error_t *error);
+    VIGIL_API vigil_status_t vigil_platform_hostname(const vigil_allocator_t *allocator, char **out_name,
+                                                     vigil_error_t *error);
 
     /* ── Process execution ───────────────────────────────────────────── */
 
@@ -121,8 +125,9 @@ extern "C"
      * caller must free, and *out_exit_code is the child's exit status.
      * Returns VIGIL_STATUS_UNSUPPORTED on stub/embedded platforms.
      */
-    VIGIL_API vigil_status_t vigil_platform_exec(const char *const *argv, char **out_stdout, char **out_stderr,
-                                                 int *out_exit_code, vigil_error_t *error);
+    VIGIL_API vigil_status_t vigil_platform_exec(const vigil_allocator_t *allocator, const char *const *argv,
+                                                 char **out_stdout, char **out_stderr, int *out_exit_code,
+                                                 vigil_error_t *error);
 
     /* ── Dynamic library loading ─────────────────────────────────────── */
 
@@ -214,7 +219,8 @@ extern "C"
     VIGIL_API vigil_status_t vigil_platform_hardlink(const char *target, const char *linkpath, vigil_error_t *error);
 
     /** Read the target of a symbolic link. Caller must free *out_target. */
-    VIGIL_API vigil_status_t vigil_platform_readlink(const char *path, char **out_target, vigil_error_t *error);
+    VIGIL_API vigil_status_t vigil_platform_readlink(const vigil_allocator_t *allocator, const char *path,
+                                                     char **out_target, vigil_error_t *error);
 
     /** Check whether path is a symbolic link. */
     VIGIL_API vigil_status_t vigil_platform_is_symlink(const char *path, int *out_is_symlink);
@@ -226,19 +232,24 @@ extern "C"
     VIGIL_API int vigil_platform_glob_match(const char *pattern, const char *name);
 
     /** Get user home directory. Caller must free *out_path. */
-    VIGIL_API vigil_status_t vigil_platform_home_dir(char **out_path, vigil_error_t *error);
+    VIGIL_API vigil_status_t vigil_platform_home_dir(const vigil_allocator_t *allocator, char **out_path,
+                                                     vigil_error_t *error);
 
     /** Get user config directory (XDG_CONFIG_HOME / ~/Library/Application Support / APPDATA). */
-    VIGIL_API vigil_status_t vigil_platform_config_dir(char **out_path, vigil_error_t *error);
+    VIGIL_API vigil_status_t vigil_platform_config_dir(const vigil_allocator_t *allocator, char **out_path,
+                                                       vigil_error_t *error);
 
     /** Get user cache directory (XDG_CACHE_HOME / ~/Library/Caches / LOCALAPPDATA). */
-    VIGIL_API vigil_status_t vigil_platform_cache_dir(char **out_path, vigil_error_t *error);
+    VIGIL_API vigil_status_t vigil_platform_cache_dir(const vigil_allocator_t *allocator, char **out_path,
+                                                      vigil_error_t *error);
 
     /** Get user data directory (XDG_DATA_HOME / ~/Library/Application Support / APPDATA). */
-    VIGIL_API vigil_status_t vigil_platform_data_dir(char **out_path, vigil_error_t *error);
+    VIGIL_API vigil_status_t vigil_platform_data_dir(const vigil_allocator_t *allocator, char **out_path,
+                                                     vigil_error_t *error);
 
     /** Create a unique temporary file. Returns path in out_path (caller must free). */
-    VIGIL_API vigil_status_t vigil_platform_temp_file(const char *prefix, char **out_path, vigil_error_t *error);
+    VIGIL_API vigil_status_t vigil_platform_temp_file(const vigil_allocator_t *allocator, const char *prefix,
+                                                      char **out_path, vigil_error_t *error);
 
     /** Append data to a file. */
     VIGIL_API vigil_status_t vigil_platform_append_file(const char *path, const void *data, size_t length,
@@ -357,7 +368,7 @@ extern "C"
 
     /** Opaque socket handle (int64_t, -1 = invalid). */
     typedef int64_t vigil_socket_t;
-#define VIGIL_INVALID_SOCKET ((vigil_socket_t)-1)
+#define VIGIL_INVALID_SOCKET ((vigil_socket_t) - 1)
 
     /** Initialise platform networking (e.g. WSAStartup). Safe to call repeatedly. */
     VIGIL_API vigil_status_t vigil_platform_net_init(vigil_error_t *error);
@@ -422,7 +433,8 @@ extern "C"
      * Returns VIGIL_STATUS_UNSUPPORTED if no native HTTP library is available.
      * The caller should fall back to a plain-socket HTTP/1.1 path (no TLS).
      */
-    VIGIL_API vigil_status_t vigil_platform_http_request(const char *method, const char *url,
+    VIGIL_API vigil_status_t vigil_platform_http_request(const vigil_allocator_t *allocator, const char *method,
+                                                         const char *url,
                                                          const char *headers, /* CRLF-separated, may be NULL */
                                                          const char *body,    /* may be NULL */
                                                          size_t body_len, vigil_http_response_t *out_response,
@@ -469,16 +481,14 @@ extern "C"
      * @param userdata Caller-supplied context pointer.
      * @return         0 to continue enumeration, non-zero to stop early.
      */
-    typedef int (*vigil_tls_ca_cb_t)(const unsigned char *der, size_t der_len,
-                                     void *userdata);
+    typedef int (*vigil_tls_ca_cb_t)(const unsigned char *der, size_t der_len, void *userdata);
 
     /**
      * Enumerate system TLS trust-anchor certificates.
      * Calls @cb once for each certificate in the platform certificate store.
      * @return Number of certificates delivered, or -1 if the store is unavailable.
      */
-    VIGIL_API int vigil_platform_enumerate_tls_cas(vigil_tls_ca_cb_t cb,
-                                                   void *userdata);
+    VIGIL_API int vigil_platform_enumerate_tls_cas(vigil_tls_ca_cb_t cb, void *userdata);
 
 #ifdef __cplusplus
 }

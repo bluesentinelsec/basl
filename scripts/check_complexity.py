@@ -197,11 +197,12 @@ def threshold_context(
             break
 
     override = matching_override(threshold_config["overrides"], file_path)
-    if override is not None:
-        thresholds = merge_thresholds(thresholds, override["thresholds"])
 
     if is_new_function:
         thresholds = merge_thresholds(thresholds, threshold_config["new_function"])
+
+    if override is not None:
+        thresholds = merge_thresholds(thresholds, override["thresholds"])
 
     return {
         "thresholds": thresholds,
