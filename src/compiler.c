@@ -13452,30 +13452,100 @@ static vigil_status_t vigil_compile_all_functions(vigil_program_state_t *program
     return VIGIL_STATUS_OK;
 }
 
+static vigil_status_t alloc_class_inits(vigil_program_state_t *program, vigil_runtime_class_init_t **out_class_inits)
+{
+    vigil_status_t status;
+    void *memory = NULL;
+    vigil_runtime_class_init_t *class_inits;
+    size_t i;
+
+    *out_class_inits = NULL;
+    if (program->class_count == 0U)
+        return VIGIL_STATUS_OK;
+
+    status = vigil_runtime_alloc(program->registry->runtime, program->class_count * sizeof(*class_inits), &memory,
+                                 program->error);
+    if (status != VIGIL_STATUS_OK)
+        return status;
+
+    class_inits = (vigil_runtime_class_init_t *)memory;
+    memset(class_inits, 0, program->class_count * sizeof(*class_inits));
+    for (i = 0U; i < program->class_count; ++i)
+    {
+        const vigil_class_decl_t *decl = &program->classes[i];
+        class_inits[i].interface_impl_count = decl->interface_impl_count;
+        if (decl->interface_impl_count == 0U)
+            continue;
+
+        memory = NULL;
+        status = vigil_runtime_alloc(program->registry->runtime,
+                                     decl->interface_impl_count * sizeof(*class_inits[i].interface_impls), &memory,
+                                     program->error);
+        if (status != VIGIL_STATUS_OK)
+        {
+            size_t ci;
+            for (ci = 0U; ci < i; ++ci)
+            {
+                memory = (void *)class_inits[ci].interface_impls;
+                vigil_runtime_free(program->registry->runtime, &memory);
+            }
+            memory = class_inits;
+            vigil_runtime_free(program->registry->runtime, &memory);
+            return status;
+        }
+
+        class_inits[i].interface_impls = (const vigil_runtime_interface_impl_init_t *)memory;
+        memset((void *)class_inits[i].interface_impls, 0,
+               decl->interface_impl_count * sizeof(*class_inits[i].interface_impls));
+        {
+            size_t impl_index;
+            vigil_runtime_interface_impl_init_t *impls =
+                (vigil_runtime_interface_impl_init_t *)class_inits[i].interface_impls;
+            for (impl_index = 0U; impl_index < decl->interface_impl_count; ++impl_index)
+            {
+                impls[impl_index].interface_index = decl->interface_impls[impl_index].interface_index;
+                impls[impl_index].function_indices = decl->interface_impls[impl_index].function_indices;
+                impls[impl_index].function_count = decl->interface_impls[impl_index].function_count;
+            }
+        }
+    }
+    *out_class_inits = class_inits;
+    return VIGIL_STATUS_OK;
+}
+
+static void free_class_inits(vigil_program_state_t *program, vigil_runtime_class_init_t *class_inits)
+{
+    size_t i;
+    void *memory;
+    if (class_inits == NULL)
+        return;
+    for (i = 0U; i < program->class_count; ++i)
+    {
+        memory = (void *)class_inits[i].interface_impls;
+        vigil_runtime_free(program->registry->runtime, &memory);
+    }
+    memory = class_inits;
+    vigil_runtime_free(program->registry->runtime, &memory);
+}
+
 static vigil_status_t vigil_compile_attach_entrypoint(vigil_program_state_t *program, vigil_object_t **out_function)
 {
     vigil_status_t status;
     vigil_object_t **function_table;
-    vigil_value_t *initial_globals;
-    vigil_runtime_class_init_t *class_inits;
+    vigil_value_t *initial_globals = NULL;
+    vigil_runtime_class_init_t *class_inits = NULL;
     size_t i;
-    void *memory;
+    void *memory = NULL;
 
-    memory = NULL;
     status = vigil_runtime_alloc(program->registry->runtime, program->functions.count * sizeof(*function_table),
                                  &memory, program->error);
     if (status != VIGIL_STATUS_OK)
-    {
         return status;
-    }
 
     function_table = (vigil_object_t **)memory;
     for (i = 0U; i < program->functions.count; ++i)
-    {
         function_table[i] = program->functions.functions[i].object;
-    }
 
-    initial_globals = NULL;
     if (program->global_count != 0U)
     {
         memory = NULL;
@@ -13487,86 +13557,22 @@ static vigil_status_t vigil_compile_attach_entrypoint(vigil_program_state_t *pro
             vigil_runtime_free(program->registry->runtime, &memory);
             return status;
         }
-
         initial_globals = (vigil_value_t *)memory;
         for (i = 0U; i < program->global_count; ++i)
-        {
             vigil_value_init_nil(&initial_globals[i]);
-        }
     }
 
-    class_inits = NULL;
-    if (program->class_count != 0U)
+    status = alloc_class_inits(program, &class_inits);
+    if (status != VIGIL_STATUS_OK)
     {
-        memory = NULL;
-        status = vigil_runtime_alloc(program->registry->runtime, program->class_count * sizeof(*class_inits), &memory,
-                                     program->error);
-        if (status != VIGIL_STATUS_OK)
+        if (initial_globals != NULL)
         {
-            if (initial_globals != NULL)
-            {
-                memory = initial_globals;
-                vigil_runtime_free(program->registry->runtime, &memory);
-            }
-            memory = function_table;
+            memory = initial_globals;
             vigil_runtime_free(program->registry->runtime, &memory);
-            return status;
         }
-
-        class_inits = (vigil_runtime_class_init_t *)memory;
-        memset(class_inits, 0, program->class_count * sizeof(*class_inits));
-        for (i = 0U; i < program->class_count; ++i)
-        {
-            const vigil_class_decl_t *decl = &program->classes[i];
-
-            class_inits[i].interface_impl_count = decl->interface_impl_count;
-            if (decl->interface_impl_count == 0U)
-            {
-                continue;
-            }
-
-            memory = NULL;
-            status = vigil_runtime_alloc(program->registry->runtime,
-                                         decl->interface_impl_count * sizeof(*class_inits[i].interface_impls), &memory,
-                                         program->error);
-            if (status != VIGIL_STATUS_OK)
-            {
-                size_t class_index;
-
-                for (class_index = 0U; class_index < i; ++class_index)
-                {
-                    memory = (void *)class_inits[class_index].interface_impls;
-                    vigil_runtime_free(program->registry->runtime, &memory);
-                }
-                memory = class_inits;
-                vigil_runtime_free(program->registry->runtime, &memory);
-                if (initial_globals != NULL)
-                {
-                    memory = initial_globals;
-                    vigil_runtime_free(program->registry->runtime, &memory);
-                }
-                memory = function_table;
-                vigil_runtime_free(program->registry->runtime, &memory);
-                return status;
-            }
-
-            class_inits[i].interface_impls = (const vigil_runtime_interface_impl_init_t *)memory;
-            memset((void *)class_inits[i].interface_impls, 0,
-                   decl->interface_impl_count * sizeof(*class_inits[i].interface_impls));
-
-            {
-                size_t impl_index;
-                vigil_runtime_interface_impl_init_t *impls =
-                    (vigil_runtime_interface_impl_init_t *)class_inits[i].interface_impls;
-
-                for (impl_index = 0U; impl_index < decl->interface_impl_count; ++impl_index)
-                {
-                    impls[impl_index].interface_index = decl->interface_impls[impl_index].interface_index;
-                    impls[impl_index].function_indices = decl->interface_impls[impl_index].function_indices;
-                    impls[impl_index].function_count = decl->interface_impls[impl_index].function_count;
-                }
-            }
-        }
+        memory = function_table;
+        vigil_runtime_free(program->registry->runtime, &memory);
+        return status;
     }
 
     status = vigil_function_object_attach_siblings(
@@ -13578,16 +13584,7 @@ static vigil_status_t vigil_compile_attach_entrypoint(vigil_program_state_t *pro
         memory = initial_globals;
         vigil_runtime_free(program->registry->runtime, &memory);
     }
-    if (class_inits != NULL)
-    {
-        for (i = 0U; i < program->class_count; ++i)
-        {
-            memory = (void *)class_inits[i].interface_impls;
-            vigil_runtime_free(program->registry->runtime, &memory);
-        }
-        memory = class_inits;
-        vigil_runtime_free(program->registry->runtime, &memory);
-    }
+    free_class_inits(program, class_inits);
     if (status != VIGIL_STATUS_OK)
     {
         memory = function_table;
