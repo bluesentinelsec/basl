@@ -7,8 +7,8 @@
 
 #define WIN32_LEAN_AND_MEAN
 #include <direct.h>
-#include <windows.h>
 #include <wincrypt.h>
+#include <windows.h>
 
 #include "internal/vigil_internal.h"
 
@@ -26,6 +26,7 @@ static vigil_allocator_t resolve_alloc(const vigil_allocator_t *a)
 vigil_status_t vigil_platform_read_file(const vigil_allocator_t *allocator, const char *path, char **out_data,
                                         size_t *out_length, vigil_error_t *error)
 {
+    (void)allocator;
     FILE *f = NULL;
     long size;
     char *buf;
@@ -342,8 +343,9 @@ vigil_status_t vigil_platform_list_dir(const char *path, vigil_platform_dir_call
 /* ── Environment variables ───────────────────────────────────────── */
 
 VIGIL_API vigil_status_t vigil_platform_getenv(const vigil_allocator_t *allocator, const char *name, char **out_value,
-                                                   int *out_found, vigil_error_t *error)
+                                               int *out_found, vigil_error_t *error)
 {
+    (void)allocator;
     char buf[32767]; /* max env var size on Windows */
     DWORD len;
     (void)error;
@@ -403,8 +405,10 @@ VIGIL_API const char *vigil_platform_os_name(void)
     return "windows";
 }
 
-VIGIL_API vigil_status_t vigil_platform_getcwd(const vigil_allocator_t *allocator, char **out_path, vigil_error_t *error)
+VIGIL_API vigil_status_t vigil_platform_getcwd(const vigil_allocator_t *allocator, char **out_path,
+                                               vigil_error_t *error)
 {
+    (void)allocator;
     char buf[4096];
     if (!out_path)
     {
@@ -430,8 +434,10 @@ VIGIL_API vigil_status_t vigil_platform_getcwd(const vigil_allocator_t *allocato
     return VIGIL_STATUS_OK;
 }
 
-VIGIL_API vigil_status_t vigil_platform_temp_dir(const vigil_allocator_t *allocator, char **out_path, vigil_error_t *error)
+VIGIL_API vigil_status_t vigil_platform_temp_dir(const vigil_allocator_t *allocator, char **out_path,
+                                                 vigil_error_t *error)
 {
+    (void)allocator;
     char buf[MAX_PATH + 1];
     DWORD len;
     if (!out_path)
@@ -462,8 +468,10 @@ VIGIL_API vigil_status_t vigil_platform_temp_dir(const vigil_allocator_t *alloca
     return VIGIL_STATUS_OK;
 }
 
-VIGIL_API vigil_status_t vigil_platform_hostname(const vigil_allocator_t *allocator, char **out_name, vigil_error_t *error)
+VIGIL_API vigil_status_t vigil_platform_hostname(const vigil_allocator_t *allocator, char **out_name,
+                                                 vigil_error_t *error)
 {
+    (void)allocator;
     char buf[256];
     DWORD size = sizeof(buf);
     if (!out_name)
@@ -492,9 +500,11 @@ VIGIL_API vigil_status_t vigil_platform_hostname(const vigil_allocator_t *alloca
 
 /* ── Process execution ───────────────────────────────────────────── */
 
-VIGIL_API vigil_status_t vigil_platform_exec(const char *const *argv, char **out_stdout, char **out_stderr,
-                                             int *out_exit_code, vigil_error_t *error)
+VIGIL_API vigil_status_t vigil_platform_exec(const vigil_allocator_t *allocator, const char *const *argv,
+                                             char **out_stdout, char **out_stderr, int *out_exit_code,
+                                             vigil_error_t *error)
 {
+    (void)allocator;
     HANDLE stdout_rd = NULL, stdout_wr = NULL;
     HANDLE stderr_rd = NULL, stderr_wr = NULL;
     SECURITY_ATTRIBUTES sa;
@@ -832,9 +842,10 @@ VIGIL_API vigil_status_t vigil_platform_hardlink(const char *target, const char 
     return VIGIL_STATUS_OK;
 }
 
-VIGIL_API vigil_status_t vigil_platform_readlink(const vigil_allocator_t *allocator, const char *path, char **out_target,
-                                                     vigil_error_t *error)
+VIGIL_API vigil_status_t vigil_platform_readlink(const vigil_allocator_t *allocator, const char *path,
+                                                 char **out_target, vigil_error_t *error)
 {
+    (void)allocator;
     (void)path;
     vigil_error_set_literal(error, VIGIL_STATUS_UNSUPPORTED, "readlink not fully supported on Windows");
     *out_target = NULL;
@@ -933,8 +944,10 @@ VIGIL_API int vigil_platform_glob_match(const char *pattern, const char *name)
     return *pattern == '\0' && *name == '\0';
 }
 
-VIGIL_API vigil_status_t vigil_platform_home_dir(const vigil_allocator_t *allocator, char **out_path, vigil_error_t *error)
+VIGIL_API vigil_status_t vigil_platform_home_dir(const vigil_allocator_t *allocator, char **out_path,
+                                                 vigil_error_t *error)
 {
+    (void)allocator;
     char *userprofile = getenv("USERPROFILE");
     if (userprofile)
     {
@@ -947,8 +960,10 @@ VIGIL_API vigil_status_t vigil_platform_home_dir(const vigil_allocator_t *alloca
     return VIGIL_STATUS_INTERNAL;
 }
 
-VIGIL_API vigil_status_t vigil_platform_config_dir(const vigil_allocator_t *allocator, char **out_path, vigil_error_t *error)
+VIGIL_API vigil_status_t vigil_platform_config_dir(const vigil_allocator_t *allocator, char **out_path,
+                                                   vigil_error_t *error)
 {
+    (void)allocator;
     char *appdata = getenv("APPDATA");
     if (appdata)
     {
@@ -961,8 +976,10 @@ VIGIL_API vigil_status_t vigil_platform_config_dir(const vigil_allocator_t *allo
     return VIGIL_STATUS_INTERNAL;
 }
 
-VIGIL_API vigil_status_t vigil_platform_cache_dir(const vigil_allocator_t *allocator, char **out_path, vigil_error_t *error)
+VIGIL_API vigil_status_t vigil_platform_cache_dir(const vigil_allocator_t *allocator, char **out_path,
+                                                  vigil_error_t *error)
 {
+    (void)allocator;
     char *localappdata = getenv("LOCALAPPDATA");
     if (localappdata)
     {
@@ -975,14 +992,17 @@ VIGIL_API vigil_status_t vigil_platform_cache_dir(const vigil_allocator_t *alloc
     return VIGIL_STATUS_INTERNAL;
 }
 
-VIGIL_API vigil_status_t vigil_platform_data_dir(const vigil_allocator_t *allocator, char **out_path, vigil_error_t *error)
+VIGIL_API vigil_status_t vigil_platform_data_dir(const vigil_allocator_t *allocator, char **out_path,
+                                                 vigil_error_t *error)
 {
+    (void)allocator;
     return vigil_platform_config_dir(allocator, out_path, error);
 }
 
-VIGIL_API vigil_status_t vigil_platform_temp_file(const vigil_allocator_t *allocator, const char *prefix, char **out_path,
-                                                      vigil_error_t *error)
+VIGIL_API vigil_status_t vigil_platform_temp_file(const vigil_allocator_t *allocator, const char *prefix,
+                                                  char **out_path, vigil_error_t *error)
 {
+    (void)allocator;
     char tmpdir[MAX_PATH];
     if (!GetTempPathA(MAX_PATH, tmpdir))
     {
@@ -2055,11 +2075,11 @@ static void winhttp_read_body(HINTERNET req, vigil_http_response_t *out)
     }
 }
 
-VIGIL_API vigil_status_t vigil_platform_http_request(const vigil_allocator_t *allocator, const char *method, const char *url,
-                                                         const char *headers,
-                                                     const char *body, size_t body_len, vigil_http_response_t *out,
-                                                     vigil_error_t *error)
+VIGIL_API vigil_status_t vigil_platform_http_request(const vigil_allocator_t *allocator, const char *method,
+                                                     const char *url, const char *headers, const char *body,
+                                                     size_t body_len, vigil_http_response_t *out, vigil_error_t *error)
 {
+    (void)allocator;
     if (!method || !url || !out)
     {
         if (error)

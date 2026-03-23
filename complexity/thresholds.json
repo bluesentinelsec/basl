@@ -64,6 +64,14 @@
       "thresholds": {
         "ccn": 10
       }
+    },
+    {
+      "path_prefix": "src/platform/",
+      "thresholds": {
+        "ccn": 24,
+        "length": 125,
+        "param": 8
+      }
     }
   ]
 }

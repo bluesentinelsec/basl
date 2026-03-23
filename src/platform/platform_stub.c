@@ -118,9 +118,10 @@ vigil_status_t vigil_platform_list_dir(const char *path, vigil_platform_dir_call
 
 /* ── Environment variables ───────────────────────────────────────── */
 
-vigil_status_t vigil_platform_getenv(const vigil_allocator_t *allocator, const char *name, char **out_value, int *out_found,
-                      vigil_error_t *error)
+vigil_status_t vigil_platform_getenv(const vigil_allocator_t *allocator, const char *name, char **out_value,
+                                     int *out_found, vigil_error_t *error)
 {
+    (void)allocator;
     (void)name;
     (void)out_value;
     (void)out_found;
@@ -155,6 +156,7 @@ const char *vigil_platform_os_name(void)
 
 vigil_status_t vigil_platform_getcwd(const vigil_allocator_t *allocator, char **out_path, vigil_error_t *error)
 {
+    (void)allocator;
     (void)out_path;
     if (error)
     {
@@ -167,6 +169,7 @@ vigil_status_t vigil_platform_getcwd(const vigil_allocator_t *allocator, char **
 
 vigil_status_t vigil_platform_temp_dir(const vigil_allocator_t *allocator, char **out_path, vigil_error_t *error)
 {
+    (void)allocator;
     (void)out_path;
     if (error)
     {
@@ -179,6 +182,7 @@ vigil_status_t vigil_platform_temp_dir(const vigil_allocator_t *allocator, char 
 
 vigil_status_t vigil_platform_hostname(const vigil_allocator_t *allocator, char **out_name, vigil_error_t *error)
 {
+    (void)allocator;
     (void)out_name;
     if (error)
     {
@@ -192,9 +196,9 @@ vigil_status_t vigil_platform_hostname(const vigil_allocator_t *allocator, char 
 /* ── Process execution ───────────────────────────────────────────── */
 
 vigil_status_t vigil_platform_exec(const vigil_allocator_t *allocator, const char *const *argv, char **out_stdout,
-                     char **out_stderr, int *out_exit_code,
-                                   vigil_error_t *error)
+                                   char **out_stderr, int *out_exit_code, vigil_error_t *error)
 {
+    (void)allocator;
     (void)argv;
     (void)out_stdout;
     (void)out_stderr;
@@ -657,8 +661,10 @@ vigil_status_t vigil_platform_udp_recv(vigil_socket_t sock, void *buf, size_t ca
 /* ── HTTP client (stub) ──────────────────────────────────────────── */
 
 vigil_status_t vigil_platform_http_request(const vigil_allocator_t *allocator, const char *method, const char *url,
-                            const char *headers, const char *body,
+                                           const char *headers, const char *body, size_t body_len,
+                                           vigil_http_response_t *out, vigil_error_t *error)
 {
+    (void)allocator;
     (void)method;
     (void)url;
     (void)headers;
@@ -694,8 +700,9 @@ vigil_status_t vigil_platform_hardlink(const char *target, const char *linkpath,
 }
 
 vigil_status_t vigil_platform_readlink(const vigil_allocator_t *allocator, const char *path, char **out_target,
-                        vigil_error_t *error)
+                                       vigil_error_t *error)
 {
+    (void)allocator;
     (void)path;
     *out_target = NULL;
     vigil_error_set_literal(error, VIGIL_STATUS_UNSUPPORTED, "readlink not supported");
