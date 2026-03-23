@@ -310,6 +310,24 @@ static vigil_status_t vigil_lexer_skip_block_comment(vigil_lexer_state_t *state,
 /* Scan an f-string literal.  Unlike plain strings, f-strings must track
    brace depth so that `"` inside `{...}` interpolations does not
    terminate the token.  This allows e.g. f"{pad("hi", 10)}". */
+static void vigil_lexer_skip_nested_literal(vigil_lexer_state_t *state, char quote)
+{
+    vigil_lexer_advance(state);
+    while (!vigil_lexer_is_at_end(state) && vigil_lexer_peek(state) != quote)
+    {
+        if (vigil_lexer_peek(state) == '\\')
+        {
+            vigil_lexer_advance(state);
+            if (!vigil_lexer_is_at_end(state))
+                vigil_lexer_advance(state);
+            continue;
+        }
+        vigil_lexer_advance(state);
+    }
+    if (!vigil_lexer_is_at_end(state))
+        vigil_lexer_advance(state);
+}
+
 static vigil_status_t vigil_lexer_scan_fstring(vigil_lexer_state_t *state, size_t start)
 {
     size_t brace_depth = 0U;
@@ -340,48 +358,12 @@ static vigil_status_t vigil_lexer_scan_fstring(vigil_lexer_state_t *state, size_
         }
         if (c == '"' && brace_depth > 0U)
         {
-            /* Inside an interpolation — skip a nested string literal. */
-            vigil_lexer_advance(state);
-            while (!vigil_lexer_is_at_end(state) && vigil_lexer_peek(state) != '"')
-            {
-                if (vigil_lexer_peek(state) == '\\')
-                {
-                    vigil_lexer_advance(state);
-                    if (!vigil_lexer_is_at_end(state))
-                    {
-                        vigil_lexer_advance(state);
-                    }
-                    continue;
-                }
-                vigil_lexer_advance(state);
-            }
-            if (!vigil_lexer_is_at_end(state))
-            {
-                vigil_lexer_advance(state); /* closing " of nested string */
-            }
+            vigil_lexer_skip_nested_literal(state, '"');
             continue;
         }
         if (c == '\'' && brace_depth > 0U)
         {
-            /* Inside an interpolation — skip a nested char literal. */
-            vigil_lexer_advance(state);
-            while (!vigil_lexer_is_at_end(state) && vigil_lexer_peek(state) != '\'')
-            {
-                if (vigil_lexer_peek(state) == '\\')
-                {
-                    vigil_lexer_advance(state);
-                    if (!vigil_lexer_is_at_end(state))
-                    {
-                        vigil_lexer_advance(state);
-                    }
-                    continue;
-                }
-                vigil_lexer_advance(state);
-            }
-            if (!vigil_lexer_is_at_end(state))
-            {
-                vigil_lexer_advance(state);
-            }
+            vigil_lexer_skip_nested_literal(state, '\'');
             continue;
         }
         if (c == '"' && brace_depth == 0U)

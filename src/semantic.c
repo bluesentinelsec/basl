@@ -555,6 +555,31 @@ vigil_status_t vigil_semantic_index_definition_at(const vigil_semantic_index_t *
 
 /* ── Find References ──────────────────────────────────────── */
 
+static const char *semantic_resolve_target_name(const vigil_semantic_index_t *index, const vigil_semantic_node_t *node,
+                                                size_t *out_len)
+{
+    if (node->kind == VIGIL_NODE_IDENTIFIER_EXPR)
+    {
+        *out_len = node->data.identifier.name_length;
+        return node->data.identifier.name;
+    }
+    if (node->kind == VIGIL_NODE_FUNCTION_DECL || node->kind == VIGIL_NODE_CLASS_DECL)
+    {
+        size_t sym_count = vigil_debug_symbol_table_count(&index->symbols);
+        for (size_t i = 0; i < sym_count; i++)
+        {
+            const vigil_debug_symbol_t *sym = vigil_debug_symbol_table_get(&index->symbols, i);
+            if (sym->span.start_offset == node->span.start_offset)
+            {
+                *out_len = sym->name_length;
+                return sym->name;
+            }
+        }
+    }
+    *out_len = 0;
+    return NULL;
+}
+
 vigil_status_t vigil_semantic_index_references_at(const vigil_semantic_index_t *index, vigil_source_id_t source_id,
                                                   size_t offset, vigil_semantic_reference_t **out_references,
                                                   size_t *out_count, vigil_error_t *error)
@@ -599,26 +624,7 @@ vigil_status_t vigil_semantic_index_references_at(const vigil_semantic_index_t *
     }
 
     /* Get target name from identifier or symbol definition */
-    if (node->kind == VIGIL_NODE_IDENTIFIER_EXPR)
-    {
-        target_name = node->data.identifier.name;
-        target_name_len = node->data.identifier.name_length;
-    }
-    else if (node->kind == VIGIL_NODE_FUNCTION_DECL || node->kind == VIGIL_NODE_CLASS_DECL)
-    {
-        /* Look up symbol at this span */
-        size_t sym_count = vigil_debug_symbol_table_count(&index->symbols);
-        for (i = 0; i < sym_count; i++)
-        {
-            const vigil_debug_symbol_t *sym = vigil_debug_symbol_table_get(&index->symbols, i);
-            if (sym->span.start_offset == node->span.start_offset)
-            {
-                target_name = sym->name;
-                target_name_len = sym->name_length;
-                break;
-            }
-        }
-    }
+    target_name = semantic_resolve_target_name(index, node, &target_name_len);
 
     if (target_name == NULL)
     {

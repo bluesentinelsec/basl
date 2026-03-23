@@ -378,6 +378,36 @@ static vigil_status_t parse_plain_scalar(yaml_parser_t *p, vigil_json_value_t **
 
 /* ── Sequence parsing ────────────────────────────────────────────── */
 
+static vigil_status_t parse_inline_value(yaml_parser_t *p, vigil_json_value_t **out)
+{
+    char c = peek(p);
+    vigil_status_t s;
+    if (c == '"' || c == '\'')
+        s = parse_quoted_string(p, c, out);
+    else if (c == '|' || c == '>')
+        s = parse_block_scalar(p, c, out);
+    else
+        s = parse_plain_scalar(p, out);
+    if (s != VIGIL_STATUS_OK)
+        return s;
+    skip_spaces(p);
+    skip_comment(p);
+    if (peek(p) == '\n')
+        advance(p);
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t parse_next_line_value(yaml_parser_t *p, size_t parent_indent, vigil_json_value_t **out)
+{
+    if (peek(p) == '\n')
+        advance(p);
+    skip_blank_lines(p);
+    size_t val_indent = measure_indent(p);
+    if (val_indent > parent_indent)
+        return parse_value(p, val_indent, out);
+    return vigil_json_null_new(&p->alloc, out, p->error);
+}
+
 static vigil_status_t parse_sequence(yaml_parser_t *p, size_t seq_indent, vigil_json_value_t **out)
 {
     vigil_status_t s = vigil_json_array_new(&p->alloc, out, p->error);
@@ -414,41 +444,11 @@ static vigil_status_t parse_sequence(yaml_parser_t *p, size_t seq_indent, vigil_
 
         if (peek(p) == '\n' || peek(p) == '\0')
         {
-            /* Value on next line */
-            if (peek(p) == '\n')
-                advance(p);
-            skip_blank_lines(p);
-            size_t item_indent = measure_indent(p);
-            if (item_indent > seq_indent)
-            {
-                s = parse_value(p, item_indent, &item);
-            }
-            else
-            {
-                s = vigil_json_null_new(&p->alloc, &item, p->error);
-            }
+            s = parse_next_line_value(p, seq_indent, &item);
         }
         else
         {
-            /* Inline value - parse directly without indent check */
-            char c = peek(p);
-            if (c == '"' || c == '\'')
-            {
-                s = parse_quoted_string(p, c, &item);
-            }
-            else if (c == '|' || c == '>')
-            {
-                s = parse_block_scalar(p, c, &item);
-            }
-            else
-            {
-                s = parse_plain_scalar(p, &item);
-            }
-            /* Skip rest of line (trailing spaces and comments) */
-            skip_spaces(p);
-            skip_comment(p);
-            if (peek(p) == '\n')
-                advance(p);
+            s = parse_inline_value(p, &item);
         }
 
         if (s != VIGIL_STATUS_OK)
@@ -519,41 +519,11 @@ static vigil_status_t parse_mapping(yaml_parser_t *p, size_t map_indent, vigil_j
 
         if (peek(p) == '\n' || peek(p) == '\0')
         {
-            /* Value on next line */
-            if (peek(p) == '\n')
-                advance(p);
-            skip_blank_lines(p);
-            size_t val_indent = measure_indent(p);
-            if (val_indent > map_indent)
-            {
-                s = parse_value(p, val_indent, &value);
-            }
-            else
-            {
-                s = vigil_json_null_new(&p->alloc, &value, p->error);
-            }
+            s = parse_next_line_value(p, map_indent, &value);
         }
         else
         {
-            /* Inline value - parse directly without indent check */
-            char c = peek(p);
-            if (c == '"' || c == '\'')
-            {
-                s = parse_quoted_string(p, c, &value);
-            }
-            else if (c == '|' || c == '>')
-            {
-                s = parse_block_scalar(p, c, &value);
-            }
-            else
-            {
-                s = parse_plain_scalar(p, &value);
-            }
-            /* Skip rest of line (trailing spaces and comments) */
-            skip_spaces(p);
-            skip_comment(p);
-            if (peek(p) == '\n')
-                advance(p);
+            s = parse_inline_value(p, &value);
         }
 
         if (s != VIGIL_STATUS_OK)
