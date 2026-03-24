@@ -4666,7 +4666,14 @@ static vigil_status_t vigil_program_parse_source(vigil_program_state_t *program,
     module_index = 0U;
     if (vigil_program_module_find(program, source_id, &module_index))
     {
-        if (program->modules[module_index].state != VIGIL_MODULE_UNSEEN)
+        if (program->modules[module_index].state == VIGIL_MODULE_PARSING)
+        {
+            vigil_source_span_t span;
+            vigil_source_span_clear(&span);
+            span.source_id = source_id;
+            return vigil_compile_report(program, span, "circular import detected");
+        }
+        if (program->modules[module_index].state == VIGIL_MODULE_PARSED)
         {
             return VIGIL_STATUS_OK;
         }

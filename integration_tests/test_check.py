@@ -66,6 +66,32 @@ class TestVigilCheck(unittest.TestCase):
         self.assertIn("error:", result.stderr)
         self.assertIn("bad.vigil", result.stderr)
 
+    def test_check_rejects_circular_import(self):
+        self._write("vigil.toml", '[project]\nname = "circproj"\n')
+        self._write(
+            "lib/a.vigil",
+            'import "b";\npub fn val() -> i32 { return b.get(); }\n',
+        )
+        self._write(
+            "lib/b.vigil",
+            'import "a";\npub fn get() -> i32 { return 1; }\n',
+        )
+        script = self._write(
+            "main.vigil",
+            'import "a";\nfn main() -> i32 { return a.val(); }\n',
+        )
+
+        result = subprocess.run(
+            [*resolve_vigil_command(), "check", str(script)],
+            cwd=self.tmpdir,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("circular import detected", result.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()
