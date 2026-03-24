@@ -657,6 +657,20 @@ void vigil_object_retain(vigil_object_t *object)
     }
 }
 
+void vigil_object_make_immortal(vigil_object_t *object)
+{
+    if (object != NULL)
+        vigil_atomic_store(&object->ref_count, INT64_MAX / 2);
+}
+
+void vigil_object_force_destroy(vigil_object_t **object)
+{
+    if (object == NULL || *object == NULL)
+        return;
+    vigil_atomic_store(&(*object)->ref_count, 1);
+    vigil_object_release(object);
+}
+
 void vigil_object_release(vigil_object_t **object)
 {
     vigil_object_t *resolved_object;
