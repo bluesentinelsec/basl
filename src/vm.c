@@ -97,6 +97,7 @@
 
 #include "internal/vigil_internal.h"
 #include "internal/vigil_nanbox.h"
+#include "internal/vigil_regvm.h"
 #include "internal/vigil_vm_internal.h"
 #include "platform/platform.h"
 #include "value_internal.h"
@@ -3301,6 +3302,31 @@ vigil_status_t vigil_vm_execute_function(vigil_vm_t *vm, const vigil_object_t *f
         if (status != VIGIL_STATUS_OK)
         {
             return status;
+        }
+
+        /* ── Register VM fast path ─────────────────────────────────
+           Translate the stack bytecode to register instructions and
+           execute with the register VM.  Only attempted for functions
+           that don't use complex opcodes (calls, string ops, etc.)
+           which the register VM doesn't yet handle. */
+        {
+            const vigil_chunk_t *fn_chunk = vigil_callable_object_chunk(function);
+            if (0 && vm->debug_hook == NULL && vigil_reg_chunk_is_translatable(fn_chunk))
+            {
+                vigil_reg_chunk_t reg_chunk;
+                vigil_status_t reg_status = vigil_reg_translate(fn_chunk, &reg_chunk, vm->runtime, error);
+                if (reg_status == VIGIL_STATUS_OK)
+                {
+                    reg_status = vigil_regvm_execute(vm, &reg_chunk, out_value, error);
+                    vigil_reg_chunk_free(&reg_chunk, vm->runtime);
+                    if (reg_status == VIGIL_STATUS_OK)
+                    {
+                        vigil_vm_release_stack(vm);
+                        vigil_vm_clear_frames(vm);
+                        return VIGIL_STATUS_OK;
+                    }
+                }
+            }
         }
     }
     while (1)
