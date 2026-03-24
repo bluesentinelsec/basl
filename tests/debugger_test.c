@@ -322,25 +322,23 @@ TEST(VigilDebuggerTest, SwitchThreadUnknownIdReturnsError)
 /* Thread breakpoint tests require real OS thread support. */
 #if !defined(__EMSCRIPTEN__) && defined(VIGIL_HAS_STDLIB_THREAD)
 
-static const char *k_worker_thread_bp_source =
-    "import \"thread\";\n"                      /* 1 */
-    "fn main() -> i32 {\n"                      /* 2 */
-    "    i64 t = thread.spawn(fn() -> void {\n" /* 3 */
-    "        i64 x = i64(99);\n"                /* 4 */
-    "    });\n"                                 /* 5 */
-    "    thread.join(t);\n"                     /* 6 */
-    "    return 0;\n"                           /* 7 */
-    "}\n";                                      /* 8 */
+static const char *k_worker_thread_bp_source = "import \"thread\";\n"                      /* 1 */
+                                               "fn main() -> i32 {\n"                      /* 2 */
+                                               "    i64 t = thread.spawn(fn() -> void {\n" /* 3 */
+                                               "        i64 x = i64(99);\n"                /* 4 */
+                                               "    });\n"                                 /* 5 */
+                                               "    thread.join(t);\n"                     /* 6 */
+                                               "    return 0;\n"                           /* 7 */
+                                               "}\n";                                      /* 8 */
 
-static const char *k_worker_thread_switch_source =
-    "import \"thread\";\n"                      /* 1 */
-    "fn main() -> i32 {\n"                      /* 2 */
-    "    i64 t = thread.spawn(fn() -> void {\n" /* 3 */
-    "        i64 y = i64(7);\n"                 /* 4 */
-    "    });\n"                                 /* 5 */
-    "    thread.join(t);\n"                     /* 6 */
-    "    return 0;\n"                           /* 7 */
-    "}\n";                                      /* 8 */
+static const char *k_worker_thread_switch_source = "import \"thread\";\n"                      /* 1 */
+                                                   "fn main() -> i32 {\n"                      /* 2 */
+                                                   "    i64 t = thread.spawn(fn() -> void {\n" /* 3 */
+                                                   "        i64 y = i64(7);\n"                 /* 4 */
+                                                   "    });\n"                                 /* 5 */
+                                                   "    thread.join(t);\n"                     /* 6 */
+                                                   "    return 0;\n"                           /* 7 */
+                                                   "}\n";                                      /* 8 */
 
 /* Callback state shared between thread breakpoint tests. */
 typedef struct ThreadBpState
