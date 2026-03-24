@@ -5005,6 +5005,15 @@ static vigil_opcode_t vigil_parser_try_fuse_locals_i64(vigil_parser_state_t *sta
     case VIGIL_OPCODE_NOT_EQUAL_I64:
         fused = VIGIL_OPCODE_LOCALS_NOT_EQUAL_I64;
         break;
+    case VIGIL_OPCODE_ADD_F64:
+        fused = VIGIL_OPCODE_LOCALS_ADD_F64;
+        break;
+    case VIGIL_OPCODE_SUBTRACT_F64:
+        fused = VIGIL_OPCODE_LOCALS_SUBTRACT_F64;
+        break;
+    case VIGIL_OPCODE_MULTIPLY_F64:
+        fused = VIGIL_OPCODE_LOCALS_MULTIPLY_F64;
+        break;
     default:
         return opcode;
     }
@@ -5056,8 +5065,7 @@ vigil_status_t vigil_parser_emit_opcode(vigil_parser_state_t *state, vigil_opcod
                           ((uint32_t)state->chunk.code.data[state->chunk.code.length - 3U] << 8U) |
                           ((uint32_t)state->chunk.code.data[state->chunk.code.length - 2U] << 16U) |
                           ((uint32_t)state->chunk.code.data[state->chunk.code.length - 1U] << 24U);
-            if (ci < state->chunk.constant_count &&
-                vigil_value_kind(&state->chunk.constants[ci]) == VIGIL_VALUE_INT)
+            if (ci < state->chunk.constant_count && vigil_value_kind(&state->chunk.constants[ci]) == VIGIL_VALUE_INT)
                 return VIGIL_STATUS_OK;
         }
     }
@@ -8964,6 +8972,34 @@ static vigil_status_t emit_typed_binop(vigil_parser_state_t *state, vigil_opcode
     int both_i32 = vigil_parser_type_is_i32(left_type) && vigil_parser_type_is_i32(right_type);
     int both_si =
         !both_i32 && vigil_parser_type_is_signed_integer(left_type) && vigil_parser_type_is_signed_integer(right_type);
+    int both_f64 = vigil_parser_type_is_f64(left_type) && vigil_parser_type_is_f64(right_type);
+    if (both_f64)
+    {
+        vigil_opcode_t f64_op;
+        switch (generic_op)
+        {
+        case VIGIL_OPCODE_ADD:
+            f64_op = VIGIL_OPCODE_ADD_F64;
+            break;
+        case VIGIL_OPCODE_SUBTRACT:
+            f64_op = VIGIL_OPCODE_SUBTRACT_F64;
+            break;
+        case VIGIL_OPCODE_MULTIPLY:
+            f64_op = VIGIL_OPCODE_MULTIPLY_F64;
+            break;
+        case VIGIL_OPCODE_DIVIDE:
+            f64_op = VIGIL_OPCODE_DIVIDE_F64;
+            break;
+        default:
+            f64_op = generic_op;
+            break;
+        }
+        /* Try LOCALS fusion for f64 ops (reuses the i64 fusion machinery). */
+        vigil_opcode_t fused = vigil_parser_try_fuse_locals_i64(state, f64_op, pre_left_size);
+        if (fused == (vigil_opcode_t)255)
+            return VIGIL_STATUS_OK;
+        return vigil_parser_emit_opcode(state, fused, span);
+    }
     return both_i32  ? vigil_parser_emit_i32_binop(state, i64_op, span, pre_left_size)
            : both_si ? vigil_parser_emit_i64_binop(state, i64_op, span, pre_left_size)
                      : vigil_parser_emit_opcode(state, generic_op, span);
@@ -11728,8 +11764,7 @@ static vigil_status_t vigil_parser_emit_integer_cast(vigil_parser_state_t *state
                           ((uint32_t)state->chunk.code.data[state->chunk.code.length - 3U] << 8U) |
                           ((uint32_t)state->chunk.code.data[state->chunk.code.length - 2U] << 16U) |
                           ((uint32_t)state->chunk.code.data[state->chunk.code.length - 1U] << 24U);
-            if (ci < state->chunk.constant_count &&
-                vigil_value_kind(&state->chunk.constants[ci]) == VIGIL_VALUE_INT)
+            if (ci < state->chunk.constant_count && vigil_value_kind(&state->chunk.constants[ci]) == VIGIL_VALUE_INT)
                 return VIGIL_STATUS_OK;
         }
     }
@@ -12159,6 +12194,22 @@ static vigil_opcode_t vigil_parser_specialize_arith_opcode(vigil_opcode_t opcode
         return specialize_arith_i32(opcode);
     if (vigil_parser_type_is_signed_integer(target_type) && vigil_parser_type_is_signed_integer(value_type))
         return specialize_arith_i64(opcode);
+    if (vigil_parser_type_is_f64(target_type) && vigil_parser_type_is_f64(value_type))
+    {
+        switch (opcode)
+        {
+        case VIGIL_OPCODE_ADD:
+            return VIGIL_OPCODE_ADD_F64;
+        case VIGIL_OPCODE_SUBTRACT:
+            return VIGIL_OPCODE_SUBTRACT_F64;
+        case VIGIL_OPCODE_MULTIPLY:
+            return VIGIL_OPCODE_MULTIPLY_F64;
+        case VIGIL_OPCODE_DIVIDE:
+            return VIGIL_OPCODE_DIVIDE_F64;
+        default:
+            break;
+        }
+    }
     return opcode;
 }
 
@@ -12218,8 +12269,8 @@ static void vigil_parser_peephole_increment_local_i32(vigil_parser_state_t *stat
    The emit_integer_cast peephole above eliminates the redundant TO_I64 when
    the constant pool entry is already VIGIL_VALUE_INT, so the pattern is the
    same 17 bytes as the i32 version. */
-static bool peephole_match_increment_i64_pattern(const uint8_t *code, size_t base, uint32_t *get_idx,
-                                                 uint32_t *set_idx, uint32_t *ci, int *is_sub)
+static bool peephole_match_increment_i64_pattern(const uint8_t *code, size_t base, uint32_t *get_idx, uint32_t *set_idx,
+                                                 uint32_t *ci, int *is_sub)
 {
     if (code[base] != VIGIL_OPCODE_GET_LOCAL || code[base + 5U] != VIGIL_OPCODE_CONSTANT ||
         (code[base + 10U] != VIGIL_OPCODE_ADD_I64 && code[base + 10U] != VIGIL_OPCODE_SUBTRACT_I64) ||
@@ -12311,7 +12362,21 @@ static vigil_opcode_t map_locals_i64_to_i32_store(vigil_opcode_t op)
     vigil_opcode_t result = map_locals_arith_i64_to_i32_store(op);
     if (result != (vigil_opcode_t)0)
         return result;
-    return map_locals_cmp_i64_to_i32_store(op);
+    result = map_locals_cmp_i64_to_i32_store(op);
+    if (result != (vigil_opcode_t)0)
+        return result;
+    /* f64 LOCALS → STORE fusion */
+    switch (op)
+    {
+    case VIGIL_OPCODE_LOCALS_ADD_F64:
+        return VIGIL_OPCODE_LOCALS_ADD_F64_STORE;
+    case VIGIL_OPCODE_LOCALS_SUBTRACT_F64:
+        return VIGIL_OPCODE_LOCALS_SUBTRACT_F64_STORE;
+    case VIGIL_OPCODE_LOCALS_MULTIPLY_F64:
+        return VIGIL_OPCODE_LOCALS_MULTIPLY_F64_STORE;
+    default:
+        return (vigil_opcode_t)0;
+    }
 }
 
 static void vigil_parser_peephole_locals_i32_store(vigil_parser_state_t *state)
@@ -12753,6 +12818,39 @@ static vigil_status_t emit_local_store(vigil_parser_state_t *state, const assign
     }
     if (!t->is_global_assignment && !t->is_capture_local && vigil_parser_type_is_i32(t->target_type))
         vigil_parser_peephole_locals_i32_store(state);
+    if (!t->is_global_assignment && !t->is_capture_local && vigil_parser_type_is_f64(t->target_type))
+        vigil_parser_peephole_locals_i32_store(state);
+
+    /* Peephole: ADD_F64/SUB_F64/MUL_F64 + SET_LOCAL + POP → *_F64_STORE.
+       Matches when the last 7 bytes are [arith_f64(1)][SET_LOCAL(1)][u32(4)][POP(1)]. */
+    if (!t->is_global_assignment && !t->is_capture_local && vigil_parser_type_is_f64(t->target_type))
+    {
+        uint8_t *code = state->chunk.code.data;
+        size_t len = state->chunk.code.length;
+        if (len >= 7U && code[len - 6U] == VIGIL_OPCODE_SET_LOCAL && code[len - 1U] == VIGIL_OPCODE_POP)
+        {
+            vigil_opcode_t arith = (vigil_opcode_t)code[len - 7U];
+            vigil_opcode_t store_op = (vigil_opcode_t)0;
+            if (arith == VIGIL_OPCODE_ADD_F64)
+                store_op = VIGIL_OPCODE_ADD_F64_STORE;
+            else if (arith == VIGIL_OPCODE_SUBTRACT_F64)
+                store_op = VIGIL_OPCODE_SUBTRACT_F64_STORE;
+            else if (arith == VIGIL_OPCODE_MULTIPLY_F64)
+                store_op = VIGIL_OPCODE_MULTIPLY_F64_STORE;
+            if (store_op != (vigil_opcode_t)0)
+            {
+                /* Rewrite: [arith(1)][SET_LOCAL(1)][u32(4)][POP(1)] → [store(1)][u32(4)] */
+                code[len - 7U] = (uint8_t)store_op;
+                code[len - 6U] = code[len - 5U];
+                code[len - 5U] = code[len - 4U];
+                code[len - 4U] = code[len - 3U];
+                code[len - 3U] = code[len - 2U];
+                state->chunk.code.length = len - 2U;
+                if (state->chunk.span_count > len - 2U)
+                    state->chunk.span_count = len - 2U;
+            }
+        }
+    }
     return VIGIL_STATUS_OK;
 }
 
