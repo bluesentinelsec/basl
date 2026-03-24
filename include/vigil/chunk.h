@@ -267,7 +267,34 @@ extern "C"
            Format: [opcode(1)][u32 local_idx][i8 delta][u32 limit_const_idx]
                    [u8 cmp][u32 back_offset]  (15 bytes)
            cmp encoding: 0=<  1=<=  2=>  3=>=  4=!= */
-        VIGIL_OPCODE_FORLOOP_I64 = 175
+        VIGIL_OPCODE_FORLOOP_I64 = 175,
+
+        /* ── f64-specific opcodes ─────────────────────────────────────
+           These operate on values known at compile time to be f64.
+           They skip the runtime nanbox type check entirely. */
+        VIGIL_OPCODE_ADD_F64 = 176,
+        VIGIL_OPCODE_SUBTRACT_F64 = 177,
+        VIGIL_OPCODE_MULTIPLY_F64 = 178,
+        VIGIL_OPCODE_DIVIDE_F64 = 179,
+
+        /* Two-address f64 superinstructions: read two locals, operate,
+           push result.  Eliminates two GET_LOCAL dispatches. */
+        VIGIL_OPCODE_LOCALS_ADD_F64 = 180,
+        VIGIL_OPCODE_LOCALS_SUBTRACT_F64 = 181,
+        VIGIL_OPCODE_LOCALS_MULTIPLY_F64 = 182,
+
+        /* Three-address f64 superinstructions: read two locals, operate,
+           store result to a third local.  Zero stack traffic. */
+        VIGIL_OPCODE_LOCALS_ADD_F64_STORE = 183,
+        VIGIL_OPCODE_LOCALS_SUBTRACT_F64_STORE = 184,
+        VIGIL_OPCODE_LOCALS_MULTIPLY_F64_STORE = 185,
+
+        /* Fused f64 arithmetic + store: pop two f64 values, operate,
+           store result to local.  Eliminates SET_LOCAL + POP dispatches.
+           Format: [opcode(1)][u32 dst_local]  (5 bytes) */
+        VIGIL_OPCODE_ADD_F64_STORE = 186,
+        VIGIL_OPCODE_SUBTRACT_F64_STORE = 187,
+        VIGIL_OPCODE_MULTIPLY_F64_STORE = 188
     } vigil_opcode_t;
 
     typedef struct vigil_chunk

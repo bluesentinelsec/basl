@@ -3421,7 +3421,7 @@ vigil_status_t vigil_vm_execute_function(vigil_vm_t *vm, const vigil_object_t *f
                 [VIGIL_OPCODE_CALL_NATIVE] = &&op_CALL_NATIVE,
                 [VIGIL_OPCODE_DEFER_CALL_NATIVE] = &&op_DEFER_CALL_NATIVE,
                 // clang-format off
-                [VIGIL_OPCODE_CALL_EXTERN]=&&op_CALL_EXTERN, [VIGIL_OPCODE_MATH_SIN_F64]=&&op_MATH_SIN_F64, [VIGIL_OPCODE_MATH_COS_F64]=&&op_MATH_COS_F64, [VIGIL_OPCODE_MATH_SQRT_F64]=&&op_MATH_SQRT_F64, [VIGIL_OPCODE_MATH_LOG_F64]=&&op_MATH_LOG_F64, [VIGIL_OPCODE_MATH_POW_F64]=&&op_MATH_POW_F64, [VIGIL_OPCODE_PARSE_I32]=&&op_PARSE_I32, [VIGIL_OPCODE_PARSE_F64]=&&op_PARSE_F64, [VIGIL_OPCODE_PARSE_BOOL]=&&op_PARSE_BOOL, [VIGIL_OPCODE_CALL_SELF]=&&op_CALL_SELF, [VIGIL_OPCODE_LESS_I32_JUMP_IF_FALSE]=&&op_LESS_I32_JUMP_IF_FALSE, [VIGIL_OPCODE_LESS_EQUAL_I32_JUMP_IF_FALSE]=&&op_LESS_EQUAL_I32_JUMP_IF_FALSE, [VIGIL_OPCODE_GREATER_I32_JUMP_IF_FALSE]=&&op_GREATER_I32_JUMP_IF_FALSE, [VIGIL_OPCODE_GREATER_EQUAL_I32_JUMP_IF_FALSE]=&&op_GREATER_EQUAL_I32_JUMP_IF_FALSE, [VIGIL_OPCODE_EQUAL_I32_JUMP_IF_FALSE]=&&op_EQUAL_I32_JUMP_IF_FALSE, [VIGIL_OPCODE_NOT_EQUAL_I32_JUMP_IF_FALSE]=&&op_NOT_EQUAL_I32_JUMP_IF_FALSE, [VIGIL_OPCODE_LESS_I64_JUMP_IF_FALSE]=&&op_LESS_I64_JUMP_IF_FALSE, [VIGIL_OPCODE_LESS_EQUAL_I64_JUMP_IF_FALSE]=&&op_LESS_EQUAL_I64_JUMP_IF_FALSE, [VIGIL_OPCODE_GREATER_I64_JUMP_IF_FALSE]=&&op_GREATER_I64_JUMP_IF_FALSE, [VIGIL_OPCODE_GREATER_EQUAL_I64_JUMP_IF_FALSE]=&&op_GREATER_EQUAL_I64_JUMP_IF_FALSE, [VIGIL_OPCODE_EQUAL_I64_JUMP_IF_FALSE]=&&op_EQUAL_I64_JUMP_IF_FALSE, [VIGIL_OPCODE_NOT_EQUAL_I64_JUMP_IF_FALSE]=&&op_NOT_EQUAL_I64_JUMP_IF_FALSE, [VIGIL_OPCODE_INCREMENT_LOCAL_I64]=&&op_INCREMENT_LOCAL_I64, [VIGIL_OPCODE_FORLOOP_I64]=&&op_FORLOOP_I64,
+                [VIGIL_OPCODE_CALL_EXTERN]=&&op_CALL_EXTERN, [VIGIL_OPCODE_MATH_SIN_F64]=&&op_MATH_SIN_F64, [VIGIL_OPCODE_MATH_COS_F64]=&&op_MATH_COS_F64, [VIGIL_OPCODE_MATH_SQRT_F64]=&&op_MATH_SQRT_F64, [VIGIL_OPCODE_MATH_LOG_F64]=&&op_MATH_LOG_F64, [VIGIL_OPCODE_MATH_POW_F64]=&&op_MATH_POW_F64, [VIGIL_OPCODE_PARSE_I32]=&&op_PARSE_I32, [VIGIL_OPCODE_PARSE_F64]=&&op_PARSE_F64, [VIGIL_OPCODE_PARSE_BOOL]=&&op_PARSE_BOOL, [VIGIL_OPCODE_CALL_SELF]=&&op_CALL_SELF, [VIGIL_OPCODE_LESS_I32_JUMP_IF_FALSE]=&&op_LESS_I32_JUMP_IF_FALSE, [VIGIL_OPCODE_LESS_EQUAL_I32_JUMP_IF_FALSE]=&&op_LESS_EQUAL_I32_JUMP_IF_FALSE, [VIGIL_OPCODE_GREATER_I32_JUMP_IF_FALSE]=&&op_GREATER_I32_JUMP_IF_FALSE, [VIGIL_OPCODE_GREATER_EQUAL_I32_JUMP_IF_FALSE]=&&op_GREATER_EQUAL_I32_JUMP_IF_FALSE, [VIGIL_OPCODE_EQUAL_I32_JUMP_IF_FALSE]=&&op_EQUAL_I32_JUMP_IF_FALSE, [VIGIL_OPCODE_NOT_EQUAL_I32_JUMP_IF_FALSE]=&&op_NOT_EQUAL_I32_JUMP_IF_FALSE, [VIGIL_OPCODE_LESS_I64_JUMP_IF_FALSE]=&&op_LESS_I64_JUMP_IF_FALSE, [VIGIL_OPCODE_LESS_EQUAL_I64_JUMP_IF_FALSE]=&&op_LESS_EQUAL_I64_JUMP_IF_FALSE, [VIGIL_OPCODE_GREATER_I64_JUMP_IF_FALSE]=&&op_GREATER_I64_JUMP_IF_FALSE, [VIGIL_OPCODE_GREATER_EQUAL_I64_JUMP_IF_FALSE]=&&op_GREATER_EQUAL_I64_JUMP_IF_FALSE, [VIGIL_OPCODE_EQUAL_I64_JUMP_IF_FALSE]=&&op_EQUAL_I64_JUMP_IF_FALSE, [VIGIL_OPCODE_NOT_EQUAL_I64_JUMP_IF_FALSE]=&&op_NOT_EQUAL_I64_JUMP_IF_FALSE, [VIGIL_OPCODE_INCREMENT_LOCAL_I64]=&&op_INCREMENT_LOCAL_I64, [VIGIL_OPCODE_FORLOOP_I64]=&&op_FORLOOP_I64, [VIGIL_OPCODE_ADD_F64]=&&op_ADD_F64, [VIGIL_OPCODE_SUBTRACT_F64]=&&op_SUBTRACT_F64, [VIGIL_OPCODE_MULTIPLY_F64]=&&op_MULTIPLY_F64, [VIGIL_OPCODE_DIVIDE_F64]=&&op_DIVIDE_F64, [VIGIL_OPCODE_LOCALS_ADD_F64]=&&op_LOCALS_ADD_F64, [VIGIL_OPCODE_LOCALS_SUBTRACT_F64]=&&op_LOCALS_SUBTRACT_F64, [VIGIL_OPCODE_LOCALS_MULTIPLY_F64]=&&op_LOCALS_MULTIPLY_F64, [VIGIL_OPCODE_LOCALS_ADD_F64_STORE]=&&op_LOCALS_ADD_F64_STORE, [VIGIL_OPCODE_LOCALS_SUBTRACT_F64_STORE]=&&op_LOCALS_SUBTRACT_F64_STORE, [VIGIL_OPCODE_LOCALS_MULTIPLY_F64_STORE]=&&op_LOCALS_MULTIPLY_F64_STORE, [VIGIL_OPCODE_ADD_F64_STORE]=&&op_ADD_F64_STORE, [VIGIL_OPCODE_SUBTRACT_F64_STORE]=&&op_SUBTRACT_F64_STORE, [VIGIL_OPCODE_MULTIPLY_F64_STORE]=&&op_MULTIPLY_F64_STORE,
                 // clang-format on
                 [VIGIL_OPCODE_MODULO] = &&op_MODULO,
                 [VIGIL_OPCODE_MULTIPLY] = &&op_MULTIPLY,
@@ -4603,67 +4603,8 @@ vigil_status_t vigil_vm_execute_function(vigil_vm_t *vm, const vigil_object_t *f
             frame->ip += 1U;
             VM_BREAK();
             VM_CASE(ADD)
-            /* Fast path: both operands are doubles — skip the full
-               generic_binary_dispatch / pop / push / release cycle. */
-            {
-                uint64_t add_r = vm->stack[vm->stack_count - 1U];
-                uint64_t add_l = vm->stack[vm->stack_count - 2U];
-                if (VIGIL_LIKELY(vigil_nanbox_is_double(add_l) && vigil_nanbox_is_double(add_r)))
-                {
-                    vm->stack_count -= 1U;
-                    vm->stack[vm->stack_count - 1U] = vigil_nanbox_encode_double(vigil_nanbox_decode_double(add_l) +
-                                                                                 vigil_nanbox_decode_double(add_r));
-                    frame->ip += 1U;
-                    VIGIL_VM_INTRINSIC_NEXT(dispatch_table, code, frame->ip);
-                }
-                else
-                {
-                    status = vigil_vm_op_generic_binary(vm, frame, code, error);
-                    if (status != VIGIL_STATUS_OK)
-                        goto cleanup;
-                }
-            }
-            VM_BREAK();
             VM_CASE(SUBTRACT)
-            {
-                uint64_t sub_r = vm->stack[vm->stack_count - 1U];
-                uint64_t sub_l = vm->stack[vm->stack_count - 2U];
-                if (VIGIL_LIKELY(vigil_nanbox_is_double(sub_l) && vigil_nanbox_is_double(sub_r)))
-                {
-                    vm->stack_count -= 1U;
-                    vm->stack[vm->stack_count - 1U] = vigil_nanbox_encode_double(vigil_nanbox_decode_double(sub_l) -
-                                                                                 vigil_nanbox_decode_double(sub_r));
-                    frame->ip += 1U;
-                    VIGIL_VM_INTRINSIC_NEXT(dispatch_table, code, frame->ip);
-                }
-                else
-                {
-                    status = vigil_vm_op_generic_binary(vm, frame, code, error);
-                    if (status != VIGIL_STATUS_OK)
-                        goto cleanup;
-                }
-            }
-            VM_BREAK();
             VM_CASE(MULTIPLY)
-            {
-                uint64_t mul_r = vm->stack[vm->stack_count - 1U];
-                uint64_t mul_l = vm->stack[vm->stack_count - 2U];
-                if (VIGIL_LIKELY(vigil_nanbox_is_double(mul_l) && vigil_nanbox_is_double(mul_r)))
-                {
-                    vm->stack_count -= 1U;
-                    vm->stack[vm->stack_count - 1U] = vigil_nanbox_encode_double(vigil_nanbox_decode_double(mul_l) *
-                                                                                 vigil_nanbox_decode_double(mul_r));
-                    frame->ip += 1U;
-                    VIGIL_VM_INTRINSIC_NEXT(dispatch_table, code, frame->ip);
-                }
-                else
-                {
-                    status = vigil_vm_op_generic_binary(vm, frame, code, error);
-                    if (status != VIGIL_STATUS_OK)
-                        goto cleanup;
-                }
-            }
-            VM_BREAK();
             VM_CASE(DIVIDE)
             VM_CASE(MODULO)
             VM_CASE(BITWISE_AND)
@@ -4724,6 +4665,126 @@ vigil_status_t vigil_vm_execute_function(vigil_vm_t *vm, const vigil_object_t *f
             if (status != VIGIL_STATUS_OK)
                 goto cleanup;
             VM_BREAK();
+
+            // clang-format off
+            /* ── f64 typed arithmetic ─────────────────────────────────
+               No type check needed — the compiler guarantees both
+               operands are f64.  Pure double arithmetic in-place. */
+            VM_CASE(ADD_F64)
+            { double fb = vigil_nanbox_decode_double(vm->stack[vm->stack_count - 1U]);
+              double fa = vigil_nanbox_decode_double(vm->stack[vm->stack_count - 2U]);
+              vm->stack_count -= 1U;
+              vm->stack[vm->stack_count - 1U] = vigil_nanbox_encode_double(fa + fb); }
+            frame->ip += 1U; VIGIL_VM_INTRINSIC_NEXT(dispatch_table, code, frame->ip);
+            VM_CASE(SUBTRACT_F64)
+            { double fb = vigil_nanbox_decode_double(vm->stack[vm->stack_count - 1U]);
+              double fa = vigil_nanbox_decode_double(vm->stack[vm->stack_count - 2U]);
+              vm->stack_count -= 1U;
+              vm->stack[vm->stack_count - 1U] = vigil_nanbox_encode_double(fa - fb); }
+            frame->ip += 1U; VIGIL_VM_INTRINSIC_NEXT(dispatch_table, code, frame->ip);
+            VM_CASE(MULTIPLY_F64)
+            { double fb = vigil_nanbox_decode_double(vm->stack[vm->stack_count - 1U]);
+              double fa = vigil_nanbox_decode_double(vm->stack[vm->stack_count - 2U]);
+              vm->stack_count -= 1U;
+              vm->stack[vm->stack_count - 1U] = vigil_nanbox_encode_double(fa * fb); }
+            frame->ip += 1U; VIGIL_VM_INTRINSIC_NEXT(dispatch_table, code, frame->ip);
+            VM_CASE(DIVIDE_F64)
+            { double fb = vigil_nanbox_decode_double(vm->stack[vm->stack_count - 1U]);
+              double fa = vigil_nanbox_decode_double(vm->stack[vm->stack_count - 2U]);
+              vm->stack_count -= 1U;
+              vm->stack[vm->stack_count - 1U] = vigil_nanbox_encode_double(fa / fb); }
+            frame->ip += 1U; VIGIL_VM_INTRINSIC_NEXT(dispatch_table, code, frame->ip);
+
+            /* ── f64 two-address superinstructions ────────────────────
+               Format: [opcode(1)][u32 local_a][u32 local_b]  (9 bytes)
+               Reads two locals, operates, pushes result. */
+            VM_CASE(LOCALS_ADD_F64)
+            { uint32_t la, lb;
+              VIGIL_VM_READ_U32(code, frame->ip, la);
+              VIGIL_VM_READ_RAW_U32(code, frame->ip, lb);
+              double fa = vigil_nanbox_decode_double(vm->stack[frame->base_slot + la]);
+              double fb = vigil_nanbox_decode_double(vm->stack[frame->base_slot + lb]);
+              vm->stack[vm->stack_count] = vigil_nanbox_encode_double(fa + fb);
+              vm->stack_count += 1U; }
+            VIGIL_VM_INTRINSIC_NEXT(dispatch_table, code, frame->ip);
+            VM_CASE(LOCALS_SUBTRACT_F64)
+            { uint32_t la, lb;
+              VIGIL_VM_READ_U32(code, frame->ip, la);
+              VIGIL_VM_READ_RAW_U32(code, frame->ip, lb);
+              double fa = vigil_nanbox_decode_double(vm->stack[frame->base_slot + la]);
+              double fb = vigil_nanbox_decode_double(vm->stack[frame->base_slot + lb]);
+              vm->stack[vm->stack_count] = vigil_nanbox_encode_double(fa - fb);
+              vm->stack_count += 1U; }
+            VIGIL_VM_INTRINSIC_NEXT(dispatch_table, code, frame->ip);
+            VM_CASE(LOCALS_MULTIPLY_F64)
+            { uint32_t la, lb;
+              VIGIL_VM_READ_U32(code, frame->ip, la);
+              VIGIL_VM_READ_RAW_U32(code, frame->ip, lb);
+              double fa = vigil_nanbox_decode_double(vm->stack[frame->base_slot + la]);
+              double fb = vigil_nanbox_decode_double(vm->stack[frame->base_slot + lb]);
+              vm->stack[vm->stack_count] = vigil_nanbox_encode_double(fa * fb);
+              vm->stack_count += 1U; }
+            VIGIL_VM_INTRINSIC_NEXT(dispatch_table, code, frame->ip);
+
+            /* ── f64 three-address superinstructions ──────────────────
+               Format: [opcode(1)][u32 dst][u32 local_a][u32 local_b]  (13 bytes)
+               Reads two locals, operates, stores to dst.  Zero stack traffic. */
+            VM_CASE(LOCALS_ADD_F64_STORE)
+            { uint32_t dst, la, lb;
+              VIGIL_VM_READ_U32(code, frame->ip, dst);
+              VIGIL_VM_READ_RAW_U32(code, frame->ip, la);
+              VIGIL_VM_READ_RAW_U32(code, frame->ip, lb);
+              double fa = vigil_nanbox_decode_double(vm->stack[frame->base_slot + la]);
+              double fb = vigil_nanbox_decode_double(vm->stack[frame->base_slot + lb]);
+              vm->stack[frame->base_slot + dst] = vigil_nanbox_encode_double(fa + fb); }
+            VIGIL_VM_INTRINSIC_NEXT(dispatch_table, code, frame->ip);
+            VM_CASE(LOCALS_SUBTRACT_F64_STORE)
+            { uint32_t dst, la, lb;
+              VIGIL_VM_READ_U32(code, frame->ip, dst);
+              VIGIL_VM_READ_RAW_U32(code, frame->ip, la);
+              VIGIL_VM_READ_RAW_U32(code, frame->ip, lb);
+              double fa = vigil_nanbox_decode_double(vm->stack[frame->base_slot + la]);
+              double fb = vigil_nanbox_decode_double(vm->stack[frame->base_slot + lb]);
+              vm->stack[frame->base_slot + dst] = vigil_nanbox_encode_double(fa - fb); }
+            VIGIL_VM_INTRINSIC_NEXT(dispatch_table, code, frame->ip);
+            VM_CASE(LOCALS_MULTIPLY_F64_STORE)
+            { uint32_t dst, la, lb;
+              VIGIL_VM_READ_U32(code, frame->ip, dst);
+              VIGIL_VM_READ_RAW_U32(code, frame->ip, la);
+              VIGIL_VM_READ_RAW_U32(code, frame->ip, lb);
+              double fa = vigil_nanbox_decode_double(vm->stack[frame->base_slot + la]);
+              double fb = vigil_nanbox_decode_double(vm->stack[frame->base_slot + lb]);
+              vm->stack[frame->base_slot + dst] = vigil_nanbox_encode_double(fa * fb); }
+            VIGIL_VM_INTRINSIC_NEXT(dispatch_table, code, frame->ip);
+
+            /* ── Fused f64 arith + store ──────────────────────────────
+               Format: [opcode(1)][u32 dst_local]  (5 bytes)
+               Pops two f64 from stack, operates, stores to local[dst]. */
+            VM_CASE(ADD_F64_STORE)
+            { uint32_t dst;
+              VIGIL_VM_READ_U32(code, frame->ip, dst);
+              double fb = vigil_nanbox_decode_double(vm->stack[vm->stack_count - 1U]);
+              double fa = vigil_nanbox_decode_double(vm->stack[vm->stack_count - 2U]);
+              vm->stack_count -= 2U;
+              vm->stack[frame->base_slot + dst] = vigil_nanbox_encode_double(fa + fb); }
+            VIGIL_VM_INTRINSIC_NEXT(dispatch_table, code, frame->ip);
+            VM_CASE(SUBTRACT_F64_STORE)
+            { uint32_t dst;
+              VIGIL_VM_READ_U32(code, frame->ip, dst);
+              double fb = vigil_nanbox_decode_double(vm->stack[vm->stack_count - 1U]);
+              double fa = vigil_nanbox_decode_double(vm->stack[vm->stack_count - 2U]);
+              vm->stack_count -= 2U;
+              vm->stack[frame->base_slot + dst] = vigil_nanbox_encode_double(fa - fb); }
+            VIGIL_VM_INTRINSIC_NEXT(dispatch_table, code, frame->ip);
+            VM_CASE(MULTIPLY_F64_STORE)
+            { uint32_t dst;
+              VIGIL_VM_READ_U32(code, frame->ip, dst);
+              double fb = vigil_nanbox_decode_double(vm->stack[vm->stack_count - 1U]);
+              double fa = vigil_nanbox_decode_double(vm->stack[vm->stack_count - 2U]);
+              vm->stack_count -= 2U;
+              vm->stack[frame->base_slot + dst] = vigil_nanbox_encode_double(fa * fb); }
+            VIGIL_VM_INTRINSIC_NEXT(dispatch_table, code, frame->ip);
+            // clang-format on
 
             VM_CASE(ADD_I32)
             {
