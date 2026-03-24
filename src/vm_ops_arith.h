@@ -39,5 +39,9 @@ vigil_status_t vigil_vm_op_increment_local_i32(vigil_vm_t *vm, vigil_vm_frame_t 
                                                vigil_error_t *error);
 vigil_status_t vigil_vm_op_forloop_i32(vigil_vm_t *vm, vigil_vm_frame_t *frame, const uint8_t *code,
                                        vigil_error_t *error);
+vigil_status_t vigil_vm_op_increment_local_i64(vigil_vm_t *vm, vigil_vm_frame_t *frame, const uint8_t *code,
+                                               vigil_error_t *error);
+vigil_status_t vigil_vm_op_forloop_i64(vigil_vm_t *vm, vigil_vm_frame_t *frame, const uint8_t *code,
+                                       vigil_error_t *error);
 
 #endif /* VIGIL_VM_OPS_ARITH_H */

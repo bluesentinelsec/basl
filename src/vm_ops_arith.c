@@ -725,3 +725,76 @@ vigil_status_t vigil_vm_op_forloop_i32(vigil_vm_t *vm, vigil_vm_frame_t *frame, 
     }
     return VIGIL_STATUS_OK;
 }
+
+vigil_status_t vigil_vm_op_increment_local_i64(vigil_vm_t *vm, vigil_vm_frame_t *frame, const uint8_t *code,
+                                               vigil_error_t *error)
+{
+    uint32_t idx;
+    int64_t val, r;
+    int64_t delta;
+    VIGIL_VM_FAST_READ_U32(code, frame->ip, idx);
+    delta = (int64_t)(int8_t)code[frame->ip];
+    frame->ip += 1U;
+    val = vigil_nanbox_decode_int(vm->stack[frame->base_slot + idx]);
+    if (checked_i64_add(val, delta, &r) != VIGIL_STATUS_OK)
+        return vigil_vm_fail_at_ip(vm, VIGIL_STATUS_INVALID_ARGUMENT, "i64 overflow", error);
+    vm->stack[frame->base_slot + idx] = vigil_nanbox_encode_int(r);
+    return VIGIL_STATUS_OK;
+}
+
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
+vigil_status_t vigil_vm_op_forloop_i64(vigil_vm_t *vm, vigil_vm_frame_t *frame, const uint8_t *code,
+                                       vigil_error_t *error)
+{
+    uint32_t idx, ci, back;
+    int64_t val, delta, r, limit;
+    uint8_t cmp;
+    int cont;
+    const vigil_value_t *cv;
+
+    VIGIL_VM_FAST_READ_U32(code, frame->ip, idx);
+    delta = (int64_t)(int8_t)code[frame->ip];
+    frame->ip += 1U;
+    VIGIL_VM_FAST_READ_RAW_U32(code, frame->ip, ci);
+    cmp = code[frame->ip];
+    frame->ip += 1U;
+    VIGIL_VM_FAST_READ_RAW_U32(code, frame->ip, back);
+
+    val = vigil_nanbox_decode_int(vm->stack[frame->base_slot + idx]);
+    if (checked_i64_add(val, delta, &r) != VIGIL_STATUS_OK)
+        return vigil_vm_fail_at_ip(vm, VIGIL_STATUS_INVALID_ARGUMENT, "i64 overflow", error);
+    vm->stack[frame->base_slot + idx] = vigil_nanbox_encode_int(r);
+
+    cv = VIGIL_VM_CHUNK_CONSTANT(frame->chunk, (size_t)ci);
+    limit = vigil_nanbox_decode_int(*cv);
+
+    switch (cmp)
+    {
+    case 0:
+        cont = r < limit;
+        break;
+    case 1:
+        cont = r <= limit;
+        break;
+    case 2:
+        cont = r > limit;
+        break;
+    case 3:
+        cont = r >= limit;
+        break;
+    case 4:
+        cont = r != limit;
+        break;
+    default:
+        cont = 0;
+        break;
+    }
+    if (cont)
+        frame->ip -= (size_t)back;
+    else
+    {
+        vm->stack[vm->stack_count] = VIGIL_NANBOX_FALSE;
+        vm->stack_count += 1U;
+    }
+    return VIGIL_STATUS_OK;
+}
