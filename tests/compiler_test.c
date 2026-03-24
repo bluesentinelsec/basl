@@ -3033,6 +3033,95 @@ TEST(VigilCompilerTest, CompilesExternFnDeclaration)
     vigil_runtime_close(&runtime);
 }
 
+TEST(VigilCompilerTest, RejectsDirectCircularImport)
+{
+    vigil_runtime_t *runtime = NULL;
+    vigil_error_t error = {0};
+    vigil_source_registry_t registry;
+    vigil_diagnostic_list_t diagnostics;
+    vigil_object_t *function = NULL;
+    vigil_source_id_t source_id;
+
+    ASSERT_EQ(vigil_runtime_open(&runtime, NULL, &error), VIGIL_STATUS_OK);
+    vigil_source_registry_init(&registry, runtime);
+    vigil_diagnostic_list_init(&diagnostics, runtime);
+
+    RegisterSource(vigil_test_failed_, &registry, "/project/a.vigil",
+                   "import \"b\";\n"
+                   "pub fn value() -> i32 { return b.get(); }\n"
+                   "fn main() -> i32 { return value(); }",
+                   &error);
+    source_id = RegisterSource(vigil_test_failed_, &registry, "/project/b.vigil",
+                               "import \"a\";\n"
+                               "pub fn get() -> i32 { return 1; }",
+                               &error);
+    /* Compile from a.vigil; it imports b which imports a — cycle. */
+    source_id = (vigil_source_id_t)1U;
+    EXPECT_EQ(vigil_compile_source(&registry, source_id, &function, &diagnostics, &error), VIGIL_STATUS_SYNTAX_ERROR);
+    ASSERT_TRUE(vigil_diagnostic_list_count(&diagnostics) >= 1U);
+    EXPECT_STREQ(vigil_string_c_str(&vigil_diagnostic_list_get(&diagnostics, 0U)->message),
+                 "circular import detected");
+
+    if (function != NULL)
+        vigil_object_release(&function);
+    vigil_diagnostic_list_free(&diagnostics);
+    vigil_source_registry_free(&registry);
+    vigil_runtime_close(&runtime);
+}
+
+TEST(VigilCompilerTest, RejectsIndirectCircularImport)
+{
+    vigil_runtime_t *runtime = NULL;
+    vigil_error_t error = {0};
+    vigil_source_registry_t registry;
+    vigil_diagnostic_list_t diagnostics;
+    vigil_object_t *function = NULL;
+    vigil_source_id_t source_id;
+
+    ASSERT_EQ(vigil_runtime_open(&runtime, NULL, &error), VIGIL_STATUS_OK);
+    vigil_source_registry_init(&registry, runtime);
+    vigil_diagnostic_list_init(&diagnostics, runtime);
+
+    RegisterSource(vigil_test_failed_, &registry, "/project/a.vigil",
+                   "import \"b\";\n"
+                   "fn main() -> i32 { return b.value(); }",
+                   &error);
+    RegisterSource(vigil_test_failed_, &registry, "/project/b.vigil",
+                   "import \"c\";\n"
+                   "pub fn value() -> i32 { return c.get(); }",
+                   &error);
+    RegisterSource(vigil_test_failed_, &registry, "/project/c.vigil",
+                   "import \"a\";\n"
+                   "pub fn get() -> i32 { return 1; }",
+                   &error);
+
+    source_id = (vigil_source_id_t)1U;
+    EXPECT_EQ(vigil_compile_source(&registry, source_id, &function, &diagnostics, &error), VIGIL_STATUS_SYNTAX_ERROR);
+    ASSERT_TRUE(vigil_diagnostic_list_count(&diagnostics) >= 1U);
+    EXPECT_STREQ(vigil_string_c_str(&vigil_diagnostic_list_get(&diagnostics, 0U)->message),
+                 "circular import detected");
+
+    if (function != NULL)
+        vigil_object_release(&function);
+    vigil_diagnostic_list_free(&diagnostics);
+    vigil_source_registry_free(&registry);
+    vigil_runtime_close(&runtime);
+}
+
+TEST(VigilCompilerTest, AllowsDiamondImportsWithoutCycle)
+{
+    /* A imports B and C; both B and C import D — no cycle. */
+    const struct TestSource sources[] = {
+        {"/project/d.vigil", "pub fn base() -> i32 { return 3; }"},
+        {"/project/b.vigil", "import \"d\";\npub fn get_b() -> i32 { return d.base(); }"},
+        {"/project/c.vigil", "import \"d\";\npub fn get_c() -> i32 { return d.base(); }"},
+        {"/project/main.vigil", "import \"b\";\nimport \"c\";\n"
+                                "fn main() -> i32 { return b.get_b() + c.get_c(); }"},
+    };
+
+    EXPECT_EQ(CompileAndRunMulti(vigil_test_failed_, sources, 4U, "/project/main.vigil"), 6);
+}
+
 static void register_compiler_defer_tests(void)
 {
     REGISTER_TEST(VigilCompilerTest, CompilesAndExecutesDeferredFunctionValues);
@@ -3158,5 +3247,8 @@ void register_compiler_tests(void)
     REGISTER_TEST(VigilCompilerTest, RejectsInvalidErrorConstructionAndMethods);
     REGISTER_TEST(VigilCompilerTest, RejectsInvalidGuardBindings);
     REGISTER_TEST(VigilCompilerTest, ReportsSyntaxErrorsForUnsupportedShape);
+    REGISTER_TEST(VigilCompilerTest, RejectsDirectCircularImport);
+    REGISTER_TEST(VigilCompilerTest, RejectsIndirectCircularImport);
+    REGISTER_TEST(VigilCompilerTest, AllowsDiamondImportsWithoutCycle);
     register_compiler_defer_tests();
 }
