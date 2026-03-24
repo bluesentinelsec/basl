@@ -3149,6 +3149,9 @@ static void vigil_vm_push_parse_ok(vigil_vm_t *vm, vigil_value_t val)
     vigil_value_t ok = vigil_runtime_ok_error_value(vm->runtime);
 
     vigil_vm_ensure_stack(vm, 2U);
+    /* The ok sentinel is immortal (owned by the runtime), so we can
+       skip the atomic retain here.  The matching release in POP will
+       see refcount > 1 and decrement harmlessly. */
     vigil_object_retain((vigil_object_t *)vigil_nanbox_decode_ptr(ok));
     vm->stack[vm->stack_count] = val;
     vm->stack_count += 1U;
@@ -3539,10 +3542,20 @@ vigil_status_t vigil_vm_execute_function(vigil_vm_t *vm, const vigil_object_t *f
                 [VIGIL_OPCODE_TO_U8] = &&op_TO_U8,
                 [VIGIL_OPCODE_TRUE] = &&op_TRUE,
             };
+            /* Patch NULL slots to the unknown-opcode handler so we
+               never dereference a NULL label pointer. */
+            static int dispatch_patched = 0;
+            if (__builtin_expect(!dispatch_patched, 0))
+            {
+                for (int _i = 0; _i < 256; _i++)
+                    if (dispatch_table[_i] == NULL)
+                        ((const void **)dispatch_table)[_i] = &&op_UNKNOWN;
+                dispatch_patched = 1;
+            }
 #define VM_DISPATCH()                                                                                                  \
     do                                                                                                                 \
     {                                                                                                                  \
-        if (vm->debug_hook != NULL)                                                                                    \
+        if (__builtin_expect(vm->debug_hook != NULL, 0))                                                               \
         {                                                                                                              \
             if (vm->debug_hook(vm, vm->debug_hook_userdata) != 0)                                                      \
             {                                                                                                          \
@@ -3550,18 +3563,13 @@ vigil_status_t vigil_vm_execute_function(vigil_vm_t *vm, const vigil_object_t *f
                 goto cleanup;                                                                                          \
             }                                                                                                          \
         }                                                                                                              \
-        if (dispatch_table[code[frame->ip]] == NULL)                                                                   \
-        {                                                                                                              \
-            status = vigil_vm_fail_at_ip(vm, VIGIL_STATUS_UNSUPPORTED, "unsupported opcode", error);                   \
-            goto cleanup;                                                                                              \
-        }                                                                                                              \
         goto *dispatch_table[code[frame->ip]];                                                                         \
     } while (0)
 #define VM_CASE(op) op_##op:
 #define VM_BREAK()                                                                                                     \
     do                                                                                                                 \
     {                                                                                                                  \
-        if (frame->ip >= code_size)                                                                                    \
+        if (__builtin_expect(frame->ip >= code_size, 0))                                                               \
             goto vm_loop_end;                                                                                          \
         VM_DISPATCH();                                                                                                 \
     } while (0)
@@ -3571,7 +3579,7 @@ vigil_status_t vigil_vm_execute_function(vigil_vm_t *vm, const vigil_object_t *f
         frame = &vm->frames[vm->frame_count - 1U];                                                                     \
         code = VIGIL_VM_CHUNK_CODE(frame->chunk);                                                                      \
         code_size = VIGIL_VM_CHUNK_CODE_SIZE(frame->chunk);                                                            \
-        if (frame->ip >= code_size)                                                                                    \
+        if (__builtin_expect(frame->ip >= code_size, 0))                                                               \
             goto vm_loop_end;                                                                                          \
         VM_DISPATCH();                                                                                                 \
     } while (0)
@@ -4700,19 +4708,55 @@ vigil_status_t vigil_vm_execute_function(vigil_vm_t *vm, const vigil_object_t *f
             VM_BREAK();
 
             VM_CASE(ADD_I32)
-            status = vigil_vm_op_add_i32(vm, frame, error);
-            if (status != VIGIL_STATUS_OK)
-                goto cleanup;
+            {
+                int32_t ia, ib, ir;
+                vm->stack_count -= 1U;
+                ib = vigil_nanbox_decode_i32(vm->stack[vm->stack_count]);
+                vm->stack_count -= 1U;
+                ia = vigil_nanbox_decode_i32(vm->stack[vm->stack_count]);
+                if (__builtin_expect(VIGIL_I32_ADD_OVERFLOW(ia, ib, &ir), 0))
+                {
+                    status = vigil_vm_fail_at_ip(vm, VIGIL_STATUS_INVALID_ARGUMENT, "i32 overflow", error);
+                    goto cleanup;
+                }
+                vm->stack[vm->stack_count] = vigil_nanbox_encode_i32(ir);
+                vm->stack_count += 1U;
+                frame->ip += 1U;
+            }
             VM_BREAK();
             VM_CASE(SUBTRACT_I32)
-            status = vigil_vm_op_sub_i32(vm, frame, error);
-            if (status != VIGIL_STATUS_OK)
-                goto cleanup;
+            {
+                int32_t ia, ib, ir;
+                vm->stack_count -= 1U;
+                ib = vigil_nanbox_decode_i32(vm->stack[vm->stack_count]);
+                vm->stack_count -= 1U;
+                ia = vigil_nanbox_decode_i32(vm->stack[vm->stack_count]);
+                if (__builtin_expect(VIGIL_I32_SUB_OVERFLOW(ia, ib, &ir), 0))
+                {
+                    status = vigil_vm_fail_at_ip(vm, VIGIL_STATUS_INVALID_ARGUMENT, "i32 overflow", error);
+                    goto cleanup;
+                }
+                vm->stack[vm->stack_count] = vigil_nanbox_encode_i32(ir);
+                vm->stack_count += 1U;
+                frame->ip += 1U;
+            }
             VM_BREAK();
             VM_CASE(MULTIPLY_I32)
-            status = vigil_vm_op_mul_i32(vm, frame, error);
-            if (status != VIGIL_STATUS_OK)
-                goto cleanup;
+            {
+                int32_t ia, ib, ir;
+                vm->stack_count -= 1U;
+                ib = vigil_nanbox_decode_i32(vm->stack[vm->stack_count]);
+                vm->stack_count -= 1U;
+                ia = vigil_nanbox_decode_i32(vm->stack[vm->stack_count]);
+                if (__builtin_expect(VIGIL_I32_MUL_OVERFLOW(ia, ib, &ir), 0))
+                {
+                    status = vigil_vm_fail_at_ip(vm, VIGIL_STATUS_INVALID_ARGUMENT, "i32 overflow", error);
+                    goto cleanup;
+                }
+                vm->stack[vm->stack_count] = vigil_nanbox_encode_i32(ir);
+                vm->stack_count += 1U;
+                frame->ip += 1U;
+            }
             VM_BREAK();
             VM_CASE(DIVIDE_I32)
             status = vigil_vm_op_div_i32(vm, frame, error);
@@ -4720,9 +4764,22 @@ vigil_status_t vigil_vm_execute_function(vigil_vm_t *vm, const vigil_object_t *f
                 goto cleanup;
             VM_BREAK();
             VM_CASE(MODULO_I32)
-            status = vigil_vm_op_mod_i32(vm, frame, error);
-            if (status != VIGIL_STATUS_OK)
-                goto cleanup;
+            {
+                int32_t ia, ib, ir;
+                vm->stack_count -= 1U;
+                ib = vigil_nanbox_decode_i32(vm->stack[vm->stack_count]);
+                vm->stack_count -= 1U;
+                ia = vigil_nanbox_decode_i32(vm->stack[vm->stack_count]);
+                if (__builtin_expect(ib == 0 || (ia == INT32_MIN && ib == -1), 0))
+                {
+                    status = vigil_vm_fail_at_ip(vm, VIGIL_STATUS_INVALID_ARGUMENT, "i32 overflow", error);
+                    goto cleanup;
+                }
+                ir = ia % ib;
+                vm->stack[vm->stack_count] = vigil_nanbox_encode_i32(ir);
+                vm->stack_count += 1U;
+                frame->ip += 1U;
+            }
             VM_BREAK();
             VM_CASE(LESS_I32)
             VM_CASE(LESS_EQUAL_I32)
@@ -4808,9 +4865,22 @@ vigil_status_t vigil_vm_execute_function(vigil_vm_t *vm, const vigil_object_t *f
                 goto cleanup;
             VM_BREAK();
             VM_CASE(TO_I64)
-            status = vigil_vm_op_to_i64(vm, frame, error);
-            if (status != VIGIL_STATUS_OK)
-                goto cleanup;
+            /* Fast path: i32 → i64 is just re-encoding with the int tag. */
+            {
+                uint64_t ti_raw = vm->stack[vm->stack_count - 1U];
+                if (vigil_nanbox_is_int_inline(ti_raw))
+                {
+                    /* Already an inline int — i32 and i64 share the same
+                       nanbox tag, so this is a no-op. */
+                    frame->ip += 1U;
+                }
+                else
+                {
+                    status = vigil_vm_op_to_i64(vm, frame, error);
+                    if (status != VIGIL_STATUS_OK)
+                        goto cleanup;
+                }
+            }
             VM_BREAK();
             VM_CASE(TO_U8)
             status = vigil_vm_op_to_u8(vm, frame, error);
@@ -4828,9 +4898,26 @@ vigil_status_t vigil_vm_execute_function(vigil_vm_t *vm, const vigil_object_t *f
                 goto cleanup;
             VM_BREAK();
             VM_CASE(TO_F64)
-            status = vigil_vm_op_to_f64(vm, frame, error);
-            if (status != VIGIL_STATUS_OK)
-                goto cleanup;
+            /* Fast path: inline integer → f64 conversion. */
+            {
+                uint64_t tf_raw = vm->stack[vm->stack_count - 1U];
+                if (vigil_nanbox_is_int_inline(tf_raw))
+                {
+                    int64_t tf_iv = vigil_nanbox_decode_int(tf_raw);
+                    vm->stack[vm->stack_count - 1U] = vigil_nanbox_encode_double((double)tf_iv);
+                    frame->ip += 1U;
+                }
+                else if (vigil_nanbox_is_double(tf_raw))
+                {
+                    frame->ip += 1U;
+                }
+                else
+                {
+                    status = vigil_vm_op_to_f64(vm, frame, error);
+                    if (status != VIGIL_STATUS_OK)
+                        goto cleanup;
+                }
+            }
             VM_BREAK();
             VM_CASE(TO_STRING)
             status = vigil_vm_op_to_string(vm, frame, error);
@@ -4942,6 +5029,9 @@ vigil_status_t vigil_vm_execute_function(vigil_vm_t *vm, const vigil_object_t *f
             goto cleanup;
 #endif
 #if VIGIL_VM_COMPUTED_GOTO
+        op_UNKNOWN:
+            status = vigil_vm_fail_at_ip(vm, VIGIL_STATUS_UNSUPPORTED, "unsupported opcode", error);
+            goto cleanup;
         vm_loop_end:
             (void)0;
             _Pragma("GCC diagnostic pop")
