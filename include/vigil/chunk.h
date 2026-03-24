@@ -246,7 +246,28 @@ extern "C"
         VIGIL_OPCODE_GREATER_I32_JUMP_IF_FALSE = 164,
         VIGIL_OPCODE_GREATER_EQUAL_I32_JUMP_IF_FALSE = 165,
         VIGIL_OPCODE_EQUAL_I32_JUMP_IF_FALSE = 166,
-        VIGIL_OPCODE_NOT_EQUAL_I32_JUMP_IF_FALSE = 167
+        VIGIL_OPCODE_NOT_EQUAL_I32_JUMP_IF_FALSE = 167,
+
+        /* Fused i64 compare + conditional jump superinstructions.
+           Format: [opcode(1)][u32 jump_offset]  (6 bytes)
+           Pops two i64 values, compares, jumps if the condition is false.
+           Eliminates the intermediate bool push/pop and one dispatch cycle. */
+        VIGIL_OPCODE_LESS_I64_JUMP_IF_FALSE = 168,
+        VIGIL_OPCODE_LESS_EQUAL_I64_JUMP_IF_FALSE = 169,
+        VIGIL_OPCODE_GREATER_I64_JUMP_IF_FALSE = 170,
+        VIGIL_OPCODE_GREATER_EQUAL_I64_JUMP_IF_FALSE = 171,
+        VIGIL_OPCODE_EQUAL_I64_JUMP_IF_FALSE = 172,
+        VIGIL_OPCODE_NOT_EQUAL_I64_JUMP_IF_FALSE = 173,
+
+        /* i64 local increment — analogous to INCREMENT_LOCAL_I32.
+           Format: [opcode(1)][u32 local_idx][i8 delta]  (6 bytes) */
+        VIGIL_OPCODE_INCREMENT_LOCAL_I64 = 174,
+
+        /* Fused i64 loop: increment + compare + conditional backward jump.
+           Format: [opcode(1)][u32 local_idx][i8 delta][u32 limit_const_idx]
+                   [u8 cmp][u32 back_offset]  (15 bytes)
+           cmp encoding: 0=<  1=<=  2=>  3=>=  4=!= */
+        VIGIL_OPCODE_FORLOOP_I64 = 175
     } vigil_opcode_t;
 
     typedef struct vigil_chunk

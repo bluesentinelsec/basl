@@ -5036,7 +5036,9 @@ static vigil_opcode_t vigil_parser_try_fuse_locals_i64(vigil_parser_state_t *sta
 
 vigil_status_t vigil_parser_emit_opcode(vigil_parser_state_t *state, vigil_opcode_t opcode, vigil_source_span_t span)
 {
-    /* Peephole: TO_I64 after an i32 arith op → rewrite op to i64 variant. */
+    /* Peephole: TO_I64 after an i32 arith op → rewrite op to i64 variant.
+       Also skip TO_I64 when the previous CONSTANT pool entry is already
+       VIGIL_VALUE_INT (i64 nanbox) — the cast is a no-op at runtime. */
     if (opcode == VIGIL_OPCODE_TO_I64 && state->chunk.code.length > 0U)
     {
         vigil_opcode_t last = (vigil_opcode_t)state->chunk.code.data[state->chunk.code.length - 1U];
@@ -5047,6 +5049,16 @@ vigil_status_t vigil_parser_emit_opcode(vigil_parser_state_t *state, vigil_opcod
         {
             state->chunk.code.data[state->chunk.code.length - 1U] = (uint8_t)promoted;
             return VIGIL_STATUS_OK;
+        }
+        if (last == VIGIL_OPCODE_CONSTANT && state->chunk.code.length >= 5U)
+        {
+            uint32_t ci = (uint32_t)state->chunk.code.data[state->chunk.code.length - 4U] |
+                          ((uint32_t)state->chunk.code.data[state->chunk.code.length - 3U] << 8U) |
+                          ((uint32_t)state->chunk.code.data[state->chunk.code.length - 2U] << 16U) |
+                          ((uint32_t)state->chunk.code.data[state->chunk.code.length - 1U] << 24U);
+            if (ci < state->chunk.constant_count &&
+                vigil_value_kind(&state->chunk.constants[ci]) == VIGIL_VALUE_INT)
+                return VIGIL_STATUS_OK;
         }
     }
     return vigil_chunk_write_opcode(&state->chunk, opcode, span, state->program->error);
@@ -5153,14 +5165,35 @@ static vigil_opcode_t vigil_parser_fuse_cmp_i32_jump(vigil_opcode_t cmp)
     }
 }
 
+static vigil_opcode_t vigil_parser_fuse_cmp_i64_jump(vigil_opcode_t cmp)
+{
+    switch (cmp)
+    {
+    case VIGIL_OPCODE_LESS_I64:
+        return VIGIL_OPCODE_LESS_I64_JUMP_IF_FALSE;
+    case VIGIL_OPCODE_LESS_EQUAL_I64:
+        return VIGIL_OPCODE_LESS_EQUAL_I64_JUMP_IF_FALSE;
+    case VIGIL_OPCODE_GREATER_I64:
+        return VIGIL_OPCODE_GREATER_I64_JUMP_IF_FALSE;
+    case VIGIL_OPCODE_GREATER_EQUAL_I64:
+        return VIGIL_OPCODE_GREATER_EQUAL_I64_JUMP_IF_FALSE;
+    case VIGIL_OPCODE_EQUAL_I64:
+        return VIGIL_OPCODE_EQUAL_I64_JUMP_IF_FALSE;
+    case VIGIL_OPCODE_NOT_EQUAL_I64:
+        return VIGIL_OPCODE_NOT_EQUAL_I64_JUMP_IF_FALSE;
+    default:
+        return (vigil_opcode_t)0;
+    }
+}
+
 static vigil_status_t vigil_parser_emit_jump(vigil_parser_state_t *state, vigil_opcode_t opcode,
                                              vigil_source_span_t span, size_t *out_operand_offset)
 {
     vigil_status_t status;
 
-    /* Peephole: fuse CMP_I32 + JUMP_IF_FALSE into a single
-       superinstruction.  The preceding byte is the i32 compare opcode.
-       The fused handler pops both i32 operands and conditionally jumps
+    /* Peephole: fuse CMP_I32/CMP_I64 + JUMP_IF_FALSE into a single
+       superinstruction.  The preceding byte is the compare opcode.
+       The fused handler pops both operands and conditionally jumps
        without pushing an intermediate bool.  The caller must skip the
        POP that normally follows JUMP_IF_FALSE when fusion fires. */
     if (opcode == VIGIL_OPCODE_JUMP_IF_FALSE)
@@ -5168,10 +5201,13 @@ static vigil_status_t vigil_parser_emit_jump(vigil_parser_state_t *state, vigil_
         size_t len = state->chunk.code.length;
         if (len >= 1U)
         {
-            vigil_opcode_t fused = vigil_parser_fuse_cmp_i32_jump((vigil_opcode_t)state->chunk.code.data[len - 1U]);
+            vigil_opcode_t prev = (vigil_opcode_t)state->chunk.code.data[len - 1U];
+            vigil_opcode_t fused = vigil_parser_fuse_cmp_i32_jump(prev);
+            if (fused == (vigil_opcode_t)0)
+                fused = vigil_parser_fuse_cmp_i64_jump(prev);
             if (fused != (vigil_opcode_t)0)
             {
-                /* Overwrite the CMP_I32 byte with the fused opcode. */
+                /* Overwrite the CMP byte with the fused opcode. */
                 state->chunk.code.data[len - 1U] = (uint8_t)fused;
                 if (out_operand_offset != NULL)
                 {
@@ -10467,6 +10503,162 @@ static void peephole_forloop_i32(vigil_parser_state_t *state, size_t loop_start)
     }
 }
 
+/* Returns the FORLOOP cmp_type (0=<,1=<=,2=>,3=>=,4=!=) for a fused i64
+   compare+jump opcode, or 255 if not a recognized fused i64 opcode. */
+static uint8_t fused_i64_cmp_type(vigil_opcode_t op)
+{
+    switch (op)
+    {
+    case VIGIL_OPCODE_LESS_I64_JUMP_IF_FALSE:
+        return 0;
+    case VIGIL_OPCODE_LESS_EQUAL_I64_JUMP_IF_FALSE:
+        return 1;
+    case VIGIL_OPCODE_GREATER_I64_JUMP_IF_FALSE:
+        return 2;
+    case VIGIL_OPCODE_GREATER_EQUAL_I64_JUMP_IF_FALSE:
+        return 3;
+    case VIGIL_OPCODE_NOT_EQUAL_I64_JUMP_IF_FALSE:
+        return 4;
+    default:
+        return 255;
+    }
+}
+
+/* Returns the FORLOOP cmp_type for a fused i32 compare+jump opcode,
+   or 255 if not a recognized fused i32 opcode. */
+static uint8_t fused_i32_cmp_type(vigil_opcode_t op)
+{
+    switch (op)
+    {
+    case VIGIL_OPCODE_LESS_I32_JUMP_IF_FALSE:
+        return 0;
+    case VIGIL_OPCODE_LESS_EQUAL_I32_JUMP_IF_FALSE:
+        return 1;
+    case VIGIL_OPCODE_GREATER_I32_JUMP_IF_FALSE:
+        return 2;
+    case VIGIL_OPCODE_GREATER_EQUAL_I32_JUMP_IF_FALSE:
+        return 3;
+    case VIGIL_OPCODE_NOT_EQUAL_I32_JUMP_IF_FALSE:
+        return 4;
+    default:
+        return 255;
+    }
+}
+
+/* Peephole: rewrite fused CMP_I64_JUMP_IF_FALSE + body + INCREMENT_LOCAL_I64 + LOOP
+   → fused CMP_I64_JUMP_IF_FALSE + body + FORLOOP_I64.
+   Detects the pattern produced by the fused compare+jump optimization:
+     cs+0..4:   GET_LOCAL idx
+     cs+5..9:   CONSTANT const_idx
+     cs+10:     LESS_I64_JUMP_IF_FALSE (or variant)
+     cs+11..14: u32 jump offset
+     cs+15:     POP
+     cs+16..:   loop body
+     len-11:    INCREMENT_LOCAL_I64 idx delta
+     len-5..:   LOOP back_off */
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
+static void peephole_forloop_i64(vigil_parser_state_t *state, size_t loop_start)
+{
+    uint8_t *c = state->chunk.code.data;
+    size_t len = state->chunk.code.length;
+    size_t cs = loop_start;
+    uint8_t cmp_type;
+
+    if (len < 11U || c[len - 11U] != VIGIL_OPCODE_INCREMENT_LOCAL_I64 || c[len - 5U] != VIGIL_OPCODE_LOOP)
+        return;
+    if (cs + 16U > len || c[cs] != VIGIL_OPCODE_GET_LOCAL || c[cs + 5U] != VIGIL_OPCODE_CONSTANT)
+        return;
+
+    cmp_type = fused_i64_cmp_type((vigil_opcode_t)c[cs + 10U]);
+    if (cmp_type == 255)
+        return;
+    if (c[cs + 15U] != VIGIL_OPCODE_POP)
+        return;
+
+    {
+        uint32_t cond_idx = (uint32_t)c[cs + 1U] | ((uint32_t)c[cs + 2U] << 8U) | ((uint32_t)c[cs + 3U] << 16U) |
+                            ((uint32_t)c[cs + 4U] << 24U);
+        uint32_t inc_idx = (uint32_t)c[len - 10U] | ((uint32_t)c[len - 9U] << 8U) | ((uint32_t)c[len - 8U] << 16U) |
+                           ((uint32_t)c[len - 7U] << 24U);
+        if (cond_idx != inc_idx)
+            return;
+    }
+
+    {
+        uint8_t const_idx[4];
+        int8_t delta = (int8_t)c[len - 6U];
+        size_t body_start = cs + 16U;
+        size_t forloop_pos = len - 11U;
+        size_t forloop_end = forloop_pos + 15U;
+        uint32_t back_off = (uint32_t)(forloop_end - body_start);
+
+        memcpy(const_idx, &c[cs + 6U], 4);
+        c[forloop_pos] = VIGIL_OPCODE_FORLOOP_I64;
+        memcpy(&c[forloop_pos + 1U], &c[len - 10U], 4);
+        c[forloop_pos + 5U] = (uint8_t)delta;
+        memcpy(&c[forloop_pos + 6U], const_idx, 4);
+        c[forloop_pos + 10U] = cmp_type;
+        c[forloop_pos + 11U] = (uint8_t)(back_off & 0xFF);
+        c[forloop_pos + 12U] = (uint8_t)((back_off >> 8U) & 0xFF);
+        c[forloop_pos + 13U] = (uint8_t)((back_off >> 16U) & 0xFF);
+        c[forloop_pos + 14U] = (uint8_t)((back_off >> 24U) & 0xFF);
+        state->chunk.code.length = forloop_pos + 15U;
+    }
+}
+
+/* Peephole: rewrite fused CMP_I32_JUMP_IF_FALSE + body + INCREMENT_LOCAL_I32 + LOOP
+   → fused CMP_I32_JUMP_IF_FALSE + body + FORLOOP_I32.
+   Handles the fused-compare pattern (condition block = 16 bytes including POP). */
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
+static void peephole_forloop_i32_fused(vigil_parser_state_t *state, size_t loop_start)
+{
+    uint8_t *c = state->chunk.code.data;
+    size_t len = state->chunk.code.length;
+    size_t cs = loop_start;
+    uint8_t cmp_type;
+
+    if (len < 11U || c[len - 11U] != VIGIL_OPCODE_INCREMENT_LOCAL_I32 || c[len - 5U] != VIGIL_OPCODE_LOOP)
+        return;
+    if (cs + 16U > len || c[cs] != VIGIL_OPCODE_GET_LOCAL || c[cs + 5U] != VIGIL_OPCODE_CONSTANT)
+        return;
+
+    cmp_type = fused_i32_cmp_type((vigil_opcode_t)c[cs + 10U]);
+    if (cmp_type == 255)
+        return;
+    if (c[cs + 15U] != VIGIL_OPCODE_POP)
+        return;
+
+    {
+        uint32_t cond_idx = (uint32_t)c[cs + 1U] | ((uint32_t)c[cs + 2U] << 8U) | ((uint32_t)c[cs + 3U] << 16U) |
+                            ((uint32_t)c[cs + 4U] << 24U);
+        uint32_t inc_idx = (uint32_t)c[len - 10U] | ((uint32_t)c[len - 9U] << 8U) | ((uint32_t)c[len - 8U] << 16U) |
+                           ((uint32_t)c[len - 7U] << 24U);
+        if (cond_idx != inc_idx)
+            return;
+    }
+
+    {
+        uint8_t const_idx[4];
+        int8_t delta = (int8_t)c[len - 6U];
+        size_t body_start = cs + 16U;
+        size_t forloop_pos = len - 11U;
+        size_t forloop_end = forloop_pos + 15U;
+        uint32_t back_off = (uint32_t)(forloop_end - body_start);
+
+        memcpy(const_idx, &c[cs + 6U], 4);
+        c[forloop_pos] = VIGIL_OPCODE_FORLOOP_I32;
+        memcpy(&c[forloop_pos + 1U], &c[len - 10U], 4);
+        c[forloop_pos + 5U] = (uint8_t)delta;
+        memcpy(&c[forloop_pos + 6U], const_idx, 4);
+        c[forloop_pos + 10U] = cmp_type;
+        c[forloop_pos + 11U] = (uint8_t)(back_off & 0xFF);
+        c[forloop_pos + 12U] = (uint8_t)((back_off >> 8U) & 0xFF);
+        c[forloop_pos + 13U] = (uint8_t)((back_off >> 16U) & 0xFF);
+        c[forloop_pos + 14U] = (uint8_t)((back_off >> 24U) & 0xFF);
+        state->chunk.code.length = forloop_pos + 15U;
+    }
+}
+
 static vigil_status_t patch_loop_breaks(vigil_parser_state_t *state)
 {
     vigil_status_t status;
@@ -10563,8 +10755,10 @@ static vigil_status_t vigil_parser_parse_while_statement(vigil_parser_state_t *s
         goto cleanup_loop;
     }
 
-    /* Peephole: rewrite INCREMENT_LOCAL_I32 + LOOP → FORLOOP_I32 */
+    /* Peephole: rewrite INCREMENT_LOCAL + LOOP → FORLOOP */
     peephole_forloop_i32(state, loop_start);
+    peephole_forloop_i32_fused(state, loop_start);
+    peephole_forloop_i64(state, loop_start);
     status = vigil_parser_patch_jump(state, exit_jump_offset);
     if (status != VIGIL_STATUS_OK)
     {
@@ -11525,6 +11719,19 @@ static vigil_status_t vigil_parser_emit_integer_cast(vigil_parser_state_t *state
             state->chunk.code.data[state->chunk.code.length - 1U] = (uint8_t)promoted;
             return VIGIL_STATUS_OK;
         }
+        /* If the last opcode was CONSTANT and its pool entry is already an i64
+           value (VIGIL_VALUE_INT), the nanbox on the stack is already correctly
+           encoded — skip the TO_I64 cast entirely. */
+        if (last == VIGIL_OPCODE_CONSTANT && state->chunk.code.length >= 5U)
+        {
+            uint32_t ci = (uint32_t)state->chunk.code.data[state->chunk.code.length - 4U] |
+                          ((uint32_t)state->chunk.code.data[state->chunk.code.length - 3U] << 8U) |
+                          ((uint32_t)state->chunk.code.data[state->chunk.code.length - 2U] << 16U) |
+                          ((uint32_t)state->chunk.code.data[state->chunk.code.length - 1U] << 24U);
+            if (ci < state->chunk.constant_count &&
+                vigil_value_kind(&state->chunk.constants[ci]) == VIGIL_VALUE_INT)
+                return VIGIL_STATUS_OK;
+        }
     }
 
     if (vigil_parser_type_is_i32(target_type))
@@ -12000,6 +12207,60 @@ static void vigil_parser_peephole_increment_local_i32(vigil_parser_state_t *stat
     if (val < -128 || val > 127)
         return;
     code[base] = VIGIL_OPCODE_INCREMENT_LOCAL_I32;
+    code[base + 5U] = (uint8_t)(int8_t)val;
+    state->chunk.code.length = base + 6U;
+    if (state->chunk.span_count > base + 6U)
+        state->chunk.span_count = base + 6U;
+}
+
+/* ── Peephole: rewrite GET_LOCAL + CONSTANT + ADD_I64/SUB_I64 + SET_LOCAL + POP
+       → INCREMENT_LOCAL_I64 when the constant is a small integer.
+   The emit_integer_cast peephole above eliminates the redundant TO_I64 when
+   the constant pool entry is already VIGIL_VALUE_INT, so the pattern is the
+   same 17 bytes as the i32 version. */
+static bool peephole_match_increment_i64_pattern(const uint8_t *code, size_t base, uint32_t *get_idx,
+                                                 uint32_t *set_idx, uint32_t *ci, int *is_sub)
+{
+    if (code[base] != VIGIL_OPCODE_GET_LOCAL || code[base + 5U] != VIGIL_OPCODE_CONSTANT ||
+        (code[base + 10U] != VIGIL_OPCODE_ADD_I64 && code[base + 10U] != VIGIL_OPCODE_SUBTRACT_I64) ||
+        code[base + 11U] != VIGIL_OPCODE_SET_LOCAL || code[base + 16U] != VIGIL_OPCODE_POP)
+        return false;
+    *get_idx = (uint32_t)code[base + 1U] | ((uint32_t)code[base + 2U] << 8U) | ((uint32_t)code[base + 3U] << 16U) |
+               ((uint32_t)code[base + 4U] << 24U);
+    *set_idx = (uint32_t)code[base + 12U] | ((uint32_t)code[base + 13U] << 8U) | ((uint32_t)code[base + 14U] << 16U) |
+               ((uint32_t)code[base + 15U] << 24U);
+    if (*get_idx != *set_idx)
+        return false;
+    *ci = (uint32_t)code[base + 6U] | ((uint32_t)code[base + 7U] << 8U) | ((uint32_t)code[base + 8U] << 16U) |
+          ((uint32_t)code[base + 9U] << 24U);
+    *is_sub = (code[base + 10U] == VIGIL_OPCODE_SUBTRACT_I64);
+    return true;
+}
+
+static void vigil_parser_peephole_increment_local_i64(vigil_parser_state_t *state)
+{
+    uint8_t *code = state->chunk.code.data;
+    size_t len = state->chunk.code.length;
+    size_t base;
+    uint32_t get_idx, set_idx, ci;
+    const vigil_value_t *cv;
+    int64_t val;
+    int is_sub;
+
+    if (len < 17U)
+        return;
+    base = len - 17U;
+    if (!peephole_match_increment_i64_pattern(code, base, &get_idx, &set_idx, &ci, &is_sub))
+        return;
+    cv = (ci < state->chunk.constant_count) ? &state->chunk.constants[ci] : NULL;
+    if (cv == NULL || vigil_value_kind(cv) != VIGIL_VALUE_INT)
+        return;
+    val = vigil_value_as_int(cv);
+    if (is_sub)
+        val = -val;
+    if (val < -128 || val > 127)
+        return;
+    code[base] = VIGIL_OPCODE_INCREMENT_LOCAL_I64;
     code[base + 5U] = (uint8_t)(int8_t)val;
     state->chunk.code.length = base + 6U;
     if (state->chunk.span_count > base + 6U)
@@ -12486,7 +12747,10 @@ static vigil_status_t emit_local_store(vigil_parser_state_t *state, const assign
         return status;
 
     if (!t->is_global_assignment && !t->is_capture_local)
+    {
         vigil_parser_peephole_increment_local_i32(state);
+        vigil_parser_peephole_increment_local_i64(state);
+    }
     if (!t->is_global_assignment && !t->is_capture_local && vigil_parser_type_is_i32(t->target_type))
         vigil_parser_peephole_locals_i32_store(state);
     return VIGIL_STATUS_OK;
