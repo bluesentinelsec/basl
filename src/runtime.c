@@ -116,13 +116,17 @@ vigil_status_t vigil_runtime_open(vigil_runtime_t **out_runtime, const vigil_run
         allocator.deallocate(allocator.user_data, runtime);
         return status;
     }
-    /* Pre-allocate the singleton "ok" error object used by stdlib success paths. */
+    /* Pre-allocate the singleton "ok" error object used by stdlib success paths.
+       Give it a saturated refcount so retain/release are harmless no-ops
+       (the atomic sub will never reach zero).  The runtime owns the object
+       and frees it directly in vigil_runtime_close(). */
     status = vigil_error_object_new_cstr(runtime, "", 0, &runtime->ok_error, error);
     if (status != VIGIL_STATUS_OK)
     {
         allocator.deallocate(allocator.user_data, runtime);
         return status;
     }
+    vigil_object_make_immortal(runtime->ok_error);
 
     /* Create the mutex that guards the VM registry used for thread-aware
      * debugging.  Failure is non-fatal in release builds but prevents thread
@@ -155,7 +159,8 @@ void vigil_runtime_close(vigil_runtime_t **runtime)
     vigil_runtime_flush_regex_cache(resolved_runtime);
     if (resolved_runtime->ok_error != NULL)
     {
-        vigil_object_release(&resolved_runtime->ok_error);
+        /* The ok sentinel has a saturated refcount; force-destroy it. */
+        vigil_object_force_destroy(&resolved_runtime->ok_error);
     }
     if (resolved_runtime->vm_registry_mutex != NULL)
     {
@@ -218,7 +223,7 @@ vigil_status_t vigil_runtime_push_ok_error(vigil_runtime_t *runtime, vigil_vm_t 
     vigil_value_t v;
     vigil_status_t s;
 
-    vigil_object_retain(runtime->ok_error);
+    /* The ok sentinel has a saturated refcount (immortal) — skip retain. */
     obj = runtime->ok_error;
     vigil_value_init_object(&v, &obj);
     s = vigil_vm_stack_push(vm, &v, error);

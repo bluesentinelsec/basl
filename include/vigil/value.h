@@ -89,6 +89,8 @@ extern "C"
      * object is destroyed only when the released reference was the last one.
      */
     VIGIL_API void vigil_object_release(vigil_object_t **object);
+    VIGIL_API void vigil_object_make_immortal(vigil_object_t *object);
+    VIGIL_API void vigil_object_force_destroy(vigil_object_t **object);
 
     VIGIL_API vigil_status_t vigil_string_object_new(vigil_runtime_t *runtime, const char *value, size_t length,
                                                      vigil_object_t **out_object, vigil_error_t *error);
