@@ -71,6 +71,9 @@ struct vigil_vm
     void *debug_hook_userdata;
     const char *const *argv;
     size_t argc;
+    /* Platform thread ID of the OS thread running this VM. Set when the VM is
+     * opened so the debugger can identify which thread hit a breakpoint. */
+    uint64_t thread_id;
 };
 
 /* ── Inline value helpers ──────────────────────────────────────── */

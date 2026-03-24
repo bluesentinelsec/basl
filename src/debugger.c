@@ -3,9 +3,22 @@
  * The debugger attaches to a VM via a lightweight hook function that
  * is checked before each opcode dispatch.  When no debugger is attached
  * the hook pointer is NULL and the VM runs at full speed.
+ *
+ * Thread-aware operation
+ * ──────────────────────
+ * When the debugger is attached it also registers itself with the runtime so
+ * that every VM opened afterwards (including those created by thread.spawn)
+ * inherits the hook automatically.  A mutex serialises concurrent breakpoint
+ * hits: only one thread enters the user callback at a time.  While the
+ * callback is running, debugger->current_vm points to the VM that triggered
+ * the pause so that all inspection APIs operate on the correct thread.
+ *
+ * Callers can enumerate live threads with vigil_debugger_list_threads() and
+ * redirect inspection to another thread's VM with vigil_debugger_switch_thread().
  */
 #include <string.h>
 
+#include "platform/platform.h"
 #include "vigil/chunk.h"
 #include "vigil/debugger.h"
 #include "vigil/status.h"
@@ -33,7 +46,16 @@ typedef struct vigil_breakpoint
 struct vigil_debugger
 {
     vigil_runtime_t *runtime;
+    /* Primary (main-thread) VM that the debugger was created for. */
     vigil_vm_t *vm;
+    /* VM currently paused in the debug callback.  NULL outside callbacks.
+     * May point to a thread-spawned VM when a worker thread hits a breakpoint.
+     * All inspection APIs (current_location, frame_count, etc.) operate on
+     * this VM when non-NULL, falling back to ->vm otherwise. */
+    vigil_vm_t *current_vm;
+    /* Serialises concurrent breakpoint hits from multiple threads.  Only one
+     * thread at a time runs the user callback; others block here. */
+    vigil_platform_mutex_t *pause_mutex;
     const vigil_source_registry_t *sources;
     const vigil_debug_symbol_table_t *symbols;
     vigil_debug_callback_t callback;
@@ -58,9 +80,17 @@ static int vigil_debugger_vm_hook(vigil_vm_t *vm, void *userdata);
 
 /* ── Helpers ─────────────────────────────────────────────────────── */
 
-/* Resolve the current IP to a source location. */
-static int vigil_debugger_resolve_ip(const vigil_debugger_t *dbg, size_t frame_index, vigil_source_id_t *out_source_id,
-                                     uint32_t *out_line, uint32_t *out_column)
+/* Return the VM to use for inspection: the currently-paused thread VM when
+ * inside a callback, or the primary VM otherwise. */
+static vigil_vm_t *vigil_debugger_active_vm(const vigil_debugger_t *dbg)
+{
+    return dbg->current_vm != NULL ? dbg->current_vm : dbg->vm;
+}
+
+/* Resolve the IP of a specific VM to a source location.
+ * frame_index 0 = innermost (top of call stack). */
+static int vigil_debugger_resolve_ip_for_vm(const vigil_debugger_t *dbg, const vigil_vm_t *vm, size_t frame_index,
+                                            vigil_source_id_t *out_source_id, uint32_t *out_line, uint32_t *out_column)
 {
     size_t vm_frame_count;
     size_t vm_frame_idx;
@@ -69,14 +99,13 @@ static int vigil_debugger_resolve_ip(const vigil_debugger_t *dbg, size_t frame_i
     const vigil_chunk_t *chunk;
     size_t ip;
 
-    vm_frame_count = vigil_vm_frame_depth(dbg->vm);
+    vm_frame_count = vigil_vm_frame_depth(vm);
     if (vm_frame_count == 0U)
         return 0;
 
-    /* frame_index 0 = innermost (top of stack). */
     vm_frame_idx = vm_frame_count - 1U - frame_index;
-    chunk = vigil_vm_frame_chunk(dbg->vm, vm_frame_idx);
-    ip = vigil_vm_frame_ip(dbg->vm, vm_frame_idx);
+    chunk = vigil_vm_frame_chunk(vm, vm_frame_idx);
+    ip = vigil_vm_frame_ip(vm, vm_frame_idx);
 
     if (chunk == NULL)
         return 0;
@@ -97,6 +126,14 @@ static int vigil_debugger_resolve_ip(const vigil_debugger_t *dbg, size_t frame_i
     if (out_column != NULL)
         *out_column = location.column;
     return 1;
+}
+
+/* Convenience wrapper that resolves against the active (inspection) VM. */
+static int vigil_debugger_resolve_ip(const vigil_debugger_t *dbg, size_t frame_index, vigil_source_id_t *out_source_id,
+                                     uint32_t *out_line, uint32_t *out_column)
+{
+    return vigil_debugger_resolve_ip_for_vm(dbg, vigil_debugger_active_vm(dbg), frame_index, out_source_id, out_line,
+                                            out_column);
 }
 
 static int vigil_debugger_check_breakpoint(const vigil_debugger_t *dbg, vigil_source_id_t source_id, uint32_t line)
@@ -139,15 +176,15 @@ static int vigil_debugger_vm_hook(vigil_vm_t *vm, void *userdata)
     uint32_t column = 0U;
     size_t current_depth;
     int should_stop = 0;
+    vigil_debug_stop_reason_t reason;
 
-    (void)vm;
-
-    if (!vigil_debugger_resolve_ip(dbg, 0U, &source_id, &line, &column))
+    /* Resolve source location using the calling thread's VM. */
+    if (!vigil_debugger_resolve_ip_for_vm(dbg, vm, 0U, &source_id, &line, &column))
     {
         return 0; /* can't resolve — keep running */
     }
 
-    current_depth = vigil_vm_frame_depth(dbg->vm);
+    current_depth = vigil_vm_frame_depth(vm);
 
     switch (dbg->mode)
     {
@@ -178,12 +215,26 @@ static int vigil_debugger_vm_hook(vigil_vm_t *vm, void *userdata)
         should_stop = vigil_debugger_check_breakpoint(dbg, source_id, line);
     }
 
-    if (should_stop)
-    {
-        vigil_debug_stop_reason_t reason =
-            (dbg->mode == VIGIL_DEBUG_MODE_RUN) ? VIGIL_DEBUG_STOP_BREAKPOINT : VIGIL_DEBUG_STOP_STEP;
-        vigil_debugger_invoke_callback(dbg, reason);
-    }
+    if (!should_stop)
+        return 0;
+
+    /* Acquire the pause mutex so only one thread is in the callback at a time.
+     * Other threads that hit breakpoints concurrently will block here until
+     * the current callback returns. */
+    if (dbg->pause_mutex != NULL)
+        vigil_platform_mutex_lock(dbg->pause_mutex);
+
+    /* Point inspection APIs at this thread's VM for the duration of the
+     * callback. */
+    dbg->current_vm = vm;
+
+    reason = (dbg->mode == VIGIL_DEBUG_MODE_RUN) ? VIGIL_DEBUG_STOP_BREAKPOINT : VIGIL_DEBUG_STOP_STEP;
+    vigil_debugger_invoke_callback(dbg, reason);
+
+    dbg->current_vm = NULL;
+
+    if (dbg->pause_mutex != NULL)
+        vigil_platform_mutex_unlock(dbg->pause_mutex);
 
     return 0; /* 0 = keep executing */
 }
@@ -215,22 +266,44 @@ vigil_status_t vigil_debugger_create(vigil_debugger_t **out_debugger, vigil_vm_t
     (*out_debugger)->vm = vm;
     (*out_debugger)->sources = sources;
     (*out_debugger)->mode = VIGIL_DEBUG_MODE_RUN;
+
+    /* Create the mutex that serialises concurrent breakpoint callbacks.
+     * Failure here is treated as a fatal setup error. */
+    status = vigil_platform_mutex_create(&(*out_debugger)->pause_mutex, error);
+    if (status != VIGIL_STATUS_OK)
+    {
+        memory = *out_debugger;
+        vigil_runtime_free(runtime, &memory);
+        *out_debugger = NULL;
+        return status;
+    }
+
     return VIGIL_STATUS_OK;
 }
 
 void vigil_debugger_destroy(vigil_debugger_t **debugger)
 {
     void *memory;
+    vigil_runtime_t *runtime;
+
     if (debugger == NULL || *debugger == NULL)
         return;
+
     vigil_debugger_detach(*debugger);
+
+    if ((*debugger)->pause_mutex != NULL)
+    {
+        vigil_platform_mutex_destroy((*debugger)->pause_mutex);
+        (*debugger)->pause_mutex = NULL;
+    }
     if ((*debugger)->breakpoints != NULL)
     {
         memory = (*debugger)->breakpoints;
         vigil_runtime_free((*debugger)->runtime, &memory);
     }
+    runtime = (*debugger)->runtime;
     memory = *debugger;
-    vigil_runtime_free((*debugger)->runtime, &memory);
+    vigil_runtime_free(runtime, &memory);
     *debugger = NULL;
 }
 
@@ -238,14 +311,19 @@ void vigil_debugger_attach(vigil_debugger_t *debugger)
 {
     if (debugger == NULL)
         return;
+    /* Install on the primary VM and on the runtime so every subsequently
+     * spawned thread VM inherits the hook automatically. */
     vigil_vm_set_debug_hook(debugger->vm, vigil_debugger_vm_hook, debugger);
+    vigil_runtime_set_debug_hook(debugger->runtime, vigil_debugger_vm_hook, debugger);
 }
 
 void vigil_debugger_detach(vigil_debugger_t *debugger)
 {
     if (debugger == NULL)
         return;
-    vigil_vm_set_debug_hook(debugger->vm, NULL, NULL);
+    /* Clear the hook from the runtime and from every currently-registered VM
+     * (including thread VMs spawned while the debugger was active). */
+    vigil_runtime_set_debug_hook(debugger->runtime, NULL, NULL);
     debugger->is_paused = 0;
 }
 
@@ -394,7 +472,10 @@ void vigil_debugger_clear_all_breakpoints(vigil_debugger_t *debugger)
 
 static void vigil_debugger_begin_step(vigil_debugger_t *debugger)
 {
-    debugger->step_frame_depth = vigil_vm_frame_depth(debugger->vm);
+    /* Capture the starting position from the VM that is currently being
+     * debugged (may be a thread VM when stepping inside a worker). */
+    vigil_vm_t *active = vigil_debugger_active_vm(debugger);
+    debugger->step_frame_depth = vigil_vm_frame_depth(active);
     debugger->step_start_line = 0U;
     debugger->step_start_source = 0U;
     vigil_debugger_resolve_ip(debugger, 0U, &debugger->step_start_source, &debugger->step_start_line, NULL);
@@ -458,7 +539,7 @@ size_t vigil_debugger_frame_count(const vigil_debugger_t *debugger)
 {
     if (debugger == NULL)
         return 0U;
-    return vigil_vm_frame_depth(debugger->vm);
+    return vigil_vm_frame_depth(vigil_debugger_active_vm(debugger));
 }
 
 vigil_status_t vigil_debugger_frame_info(const vigil_debugger_t *debugger, size_t frame_index,
@@ -467,11 +548,13 @@ vigil_status_t vigil_debugger_frame_info(const vigil_debugger_t *debugger, size_
 {
     size_t vm_frame_count;
     size_t vm_frame_idx;
+    const vigil_vm_t *active;
 
     if (debugger == NULL)
         return VIGIL_STATUS_INVALID_ARGUMENT;
 
-    vm_frame_count = vigil_vm_frame_depth(debugger->vm);
+    active = vigil_debugger_active_vm(debugger);
+    vm_frame_count = vigil_vm_frame_depth(active);
     if (frame_index >= vm_frame_count)
         return VIGIL_STATUS_INVALID_ARGUMENT;
 
@@ -479,7 +562,7 @@ vigil_status_t vigil_debugger_frame_info(const vigil_debugger_t *debugger, size_
 
     /* Get function name from the frame's function object. */
     {
-        const vigil_object_t *fn_obj = vigil_vm_frame_function(debugger->vm, vm_frame_idx);
+        const vigil_object_t *fn_obj = vigil_vm_frame_function(active, vm_frame_idx);
         if (fn_obj != NULL)
         {
             const char *name = vigil_function_object_name(fn_obj);
@@ -511,18 +594,20 @@ size_t vigil_debugger_frame_locals(const vigil_debugger_t *debugger, size_t fram
     size_t base_slot;
     size_t count = 0U;
     size_t i;
+    const vigil_vm_t *active;
 
     if (debugger == NULL || max_locals == 0U)
         return 0U;
 
-    vm_frame_count = vigil_vm_frame_depth(debugger->vm);
+    active = vigil_debugger_active_vm(debugger);
+    vm_frame_count = vigil_vm_frame_depth(active);
     if (frame_index >= vm_frame_count)
         return 0U;
     vm_frame_idx = vm_frame_count - 1U - frame_index;
 
-    chunk = vigil_vm_frame_chunk(debugger->vm, vm_frame_idx);
-    ip = vigil_vm_frame_ip(debugger->vm, vm_frame_idx);
-    base_slot = vigil_vm_frame_base_slot(debugger->vm, vm_frame_idx);
+    chunk = vigil_vm_frame_chunk(active, vm_frame_idx);
+    ip = vigil_vm_frame_ip(active, vm_frame_idx);
+    base_slot = vigil_vm_frame_base_slot(active, vm_frame_idx);
 
     if (chunk == NULL)
         return 0U;
@@ -543,7 +628,7 @@ size_t vigil_debugger_frame_locals(const vigil_debugger_t *debugger, size_t fram
             if (out_values != NULL)
             {
                 size_t stack_slot = base_slot + local->slot;
-                out_values[count] = vigil_vm_stack_get(debugger->vm, stack_slot);
+                out_values[count] = vigil_vm_stack_get(active, stack_slot);
             }
             count += 1U;
         }
@@ -562,21 +647,23 @@ vigil_status_t vigil_debugger_get_local(const vigil_debugger_t *debugger, size_t
     size_t base_slot;
     size_t name_len;
     size_t i;
+    const vigil_vm_t *active;
 
     if (debugger == NULL || name == NULL || out_value == NULL)
     {
         return VIGIL_STATUS_INVALID_ARGUMENT;
     }
 
+    active = vigil_debugger_active_vm(debugger);
     name_len = strlen(name);
-    vm_frame_count = vigil_vm_frame_depth(debugger->vm);
+    vm_frame_count = vigil_vm_frame_depth(active);
     if (frame_index >= vm_frame_count)
         return VIGIL_STATUS_INVALID_ARGUMENT;
     vm_frame_idx = vm_frame_count - 1U - frame_index;
 
-    chunk = vigil_vm_frame_chunk(debugger->vm, vm_frame_idx);
-    ip = vigil_vm_frame_ip(debugger->vm, vm_frame_idx);
-    base_slot = vigil_vm_frame_base_slot(debugger->vm, vm_frame_idx);
+    chunk = vigil_vm_frame_chunk(active, vm_frame_idx);
+    ip = vigil_vm_frame_ip(active, vm_frame_idx);
+    base_slot = vigil_vm_frame_base_slot(active, vm_frame_idx);
 
     if (chunk == NULL)
         return VIGIL_STATUS_INVALID_ARGUMENT;
@@ -591,11 +678,68 @@ vigil_status_t vigil_debugger_get_local(const vigil_debugger_t *debugger, size_t
             if (local->name_length == name_len && memcmp(local->name, name, name_len) == 0)
             {
                 size_t stack_slot = base_slot + local->slot;
-                *out_value = vigil_vm_stack_get(debugger->vm, stack_slot);
+                *out_value = vigil_vm_stack_get(active, stack_slot);
                 return VIGIL_STATUS_OK;
             }
         }
     }
 
+    return VIGIL_STATUS_INVALID_ARGUMENT;
+}
+
+/* ── Thread-aware debugging ──────────────────────────────────────── */
+
+uint64_t vigil_debugger_current_thread_id(const vigil_debugger_t *debugger)
+{
+    if (debugger == NULL || debugger->current_vm == NULL)
+        return 0U;
+    return vigil_vm_thread_id(debugger->current_vm);
+}
+
+size_t vigil_debugger_list_threads(const vigil_debugger_t *debugger, vigil_thread_info_t *out_threads,
+                                   size_t max_threads)
+{
+    vigil_vm_t *vms[256]; /* generous upper bound for a single list call */
+    size_t count;
+    size_t i;
+
+    if (debugger == NULL || out_threads == NULL || max_threads == 0U)
+        return 0U;
+
+    if (max_threads > 256U)
+        max_threads = 256U;
+
+    count = vigil_runtime_list_vms(debugger->runtime, vms, max_threads);
+    for (i = 0U; i < count; i++)
+    {
+        out_threads[i].vm = vms[i];
+        out_threads[i].thread_id = vigil_vm_thread_id(vms[i]);
+    }
+    return count;
+}
+
+vigil_status_t vigil_debugger_switch_thread(vigil_debugger_t *debugger, uint64_t thread_id, vigil_error_t *error)
+{
+    vigil_vm_t *vms[256];
+    size_t count;
+    size_t i;
+
+    if (debugger == NULL)
+    {
+        vigil_error_set_literal(error, VIGIL_STATUS_INVALID_ARGUMENT, "debugger must not be null");
+        return VIGIL_STATUS_INVALID_ARGUMENT;
+    }
+
+    count = vigil_runtime_list_vms(debugger->runtime, vms, 256U);
+    for (i = 0U; i < count; i++)
+    {
+        if (vigil_vm_thread_id(vms[i]) == thread_id)
+        {
+            debugger->current_vm = vms[i];
+            return VIGIL_STATUS_OK;
+        }
+    }
+
+    vigil_error_set_literal(error, VIGIL_STATUS_INVALID_ARGUMENT, "thread not found");
     return VIGIL_STATUS_INVALID_ARGUMENT;
 }

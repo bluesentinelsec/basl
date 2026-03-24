@@ -260,6 +260,195 @@ TEST(VigilDebuggerTest, NoDebuggerAttachedRunsNormally)
     dbgf_free(&f);
 }
 
+/* ── Thread-aware debugger tests ─────────────────────────────────── */
+
+/* Each VM captures the OS thread ID when opened. */
+TEST(VigilDebuggerTest, VmThreadIdIsNonZero)
+{
+    DebuggerFixture f;
+    dbgf_init(&f);
+    EXPECT_NE(vigil_vm_thread_id(f.vm), 0U);
+    dbgf_free(&f);
+}
+
+/* current_thread_id returns 0 when called outside a debug callback. */
+TEST(VigilDebuggerTest, CurrentThreadIdZeroOutsideCallback)
+{
+    DebuggerFixture f;
+    dbgf_init(&f);
+    dbgf_create_debugger(&f);
+    EXPECT_EQ(vigil_debugger_current_thread_id(f.debugger), 0U);
+    dbgf_free(&f);
+}
+
+/* list_threads always includes at least the main VM. */
+TEST(VigilDebuggerTest, ListThreadsIncludesMainVm)
+{
+    vigil_thread_info_t threads[8];
+    size_t count;
+    size_t i;
+    int found;
+    DebuggerFixture f;
+
+    dbgf_init(&f);
+    dbgf_create_debugger(&f);
+
+    count = vigil_debugger_list_threads(f.debugger, threads, 8U);
+    EXPECT_GE(count, 1U);
+
+    found = 0;
+    for (i = 0U; i < count; i++)
+    {
+        if (threads[i].vm == f.vm)
+            found = 1;
+    }
+    EXPECT_TRUE(found);
+
+    dbgf_free(&f);
+}
+
+/* switch_thread returns INVALID_ARGUMENT for an unknown thread ID. */
+TEST(VigilDebuggerTest, SwitchThreadUnknownIdReturnsError)
+{
+    vigil_error_t err = {0};
+    DebuggerFixture f;
+
+    dbgf_init(&f);
+    dbgf_create_debugger(&f);
+    EXPECT_EQ(vigil_debugger_switch_thread(f.debugger, (uint64_t)-1, &err), VIGIL_STATUS_INVALID_ARGUMENT);
+    dbgf_free(&f);
+}
+
+/* Thread breakpoint tests require real OS thread support. */
+#ifndef __EMSCRIPTEN__
+
+/* Callback state shared between thread breakpoint tests. */
+typedef struct ThreadBpState
+{
+    uint64_t hit_thread_ids[16];
+    size_t hit_count;
+} ThreadBpState;
+
+static vigil_debug_action_t thread_bp_callback(vigil_debugger_t *dbg, vigil_debug_stop_reason_t reason, void *userdata)
+{
+    ThreadBpState *s = (ThreadBpState *)userdata;
+    (void)reason;
+    if (s->hit_count < 16U)
+        s->hit_thread_ids[s->hit_count++] = vigil_debugger_current_thread_id(dbg);
+    return VIGIL_DEBUG_CONTINUE;
+}
+
+/* A breakpoint inside a thread.spawn closure fires from the worker thread,
+ * not from the main thread. */
+TEST(VigilDebuggerTest, BreakpointHitsInWorkerThread)
+{
+    uint64_t main_thread_id;
+    vigil_value_t result;
+    ThreadBpState cb_state;
+    DebuggerFixture f;
+
+    dbgf_init(&f);
+
+    /* Line 4 (i64 x = ...) is inside the spawned closure and only runs
+     * on the worker thread. */
+    vigil_object_t *fn = dbgf_compile(&f, "import \"thread\";\n"                      /* 1 */
+                                          "fn main() -> i32 {\n"                      /* 2 */
+                                          "    i64 t = thread.spawn(fn() -> void {\n" /* 3 */
+                                          "        i64 x = i64(99);\n"                /* 4 */
+                                          "    });\n"                                 /* 5 */
+                                          "    thread.join(t);\n"                     /* 6 */
+                                          "    return 0;\n"                           /* 7 */
+                                          "}\n");                                     /* 8 */
+    ASSERT_NE(fn, NULL);
+
+    dbgf_create_debugger(&f);
+
+    memset(&cb_state, 0, sizeof(cb_state));
+    vigil_debugger_set_callback(f.debugger, thread_bp_callback, &cb_state);
+    EXPECT_EQ(vigil_debugger_set_breakpoint(f.debugger, f.source_id, 4, NULL, &f.error), VIGIL_STATUS_OK);
+
+    main_thread_id = vigil_vm_thread_id(f.vm);
+    EXPECT_NE(main_thread_id, 0U);
+
+    vigil_debugger_attach(f.debugger);
+
+    vigil_value_init_nil(&result);
+    EXPECT_EQ(vigil_vm_execute_function(f.vm, fn, &result, &f.error), VIGIL_STATUS_OK);
+
+    /* Breakpoint must have fired at least once, from a thread other than main. */
+    EXPECT_TRUE(cb_state.hit_count > 0U);
+    EXPECT_NE(cb_state.hit_thread_ids[0], 0U);
+    EXPECT_NE(cb_state.hit_thread_ids[0], main_thread_id);
+
+    vigil_debugger_detach(f.debugger);
+    vigil_value_release(&result);
+    vigil_object_release(&fn);
+    dbgf_free(&f);
+}
+
+/* list_threads returns the worker VM while it is registered, and
+ * switch_thread can redirect inspection to it. */
+TEST(VigilDebuggerTest, SwitchThreadToWorkerVm)
+{
+    ThreadBpState cb_state;
+    vigil_thread_info_t threads[8];
+    vigil_value_t result;
+    DebuggerFixture f;
+
+    dbgf_init(&f);
+
+    vigil_object_t *fn = dbgf_compile(&f, "import \"thread\";\n"                      /* 1 */
+                                          "fn main() -> i32 {\n"                      /* 2 */
+                                          "    i64 t = thread.spawn(fn() -> void {\n" /* 3 */
+                                          "        i64 y = i64(7);\n"                 /* 4 */
+                                          "    });\n"                                 /* 5 */
+                                          "    thread.join(t);\n"                     /* 6 */
+                                          "    return 0;\n"                           /* 7 */
+                                          "}\n");                                     /* 8 */
+    ASSERT_NE(fn, NULL);
+
+    dbgf_create_debugger(&f);
+
+    memset(&cb_state, 0, sizeof(cb_state));
+
+    /* Use a callback that exercises switch_thread: on each hit, enumerate
+     * threads and verify the worker VM appears in the list. */
+    vigil_debugger_set_callback(f.debugger, thread_bp_callback, &cb_state);
+    EXPECT_EQ(vigil_debugger_set_breakpoint(f.debugger, f.source_id, 4, NULL, &f.error), VIGIL_STATUS_OK);
+    vigil_debugger_attach(f.debugger);
+
+    vigil_value_init_nil(&result);
+    EXPECT_EQ(vigil_vm_execute_function(f.vm, fn, &result, &f.error), VIGIL_STATUS_OK);
+
+    /* After execution the thread list shrinks back to just the main VM. */
+    size_t post_count = vigil_debugger_list_threads(f.debugger, threads, 8U);
+    EXPECT_GE(post_count, 1U);
+
+    vigil_debugger_detach(f.debugger);
+    vigil_value_release(&result);
+    vigil_object_release(&fn);
+    dbgf_free(&f);
+}
+
+/* switch_thread succeeds when given the main thread's ID. */
+TEST(VigilDebuggerTest, SwitchThreadToMainThreadSucceeds)
+{
+    vigil_error_t err = {0};
+    uint64_t main_id;
+    DebuggerFixture f;
+
+    dbgf_init(&f);
+    dbgf_create_debugger(&f);
+
+    main_id = vigil_vm_thread_id(f.vm);
+    EXPECT_NE(main_id, 0U);
+    EXPECT_EQ(vigil_debugger_switch_thread(f.debugger, main_id, &err), VIGIL_STATUS_OK);
+
+    dbgf_free(&f);
+}
+
+#endif /* __EMSCRIPTEN__ */
+
 void register_debugger_tests(void)
 {
     REGISTER_TEST(VigilDebuggerTest, CreateAndDestroy);
@@ -268,4 +457,14 @@ void register_debugger_tests(void)
     REGISTER_TEST(VigilDebuggerTest, ClearBreakpointStopsHitting);
     REGISTER_TEST(VigilDebuggerTest, FrameCountDuringCallback);
     REGISTER_TEST(VigilDebuggerTest, NoDebuggerAttachedRunsNormally);
+    /* Thread-aware debugger tests. */
+    REGISTER_TEST(VigilDebuggerTest, VmThreadIdIsNonZero);
+    REGISTER_TEST(VigilDebuggerTest, CurrentThreadIdZeroOutsideCallback);
+    REGISTER_TEST(VigilDebuggerTest, ListThreadsIncludesMainVm);
+    REGISTER_TEST(VigilDebuggerTest, SwitchThreadUnknownIdReturnsError);
+#ifndef __EMSCRIPTEN__
+    REGISTER_TEST(VigilDebuggerTest, BreakpointHitsInWorkerThread);
+    REGISTER_TEST(VigilDebuggerTest, SwitchThreadToWorkerVm);
+    REGISTER_TEST(VigilDebuggerTest, SwitchThreadToMainThreadSucceeds);
+#endif
 }

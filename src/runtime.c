@@ -2,6 +2,7 @@
 
 #include "internal/vigil_internal.h"
 #include "internal/vigil_nanbox.h"
+#include "platform/platform.h"
 #include "stdlib/regex.h"
 #include "vigil/value.h"
 #include "vigil/vm.h"
@@ -122,6 +123,19 @@ vigil_status_t vigil_runtime_open(vigil_runtime_t **out_runtime, const vigil_run
         allocator.deallocate(allocator.user_data, runtime);
         return status;
     }
+
+    /* Create the mutex that guards the VM registry used for thread-aware
+     * debugging.  Failure is non-fatal in release builds but prevents thread
+     * inspection; we treat it as an allocation failure to keep error handling
+     * simple. */
+    status = vigil_platform_mutex_create(&runtime->vm_registry_mutex, error);
+    if (status != VIGIL_STATUS_OK)
+    {
+        vigil_object_release(&runtime->ok_error);
+        allocator.deallocate(allocator.user_data, runtime);
+        return status;
+    }
+
     *out_runtime = runtime;
     return VIGIL_STATUS_OK;
 }
@@ -142,6 +156,14 @@ void vigil_runtime_close(vigil_runtime_t **runtime)
     if (resolved_runtime->ok_error != NULL)
     {
         vigil_object_release(&resolved_runtime->ok_error);
+    }
+    if (resolved_runtime->vm_registry_mutex != NULL)
+    {
+        vigil_platform_mutex_destroy(resolved_runtime->vm_registry_mutex);
+    }
+    if (resolved_runtime->vm_registry != NULL)
+    {
+        allocator.deallocate(allocator.user_data, resolved_runtime->vm_registry);
     }
     allocator.deallocate(allocator.user_data, resolved_runtime);
     *runtime = NULL;
@@ -207,4 +229,120 @@ vigil_status_t vigil_runtime_push_ok_error(vigil_runtime_t *runtime, vigil_vm_t 
 vigil_value_t vigil_runtime_ok_error_value(vigil_runtime_t *runtime)
 {
     return vigil_nanbox_encode_object(runtime->ok_error);
+}
+
+/* ── VM registry ─────────────────────────────────────────────────── */
+
+/* Initial capacity for the VM registry array. */
+#define VIGIL_VM_REGISTRY_INITIAL_CAPACITY 8U
+
+vigil_status_t vigil_runtime_register_vm(vigil_runtime_t *runtime, vigil_vm_t *vm, vigil_error_t *error)
+{
+    void *new_memory;
+    size_t new_cap;
+    vigil_status_t status;
+
+    if (runtime == NULL || vm == NULL || runtime->vm_registry_mutex == NULL)
+        return VIGIL_STATUS_OK; /* no-op if registry isn't initialised */
+
+    vigil_platform_mutex_lock(runtime->vm_registry_mutex);
+
+    /* Grow the array if needed. */
+    if (runtime->vm_registry_count >= runtime->vm_registry_capacity)
+    {
+        new_cap = runtime->vm_registry_capacity == 0U ? VIGIL_VM_REGISTRY_INITIAL_CAPACITY
+                                                      : runtime->vm_registry_capacity * 2U;
+        new_memory = NULL;
+        status = vigil_runtime_alloc(runtime, new_cap * sizeof(vigil_vm_t *), &new_memory, error);
+        if (status != VIGIL_STATUS_OK)
+        {
+            vigil_platform_mutex_unlock(runtime->vm_registry_mutex);
+            return status;
+        }
+
+        if (runtime->vm_registry != NULL)
+        {
+            memcpy(new_memory, runtime->vm_registry, runtime->vm_registry_count * sizeof(vigil_vm_t *));
+            void *old = runtime->vm_registry;
+            vigil_runtime_free(runtime, &old);
+        }
+        runtime->vm_registry = (vigil_vm_t **)new_memory;
+        runtime->vm_registry_capacity = new_cap;
+    }
+
+    runtime->vm_registry[runtime->vm_registry_count] = vm;
+    runtime->vm_registry_count += 1U;
+
+    vigil_platform_mutex_unlock(runtime->vm_registry_mutex);
+    return VIGIL_STATUS_OK;
+}
+
+void vigil_runtime_unregister_vm(vigil_runtime_t *runtime, vigil_vm_t *vm)
+{
+    size_t i;
+
+    if (runtime == NULL || vm == NULL || runtime->vm_registry_mutex == NULL)
+        return;
+
+    vigil_platform_mutex_lock(runtime->vm_registry_mutex);
+
+    for (i = 0U; i < runtime->vm_registry_count; i++)
+    {
+        if (runtime->vm_registry[i] == vm)
+        {
+            /* Compact the array by shifting tail entries down by one. */
+            size_t tail = runtime->vm_registry_count - 1U - i;
+            if (tail > 0U)
+            {
+                memmove(&runtime->vm_registry[i], &runtime->vm_registry[i + 1U], tail * sizeof(vigil_vm_t *));
+            }
+            runtime->vm_registry_count -= 1U;
+            break;
+        }
+    }
+
+    vigil_platform_mutex_unlock(runtime->vm_registry_mutex);
+}
+
+size_t vigil_runtime_list_vms(vigil_runtime_t *runtime, vigil_vm_t **out_vms, size_t max_vms)
+{
+    size_t count;
+
+    if (runtime == NULL || out_vms == NULL || max_vms == 0U || runtime->vm_registry_mutex == NULL)
+        return 0U;
+
+    vigil_platform_mutex_lock(runtime->vm_registry_mutex);
+
+    count = runtime->vm_registry_count < max_vms ? runtime->vm_registry_count : max_vms;
+    memcpy(out_vms, runtime->vm_registry, count * sizeof(vigil_vm_t *));
+
+    vigil_platform_mutex_unlock(runtime->vm_registry_mutex);
+    return count;
+}
+
+void vigil_runtime_set_debug_hook(vigil_runtime_t *runtime, int (*hook)(vigil_vm_t *vm, void *userdata), void *userdata)
+{
+    size_t i;
+    vigil_vm_t *vm;
+
+    if (runtime == NULL)
+        return;
+
+    /* Store for future VMs opened while the debugger is active. */
+    runtime->debug_hook = hook;
+    runtime->debug_hook_userdata = userdata;
+
+    /* Propagate to every VM already running (e.g. thread VMs that were spawned
+     * before the debugger attached, or detach clearing all hooks at once). */
+    if (runtime->vm_registry_mutex == NULL)
+        return;
+
+    vigil_platform_mutex_lock(runtime->vm_registry_mutex);
+    for (i = 0U; i < runtime->vm_registry_count; i++)
+    {
+        vm = runtime->vm_registry[i];
+        if (vm != NULL)
+            vigil_vm_set_debug_hook(vm, hook, userdata);
+    }
+    vigil_platform_mutex_unlock(runtime->vm_registry_mutex);
 }

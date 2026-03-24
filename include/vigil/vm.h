@@ -2,6 +2,7 @@
 #define VIGIL_VM_H
 
 #include <stddef.h>
+#include <stdint.h>
 
 #include "vigil/chunk.h"
 #include "vigil/export.h"
@@ -44,6 +45,10 @@ extern "C"
 
     /* Debug hook — set by debugger, NULL when not debugging. */
     VIGIL_API void vigil_vm_set_debug_hook(vigil_vm_t *vm, int (*hook)(vigil_vm_t *vm, void *userdata), void *userdata);
+
+    /** Return the platform thread ID of the OS thread running this VM.
+     *  Matches vigil_platform_thread_current_id() from the calling thread. */
+    VIGIL_API uint64_t vigil_vm_thread_id(const vigil_vm_t *vm);
 
     VIGIL_API void vigil_vm_set_args(vigil_vm_t *vm, const char *const *argv, size_t argc);
 
