@@ -21,6 +21,15 @@
 #include "vigil_internal.h"
 #include "vigil_nanbox.h"
 
+/* ── Branch-prediction hints (no-op on MSVC) ───────────────────── */
+#if defined(__GNUC__) || defined(__clang__)
+#define VIGIL_LIKELY(x) __builtin_expect(!!(x), 1)
+#define VIGIL_UNLIKELY(x) __builtin_expect(!!(x), 0)
+#else
+#define VIGIL_LIKELY(x) (x)
+#define VIGIL_UNLIKELY(x) (x)
+#endif
+
 /* ── Frame and defer types ─────────────────────────────────────── */
 
 typedef struct vigil_vm_frame

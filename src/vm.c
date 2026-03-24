@@ -3484,7 +3484,7 @@ vigil_status_t vigil_vm_execute_function(vigil_vm_t *vm, const vigil_object_t *f
             /* Patch NULL slots to the unknown-opcode handler so we
                never dereference a NULL label pointer. */
             static int dispatch_patched = 0;
-            if (__builtin_expect(!dispatch_patched, 0))
+            if (VIGIL_UNLIKELY(!dispatch_patched))
             {
                 for (int _i = 0; _i < 256; _i++)
                     if (dispatch_table[_i] == NULL)
@@ -3494,7 +3494,7 @@ vigil_status_t vigil_vm_execute_function(vigil_vm_t *vm, const vigil_object_t *f
 #define VM_DISPATCH()                                                                                                  \
     do                                                                                                                 \
     {                                                                                                                  \
-        if (__builtin_expect(vm->debug_hook != NULL, 0))                                                               \
+        if (VIGIL_UNLIKELY(vm->debug_hook != NULL))                                                                    \
         {                                                                                                              \
             if (vm->debug_hook(vm, vm->debug_hook_userdata) != 0)                                                      \
             {                                                                                                          \
@@ -3508,7 +3508,7 @@ vigil_status_t vigil_vm_execute_function(vigil_vm_t *vm, const vigil_object_t *f
 #define VM_BREAK()                                                                                                     \
     do                                                                                                                 \
     {                                                                                                                  \
-        if (__builtin_expect(frame->ip >= code_size, 0))                                                               \
+        if (VIGIL_UNLIKELY(frame->ip >= code_size))                                                                    \
             goto vm_loop_end;                                                                                          \
         VM_DISPATCH();                                                                                                 \
     } while (0)
@@ -3518,7 +3518,7 @@ vigil_status_t vigil_vm_execute_function(vigil_vm_t *vm, const vigil_object_t *f
         frame = &vm->frames[vm->frame_count - 1U];                                                                     \
         code = VIGIL_VM_CHUNK_CODE(frame->chunk);                                                                      \
         code_size = VIGIL_VM_CHUNK_CODE_SIZE(frame->chunk);                                                            \
-        if (__builtin_expect(frame->ip >= code_size, 0))                                                               \
+        if (VIGIL_UNLIKELY(frame->ip >= code_size))                                                                    \
             goto vm_loop_end;                                                                                          \
         VM_DISPATCH();                                                                                                 \
     } while (0)
@@ -3620,9 +3620,9 @@ vigil_status_t vigil_vm_execute_function(vigil_vm_t *vm, const vigil_object_t *f
             local_index = frame->base_slot + (size_t)operand;
             /* Fast path: non-object values (int, bool, float, nil)
                don't need retain/release — just copy the struct. */
-            if (__builtin_expect(!vigil_nanbox_has_object(vm->stack[local_index]), 1))
+            if (VIGIL_LIKELY(!vigil_nanbox_has_object(vm->stack[local_index])))
             {
-                if (__builtin_expect(vm->stack_count >= vm->stack_capacity, 0))
+                if (VIGIL_UNLIKELY(vm->stack_count >= vm->stack_capacity))
                 {
                     status = vigil_vm_grow_stack(vm, vm->stack_count + 1U, error);
                     if (status != VIGIL_STATUS_OK)
@@ -4043,22 +4043,22 @@ vigil_status_t vigil_vm_execute_function(vigil_vm_t *vm, const vigil_object_t *f
             // clang-format off
             VM_CASE(MATH_SIN_F64)
             vm->stack[vm->stack_count - 1U] = vigil_nanbox_encode_double(sin(vigil_nanbox_decode_double(vm->stack[vm->stack_count - 1U])));
-            frame->ip += 1U; goto *dispatch_table[code[frame->ip]];
+            frame->ip += 1U; VIGIL_VM_INTRINSIC_NEXT(dispatch_table, code, frame->ip);
             VM_CASE(MATH_COS_F64)
             vm->stack[vm->stack_count - 1U] = vigil_nanbox_encode_double(cos(vigil_nanbox_decode_double(vm->stack[vm->stack_count - 1U])));
-            frame->ip += 1U; goto *dispatch_table[code[frame->ip]];
+            frame->ip += 1U; VIGIL_VM_INTRINSIC_NEXT(dispatch_table, code, frame->ip);
             VM_CASE(MATH_SQRT_F64)
             vm->stack[vm->stack_count - 1U] = vigil_nanbox_encode_double(sqrt(vigil_nanbox_decode_double(vm->stack[vm->stack_count - 1U])));
-            frame->ip += 1U; goto *dispatch_table[code[frame->ip]];
+            frame->ip += 1U; VIGIL_VM_INTRINSIC_NEXT(dispatch_table, code, frame->ip);
             VM_CASE(MATH_LOG_F64)
             vm->stack[vm->stack_count - 1U] = vigil_nanbox_encode_double(log(vigil_nanbox_decode_double(vm->stack[vm->stack_count - 1U])));
-            frame->ip += 1U; goto *dispatch_table[code[frame->ip]];
+            frame->ip += 1U; VIGIL_VM_INTRINSIC_NEXT(dispatch_table, code, frame->ip);
             VM_CASE(MATH_POW_F64)
             { double pw_b = vigil_nanbox_decode_double(vm->stack[vm->stack_count - 1U]);
               double pw_a = vigil_nanbox_decode_double(vm->stack[vm->stack_count - 2U]);
               vm->stack_count -= 1U;
               vm->stack[vm->stack_count - 1U] = vigil_nanbox_encode_double(pow(pw_a, pw_b)); }
-            frame->ip += 1U; goto *dispatch_table[code[frame->ip]];
+            frame->ip += 1U; VIGIL_VM_INTRINSIC_NEXT(dispatch_table, code, frame->ip);
             VM_CASE(PARSE_I32) vigil_vm_parse_i32(vm); frame->ip += 1U; VIGIL_VM_INTRINSIC_NEXT(dispatch_table, code, frame->ip);
             VM_CASE(PARSE_F64) vigil_vm_parse_f64(vm); frame->ip += 1U; VIGIL_VM_INTRINSIC_NEXT(dispatch_table, code, frame->ip);
             VM_CASE(PARSE_BOOL) vigil_vm_parse_bool(vm); frame->ip += 1U; VIGIL_VM_INTRINSIC_NEXT(dispatch_table, code, frame->ip);
@@ -4608,15 +4608,13 @@ vigil_status_t vigil_vm_execute_function(vigil_vm_t *vm, const vigil_object_t *f
             {
                 uint64_t add_r = vm->stack[vm->stack_count - 1U];
                 uint64_t add_l = vm->stack[vm->stack_count - 2U];
-                if (__builtin_expect(vigil_nanbox_is_double(add_l) && vigil_nanbox_is_double(add_r), 1))
+                if (VIGIL_LIKELY(vigil_nanbox_is_double(add_l) && vigil_nanbox_is_double(add_r)))
                 {
                     vm->stack_count -= 1U;
-                    vm->stack[vm->stack_count - 1U] = vigil_nanbox_encode_double(
-                        vigil_nanbox_decode_double(add_l) + vigil_nanbox_decode_double(add_r));
+                    vm->stack[vm->stack_count - 1U] = vigil_nanbox_encode_double(vigil_nanbox_decode_double(add_l) +
+                                                                                 vigil_nanbox_decode_double(add_r));
                     frame->ip += 1U;
-#if VIGIL_VM_COMPUTED_GOTO
-                    goto *dispatch_table[code[frame->ip]];
-#endif
+                    VIGIL_VM_INTRINSIC_NEXT(dispatch_table, code, frame->ip);
                 }
                 else
                 {
@@ -4630,15 +4628,13 @@ vigil_status_t vigil_vm_execute_function(vigil_vm_t *vm, const vigil_object_t *f
             {
                 uint64_t sub_r = vm->stack[vm->stack_count - 1U];
                 uint64_t sub_l = vm->stack[vm->stack_count - 2U];
-                if (__builtin_expect(vigil_nanbox_is_double(sub_l) && vigil_nanbox_is_double(sub_r), 1))
+                if (VIGIL_LIKELY(vigil_nanbox_is_double(sub_l) && vigil_nanbox_is_double(sub_r)))
                 {
                     vm->stack_count -= 1U;
-                    vm->stack[vm->stack_count - 1U] = vigil_nanbox_encode_double(
-                        vigil_nanbox_decode_double(sub_l) - vigil_nanbox_decode_double(sub_r));
+                    vm->stack[vm->stack_count - 1U] = vigil_nanbox_encode_double(vigil_nanbox_decode_double(sub_l) -
+                                                                                 vigil_nanbox_decode_double(sub_r));
                     frame->ip += 1U;
-#if VIGIL_VM_COMPUTED_GOTO
-                    goto *dispatch_table[code[frame->ip]];
-#endif
+                    VIGIL_VM_INTRINSIC_NEXT(dispatch_table, code, frame->ip);
                 }
                 else
                 {
@@ -4652,15 +4648,13 @@ vigil_status_t vigil_vm_execute_function(vigil_vm_t *vm, const vigil_object_t *f
             {
                 uint64_t mul_r = vm->stack[vm->stack_count - 1U];
                 uint64_t mul_l = vm->stack[vm->stack_count - 2U];
-                if (__builtin_expect(vigil_nanbox_is_double(mul_l) && vigil_nanbox_is_double(mul_r), 1))
+                if (VIGIL_LIKELY(vigil_nanbox_is_double(mul_l) && vigil_nanbox_is_double(mul_r)))
                 {
                     vm->stack_count -= 1U;
-                    vm->stack[vm->stack_count - 1U] = vigil_nanbox_encode_double(
-                        vigil_nanbox_decode_double(mul_l) * vigil_nanbox_decode_double(mul_r));
+                    vm->stack[vm->stack_count - 1U] = vigil_nanbox_encode_double(vigil_nanbox_decode_double(mul_l) *
+                                                                                 vigil_nanbox_decode_double(mul_r));
                     frame->ip += 1U;
-#if VIGIL_VM_COMPUTED_GOTO
-                    goto *dispatch_table[code[frame->ip]];
-#endif
+                    VIGIL_VM_INTRINSIC_NEXT(dispatch_table, code, frame->ip);
                 }
                 else
                 {
@@ -4738,7 +4732,7 @@ vigil_status_t vigil_vm_execute_function(vigil_vm_t *vm, const vigil_object_t *f
                 ib = vigil_nanbox_decode_i32(vm->stack[vm->stack_count]);
                 vm->stack_count -= 1U;
                 ia = vigil_nanbox_decode_i32(vm->stack[vm->stack_count]);
-                if (__builtin_expect(VIGIL_I32_ADD_OVERFLOW(ia, ib, &ir), 0))
+                if (VIGIL_UNLIKELY(VIGIL_I32_ADD_OVERFLOW(ia, ib, &ir)))
                 {
                     status = vigil_vm_fail_at_ip(vm, VIGIL_STATUS_INVALID_ARGUMENT, "i32 overflow", error);
                     goto cleanup;
@@ -4755,7 +4749,7 @@ vigil_status_t vigil_vm_execute_function(vigil_vm_t *vm, const vigil_object_t *f
                 ib = vigil_nanbox_decode_i32(vm->stack[vm->stack_count]);
                 vm->stack_count -= 1U;
                 ia = vigil_nanbox_decode_i32(vm->stack[vm->stack_count]);
-                if (__builtin_expect(VIGIL_I32_SUB_OVERFLOW(ia, ib, &ir), 0))
+                if (VIGIL_UNLIKELY(VIGIL_I32_SUB_OVERFLOW(ia, ib, &ir)))
                 {
                     status = vigil_vm_fail_at_ip(vm, VIGIL_STATUS_INVALID_ARGUMENT, "i32 overflow", error);
                     goto cleanup;
@@ -4772,7 +4766,7 @@ vigil_status_t vigil_vm_execute_function(vigil_vm_t *vm, const vigil_object_t *f
                 ib = vigil_nanbox_decode_i32(vm->stack[vm->stack_count]);
                 vm->stack_count -= 1U;
                 ia = vigil_nanbox_decode_i32(vm->stack[vm->stack_count]);
-                if (__builtin_expect(VIGIL_I32_MUL_OVERFLOW(ia, ib, &ir), 0))
+                if (VIGIL_UNLIKELY(VIGIL_I32_MUL_OVERFLOW(ia, ib, &ir)))
                 {
                     status = vigil_vm_fail_at_ip(vm, VIGIL_STATUS_INVALID_ARGUMENT, "i32 overflow", error);
                     goto cleanup;
@@ -4794,7 +4788,7 @@ vigil_status_t vigil_vm_execute_function(vigil_vm_t *vm, const vigil_object_t *f
                 ib = vigil_nanbox_decode_i32(vm->stack[vm->stack_count]);
                 vm->stack_count -= 1U;
                 ia = vigil_nanbox_decode_i32(vm->stack[vm->stack_count]);
-                if (__builtin_expect(ib == 0 || (ia == INT32_MIN && ib == -1), 0))
+                if (VIGIL_UNLIKELY(ib == 0 || (ia == INT32_MIN && ib == -1)))
                 {
                     status = vigil_vm_fail_at_ip(vm, VIGIL_STATUS_INVALID_ARGUMENT, "i32 overflow", error);
                     goto cleanup;
