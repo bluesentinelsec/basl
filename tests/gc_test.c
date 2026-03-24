@@ -1,3 +1,4 @@
+// NOLINTBEGIN(readability-function-cognitive-complexity)
 #include "vigil_test.h"
 
 #include <string.h>
@@ -511,3 +512,4 @@ void register_gc_tests(void)
     REGISTER_TEST(VigilGcTest, CollectsLargeCycleRing);
     REGISTER_TEST(VigilGcTest, TrackedCountReturnsZeroForNull);
 }
+// NOLINTEND(readability-function-cognitive-complexity)
