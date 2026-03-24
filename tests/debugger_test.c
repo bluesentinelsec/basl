@@ -320,7 +320,27 @@ TEST(VigilDebuggerTest, SwitchThreadUnknownIdReturnsError)
 }
 
 /* Thread breakpoint tests require real OS thread support. */
-#ifndef __EMSCRIPTEN__
+#if !defined(__EMSCRIPTEN__) && defined(VIGIL_HAS_STDLIB_THREAD)
+
+static const char *k_worker_thread_bp_source =
+    "import \"thread\";\n"                      /* 1 */
+    "fn main() -> i32 {\n"                      /* 2 */
+    "    i64 t = thread.spawn(fn() -> void {\n" /* 3 */
+    "        i64 x = i64(99);\n"                /* 4 */
+    "    });\n"                                 /* 5 */
+    "    thread.join(t);\n"                     /* 6 */
+    "    return 0;\n"                           /* 7 */
+    "}\n";                                      /* 8 */
+
+static const char *k_worker_thread_switch_source =
+    "import \"thread\";\n"                      /* 1 */
+    "fn main() -> i32 {\n"                      /* 2 */
+    "    i64 t = thread.spawn(fn() -> void {\n" /* 3 */
+    "        i64 y = i64(7);\n"                 /* 4 */
+    "    });\n"                                 /* 5 */
+    "    thread.join(t);\n"                     /* 6 */
+    "    return 0;\n"                           /* 7 */
+    "}\n";                                      /* 8 */
 
 /* Callback state shared between thread breakpoint tests. */
 typedef struct ThreadBpState
@@ -338,6 +358,9 @@ static vigil_debug_action_t thread_bp_callback(vigil_debugger_t *dbg, vigil_debu
     return VIGIL_DEBUG_CONTINUE;
 }
 
+/* Test functions below are assertion-heavy; suppress cognitive-complexity lint. */
+// NOLINTBEGIN(readability-function-cognitive-complexity)
+
 /* A breakpoint inside a thread.spawn closure fires from the worker thread,
  * not from the main thread. */
 TEST(VigilDebuggerTest, BreakpointHitsInWorkerThread)
@@ -351,14 +374,7 @@ TEST(VigilDebuggerTest, BreakpointHitsInWorkerThread)
 
     /* Line 4 (i64 x = ...) is inside the spawned closure and only runs
      * on the worker thread. */
-    vigil_object_t *fn = dbgf_compile(&f, "import \"thread\";\n"                      /* 1 */
-                                          "fn main() -> i32 {\n"                      /* 2 */
-                                          "    i64 t = thread.spawn(fn() -> void {\n" /* 3 */
-                                          "        i64 x = i64(99);\n"                /* 4 */
-                                          "    });\n"                                 /* 5 */
-                                          "    thread.join(t);\n"                     /* 6 */
-                                          "    return 0;\n"                           /* 7 */
-                                          "}\n");                                     /* 8 */
+    vigil_object_t *fn = dbgf_compile(&f, k_worker_thread_bp_source);
     ASSERT_NE(fn, NULL);
 
     dbgf_create_debugger(&f);
@@ -397,14 +413,7 @@ TEST(VigilDebuggerTest, SwitchThreadToWorkerVm)
 
     dbgf_init(&f);
 
-    vigil_object_t *fn = dbgf_compile(&f, "import \"thread\";\n"                      /* 1 */
-                                          "fn main() -> i32 {\n"                      /* 2 */
-                                          "    i64 t = thread.spawn(fn() -> void {\n" /* 3 */
-                                          "        i64 y = i64(7);\n"                 /* 4 */
-                                          "    });\n"                                 /* 5 */
-                                          "    thread.join(t);\n"                     /* 6 */
-                                          "    return 0;\n"                           /* 7 */
-                                          "}\n");                                     /* 8 */
+    vigil_object_t *fn = dbgf_compile(&f, k_worker_thread_switch_source);
     ASSERT_NE(fn, NULL);
 
     dbgf_create_debugger(&f);
@@ -447,7 +456,9 @@ TEST(VigilDebuggerTest, SwitchThreadToMainThreadSucceeds)
     dbgf_free(&f);
 }
 
-#endif /* __EMSCRIPTEN__ */
+// NOLINTEND(readability-function-cognitive-complexity)
+
+#endif /* !__EMSCRIPTEN__ && VIGIL_HAS_STDLIB_THREAD */
 
 void register_debugger_tests(void)
 {
@@ -462,9 +473,9 @@ void register_debugger_tests(void)
     REGISTER_TEST(VigilDebuggerTest, CurrentThreadIdZeroOutsideCallback);
     REGISTER_TEST(VigilDebuggerTest, ListThreadsIncludesMainVm);
     REGISTER_TEST(VigilDebuggerTest, SwitchThreadUnknownIdReturnsError);
-#ifndef __EMSCRIPTEN__
+#if !defined(__EMSCRIPTEN__) && defined(VIGIL_HAS_STDLIB_THREAD)
     REGISTER_TEST(VigilDebuggerTest, BreakpointHitsInWorkerThread);
     REGISTER_TEST(VigilDebuggerTest, SwitchThreadToWorkerVm);
     REGISTER_TEST(VigilDebuggerTest, SwitchThreadToMainThreadSucceeds);
-#endif
+#endif /* !__EMSCRIPTEN__ && VIGIL_HAS_STDLIB_THREAD */
 }
