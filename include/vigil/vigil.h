@@ -8,6 +8,7 @@
 #include "vigil/compiler.h"
 #include "vigil/diagnostic.h"
 #include "vigil/export.h"
+#include "vigil/gc.h"
 #include "vigil/lexer.h"
 #include "vigil/log.h"
 #include "vigil/map.h"

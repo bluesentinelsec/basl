@@ -83,6 +83,7 @@ add_library(vigil_core OBJECT
     src/compiler_declarations.c
     src/compiler_types.c
     src/diagnostic.c
+    src/gc.c
     src/json.c
     src/jsonrpc.c
     src/toml.c
@@ -319,6 +320,7 @@ if(VIGIL_BUILD_TESTS)
         tests/diagnostic_test.c
         tests/ffi_test.c
         tests/fs_test.c
+        tests/gc_test.c
         tests/unsafe_test.c
         tests/json_test.c
         tests/lexer_test.c
