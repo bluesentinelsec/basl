@@ -3059,8 +3059,7 @@ TEST(VigilCompilerTest, RejectsDirectCircularImport)
     source_id = (vigil_source_id_t)1U;
     EXPECT_EQ(vigil_compile_source(&registry, source_id, &function, &diagnostics, &error), VIGIL_STATUS_SYNTAX_ERROR);
     ASSERT_TRUE(vigil_diagnostic_list_count(&diagnostics) >= 1U);
-    EXPECT_STREQ(vigil_string_c_str(&vigil_diagnostic_list_get(&diagnostics, 0U)->message),
-                 "circular import detected");
+    EXPECT_STREQ(vigil_string_c_str(&vigil_diagnostic_list_get(&diagnostics, 0U)->message), "circular import detected");
 
     if (function != NULL)
         vigil_object_release(&function);
@@ -3098,8 +3097,7 @@ TEST(VigilCompilerTest, RejectsIndirectCircularImport)
     source_id = (vigil_source_id_t)1U;
     EXPECT_EQ(vigil_compile_source(&registry, source_id, &function, &diagnostics, &error), VIGIL_STATUS_SYNTAX_ERROR);
     ASSERT_TRUE(vigil_diagnostic_list_count(&diagnostics) >= 1U);
-    EXPECT_STREQ(vigil_string_c_str(&vigil_diagnostic_list_get(&diagnostics, 0U)->message),
-                 "circular import detected");
+    EXPECT_STREQ(vigil_string_c_str(&vigil_diagnostic_list_get(&diagnostics, 0U)->message), "circular import detected");
 
     if (function != NULL)
         vigil_object_release(&function);
@@ -3120,6 +3118,13 @@ TEST(VigilCompilerTest, AllowsDiamondImportsWithoutCycle)
     };
 
     EXPECT_EQ(CompileAndRunMulti(vigil_test_failed_, sources, 4U, "/project/main.vigil"), 6);
+}
+
+static void register_compiler_import_tests(void)
+{
+    REGISTER_TEST(VigilCompilerTest, RejectsDirectCircularImport);
+    REGISTER_TEST(VigilCompilerTest, RejectsIndirectCircularImport);
+    REGISTER_TEST(VigilCompilerTest, AllowsDiamondImportsWithoutCycle);
 }
 
 static void register_compiler_defer_tests(void)
@@ -3247,8 +3252,6 @@ void register_compiler_tests(void)
     REGISTER_TEST(VigilCompilerTest, RejectsInvalidErrorConstructionAndMethods);
     REGISTER_TEST(VigilCompilerTest, RejectsInvalidGuardBindings);
     REGISTER_TEST(VigilCompilerTest, ReportsSyntaxErrorsForUnsupportedShape);
-    REGISTER_TEST(VigilCompilerTest, RejectsDirectCircularImport);
-    REGISTER_TEST(VigilCompilerTest, RejectsIndirectCircularImport);
-    REGISTER_TEST(VigilCompilerTest, AllowsDiamondImportsWithoutCycle);
+    register_compiler_import_tests();
     register_compiler_defer_tests();
 }
