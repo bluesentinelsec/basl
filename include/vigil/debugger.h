@@ -2,6 +2,7 @@
 #define VIGIL_DEBUGGER_H
 
 #include <stddef.h>
+#include <stdint.h>
 
 #include "vigil/debug_info.h"
 #include "vigil/export.h"
@@ -133,6 +134,44 @@ extern "C"
      */
     VIGIL_API vigil_status_t vigil_debugger_get_local(const vigil_debugger_t *debugger, size_t frame_index,
                                                       const char *name, vigil_value_t *out_value);
+
+    /* ── Thread-aware debugging ───────────────────────────────────────── */
+
+    /**
+     * Thread info snapshot returned by vigil_debugger_list_threads().
+     * The vm pointer is valid only while the runtime is still open and the
+     * thread has not yet terminated.
+     */
+    typedef struct vigil_thread_info
+    {
+        uint64_t thread_id; /**< Platform thread ID (matches vigil_vm_thread_id). */
+        vigil_vm_t *vm;     /**< The VM running on that thread. */
+    } vigil_thread_info_t;
+
+    /**
+     * Return the platform thread ID of the VM that is currently paused in the
+     * debug callback.  Returns 0 when called outside a callback.
+     */
+    VIGIL_API uint64_t vigil_debugger_current_thread_id(const vigil_debugger_t *debugger);
+
+    /**
+     * Snapshot the live thread list into out_threads (at most max_threads entries).
+     * Returns the number of entries written.  Safe to call from any context.
+     */
+    VIGIL_API size_t vigil_debugger_list_threads(const vigil_debugger_t *debugger, vigil_thread_info_t *out_threads,
+                                                 size_t max_threads);
+
+    /**
+     * Redirect the debugger's inspection target to the VM running on thread_id.
+     * After a successful switch, vigil_debugger_current_location(), frame_count(),
+     * frame_info(), frame_locals(), and get_local() all operate on that thread's VM.
+     * Returns VIGIL_STATUS_INVALID_ARGUMENT when thread_id is not registered.
+     *
+     * Note: inspecting a running (non-paused) thread provides a best-effort
+     * snapshot; the thread may advance between individual inspection calls.
+     */
+    VIGIL_API vigil_status_t vigil_debugger_switch_thread(vigil_debugger_t *debugger, uint64_t thread_id,
+                                                          vigil_error_t *error);
 
 #ifdef __cplusplus
 }

@@ -98,6 +98,7 @@
 #include "internal/vigil_internal.h"
 #include "internal/vigil_nanbox.h"
 #include "internal/vigil_vm_internal.h"
+#include "platform/platform.h"
 #include "value_internal.h"
 #include "vigil/string.h"
 #include "vigil/vm.h"
@@ -2802,6 +2803,28 @@ vigil_status_t vigil_vm_open(vigil_vm_t **out_vm, vigil_runtime_t *runtime, cons
         return status;
     }
 
+    /* Inherit any debug hook that was active when this VM was created so that
+     * thread-spawned VMs are immediately instrumented. */
+    vm->debug_hook = runtime->debug_hook;
+    vm->debug_hook_userdata = runtime->debug_hook_userdata;
+
+    /* Record the calling thread's ID so the debugger can identify which
+     * thread owns this VM when a breakpoint fires. */
+    vm->thread_id = vigil_platform_thread_current_id();
+
+    /* Register in the runtime's thread-aware VM registry. */
+    status = vigil_runtime_register_vm(runtime, vm, error);
+    if (status != VIGIL_STATUS_OK)
+    {
+        memory = vm->stack;
+        vigil_runtime_free(runtime, &memory);
+        memory = vm->frames;
+        vigil_runtime_free(runtime, &memory);
+        memory = vm;
+        vigil_runtime_free(runtime, &memory);
+        return status;
+    }
+
     *out_vm = vm;
     return VIGIL_STATUS_OK;
 }
@@ -2820,6 +2843,11 @@ void vigil_vm_close(vigil_vm_t **vm)
     resolved_vm = *vm;
     *vm = NULL;
     runtime = resolved_vm->runtime;
+
+    /* Remove from the runtime's thread registry before freeing so the debugger
+     * never holds a dangling VM pointer. */
+    vigil_runtime_unregister_vm(runtime, resolved_vm);
+
     vigil_vm_release_stack(resolved_vm);
     vigil_vm_clear_frames(resolved_vm);
     memory = resolved_vm->stack;
@@ -2917,6 +2945,11 @@ void vigil_vm_set_debug_hook(vigil_vm_t *vm, int (*hook)(vigil_vm_t *vm, void *u
         return;
     vm->debug_hook = hook;
     vm->debug_hook_userdata = userdata;
+}
+
+uint64_t vigil_vm_thread_id(const vigil_vm_t *vm)
+{
+    return vm != NULL ? vm->thread_id : 0U;
 }
 
 void vigil_vm_set_args(vigil_vm_t *vm, const char *const *argv, size_t argc)

@@ -283,6 +283,83 @@ TEST(VigilRuntimeTest, RuntimeOpenFailsWhenOkErrorAllocFails)
     EXPECT_EQ(runtime, NULL);
 }
 
+/* New VM-registry tests are assertion-heavy; suppress cognitive-complexity. */
+// NOLINTBEGIN(readability-function-cognitive-complexity)
+
+/* Opening more VMs than the initial registry capacity triggers the grow path
+ * (memcpy the old array, free it, use the new one). */
+TEST(VigilRuntimeTest, VmRegistryGrowsBeyondInitialCapacity)
+{
+    /* Initial capacity is 8; open 9 to force a grow. */
+    vigil_runtime_t *runtime = NULL;
+    vigil_vm_t *vms[9];
+    vigil_error_t error = {0};
+    size_t i;
+
+    ASSERT_EQ(vigil_runtime_open(&runtime, NULL, &error), VIGIL_STATUS_OK);
+    for (i = 0U; i < 9U; i++)
+    {
+        vms[i] = NULL;
+        EXPECT_EQ(vigil_vm_open(&vms[i], runtime, NULL, &error), VIGIL_STATUS_OK);
+        EXPECT_NE(vms[i], NULL);
+    }
+    for (i = 0U; i < 9U; i++)
+    {
+        vigil_vm_close(&vms[i]);
+    }
+    vigil_runtime_close(&runtime);
+}
+
+/* Closing the first VM when a second is still open exercises the memmove
+ * compaction path inside vigil_runtime_unregister_vm. */
+TEST(VigilRuntimeTest, VmRegistryUnregisterNonLastVm)
+{
+    vigil_runtime_t *runtime = NULL;
+    vigil_vm_t *vm_a = NULL;
+    vigil_vm_t *vm_b = NULL;
+    vigil_error_t error = {0};
+
+    ASSERT_EQ(vigil_runtime_open(&runtime, NULL, &error), VIGIL_STATUS_OK);
+    ASSERT_EQ(vigil_vm_open(&vm_a, runtime, NULL, &error), VIGIL_STATUS_OK);
+    ASSERT_EQ(vigil_vm_open(&vm_b, runtime, NULL, &error), VIGIL_STATUS_OK);
+
+    /* vm_a is at index 0, vm_b at index 1. Closing vm_a triggers memmove. */
+    vigil_vm_close(&vm_a);
+    vigil_vm_close(&vm_b);
+    vigil_runtime_close(&runtime);
+}
+
+/* vigil_vm_open must free the VM struct, stack, and frames when the runtime
+ * registry allocation fails. */
+TEST(VigilRuntimeTest, VmOpenFailsWhenRegistryAllocFails)
+{
+    vigil_runtime_t *runtime = NULL;
+    vigil_vm_t *vm = NULL;
+    vigil_error_t error = {0};
+    struct FailingAllocatorState state = {0};
+    vigil_allocator_t allocator = {0};
+    vigil_runtime_options_t options = {0};
+
+    /* Allow 3 allocs for runtime_open (struct + ok_error obj + string) and 3
+     * for vigil_vm_open (vm struct + stack + frames). The 7th alloc is the
+     * initial registry array and is made to fail. */
+    state.fail_after = 6;
+    allocator.user_data = &state;
+    allocator.allocate = FailAllocate;
+    allocator.deallocate = FailDeallocate;
+    vigil_runtime_options_init(&options);
+    options.allocator = &allocator;
+
+    ASSERT_EQ(vigil_runtime_open(&runtime, &options, &error), VIGIL_STATUS_OK);
+
+    EXPECT_EQ(vigil_vm_open(&vm, runtime, NULL, &error), VIGIL_STATUS_OUT_OF_MEMORY);
+    EXPECT_EQ(vm, NULL);
+
+    vigil_runtime_close(&runtime);
+}
+
+// NOLINTEND(readability-function-cognitive-complexity)
+
 void register_runtime_tests(void)
 {
     REGISTER_TEST(VigilRuntimeTest, RuntimeOpensAndClosesWithDefaultAllocator);
@@ -295,4 +372,7 @@ void register_runtime_tests(void)
     REGISTER_TEST(VigilRuntimeTest, RuntimeReallocUsesAllocatorWhenAvailable);
     REGISTER_TEST(VigilRuntimeTest, RuntimeReallocRejectsUnsupportedAllocator);
     REGISTER_TEST(VigilRuntimeTest, RuntimeOpenFailsWhenOkErrorAllocFails);
+    REGISTER_TEST(VigilRuntimeTest, VmRegistryGrowsBeyondInitialCapacity);
+    REGISTER_TEST(VigilRuntimeTest, VmRegistryUnregisterNonLastVm);
+    REGISTER_TEST(VigilRuntimeTest, VmOpenFailsWhenRegistryAllocFails);
 }

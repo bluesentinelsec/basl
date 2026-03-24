@@ -7,6 +7,11 @@
 #include "vigil/status.h"
 #include "vigil/value.h"
 
+/* Forward declarations for opaque platform types used by the runtime struct.
+ * The full definitions live in platform/platform.h; callers that need them
+ * must include that header directly. */
+typedef struct vigil_platform_mutex vigil_platform_mutex_t;
+
 /* ── Regex pattern cache ─────────────────────────────────────────────
  * Fixed-size open-addressing LRU-approximation cache for compiled regex
  * patterns.  Stored inline in vigil_runtime to avoid extra allocation.
@@ -37,6 +42,18 @@ struct vigil_runtime
     /* Singleton "ok" error object — reused by stdlib functions that return
        (value, err) on the success path to avoid a heap allocation per call. */
     vigil_object_t *ok_error;
+
+    /* Debug hook propagated to every VM opened from this runtime.  Set by the
+     * debugger on attach so that thread-spawned VMs inherit instrumentation. */
+    int (*debug_hook)(vigil_vm_t *vm, void *userdata);
+    void *debug_hook_userdata;
+
+    /* Thread-aware VM registry.  Every vigil_vm_open / vigil_vm_close call
+     * adds / removes the VM here so the debugger can enumerate live threads. */
+    vigil_platform_mutex_t *vm_registry_mutex;
+    vigil_vm_t **vm_registry;
+    size_t vm_registry_count;
+    size_t vm_registry_capacity;
 };
 
 typedef struct vigil_runtime_interface_impl_init
@@ -79,5 +96,26 @@ vigil_status_t vigil_runtime_push_ok_error(vigil_runtime_t *runtime, vigil_vm_t 
    Callers can push this directly with VIGIL_VM_PUSH to skip the
    retain/release overhead of vigil_runtime_push_ok_error(). */
 vigil_value_t vigil_runtime_ok_error_value(vigil_runtime_t *runtime);
+
+/* ── VM registry (internal) ──────────────────────────────────────────
+ * Called by vigil_vm_open / vigil_vm_close to maintain the per-runtime
+ * list of live VMs.  The debugger uses this to enumerate threads. */
+
+/** Register a VM with its runtime's thread registry.  Called from
+ *  vigil_vm_open after the VM is fully initialised. */
+vigil_status_t vigil_runtime_register_vm(vigil_runtime_t *runtime, vigil_vm_t *vm, vigil_error_t *error);
+
+/** Remove a VM from its runtime's thread registry.  Called from
+ *  vigil_vm_close before the VM is freed. */
+void vigil_runtime_unregister_vm(vigil_runtime_t *runtime, vigil_vm_t *vm);
+
+/** Copy at most max_vms live VM pointers into out_vms.  Returns the
+ *  number written.  Thread-safe: holds the registry mutex while copying. */
+size_t vigil_runtime_list_vms(vigil_runtime_t *runtime, vigil_vm_t **out_vms, size_t max_vms);
+
+/** Propagate the debug hook to every currently-registered VM.
+ *  Called by vigil_debugger_attach / vigil_debugger_detach. */
+void vigil_runtime_set_debug_hook(vigil_runtime_t *runtime, int (*hook)(vigil_vm_t *vm, void *userdata),
+                                  void *userdata);
 
 #endif
