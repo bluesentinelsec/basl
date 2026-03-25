@@ -1292,6 +1292,7 @@ TEST(VigilVmTest, RejectsDeferredNativeCallTargetThatIsNotNative)
               VIGIL_STATUS_OK);
     ASSERT_EQ(vigil_chunk_write_u32(&chunk, 0U, Span(17U, 4U, 5U), &error), VIGIL_STATUS_OK);
     ASSERT_EQ(vigil_chunk_write_u32(&chunk, 0U, Span(17U, 6U, 7U), &error), VIGIL_STATUS_OK);
+    ASSERT_EQ(vigil_chunk_write_u32(&chunk, 0U, Span(17U, 6U, 7U), &error), VIGIL_STATUS_OK); /* return_count */
     ASSERT_EQ(vigil_chunk_write_opcode(&chunk, VIGIL_OPCODE_RETURN, Span(17U, 8U, 9U), &error), VIGIL_STATUS_OK);
 
     EXPECT_EQ(vigil_vm_execute(vm, &chunk, &result, &error), VIGIL_STATUS_INTERNAL);

@@ -4010,6 +4010,7 @@ vigil_status_t vigil_vm_execute_function(vigil_vm_t *vm, const vigil_object_t *f
 
                 VIGIL_VM_READ_U32(code, frame->ip, constant_index);
                 VIGIL_VM_READ_RAW_U32(code, frame->ip, native_arg_count);
+                frame->ip += 4U; /* skip return_count operand */
 
                 native_val = VIGIL_VM_CHUNK_CONSTANT(frame->chunk, (size_t)constant_index);
                 native_obj = (vigil_object_t *)vigil_nanbox_decode_ptr(*native_val);
@@ -4033,6 +4034,7 @@ vigil_status_t vigil_vm_execute_function(vigil_vm_t *vm, const vigil_object_t *f
 
                 VIGIL_VM_READ_U32(code, frame->ip, constant_index);
                 VIGIL_VM_READ_RAW_U32(code, frame->ip, native_defer_arg_count);
+                frame->ip += 4U; /* skip return_count operand */
 
                 frame = vigil_vm_current_frame(vm);
                 status = vigil_vm_schedule_defer(vm, frame, VIGIL_VM_DEFER_CALL_NATIVE, constant_index, 0U,

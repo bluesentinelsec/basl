@@ -295,7 +295,6 @@ static size_t stack_op_size(const uint8_t *code, size_t ip, size_t code_size)
     /* 9-byte: opcode + u32 + u32 */
     case VIGIL_OPCODE_CALL:
     case VIGIL_OPCODE_TAIL_CALL:
-    case VIGIL_OPCODE_CALL_NATIVE:
     case VIGIL_OPCODE_CALL_INTERFACE:
     case VIGIL_OPCODE_CALL_EXTERN:
     case VIGIL_OPCODE_NEW_CLOSURE:
@@ -321,6 +320,7 @@ static size_t stack_op_size(const uint8_t *code, size_t ip, size_t code_size)
         return 9;
 
     /* 13-byte: opcode + u32 + u32 + u32 */
+    case VIGIL_OPCODE_CALL_NATIVE:
     case VIGIL_OPCODE_LOCALS_ADD_I32_STORE:
     case VIGIL_OPCODE_LOCALS_SUBTRACT_I32_STORE:
     case VIGIL_OPCODE_LOCALS_MULTIPLY_I32_STORE:
@@ -929,6 +929,8 @@ int vigil_reg_chunk_is_translatable(const vigil_chunk_t *stack_chunk)
         case VIGIL_OPCODE_LESS:
         case VIGIL_OPCODE_DUP:
         case VIGIL_OPCODE_JUMP_IF_FALSE:
+        case VIGIL_OPCODE_CALL_NATIVE:
+        case VIGIL_OPCODE_TO_STRING:
             break;
         default:
             return 0; /* unsupported opcode */
@@ -1474,44 +1476,9 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
         case VIGIL_OPCODE_CALL_NATIVE: {
             uint32_t ci = rd_u32(code, &ip);
             uint32_t arg_count = rd_raw_u32(code, &ip);
+            uint32_t ret_count = rd_raw_u32(code, &ip);
             uint8_t stack_top = (uint8_t)vs.top;
             TR_EMIT(vigil_reg_abc(VREG_CALL_NATIVE, stack_top, (uint8_t)ci, (uint8_t)arg_count));
-            /* Determine return count from subsequent bytecode. */
-            uint32_t ret_count = 0;
-            if (ip < code_size)
-            {
-                uint8_t next = code[ip];
-                if (next == VIGIL_OPCODE_SET_LOCAL)
-                {
-                    /* Count SET_LOCAL+POP pairs = return count. */
-                    size_t scan = ip;
-                    while (scan + 5 < code_size && code[scan] == VIGIL_OPCODE_SET_LOCAL)
-                    {
-                        ret_count++;
-                        scan += 5;
-                        if (scan < code_size && code[scan] == VIGIL_OPCODE_POP)
-                            scan += 1;
-                        else
-                            break;
-                    }
-                }
-                else if (next == VIGIL_OPCODE_POP)
-                {
-                    ret_count = 1; /* 1 return, immediately discarded */
-                }
-                else if (next == VIGIL_OPCODE_CONSTANT || next == VIGIL_OPCODE_GET_LOCAL || next == VIGIL_OPCODE_NIL ||
-                         next == VIGIL_OPCODE_TRUE || next == VIGIL_OPCODE_FALSE || next == VIGIL_OPCODE_RETURN ||
-                         next == VIGIL_OPCODE_JUMP || next == VIGIL_OPCODE_LOOP || next == VIGIL_OPCODE_CALL_NATIVE ||
-                         next == VIGIL_OPCODE_GET_GLOBAL || next == VIGIL_OPCODE_GET_CAPTURE ||
-                         next == VIGIL_OPCODE_GET_FUNCTION)
-                {
-                    ret_count = 0; /* void — next opcode is a new statement */
-                }
-                else
-                {
-                    ret_count = 1; /* default: 1 return used as operand */
-                }
-            }
             for (uint32_t i = 0; i < arg_count; i++)
                 vs_pop(&vs);
             for (uint32_t i = 0; i < ret_count; i++)

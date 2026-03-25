@@ -7145,6 +7145,8 @@ static vigil_status_t vigil_parser_emit_native_call(vigil_parser_state_t *state,
             status = vigil_parser_emit_u32(state, (uint32_t)const_idx, member_token->span);
         if (status == VIGIL_STATUS_OK)
             status = vigil_parser_emit_u32(state, (uint32_t)arg_count, member_token->span);
+        if (status == VIGIL_STATUS_OK)
+            status = vigil_parser_emit_u32(state, (uint32_t)fn->return_count, member_token->span);
         if (status != VIGIL_STATUS_OK)
             return status;
     }
@@ -7344,6 +7346,11 @@ static vigil_status_t vigil_parser_parse_native_static_method_call(vigil_parser_
         {
             return status;
         }
+        status = vigil_parser_emit_u32(state, (uint32_t)method->return_count, method_token->span);
+        if (status != VIGIL_STATUS_OK)
+        {
+            return status;
+        }
     }
 
     /* Set return type. */
@@ -7447,6 +7454,11 @@ static vigil_status_t vigil_parser_parse_native_method_call(vigil_parser_state_t
             return status;
         }
         status = vigil_parser_emit_u32(state, (uint32_t)(arg_count + 1U), method_token->span);
+        if (status != VIGIL_STATUS_OK)
+        {
+            return status;
+        }
+        status = vigil_parser_emit_u32(state, (uint32_t)method->return_count, method_token->span);
         if (status != VIGIL_STATUS_OK)
         {
             return status;
