@@ -2176,6 +2176,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
             [VREG_INC_I32] = &&r_INC_I32,
             [VREG_INC_I64] = &&r_INC_I64,
             [VREG_RETURN] = &&r_RETURN,
+            [VREG_CALL_NATIVE] = &&r_CALL_NATIVE,
             [VREG_MATH_SIN] = &&r_MATH_SIN,
             [VREG_MATH_COS] = &&r_MATH_COS,
             [VREG_MATH_SQRT] = &&r_MATH_SQRT,
@@ -3104,6 +3105,47 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         }
         status = VIGIL_STATUS_UNSUPPORTED;
         goto r_cleanup;
+    }
+
+    /* ── Native call ───────────────────────────────────────────── */
+    RCASE(CALL_NATIVE)
+    {
+        vigil_reg_instr_t i = code[ip];
+        uint8_t ret_reg = VREG_GET_A(i);
+        uint8_t ci = VREG_GET_B(i);
+        uint8_t arg_count = VREG_GET_C(i);
+
+        /* Sync stack: set stack_count so native function sees args at top.
+           Args are in registers (ret_reg - arg_count) .. (ret_reg - 1). */
+        vm->stack_count = base + (size_t)ret_reg;
+
+        const vigil_value_t *native_val = VIGIL_VM_CHUNK_CONSTANT(sc, (size_t)ci);
+        if (!native_val)
+        {
+            status = VIGIL_STATUS_UNSUPPORTED;
+            goto r_cleanup;
+        }
+        vigil_object_t *native_obj = (vigil_object_t *)vigil_nanbox_decode_ptr(*native_val);
+        vigil_native_fn_t native_fn = vigil_native_function_get(native_obj);
+        if (!native_fn)
+        {
+            status = VIGIL_STATUS_UNSUPPORTED;
+            goto r_cleanup;
+        }
+        status = native_fn(vm, (size_t)arg_count, error);
+        if (status != VIGIL_STATUS_OK)
+            goto r_cleanup;
+
+        /* Native function may have pushed result(s) onto the stack.
+           Copy the first result back to the return register.
+           Restore stack_count to cover all registers. */
+        if (vm->stack_count > base + (size_t)ret_reg)
+            R[ret_reg] = vm->stack[base + (size_t)ret_reg];
+        /* Ensure stack_count covers the register window. */
+        if (vm->stack_count < base + rc->max_registers)
+            vm->stack_count = base + rc->max_registers;
+
+        RNEXT();
     }
 
     /* ── Return ────────────────────────────────────────────────── */
