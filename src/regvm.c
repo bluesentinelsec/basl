@@ -69,54 +69,36 @@ typedef struct
 {
     uint8_t regs[256];
     int top;
-    uint8_t next_temp;
     uint8_t max_reg;
     uint8_t local_count;
-    uint8_t locals_initialized; /* how many locals have been initialized */
 } vstack_t;
 
 static void vs_init(vstack_t *vs, uint8_t lc)
 {
     vs->top = 0;
-    vs->next_temp = lc; /* Temps start after locals */
     vs->max_reg = lc > 0 ? lc : 1;
     vs->local_count = lc;
-    vs->locals_initialized = 0;
     memset(vs->regs, 0, sizeof(vs->regs));
 }
 
+/* Push: use position-based register (stack position = register index).
+   This mirrors the stack VM exactly. The key invariant is that the
+   stack pointer never drops below local_count during normal execution
+   (only during the initial setup and after RETURN). */
 static uint8_t vs_push(vstack_t *vs)
 {
-    uint8_t r;
-    if (vs->locals_initialized < vs->local_count)
-    {
-        /* Still initializing locals — assign to the next local register. */
-        r = vs->locals_initialized;
-        vs->locals_initialized++;
-    }
-    else
-    {
-        r = vs->next_temp++;
-        if (vs->next_temp > vs->max_reg)
-            vs->max_reg = vs->next_temp;
-    }
-    vs->regs[vs->top++] = r;
-    return r;
-}
-
-static uint8_t vs_push_r(vstack_t *vs, uint8_t r)
-{
-    vs->regs[vs->top++] = r;
+    uint8_t r = (uint8_t)vs->top;
+    vs->regs[vs->top] = r;
+    vs->top++;
+    if (r >= vs->max_reg)
+        vs->max_reg = r + 1;
     return r;
 }
 
 static uint8_t vs_pop(vstack_t *vs)
 {
     vs->top--;
-    uint8_t r = vs->regs[vs->top];
-    if (r >= vs->local_count && r == vs->next_temp - 1)
-        vs->next_temp--;
-    return r;
+    return vs->regs[vs->top];
 }
 
 static uint8_t vs_peek(const vstack_t *vs, int depth)
@@ -435,14 +417,6 @@ static size_t *collect_jump_targets(const uint8_t *code, size_t code_size, size_
     }
     *out_count = count;
     return targets;
-}
-
-static int is_jump_target(const size_t *targets, size_t count, size_t offset)
-{
-    for (size_t i = 0; i < count; i++)
-        if (targets[i] == offset)
-            return 1;
-    return 0;
 }
 
 /* ── Offset map: stack bytecode offset → register instruction index ── */
@@ -1032,6 +1006,9 @@ static uint8_t count_locals(const uint8_t *code, size_t code_size)
     return max_local > 250 ? 250 : (uint8_t)max_local;
 }
 
+/* Count how many locals are initialized at the start of the function
+   (consecutive CONSTANT/NIL/TRUE/FALSE pushes before any control flow). */
+
 /* ── Translation: main pass ────────────────────────────────────── */
 
 vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_chunk_t *rc, vigil_runtime_t *runtime,
@@ -1068,19 +1045,8 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
         /* Record offset mapping. */
         omap_add(&omap, start_ip, rc->code_count);
 
-        /* At jump targets, reclaim temporary registers so they can be reused.
-           This ensures the register allocator doesn't run out of temps
-           across loop iterations. */
-        if (is_jump_target(jt, jt_count, start_ip))
-        {
-            vs.next_temp = vs.local_count;
-            /* Scan the virtual stack for the highest temp in use. */
-            for (int si = 0; si < vs.top; si++)
-            {
-                if (vs.regs[si] >= vs.local_count && vs.regs[si] >= vs.next_temp)
-                    vs.next_temp = vs.regs[si] + 1;
-            }
-        }
+        /* At jump targets, no special handling needed — position-based
+           register allocation ensures consistent state. */
 
         switch (op)
         {
@@ -1111,8 +1077,9 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
         }
         case VIGIL_OPCODE_GET_LOCAL: {
             uint32_t idx = rd_u32(code, &ip);
-            /* Push the local's register directly — no MOVE needed. */
-            vs_push_r(&vs, (uint8_t)idx);
+            uint8_t dst = vs_push(&vs);
+            if (dst != (uint8_t)idx)
+                TR_EMIT(vigil_reg_abc(VREG_MOVE, dst, (uint8_t)idx, 0));
             break;
         }
         case VIGIL_OPCODE_SET_LOCAL: {
@@ -1383,6 +1350,10 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
             /* Emit a second word with the jump offset (patched later). */
             jpatch_add(&patches, rc->code_count, target, 0);
             TR_EMIT(vigil_reg_asbx(VREG_JMP, 0, 0));
+            /* The stack VM skips a trailing POP after fused compare+jump.
+               We must do the same to keep the virtual stack in sync. */
+            if (ip < code_size && code[ip] == VIGIL_OPCODE_POP)
+                ip += 1;
             break;
         }
 
@@ -1498,6 +1469,8 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
             for (uint32_t i = 0; i < ret_count && vs.top > 0; i++)
                 vs_pop(&vs);
             TR_EMIT(vigil_reg_abc(VREG_RETURN, base_r, (uint8_t)ret_count, 0));
+            /* Control doesn't continue past RETURN — reset virtual stack. */
+            vs.top = 0;
             break;
         }
 
