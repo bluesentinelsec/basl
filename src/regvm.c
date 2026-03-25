@@ -928,6 +928,7 @@ int vigil_reg_chunk_is_translatable(const vigil_chunk_t *stack_chunk)
         case VIGIL_OPCODE_GREATER:
         case VIGIL_OPCODE_LESS:
         case VIGIL_OPCODE_DUP:
+        case VIGIL_OPCODE_JUMP_IF_FALSE:
             break;
         default:
             return 0; /* unsupported opcode */
@@ -1473,9 +1474,31 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
         case VIGIL_OPCODE_CALL_NATIVE: {
             uint32_t ci = rd_u32(code, &ip);
             uint32_t arg_count = rd_raw_u32(code, &ip);
+            /* Infer return count from bytecode after the call.
+               - Multiple SET_LOCAL+POP pairs: multi-return.
+               - Otherwise: single return (native always pushes at least nil). */
+            uint32_t ret_count = 1;
+            {
+                size_t scan = ip;
+                uint32_t pairs = 0;
+                while (scan + 5 < code_size && code[scan] == VIGIL_OPCODE_SET_LOCAL)
+                {
+                    if (scan + 6 <= code_size && code[scan + 5] == VIGIL_OPCODE_POP)
+                    {
+                        pairs++;
+                        scan += 6;
+                    }
+                    else
+                        break;
+                }
+                if (pairs >= 2)
+                    ret_count = pairs;
+            }
             for (uint32_t i = 0; i < arg_count; i++)
                 vs_pop(&vs);
-            uint8_t ret = vs_push(&vs);
+            uint8_t ret = (uint8_t)vs.top; /* position where results start */
+            for (uint32_t i = 0; i < ret_count; i++)
+                vs_push(&vs);
             TR_EMIT(vigil_reg_abc(VREG_CALL_NATIVE, ret, (uint8_t)ci, (uint8_t)arg_count));
             break;
         }
@@ -1525,17 +1548,8 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
             for (uint32_t i = 0; i < ret_count && vs.top > 0; i++)
                 vs_pop(&vs);
             TR_EMIT(vigil_reg_abc(VREG_RETURN, base_r, (uint8_t)ret_count, 0));
-            /* Control doesn't continue past RETURN — reset virtual stack.
-               But only if the next instruction isn't a jump target (which
-               will restore the correct depth from the jump source). */
-            {
-                int next_is_target = 0;
-                for (size_t pi = 0; pi < patches.count && !next_is_target; pi++)
-                    if (patches.items[pi].target_stack_off == ip)
-                        next_is_target = 1;
-                if (!next_is_target)
-                    vs.top = 0;
-            }
+            /* Don't reset vs.top — the jump target restoration at the
+               next reachable instruction will set the correct depth. */
             break;
         }
 
@@ -3123,17 +3137,11 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         uint8_t ci = VREG_GET_B(i);
         uint8_t arg_count = VREG_GET_C(i);
 
-        /* Sync stack: native function reads args from stack_count - arg_count.
-           Args are in registers ret_reg .. ret_reg + arg_count - 1
-           (the positions they occupied before being popped). */
+        /* Sync stack: args are at registers ret_reg .. ret_reg+arg_count-1. */
         vm->stack_count = base + (size_t)ret_reg + (size_t)arg_count;
 
         const vigil_value_t *native_val = VIGIL_VM_CHUNK_CONSTANT(sc, (size_t)ci);
         if (!native_val || !vigil_nanbox_has_object(*native_val))
-        {
-            status = VIGIL_STATUS_UNSUPPORTED;
-            goto r_cleanup;
-        }
         {
             status = VIGIL_STATUS_UNSUPPORTED;
             goto r_cleanup;
@@ -3149,12 +3157,11 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         if (status != VIGIL_STATUS_OK)
             goto r_cleanup;
 
-        /* Native function may have pushed result(s) onto the stack.
-           Copy the first result back to the return register.
-           Restore stack_count to cover all registers. */
-        if (vm->stack_count > base + (size_t)ret_reg)
-            R[ret_reg] = vm->stack[base + (size_t)ret_reg];
-        /* Ensure stack_count covers the register window. */
+        /* Native function modified the stack. The results are at
+           stack positions ret_reg .. ret_reg + return_count - 1.
+           Since R[] = vm->stack + base, the results are already
+           in the right registers. Just ensure stack_count covers
+           the register window. */
         if (vm->stack_count < base + rc->max_registers)
             vm->stack_count = base + rc->max_registers;
 
