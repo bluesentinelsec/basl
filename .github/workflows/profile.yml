@@ -1,0 +1,49 @@
+name: Profile
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 3 * * 1'  # Mondays at 03:00 UTC
+
+jobs:
+  gprof:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install profiling tools
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y binutils graphviz
+          pip3 install gprof2dot
+
+      - name: Build with gprof instrumentation
+        run: |
+          cmake -S . -B build-profile \
+            -DVIGIL_BUILD_TESTS=OFF \
+            -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+            -DCMAKE_C_FLAGS="-pg" \
+            -DCMAKE_EXE_LINKER_FLAGS="-pg"
+
+      - name: Compile
+        run: cmake --build build-profile
+
+      - name: Run profiler
+        run: >
+          python3 scripts/run_profile.py
+          --vigil-bin $PWD/build-profile/vigil
+          --manifest $PWD/benchmarks/manifest.json
+          --output $PWD/profile-artifacts
+
+      - name: Upload profile artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: profile-results
+          path: profile-artifacts/
