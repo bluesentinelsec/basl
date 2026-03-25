@@ -933,6 +933,12 @@ int vigil_reg_chunk_is_translatable(const vigil_chunk_t *stack_chunk)
         case VIGIL_OPCODE_CALL_NATIVE:
         case VIGIL_OPCODE_TO_STRING:
         case VIGIL_OPCODE_CALL:
+        case VIGIL_OPCODE_GET_GLOBAL:
+        case VIGIL_OPCODE_SET_GLOBAL:
+        case VIGIL_OPCODE_GET_CAPTURE:
+        case VIGIL_OPCODE_SET_CAPTURE:
+        case VIGIL_OPCODE_GET_FUNCTION:
+        case VIGIL_OPCODE_NEW_CLOSURE:
             break;
         default:
             return 0; /* unsupported opcode */
@@ -2192,6 +2198,12 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
             [VREG_RETURN] = &&r_RETURN,
             [VREG_CALL_NATIVE] = &&r_CALL_NATIVE,
             [VREG_CALL] = &&r_CALL,
+            [VREG_GET_GLOBAL] = &&r_GET_GLOBAL,
+            [VREG_SET_GLOBAL] = &&r_SET_GLOBAL,
+            [VREG_GET_CAPTURE] = &&r_GET_CAPTURE,
+            [VREG_SET_CAPTURE] = &&r_SET_CAPTURE,
+            [VREG_GET_FUNCTION] = &&r_GET_FUNCTION,
+            [VREG_NEW_CLOSURE] = &&r_NEW_CLOSURE,
             [VREG_MATH_SIN] = &&r_MATH_SIN,
             [VREG_MATH_COS] = &&r_MATH_COS,
             [VREG_MATH_SQRT] = &&r_MATH_SQRT,
@@ -3141,6 +3153,92 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         if (status != VIGIL_STATUS_OK)
             goto r_cleanup;
         R[dst] = str_val;
+        RNEXT();
+    }
+
+    /* ── Globals ────────────────────────────────────────────────── */
+    RCASE(GET_GLOBAL)
+    {
+        vigil_reg_instr_t i = code[ip];
+        vigil_value_t gval;
+        VIGIL_VM_VALUE_INIT_NIL(&gval);
+        if (!vigil_function_object_get_global(frame->function, (size_t)VREG_GET_Bx(i), &gval))
+        {
+            status = VIGIL_STATUS_INTERNAL;
+            goto r_cleanup;
+        }
+        R[VREG_GET_A(i)] = gval;
+        RNEXT();
+    }
+    RCASE(SET_GLOBAL)
+    {
+        vigil_reg_instr_t i = code[ip];
+        status = vigil_function_object_set_global(frame->function, (size_t)VREG_GET_Bx(i), &R[VREG_GET_A(i)], error);
+        if (status != VIGIL_STATUS_OK)
+            goto r_cleanup;
+        RNEXT();
+    }
+
+    /* ── Captures ──────────────────────────────────────────────── */
+    RCASE(GET_CAPTURE)
+    {
+        vigil_reg_instr_t i = code[ip];
+        vigil_value_t cval;
+        VIGIL_VM_VALUE_INIT_NIL(&cval);
+        if (frame->callable && vigil_object_type(frame->callable) == VIGIL_OBJECT_CLOSURE)
+        {
+            vigil_closure_object_get_capture((vigil_object_t *)frame->callable, (size_t)VREG_GET_Bx(i), &cval);
+        }
+        R[VREG_GET_A(i)] = cval;
+        RNEXT();
+    }
+    RCASE(SET_CAPTURE)
+    {
+        vigil_reg_instr_t i = code[ip];
+        if (frame->callable && vigil_object_type(frame->callable) == VIGIL_OBJECT_CLOSURE)
+        {
+            status = vigil_closure_object_set_capture((vigil_object_t *)frame->callable, (size_t)VREG_GET_Bx(i),
+                                                      &R[VREG_GET_A(i)], error);
+            if (status != VIGIL_STATUS_OK)
+                goto r_cleanup;
+        }
+        RNEXT();
+    }
+
+    /* ── Functions and closures ─────────────────────────────────── */
+    RCASE(GET_FUNCTION)
+    {
+        vigil_reg_instr_t i = code[ip];
+        const vigil_object_t *fn = vigil_vm_function_sibling(frame->function, (size_t)VREG_GET_Bx(i));
+        if (!fn)
+        {
+            status = VIGIL_STATUS_INTERNAL;
+            goto r_cleanup;
+        }
+        vigil_object_retain((vigil_object_t *)fn);
+        vigil_value_init_object(&R[VREG_GET_A(i)], (vigil_object_t **)&fn);
+        RNEXT();
+    }
+    RCASE(NEW_CLOSURE)
+    {
+        vigil_reg_instr_t i = code[ip];
+        uint8_t func_idx = VREG_GET_B(i);
+        uint8_t cap_count = VREG_GET_C(i);
+        const vigil_object_t *fn = vigil_vm_function_sibling(frame->function, (size_t)func_idx);
+        if (!fn)
+        {
+            status = VIGIL_STATUS_INTERNAL;
+            goto r_cleanup;
+        }
+        /* Captures are on the stack at positions A .. A+cap_count-1.
+           Sync stack_count to point past them. */
+        vm->stack_count = base + (size_t)VREG_GET_A(i) + (size_t)cap_count;
+        vigil_object_t *closure = NULL;
+        status = vigil_closure_object_new(vm->runtime, (vigil_object_t *)fn, &vm->stack[base + (size_t)VREG_GET_A(i)],
+                                          (size_t)cap_count, &closure, error);
+        if (status != VIGIL_STATUS_OK)
+            goto r_cleanup;
+        vigil_value_init_object(&R[VREG_GET_A(i)], &closure);
         RNEXT();
     }
 
