@@ -13,6 +13,7 @@
 #include "internal/vigil_regvm.h"
 
 #include <math.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -71,6 +72,7 @@ typedef struct
     uint8_t next_temp;
     uint8_t max_reg;
     uint8_t local_count;
+    uint8_t locals_initialized; /* how many locals have been initialized */
 } vstack_t;
 
 static void vs_init(vstack_t *vs, uint8_t lc)
@@ -79,16 +81,18 @@ static void vs_init(vstack_t *vs, uint8_t lc)
     vs->next_temp = lc; /* Temps start after locals */
     vs->max_reg = lc > 0 ? lc : 1;
     vs->local_count = lc;
+    vs->locals_initialized = 0;
     memset(vs->regs, 0, sizeof(vs->regs));
 }
 
 static uint8_t vs_push(vstack_t *vs)
 {
     uint8_t r;
-    if (vs->top < (int)vs->local_count)
+    if (vs->locals_initialized < vs->local_count)
     {
-        /* Pushing into a local slot — use the local's register. */
-        r = (uint8_t)vs->top;
+        /* Still initializing locals — assign to the next local register. */
+        r = vs->locals_initialized;
+        vs->locals_initialized++;
     }
     else
     {
@@ -1064,21 +1068,17 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
         /* Record offset mapping. */
         omap_add(&omap, start_ip, rc->code_count);
 
-        /* At jump targets, reset temp registers to ensure consistent state.
-           Only reset if the virtual stack has temporaries above locals. */
-        if (is_jump_target(jt, jt_count, start_ip) && vs.top > 0)
+        /* At jump targets, reclaim temporary registers so they can be reused.
+           This ensures the register allocator doesn't run out of temps
+           across loop iterations. */
+        if (is_jump_target(jt, jt_count, start_ip))
         {
-            /* Reclaim any temporaries but keep the stack depth. */
             vs.next_temp = vs.local_count;
+            /* Scan the virtual stack for the highest temp in use. */
             for (int si = 0; si < vs.top; si++)
             {
-                if (vs.regs[si] >= vs.local_count)
-                {
-                    /* Reassign temp to a fresh register. */
-                    vs.regs[si] = vs.next_temp++;
-                    if (vs.next_temp > vs.max_reg)
-                        vs.max_reg = vs.next_temp;
-                }
+                if (vs.regs[si] >= vs.local_count && vs.regs[si] >= vs.next_temp)
+                    vs.next_temp = vs.regs[si] + 1;
             }
         }
 
@@ -1919,6 +1919,109 @@ tr_fail:
     jpatch_free(&patches);
     vigil_reg_chunk_free(rc, runtime);
     return VIGIL_STATUS_OUT_OF_MEMORY;
+}
+
+/* ── Debug dump ────────────────────────────────────────────────── */
+
+static const char *reg_op_name(uint8_t op)
+{
+    static const char *names[] = {
+        [VREG_MOVE] = "MOVE",
+        [VREG_LOAD_K] = "LOAD_K",
+        [VREG_LOAD_NIL] = "LOAD_NIL",
+        [VREG_LOAD_TRUE] = "LOAD_T",
+        [VREG_LOAD_FALSE] = "LOAD_F",
+        [VREG_ADD] = "ADD",
+        [VREG_SUB] = "SUB",
+        [VREG_MUL] = "MUL",
+        [VREG_DIV] = "DIV",
+        [VREG_MOD] = "MOD",
+        [VREG_ADD_I32] = "ADD_I32",
+        [VREG_SUB_I32] = "SUB_I32",
+        [VREG_MUL_I32] = "MUL_I32",
+        [VREG_DIV_I32] = "DIV_I32",
+        [VREG_MOD_I32] = "MOD_I32",
+        [VREG_ADD_I64] = "ADD_I64",
+        [VREG_SUB_I64] = "SUB_I64",
+        [VREG_MUL_I64] = "MUL_I64",
+        [VREG_DIV_I64] = "DIV_I64",
+        [VREG_MOD_I64] = "MOD_I64",
+        [VREG_ADD_F64] = "ADD_F64",
+        [VREG_SUB_F64] = "SUB_F64",
+        [VREG_MUL_F64] = "MUL_F64",
+        [VREG_DIV_F64] = "DIV_F64",
+        [VREG_LT_I32] = "LT_I32",
+        [VREG_LE_I32] = "LE_I32",
+        [VREG_GT_I32] = "GT_I32",
+        [VREG_GE_I32] = "GE_I32",
+        [VREG_EQ_I32] = "EQ_I32",
+        [VREG_NE_I32] = "NE_I32",
+        [VREG_LT_I64] = "LT_I64",
+        [VREG_LE_I64] = "LE_I64",
+        [VREG_GT_I64] = "GT_I64",
+        [VREG_GE_I64] = "GE_I64",
+        [VREG_EQ_I64] = "EQ_I64",
+        [VREG_NE_I64] = "NE_I64",
+        [VREG_NEG] = "NEG",
+        [VREG_NOT] = "NOT",
+        [VREG_BNOT] = "BNOT",
+        [VREG_EQ] = "EQ",
+        [VREG_LT] = "LT",
+        [VREG_LE] = "LE",
+        [VREG_JMP] = "JMP",
+        [VREG_TEST] = "TEST",
+        [VREG_LT_I32_JMP] = "LT_I32_JMP",
+        [VREG_LE_I32_JMP] = "LE_I32_JMP",
+        [VREG_GT_I32_JMP] = "GT_I32_JMP",
+        [VREG_GE_I32_JMP] = "GE_I32_JMP",
+        [VREG_EQ_I32_JMP] = "EQ_I32_JMP",
+        [VREG_NE_I32_JMP] = "NE_I32_JMP",
+        [VREG_FORLOOP_I32] = "FORLOOP32",
+        [VREG_FORLOOP_I64] = "FORLOOP64",
+        [VREG_INC_I32] = "INC_I32",
+        [VREG_INC_I64] = "INC_I64",
+        [VREG_RETURN] = "RETURN",
+        [VREG_CALL] = "CALL",
+        [VREG_MATH_SIN] = "SIN",
+        [VREG_MATH_COS] = "COS",
+        [VREG_MATH_SQRT] = "SQRT",
+        [VREG_MATH_LOG] = "LOG",
+        [VREG_MATH_POW] = "POW",
+        [VREG_DUP] = "DUP",
+        [VREG_TO_I32] = "TO_I32",
+        [VREG_TO_I64] = "TO_I64",
+        [VREG_TO_F64] = "TO_F64",
+    };
+    if (op < sizeof(names) / sizeof(names[0]) && names[op])
+        return names[op];
+    return "???";
+}
+
+void vigil_reg_dump(const vigil_reg_chunk_t *rc)
+{
+    fprintf(stderr, "=== Register instructions: %zu, max_regs: %u ===\n", rc->code_count, rc->max_registers);
+    for (size_t i = 0; i < rc->code_count; i++)
+    {
+        vigil_reg_instr_t instr = rc->code[i];
+        uint8_t op = VREG_GET_OP(instr);
+        uint8_t a = VREG_GET_A(instr);
+        uint8_t b = VREG_GET_B(instr);
+        uint8_t c = VREG_GET_C(instr);
+        int16_t sbx = VREG_GET_sBx(instr);
+        uint16_t bx = VREG_GET_Bx(instr);
+
+        if (op == VREG_JMP)
+            fprintf(stderr, "  [%2zu] %-12s sBx=%d (→%zu)\n", i, reg_op_name(op), sbx, (size_t)((int)i + 1 + sbx));
+        else if (op == VREG_LOAD_K)
+            fprintf(stderr, "  [%2zu] %-12s R%u = K[%u]\n", i, reg_op_name(op), a, bx);
+        else if (op == VREG_TEST)
+            fprintf(stderr, "  [%2zu] %-12s R%u\n", i, reg_op_name(op), a);
+        else if (op == VREG_RETURN)
+            fprintf(stderr, "  [%2zu] %-12s R%u count=%u\n", i, reg_op_name(op), a, b);
+        else
+            fprintf(stderr, "  [%2zu] %-12s R%u R%u R%u (op=%u)\n", i, reg_op_name(op), a, b, c, op);
+    }
+    fprintf(stderr, "===\n");
 }
 
 /* ══════════════════════════════════════════════════════════════════

@@ -296,4 +296,7 @@ void vigil_reg_chunk_free(vigil_reg_chunk_t *rc, vigil_runtime_t *runtime);
 vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, vigil_value_t *out_value,
                                    vigil_error_t *error);
 
+/* Debug: dump register instructions to stderr. */
+void vigil_reg_dump(const vigil_reg_chunk_t *rc);
+
 #endif /* VIGIL_REGVM_H */

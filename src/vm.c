@@ -3317,6 +3317,7 @@ vigil_status_t vigil_vm_execute_function(vigil_vm_t *vm, const vigil_object_t *f
                 vigil_status_t reg_status = vigil_reg_translate(fn_chunk, &reg_chunk, vm->runtime, error);
                 if (reg_status == VIGIL_STATUS_OK)
                 {
+                    vigil_reg_dump(&reg_chunk);
                     reg_status = vigil_regvm_execute(vm, &reg_chunk, out_value, error);
                     vigil_reg_chunk_free(&reg_chunk, vm->runtime);
                     if (reg_status == VIGIL_STATUS_OK)
