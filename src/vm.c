@@ -3311,7 +3311,7 @@ vigil_status_t vigil_vm_execute_function(vigil_vm_t *vm, const vigil_object_t *f
            which the register VM doesn't yet handle. */
         {
             const vigil_chunk_t *fn_chunk = vigil_callable_object_chunk(function);
-            if (0 && vm->debug_hook == NULL && vigil_reg_chunk_is_translatable(fn_chunk))
+            if (vm->debug_hook == NULL && vigil_reg_chunk_is_translatable(fn_chunk))
             {
                 vigil_reg_chunk_t reg_chunk;
                 vigil_status_t reg_status = vigil_reg_translate(fn_chunk, &reg_chunk, vm->runtime, error);

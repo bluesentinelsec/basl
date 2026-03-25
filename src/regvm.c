@@ -272,9 +272,9 @@ static size_t stack_op_size(const uint8_t *code, size_t ip, size_t code_size)
     case VIGIL_OPCODE_PARSE_BOOL:
         return 5;
 
-    /* 5-byte: RETURN has opcode + u32 return count */
+    /* 5-byte: RETURN has opcode + u32 return count (if present) */
     case VIGIL_OPCODE_RETURN:
-        return 5;
+        return (ip + 5 <= code_size) ? 5 : 1;
 
     /* 6-byte: opcode + u32 + u8 */
     case VIGIL_OPCODE_INCREMENT_LOCAL_I32:
@@ -480,6 +480,7 @@ typedef struct
     size_t reg_instr_idx;    /* index of the register instruction to patch */
     size_t target_stack_off; /* target stack bytecode offset */
     int is_backward;         /* 1 = backward jump (LOOP), 0 = forward */
+    int stack_depth;         /* virtual stack depth when jump was emitted */
 } jump_patch_t;
 
 typedef struct
@@ -499,7 +500,7 @@ static void jpatch_free(jump_patch_list_t *l)
     free(l->items);
 }
 
-static int jpatch_add(jump_patch_list_t *l, size_t reg_idx, size_t target_off, int backward)
+static int jpatch_add(jump_patch_list_t *l, size_t reg_idx, size_t target_off, int backward, int stack_depth)
 {
     if (l->count >= l->capacity)
     {
@@ -513,6 +514,7 @@ static int jpatch_add(jump_patch_list_t *l, size_t reg_idx, size_t target_off, i
     l->items[l->count].reg_instr_idx = reg_idx;
     l->items[l->count].target_stack_off = target_off;
     l->items[l->count].is_backward = backward;
+    l->items[l->count].stack_depth = stack_depth;
     l->count++;
     return 1;
 }
@@ -823,12 +825,21 @@ int vigil_reg_chunk_is_translatable(const vigil_chunk_t *stack_chunk)
         case VIGIL_OPCODE_NIL:
         case VIGIL_OPCODE_TRUE:
         case VIGIL_OPCODE_FALSE:
-        case VIGIL_OPCODE_RETURN:
+        case VIGIL_OPCODE_RETURN: {
+            /* Reject multi-value return (count > 1). */
+            if (op == VIGIL_OPCODE_RETURN && ip + 5 <= code_size)
+            {
+                uint32_t rc = (uint32_t)code[ip + 1] | ((uint32_t)code[ip + 2] << 8) | ((uint32_t)code[ip + 3] << 16) |
+                              ((uint32_t)code[ip + 4] << 24);
+                if (rc > 1)
+                    return 0;
+            }
+            break;
+        }
         case VIGIL_OPCODE_POP:
         case VIGIL_OPCODE_GET_LOCAL:
         case VIGIL_OPCODE_SET_LOCAL:
         case VIGIL_OPCODE_JUMP:
-        case VIGIL_OPCODE_JUMP_IF_FALSE:
         case VIGIL_OPCODE_LOOP:
         case VIGIL_OPCODE_ADD_I32:
         case VIGIL_OPCODE_SUBTRACT_I32:
@@ -917,9 +928,6 @@ int vigil_reg_chunk_is_translatable(const vigil_chunk_t *stack_chunk)
         case VIGIL_OPCODE_BITWISE_XOR:
         case VIGIL_OPCODE_SHIFT_LEFT:
         case VIGIL_OPCODE_SHIFT_RIGHT:
-        case VIGIL_OPCODE_EQUAL:
-        case VIGIL_OPCODE_GREATER:
-        case VIGIL_OPCODE_LESS:
         case VIGIL_OPCODE_DUP:
             break;
         default:
@@ -927,6 +935,30 @@ int vigil_reg_chunk_is_translatable(const vigil_chunk_t *stack_chunk)
         }
         ip += stack_op_size(code, ip, code_size);
     }
+
+    /* Reject functions with multiple forward JUMPs to the same target
+       (nested ternary / complex join points). */
+    {
+        size_t fwd_targets[64];
+        size_t fwd_count = 0;
+        size_t sip = 0;
+        while (sip < code_size && fwd_count < 64)
+        {
+            uint8_t sop = code[sip];
+            if (sop == VIGIL_OPCODE_JUMP && sip + 4 < code_size)
+            {
+                uint32_t off = (uint32_t)code[sip + 1] | ((uint32_t)code[sip + 2] << 8) |
+                               ((uint32_t)code[sip + 3] << 16) | ((uint32_t)code[sip + 4] << 24);
+                size_t target = sip + 5 + (size_t)off;
+                for (size_t fi = 0; fi < fwd_count; fi++)
+                    if (fwd_targets[fi] == target)
+                        return 0;
+                fwd_targets[fwd_count++] = target;
+            }
+            sip += stack_op_size(code, sip, code_size);
+        }
+    }
+
     return 1;
 }
 
@@ -1045,8 +1077,21 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
         /* Record offset mapping. */
         omap_add(&omap, start_ip, rc->code_count);
 
-        /* At jump targets, no special handling needed — position-based
-           register allocation ensures consistent state. */
+        /* At jump targets, restore the virtual stack depth from the
+           jump source. Use the maximum depth from all incoming jumps
+           to handle join points where branches have different depths. */
+        {
+            int restored = 0;
+            for (size_t pi = 0; pi < patches.count; pi++)
+            {
+                if (patches.items[pi].target_stack_off == start_ip)
+                {
+                    if (!restored || patches.items[pi].stack_depth > vs.top)
+                        vs.top = patches.items[pi].stack_depth;
+                    restored = 1;
+                }
+            }
+        }
 
         switch (op)
         {
@@ -1307,23 +1352,27 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
             uint32_t off = rd_u32(code, &ip);
             size_t target = ip + (size_t)off;
             /* Emit placeholder — will be patched. */
-            jpatch_add(&patches, rc->code_count, target, 0);
+            jpatch_add(&patches, rc->code_count, target, 0, vs.top);
             TR_EMIT(vigil_reg_asbx(VREG_JMP, 0, 0));
             break;
         }
         case VIGIL_OPCODE_LOOP: {
             uint32_t off = rd_u32(code, &ip);
             size_t target = ip - (size_t)off;
-            jpatch_add(&patches, rc->code_count, target, 1);
+            jpatch_add(&patches, rc->code_count, target, 1, vs.top);
             TR_EMIT(vigil_reg_asbx(VREG_JMP, 0, 0));
             break;
         }
         case VIGIL_OPCODE_JUMP_IF_FALSE: {
             uint32_t off = rd_u32(code, &ip);
             size_t target = ip + (size_t)off;
-            uint8_t cond = vs_pop(&vs);
-            jpatch_add(&patches, rc->code_count, target, 0);
+            /* Peek at the condition register (don't pop — the following
+               POP in the bytecode handles that on the true path, and
+               the jump skips it on the false path). */
+            uint8_t cond = vs_peek(&vs, 0);
             TR_EMIT(vigil_reg_abc(VREG_TEST, cond, 0, 0));
+            jpatch_add(&patches, rc->code_count, target, 0, vs.top);
+            TR_EMIT(vigil_reg_asbx(VREG_JMP, 0, 0));
             break;
         }
 
@@ -1348,7 +1397,7 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
             /* Encode: op=cmp_jmp, A=ra, B=rb, jump offset in next word */
             TR_EMIT(vigil_reg_abc(map_cmp_jmp(op), ra, rb, 0));
             /* Emit a second word with the jump offset (patched later). */
-            jpatch_add(&patches, rc->code_count, target, 0);
+            jpatch_add(&patches, rc->code_count, target, 0, vs.top);
             TR_EMIT(vigil_reg_asbx(VREG_JMP, 0, 0));
             /* The stack VM skips a trailing POP after fused compare+jump.
                We must do the same to keep the virtual stack in sync. */
@@ -1373,7 +1422,7 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
                Third word: jump offset (patched). */
             TR_EMIT(vigil_reg_abc(rop, (uint8_t)idx, (uint8_t)delta, cmp));
             TR_EMIT(vigil_reg_abx(VREG_LOAD_K, 0, (uint16_t)ci)); /* constant index */
-            jpatch_add(&patches, rc->code_count, target, 1);
+            jpatch_add(&patches, rc->code_count, target, 1, vs.top);
             TR_EMIT(vigil_reg_asbx(VREG_JMP, 0, 0)); /* back jump */
             /* FORLOOP pushes FALSE on exit. */
             uint8_t fr = vs_push(&vs);
@@ -1462,15 +1511,33 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
 
         /* ── Return ────────────────────────────────────────────── */
         case VIGIL_OPCODE_RETURN: {
-            uint32_t ret_count = rd_u32(code, &ip);
+            uint32_t ret_count;
+            if (ip + 5 <= code_size)
+            {
+                ret_count = rd_u32(code, &ip);
+            }
+            else
+            {
+                ret_count = 1;
+                ip += 1;
+            }
             uint8_t base_r = 0;
             if (ret_count > 0 && vs.top > 0)
                 base_r = vs.regs[vs.top - (int)ret_count];
             for (uint32_t i = 0; i < ret_count && vs.top > 0; i++)
                 vs_pop(&vs);
             TR_EMIT(vigil_reg_abc(VREG_RETURN, base_r, (uint8_t)ret_count, 0));
-            /* Control doesn't continue past RETURN — reset virtual stack. */
-            vs.top = 0;
+            /* Control doesn't continue past RETURN — reset virtual stack.
+               But only if the next instruction isn't a jump target (which
+               will restore the correct depth from the jump source). */
+            {
+                int next_is_target = 0;
+                for (size_t pi = 0; pi < patches.count && !next_is_target; pi++)
+                    if (patches.items[pi].target_stack_off == ip)
+                        next_is_target = 1;
+                if (!next_is_target)
+                    vs.top = 0;
+            }
             break;
         }
 
