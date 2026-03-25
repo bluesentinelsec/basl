@@ -2227,13 +2227,21 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         vigil_reg_instr_t i = code[ip];
         const vigil_value_t *k = VIGIL_VM_CHUNK_CONSTANT(sc, (size_t)VREG_GET_Bx(i));
         if (k)
-            R[VREG_GET_A(i)] = *k;
+        {
+            if (vigil_nanbox_has_object(*k))
+                VIGIL_VM_VALUE_COPY(&R[VREG_GET_A(i)], k);
+            else
+                R[VREG_GET_A(i)] = *k;
+        }
         RNEXT();
     }
     RCASE(MOVE)
     {
         vigil_reg_instr_t i = code[ip];
-        R[VREG_GET_A(i)] = R[VREG_GET_B(i)];
+        if (vigil_nanbox_has_object(R[VREG_GET_B(i)]))
+            VIGIL_VM_VALUE_COPY(&R[VREG_GET_A(i)], &R[VREG_GET_B(i)]);
+        else
+            R[VREG_GET_A(i)] = R[VREG_GET_B(i)];
         RNEXT();
     }
     RCASE(LOAD_NIL)
@@ -3121,7 +3129,11 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         vm->stack_count = base + (size_t)ret_reg + (size_t)arg_count;
 
         const vigil_value_t *native_val = VIGIL_VM_CHUNK_CONSTANT(sc, (size_t)ci);
-        if (!native_val)
+        if (!native_val || !vigil_nanbox_has_object(*native_val))
+        {
+            status = VIGIL_STATUS_UNSUPPORTED;
+            goto r_cleanup;
+        }
         {
             status = VIGIL_STATUS_UNSUPPORTED;
             goto r_cleanup;
