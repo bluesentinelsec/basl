@@ -128,6 +128,14 @@ vigil_status_t vigil_vm_grow_stack(vigil_vm_t *vm, size_t minimum_capacity, vigi
 vigil_status_t vigil_vm_grow_value_array(vigil_runtime_t *runtime, vigil_value_t **values, size_t *capacity,
                                          size_t minimum_capacity, vigil_error_t *error);
 int vigil_vm_get_string_parts(const vigil_value_t *value, const char **out_text, size_t *out_length);
+vigil_status_t vigil_vm_invoke_value_call(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error);
+vigil_status_t vigil_vm_invoke_interface_call(vigil_vm_t *vm, vigil_vm_frame_t *frame, size_t interface_index,
+                                              size_t method_index, size_t arg_count, vigil_error_t *error);
+vigil_status_t vigil_vm_call_extern_fn(vigil_vm_t *vm, const char *desc, size_t desc_len, size_t arg_count,
+                                       vigil_error_t *error);
+void vigil_vm_parse_i32(vigil_vm_t *vm);
+void vigil_vm_parse_f64(vigil_vm_t *vm);
+void vigil_vm_parse_bool(vigil_vm_t *vm);
 vigil_status_t vigil_vm_new_string_value(vigil_vm_t *vm, const char *text, size_t length, vigil_value_t *out_value,
                                          vigil_error_t *error);
 vigil_status_t vigil_vm_make_error_value(vigil_vm_t *vm, int64_t kind, const char *message, size_t message_length,

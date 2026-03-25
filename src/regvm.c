@@ -12,6 +12,7 @@
 
 #include "internal/vigil_regvm.h"
 
+#include <errno.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -21,6 +22,10 @@
 #include "internal/vigil_vm_internal.h"
 #include "value_internal.h"
 #include "vigil/chunk.h"
+#include "vm_ops_arith.h"
+#include "vm_ops_collection.h"
+#include "vm_ops_convert.h"
+#include "vm_ops_string.h"
 
 /* ── Chunk lifecycle ───────────────────────────────────────────── */
 
@@ -295,7 +300,6 @@ static size_t stack_op_size(const uint8_t *code, size_t ip, size_t code_size)
     /* 9-byte: opcode + u32 + u32 */
     case VIGIL_OPCODE_CALL_SELF:
     case VIGIL_OPCODE_TAIL_CALL:
-    case VIGIL_OPCODE_CALL_INTERFACE:
     case VIGIL_OPCODE_CALL_EXTERN:
     case VIGIL_OPCODE_NEW_CLOSURE:
     case VIGIL_OPCODE_LOCALS_ADD_I64:
@@ -335,6 +339,7 @@ static size_t stack_op_size(const uint8_t *code, size_t ip, size_t code_size)
     case VIGIL_OPCODE_LOCALS_ADD_F64_STORE:
     case VIGIL_OPCODE_LOCALS_SUBTRACT_F64_STORE:
     case VIGIL_OPCODE_LOCALS_MULTIPLY_F64_STORE:
+    case VIGIL_OPCODE_CALL_INTERFACE:
         return 13;
 
     /* FORLOOP: opcode + u32 + i8 + u32 + u8 + u32 = 15 bytes */
@@ -1516,11 +1521,13 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
         }
         case VIGIL_OPCODE_CALL_INTERFACE: {
             uint32_t iface_idx = rd_u32(code, &ip);
+            uint32_t method_idx = rd_raw_u32(code, &ip);
             uint32_t arg_count = rd_raw_u32(code, &ip);
             for (uint32_t i = 0; i < arg_count + 1; i++)
                 vs_pop(&vs);
             uint8_t ret = vs_push(&vs);
             TR_EMIT(vigil_reg_abc(VREG_CALL_INTERFACE, ret, (uint8_t)iface_idx, (uint8_t)arg_count));
+            TR_EMIT((uint32_t)method_idx);
             break;
         }
         case VIGIL_OPCODE_CALL_EXTERN: {
@@ -2213,6 +2220,48 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
             [VREG_LT] = &&r_LT,
             [VREG_LE] = &&r_LE,
             [VREG_DUP] = &&r_DUP,
+            [VREG_TO_U8] = &&r_TO_U8,
+            [VREG_TO_U32] = &&r_TO_U32,
+            [VREG_TO_U64] = &&r_TO_U64,
+            [VREG_TESTSET] = &&r_TESTSET,
+            [VREG_CALL_VALUE] = &&r_CALL_VALUE,
+            [VREG_CALL_SELF] = &&r_CALL_SELF,
+            [VREG_CALL_INTERFACE] = &&r_CALL_INTERFACE,
+            [VREG_CALL_EXTERN] = &&r_CALL_EXTERN,
+            [VREG_TAIL_CALL] = &&r_TAIL_CALL,
+            [VREG_NEW_INSTANCE] = &&r_NEW_INSTANCE,
+            [VREG_GET_FIELD] = &&r_GET_FIELD,
+            [VREG_SET_FIELD] = &&r_SET_FIELD,
+            [VREG_NEW_ARRAY] = &&r_NEW_ARRAY,
+            [VREG_NEW_MAP] = &&r_NEW_MAP,
+            [VREG_GET_INDEX] = &&r_GET_INDEX,
+            [VREG_SET_INDEX] = &&r_SET_INDEX,
+            [VREG_COLLECTION_SIZE] = &&r_COLLECTION_SIZE,
+            [VREG_NEW_ERROR] = &&r_NEW_ERROR,
+            [VREG_GET_ERROR_KIND] = &&r_GET_ERROR_KIND,
+            [VREG_GET_ERROR_MSG] = &&r_GET_ERROR_MSG,
+            [VREG_STRING_OP] = &&r_STRING_OP,
+            [VREG_FORMAT_F64] = &&r_FORMAT_F64,
+            [VREG_FORMAT_SPEC] = &&r_FORMAT_SPEC,
+            [VREG_PARSE_I32] = &&r_PARSE_I32,
+            [VREG_PARSE_F64] = &&r_PARSE_F64,
+            [VREG_PARSE_BOOL] = &&r_PARSE_BOOL,
+            [VREG_DEFER] = &&r_DEFER,
+            [VREG_MAP_KEY_AT] = &&r_MAP_KEY_AT,
+            [VREG_MAP_VALUE_AT] = &&r_MAP_VALUE_AT,
+            [VREG_ARRAY_PUSH] = &&r_ARRAY_PUSH,
+            [VREG_ARRAY_POP] = &&r_ARRAY_POP,
+            [VREG_ARRAY_GET_SAFE] = &&r_ARRAY_GET_SAFE,
+            [VREG_ARRAY_SET_SAFE] = &&r_ARRAY_SET_SAFE,
+            [VREG_ARRAY_SLICE] = &&r_ARRAY_SLICE,
+            [VREG_ARRAY_CONTAINS] = &&r_ARRAY_CONTAINS,
+            [VREG_MAP_GET_SAFE] = &&r_MAP_GET_SAFE,
+            [VREG_MAP_SET_SAFE] = &&r_MAP_SET_SAFE,
+            [VREG_MAP_REMOVE_SAFE] = &&r_MAP_REMOVE_SAFE,
+            [VREG_MAP_HAS] = &&r_MAP_HAS,
+            [VREG_MAP_KEYS] = &&r_MAP_KEYS,
+            [VREG_MAP_VALUES] = &&r_MAP_VALUES,
+            [VREG_CHAR_FROM_INT] = &&r_CHAR_FROM_INT,
         };
 
     /* Patch NULLs. */
@@ -3331,6 +3380,644 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
             vm->stack_count = base + rc->max_registers;
         }
 
+        RNEXT();
+    }
+
+    /* ── Return ────────────────────────────────────────────────── */
+    /* ── Stack-sync macro for calling vm_ops helpers ──────────── */
+    /* The vm_ops helpers pop from vm->stack and push results back.
+       Since R = vm->stack + base, we sync stack_count before calling
+       and refresh R afterwards (stack may have grown). */
+#define REGVM_SYNC_PRE(top_reg) vm->stack_count = base + (size_t)(top_reg) + 1U
+#define REGVM_SYNC_POST()                                                                                              \
+    do                                                                                                                 \
+    {                                                                                                                  \
+        R = vm->stack + base;                                                                                          \
+        if (vm->stack_count < base + rc->max_registers)                                                                \
+        {                                                                                                              \
+            for (size_t _fi = vm->stack_count; _fi < base + rc->max_registers; _fi++)                                  \
+                vm->stack[_fi] = VIGIL_NANBOX_NIL;                                                                     \
+            vm->stack_count = base + rc->max_registers;                                                                \
+        }                                                                                                              \
+    } while (0)
+
+    /* ── Type conversions (unsigned) ───────────────────────────── */
+    RCASE(TO_U8)
+    {
+        vigil_reg_instr_t i = code[ip];
+        REGVM_SYNC_PRE(VREG_GET_B(i));
+        frame->ip = 0;
+        status = vigil_vm_op_to_u8(vm, frame, error);
+        if (status != VIGIL_STATUS_OK) goto r_cleanup;
+        REGVM_SYNC_POST();
+        RNEXT();
+    }
+    RCASE(TO_U32)
+    {
+        vigil_reg_instr_t i = code[ip];
+        REGVM_SYNC_PRE(VREG_GET_B(i));
+        frame->ip = 0;
+        status = vigil_vm_op_to_u32(vm, frame, error);
+        if (status != VIGIL_STATUS_OK) goto r_cleanup;
+        REGVM_SYNC_POST();
+        RNEXT();
+    }
+    RCASE(TO_U64)
+    {
+        vigil_reg_instr_t i = code[ip];
+        REGVM_SYNC_PRE(VREG_GET_B(i));
+        frame->ip = 0;
+        status = vigil_vm_op_to_u64(vm, frame, error);
+        if (status != VIGIL_STATUS_OK) goto r_cleanup;
+        REGVM_SYNC_POST();
+        RNEXT();
+    }
+
+    /* ── TESTSET ───────────────────────────────────────────────── */
+    RCASE(TESTSET)
+    {
+        vigil_reg_instr_t i = code[ip];
+        uint8_t a = VREG_GET_A(i);
+        uint8_t b = VREG_GET_B(i);
+        uint8_t c = VREG_GET_C(i);
+        int falsey = (R[b] == VIGIL_NANBOX_NIL || R[b] == VIGIL_NANBOX_FALSE);
+        if (c == 0 ? !falsey : falsey)
+        {
+            ip += 2; /* skip next instruction */
+        }
+        else
+        {
+            VIGIL_VM_VALUE_COPY(&R[a], &R[b]);
+            ip++;
+        }
+        RDISPATCH();
+    }
+
+    /* ── Object/collection ops ─────────────────────────────────── */
+    RCASE(GET_INDEX)
+    {
+        vigil_reg_instr_t i = code[ip];
+        REGVM_SYNC_PRE(VREG_GET_C(i));
+        frame->ip = 0;
+        status = vigil_vm_op_get_index(vm, frame, error);
+        if (status != VIGIL_STATUS_OK) goto r_cleanup;
+        REGVM_SYNC_POST();
+        RNEXT();
+    }
+    RCASE(SET_INDEX)
+    {
+        vigil_reg_instr_t i = code[ip];
+        uint8_t top = VREG_GET_A(i);
+        if (VREG_GET_B(i) > top) top = VREG_GET_B(i);
+        if (VREG_GET_C(i) > top) top = VREG_GET_C(i);
+        REGVM_SYNC_PRE(top);
+        frame->ip = 0;
+        status = vigil_vm_op_set_index(vm, frame, error);
+        if (status != VIGIL_STATUS_OK) goto r_cleanup;
+        REGVM_SYNC_POST();
+        RNEXT();
+    }
+    RCASE(COLLECTION_SIZE)
+    {
+        vigil_reg_instr_t i = code[ip];
+        uint8_t c = VREG_GET_C(i);
+        REGVM_SYNC_PRE(VREG_GET_B(i));
+        frame->ip = 0;
+        if (c == 1)
+            status = vigil_vm_op_get_string_size(vm, frame, error);
+        else
+            status = vigil_vm_op_get_collection_size(vm, frame, error);
+        if (status != VIGIL_STATUS_OK) goto r_cleanup;
+        REGVM_SYNC_POST();
+        RNEXT();
+    }
+    RCASE(GET_FIELD)
+    {
+        vigil_reg_instr_t i = code[ip];
+        uint8_t obj = VREG_GET_B(i);
+        uint8_t fi = VREG_GET_C(i);
+        vigil_object_t *o = (vigil_object_t *)vigil_nanbox_decode_ptr(R[obj]);
+        vigil_value_t fv = {0};
+        if (!vigil_instance_object_get_field(o, (size_t)fi, &fv))
+        { status = VIGIL_STATUS_INVALID_ARGUMENT; goto r_cleanup; }
+        VIGIL_VM_VALUE_COPY(&R[VREG_GET_A(i)], &fv);
+        RNEXT();
+    }
+    RCASE(SET_FIELD)
+    {
+        vigil_reg_instr_t i = code[ip];
+        uint8_t obj_r = VREG_GET_A(i);
+        uint8_t fi = VREG_GET_B(i);
+        uint8_t val_r = VREG_GET_C(i);
+        vigil_object_t *o = (vigil_object_t *)vigil_nanbox_decode_ptr(R[obj_r]);
+        status = vigil_instance_object_set_field(o, (size_t)fi, &R[val_r], error);
+        if (status != VIGIL_STATUS_OK) goto r_cleanup;
+        RNEXT();
+    }
+    RCASE(NEW_INSTANCE)
+    {
+        vigil_reg_instr_t i = code[ip];
+        uint16_t ci = VREG_GET_Bx(i);
+        vigil_object_t *inst = NULL;
+        status = vigil_instance_object_new(vm->runtime, (size_t)ci, NULL, 0, &inst, error);
+        if (status != VIGIL_STATUS_OK) goto r_cleanup;
+        vigil_value_init_object(&R[VREG_GET_A(i)], &inst);
+        RNEXT();
+    }
+    RCASE(NEW_ARRAY)
+    {
+        vigil_reg_instr_t i = code[ip];
+        uint8_t dest = VREG_GET_A(i);
+        uint16_t count = VREG_GET_Bx(i);
+        vigil_object_t *arr = NULL;
+        vigil_value_t *items = (count > 0) ? &R[dest - count] : NULL;
+        status = vigil_array_object_new(vm->runtime, items, (size_t)count, &arr, error);
+        if (status != VIGIL_STATUS_OK) goto r_cleanup;
+        vigil_value_init_object(&R[dest], &arr);
+        REGVM_SYNC_POST();
+        RNEXT();
+    }
+    RCASE(NEW_MAP)
+    {
+        vigil_reg_instr_t i = code[ip];
+        uint8_t dest = VREG_GET_A(i);
+        uint16_t pair_count = VREG_GET_Bx(i);
+        vigil_object_t *map = NULL;
+        status = vigil_map_object_new(vm->runtime, &map, error);
+        if (status != VIGIL_STATUS_OK) goto r_cleanup;
+        for (uint16_t idx = 0; idx < pair_count; idx++)
+        {
+            vigil_value_t *key = &R[dest - pair_count * 2 + idx * 2];
+            vigil_value_t *val = &R[dest - pair_count * 2 + idx * 2 + 1];
+            status = vigil_map_object_set(map, key, val, error);
+            if (status != VIGIL_STATUS_OK) { vigil_object_release(&map); goto r_cleanup; }
+        }
+        vigil_value_init_object(&R[dest], &map);
+        REGVM_SYNC_POST();
+        RNEXT();
+    }
+
+    /* ── Error ops ─────────────────────────────────────────────── */
+    RCASE(NEW_ERROR)
+    {
+        vigil_reg_instr_t i = code[ip];
+        uint8_t top = VREG_GET_B(i) > VREG_GET_C(i) ? VREG_GET_B(i) : VREG_GET_C(i);
+        REGVM_SYNC_PRE(top);
+        frame->ip = 0;
+        status = vigil_vm_op_new_error(vm, frame, error);
+        if (status != VIGIL_STATUS_OK) goto r_cleanup;
+        REGVM_SYNC_POST();
+        RNEXT();
+    }
+    RCASE(GET_ERROR_KIND)
+    {
+        vigil_reg_instr_t i = code[ip];
+        REGVM_SYNC_PRE(VREG_GET_B(i));
+        frame->ip = 0;
+        status = vigil_vm_op_get_error_kind(vm, frame, error);
+        if (status != VIGIL_STATUS_OK) goto r_cleanup;
+        REGVM_SYNC_POST();
+        RNEXT();
+    }
+    RCASE(GET_ERROR_MSG)
+    {
+        vigil_reg_instr_t i = code[ip];
+        REGVM_SYNC_PRE(VREG_GET_B(i));
+        frame->ip = 0;
+        status = vigil_vm_op_get_error_message(vm, frame, error);
+        if (status != VIGIL_STATUS_OK) goto r_cleanup;
+        REGVM_SYNC_POST();
+        RNEXT();
+    }
+
+    /* ── String ops ───────────────────────────────────────────── */
+    RCASE(STRING_OP)
+    {
+        vigil_reg_instr_t i = code[ip];
+        uint8_t str_r = VREG_GET_B(i);
+        uint8_t sub_op = VREG_GET_C(i);
+        /* The string op may need 1-3 args on the stack depending on the
+           sub-opcode.  The translator places them in consecutive registers
+           ending at str_r.  Sync past the highest. */
+        REGVM_SYNC_PRE(str_r);
+        frame->ip = 0;
+        /* Dispatch to the appropriate string helper based on the original
+           stack opcode stored in C. */
+        switch (sub_op)
+        {
+        case VIGIL_OPCODE_STRING_CONTAINS:
+        case VIGIL_OPCODE_STRING_STARTS_WITH:
+        case VIGIL_OPCODE_STRING_ENDS_WITH:
+            status = vigil_vm_op_string_search(vm, frame, (const uint8_t *)&sub_op, error);
+            break;
+        case VIGIL_OPCODE_STRING_TO_UPPER:
+        case VIGIL_OPCODE_STRING_TO_LOWER:
+            status = vigil_vm_op_string_transform(vm, frame, (const uint8_t *)&sub_op, error);
+            break;
+        case VIGIL_OPCODE_STRING_REPLACE:
+            status = vigil_vm_op_string_replace(vm, frame, error);
+            break;
+        case VIGIL_OPCODE_STRING_SPLIT:
+            status = vigil_vm_op_string_split(vm, frame, error);
+            break;
+        case VIGIL_OPCODE_STRING_INDEX_OF:
+            status = vigil_vm_op_string_index_of(vm, frame, error);
+            break;
+        case VIGIL_OPCODE_STRING_SUBSTR:
+            status = vigil_vm_op_string_substr(vm, frame, error);
+            break;
+        case VIGIL_OPCODE_STRING_BYTES:
+            status = vigil_vm_op_string_bytes(vm, frame, error);
+            break;
+        case VIGIL_OPCODE_STRING_CHAR_AT:
+            status = vigil_vm_op_string_char_at(vm, frame, error);
+            break;
+        case VIGIL_OPCODE_STRING_TRIM:
+        case VIGIL_OPCODE_STRING_TRIM_LEFT:
+        case VIGIL_OPCODE_STRING_TRIM_RIGHT:
+            status = vigil_vm_op_string_trim_dir(vm, frame, (const uint8_t *)&sub_op, error);
+            break;
+        case VIGIL_OPCODE_STRING_REVERSE:
+            status = vigil_vm_op_string_reverse(vm, frame, error);
+            break;
+        case VIGIL_OPCODE_STRING_IS_EMPTY:
+            status = vigil_vm_op_string_is_empty(vm, frame, error);
+            break;
+        case VIGIL_OPCODE_STRING_CHAR_COUNT:
+            status = vigil_vm_op_string_char_count(vm, frame, error);
+            break;
+        case VIGIL_OPCODE_STRING_REPEAT:
+            status = vigil_vm_op_string_repeat(vm, frame, error);
+            break;
+        case VIGIL_OPCODE_STRING_COUNT:
+            status = vigil_vm_op_string_count(vm, frame, error);
+            break;
+        case VIGIL_OPCODE_STRING_LAST_INDEX_OF:
+            status = vigil_vm_op_string_last_index_of(vm, frame, error);
+            break;
+        case VIGIL_OPCODE_STRING_TRIM_PREFIX:
+        case VIGIL_OPCODE_STRING_TRIM_SUFFIX:
+            status = vigil_vm_op_string_trim_affix(vm, frame, (const uint8_t *)&sub_op, error);
+            break;
+        case VIGIL_OPCODE_STRING_TO_C:
+            status = vigil_vm_op_string_to_c(vm, frame, error);
+            break;
+        case VIGIL_OPCODE_STRING_FIELDS:
+            status = vigil_vm_op_string_fields(vm, frame, error);
+            break;
+        case VIGIL_OPCODE_STRING_EQUAL_FOLD:
+            status = vigil_vm_op_string_equal_fold(vm, frame, error);
+            break;
+        case VIGIL_OPCODE_STRING_CUT:
+            status = vigil_vm_op_string_cut(vm, frame, error);
+            break;
+        case VIGIL_OPCODE_STRING_JOIN:
+            status = vigil_vm_op_string_join(vm, frame, error);
+            break;
+        default:
+            status = VIGIL_STATUS_UNSUPPORTED;
+            break;
+        }
+        if (status != VIGIL_STATUS_OK) goto r_cleanup;
+        REGVM_SYNC_POST();
+        RNEXT();
+    }
+
+    /* ── Format ops ────────────────────────────────────────────── */
+    RCASE(FORMAT_F64)
+    {
+        vigil_reg_instr_t i = code[ip];
+        REGVM_SYNC_PRE(VREG_GET_B(i));
+        frame->ip = 0;
+        status = vigil_vm_op_format_f64(vm, frame, error);
+        if (status != VIGIL_STATUS_OK) goto r_cleanup;
+        REGVM_SYNC_POST();
+        RNEXT();
+    }
+    RCASE(FORMAT_SPEC)
+    {
+        vigil_reg_instr_t i = code[ip];
+        REGVM_SYNC_PRE(VREG_GET_B(i));
+        frame->ip = 0;
+        status = vigil_vm_op_format_spec(vm, frame, error);
+        if (status != VIGIL_STATUS_OK) goto r_cleanup;
+        REGVM_SYNC_POST();
+        ip += 2; /* skip the two extra words (w1, w2) */
+        RNEXT();
+    }
+
+    /* ── Parse intrinsics ──────────────────────────────────────── */
+    RCASE(PARSE_I32)
+    {
+        vigil_reg_instr_t i = code[ip];
+        REGVM_SYNC_PRE(VREG_GET_B(i));
+        vigil_vm_parse_i32(vm);
+        REGVM_SYNC_POST();
+        RNEXT();
+    }
+    RCASE(PARSE_F64)
+    {
+        vigil_reg_instr_t i = code[ip];
+        REGVM_SYNC_PRE(VREG_GET_B(i));
+        vigil_vm_parse_f64(vm);
+        REGVM_SYNC_POST();
+        RNEXT();
+    }
+    RCASE(PARSE_BOOL)
+    {
+        vigil_reg_instr_t i = code[ip];
+        REGVM_SYNC_PRE(VREG_GET_B(i));
+        vigil_vm_parse_bool(vm);
+        REGVM_SYNC_POST();
+        RNEXT();
+    }
+
+    /* ── Defer ─────────────────────────────────────────────────── */
+    RCASE(DEFER)
+    {
+        vigil_reg_instr_t i = code[ip];
+        uint8_t defer_op = VREG_GET_A(i);
+        uint32_t a = code[ip + 1];
+        uint32_t b = code[ip + 2];
+        vigil_vm_defer_kind_t kind;
+        switch (defer_op)
+        {
+        case VIGIL_OPCODE_DEFER_CALL:           kind = VIGIL_VM_DEFER_CALL; break;
+        case VIGIL_OPCODE_DEFER_CALL_VALUE:     kind = VIGIL_VM_DEFER_CALL_VALUE; break;
+        case VIGIL_OPCODE_DEFER_NEW_INSTANCE:   kind = VIGIL_VM_DEFER_NEW_INSTANCE; break;
+        case VIGIL_OPCODE_DEFER_CALL_INTERFACE: kind = VIGIL_VM_DEFER_CALL_INTERFACE; break;
+        case VIGIL_OPCODE_DEFER_CALL_NATIVE:    kind = VIGIL_VM_DEFER_CALL_NATIVE; break;
+        default: status = VIGIL_STATUS_UNSUPPORTED; goto r_cleanup;
+        }
+        /* Capture current stack values for the deferred call. */
+        size_t val_count = (size_t)b;
+        vigil_value_t *vals = NULL;
+        if (val_count > 0)
+        {
+            vals = malloc(val_count * sizeof(vigil_value_t));
+            if (!vals) { status = VIGIL_STATUS_OUT_OF_MEMORY; goto r_cleanup; }
+            for (size_t di = 0; di < val_count; di++)
+            {
+                vm->stack_count -= 1;
+                VIGIL_VM_VALUE_COPY(&vals[val_count - 1 - di], &vm->stack[vm->stack_count]);
+            }
+        }
+        /* Grow defer array if needed. */
+        if (frame->defer_count >= frame->defer_capacity)
+        {
+            size_t new_cap = frame->defer_capacity < 4 ? 4 : frame->defer_capacity * 2;
+            vigil_vm_defer_action_t *nd = realloc(frame->defers, new_cap * sizeof(*nd));
+            if (!nd) { free(vals); status = VIGIL_STATUS_OUT_OF_MEMORY; goto r_cleanup; }
+            frame->defers = nd;
+            frame->defer_capacity = new_cap;
+        }
+        vigil_vm_defer_action_t *da = &frame->defers[frame->defer_count++];
+        da->kind = kind;
+        da->operand_a = a;
+        da->operand_b = b;
+        da->arg_count = (uint32_t)val_count;
+        da->values = vals;
+        da->value_count = val_count;
+        ip += 3; /* skip the two extra words */
+        REGVM_SYNC_POST();
+        RDISPATCH();
+    }
+
+    /* ── Call ops ───────────────────────────────────────────────── */
+    RCASE(CALL_VALUE)
+    {
+        vigil_reg_instr_t i = code[ip];
+        uint8_t ret = VREG_GET_A(i);
+        uint16_t arg_count = VREG_GET_Bx(i);
+        /* Callable + args are on the stack below ret. */
+        vm->stack_count = base + (size_t)ret;
+        status = vigil_vm_invoke_value_call(vm, (size_t)arg_count, error);
+        if (status != VIGIL_STATUS_OK) goto r_cleanup;
+        R = vm->stack + base;
+        REGVM_SYNC_POST();
+        RNEXT();
+    }
+    RCASE(CALL_SELF)
+    {
+        vigil_reg_instr_t i = code[ip];
+        uint8_t ret = VREG_GET_A(i);
+        uint8_t arg_count = VREG_GET_B(i);
+        vm->stack_count = base + (size_t)ret;
+        /* Self-call: re-execute the current function's chunk. */
+        status = vigil_vm_execute_call(vm, frame->function, (size_t)arg_count, error);
+        R = vm->stack + base;
+        if (status != VIGIL_STATUS_OK) goto r_cleanup;
+        REGVM_SYNC_POST();
+        RNEXT();
+    }
+    RCASE(CALL_INTERFACE)
+    {
+        vigil_reg_instr_t i = code[ip];
+        uint8_t ret = VREG_GET_A(i);
+        uint8_t iface_idx = VREG_GET_B(i);
+        uint8_t arg_count = VREG_GET_C(i);
+        uint32_t method_idx = code[ip + 1];
+        vm->stack_count = base + (size_t)ret;
+        status = vigil_vm_invoke_interface_call(vm, frame, (size_t)iface_idx, (size_t)method_idx, (size_t)arg_count, error);
+        R = vm->stack + base;
+        if (status != VIGIL_STATUS_OK) goto r_cleanup;
+        REGVM_SYNC_POST();
+        ip += 1; /* skip extra word */
+        RNEXT();
+    }
+    RCASE(CALL_EXTERN)
+    {
+        vigil_reg_instr_t i = code[ip];
+        uint8_t ret = VREG_GET_A(i);
+        uint8_t ci = VREG_GET_B(i);
+        uint8_t arg_count = VREG_GET_C(i);
+        vm->stack_count = base + (size_t)ret;
+        const vigil_value_t *desc_val = VIGIL_VM_CHUNK_CONSTANT(sc, (size_t)ci);
+        if (!desc_val || !vigil_nanbox_has_object(*desc_val))
+        { status = VIGIL_STATUS_UNSUPPORTED; goto r_cleanup; }
+        vigil_object_t *desc_obj = (vigil_object_t *)vigil_nanbox_decode_ptr(*desc_val);
+        const char *desc = vigil_string_object_c_str(desc_obj);
+        size_t desc_len = vigil_string_object_length(desc_obj);
+        status = vigil_vm_call_extern_fn(vm, desc, desc_len, (size_t)arg_count, error);
+        R = vm->stack + base;
+        if (status != VIGIL_STATUS_OK) goto r_cleanup;
+        REGVM_SYNC_POST();
+        RNEXT();
+    }
+    RCASE(TAIL_CALL)
+    {
+        vigil_reg_instr_t i = code[ip];
+        uint8_t ret = VREG_GET_A(i);
+        uint8_t func_idx = VREG_GET_B(i);
+        uint8_t arg_count = VREG_GET_C(i);
+        vm->stack_count = base + (size_t)ret;
+        const vigil_object_t *callee = vigil_vm_function_sibling(frame->function, (size_t)func_idx);
+        if (!callee) { status = VIGIL_STATUS_INTERNAL; goto r_cleanup; }
+        status = vigil_vm_execute_call(vm, callee, (size_t)arg_count, error);
+        R = vm->stack + base;
+        if (status != VIGIL_STATUS_OK) goto r_cleanup;
+        REGVM_SYNC_POST();
+        RNEXT();
+    }
+
+    /* ── Array method ops ──────────────────────────────────────── */
+    RCASE(ARRAY_PUSH)
+    {
+        vigil_reg_instr_t i = code[ip];
+        REGVM_SYNC_PRE(VREG_GET_C(i));
+        frame->ip = 0;
+        status = vigil_vm_op_array_push(vm, frame, error);
+        if (status != VIGIL_STATUS_OK) goto r_cleanup;
+        REGVM_SYNC_POST();
+        RNEXT();
+    }
+    RCASE(ARRAY_POP)
+    {
+        vigil_reg_instr_t i = code[ip];
+        REGVM_SYNC_PRE(VREG_GET_B(i));
+        frame->ip = 0;
+        status = vigil_vm_op_array_pop(vm, frame, error);
+        if (status != VIGIL_STATUS_OK) goto r_cleanup;
+        REGVM_SYNC_POST();
+        RNEXT();
+    }
+    RCASE(ARRAY_GET_SAFE)
+    {
+        vigil_reg_instr_t i = code[ip];
+        REGVM_SYNC_PRE(VREG_GET_C(i));
+        frame->ip = 0;
+        status = vigil_vm_op_array_get_safe(vm, frame, error);
+        if (status != VIGIL_STATUS_OK) goto r_cleanup;
+        REGVM_SYNC_POST();
+        RNEXT();
+    }
+    RCASE(ARRAY_SET_SAFE)
+    {
+        vigil_reg_instr_t i = code[ip];
+        REGVM_SYNC_PRE(VREG_GET_C(i));
+        frame->ip = 0;
+        status = vigil_vm_op_array_set_safe(vm, frame, error);
+        if (status != VIGIL_STATUS_OK) goto r_cleanup;
+        REGVM_SYNC_POST();
+        RNEXT();
+    }
+    RCASE(ARRAY_SLICE)
+    {
+        vigil_reg_instr_t i = code[ip];
+        /* end register is at C (translator stored start in C, end is C+1 area) */
+        uint8_t top = VREG_GET_C(i);
+        if (VREG_GET_B(i) > top) top = VREG_GET_B(i);
+        REGVM_SYNC_PRE(top);
+        frame->ip = 0;
+        status = vigil_vm_op_array_slice(vm, frame, error);
+        if (status != VIGIL_STATUS_OK) goto r_cleanup;
+        REGVM_SYNC_POST();
+        RNEXT();
+    }
+    RCASE(ARRAY_CONTAINS)
+    {
+        vigil_reg_instr_t i = code[ip];
+        REGVM_SYNC_PRE(VREG_GET_C(i));
+        frame->ip = 0;
+        status = vigil_vm_op_array_contains(vm, frame, error);
+        if (status != VIGIL_STATUS_OK) goto r_cleanup;
+        REGVM_SYNC_POST();
+        RNEXT();
+    }
+
+    /* ── Map method ops ────────────────────────────────────────── */
+    RCASE(MAP_GET_SAFE)
+    {
+        vigil_reg_instr_t i = code[ip];
+        REGVM_SYNC_PRE(VREG_GET_C(i));
+        frame->ip = 0;
+        status = vigil_vm_op_map_get_safe(vm, frame, error);
+        if (status != VIGIL_STATUS_OK) goto r_cleanup;
+        REGVM_SYNC_POST();
+        RNEXT();
+    }
+    RCASE(MAP_SET_SAFE)
+    {
+        vigil_reg_instr_t i = code[ip];
+        REGVM_SYNC_PRE(VREG_GET_C(i));
+        frame->ip = 0;
+        status = vigil_vm_op_map_set_safe(vm, frame, error);
+        if (status != VIGIL_STATUS_OK) goto r_cleanup;
+        REGVM_SYNC_POST();
+        RNEXT();
+    }
+    RCASE(MAP_REMOVE_SAFE)
+    {
+        vigil_reg_instr_t i = code[ip];
+        REGVM_SYNC_PRE(VREG_GET_C(i));
+        frame->ip = 0;
+        status = vigil_vm_op_map_remove_safe(vm, frame, error);
+        if (status != VIGIL_STATUS_OK) goto r_cleanup;
+        REGVM_SYNC_POST();
+        RNEXT();
+    }
+    RCASE(MAP_HAS)
+    {
+        vigil_reg_instr_t i = code[ip];
+        REGVM_SYNC_PRE(VREG_GET_C(i));
+        frame->ip = 0;
+        status = vigil_vm_op_map_has(vm, frame, error);
+        if (status != VIGIL_STATUS_OK) goto r_cleanup;
+        REGVM_SYNC_POST();
+        RNEXT();
+    }
+    RCASE(MAP_KEYS)
+    {
+        vigil_reg_instr_t i = code[ip];
+        REGVM_SYNC_PRE(VREG_GET_B(i));
+        frame->ip = 0;
+        uint8_t keys_op = VIGIL_OPCODE_MAP_KEYS;
+        status = vigil_vm_op_map_keys_values(vm, frame, &keys_op, error);
+        if (status != VIGIL_STATUS_OK) goto r_cleanup;
+        REGVM_SYNC_POST();
+        RNEXT();
+    }
+    RCASE(MAP_VALUES)
+    {
+        vigil_reg_instr_t i = code[ip];
+        REGVM_SYNC_PRE(VREG_GET_B(i));
+        frame->ip = 0;
+        uint8_t vals_op = VIGIL_OPCODE_MAP_VALUES;
+        status = vigil_vm_op_map_keys_values(vm, frame, &vals_op, error);
+        if (status != VIGIL_STATUS_OK) goto r_cleanup;
+        REGVM_SYNC_POST();
+        RNEXT();
+    }
+    RCASE(MAP_KEY_AT)
+    {
+        vigil_reg_instr_t i = code[ip];
+        REGVM_SYNC_PRE(VREG_GET_C(i));
+        frame->ip = 0;
+        status = vigil_vm_op_get_map_key_at(vm, frame, error);
+        if (status != VIGIL_STATUS_OK) goto r_cleanup;
+        REGVM_SYNC_POST();
+        RNEXT();
+    }
+    RCASE(MAP_VALUE_AT)
+    {
+        vigil_reg_instr_t i = code[ip];
+        REGVM_SYNC_PRE(VREG_GET_C(i));
+        frame->ip = 0;
+        status = vigil_vm_op_get_map_value_at(vm, frame, error);
+        if (status != VIGIL_STATUS_OK) goto r_cleanup;
+        REGVM_SYNC_POST();
+        RNEXT();
+    }
+
+    /* ── Char from int ─────────────────────────────────────────── */
+    RCASE(CHAR_FROM_INT)
+    {
+        vigil_reg_instr_t i = code[ip];
+        REGVM_SYNC_PRE(VREG_GET_B(i));
+        frame->ip = 0;
+        status = vigil_vm_op_char_from_int(vm, frame, error);
+        if (status != VIGIL_STATUS_OK) goto r_cleanup;
+        REGVM_SYNC_POST();
         RNEXT();
     }
 

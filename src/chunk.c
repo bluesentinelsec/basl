@@ -1,9 +1,11 @@
 #include <stdarg.h>
 #include <stddef.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "internal/vigil_internal.h"
+#include "internal/vigil_regvm.h"
 #include "vigil/chunk.h"
 
 static const char *const kVigilOpcodeNames[VIGIL_OPCODE_MULTIPLY_F64_STORE + 1] = {
@@ -809,6 +811,14 @@ void vigil_chunk_free(vigil_chunk_t *chunk)
     if (chunk == NULL)
     {
         return;
+    }
+
+    /* Free cached register translation. */
+    if (chunk->reg_cache != NULL)
+    {
+        vigil_reg_chunk_free(chunk->reg_cache, chunk->runtime);
+        free(chunk->reg_cache);
+        chunk->reg_cache = NULL;
     }
 
     vigil_chunk_clear(chunk);
