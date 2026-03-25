@@ -3115,9 +3115,10 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         uint8_t ci = VREG_GET_B(i);
         uint8_t arg_count = VREG_GET_C(i);
 
-        /* Sync stack: set stack_count so native function sees args at top.
-           Args are in registers (ret_reg - arg_count) .. (ret_reg - 1). */
-        vm->stack_count = base + (size_t)ret_reg;
+        /* Sync stack: native function reads args from stack_count - arg_count.
+           Args are in registers ret_reg .. ret_reg + arg_count - 1
+           (the positions they occupied before being popped). */
+        vm->stack_count = base + (size_t)ret_reg + (size_t)arg_count;
 
         const vigil_value_t *native_val = VIGIL_VM_CHUNK_CONSTANT(sc, (size_t)ci);
         if (!native_val)
