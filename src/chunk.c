@@ -251,7 +251,7 @@ static vigil_status_t vigil_chunk_disassemble_call(const vigil_chunk_t *chunk, s
     uint32_t arg_count;
     vigil_status_t status;
 
-    status = vigil_chunk_require_operand_bytes(chunk, *offset, 8U, "truncated call instruction", error);
+    status = vigil_chunk_require_operand_bytes(chunk, *offset, 12U, "truncated call instruction", error);
     if (status != VIGIL_STATUS_OK)
     {
         return status;
@@ -266,7 +266,7 @@ static vigil_status_t vigil_chunk_disassemble_call(const vigil_chunk_t *chunk, s
         return status;
     }
 
-    *offset += 9U;
+    *offset += 13U;
     return VIGIL_STATUS_OK;
 }
 
@@ -455,7 +455,8 @@ static int vigil_chunk_is_interface_call_opcode(vigil_opcode_t opcode)
 static int vigil_chunk_is_two_u32_operand_opcode(vigil_opcode_t opcode)
 {
     return opcode == VIGIL_OPCODE_NEW_INSTANCE || opcode == VIGIL_OPCODE_NEW_ARRAY || opcode == VIGIL_OPCODE_NEW_MAP ||
-           opcode == VIGIL_OPCODE_DEFER_NEW_INSTANCE || opcode == VIGIL_OPCODE_FORMAT_SPEC;
+           opcode == VIGIL_OPCODE_DEFER_NEW_INSTANCE || opcode == VIGIL_OPCODE_FORMAT_SPEC ||
+           opcode == VIGIL_OPCODE_CALL_SELF;
 }
 
 static int vigil_chunk_is_u32_operand_opcode(vigil_opcode_t opcode)
@@ -476,7 +477,6 @@ static int vigil_chunk_is_u32_operand_opcode(vigil_opcode_t opcode)
         [VIGIL_OPCODE_FORMAT_F64] = 1,
         [VIGIL_OPCODE_GET_FIELD] = 1,
         [VIGIL_OPCODE_SET_FIELD] = 1,
-        [VIGIL_OPCODE_CALL_SELF] = 1,
         [VIGIL_OPCODE_LESS_I32_JUMP_IF_FALSE] = 1,
         [VIGIL_OPCODE_LESS_EQUAL_I32_JUMP_IF_FALSE] = 1,
         [VIGIL_OPCODE_GREATER_I32_JUMP_IF_FALSE] = 1,

@@ -3915,6 +3915,7 @@ vigil_status_t vigil_vm_execute_function(vigil_vm_t *vm, const vigil_object_t *f
                 size_t base_slot;
                 VIGIL_VM_READ_U32(code, frame->ip, constant_index);
                 VIGIL_VM_READ_RAW_U32(code, frame->ip, operand);
+                frame->ip += 4U; /* skip return_count */
                 callee = vigil_vm_function_sibling(frame->function, (size_t)constant_index);
                 base_slot = vm->stack_count - (size_t)operand;
 
@@ -3939,6 +3940,7 @@ vigil_status_t vigil_vm_execute_function(vigil_vm_t *vm, const vigil_object_t *f
             VM_CASE(CALL_SELF)
             {
                 VIGIL_VM_READ_U32(code, frame->ip, operand);
+                frame->ip += 4U; /* skip return_count */
                 vigil_vm_call_self(vm, frame, (size_t)operand, error);
                 VM_BREAK_RELOAD();
             }
@@ -4218,6 +4220,7 @@ vigil_status_t vigil_vm_execute_function(vigil_vm_t *vm, const vigil_object_t *f
                     goto cleanup;
                 }
                 frame = vigil_vm_current_frame(vm);
+                frame->ip += 4U; /* skip return_count */
                 status = vigil_vm_schedule_defer(vm, frame, VIGIL_VM_DEFER_CALL, constant_index, 0U, arg_count,
                                                  (size_t)arg_count, error);
                 if (status != VIGIL_STATUS_OK)

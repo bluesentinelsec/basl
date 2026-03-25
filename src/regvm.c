@@ -254,7 +254,6 @@ static size_t stack_op_size(const uint8_t *code, size_t ip, size_t code_size)
     case VIGIL_OPCODE_JUMP_IF_FALSE:
     case VIGIL_OPCODE_LOOP:
     case VIGIL_OPCODE_CALL_VALUE:
-    case VIGIL_OPCODE_CALL_SELF:
     case VIGIL_OPCODE_NEW_ARRAY:
     case VIGIL_OPCODE_NEW_MAP:
     case VIGIL_OPCODE_GET_FIELD:
@@ -294,7 +293,7 @@ static size_t stack_op_size(const uint8_t *code, size_t ip, size_t code_size)
         return 5;
 
     /* 9-byte: opcode + u32 + u32 */
-    case VIGIL_OPCODE_CALL:
+    case VIGIL_OPCODE_CALL_SELF:
     case VIGIL_OPCODE_TAIL_CALL:
     case VIGIL_OPCODE_CALL_INTERFACE:
     case VIGIL_OPCODE_CALL_EXTERN:
@@ -313,7 +312,6 @@ static size_t stack_op_size(const uint8_t *code, size_t ip, size_t code_size)
     case VIGIL_OPCODE_LOCALS_SUBTRACT_F64:
     case VIGIL_OPCODE_LOCALS_MULTIPLY_F64:
     case VIGIL_OPCODE_FORMAT_SPEC:
-    case VIGIL_OPCODE_DEFER_CALL:
     case VIGIL_OPCODE_DEFER_CALL_VALUE:
     case VIGIL_OPCODE_DEFER_NEW_INSTANCE:
     case VIGIL_OPCODE_DEFER_CALL_INTERFACE:
@@ -321,6 +319,8 @@ static size_t stack_op_size(const uint8_t *code, size_t ip, size_t code_size)
         return 9;
 
     /* 13-byte: opcode + u32 + u32 + u32 */
+    case VIGIL_OPCODE_CALL:
+    case VIGIL_OPCODE_DEFER_CALL:
     case VIGIL_OPCODE_CALL_NATIVE:
     case VIGIL_OPCODE_LOCALS_ADD_I32_STORE:
     case VIGIL_OPCODE_LOCALS_SUBTRACT_I32_STORE:
@@ -932,7 +932,17 @@ int vigil_reg_chunk_is_translatable(const vigil_chunk_t *stack_chunk)
         case VIGIL_OPCODE_JUMP_IF_FALSE:
         case VIGIL_OPCODE_CALL_NATIVE:
         case VIGIL_OPCODE_TO_STRING:
+        case VIGIL_OPCODE_CALL: {
+            /* Reject multi-return CALL (return_count > 1). */
+            if (ip + 12 < code_size)
+            {
+                uint32_t rc = (uint32_t)code[ip + 9] | ((uint32_t)code[ip + 10] << 8) |
+                              ((uint32_t)code[ip + 11] << 16) | ((uint32_t)code[ip + 12] << 24);
+                if (rc > 1)
+                    return 0;
+            }
             break;
+        }
         default:
             return 0; /* unsupported opcode */
         }
@@ -959,29 +969,6 @@ int vigil_reg_chunk_is_translatable(const vigil_chunk_t *stack_chunk)
             }
             sip += stack_op_size(code, sip, code_size);
         }
-    }
-
-    /* Reject functions with multi-return patterns. */
-    {
-        int has_call = 0;
-        int has_error_ops = 0;
-        size_t sip2 = 0;
-        while (sip2 < code_size)
-        {
-            uint8_t sop = code[sip2];
-            if (sop == VIGIL_OPCODE_CALL || sop == VIGIL_OPCODE_CALL_NATIVE)
-                has_call = 1;
-            if (sop == VIGIL_OPCODE_GET_ERROR_KIND || sop == VIGIL_OPCODE_GET_ERROR_MESSAGE ||
-                sop == VIGIL_OPCODE_NEW_ERROR)
-                has_error_ops = 1;
-            /* Also check for 2+ consecutive SET_LOCAL+POP pairs. */
-            if (sop == VIGIL_OPCODE_SET_LOCAL && sip2 + 11 < code_size && code[sip2 + 5] == VIGIL_OPCODE_POP &&
-                code[sip2 + 6] == VIGIL_OPCODE_SET_LOCAL && code[sip2 + 11] == VIGIL_OPCODE_POP)
-                return 0;
-            sip2 += stack_op_size(code, sip2, code_size);
-        }
-        if (has_call && has_error_ops)
-            return 0;
     }
 
     return 1;
@@ -1475,11 +1462,13 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
         case VIGIL_OPCODE_CALL: {
             uint32_t func_idx = rd_u32(code, &ip);
             uint32_t arg_count = rd_raw_u32(code, &ip);
+            uint32_t ret_count = rd_raw_u32(code, &ip);
             uint8_t stack_top = (uint8_t)vs.top;
             TR_EMIT(vigil_reg_abc(VREG_CALL, stack_top, (uint8_t)func_idx, (uint8_t)arg_count));
             for (uint32_t i = 0; i < arg_count; i++)
                 vs_pop(&vs);
-            vs_push(&vs); /* 1 return value */
+            for (uint32_t i = 0; i < ret_count; i++)
+                vs_push(&vs);
             break;
         }
         case VIGIL_OPCODE_CALL_SELF: {

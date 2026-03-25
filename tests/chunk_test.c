@@ -103,6 +103,7 @@ static char *BuildOperandDisassemblyOutput(void)
 
     if (AppendOpcodeU32(&chunk, VIGIL_OPCODE_CALL, 7U, &error) != VIGIL_STATUS_OK ||
         vigil_chunk_write_u32(&chunk, 2U, Span(1U, 0U, 0U), &error) != VIGIL_STATUS_OK ||
+        vigil_chunk_write_u32(&chunk, 1U, Span(1U, 0U, 0U), &error) != VIGIL_STATUS_OK || /* return_count */
         AppendOpcodeU32(&chunk, VIGIL_OPCODE_CALL_VALUE, 9U, &error) != VIGIL_STATUS_OK ||
         AppendOpcodeU32(&chunk, VIGIL_OPCODE_NEW_CLOSURE, 5U, &error) != VIGIL_STATUS_OK ||
         vigil_chunk_write_u32(&chunk, 3U, Span(1U, 0U, 0U), &error) != VIGIL_STATUS_OK ||
