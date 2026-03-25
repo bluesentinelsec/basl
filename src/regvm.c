@@ -81,10 +81,6 @@ static void vs_init(vstack_t *vs, uint8_t lc)
     memset(vs->regs, 0, sizeof(vs->regs));
 }
 
-/* Push: use position-based register (stack position = register index).
-   This mirrors the stack VM exactly. The key invariant is that the
-   stack pointer never drops below local_count during normal execution
-   (only during the initial setup and after RETURN). */
 static uint8_t vs_push(vstack_t *vs)
 {
     uint8_t r = (uint8_t)vs->top;
@@ -928,6 +924,9 @@ int vigil_reg_chunk_is_translatable(const vigil_chunk_t *stack_chunk)
         case VIGIL_OPCODE_BITWISE_XOR:
         case VIGIL_OPCODE_SHIFT_LEFT:
         case VIGIL_OPCODE_SHIFT_RIGHT:
+        case VIGIL_OPCODE_EQUAL:
+        case VIGIL_OPCODE_GREATER:
+        case VIGIL_OPCODE_LESS:
         case VIGIL_OPCODE_DUP:
             break;
         default:
@@ -937,15 +936,14 @@ int vigil_reg_chunk_is_translatable(const vigil_chunk_t *stack_chunk)
     }
 
     /* Reject functions with multiple forward JUMPs to the same target
-       (nested ternary / complex join points). */
+       (nested ternary where branches have different stack depths). */
     {
         size_t fwd_targets[64];
         size_t fwd_count = 0;
         size_t sip = 0;
         while (sip < code_size && fwd_count < 64)
         {
-            uint8_t sop = code[sip];
-            if (sop == VIGIL_OPCODE_JUMP && sip + 4 < code_size)
+            if (code[sip] == VIGIL_OPCODE_JUMP && sip + 4 < code_size)
             {
                 uint32_t off = (uint32_t)code[sip + 1] | ((uint32_t)code[sip + 2] << 8) |
                                ((uint32_t)code[sip + 3] << 16) | ((uint32_t)code[sip + 4] << 24);
@@ -2926,7 +2924,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
     RCASE(EQ)
     {
         vigil_reg_instr_t i = code[ip];
-        R[VREG_GET_A(i)] = vigil_nanbox_from_bool(R[VREG_GET_B(i)] == R[VREG_GET_C(i)]);
+        R[VREG_GET_A(i)] = vigil_nanbox_from_bool(vigil_vm_values_equal(&R[VREG_GET_B(i)], &R[VREG_GET_C(i)]));
         RNEXT();
     }
     RCASE(LT)
