@@ -83,6 +83,7 @@ struct vigil_vm
     /* Platform thread ID of the OS thread running this VM. Set when the VM is
      * opened so the debugger can identify which thread hit a breakpoint. */
     uint64_t thread_id;
+    int in_regvm_call; /* set by vigil_vm_execute_call to skip cleanup */
 };
 
 /* ── Inline value helpers ──────────────────────────────────────── */

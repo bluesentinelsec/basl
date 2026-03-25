@@ -932,6 +932,7 @@ int vigil_reg_chunk_is_translatable(const vigil_chunk_t *stack_chunk)
         case VIGIL_OPCODE_JUMP_IF_FALSE:
         case VIGIL_OPCODE_CALL_NATIVE:
         case VIGIL_OPCODE_TO_STRING:
+        case VIGIL_OPCODE_CALL:
             break;
         default:
             return 0; /* unsupported opcode */
@@ -1102,9 +1103,7 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
            differs from the expected depth, a branch left its result
            at a different position. Emit a MOVE to normalize. */
         if (depth_at[start_ip] >= 0)
-        {
             vs.top = depth_at[start_ip];
-        }
 
         switch (op)
         {
@@ -3163,12 +3162,16 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
             goto r_cleanup;
         }
 
-        /* Execute the callee via vigil_vm_execute_call which saves/restores
-           our register window around the call. */
+        /* Set our frame ip past end so the stack VM stops after callee. */
+        size_t saved_ip = frame->ip;
+        frame->ip = VIGIL_VM_CHUNK_CODE_SIZE(frame->chunk);
+
         status = vigil_vm_execute_call(vm, callee, (size_t)arg_count, error);
 
-        R = vm->stack + base;
+        /* Restore ip and refresh pointers (stack may have grown). */
         frame = &vm->frames[vm->frame_count - 1];
+        frame->ip = saved_ip;
+        R = vm->stack + base;
 
         if (status != VIGIL_STATUS_OK)
             goto r_cleanup;

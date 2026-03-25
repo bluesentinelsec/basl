@@ -3247,62 +3247,44 @@ static void vigil_vm_call_self(vigil_vm_t *vm, const vigil_vm_frame_t *frame, si
 vigil_status_t vigil_vm_execute_call(vigil_vm_t *vm, const vigil_object_t *callee, size_t arg_count,
                                      vigil_error_t *error)
 {
-    /* Save the caller's frame and register window. */
-    vigil_vm_frame_t saved_frame = vm->frames[vm->frame_count - 1];
-    size_t saved_stack_count = vm->stack_count;
+    size_t base_slot = vm->stack_count - arg_count;
+    const vigil_chunk_t *callee_chunk = vigil_callable_object_chunk(callee);
 
-    /* Save the register window (the caller's locals + temps). */
-    size_t base = saved_frame.base_slot;
-    size_t window = saved_stack_count - base;
-    vigil_value_t *saved_regs = NULL;
-    if (window > 0)
+    /* Push callee frame. */
+    if (vm->frame_count >= vm->frame_capacity)
     {
-        saved_regs = malloc(window * sizeof(vigil_value_t));
-        if (saved_regs)
-            memcpy(saved_regs, &vm->stack[base], window * sizeof(vigil_value_t));
+        vigil_status_t s = vigil_vm_push_frame(vm, callee, callee, callee_chunk, base_slot, error);
+        if (s != VIGIL_STATUS_OK)
+            return s;
+    }
+    else
+    {
+        vigil_vm_frame_t *nf = &vm->frames[vm->frame_count];
+        nf->callable = callee;
+        nf->function = callee;
+        nf->chunk = callee_chunk;
+        nf->ip = 0U;
+        nf->base_slot = base_slot;
+        nf->defers = NULL;
+        nf->defer_count = 0;
+        nf->defer_capacity = 0;
+        nf->pending_returns = NULL;
+        nf->pending_return_count = 0;
+        nf->pending_return_capacity = 0;
+        nf->draining_defers = 0;
+        vm->frame_count += 1U;
     }
 
-    /* Execute the callee. This clears frames and stack. */
-    vigil_value_t first_result = VIGIL_NANBOX_NIL;
-    vigil_status_t status = vigil_vm_execute_function(vm, (vigil_object_t *)callee, &first_result, error);
+    /* Execute via the stack VM dispatch loop. The caller's frame has
+       ip set past code_size, so the loop stops after the callee returns.
+       The cleanup is skipped (function == NULL && frame_count > 0).
+       Return values are left on the stack at base_slot. */
+    vigil_value_t dummy = {0};
+    vm->in_regvm_call = 1;
+    vigil_status_t status = vigil_vm_execute_function(vm, NULL, &dummy, error);
+    vm->in_regvm_call = 0;
 
-    /* Restore the caller's frame. */
-    vm->frames[0] = saved_frame;
-    vm->frame_count = 1;
-
-    /* Ensure stack has room for the register window. */
-    if (vm->stack_capacity < base + window)
-    {
-        vigil_status_t gs = vigil_vm_grow_stack(vm, base + window, error);
-        if (gs != VIGIL_STATUS_OK)
-        {
-            free(saved_regs);
-            return gs;
-        }
-    }
-    if (vm->stack_count < base + window)
-        vm->stack_count = base + window;
-
-    /* Restore saved registers. */
-    if (saved_regs)
-    {
-        memcpy(&vm->stack[base], saved_regs, window * sizeof(vigil_value_t));
-        free(saved_regs);
-    }
-
-    if (status != VIGIL_STATUS_OK)
-        return status;
-
-    /* Place the first return value. For multi-return, we need all values.
-       The callee pushed them onto the stack before cleanup destroyed them.
-       We can only recover the first via first_result. For multi-return,
-       re-execute the callee to get all values. */
-    /* TODO: For now, place first_result at callee_base. Multi-return
-       values beyond the first need a different approach. */
-    size_t ret_base = saved_stack_count - arg_count;
-    vm->stack[ret_base] = first_result;
-
-    return VIGIL_STATUS_OK;
+    return status;
 }
 
 // NOLINTNEXTLINE(readability-function-cognitive-complexity) origin/main
@@ -5225,6 +5207,8 @@ vigil_status_t vigil_vm_execute_function(vigil_vm_t *vm, const vigil_object_t *f
     status = vigil_vm_fail_at_ip(vm, VIGIL_STATUS_INTERNAL, "chunk execution reached end without return", error);
 
 cleanup:
+    if (vm->in_regvm_call)
+        return VIGIL_STATUS_OK;
     vigil_vm_release_stack(vm);
     vigil_vm_clear_frames(vm);
     return status;
