@@ -929,6 +929,8 @@ int vigil_reg_chunk_is_translatable(const vigil_chunk_t *stack_chunk)
         case VIGIL_OPCODE_LESS:
         case VIGIL_OPCODE_DUP:
         case VIGIL_OPCODE_JUMP_IF_FALSE:
+        case VIGIL_OPCODE_CALL_NATIVE:
+        case VIGIL_OPCODE_TO_STRING:
             break;
         default:
             return 0; /* unsupported opcode */
@@ -1067,6 +1069,25 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
     jump_patch_list_t patches;
     jpatch_init(&patches);
 
+    /* Map from stack bytecode offset → expected virtual stack depth.
+       Populated when jumps are emitted; consulted at each instruction
+       to restore the correct depth at jump targets. -1 = no entry. */
+    int *depth_at = calloc(code_size + 1, sizeof(int));
+    if (!depth_at)
+    {
+        free(jt);
+        return VIGIL_STATUS_OUT_OF_MEMORY;
+    }
+    for (size_t di = 0; di <= code_size; di++)
+        depth_at[di] = -1;
+
+#define RECORD_DEPTH(off, d)                                                                                           \
+    do                                                                                                                 \
+    {                                                                                                                  \
+        if ((off) <= code_size && (depth_at[(off)] == -1 || (d) > depth_at[(off)]))                                    \
+            depth_at[(off)] = (d);                                                                                     \
+    } while (0)
+
     size_t ip = 0;
     while (ip < code_size)
     {
@@ -1076,21 +1097,9 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
         /* Record offset mapping. */
         omap_add(&omap, start_ip, rc->code_count);
 
-        /* At jump targets, restore the virtual stack depth from the
-           jump source. Use the maximum depth from all incoming jumps
-           to handle join points where branches have different depths. */
-        {
-            int restored = 0;
-            for (size_t pi = 0; pi < patches.count; pi++)
-            {
-                if (patches.items[pi].target_stack_off == start_ip)
-                {
-                    if (!restored || patches.items[pi].stack_depth > vs.top)
-                        vs.top = patches.items[pi].stack_depth;
-                    restored = 1;
-                }
-            }
-        }
+        /* Restore stack depth at jump targets. */
+        if (depth_at[start_ip] >= 0)
+            vs.top = depth_at[start_ip];
 
         switch (op)
         {
@@ -1352,6 +1361,7 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
             size_t target = ip + (size_t)off;
             /* Emit placeholder — will be patched. */
             jpatch_add(&patches, rc->code_count, target, 0, vs.top);
+            RECORD_DEPTH(target, vs.top);
             TR_EMIT(vigil_reg_asbx(VREG_JMP, 0, 0));
             break;
         }
@@ -1359,6 +1369,7 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
             uint32_t off = rd_u32(code, &ip);
             size_t target = ip - (size_t)off;
             jpatch_add(&patches, rc->code_count, target, 1, vs.top);
+            RECORD_DEPTH(target, vs.top);
             TR_EMIT(vigil_reg_asbx(VREG_JMP, 0, 0));
             break;
         }
@@ -1371,6 +1382,7 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
             uint8_t cond = vs_peek(&vs, 0);
             TR_EMIT(vigil_reg_abc(VREG_TEST, cond, 0, 0));
             jpatch_add(&patches, rc->code_count, target, 0, vs.top);
+            RECORD_DEPTH(target, vs.top);
             TR_EMIT(vigil_reg_asbx(VREG_JMP, 0, 0));
             break;
         }
@@ -1393,10 +1405,15 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
             uint8_t rb = vs_pop(&vs);
             uint8_t ra = vs_pop(&vs);
             size_t target = ip + (size_t)off;
+            /* The stack VM skips a POP at the jump target on the false
+               path. Adjust target to match. */
+            if (target < code_size && code[target] == VIGIL_OPCODE_POP)
+                target += 1;
             /* Encode: op=cmp_jmp, A=ra, B=rb, jump offset in next word */
             TR_EMIT(vigil_reg_abc(map_cmp_jmp(op), ra, rb, 0));
             /* Emit a second word with the jump offset (patched later). */
             jpatch_add(&patches, rc->code_count, target, 0, vs.top);
+            RECORD_DEPTH(target, vs.top);
             TR_EMIT(vigil_reg_asbx(VREG_JMP, 0, 0));
             /* The stack VM skips a trailing POP after fused compare+jump.
                We must do the same to keep the virtual stack in sync. */
@@ -1422,6 +1439,7 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
             TR_EMIT(vigil_reg_abc(rop, (uint8_t)idx, (uint8_t)delta, cmp));
             TR_EMIT(vigil_reg_abx(VREG_LOAD_K, 0, (uint16_t)ci)); /* constant index */
             jpatch_add(&patches, rc->code_count, target, 1, vs.top);
+            RECORD_DEPTH(target, vs.top);
             TR_EMIT(vigil_reg_asbx(VREG_JMP, 0, 0)); /* back jump */
             /* FORLOOP pushes FALSE on exit. */
             uint8_t fr = vs_push(&vs);
@@ -1942,12 +1960,14 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
     rc->max_registers = vs.max_reg;
 
     free(jt);
+    free(depth_at);
     omap_free(&omap);
     jpatch_free(&patches);
     return VIGIL_STATUS_OK;
 
 tr_fail:
     free(jt);
+    free(depth_at);
     omap_free(&omap);
     jpatch_free(&patches);
     vigil_reg_chunk_free(rc, runtime);
