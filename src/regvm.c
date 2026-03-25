@@ -932,29 +932,7 @@ int vigil_reg_chunk_is_translatable(const vigil_chunk_t *stack_chunk)
         case VIGIL_OPCODE_JUMP_IF_FALSE:
         case VIGIL_OPCODE_CALL_NATIVE:
         case VIGIL_OPCODE_TO_STRING:
-        case VIGIL_OPCODE_CALL: {
-            /* Reject multi-return calls (CALL or CALL_NATIVE followed
-               by 2+ SET_LOCAL+POP pairs). */
-            if (op == VIGIL_OPCODE_CALL || op == VIGIL_OPCODE_CALL_NATIVE)
-            {
-                size_t after = ip + stack_op_size(code, ip, code_size);
-                uint32_t pairs = 0;
-                while (after + 5 < code_size && code[after] == VIGIL_OPCODE_SET_LOCAL)
-                {
-                    after += 5;
-                    if (after < code_size && code[after] == VIGIL_OPCODE_POP)
-                    {
-                        pairs++;
-                        after += 1;
-                    }
-                    else
-                        break;
-                }
-                if (pairs >= 2)
-                    return 0;
-            }
             break;
-        }
         default:
             return 0; /* unsupported opcode */
         }
@@ -981,6 +959,29 @@ int vigil_reg_chunk_is_translatable(const vigil_chunk_t *stack_chunk)
             }
             sip += stack_op_size(code, sip, code_size);
         }
+    }
+
+    /* Reject functions with multi-return patterns. */
+    {
+        int has_call = 0;
+        int has_error_ops = 0;
+        size_t sip2 = 0;
+        while (sip2 < code_size)
+        {
+            uint8_t sop = code[sip2];
+            if (sop == VIGIL_OPCODE_CALL || sop == VIGIL_OPCODE_CALL_NATIVE)
+                has_call = 1;
+            if (sop == VIGIL_OPCODE_GET_ERROR_KIND || sop == VIGIL_OPCODE_GET_ERROR_MESSAGE ||
+                sop == VIGIL_OPCODE_NEW_ERROR)
+                has_error_ops = 1;
+            /* Also check for 2+ consecutive SET_LOCAL+POP pairs. */
+            if (sop == VIGIL_OPCODE_SET_LOCAL && sip2 + 11 < code_size && code[sip2 + 5] == VIGIL_OPCODE_POP &&
+                code[sip2 + 6] == VIGIL_OPCODE_SET_LOCAL && code[sip2 + 11] == VIGIL_OPCODE_POP)
+                return 0;
+            sip2 += stack_op_size(code, sip2, code_size);
+        }
+        if (has_call && has_error_ops)
+            return 0;
     }
 
     return 1;
