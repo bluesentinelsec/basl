@@ -929,8 +929,6 @@ int vigil_reg_chunk_is_translatable(const vigil_chunk_t *stack_chunk)
         case VIGIL_OPCODE_LESS:
         case VIGIL_OPCODE_DUP:
         case VIGIL_OPCODE_JUMP_IF_FALSE:
-        case VIGIL_OPCODE_CALL_NATIVE:
-        case VIGIL_OPCODE_TO_STRING:
             break;
         default:
             return 0; /* unsupported opcode */
