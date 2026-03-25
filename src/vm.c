@@ -3247,54 +3247,62 @@ static void vigil_vm_call_self(vigil_vm_t *vm, const vigil_vm_frame_t *frame, si
 vigil_status_t vigil_vm_execute_call(vigil_vm_t *vm, const vigil_object_t *callee, size_t arg_count,
                                      vigil_error_t *error)
 {
-    vigil_status_t status;
-    size_t base_slot = vm->stack_count - arg_count;
-    const vigil_object_t *inner_fn = callee;
-    const vigil_chunk_t *callee_chunk = vigil_callable_object_chunk(callee);
+    /* Save the caller's frame and register window. */
+    vigil_vm_frame_t saved_frame = vm->frames[vm->frame_count - 1];
+    size_t saved_stack_count = vm->stack_count;
 
-    if (vm->frame_count >= vm->frame_capacity)
+    /* Save the register window (the caller's locals + temps). */
+    size_t base = saved_frame.base_slot;
+    size_t window = saved_stack_count - base;
+    vigil_value_t *saved_regs = NULL;
+    if (window > 0)
     {
-        status = vigil_vm_push_frame(vm, callee, inner_fn, callee_chunk, base_slot, error);
-        if (status != VIGIL_STATUS_OK)
-            return status;
-    }
-    else
-    {
-        vigil_vm_frame_t *nf = &vm->frames[vm->frame_count];
-        nf->callable = callee;
-        nf->function = inner_fn;
-        nf->chunk = callee_chunk;
-        nf->ip = 0U;
-        nf->base_slot = base_slot;
-        nf->defers = NULL;
-        nf->defer_count = 0;
-        nf->defer_capacity = 0;
-        nf->pending_returns = NULL;
-        nf->pending_return_count = 0;
-        nf->pending_return_capacity = 0;
-        nf->draining_defers = 0;
-        vm->frame_count += 1U;
+        saved_regs = malloc(window * sizeof(vigil_value_t));
+        if (saved_regs)
+            memcpy(saved_regs, &vm->stack[base], window * sizeof(vigil_value_t));
     }
 
-    /* Run the dispatch loop.  It will execute the callee and then
-       try to continue the caller's frame.  The caller's frame has
-       ip >= code_size, so the while loop breaks and we reach the
-       "reached end without return" error path.  We intercept that
-       by checking frame_count: if it dropped back to the caller's
-       frame, the callee returned successfully. */
-    size_t caller_frame_idx = vm->frame_count - 2;
-    vigil_value_t dummy = {0};
-    status = vigil_vm_execute_function(vm, NULL, &dummy, error);
+    /* Execute the callee. This clears frames and stack. */
+    vigil_value_t first_result = VIGIL_NANBOX_NIL;
+    vigil_status_t status = vigil_vm_execute_function(vm, (vigil_object_t *)callee, &first_result, error);
 
-    /* If the stack VM returned an error because the caller's frame
-       reached end-of-chunk, that's expected — not a real error. */
-    if (status != VIGIL_STATUS_OK && vm->frame_count <= caller_frame_idx + 1)
+    /* Restore the caller's frame. */
+    vm->frames[0] = saved_frame;
+    vm->frame_count = 1;
+
+    /* Ensure stack has room for the register window. */
+    if (vm->stack_capacity < base + window)
     {
-        /* The callee returned and the return values are on the stack. */
-        status = VIGIL_STATUS_OK;
+        vigil_status_t gs = vigil_vm_grow_stack(vm, base + window, error);
+        if (gs != VIGIL_STATUS_OK)
+        {
+            free(saved_regs);
+            return gs;
+        }
+    }
+    if (vm->stack_count < base + window)
+        vm->stack_count = base + window;
+
+    /* Restore saved registers. */
+    if (saved_regs)
+    {
+        memcpy(&vm->stack[base], saved_regs, window * sizeof(vigil_value_t));
+        free(saved_regs);
     }
 
-    return status;
+    if (status != VIGIL_STATUS_OK)
+        return status;
+
+    /* Place the first return value. For multi-return, we need all values.
+       The callee pushed them onto the stack before cleanup destroyed them.
+       We can only recover the first via first_result. For multi-return,
+       re-execute the callee to get all values. */
+    /* TODO: For now, place first_result at callee_base. Multi-return
+       values beyond the first need a different approach. */
+    size_t ret_base = saved_stack_count - arg_count;
+    vm->stack[ret_base] = first_result;
+
+    return VIGIL_STATUS_OK;
 }
 
 // NOLINTNEXTLINE(readability-function-cognitive-complexity) origin/main
@@ -5217,12 +5225,7 @@ vigil_status_t vigil_vm_execute_function(vigil_vm_t *vm, const vigil_object_t *f
     status = vigil_vm_fail_at_ip(vm, VIGIL_STATUS_INTERNAL, "chunk execution reached end without return", error);
 
 cleanup:
-    /* Skip cleanup when called as a sub-call (function == NULL) —
-       the register VM manages its own stack and frames. */
-    if (function != NULL)
-    {
-        vigil_vm_release_stack(vm);
-        vigil_vm_clear_frames(vm);
-    }
+    vigil_vm_release_stack(vm);
+    vigil_vm_clear_frames(vm);
     return status;
 }
