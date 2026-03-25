@@ -216,4 +216,11 @@ vigil_status_t vigil_vm_convert_to_unsigned_integer_type(vigil_vm_t *vm, const v
 vigil_status_t vigil_vm_read_u32(vigil_vm_t *vm, uint32_t *out_value, vigil_error_t *error);
 vigil_status_t vigil_vm_read_raw_u32(vigil_vm_t *vm, uint32_t *out_value, vigil_error_t *error);
 
+/* Execute a function call: push a frame for the callee and run the
+   stack VM dispatch loop.  When the callee returns, its return values
+   are left on the stack at base_slot.  The caller's frame remains
+   intact.  Used by the register VM's CALL handler. */
+vigil_status_t vigil_vm_execute_call(vigil_vm_t *vm, const vigil_object_t *callee, size_t arg_count,
+                                     vigil_error_t *error);
+
 #endif /* VIGIL_VM_INTERNAL_H */
