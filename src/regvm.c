@@ -1474,32 +1474,48 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
         case VIGIL_OPCODE_CALL_NATIVE: {
             uint32_t ci = rd_u32(code, &ip);
             uint32_t arg_count = rd_raw_u32(code, &ip);
-            /* Infer return count from bytecode after the call.
-               - Multiple SET_LOCAL+POP pairs: multi-return.
-               - Otherwise: single return (native always pushes at least nil). */
-            uint32_t ret_count = 1;
+            uint8_t stack_top = (uint8_t)vs.top;
+            TR_EMIT(vigil_reg_abc(VREG_CALL_NATIVE, stack_top, (uint8_t)ci, (uint8_t)arg_count));
+            /* Determine return count from subsequent bytecode. */
+            uint32_t ret_count = 0;
+            if (ip < code_size)
             {
-                size_t scan = ip;
-                uint32_t pairs = 0;
-                while (scan + 5 < code_size && code[scan] == VIGIL_OPCODE_SET_LOCAL)
+                uint8_t next = code[ip];
+                if (next == VIGIL_OPCODE_SET_LOCAL)
                 {
-                    if (scan + 6 <= code_size && code[scan + 5] == VIGIL_OPCODE_POP)
+                    /* Count SET_LOCAL+POP pairs = return count. */
+                    size_t scan = ip;
+                    while (scan + 5 < code_size && code[scan] == VIGIL_OPCODE_SET_LOCAL)
                     {
-                        pairs++;
-                        scan += 6;
+                        ret_count++;
+                        scan += 5;
+                        if (scan < code_size && code[scan] == VIGIL_OPCODE_POP)
+                            scan += 1;
+                        else
+                            break;
                     }
-                    else
-                        break;
                 }
-                if (pairs >= 2)
-                    ret_count = pairs;
+                else if (next == VIGIL_OPCODE_POP)
+                {
+                    ret_count = 1; /* 1 return, immediately discarded */
+                }
+                else if (next == VIGIL_OPCODE_CONSTANT || next == VIGIL_OPCODE_GET_LOCAL || next == VIGIL_OPCODE_NIL ||
+                         next == VIGIL_OPCODE_TRUE || next == VIGIL_OPCODE_FALSE || next == VIGIL_OPCODE_RETURN ||
+                         next == VIGIL_OPCODE_JUMP || next == VIGIL_OPCODE_LOOP || next == VIGIL_OPCODE_CALL_NATIVE ||
+                         next == VIGIL_OPCODE_GET_GLOBAL || next == VIGIL_OPCODE_GET_CAPTURE ||
+                         next == VIGIL_OPCODE_GET_FUNCTION)
+                {
+                    ret_count = 0; /* void — next opcode is a new statement */
+                }
+                else
+                {
+                    ret_count = 1; /* default: 1 return used as operand */
+                }
             }
             for (uint32_t i = 0; i < arg_count; i++)
                 vs_pop(&vs);
-            uint8_t ret = (uint8_t)vs.top; /* position where results start */
             for (uint32_t i = 0; i < ret_count; i++)
                 vs_push(&vs);
-            TR_EMIT(vigil_reg_abc(VREG_CALL_NATIVE, ret, (uint8_t)ci, (uint8_t)arg_count));
             break;
         }
         case VIGIL_OPCODE_CALL_VALUE: {
@@ -2171,6 +2187,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
             [VREG_TO_I32] = &&r_TO_I32,
             [VREG_TO_I64] = &&r_TO_I64,
             [VREG_TO_F64] = &&r_TO_F64,
+            [VREG_TO_STRING] = &&r_TO_STRING,
             [VREG_JMP] = &&r_JMP,
             [VREG_TEST] = &&r_TEST,
             [VREG_LT_I32_JMP] = &&r_LT_I32_JMP,
@@ -3129,16 +3146,30 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         goto r_cleanup;
     }
 
+    /* ── TO_STRING ─────────────────────────────────────────────── */
+    RCASE(TO_STRING)
+    {
+        vigil_reg_instr_t i = code[ip];
+        uint8_t src = VREG_GET_B(i);
+        uint8_t dst = VREG_GET_A(i);
+        vigil_value_t str_val;
+        status = vigil_vm_stringify_value(vm, &R[src], &str_val, error);
+        if (status != VIGIL_STATUS_OK)
+            goto r_cleanup;
+        R[dst] = str_val;
+        RNEXT();
+    }
+
     /* ── Native call ───────────────────────────────────────────── */
     RCASE(CALL_NATIVE)
     {
         vigil_reg_instr_t i = code[ip];
-        uint8_t ret_reg = VREG_GET_A(i);
+        uint8_t stack_top = VREG_GET_A(i);
         uint8_t ci = VREG_GET_B(i);
         uint8_t arg_count = VREG_GET_C(i);
 
-        /* Sync stack: args are at registers ret_reg .. ret_reg+arg_count-1. */
-        vm->stack_count = base + (size_t)ret_reg + (size_t)arg_count;
+        /* Set stack_count so native function finds args at the top. */
+        vm->stack_count = base + (size_t)stack_top;
 
         const vigil_value_t *native_val = VIGIL_VM_CHUNK_CONSTANT(sc, (size_t)ci);
         if (!native_val || !vigil_nanbox_has_object(*native_val))
@@ -3153,17 +3184,24 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
             status = VIGIL_STATUS_UNSUPPORTED;
             goto r_cleanup;
         }
+
         status = native_fn(vm, (size_t)arg_count, error);
         if (status != VIGIL_STATUS_OK)
             goto r_cleanup;
 
-        /* Native function modified the stack. The results are at
-           stack positions ret_reg .. ret_reg + return_count - 1.
-           Since R[] = vm->stack + base, the results are already
-           in the right registers. Just ensure stack_count covers
-           the register window. */
+        /* The native function modified stack_count. Grow the stack
+           if needed to cover the register window, but preserve the
+           actual stack_count so subsequent instructions see the
+           correct depth. We store the post-call stack_count in a
+           register instruction's A field for the translator to use,
+           but at runtime we just need the stack to be big enough. */
         if (vm->stack_count < base + rc->max_registers)
+        {
+            /* Zero-fill any gap so registers read as nil. */
+            for (size_t fi = vm->stack_count; fi < base + rc->max_registers; fi++)
+                vm->stack[fi] = VIGIL_NANBOX_NIL;
             vm->stack_count = base + rc->max_registers;
+        }
 
         RNEXT();
     }
