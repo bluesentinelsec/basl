@@ -1687,8 +1687,9 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
         /* ── Objects ───────────────────────────────────────────── */
         case VIGIL_OPCODE_NEW_INSTANCE: {
             uint32_t ci = rd_u32(code, &ip);
-            uint32_t arg_count = rd_raw_u32(code, &ip);
-            (void)arg_count;
+            uint32_t field_count = rd_raw_u32(code, &ip);
+            for (uint32_t i = 0; i < field_count; i++)
+                vs_pop(&vs);
             uint8_t r = vs_push(&vs);
             TR_EMIT(vigil_reg_abx(VREG_NEW_INSTANCE, r, (uint16_t)ci));
             break;
