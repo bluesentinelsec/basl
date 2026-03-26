@@ -2146,8 +2146,6 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
             (void)start;
             uint8_t arr = vs_pop(&vs);
             uint8_t r1 = vs_push_at(&vs, arr);
-            uint8_t r2 = vs_push_at(&vs, (uint8_t)(arr + 1));
-            (void)r2;
             TR_EMIT(vigil_reg_abc(VREG_ARRAY_SLICE, r1, arr, end));
             ip += 1;
             break;
