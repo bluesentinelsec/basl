@@ -94,17 +94,28 @@ static uint8_t vs_push(vstack_t *vs)
     if (!vs->locals_done && vs->top >= (int)vs->local_count)
         vs->locals_done = 1;
     uint8_t r;
-    if (!vs->locals_done)
-        r = (uint8_t)vs->top;
+    if (vs->top < (int)vs->local_count)
+        r = (uint8_t)vs->top;                /* local slot: identity */
     else if (vs->top >= (int)vs->next_reg)
-        r = (uint8_t)vs->top;
+        r = (uint8_t)vs->top;                /* at frontier: consecutive */
     else
-        r = vs->next_reg;
+        r = vs->next_reg;                    /* below frontier: fresh */
     vs->regs[vs->top] = r;
     vs->top++;
     if (r >= vs->next_reg)
         vs->next_reg = r + 1;
     return r;
+}
+
+/* Check if the last push needs a MOV to copy to the local register.
+   Returns the local register if a MOV is needed, or 255 if not. */
+static uint8_t vs_needs_local_mov(const vstack_t *vs)
+{
+    if (!vs->locals_done) return 255;
+    int pos = vs->top - 1;
+    if (pos < 0 || pos >= (int)vs->local_count) return 255;
+    if (vs->regs[pos] == (uint8_t)pos) return 255;
+    return (uint8_t)pos;
 }
 
 static uint8_t vs_push_at(vstack_t *vs, uint8_t reg)
@@ -1559,7 +1570,12 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
                     vs_pop(&vs);
             }
             for (uint32_t i = 0; i < ret_count; i++)
-                vs_push(&vs);
+            {
+                /* CALL_SELF returns must use fresh registers to avoid
+                   clobbering locals when top drops below lc. */
+                uint8_t fr = vs.next_reg;
+                vs_push_at(&vs, fr);
+            }
             uint8_t ret = vs.regs[vs.top - 1];
             TR_EMIT(vigil_reg_abc(VREG_CALL_SELF, ret, (uint8_t)arg_count, (uint8_t)ret_count));
             TR_EMIT((uint32_t)base_r);
