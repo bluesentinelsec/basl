@@ -13507,7 +13507,12 @@ static vigil_status_t vigil_compile_synthetic_constructor(vigil_program_state_t 
     {
         goto cleanup;
     }
-    status = vigil_parser_emit_u32(&state, (uint32_t)decl->return_count, decl->name_span);
+    {
+        /* Use init's return count, not the constructor's, so the register VM
+           translator tracks the correct number of return values. */
+        const vigil_function_decl_t *init_decl = &program->functions.functions[init_function_index];
+        status = vigil_parser_emit_u32(&state, (uint32_t)init_decl->return_count, decl->name_span);
+    }
     if (status != VIGIL_STATUS_OK)
     {
         goto cleanup;
