@@ -336,7 +336,6 @@ static size_t stack_op_size(const uint8_t *code, size_t ip, size_t code_size)
     case VIGIL_OPCODE_LOCALS_MULTIPLY_F64:
     case VIGIL_OPCODE_FORMAT_SPEC:
     case VIGIL_OPCODE_DEFER_NEW_INSTANCE:
-    case VIGIL_OPCODE_DEFER_CALL_NATIVE:
         return 9;
 
     /* 5-byte defer: opcode + u32 */
@@ -348,6 +347,7 @@ static size_t stack_op_size(const uint8_t *code, size_t ip, size_t code_size)
     case VIGIL_OPCODE_DEFER_CALL:
     case VIGIL_OPCODE_DEFER_CALL_INTERFACE:
     case VIGIL_OPCODE_CALL_NATIVE:
+    case VIGIL_OPCODE_DEFER_CALL_NATIVE:
     case VIGIL_OPCODE_LOCALS_ADD_I32_STORE:
     case VIGIL_OPCODE_LOCALS_SUBTRACT_I32_STORE:
     case VIGIL_OPCODE_LOCALS_MULTIPLY_I32_STORE:
@@ -2245,6 +2245,8 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
         case VIGIL_OPCODE_DEFER_CALL_NATIVE: {
             uint32_t a = rd_u32(code, &ip);
             uint32_t b = rd_raw_u32(code, &ip);
+            if (op == VIGIL_OPCODE_DEFER_CALL_NATIVE)
+                rd_raw_u32(code, &ip); /* skip return_count */
             SYNC_PACK(b);
             uint8_t top_r = (b > 0) ? vs.regs[vs.top - 1] : 0;
             for (uint32_t di = 0; di < b; di++) vs_pop(&vs);
