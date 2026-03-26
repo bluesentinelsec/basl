@@ -1082,6 +1082,18 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
     vstack_t vs;
     vs_init(&vs, lc);
 
+    if (lc > 0)
+    {
+        size_t si = 0;
+        while (si < code_size)
+        {
+            uint8_t sop = code[si];
+            if (sop == VIGIL_OPCODE_CALL_SELF)
+            { vs.monotonic = -1; break; }
+            si += stack_op_size(code, si, code_size);
+        }
+    }
+
 
     /* Collect jump targets for stack-state reset at join points. */
     size_t jt_count = 0;
@@ -1529,8 +1541,7 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
                 vs_push(&vs);
             uint8_t ret = vs.regs[vs.top - 1];
             TR_EMIT(vigil_reg_abc(VREG_CALL_SELF, ret, (uint8_t)arg_count, (uint8_t)ret_count));
-            if (vs.monotonic > 0)
-                TR_EMIT((uint32_t)base_r);
+            TR_EMIT((uint32_t)base_r);
             break;
         }
         case VIGIL_OPCODE_TAIL_CALL: {
@@ -1636,6 +1647,15 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
                 base_r = vs.regs[vs.top - (int)ret_count];
             for (uint32_t i = 0; i < ret_count && vs.top > 0; i++)
                 vs_pop(&vs);
+            /* Move return values to R[0..count-1] so callers always find
+               them at arg_base. Emit MOVs in the translator so the runtime
+               RETURN handler just reads from R[0]. */
+            if (base_r != 0 && ret_count > 0)
+            {
+                for (uint32_t ri = 0; ri < ret_count; ri++)
+                    TR_EMIT(vigil_reg_abc(VREG_MOVE, (uint8_t)ri, (uint8_t)(base_r + ri), 0));
+                base_r = 0;
+            }
             TR_EMIT(vigil_reg_abc(VREG_RETURN, base_r, (uint8_t)ret_count, 0));
             /* Don't reset vs.top — the jump target restoration at the
                next reachable instruction will set the correct depth. */
@@ -4030,20 +4050,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         vigil_reg_instr_t i = code[ip];
         uint8_t ret = VREG_GET_A(i);
         uint8_t arg_count = VREG_GET_B(i);
-        /* Read arg_base from optional second word; if next word looks
-           like a valid small register index and ret != it, use it. */
-        uint8_t arg_base_r = ret;
-        {
-            uint32_t next_word = code[ip + 1];
-            /* The second word is present when monotonic mode emitted it.
-               Detect: if next_word < 256 and the word after is a valid opcode
-               or we're near the end, treat it as arg_base. */
-            if (next_word < rc->max_registers)
-            {
-                arg_base_r = (uint8_t)next_word;
-                ip++;
-            }
-        }
+        uint8_t arg_base_r = (uint8_t)(code[ip + 1] & 0xFF);
 
         size_t arg_base = base + (size_t)arg_base_r;
         REGVM_ISOLATE_CALL(arg_base, arg_count);
@@ -4054,13 +4061,12 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         R = vm->stack + base;
         if (status != VIGIL_STATUS_OK) goto r_cleanup;
 
-        {
-            size_t ret_n = vm->stack_count > arg_base ? vm->stack_count - arg_base : 0;
-            if (ret_n > 0 && arg_base != base + (size_t)ret)
-                memmove(&vm->stack[base + ret], &vm->stack[arg_base], ret_n * sizeof(vigil_value_t));
-            vm->stack_count = base + (size_t)ret + ret_n;
-        }
+        /* Return value is at R[0] of callee (guaranteed by RETURN MOV fix). */
+        if (vm->stack_count > arg_base)
+            R[ret] = vm->stack[arg_base];
+        vm->stack_count = base + (size_t)ret + 1;
         REGVM_SYNC_POST();
+        ip++;
         RNEXT();
     }
     RCASE(CALL_INTERFACE)
