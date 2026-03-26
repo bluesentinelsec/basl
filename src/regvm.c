@@ -2649,6 +2649,9 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         vm->stack_count = base + rc->max_registers;
     }
 
+
+#define RRELEASE(reg) do { if (vigil_nanbox_has_object(R[(reg)])) vigil_value_release(&R[(reg)]); } while (0)
+
 #if REGVM_COMPUTED_GOTO
     _Pragma("GCC diagnostic push") _Pragma("GCC diagnostic ignored \"-Wpedantic\"")
 
@@ -2851,7 +2854,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         if (k)
         {
             if (vigil_nanbox_has_object(*k))
-            { VIGIL_VM_VALUE_COPY(&R[VREG_GET_A(i)], k); has_reg_objects = 1; }
+            { RRELEASE(VREG_GET_A(i)); VIGIL_VM_VALUE_COPY(&R[VREG_GET_A(i)], k); has_reg_objects = 1; }
             else
                 R[VREG_GET_A(i)] = *k;
         }
