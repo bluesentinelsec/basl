@@ -3188,46 +3188,42 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
     RCASE(LT_I64_JMP)
     {
         vigil_reg_instr_t i = code[ip];
-        if (vigil_nanbox_decode_int(R[VREG_GET_A(i)]) < vigil_nanbox_decode_int(R[VREG_GET_B(i)]))
-        {
-            ip += 2;
-            RDISPATCH();
-        }
-        ip++;
-        RDISPATCH();
+        uint8_t ra = VREG_GET_A(i), rb = VREG_GET_B(i);
+        int cond = (vigil_nanbox_is_uint(R[ra]) || vigil_nanbox_is_uint(R[rb]))
+            ? (vigil_nanbox_decode_uint(R[ra]) < vigil_nanbox_decode_uint(R[rb]))
+            : (vigil_nanbox_decode_int(R[ra]) < vigil_nanbox_decode_int(R[rb]));
+        if (cond) { ip += 2; RDISPATCH(); }
+        ip++; RDISPATCH();
     }
     RCASE(LE_I64_JMP)
     {
         vigil_reg_instr_t i = code[ip];
-        if (vigil_nanbox_decode_int(R[VREG_GET_A(i)]) <= vigil_nanbox_decode_int(R[VREG_GET_B(i)]))
-        {
-            ip += 2;
-            RDISPATCH();
-        }
-        ip++;
-        RDISPATCH();
+        uint8_t ra = VREG_GET_A(i), rb = VREG_GET_B(i);
+        int cond = (vigil_nanbox_is_uint(R[ra]) || vigil_nanbox_is_uint(R[rb]))
+            ? (vigil_nanbox_decode_uint(R[ra]) <= vigil_nanbox_decode_uint(R[rb]))
+            : (vigil_nanbox_decode_int(R[ra]) <= vigil_nanbox_decode_int(R[rb]));
+        if (cond) { ip += 2; RDISPATCH(); }
+        ip++; RDISPATCH();
     }
     RCASE(GT_I64_JMP)
     {
         vigil_reg_instr_t i = code[ip];
-        if (vigil_nanbox_decode_int(R[VREG_GET_A(i)]) > vigil_nanbox_decode_int(R[VREG_GET_B(i)]))
-        {
-            ip += 2;
-            RDISPATCH();
-        }
-        ip++;
-        RDISPATCH();
+        uint8_t ra = VREG_GET_A(i), rb = VREG_GET_B(i);
+        int cond = (vigil_nanbox_is_uint(R[ra]) || vigil_nanbox_is_uint(R[rb]))
+            ? (vigil_nanbox_decode_uint(R[ra]) > vigil_nanbox_decode_uint(R[rb]))
+            : (vigil_nanbox_decode_int(R[ra]) > vigil_nanbox_decode_int(R[rb]));
+        if (cond) { ip += 2; RDISPATCH(); }
+        ip++; RDISPATCH();
     }
     RCASE(GE_I64_JMP)
     {
         vigil_reg_instr_t i = code[ip];
-        if (vigil_nanbox_decode_int(R[VREG_GET_A(i)]) >= vigil_nanbox_decode_int(R[VREG_GET_B(i)]))
-        {
-            ip += 2;
-            RDISPATCH();
-        }
-        ip++;
-        RDISPATCH();
+        uint8_t ra = VREG_GET_A(i), rb = VREG_GET_B(i);
+        int cond = (vigil_nanbox_is_uint(R[ra]) || vigil_nanbox_is_uint(R[rb]))
+            ? (vigil_nanbox_decode_uint(R[ra]) >= vigil_nanbox_decode_uint(R[rb]))
+            : (vigil_nanbox_decode_int(R[ra]) >= vigil_nanbox_decode_int(R[rb]));
+        if (cond) { ip += 2; RDISPATCH(); }
+        ip++; RDISPATCH();
     }
     RCASE(EQ_I64_JMP)
     {
