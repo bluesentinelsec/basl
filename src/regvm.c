@@ -1009,6 +1009,26 @@ int vigil_reg_chunk_is_translatable(const vigil_chunk_t *stack_chunk)
 
 /* Pack top n virtual stack values into consecutive registers ending at
    the highest. Emits MOV instructions for any gaps. */
+#if defined(_MSC_VER)
+#define SYNC_PACK(n) \
+    do { \
+        __pragma(warning(push)) \
+        __pragma(warning(disable:4127)) \
+        if ((n) > 1) { \
+            uint8_t _hi = vs.regs[vs.top - 1]; \
+            for (int _si = 2; _si <= (int)(n); _si++) { \
+                uint8_t _exp = (uint8_t)(_hi - (_si - 1)); \
+                uint8_t _act = vs.regs[vs.top - _si]; \
+                if (_act != _exp) { \
+                    TR_EMIT(vigil_reg_abc(VREG_MOVE, _exp, _act, 0)); \
+                    vs.regs[vs.top - _si] = _exp; \
+                    if (_exp >= vs.next_reg) vs.next_reg = _exp + 1; \
+                } \
+            } \
+        } \
+        __pragma(warning(pop)) \
+    } while (0)
+#else
 #define SYNC_PACK(n) \
     do { \
         if ((n) > 1) { \
@@ -1024,6 +1044,7 @@ int vigil_reg_chunk_is_translatable(const vigil_chunk_t *stack_chunk)
             } \
         } \
     } while (0)
+#endif
 
 /* Count locals by scanning for the highest GET_LOCAL/SET_LOCAL operand. */
 static uint8_t count_locals(const uint8_t *code, size_t code_size)
@@ -2747,6 +2768,18 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
     } while (0)
 #define RCASE(op) r_##op:
 #else
+#define REGVM_DEBUG_HOOK()                                                                                             \
+    do                                                                                                                 \
+    {                                                                                                                  \
+        if (VIGIL_UNLIKELY(vm->debug_hook != NULL))                                                                    \
+        {                                                                                                              \
+            size_t _saved = frame->ip;                                                                                 \
+            frame->ip = (ip < rc->span_map_count) ? rc->span_map[ip] : 0;                                             \
+            if (vm->debug_hook(vm, vm->debug_hook_userdata) != 0)                                                      \
+            { frame->ip = _saved; status = VIGIL_STATUS_OK; goto r_cleanup; }                                          \
+            frame->ip = _saved;                                                                                        \
+        }                                                                                                              \
+    } while (0)
 #define RDISPATCH() break
 #define RNEXT() break
 #define RCASE(op) case VREG_##op:
