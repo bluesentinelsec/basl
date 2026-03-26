@@ -3340,7 +3340,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
     {
         vigil_reg_instr_t i = code[ip];
         uint8_t ra = VREG_GET_B(i), rb = VREG_GET_C(i), rd = VREG_GET_A(i);
-        if (vigil_nanbox_is_uint(R[ra]) && vigil_nanbox_is_uint(R[rb]))
+        if (vigil_nanbox_is_uint(R[ra]) || vigil_nanbox_is_uint(R[rb]))
         {
             uint64_t a = vigil_nanbox_decode_uint(R[ra]), b = vigil_nanbox_decode_uint(R[rb]), r;
             if (VIGIL_LIKELY(vigil_vm_checked_uadd(a, b, &r) == VIGIL_STATUS_OK))
@@ -3378,7 +3378,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
     {
         vigil_reg_instr_t i = code[ip];
         uint8_t ra = VREG_GET_B(i), rb = VREG_GET_C(i), rd = VREG_GET_A(i);
-        if (vigil_nanbox_is_uint(R[ra]) && vigil_nanbox_is_uint(R[rb]))
+        if (vigil_nanbox_is_uint(R[ra]) || vigil_nanbox_is_uint(R[rb]))
         {
             uint64_t a = vigil_nanbox_decode_uint(R[ra]), b = vigil_nanbox_decode_uint(R[rb]), r;
             if (VIGIL_LIKELY(vigil_vm_checked_usubtract(a, b, &r) == VIGIL_STATUS_OK))
@@ -3404,7 +3404,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
     {
         vigil_reg_instr_t i = code[ip];
         uint8_t ra = VREG_GET_B(i), rb = VREG_GET_C(i), rd = VREG_GET_A(i);
-        if (vigil_nanbox_is_uint(R[ra]) && vigil_nanbox_is_uint(R[rb]))
+        if (vigil_nanbox_is_uint(R[ra]) || vigil_nanbox_is_uint(R[rb]))
         {
             uint64_t a = vigil_nanbox_decode_uint(R[ra]), b = vigil_nanbox_decode_uint(R[rb]), r;
             if (VIGIL_LIKELY(vigil_vm_checked_umultiply(a, b, &r) == VIGIL_STATUS_OK))
@@ -3430,7 +3430,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
     {
         vigil_reg_instr_t i = code[ip];
         uint8_t ra = VREG_GET_B(i), rb = VREG_GET_C(i), rd = VREG_GET_A(i);
-        if (vigil_nanbox_is_uint(R[ra]) && vigil_nanbox_is_uint(R[rb]))
+        if (vigil_nanbox_is_uint(R[ra]) || vigil_nanbox_is_uint(R[rb]))
         {
             uint64_t a = vigil_nanbox_decode_uint(R[ra]), b = vigil_nanbox_decode_uint(R[rb]), r;
             if (VIGIL_UNLIKELY(b == 0)) goto r_divzero;
@@ -3458,7 +3458,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
     {
         vigil_reg_instr_t i = code[ip];
         uint8_t ra = VREG_GET_B(i), rb = VREG_GET_C(i), rd = VREG_GET_A(i);
-        if (vigil_nanbox_is_uint(R[ra]) && vigil_nanbox_is_uint(R[rb]))
+        if (vigil_nanbox_is_uint(R[ra]) || vigil_nanbox_is_uint(R[rb]))
         {
             uint64_t a = vigil_nanbox_decode_uint(R[ra]), b = vigil_nanbox_decode_uint(R[rb]), r;
             if (VIGIL_UNLIKELY(b == 0)) goto r_divzero;
@@ -3487,7 +3487,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
     {
         vigil_reg_instr_t i = code[ip];
         uint8_t ra = VREG_GET_B(i), rb = VREG_GET_C(i);
-        if (vigil_nanbox_is_uint(R[ra]) && vigil_nanbox_is_uint(R[rb]))
+        if (vigil_nanbox_is_uint(R[ra]) || vigil_nanbox_is_uint(R[rb]))
         {
             R[VREG_GET_A(i)] = vigil_nanbox_from_bool(vigil_nanbox_decode_uint(R[ra]) < vigil_nanbox_decode_uint(R[rb]));
             RNEXT();
@@ -3509,7 +3509,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
     {
         vigil_reg_instr_t i = code[ip];
         uint8_t ra = VREG_GET_B(i), rb = VREG_GET_C(i);
-        if (vigil_nanbox_is_uint(R[ra]) && vigil_nanbox_is_uint(R[rb]))
+        if (vigil_nanbox_is_uint(R[ra]) || vigil_nanbox_is_uint(R[rb]))
         {
             R[VREG_GET_A(i)] = vigil_nanbox_from_bool(vigil_nanbox_decode_uint(R[ra]) <= vigil_nanbox_decode_uint(R[rb]));
             RNEXT();
