@@ -2410,6 +2410,49 @@ static vigil_status_t regvm_drain_defers(vigil_vm_t *vm, size_t frame_idx, vigil
             if (nfn) s = nfn(vm, action.arg_count, error);
             break;
         }
+        case VIGIL_VM_DEFER_CALL_VALUE: {
+            /* The callee is the first pushed value; args follow. */
+            size_t total = action.arg_count;
+            if (total > 0 && vm->stack_count >= total)
+            {
+                size_t callee_slot = vm->stack_count - total;
+                vigil_value_t cv = vm->stack[callee_slot];
+                if (vigil_nanbox_is_object(cv))
+                {
+                    vigil_object_t *callee_obj = (vigil_object_t *)vigil_nanbox_decode_ptr(cv);
+                    /* Shift args down over the callee slot. */
+                    size_t real_args = total - 1;
+                    if (real_args > 0)
+                        memmove(&vm->stack[callee_slot], &vm->stack[callee_slot + 1], real_args * sizeof(vigil_value_t));
+                    vm->stack_count -= 1;
+                    s = vigil_vm_execute_call(vm, callee_obj, real_args, error);
+                }
+            }
+            break;
+        }
+        case VIGIL_VM_DEFER_CALL_INTERFACE: {
+            /* The receiver is the first pushed value; args follow. */
+            size_t total = action.arg_count;
+            if (total > 0 && vm->stack_count >= total)
+            {
+                size_t recv_slot = vm->stack_count - total;
+                vigil_value_t rv = vm->stack[recv_slot];
+                if (vigil_nanbox_is_object(rv))
+                {
+                    vigil_object_t *recv_obj = (vigil_object_t *)vigil_nanbox_decode_ptr(rv);
+                    if (vigil_object_type(recv_obj) == VIGIL_OBJECT_INSTANCE)
+                    {
+                        frame = &vm->frames[frame_idx];
+                        size_t ci = vigil_instance_object_class_index(recv_obj);
+                        const vigil_object_t *callee = vigil_function_object_resolve_interface_method(
+                            frame->function, ci, (size_t)action.operand_a, (size_t)action.operand_b);
+                        if (callee)
+                            s = vigil_vm_execute_call(vm, callee, total, error);
+                    }
+                }
+            }
+            break;
+        }
         default:
             break;
         }
