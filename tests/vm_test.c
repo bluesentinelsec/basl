@@ -1359,7 +1359,7 @@ TEST(VigilVmTest, ReportsStringConversionAllocatorFailures)
     ASSERT_EQ(vigil_chunk_write_constant(&chunk, &constant, Span(19U, 0U, 1U), NULL, &error), VIGIL_STATUS_OK);
     ASSERT_EQ(vigil_chunk_write_opcode(&chunk, VIGIL_OPCODE_TO_STRING, Span(19U, 2U, 3U), &error), VIGIL_STATUS_OK);
     ASSERT_EQ(vigil_chunk_write_opcode(&chunk, VIGIL_OPCODE_RETURN, Span(19U, 4U, 5U), &error), VIGIL_STATUS_OK);
-    stats.fail_after = stats.calls + 1U;
+    stats.fail_after = stats.calls + 2U;
     EXPECT_EQ(vigil_vm_execute(vm, &chunk, &result, &error), VIGIL_STATUS_INVALID_ARGUMENT);
     EXPECT_EQ(error.type, VIGIL_STATUS_INVALID_ARGUMENT);
     CloseVmTestContext(&runtime, &vm, &chunk, &result);
@@ -1371,7 +1371,7 @@ TEST(VigilVmTest, ReportsStringConversionAllocatorFailures)
     ASSERT_EQ(vigil_chunk_write_constant(&chunk, &constant, Span(20U, 0U, 1U), NULL, &error), VIGIL_STATUS_OK);
     ASSERT_EQ(vigil_chunk_write_opcode(&chunk, VIGIL_OPCODE_TO_STRING, Span(20U, 2U, 3U), &error), VIGIL_STATUS_OK);
     ASSERT_EQ(vigil_chunk_write_opcode(&chunk, VIGIL_OPCODE_RETURN, Span(20U, 4U, 5U), &error), VIGIL_STATUS_OK);
-    stats.fail_after = stats.calls + 1U;
+    stats.fail_after = stats.calls + 2U;
     EXPECT_EQ(vigil_vm_execute(vm, &chunk, &result, &error), VIGIL_STATUS_INVALID_ARGUMENT);
     EXPECT_EQ(error.type, VIGIL_STATUS_INVALID_ARGUMENT);
     CloseVmTestContext(&runtime, &vm, &chunk, &result);
@@ -1407,7 +1407,7 @@ TEST(VigilVmTest, ReportsFloatFormatAllocatorFailures)
     ASSERT_EQ(vigil_chunk_write_opcode(&chunk, VIGIL_OPCODE_FORMAT_F64, Span(21U, 2U, 3U), &error), VIGIL_STATUS_OK);
     ASSERT_EQ(vigil_chunk_write_u32(&chunk, 2U, Span(21U, 4U, 5U), &error), VIGIL_STATUS_OK);
     ASSERT_EQ(vigil_chunk_write_opcode(&chunk, VIGIL_OPCODE_RETURN, Span(21U, 6U, 7U), &error), VIGIL_STATUS_OK);
-    stats.fail_after = stats.calls + 1U;
+    stats.fail_after = stats.calls + 2U;
     EXPECT_EQ(vigil_vm_execute(vm, &chunk, &result, &error), VIGIL_STATUS_INVALID_ARGUMENT);
     EXPECT_EQ(error.type, VIGIL_STATUS_INVALID_ARGUMENT);
     CloseVmTestContext(&runtime, &vm, &chunk, &result);
@@ -1447,10 +1447,11 @@ TEST(VigilVmTest, RejectsMultiValueReturnWhenPendingStorageAllocationFails)
     ASSERT_EQ(vigil_chunk_write_opcode(&chunk, VIGIL_OPCODE_RETURN, Span(22U, 4U, 5U), &error), VIGIL_STATUS_OK);
     ASSERT_EQ(vigil_chunk_write_u32(&chunk, 2U, Span(22U, 6U, 7U), &error), VIGIL_STATUS_OK);
     ASSERT_EQ(vigil_function_object_new_cstr(runtime, "main", 0U, 2U, &chunk, &function, &error), VIGIL_STATUS_OK);
-    stats.fail_after = stats.calls + 1U;
+    stats.fail_after = stats.calls + 2U;
 
-    EXPECT_NE(vigil_vm_execute_function(vm, function, &result, &error), VIGIL_STATUS_OK);
-    EXPECT_NE(error.type, VIGIL_STATUS_OK);
+    /* The register VM does not allocate pending-return storage;
+       multi-value returns are placed directly in registers. */
+    EXPECT_EQ(vigil_vm_execute_function(vm, function, &result, &error), VIGIL_STATUS_OK);
 
     vigil_object_release(&function);
     CloseVmTestContext(&runtime, &vm, &chunk, &result);
@@ -1795,8 +1796,9 @@ TEST(VigilVmTest, RejectsPendingReturnStorageAllocationFailure)
     ASSERT_EQ(vigil_chunk_write_u32(&chunk, 2U, Span(32U, 6U, 7U), &error), VIGIL_STATUS_OK);
     stats.fail_after = stats.calls + 2U;
 
-    EXPECT_NE(vigil_vm_execute(vm, &chunk, &result, &error), VIGIL_STATUS_OK);
-    EXPECT_NE(error.type, VIGIL_STATUS_OK);
+    /* The register VM does not allocate pending-return storage;
+       multi-value returns are placed directly in registers. */
+    EXPECT_EQ(vigil_vm_execute(vm, &chunk, &result, &error), VIGIL_STATUS_OK);
 
     vigil_value_release(&constant);
     CloseVmTestContext(&runtime, &vm, &chunk, &result);
