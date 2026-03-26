@@ -1521,8 +1521,16 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
 
 #define CALL_RET_PUSH(base_reg, count) \
     do { \
-        for (uint32_t _i = 0; _i < (count); _i++) \
-            vs_push_at(&vs, (uint8_t)((base_reg) + _i)); \
+        for (uint32_t _i = 0; _i < (count); _i++) { \
+            uint8_t _br = (uint8_t)((base_reg) + _i); \
+            if (vs.top < (int)vs.local_count) { \
+                uint8_t _r = vs_push(&vs); \
+                if (_r != _br) \
+                    TR_EMIT(vigil_reg_abc(VREG_MOVE, _r, _br, 0)); \
+            } else { \
+                vs_push_at(&vs, _br); \
+            } \
+        } \
     } while (0)
 
         /* ── Calls ─────────────────────────────────────────────── */
