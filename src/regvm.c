@@ -3895,10 +3895,6 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         case VIGIL_OPCODE_STRING_ENDS_WITH:
             status = vigil_vm_op_string_search(vm, frame, (const uint8_t *)&sub_op, error);
             break;
-        case VIGIL_OPCODE_STRING_TO_UPPER:
-        case VIGIL_OPCODE_STRING_TO_LOWER:
-            status = vigil_vm_op_string_transform(vm, frame, (const uint8_t *)&sub_op, error);
-            break;
         case VIGIL_OPCODE_STRING_REPLACE:
             status = vigil_vm_op_string_replace(vm, frame, error);
             break;
@@ -3918,6 +3914,10 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
             status = vigil_vm_op_string_char_at(vm, frame, error);
             break;
         case VIGIL_OPCODE_STRING_TRIM:
+        case VIGIL_OPCODE_STRING_TO_UPPER:
+        case VIGIL_OPCODE_STRING_TO_LOWER:
+            status = vigil_vm_op_string_transform(vm, frame, (const uint8_t *)&sub_op, error);
+            break;
         case VIGIL_OPCODE_STRING_TRIM_LEFT:
         case VIGIL_OPCODE_STRING_TRIM_RIGHT:
             status = vigil_vm_op_string_trim_dir(vm, frame, (const uint8_t *)&sub_op, error);
