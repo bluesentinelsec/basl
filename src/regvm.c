@@ -1511,24 +1511,57 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
         case VIGIL_OPCODE_EQUAL_I64_JUMP_IF_FALSE:
         case VIGIL_OPCODE_NOT_EQUAL_I64_JUMP_IF_FALSE: {
             uint32_t off = rd_u32(code, &ip);
-            /* These pop two values and jump if comparison is false. */
             uint8_t rb = vs_pop(&vs);
             uint8_t ra = vs_pop(&vs);
             size_t target = ip + (size_t)off;
-            /* The stack VM skips a POP at the jump target on the false
-               path. Adjust target to match. */
-            if (target < code_size && code[target] == VIGIL_OPCODE_POP)
-                target += 1;
-            /* Encode: op=cmp_jmp, A=ra, B=rb, jump offset in next word */
-            TR_EMIT(vigil_reg_abc(map_cmp_jmp(op), ra, rb, 0));
-            /* Emit a second word with the jump offset (patched later). */
-            jpatch_add(&patches, rc->code_count, target, 0, vs.top);
-            RECORD_DEPTH(target, vs.top);
-            TR_EMIT(vigil_reg_asbx(VREG_JMP, 0, 0));
-            /* The stack VM skips a trailing POP after fused compare+jump.
-               We must do the same to keep the virtual stack in sync. */
-            if (ip < code_size && code[ip] == VIGIL_OPCODE_POP)
-                ip += 1;
+            /* Detect && chain: trailing POP followed by another comparison
+               (GET_LOCAL or CONSTANT starts the next operand). */
+            int in_chain = 0;
+            if (ip < code_size && code[ip] == VIGIL_OPCODE_POP && ip + 1 < code_size)
+            {
+                uint8_t next = code[ip + 1];
+                in_chain = (next == VIGIL_OPCODE_GET_LOCAL || next == VIGIL_OPCODE_CONSTANT ||
+                            next == VIGIL_OPCODE_TRUE || next == VIGIL_OPCODE_FALSE ||
+                            next == VIGIL_OPCODE_NIL || next == VIGIL_OPCODE_GET_GLOBAL);
+            }
+            if (in_chain)
+            {
+                /* In a && chain: emit compare → push bool → TEST+JMP.
+                   This matches the generic EQUAL + JUMP_IF_FALSE path. */
+                uint8_t res = vs_push(&vs);
+                uint8_t cmp_op = VREG_EQ;
+                switch (op) {
+                case VIGIL_OPCODE_LESS_I32_JUMP_IF_FALSE:
+                case VIGIL_OPCODE_LESS_I64_JUMP_IF_FALSE: cmp_op = VREG_LT; break;
+                case VIGIL_OPCODE_LESS_EQUAL_I32_JUMP_IF_FALSE:
+                case VIGIL_OPCODE_LESS_EQUAL_I64_JUMP_IF_FALSE: cmp_op = VREG_LE; break;
+                case VIGIL_OPCODE_GREATER_I32_JUMP_IF_FALSE:
+                case VIGIL_OPCODE_GREATER_I64_JUMP_IF_FALSE: cmp_op = VREG_LT; ra ^= rb; rb ^= ra; ra ^= rb; break;
+                case VIGIL_OPCODE_GREATER_EQUAL_I32_JUMP_IF_FALSE:
+                case VIGIL_OPCODE_GREATER_EQUAL_I64_JUMP_IF_FALSE: cmp_op = VREG_LE; ra ^= rb; rb ^= ra; ra ^= rb; break;
+                case VIGIL_OPCODE_NOT_EQUAL_I32_JUMP_IF_FALSE:
+                case VIGIL_OPCODE_NOT_EQUAL_I64_JUMP_IF_FALSE: cmp_op = VREG_EQ; break; /* EQ then negate via NOT */
+                default: cmp_op = VREG_EQ; break;
+                }
+                TR_EMIT(vigil_reg_abc(cmp_op, res, ra, rb));
+                if (op == VIGIL_OPCODE_NOT_EQUAL_I32_JUMP_IF_FALSE || op == VIGIL_OPCODE_NOT_EQUAL_I64_JUMP_IF_FALSE)
+                    TR_EMIT(vigil_reg_abc(VREG_NOT, res, res, 0));
+                TR_EMIT(vigil_reg_abc(VREG_TEST, res, 0, 0));
+                jpatch_add(&patches, rc->code_count, target, 0, vs.top);
+                RECORD_DEPTH(target, vs.top);
+                TR_EMIT(vigil_reg_asbx(VREG_JMP, 0, 0));
+            }
+            else
+            {
+                if (target < code_size && code[target] == VIGIL_OPCODE_POP)
+                    target += 1;
+                TR_EMIT(vigil_reg_abc(map_cmp_jmp(op), ra, rb, 0));
+                jpatch_add(&patches, rc->code_count, target, 0, vs.top);
+                RECORD_DEPTH(target, vs.top);
+                TR_EMIT(vigil_reg_asbx(VREG_JMP, 0, 0));
+                if (ip < code_size && code[ip] == VIGIL_OPCODE_POP)
+                    ip += 1;
+            }
             break;
         }
 
