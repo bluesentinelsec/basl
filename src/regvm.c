@@ -335,10 +335,13 @@ static size_t stack_op_size(const uint8_t *code, size_t ip, size_t code_size)
     case VIGIL_OPCODE_LOCALS_SUBTRACT_F64:
     case VIGIL_OPCODE_LOCALS_MULTIPLY_F64:
     case VIGIL_OPCODE_FORMAT_SPEC:
-    case VIGIL_OPCODE_DEFER_CALL_VALUE:
     case VIGIL_OPCODE_DEFER_NEW_INSTANCE:
     case VIGIL_OPCODE_DEFER_CALL_NATIVE:
         return 9;
+
+    /* 5-byte defer: opcode + u32 */
+    case VIGIL_OPCODE_DEFER_CALL_VALUE:
+        return 5;
 
     /* 13-byte: opcode + u32 + u32 + u32 */
     case VIGIL_OPCODE_CALL:
@@ -2224,7 +2227,17 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
             TR_EMIT((uint32_t)b);
             break;
         }
-        case VIGIL_OPCODE_DEFER_CALL_VALUE:
+        case VIGIL_OPCODE_DEFER_CALL_VALUE: {
+            uint32_t a = rd_u32(code, &ip); /* arg_count (excl callee) */
+            uint32_t val_count = a + 1; /* include the callee */
+            SYNC_PACK(val_count);
+            uint8_t top_r = (val_count > 0) ? vs.regs[vs.top - 1] : 0;
+            for (uint32_t di = 0; di < val_count; di++) vs_pop(&vs);
+            TR_EMIT(vigil_reg_abc(VREG_DEFER, op, 0, top_r));
+            TR_EMIT((uint32_t)0);
+            TR_EMIT((uint32_t)val_count);
+            break;
+        }
         case VIGIL_OPCODE_DEFER_NEW_INSTANCE:
         case VIGIL_OPCODE_DEFER_CALL_NATIVE: {
             uint32_t a = rd_u32(code, &ip);
@@ -2238,15 +2251,17 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
             break;
         }
         case VIGIL_OPCODE_DEFER_CALL_INTERFACE: {
-            uint32_t a = rd_u32(code, &ip);
-            uint32_t b = rd_raw_u32(code, &ip);
-            uint32_t c = rd_raw_u32(code, &ip);
-            SYNC_PACK(c);
-            uint8_t top_r = (c > 0) ? vs.regs[vs.top - 1] : 0;
-            for (uint32_t di = 0; di < c; di++) vs_pop(&vs);
+            uint32_t a = rd_u32(code, &ip);  /* iface_index */
+            uint32_t b = rd_raw_u32(code, &ip);  /* method_index */
+            uint32_t c = rd_raw_u32(code, &ip);  /* arg_count (excl receiver) */
+            uint32_t total = c + 1; /* include receiver */
+            SYNC_PACK(total);
+            uint8_t top_r = (total > 0) ? vs.regs[vs.top - 1] : 0;
+            for (uint32_t di = 0; di < total; di++) vs_pop(&vs);
             TR_EMIT(vigil_reg_abc(VREG_DEFER, op, (uint8_t)a, top_r));
-            TR_EMIT((uint32_t)a);
-            TR_EMIT((uint32_t)b);
+            TR_EMIT((uint32_t)a);      /* operand_a = iface_index */
+            TR_EMIT((uint32_t)total);  /* operand_b = total values (used as val_count) */
+            TR_EMIT((uint32_t)b);      /* extra word: method_index */
             break;
         }
 
@@ -2476,7 +2491,6 @@ static vigil_status_t regvm_drain_defers(vigil_vm_t *vm, size_t frame_idx, vigil
             break;
         }
         case VIGIL_VM_DEFER_CALL_INTERFACE: {
-            /* The receiver is the first pushed value; args follow. */
             size_t total = action.arg_count;
             if (total > 0 && vm->stack_count >= total)
             {
@@ -4293,7 +4307,17 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         da->arg_count = (uint32_t)val_count;
         da->values = vals;
         da->value_count = val_count;
-        ip += 3; /* skip the two extra words */
+        if (kind == VIGIL_VM_DEFER_CALL_INTERFACE)
+        {
+            /* Third extra word is method_index; store in operand_b,
+               move arg_count to arg_count field. */
+            da->operand_b = code[ip + 3];
+            ip += 4;
+        }
+        else
+        {
+            ip += 3;
+        }
         REGVM_SYNC_POST();
         RDISPATCH();
     }
