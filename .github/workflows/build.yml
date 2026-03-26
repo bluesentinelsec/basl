@@ -4,8 +4,13 @@ on:
   push:
   workflow_dispatch:
 
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   native-full:
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
@@ -39,6 +44,7 @@ jobs:
         run: ctest --test-dir build --output-on-failure -C Release
 
   native-minimal:
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
@@ -72,6 +78,7 @@ jobs:
         run: ctest --test-dir build --output-on-failure -C Release
 
   integration-tests:
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
@@ -125,6 +132,7 @@ jobs:
           pytest integration_tests/ -v
 
   android:
+    timeout-minutes: 10
     runs-on: ubuntu-latest
 
     strategy:
@@ -150,6 +158,7 @@ jobs:
         run: cmake --build build --config Release
 
   ios:
+    timeout-minutes: 10
     runs-on: macos-latest
 
     steps:
@@ -169,6 +178,7 @@ jobs:
         run: cmake --build build --config Release
 
   emscripten:
+    timeout-minutes: 10
     runs-on: ubuntu-latest
 
     steps:
@@ -185,6 +195,7 @@ jobs:
         run: cmake --build build
 
   clang-format:
+    timeout-minutes: 5
     runs-on: ubuntu-latest
 
     steps:
@@ -209,6 +220,7 @@ jobs:
           fi
           scripts/run_clang_format.sh --check "${files[@]}"
   portability:
+    timeout-minutes: 5
     runs-on: ubuntu-latest
 
     steps:
@@ -221,6 +233,7 @@ jobs:
         run: python3 scripts/check_stdlib_portability.py
 
   valgrind:
+    timeout-minutes: 15
     runs-on: ubuntu-latest
 
     steps:
@@ -250,6 +263,7 @@ jobs:
           ./build/vigil_tests
 
   sanitizers:
+    timeout-minutes: 15
     runs-on: ubuntu-latest
     env:
       ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
