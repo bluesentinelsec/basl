@@ -4926,15 +4926,12 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         /* Fast path: inline return to caller (no defers, not top-level). */
         if (VIGIL_LIKELY(frame->defer_count == 0 && vm->frame_count > initial_frame_count))
         {
-            /* Release callee-owned objects above args and return values. */
+            /* Release callee-owned objects above return values. */
             if (has_reg_objects)
             {
-                const vigil_reg_chunk_t *callee_rc = rc;
                 size_t callee_base = base;
-                size_t skip = callee_rc->arity;
-                if ((size_t)base_r + (size_t)count > skip)
-                    skip = (size_t)base_r + (size_t)count;
-                for (size_t ri = skip; ri < (size_t)callee_rc->max_registers; ri++)
+                size_t skip = (size_t)base_r + (size_t)count;
+                for (size_t ri = skip; ri < (size_t)rc->max_registers; ri++)
                     if (vigil_nanbox_has_object(vm->stack[callee_base + ri]))
                         vigil_value_release(&vm->stack[callee_base + ri]);
             }
@@ -4972,8 +4969,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         {
             if (has_reg_objects)
             {
-                size_t skip2 = rc->arity;
-                if ((size_t)base_r + (size_t)count > skip2) skip2 = (size_t)base_r + (size_t)count;
+                size_t skip2 = (size_t)base_r + (size_t)count;
                 for (size_t ri2 = skip2; ri2 < (size_t)rc->max_registers; ri2++)
                     if (vigil_nanbox_has_object(vm->stack[base + ri2]))
                         vigil_value_release(&vm->stack[base + ri2]);
