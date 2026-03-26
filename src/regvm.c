@@ -1532,8 +1532,6 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
                 in_chain = 1;
             if (in_chain)
             {
-                /* In a && chain: emit compare → push bool → TEST+JMP.
-                   This matches the generic EQUAL + JUMP_IF_FALSE path. */
                 uint8_t res = vs_push(&vs);
                 uint8_t cmp_op = VREG_EQ;
                 switch (op) {
@@ -2956,29 +2954,37 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
     RCASE(LT_I64)
     {
         vigil_reg_instr_t i = code[ip];
-        R[VREG_GET_A(i)] = vigil_nanbox_from_bool(vigil_nanbox_decode_int(R[VREG_GET_B(i)]) <
-                                                  vigil_nanbox_decode_int(R[VREG_GET_C(i)]));
+        uint8_t rb = VREG_GET_B(i), rc2 = VREG_GET_C(i);
+        R[VREG_GET_A(i)] = (vigil_nanbox_is_uint(R[rb]) || vigil_nanbox_is_uint(R[rc2]))
+            ? vigil_nanbox_from_bool(vigil_nanbox_decode_uint(R[rb]) < vigil_nanbox_decode_uint(R[rc2]))
+            : vigil_nanbox_from_bool(vigil_nanbox_decode_int(R[rb]) < vigil_nanbox_decode_int(R[rc2]));
         RNEXT();
     }
     RCASE(LE_I64)
     {
         vigil_reg_instr_t i = code[ip];
-        R[VREG_GET_A(i)] = vigil_nanbox_from_bool(vigil_nanbox_decode_int(R[VREG_GET_B(i)]) <=
-                                                  vigil_nanbox_decode_int(R[VREG_GET_C(i)]));
+        uint8_t rb = VREG_GET_B(i), rc2 = VREG_GET_C(i);
+        R[VREG_GET_A(i)] = (vigil_nanbox_is_uint(R[rb]) || vigil_nanbox_is_uint(R[rc2]))
+            ? vigil_nanbox_from_bool(vigil_nanbox_decode_uint(R[rb]) <= vigil_nanbox_decode_uint(R[rc2]))
+            : vigil_nanbox_from_bool(vigil_nanbox_decode_int(R[rb]) <= vigil_nanbox_decode_int(R[rc2]));
         RNEXT();
     }
     RCASE(GT_I64)
     {
         vigil_reg_instr_t i = code[ip];
-        R[VREG_GET_A(i)] = vigil_nanbox_from_bool(vigil_nanbox_decode_int(R[VREG_GET_B(i)]) >
-                                                  vigil_nanbox_decode_int(R[VREG_GET_C(i)]));
+        uint8_t rb = VREG_GET_B(i), rc2 = VREG_GET_C(i);
+        R[VREG_GET_A(i)] = (vigil_nanbox_is_uint(R[rb]) || vigil_nanbox_is_uint(R[rc2]))
+            ? vigil_nanbox_from_bool(vigil_nanbox_decode_uint(R[rb]) > vigil_nanbox_decode_uint(R[rc2]))
+            : vigil_nanbox_from_bool(vigil_nanbox_decode_int(R[rb]) > vigil_nanbox_decode_int(R[rc2]));
         RNEXT();
     }
     RCASE(GE_I64)
     {
         vigil_reg_instr_t i = code[ip];
-        R[VREG_GET_A(i)] = vigil_nanbox_from_bool(vigil_nanbox_decode_int(R[VREG_GET_B(i)]) >=
-                                                  vigil_nanbox_decode_int(R[VREG_GET_C(i)]));
+        uint8_t rb = VREG_GET_B(i), rc2 = VREG_GET_C(i);
+        R[VREG_GET_A(i)] = (vigil_nanbox_is_uint(R[rb]) || vigil_nanbox_is_uint(R[rc2]))
+            ? vigil_nanbox_from_bool(vigil_nanbox_decode_uint(R[rb]) >= vigil_nanbox_decode_uint(R[rc2]))
+            : vigil_nanbox_from_bool(vigil_nanbox_decode_int(R[rb]) >= vigil_nanbox_decode_int(R[rc2]));
         RNEXT();
     }
     RCASE(EQ_I64)
