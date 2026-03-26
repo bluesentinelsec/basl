@@ -3861,6 +3861,15 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
             }                                                                                                          \
             memmove(&vm->stack[_min], &vm->stack[(arg_base_var)],                                                      \
                     (size_t)(arg_count_val) * sizeof(vigil_value_t));                                                   \
+            /* Retain objects in the isolated copy so the callee's pop                                                 \
+               does not free them while the caller still holds refs                                                    \
+               in the original register slots. */                                                                      \
+            for (size_t _ci = 0; _ci < (size_t)(arg_count_val); _ci++)                                                 \
+            {                                                                                                          \
+                if (vigil_nanbox_has_object(vm->stack[_min + _ci]))                                                    \
+                    vigil_object_retain(                                                                                \
+                        (vigil_object_t *)vigil_nanbox_decode_ptr(vm->stack[_min + _ci]));                              \
+            }                                                                                                          \
             (arg_base_var) = _min;                                                                                     \
         }                                                                                                              \
     } while (0)
@@ -4754,5 +4763,18 @@ r_divzero:
     return VIGIL_STATUS_INVALID_ARGUMENT;
 
 r_cleanup:
+    /* Release object references still held in the register file.
+       Skip the return-value slots (0..live-1) — those are live
+       values the caller will consume. */
+    if (R != NULL)
+    {
+        size_t live = vm->stack_count > base ? vm->stack_count - base : 0;
+        size_t nregs = (size_t)rc->max_registers;
+        for (size_t ri = live; ri < nregs; ri++)
+        {
+            if (vigil_nanbox_has_object(R[ri]))
+                vigil_value_release(&R[ri]);
+        }
+    }
     return status;
 }
