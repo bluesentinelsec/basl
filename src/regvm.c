@@ -3542,9 +3542,10 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
 
         {
             size_t ret_dst = base + (size_t)arg_base_r;
-            if (vm->stack_count > arg_base)
-                vm->stack[ret_dst] = vm->stack[arg_base];
-            vm->stack_count = ret_dst + 1;
+            size_t ret_n = vm->stack_count > arg_base ? vm->stack_count - arg_base : 0;
+            if (ret_n > 0)
+                memmove(&vm->stack[ret_dst], &vm->stack[arg_base], ret_n * sizeof(vigil_value_t));
+            vm->stack_count = ret_dst + ret_n;
         }
 
         if (vm->stack_count < base + rc->max_registers)
@@ -4043,9 +4044,12 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         R = vm->stack + base;
         if (status != VIGIL_STATUS_OK) goto r_cleanup;
 
-        if (vm->stack_count > arg_base)
-            vm->stack[orig_base] = vm->stack[arg_base];
-        vm->stack_count = orig_base + 1;
+        {
+            size_t ret_n = vm->stack_count > arg_base ? vm->stack_count - arg_base : 0;
+            if (ret_n > 0)
+                memmove(&vm->stack[orig_base], &vm->stack[arg_base], ret_n * sizeof(vigil_value_t));
+            vm->stack_count = orig_base + ret_n;
+        }
         REGVM_SYNC_POST();
         RNEXT();
     }
@@ -4109,9 +4113,12 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         R = vm->stack + base;
         if (status != VIGIL_STATUS_OK) goto r_cleanup;
 
-        if (vm->stack_count > arg_base)
-            vm->stack[orig_base] = vm->stack[arg_base];
-        vm->stack_count = orig_base + 1;
+        {
+            size_t ret_n = vm->stack_count > arg_base ? vm->stack_count - arg_base : 0;
+            if (ret_n > 0)
+                memmove(&vm->stack[orig_base], &vm->stack[arg_base], ret_n * sizeof(vigil_value_t));
+            vm->stack_count = orig_base + ret_n;
+        }
         REGVM_SYNC_POST();
         ip += 1;
         RNEXT();
