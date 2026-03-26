@@ -2573,6 +2573,13 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
     const vigil_reg_instr_t *code = rc->code;
     const size_t code_count = rc->code_count;
     (void)code_count;
+
+    if (code == NULL || code_count == 0)
+    {
+        *out_value = VIGIL_NANBOX_NIL;
+        return VIGIL_STATUS_UNSUPPORTED;
+    }
+
     const vigil_chunk_t *sc = rc->stack_chunk;
     vigil_value_t *R = vm->stack; /* register file = stack base */
     size_t ip = 0;
