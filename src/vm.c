@@ -2381,8 +2381,22 @@ void vigil_vm_parse_bool(vigil_vm_t *vm)
 vigil_status_t vigil_vm_execute_call(vigil_vm_t *vm, const vigil_object_t *callee, size_t arg_count,
                                      vigil_error_t *error)
 {
+    /* Handle native functions directly — they have no chunk to translate. */
+    if (callee && vigil_object_type(callee) == VIGIL_OBJECT_NATIVE_FUNCTION)
+    {
+        vigil_native_fn_t nfn = vigil_native_function_get((vigil_object_t *)callee);
+        if (nfn)
+            return nfn(vm, arg_count, error);
+        return VIGIL_STATUS_INTERNAL;
+    }
+
     size_t base_slot = vm->stack_count - arg_count;
     vigil_chunk_t *callee_chunk = (vigil_chunk_t *)vigil_callable_object_chunk(callee);
+    if (!callee_chunk)
+    {
+        vigil_error_set_literal(error, VIGIL_STATUS_INTERNAL, "execute_call: callee has no chunk");
+        return VIGIL_STATUS_INTERNAL;
+    }
 
     /* Push callee frame. */
     if (vm->frame_count >= vm->frame_capacity)
