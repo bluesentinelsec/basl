@@ -1911,15 +1911,28 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
         case VIGIL_OPCODE_STRING_CONTAINS:
         case VIGIL_OPCODE_STRING_STARTS_WITH:
         case VIGIL_OPCODE_STRING_ENDS_WITH:
-        case VIGIL_OPCODE_STRING_INDEX_OF:
-        case VIGIL_OPCODE_STRING_LAST_INDEX_OF:
         case VIGIL_OPCODE_STRING_EQUAL_FOLD: {
+            /* Pop 2 (str, arg), push 1 (bool). */
             SYNC_PACK(2); uint8_t arg =
             vs_pop(&vs);
             uint8_t str = vs_pop(&vs);
             (void)str;
             uint8_t r = vs_push_at(&vs, str);
             TR_EMIT(vigil_reg_abc(VREG_STRING_OP, r, arg, op));
+            ip += 1;
+            break;
+        }
+        case VIGIL_OPCODE_STRING_INDEX_OF:
+        case VIGIL_OPCODE_STRING_LAST_INDEX_OF: {
+            /* Pop 2 (str, arg), push 2 (idx, found). */
+            SYNC_PACK(2); uint8_t arg =
+            vs_pop(&vs);
+            uint8_t str = vs_pop(&vs);
+            (void)str;
+            uint8_t r1 = vs_push_at(&vs, str);
+            uint8_t r2 = vs_push_at(&vs, (uint8_t)(str + 1));
+            (void)r1; (void)r2;
+            TR_EMIT(vigil_reg_abc(VREG_STRING_OP, str, arg, op));
             ip += 1;
             break;
         }
@@ -1953,7 +1966,6 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
             break;
         }
         case VIGIL_OPCODE_STRING_SPLIT:
-        case VIGIL_OPCODE_STRING_SUBSTR:
         case VIGIL_OPCODE_STRING_TRIM_PREFIX:
         case VIGIL_OPCODE_STRING_TRIM_SUFFIX: {
             uint8_t arg = vs_pop(&vs);
@@ -1964,27 +1976,54 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
             ip += 1;
             break;
         }
+        case VIGIL_OPCODE_STRING_SUBSTR: {
+            /* Pop 3 (str, start, end), push 2 (result, err). */
+            SYNC_PACK(3); uint8_t end_r =
+            vs_pop(&vs);
+            uint8_t start_r = vs_pop(&vs);
+            uint8_t str = vs_pop(&vs);
+            (void)start_r; (void)end_r;
+            uint8_t r1 = vs_push_at(&vs, str);
+            uint8_t r2 = vs_push_at(&vs, (uint8_t)(str + 1));
+            (void)r1; (void)r2;
+            TR_EMIT(vigil_reg_abc(VREG_STRING_OP, str, end_r, op));
+            ip += 1;
+            break;
+        }
         case VIGIL_OPCODE_STRING_CUT: {
+            /* Pop 2 (str, sep), push 2 (before, after). */
             SYNC_PACK(2); uint8_t arg =
             vs_pop(&vs);
             uint8_t str = vs_pop(&vs);
             (void)str;
-            uint8_t r = vs_push_at(&vs, str);
-            vs_push(&vs);
-            vs_push(&vs);
-            TR_EMIT(vigil_reg_abc(VREG_STRING_OP, r, arg, op));
+            uint8_t r1 = vs_push_at(&vs, str);
+            uint8_t r2 = vs_push_at(&vs, (uint8_t)(str + 1));
+            (void)r1; (void)r2;
+            TR_EMIT(vigil_reg_abc(VREG_STRING_OP, str, arg, op));
             ip += 1;
             break;
         }
         case VIGIL_OPCODE_STRING_REPEAT:
         case VIGIL_OPCODE_STRING_COUNT:
-        case VIGIL_OPCODE_STRING_CHAR_AT:
         case VIGIL_OPCODE_STRING_JOIN: {
             uint8_t arg = vs_pop(&vs);
             uint8_t str = vs_pop(&vs);
             (void)str;
             uint8_t r = vs_push_at(&vs, str);
             TR_EMIT(vigil_reg_abc(VREG_STRING_OP, r, arg, op));
+            ip += 1;
+            break;
+        }
+        case VIGIL_OPCODE_STRING_CHAR_AT: {
+            /* Pop 2 (str, idx), push 2 (char, err). */
+            SYNC_PACK(2); uint8_t arg =
+            vs_pop(&vs);
+            uint8_t str = vs_pop(&vs);
+            (void)arg;
+            uint8_t r1 = vs_push_at(&vs, str);
+            uint8_t r2 = vs_push_at(&vs, (uint8_t)(str + 1));
+            (void)r1; (void)r2;
+            TR_EMIT(vigil_reg_abc(VREG_STRING_OP, str, arg, op));
             ip += 1;
             break;
         }
