@@ -3211,12 +3211,14 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
             uint64_t a = vigil_nanbox_decode_uint(R[ra]), b = vigil_nanbox_decode_uint(R[rb]), r;
             if (VIGIL_LIKELY(vigil_vm_checked_uadd(a, b, &r) == VIGIL_STATUS_OK))
             { R[rd] = vigil_nanbox_encode_uint(r); RNEXT(); }
+            goto r_overflow;
         }
         if (vigil_nanbox_is_int(R[ra]) && vigil_nanbox_is_int(R[rb]))
         {
             int64_t a = vigil_nanbox_decode_int(R[ra]), b = vigil_nanbox_decode_int(R[rb]), r;
             if (VIGIL_LIKELY(vigil_vm_checked_add(a, b, &r) == VIGIL_STATUS_OK))
             { R[rd] = vigil_nanbox_encode_int(r); RNEXT(); }
+            goto r_overflow;
         }
         /* Try f64 fast path. */
         if (vigil_nanbox_is_double(R[ra]) && vigil_nanbox_is_double(R[rb]))
@@ -3247,12 +3249,14 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
             uint64_t a = vigil_nanbox_decode_uint(R[ra]), b = vigil_nanbox_decode_uint(R[rb]), r;
             if (VIGIL_LIKELY(vigil_vm_checked_usubtract(a, b, &r) == VIGIL_STATUS_OK))
             { R[rd] = vigil_nanbox_encode_uint(r); RNEXT(); }
+            goto r_overflow;
         }
         if (vigil_nanbox_is_int(R[ra]) && vigil_nanbox_is_int(R[rb]))
         {
             int64_t a = vigil_nanbox_decode_int(R[ra]), b = vigil_nanbox_decode_int(R[rb]), r;
             if (VIGIL_LIKELY(vigil_vm_checked_subtract(a, b, &r) == VIGIL_STATUS_OK))
             { R[rd] = vigil_nanbox_encode_int(r); RNEXT(); }
+            goto r_overflow;
         }
         if (vigil_nanbox_is_double(R[ra]) && vigil_nanbox_is_double(R[rb]))
         {
@@ -3271,12 +3275,14 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
             uint64_t a = vigil_nanbox_decode_uint(R[ra]), b = vigil_nanbox_decode_uint(R[rb]), r;
             if (VIGIL_LIKELY(vigil_vm_checked_umultiply(a, b, &r) == VIGIL_STATUS_OK))
             { R[rd] = vigil_nanbox_encode_uint(r); RNEXT(); }
+            goto r_overflow;
         }
         if (vigil_nanbox_is_int(R[ra]) && vigil_nanbox_is_int(R[rb]))
         {
             int64_t a = vigil_nanbox_decode_int(R[ra]), b = vigil_nanbox_decode_int(R[rb]), r;
             if (VIGIL_LIKELY(vigil_vm_checked_multiply(a, b, &r) == VIGIL_STATUS_OK))
             { R[rd] = vigil_nanbox_encode_int(r); RNEXT(); }
+            goto r_overflow;
         }
         if (vigil_nanbox_is_double(R[ra]) && vigil_nanbox_is_double(R[rb]))
         {
@@ -3296,6 +3302,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
             if (VIGIL_UNLIKELY(b == 0)) goto r_divzero;
             if (VIGIL_LIKELY(vigil_vm_checked_udivide(a, b, &r) == VIGIL_STATUS_OK))
             { R[rd] = vigil_nanbox_encode_uint(r); RNEXT(); }
+            goto r_overflow;
         }
         if (vigil_nanbox_is_int(R[ra]) && vigil_nanbox_is_int(R[rb]))
         {
@@ -3303,6 +3310,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
             if (VIGIL_UNLIKELY(b == 0)) goto r_divzero;
             if (VIGIL_LIKELY(vigil_vm_checked_divide(a, b, &r) == VIGIL_STATUS_OK))
             { R[rd] = vigil_nanbox_encode_int(r); RNEXT(); }
+            goto r_overflow;
         }
         if (vigil_nanbox_is_double(R[ra]) && vigil_nanbox_is_double(R[rb]))
         {
@@ -3322,6 +3330,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
             if (VIGIL_UNLIKELY(b == 0)) goto r_divzero;
             if (VIGIL_LIKELY(vigil_vm_checked_umodulo(a, b, &r) == VIGIL_STATUS_OK))
             { R[rd] = vigil_nanbox_encode_uint(r); RNEXT(); }
+            goto r_overflow;
         }
         if (vigil_nanbox_is_int(R[ra]) && vigil_nanbox_is_int(R[rb]))
         {
@@ -3329,6 +3338,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
             if (VIGIL_UNLIKELY(b == 0)) goto r_divzero;
             if (VIGIL_LIKELY(vigil_vm_checked_modulo(a, b, &r) == VIGIL_STATUS_OK))
             { R[rd] = vigil_nanbox_encode_int(r); RNEXT(); }
+            goto r_overflow;
         }
         status = VIGIL_STATUS_UNSUPPORTED;
         goto r_cleanup;
@@ -3398,6 +3408,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
                 R[VREG_GET_A(i)] = vigil_nanbox_encode_int(r);
                 RNEXT();
             }
+            goto r_overflow;
         }
         if (vigil_nanbox_is_double(R[src]))
         {
