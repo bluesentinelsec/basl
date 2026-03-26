@@ -4025,40 +4025,24 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         uint8_t ci = VREG_GET_B(i);
         uint8_t arg_count = VREG_GET_C(i);
 
-        size_t orig_base = base + (size_t)arg_base_r;
-        size_t arg_base = orig_base;
-        REGVM_ISOLATE_CALL(arg_base, arg_count);
+        size_t arg_base = base + (size_t)arg_base_r;
         vm->stack_count = arg_base + (size_t)arg_count;
 
         const vigil_value_t *native_val = VIGIL_VM_CHUNK_CONSTANT(sc, (size_t)ci);
-        if (!native_val || !vigil_nanbox_has_object(*native_val))
-        {
-            status = VIGIL_STATUS_UNSUPPORTED;
-            goto r_cleanup;
-        }
-        vigil_object_t *native_obj = (vigil_object_t *)vigil_nanbox_decode_ptr(*native_val);
-        vigil_native_fn_t native_fn = vigil_native_function_get(native_obj);
-        if (!native_fn)
-        {
-            status = VIGIL_STATUS_UNSUPPORTED;
-            goto r_cleanup;
-        }
+        if (VIGIL_UNLIKELY(!native_val || !vigil_nanbox_has_object(*native_val)))
+        { status = VIGIL_STATUS_UNSUPPORTED; goto r_cleanup; }
+        vigil_native_fn_t native_fn = vigil_native_function_get(
+            (vigil_object_t *)vigil_nanbox_decode_ptr(*native_val));
+        if (VIGIL_UNLIKELY(!native_fn))
+        { status = VIGIL_STATUS_UNSUPPORTED; goto r_cleanup; }
 
         status = native_fn(vm, (size_t)arg_count, error);
-        if (status != VIGIL_STATUS_OK)
+        if (VIGIL_UNLIKELY(status != VIGIL_STATUS_OK))
             goto r_cleanup;
 
         R = vm->stack + base;
-        if (arg_base != orig_base)
-        {
-            size_t ret_n = vm->stack_count > arg_base ? vm->stack_count - arg_base : 0;
-            if (ret_n > 0)
-                memmove(&vm->stack[orig_base], &vm->stack[arg_base], ret_n * sizeof(vigil_value_t));
-            vm->stack_count = orig_base + ret_n;
-        }
-
-        /* Ensure stack_count covers the register window without
-           zero-filling (bump-allocated registers may hold live values). */
+        /* Return values are at stack[arg_base .. stack_count-1].
+           They're already in the caller's register window. */
         if (vm->stack_count < base + rc->max_registers)
             vm->stack_count = base + rc->max_registers;
 
@@ -4409,25 +4393,69 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
     RCASE(PARSE_I32)
     {
         vigil_reg_instr_t i = code[ip];
-        REGVM_SYNC_PRE(VREG_GET_B(i));
-        vigil_vm_parse_i32(vm);
-        REGVM_SYNC_POST();
+        uint8_t src = VREG_GET_B(i);
+        uint8_t dst = VREG_GET_A(i);
+        vigil_object_t *obj = (vigil_object_t *)vigil_nanbox_decode_ptr(R[src]);
+        const char *s = vigil_string_object_c_str(obj);
+        if (s != NULL && *s != '\0')
+        {
+            char *end; errno = 0;
+            long val = strtol(s, &end, 10);
+            if (errno == 0 && end != s && *end == '\0' && val >= INT32_MIN && val <= INT32_MAX)
+            {
+                R[dst] = vigil_nanbox_encode_int((int64_t)val);
+                R[dst + 1] = vigil_runtime_ok_error_value(vm->runtime);
+                RNEXT();
+            }
+        }
+        R[dst] = vigil_nanbox_encode_int(0);
+        R[dst + 1] = vigil_runtime_ok_error_value(vm->runtime); /* TODO: real error */
         RNEXT();
     }
     RCASE(PARSE_F64)
     {
         vigil_reg_instr_t i = code[ip];
-        REGVM_SYNC_PRE(VREG_GET_B(i));
-        vigil_vm_parse_f64(vm);
-        REGVM_SYNC_POST();
+        uint8_t src = VREG_GET_B(i);
+        uint8_t dst = VREG_GET_A(i);
+        vigil_object_t *obj = (vigil_object_t *)vigil_nanbox_decode_ptr(R[src]);
+        const char *s = vigil_string_object_c_str(obj);
+        if (s != NULL && *s != '\0')
+        {
+            char *end; errno = 0;
+            double val = strtod(s, &end);
+            if (errno == 0 && end != s && *end == '\0')
+            {
+                R[dst] = vigil_nanbox_encode_double(val);
+                R[dst + 1] = vigil_runtime_ok_error_value(vm->runtime);
+                RNEXT();
+            }
+        }
+        R[dst] = vigil_nanbox_encode_double(0.0);
+        R[dst + 1] = vigil_runtime_ok_error_value(vm->runtime);
         RNEXT();
     }
     RCASE(PARSE_BOOL)
     {
         vigil_reg_instr_t i = code[ip];
-        REGVM_SYNC_PRE(VREG_GET_B(i));
-        vigil_vm_parse_bool(vm);
-        REGVM_SYNC_POST();
+        uint8_t src = VREG_GET_B(i);
+        uint8_t dst = VREG_GET_A(i);
+        vigil_object_t *obj = (vigil_object_t *)vigil_nanbox_decode_ptr(R[src]);
+        const char *s = vigil_string_object_c_str(obj);
+        size_t len = s ? vigil_string_object_length(obj) : 0;
+        if (len == 4 && memcmp(s, "true", 4) == 0)
+        {
+            R[dst] = VIGIL_NANBOX_TRUE;
+            R[dst + 1] = vigil_runtime_ok_error_value(vm->runtime);
+            RNEXT();
+        }
+        if (len == 5 && memcmp(s, "false", 5) == 0)
+        {
+            R[dst] = VIGIL_NANBOX_FALSE;
+            R[dst + 1] = vigil_runtime_ok_error_value(vm->runtime);
+            RNEXT();
+        }
+        R[dst] = VIGIL_NANBOX_FALSE;
+        R[dst + 1] = vigil_runtime_ok_error_value(vm->runtime);
         RNEXT();
     }
 
