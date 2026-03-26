@@ -107,17 +107,6 @@ static uint8_t vs_push(vstack_t *vs)
     return r;
 }
 
-/* Check if the last push needs a MOV to copy to the local register.
-   Returns the local register if a MOV is needed, or 255 if not. */
-static uint8_t vs_needs_local_mov(const vstack_t *vs)
-{
-    if (!vs->locals_done) return 255;
-    int pos = vs->top - 1;
-    if (pos < 0 || pos >= (int)vs->local_count) return 255;
-    if (vs->regs[pos] == (uint8_t)pos) return 255;
-    return (uint8_t)pos;
-}
-
 static uint8_t vs_push_at(vstack_t *vs, uint8_t reg)
 {
     vs->regs[vs->top] = reg;
