@@ -1184,21 +1184,25 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
         uint8_t op = code[ip];
 
 
-        /* Record offset mapping. */
-        omap_add(&omap, start_ip, rc->code_count);
-
-        /* Restore stack depth at jump targets. If the current depth
-           differs from the expected depth, a branch left its result
-           at a different position. Emit a MOVE to normalize. */
+        /* Restore stack depth at jump targets. */
         if (depth_at[start_ip] >= 0)
         {
             vs.top = depth_at[start_ip];
+            /* At a join point after short-circuit (&&/||), emit a MOV
+               to normalize the register BEFORE the omap entry. Jumps
+               targeting this offset land AFTER the MOV (via omap), so
+               the short-circuit path skips it. The fall-through path
+               executes it. */
             if (reg_at[start_ip] >= 0 && vs.top > 0 && vs.regs[vs.top - 1] != (uint8_t)reg_at[start_ip])
             {
                 uint8_t expected = (uint8_t)reg_at[start_ip];
-                TR_EMIT(vigil_reg_abc(VREG_MOVE, vs.regs[vs.top - 1], expected, 0));
+                TR_EMIT(vigil_reg_abc(VREG_MOVE, expected, vs.regs[vs.top - 1], 0));
+                vs.regs[vs.top - 1] = expected;
             }
         }
+
+        /* Record offset mapping (after any normalization MOV). */
+        omap_add(&omap, start_ip, rc->code_count);
 
         switch (op)
         {
@@ -1244,7 +1248,8 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
             break;
         }
         case VIGIL_OPCODE_POP: {
-            vs_pop(&vs);
+            uint8_t popped = vs_pop(&vs);
+            (void)popped;
             ip += 1;
             break;
         }
@@ -1476,10 +1481,19 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
             uint32_t off = rd_u32(code, &ip);
             size_t target = ip + (size_t)off;
             uint8_t cond = vs_peek(&vs, 0);
-            TR_EMIT(vigil_reg_abc(VREG_TEST, cond, 0, 0));
+            /* If a previous && already recorded a register at the target,
+               and our cond differs, emit a MOV so the short-circuit path
+               leaves the value at the expected register. */
+            if (reg_at[target] >= 0 && cond != (uint8_t)reg_at[target])
+                TR_EMIT(vigil_reg_abc(VREG_MOVE, (uint8_t)reg_at[target], cond, 0));
+            uint8_t test_reg = (reg_at[target] >= 0) ? (uint8_t)reg_at[target] : cond;
+            TR_EMIT(vigil_reg_abc(VREG_TEST, test_reg, 0, 0));
             jpatch_add(&patches, rc->code_count, target, 0, vs.top);
             RECORD_DEPTH(target, vs.top);
             TR_EMIT(vigil_reg_asbx(VREG_JMP, 0, 0));
+            /* Mark the fall-through (POP) so it reuses the peeked register. */
+            if (ip <= code_size && reg_at[ip] == -1)
+                reg_at[ip] = cond;
             break;
         }
 
