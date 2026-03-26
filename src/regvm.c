@@ -1527,6 +1527,9 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
                             next == VIGIL_OPCODE_TRUE || next == VIGIL_OPCODE_FALSE ||
                             next == VIGIL_OPCODE_NIL || next == VIGIL_OPCODE_GET_GLOBAL);
             }
+            /* Also detect last condition in chain: target already has depth recorded. */
+            if (!in_chain && depth_at[target] >= 0)
+                in_chain = 1;
             if (in_chain)
             {
                 /* In a && chain: emit compare → push bool → TEST+JMP.
