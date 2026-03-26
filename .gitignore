@@ -44,3 +44,4 @@ build-san/
 ffi.o
 *.o
 build-prof/
+build-main/

@@ -2595,7 +2595,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         return VIGIL_STATUS_INVALID_ARGUMENT;
 
     const vigil_reg_instr_t *code = rc->code;
-    const size_t code_count = rc->code_count;
+    size_t code_count = rc->code_count;
     (void)code_count;
 
     if (code == NULL || code_count == 0)
@@ -2619,6 +2619,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
     vigil_value_t *R = vm->stack; /* register file = stack base */
     size_t ip = 0;
     vigil_status_t status = VIGIL_STATUS_OK;
+    size_t initial_frame_count = vm->frame_count;
 
     /* Ensure stack has room for registers. */
     /* Set up initial frame if needed. */
@@ -3948,40 +3949,72 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         uint8_t arg_count = VREG_GET_C(i);
 
         size_t arg_base = base + (size_t)arg_base_r;
-        REGVM_ISOLATE_CALL(arg_base, arg_count);
-        vm->stack_count = arg_base + (size_t)arg_count;
 
         const vigil_object_t *callee = vigil_vm_function_sibling(frame->function, (size_t)func_idx);
         if (!callee)
+        { status = VIGIL_STATUS_INTERNAL; goto r_cleanup; }
+
+        vigil_chunk_t *cc = (vigil_chunk_t *)vigil_callable_object_chunk(callee);
+        if (!cc) { status = VIGIL_STATUS_INTERNAL; goto r_cleanup; }
+        if (cc->reg_cache == NULL)
         {
-            status = VIGIL_STATUS_INTERNAL;
-            goto r_cleanup;
+            vigil_reg_chunk_t *nrc = malloc(sizeof(*nrc));
+            if (!nrc) { status = VIGIL_STATUS_OUT_OF_MEMORY; goto r_cleanup; }
+            nrc->arity = (uint8_t)vigil_function_object_arity(
+                vigil_callable_object_function(callee));
+            status = vigil_reg_translate(cc, nrc, vm->runtime, error);
+            if (status != VIGIL_STATUS_OK) { free(nrc); goto r_cleanup; }
+            cc->reg_cache = nrc;
         }
 
-        size_t saved_ip = frame->ip;
-        frame->ip = VIGIL_VM_CHUNK_CODE_SIZE(frame->chunk);
+        /* Save caller state. */
+        frame->ip = ip + 1;
 
-        status = vigil_vm_execute_call(vm, callee, (size_t)arg_count, error);
+        /* Push callee frame. */
+        if (VIGIL_UNLIKELY(vm->frame_count >= vm->frame_capacity))
+        {
+            /* Rare path: grow frames via execute_call fallback. */
+            vm->stack_count = arg_base + (size_t)arg_count;
+            status = vigil_vm_execute_call(vm, callee, (size_t)arg_count, error);
+            frame = &vm->frames[vm->frame_count - 1];
+            R = vm->stack + base;
+            if (status != VIGIL_STATUS_OK) goto r_cleanup;
+            vm->stack_count = arg_base + (vm->stack_count > arg_base ? vm->stack_count - arg_base : 0);
+            if (vm->stack_count < base + rc->max_registers)
+                vm->stack_count = base + rc->max_registers;
+            RNEXT();
+        }
+        {
+            vigil_vm_frame_t *nf = &vm->frames[vm->frame_count++];
+            nf->callable = callee;
+            nf->function = vigil_callable_object_function(callee);
+            nf->chunk = cc;
+            nf->ip = 0U;
+            nf->base_slot = arg_base;
+            nf->defers = NULL; nf->defer_count = 0; nf->defer_capacity = 0;
+            nf->pending_returns = NULL; nf->pending_return_count = 0;
+            nf->pending_return_capacity = 0; nf->draining_defers = 0;
+        }
 
+        /* Switch to callee — registers start at arg position. */
+        rc = cc->reg_cache;
+        code = rc->code; code_count = rc->code_count;
+        sc = rc->stack_chunk;
         frame = &vm->frames[vm->frame_count - 1];
-        frame->ip = saved_ip;
-        R = vm->stack + base;
+        base = arg_base;
+        ip = 0;
 
-        if (status != VIGIL_STATUS_OK)
-            goto r_cleanup;
-
+        /* Ensure stack has room for callee registers. */
+        if (VIGIL_UNLIKELY(vm->stack_capacity < base + (size_t)rc->max_registers + 16))
         {
-            size_t ret_dst = base + (size_t)arg_base_r;
-            size_t ret_n = vm->stack_count > arg_base ? vm->stack_count - arg_base : 0;
-            if (ret_n > 0)
-                memmove(&vm->stack[ret_dst], &vm->stack[arg_base], ret_n * sizeof(vigil_value_t));
-            vm->stack_count = ret_dst + ret_n;
+            status = vigil_vm_grow_stack(vm, base + (size_t)rc->max_registers + 16, error);
+            if (status != VIGIL_STATUS_OK) goto r_cleanup;
         }
-
+        R = vm->stack + base;
         if (vm->stack_count < base + rc->max_registers)
             vm->stack_count = base + rc->max_registers;
 
-        RNEXT();
+        RDISPATCH();
     }
 
     /* ── Native call ───────────────────────────────────────────── */
@@ -4623,6 +4656,23 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
             R[0] = rv;
             vm->stack_count = base + 1;
         }
+        /* If we were pushed by an inline CALL, restore the caller. */
+        if (vm->frame_count > initial_frame_count)
+        {
+            vm->frame_count -= 1U;
+            frame = &vm->frames[vm->frame_count - 1];
+            vigil_chunk_t *cc = (vigil_chunk_t *)frame->chunk;
+            rc = cc->reg_cache;
+            code = rc->code; code_count = rc->code_count;
+            sc = rc->stack_chunk;
+            base = frame->base_slot;
+            ip = frame->ip;
+            R = vm->stack + base;
+            if (vm->stack_count < base + rc->max_registers)
+                vm->stack_count = base + rc->max_registers;
+            if (status != VIGIL_STATUS_OK) goto r_cleanup;
+            RDISPATCH();
+        }
         goto r_cleanup;
     }
 
@@ -4808,6 +4858,29 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
             status = regvm_drain_defers(vm, fi, error);
             if (status != VIGIL_STATUS_OK) goto r_cleanup;
         }
+
+        /* Inline return to caller if we were pushed by inline CALL. */
+        if (vm->frame_count > initial_frame_count)
+        {
+            /* Return values are already at the right position in the
+               caller's register window (callee base == caller arg_base).
+               Just pop the frame and restore caller state. */
+            vm->frame_count -= 1U;
+            frame = &vm->frames[vm->frame_count - 1];
+            vigil_chunk_t *cc = (vigil_chunk_t *)frame->chunk;
+            rc = cc->reg_cache;
+            code = rc->code; code_count = rc->code_count;
+            sc = rc->stack_chunk;
+            base = frame->base_slot;
+            ip = frame->ip;
+            R = vm->stack + base;
+            /* stack_count: return values are at base + arg_base_r + 0..count-1.
+               The caller expects them there. Just ensure stack covers caller regs. */
+            if (vm->stack_count < base + rc->max_registers)
+                vm->stack_count = base + rc->max_registers;
+            RDISPATCH();
+        }
+
         status = VIGIL_STATUS_OK;
         goto r_cleanup;
     }
