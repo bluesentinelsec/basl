@@ -2156,7 +2156,11 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
             uint32_t b = rd_raw_u32(code, &ip);
             uint32_t c = rd_raw_u32(code, &ip);
             (void)c;
-            TR_EMIT(vigil_reg_abc(VREG_DEFER, op, (uint8_t)a, (uint8_t)b));
+            /* Pack and pop the deferred args so SYNC_PRE can find them. */
+            SYNC_PACK(b);
+            uint8_t top_r = (b > 0) ? vs.regs[vs.top - 1] : 0;
+            for (uint32_t di = 0; di < b; di++) vs_pop(&vs);
+            TR_EMIT(vigil_reg_abc(VREG_DEFER, op, (uint8_t)a, top_r));
             TR_EMIT((uint32_t)a);
             TR_EMIT((uint32_t)b);
             break;
@@ -2166,7 +2170,10 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
         case VIGIL_OPCODE_DEFER_CALL_NATIVE: {
             uint32_t a = rd_u32(code, &ip);
             uint32_t b = rd_raw_u32(code, &ip);
-            TR_EMIT(vigil_reg_abc(VREG_DEFER, op, (uint8_t)a, (uint8_t)b));
+            SYNC_PACK(b);
+            uint8_t top_r = (b > 0) ? vs.regs[vs.top - 1] : 0;
+            for (uint32_t di = 0; di < b; di++) vs_pop(&vs);
+            TR_EMIT(vigil_reg_abc(VREG_DEFER, op, (uint8_t)a, top_r));
             TR_EMIT((uint32_t)a);
             TR_EMIT((uint32_t)b);
             break;
@@ -2175,7 +2182,10 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
             uint32_t a = rd_u32(code, &ip);
             uint32_t b = rd_raw_u32(code, &ip);
             uint32_t c = rd_raw_u32(code, &ip);
-            TR_EMIT(vigil_reg_abc(VREG_DEFER, op, (uint8_t)a, (uint8_t)c));
+            SYNC_PACK(c);
+            uint8_t top_r = (c > 0) ? vs.regs[vs.top - 1] : 0;
+            for (uint32_t di = 0; di < c; di++) vs_pop(&vs);
+            TR_EMIT(vigil_reg_abc(VREG_DEFER, op, (uint8_t)a, top_r));
             TR_EMIT((uint32_t)a);
             TR_EMIT((uint32_t)b);
             break;
@@ -2351,10 +2361,11 @@ void vigil_reg_dump(const vigil_reg_chunk_t *rc)
 #endif
 
 /* ── Defer drain helper ────────────────────────────────────────── */
-static vigil_status_t regvm_drain_defers(vigil_vm_t *vm, vigil_vm_frame_t *frame, vigil_error_t *error)
+static vigil_status_t regvm_drain_defers(vigil_vm_t *vm, size_t frame_idx, vigil_error_t *error)
 {
-    while (frame->defer_count > 0U)
+    while (vm->frames[frame_idx].defer_count > 0U)
     {
+        vigil_vm_frame_t *frame = &vm->frames[frame_idx];
         vigil_vm_defer_action_t action = frame->defers[frame->defer_count - 1U];
         memset(&frame->defers[frame->defer_count - 1U], 0, sizeof(action));
         frame->defer_count -= 1U;
@@ -4106,6 +4117,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
     {
         vigil_reg_instr_t i = code[ip];
         uint8_t defer_op = VREG_GET_A(i);
+        uint8_t top_r = VREG_GET_C(i);
         uint32_t a = code[ip + 1];
         uint32_t b = code[ip + 2];
         vigil_vm_defer_kind_t kind;
@@ -4118,8 +4130,10 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         case VIGIL_OPCODE_DEFER_CALL_NATIVE:    kind = VIGIL_VM_DEFER_CALL_NATIVE; break;
         default: status = VIGIL_STATUS_UNSUPPORTED; goto r_cleanup;
         }
-        /* Capture current stack values for the deferred call. */
+        /* Sync registers to stack so we can capture the values. */
         size_t val_count = (size_t)b;
+        if (val_count > 0)
+            REGVM_SYNC_PRE(top_r);
         vigil_value_t *vals = NULL;
         if (val_count > 0)
         {
@@ -4491,7 +4505,8 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         /* Drain deferred calls before returning. */
         if (frame->defer_count > 0U)
         {
-            status = regvm_drain_defers(vm, frame, error);
+            size_t fi = (size_t)(frame - vm->frames);
+            status = regvm_drain_defers(vm, fi, error);
             if (status != VIGIL_STATUS_OK) goto r_cleanup;
         }
         status = VIGIL_STATUS_OK;
