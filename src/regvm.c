@@ -1688,10 +1688,12 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
         case VIGIL_OPCODE_NEW_INSTANCE: {
             uint32_t ci = rd_u32(code, &ip);
             uint32_t field_count = rd_raw_u32(code, &ip);
+            uint8_t fields_base = (field_count > 0) ? vs.regs[vs.top - (int)field_count] : 0;
             for (uint32_t i = 0; i < field_count; i++)
                 vs_pop(&vs);
             uint8_t r = vs_push(&vs);
             TR_EMIT(vigil_reg_abx(VREG_NEW_INSTANCE, r, (uint16_t)ci));
+            TR_EMIT(vigil_reg_abc(0, fields_base, (uint8_t)field_count, 0));
             break;
         }
         case VIGIL_OPCODE_GET_FIELD: {
@@ -3701,11 +3703,17 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
     RCASE(NEW_INSTANCE)
     {
         vigil_reg_instr_t i = code[ip];
+        uint8_t dest = VREG_GET_A(i);
         uint16_t ci = VREG_GET_Bx(i);
+        vigil_reg_instr_t i2 = code[ip + 1];
+        uint8_t fields_base = VREG_GET_A(i2);
+        uint8_t field_count = VREG_GET_B(i2);
         vigil_object_t *inst = NULL;
-        status = vigil_instance_object_new(vm->runtime, (size_t)ci, NULL, 0, &inst, error);
+        vigil_value_t *fields = (field_count > 0) ? &R[fields_base] : NULL;
+        status = vigil_instance_object_new(vm->runtime, (size_t)ci, fields, (size_t)field_count, &inst, error);
         if (status != VIGIL_STATUS_OK) goto r_cleanup;
-        vigil_value_init_object(&R[VREG_GET_A(i)], &inst);
+        vigil_value_init_object(&R[dest], &inst);
+        ip++;
         RNEXT();
     }
     RCASE(NEW_ARRAY)
