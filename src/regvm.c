@@ -2285,6 +2285,49 @@ void vigil_reg_dump(const vigil_reg_chunk_t *rc)
 #define REGVM_COMPUTED_GOTO 0
 #endif
 
+/* ── Defer drain helper ────────────────────────────────────────── */
+static vigil_status_t regvm_drain_defers(vigil_vm_t *vm, vigil_vm_frame_t *frame, vigil_error_t *error)
+{
+    while (frame->defer_count > 0U)
+    {
+        vigil_vm_defer_action_t action = frame->defers[frame->defer_count - 1U];
+        memset(&frame->defers[frame->defer_count - 1U], 0, sizeof(action));
+        frame->defer_count -= 1U;
+
+        /* Push deferred argument values onto the stack. */
+        for (size_t i = 0; i < action.value_count; i++)
+        {
+            vigil_status_t s = vigil_vm_push(vm, &action.values[i], error);
+            if (s != VIGIL_STATUS_OK) { free(action.values); return s; }
+        }
+
+        vigil_status_t s = VIGIL_STATUS_OK;
+        switch (action.kind)
+        {
+        case VIGIL_VM_DEFER_CALL: {
+            const vigil_object_t *callee = vigil_vm_function_sibling(frame->function, (size_t)action.operand_a);
+            if (callee)
+                s = vigil_vm_execute_call(vm, callee, action.arg_count, error);
+            break;
+        }
+        case VIGIL_VM_DEFER_CALL_NATIVE: {
+            const vigil_value_t *nval = VIGIL_VM_CHUNK_CONSTANT(frame->chunk, (size_t)action.operand_a);
+            vigil_object_t *nobj = (vigil_object_t *)vigil_nanbox_decode_ptr(*nval);
+            vigil_native_fn_t nfn = vigil_native_function_get(nobj);
+            if (nfn) s = nfn(vm, action.arg_count, error);
+            break;
+        }
+        default:
+            break;
+        }
+        for (size_t i = 0; i < action.value_count; i++)
+            vigil_value_release(&action.values[i]);
+        free(action.values);
+        if (s != VIGIL_STATUS_OK) return s;
+    }
+    return VIGIL_STATUS_OK;
+}
+
 vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, vigil_value_t *out_value,
                                    vigil_error_t *error)
 {
@@ -4367,6 +4410,12 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         else
             *out_value = VIGIL_NANBOX_NIL;
         vm->stack_count = base + (size_t)base_r + (size_t)count;
+        /* Drain deferred calls before returning. */
+        if (frame->defer_count > 0U)
+        {
+            status = regvm_drain_defers(vm, frame, error);
+            if (status != VIGIL_STATUS_OK) goto r_cleanup;
+        }
         status = VIGIL_STATUS_OK;
         goto r_cleanup;
     }
