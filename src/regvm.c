@@ -2825,7 +2825,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         }                                                                                                              \
     } while (0)
 #define RDISPATCH() break
-#define RNEXT() break
+#define RNEXT() do { ip++; } while (0); break
 #define RCASE(op) case VREG_##op:
 #endif
 
@@ -4408,8 +4408,10 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
                 RNEXT();
             }
         }
-        R[dst] = vigil_nanbox_encode_int(0);
-        R[dst + 1] = vigil_runtime_ok_error_value(vm->runtime); /* TODO: real error */
+        /* Error path: fall back to stack-based implementation. */
+        REGVM_SYNC_PRE(src);
+        vigil_vm_parse_i32(vm);
+        REGVM_SYNC_POST();
         RNEXT();
     }
     RCASE(PARSE_F64)
@@ -4430,8 +4432,9 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
                 RNEXT();
             }
         }
-        R[dst] = vigil_nanbox_encode_double(0.0);
-        R[dst + 1] = vigil_runtime_ok_error_value(vm->runtime);
+        REGVM_SYNC_PRE(src);
+        vigil_vm_parse_f64(vm);
+        REGVM_SYNC_POST();
         RNEXT();
     }
     RCASE(PARSE_BOOL)
@@ -4454,8 +4457,9 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
             R[dst + 1] = vigil_runtime_ok_error_value(vm->runtime);
             RNEXT();
         }
-        R[dst] = VIGIL_NANBOX_FALSE;
-        R[dst + 1] = vigil_runtime_ok_error_value(vm->runtime);
+        REGVM_SYNC_PRE(src);
+        vigil_vm_parse_bool(vm);
+        REGVM_SYNC_POST();
         RNEXT();
     }
 
