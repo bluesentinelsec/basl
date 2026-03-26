@@ -1154,19 +1154,27 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
        Populated when jumps are emitted; consulted at each instruction
        to restore the correct depth at jump targets. -1 = no entry. */
     int *depth_at = calloc(code_size + 1, sizeof(int));
-    if (!depth_at)
+    int *reg_at = calloc(code_size + 1, sizeof(int));
+    if (!depth_at || !reg_at)
     {
+        free(depth_at); free(reg_at);
+        free(reg_at);
         free(jt);
         return VIGIL_STATUS_OUT_OF_MEMORY;
     }
     for (size_t di = 0; di <= code_size; di++)
+    {
         depth_at[di] = -1;
+        reg_at[di] = -1;
+    }
 
 #define RECORD_DEPTH(off, d)                                                                                           \
     do                                                                                                                 \
     {                                                                                                                  \
         if ((off) <= code_size && (depth_at[(off)] == -1 || (d) > depth_at[(off)]))                                    \
             depth_at[(off)] = (d);                                                                                     \
+        if ((off) <= code_size && reg_at[(off)] == -1 && vs.top > 0)                                                   \
+            reg_at[(off)] = vs.regs[vs.top - 1];                                                                       \
     } while (0)
 
     size_t ip = 0;
@@ -1183,7 +1191,16 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
            differs from the expected depth, a branch left its result
            at a different position. Emit a MOVE to normalize. */
         if (depth_at[start_ip] >= 0)
+        {
             vs.top = depth_at[start_ip];
+            /* If a branch left its result in a different register than
+               the jump source expected, emit a MOV to normalize. */
+            if (reg_at[start_ip] >= 0 && vs.top > 0 && vs.regs[vs.top - 1] != (uint8_t)reg_at[start_ip])
+            {
+                uint8_t expected = (uint8_t)reg_at[start_ip];
+                TR_EMIT(vigil_reg_abc(VREG_MOVE, vs.regs[vs.top - 1], expected, 0));
+            }
+        }
 
         switch (op)
         {
@@ -2232,14 +2249,14 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
     rc->max_registers = vs.next_reg;
 
     free(jt);
-    free(depth_at);
+    free(depth_at); free(reg_at);
     omap_free(&omap);
     jpatch_free(&patches);
     return VIGIL_STATUS_OK;
 
 tr_fail:
     free(jt);
-    free(depth_at);
+    free(depth_at); free(reg_at);
     omap_free(&omap);
     jpatch_free(&patches);
     vigil_reg_chunk_free(rc, runtime);
