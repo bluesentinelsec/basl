@@ -1723,11 +1723,20 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
         case VIGIL_OPCODE_NEW_CLOSURE: {
             uint32_t func_idx = rd_u32(code, &ip);
             uint32_t cap_count = rd_raw_u32(code, &ip);
-            /* Captures are on the stack. Pop them. */
-            for (uint32_t i = 0; i < cap_count; i++)
-                vs_pop(&vs);
-            uint8_t r = vs_push(&vs);
-            TR_EMIT(vigil_reg_abc(VREG_NEW_CLOSURE, r, (uint8_t)func_idx, (uint8_t)cap_count));
+            uint8_t a;
+            if (cap_count > 0)
+            {
+                SYNC_PACK(cap_count);
+                a = vs.regs[vs.top - (int)cap_count];
+                for (uint32_t i = 0; i < cap_count; i++)
+                    vs_pop(&vs);
+                vs_push_at(&vs, a);
+            }
+            else
+            {
+                a = vs_push(&vs);
+            }
+            TR_EMIT(vigil_reg_abc(VREG_NEW_CLOSURE, a, (uint8_t)func_idx, (uint8_t)cap_count));
             break;
         }
 
