@@ -274,6 +274,7 @@ typedef struct vigil_reg_chunk
     /* Pointer to the original stack chunk (for constants and spans). */
     const vigil_chunk_t *stack_chunk;
     uint8_t max_registers;
+    uint8_t arity; /* function parameter count, set before translation */
 } vigil_reg_chunk_t;
 
 /* ── Translation API ───────────────────────────────────────────── */

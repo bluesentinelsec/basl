@@ -1104,21 +1104,15 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
     const uint8_t *code = stack_chunk->code.data;
     size_t code_size = stack_chunk->code.length;
 
+    uint8_t saved_arity = rc->arity;
     vigil_reg_chunk_init(rc);
+    rc->arity = saved_arity;
     rc->stack_chunk = stack_chunk;
 
     uint8_t lc = count_locals(code, code_size);
     vstack_t vs;
-    /* Compute arity from debug local table: count locals with scope_start_ip=0. */
-    uint8_t arity = 0;
-    {
-        const vigil_debug_local_table_t *dlt = &stack_chunk->debug_locals;
-        for (size_t di = 0; di < dlt->count; di++)
-        {
-            if (dlt->locals[di].scope_start_ip == 0 && dlt->locals[di].slot < lc)
-                arity++;
-        }
-    }
+    /* Use the arity from the function object (set by the caller). */
+    uint8_t arity = rc->arity;
     vs_init(&vs, lc);
     /* Pre-initialize param slots: params are at R[0..arity-1]. */
     if (arity > 0)

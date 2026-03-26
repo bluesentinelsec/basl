@@ -2415,6 +2415,7 @@ vigil_status_t vigil_vm_execute_call(vigil_vm_t *vm, const vigil_object_t *calle
         vigil_reg_chunk_t *rc = malloc(sizeof(*rc));
         if (!rc)
             return VIGIL_STATUS_OUT_OF_MEMORY;
+        rc->arity = (uint8_t)vigil_function_object_arity(callee);
         vigil_status_t s = vigil_reg_translate(callee_chunk, rc, vm->runtime, error);
         if (s != VIGIL_STATUS_OK)
         {
@@ -2495,6 +2496,7 @@ vigil_status_t vigil_vm_execute_function(vigil_vm_t *vm, const vigil_object_t *f
                 vigil_vm_clear_frames(vm);
                 return VIGIL_STATUS_OUT_OF_MEMORY;
             }
+            rc->arity = (uint8_t)arity;
             status = vigil_reg_translate(fn_chunk, rc, vm->runtime, error);
             if (status != VIGIL_STATUS_OK)
             {
@@ -2527,6 +2529,7 @@ vigil_status_t vigil_vm_execute_function(vigil_vm_t *vm, const vigil_object_t *f
             vigil_reg_chunk_t *rc = malloc(sizeof(*rc));
             if (!rc)
                 return VIGIL_STATUS_OUT_OF_MEMORY;
+            rc->arity = 0; /* REPL/top-level: no params */
             status = vigil_reg_translate(chunk, rc, vm->runtime, error);
             if (status != VIGIL_STATUS_OK)
             {
