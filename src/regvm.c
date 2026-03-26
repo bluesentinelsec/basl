@@ -4545,21 +4545,53 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         uint8_t arg_base_r = (uint8_t)(code[ip + 1] & 0xFF);
 
         size_t arg_base = base + (size_t)arg_base_r;
-        REGVM_ISOLATE_CALL(arg_base, arg_count);
-        vm->stack_count = arg_base + (size_t)arg_count;
 
-        status = vigil_vm_execute_call(vm, frame->function, (size_t)arg_count, error);
+        /* Save caller state. CALL_SELF is 2 words. */
+        frame->ip = ip + 2;
+
+        /* Push self-recursive frame (fast path). */
+        if (VIGIL_UNLIKELY(vm->frame_count >= vm->frame_capacity))
+        {
+            REGVM_ISOLATE_CALL(arg_base, arg_count);
+            vm->stack_count = arg_base + (size_t)arg_count;
+            status = vigil_vm_execute_call(vm, frame->function, (size_t)arg_count, error);
+            frame = &vm->frames[vm->frame_count - 1];
+            R = vm->stack + base;
+            if (status != VIGIL_STATUS_OK) goto r_cleanup;
+            if (vm->stack_count > arg_base)
+                R[ret] = vm->stack[arg_base];
+            vm->stack_count = base + (size_t)ret + 1;
+            if (vm->stack_count < base + rc->max_registers)
+                vm->stack_count = base + rc->max_registers;
+            ip++;
+            RNEXT();
+        }
+        {
+            vigil_vm_frame_t *nf = &vm->frames[vm->frame_count++];
+            nf->function = frame->function;
+            nf->callable = frame->callable;
+            nf->chunk = frame->chunk;
+            nf->base_slot = arg_base;
+            nf->ip = 0U;
+            nf->defer_count = 0;
+            nf->pending_return_count = 0;
+            nf->draining_defers = 0;
+        }
+
+        /* Self-call: same rc/code/sc. Just switch base/ip/R. */
         frame = &vm->frames[vm->frame_count - 1];
+        base = arg_base;
+        ip = 0;
+        if (VIGIL_UNLIKELY(vm->stack_capacity < base + (size_t)rc->max_registers))
+        {
+            status = vigil_vm_grow_stack(vm, base + (size_t)rc->max_registers + 16, error);
+            if (status != VIGIL_STATUS_OK) goto r_cleanup;
+        }
         R = vm->stack + base;
-        if (status != VIGIL_STATUS_OK) goto r_cleanup;
+        if (vm->stack_count < base + rc->max_registers)
+            vm->stack_count = base + rc->max_registers;
 
-        /* Return value is at R[0] of callee (guaranteed by RETURN MOV fix). */
-        if (vm->stack_count > arg_base)
-            R[ret] = vm->stack[arg_base];
-        vm->stack_count = base + (size_t)ret + 1;
-        REGVM_SYNC_POST();
-        ip++;
-        RNEXT();
+        RDISPATCH();
     }
     RCASE(CALL_INTERFACE)
     {
@@ -4668,6 +4700,11 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
             base = frame->base_slot;
             ip = frame->ip;
             R = vm->stack + base;
+            if (ip >= 2 && VREG_GET_OP(code[ip - 2]) == VREG_CALL_SELF)
+            {
+                uint8_t cs_ret = VREG_GET_A(code[ip - 2]);
+                R[cs_ret] = *out_value;
+            }
             if (vm->stack_count < base + rc->max_registers)
                 vm->stack_count = base + rc->max_registers;
             if (status != VIGIL_STATUS_OK) goto r_cleanup;
@@ -4863,6 +4900,15 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
             base = frame->base_slot;
             ip = frame->ip;
             R = vm->stack + base;
+            /* For CALL_SELF (2-word instruction), move return value
+               from R[arg_base_r] to R[ret]. */
+            if (ip >= 2 && VREG_GET_OP(code[ip - 2]) == VREG_CALL_SELF)
+            {
+                uint8_t cs_ret = VREG_GET_A(code[ip - 2]);
+                uint8_t cs_abr = (uint8_t)(code[ip - 1] & 0xFF);
+                if (cs_ret != cs_abr && count >= 1)
+                    R[cs_ret] = R[cs_abr];
+            }
             if (vm->stack_count < base + rc->max_registers)
                 vm->stack_count = base + rc->max_registers;
             RDISPATCH();
@@ -4885,6 +4931,13 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
             base = frame->base_slot;
             ip = frame->ip;
             R = vm->stack + base;
+            if (ip >= 2 && VREG_GET_OP(code[ip - 2]) == VREG_CALL_SELF)
+            {
+                uint8_t cs_ret = VREG_GET_A(code[ip - 2]);
+                uint8_t cs_abr = (uint8_t)(code[ip - 1] & 0xFF);
+                if (cs_ret != cs_abr && count >= 1)
+                    R[cs_ret] = R[cs_abr];
+            }
             if (vm->stack_count < base + rc->max_registers)
                 vm->stack_count = base + rc->max_registers;
             RDISPATCH();
