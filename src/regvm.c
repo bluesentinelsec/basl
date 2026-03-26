@@ -4059,7 +4059,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
 
         size_t saved_ip = frame->ip;
         frame->ip = VIGIL_VM_CHUNK_CODE_SIZE(frame->chunk);
-        status = vigil_vm_execute_call(vm, fn_obj, (size_t)arg_count, error);
+        status = vigil_vm_execute_call(vm, callee_obj, (size_t)arg_count, error);
         frame = &vm->frames[vm->frame_count - 1];
         frame->ip = saved_ip;
         R = vm->stack + base;

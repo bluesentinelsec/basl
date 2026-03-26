@@ -2387,7 +2387,7 @@ vigil_status_t vigil_vm_execute_call(vigil_vm_t *vm, const vigil_object_t *calle
     /* Push callee frame. */
     if (vm->frame_count >= vm->frame_capacity)
     {
-        vigil_status_t s = vigil_vm_push_frame(vm, callee, callee, callee_chunk, base_slot, error);
+        vigil_status_t s = vigil_vm_push_frame(vm, callee, vigil_callable_object_function(callee), callee_chunk, base_slot, error);
         if (s != VIGIL_STATUS_OK)
             return s;
     }
@@ -2395,7 +2395,7 @@ vigil_status_t vigil_vm_execute_call(vigil_vm_t *vm, const vigil_object_t *calle
     {
         vigil_vm_frame_t *nf = &vm->frames[vm->frame_count];
         nf->callable = callee;
-        nf->function = callee;
+        nf->function = vigil_callable_object_function(callee);
         nf->chunk = callee_chunk;
         nf->ip = 0U;
         nf->base_slot = base_slot;
@@ -2415,7 +2415,7 @@ vigil_status_t vigil_vm_execute_call(vigil_vm_t *vm, const vigil_object_t *calle
         vigil_reg_chunk_t *rc = malloc(sizeof(*rc));
         if (!rc)
             return VIGIL_STATUS_OUT_OF_MEMORY;
-        rc->arity = (uint8_t)vigil_function_object_arity(callee);
+        rc->arity = (uint8_t)vigil_function_object_arity(vigil_callable_object_function(callee));
         vigil_status_t s = vigil_reg_translate(callee_chunk, rc, vm->runtime, error);
         if (s != VIGIL_STATUS_OK)
         {
