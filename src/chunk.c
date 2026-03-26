@@ -794,6 +794,14 @@ void vigil_chunk_clear(vigil_chunk_t *chunk)
         return;
     }
 
+    /* Free cached register translation so it is re-translated after clear. */
+    if (chunk->reg_cache != NULL)
+    {
+        vigil_reg_chunk_free(chunk->reg_cache, chunk->runtime);
+        free(chunk->reg_cache);
+        chunk->reg_cache = NULL;
+    }
+
     vigil_byte_buffer_clear(&chunk->code);
     chunk->span_count = 0U;
     for (i = 0U; i < chunk->constant_count; ++i)
