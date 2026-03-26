@@ -2620,6 +2620,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
     size_t ip = 0;
     vigil_status_t status = VIGIL_STATUS_OK;
     size_t initial_frame_count = vm->frame_count;
+    int has_reg_objects = 0; /* set when an object is stored in a register */
 
     /* Ensure stack has room for registers. */
     /* Set up initial frame if needed. */
@@ -2848,7 +2849,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         if (k)
         {
             if (vigil_nanbox_has_object(*k))
-                VIGIL_VM_VALUE_COPY(&R[VREG_GET_A(i)], k);
+            { VIGIL_VM_VALUE_COPY(&R[VREG_GET_A(i)], k); has_reg_objects = 1; }
             else
                 R[VREG_GET_A(i)] = *k;
         }
@@ -4000,7 +4001,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         code = rc->code; code_count = rc->code_count;
         sc = rc->stack_chunk;
         frame = &vm->frames[vm->frame_count - 1];
-        base = arg_base;
+        base = arg_base; has_reg_objects = 0;
         ip = 0;
         R = vm->stack + base;
 
@@ -4059,6 +4060,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
     do                                                                                                                 \
     {                                                                                                                  \
         R = vm->stack + base;                                                                                          \
+        has_reg_objects = 1;                                                                                           \
         if (vm->stack_count < base + rc->max_registers)                                                                \
             vm->stack_count = base + rc->max_registers;                                                                \
     } while (0)
@@ -4924,6 +4926,19 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         /* Fast path: inline return to caller (no defers, not top-level). */
         if (VIGIL_LIKELY(frame->defer_count == 0 && vm->frame_count > initial_frame_count))
         {
+            /* Release callee-owned objects above args and return values. */
+            if (has_reg_objects)
+            {
+                const vigil_reg_chunk_t *callee_rc = rc;
+                size_t callee_base = base;
+                size_t skip = callee_rc->arity;
+                if ((size_t)base_r + (size_t)count > skip)
+                    skip = (size_t)base_r + (size_t)count;
+                for (size_t ri = skip; ri < (size_t)callee_rc->max_registers; ri++)
+                    if (vigil_nanbox_has_object(vm->stack[callee_base + ri]))
+                        vigil_value_release(&vm->stack[callee_base + ri]);
+            }
+
             vm->frame_count -= 1U;
             frame = &vm->frames[vm->frame_count - 1];
             rc = ((vigil_chunk_t *)frame->chunk)->reg_cache;
@@ -4931,7 +4946,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
             sc = rc->stack_chunk;
             base = frame->base_slot;
             ip = frame->ip;
-            R = vm->stack + base;
+            R = vm->stack + base; has_reg_objects = 1;
             /* For CALL_SELF (2-word instruction), move return value
                from R[arg_base_r] to R[ret]. */
             if (ip >= 2 && VREG_GET_OP(code[ip - 2]) == VREG_CALL_SELF)
@@ -4955,6 +4970,15 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         }
         if (vm->frame_count > initial_frame_count)
         {
+            if (has_reg_objects)
+            {
+                size_t skip2 = rc->arity;
+                if ((size_t)base_r + (size_t)count > skip2) skip2 = (size_t)base_r + (size_t)count;
+                for (size_t ri2 = skip2; ri2 < (size_t)rc->max_registers; ri2++)
+                    if (vigil_nanbox_has_object(vm->stack[base + ri2]))
+                        vigil_value_release(&vm->stack[base + ri2]);
+            }
+
             vm->frame_count -= 1U;
             frame = &vm->frames[vm->frame_count - 1];
             rc = ((vigil_chunk_t *)frame->chunk)->reg_cache;
@@ -4999,18 +5023,13 @@ r_divzero:
     return VIGIL_STATUS_INVALID_ARGUMENT;
 
 r_cleanup:
-    /* Release object references still held in the register file.
-       Skip the return-value slots (0..live-1) — those are live
-       values the caller will consume. */
-    if (R != NULL)
+    if (has_reg_objects && R != NULL)
     {
         size_t live = vm->stack_count > base ? vm->stack_count - base : 0;
         size_t nregs = (size_t)rc->max_registers;
         for (size_t ri = live; ri < nregs; ri++)
-        {
             if (vigil_nanbox_has_object(R[ri]))
                 vigil_value_release(&R[ri]);
-        }
     }
     return status;
 }
