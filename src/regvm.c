@@ -1191,16 +1191,7 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
            differs from the expected depth, a branch left its result
            at a different position. Emit a MOVE to normalize. */
         if (depth_at[start_ip] >= 0)
-        {
             vs.top = depth_at[start_ip];
-            /* If a branch left its result in a different register than
-               the jump source expected, emit a MOV to normalize. */
-            if (reg_at[start_ip] >= 0 && vs.top > 0 && vs.regs[vs.top - 1] != (uint8_t)reg_at[start_ip])
-            {
-                uint8_t expected = (uint8_t)reg_at[start_ip];
-                TR_EMIT(vigil_reg_abc(VREG_MOVE, vs.regs[vs.top - 1], expected, 0));
-            }
-        }
 
         switch (op)
         {
@@ -1477,14 +1468,15 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
         case VIGIL_OPCODE_JUMP_IF_FALSE: {
             uint32_t off = rd_u32(code, &ip);
             size_t target = ip + (size_t)off;
-            /* Peek at the condition register (don't pop — the following
-               POP in the bytecode handles that on the true path, and
-               the jump skips it on the false path). */
             uint8_t cond = vs_peek(&vs, 0);
             TR_EMIT(vigil_reg_abc(VREG_TEST, cond, 0, 0));
             jpatch_add(&patches, rc->code_count, target, 0, vs.top);
             RECORD_DEPTH(target, vs.top);
             TR_EMIT(vigil_reg_asbx(VREG_JMP, 0, 0));
+            /* Record the peeked register at both the jump target AND the
+               fall-through so POP+push reuses the same register. */
+            if (ip <= code_size && reg_at[ip] == -1)
+                reg_at[ip] = cond;
             break;
         }
 
