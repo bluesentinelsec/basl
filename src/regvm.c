@@ -1856,9 +1856,10 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
             uint32_t type_idx = rd_u32(code, &ip);
             uint32_t count = rd_raw_u32(code, &ip);
             (void)type_idx;
+            uint8_t first = (count > 0) ? vs.regs[vs.top - (int)count] : 0;
             for (uint32_t i = 0; i < count; i++)
                 vs_pop(&vs);
-            uint8_t r = vs_push(&vs);
+            uint8_t r = (count > 0) ? vs_push_at(&vs, first) : vs_push(&vs);
             TR_EMIT(vigil_reg_abx(VREG_NEW_ARRAY, r, (uint16_t)count));
             break;
         }
@@ -1866,9 +1867,10 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
             uint32_t type_idx = rd_u32(code, &ip);
             uint32_t count = rd_raw_u32(code, &ip);
             (void)type_idx;
+            uint8_t first = (count > 0) ? vs.regs[vs.top - (int)(count * 2)] : 0;
             for (uint32_t i = 0; i < count * 2; i++)
                 vs_pop(&vs);
-            uint8_t r = vs_push(&vs);
+            uint8_t r = (count > 0) ? vs_push_at(&vs, first) : vs_push(&vs);
             TR_EMIT(vigil_reg_abx(VREG_NEW_MAP, r, (uint16_t)count));
             break;
         }

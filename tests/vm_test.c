@@ -1359,7 +1359,16 @@ TEST(VigilVmTest, ReportsStringConversionAllocatorFailures)
     ASSERT_EQ(vigil_chunk_write_constant(&chunk, &constant, Span(19U, 0U, 1U), NULL, &error), VIGIL_STATUS_OK);
     ASSERT_EQ(vigil_chunk_write_opcode(&chunk, VIGIL_OPCODE_TO_STRING, Span(19U, 2U, 3U), &error), VIGIL_STATUS_OK);
     ASSERT_EQ(vigil_chunk_write_opcode(&chunk, VIGIL_OPCODE_RETURN, Span(19U, 4U, 5U), &error), VIGIL_STATUS_OK);
-    stats.fail_after = stats.calls + 2U;
+    /* Warm up: execute once so the stack/frame caches are populated.
+       Then the allocator failure targets the TO_STRING allocation. */
+    ASSERT_EQ(vigil_vm_execute(vm, &chunk, &result, &error), VIGIL_STATUS_OK);
+    vigil_value_release(&result);
+    vigil_chunk_clear(&chunk);
+    vigil_value_init_bool(&constant, true);
+    ASSERT_EQ(vigil_chunk_write_constant(&chunk, &constant, Span(19U, 0U, 1U), NULL, &error), VIGIL_STATUS_OK);
+    ASSERT_EQ(vigil_chunk_write_opcode(&chunk, VIGIL_OPCODE_TO_STRING, Span(19U, 2U, 3U), &error), VIGIL_STATUS_OK);
+    ASSERT_EQ(vigil_chunk_write_opcode(&chunk, VIGIL_OPCODE_RETURN, Span(19U, 4U, 5U), &error), VIGIL_STATUS_OK);
+    stats.fail_after = stats.calls + 1U;
     EXPECT_EQ(vigil_vm_execute(vm, &chunk, &result, &error), VIGIL_STATUS_INVALID_ARGUMENT);
     EXPECT_EQ(error.type, VIGIL_STATUS_INVALID_ARGUMENT);
     CloseVmTestContext(&runtime, &vm, &chunk, &result);
@@ -1371,7 +1380,14 @@ TEST(VigilVmTest, ReportsStringConversionAllocatorFailures)
     ASSERT_EQ(vigil_chunk_write_constant(&chunk, &constant, Span(20U, 0U, 1U), NULL, &error), VIGIL_STATUS_OK);
     ASSERT_EQ(vigil_chunk_write_opcode(&chunk, VIGIL_OPCODE_TO_STRING, Span(20U, 2U, 3U), &error), VIGIL_STATUS_OK);
     ASSERT_EQ(vigil_chunk_write_opcode(&chunk, VIGIL_OPCODE_RETURN, Span(20U, 4U, 5U), &error), VIGIL_STATUS_OK);
-    stats.fail_after = stats.calls + 2U;
+    ASSERT_EQ(vigil_vm_execute(vm, &chunk, &result, &error), VIGIL_STATUS_OK);
+    vigil_value_release(&result);
+    vigil_chunk_clear(&chunk);
+    vigil_value_init_int(&constant, 17);
+    ASSERT_EQ(vigil_chunk_write_constant(&chunk, &constant, Span(20U, 0U, 1U), NULL, &error), VIGIL_STATUS_OK);
+    ASSERT_EQ(vigil_chunk_write_opcode(&chunk, VIGIL_OPCODE_TO_STRING, Span(20U, 2U, 3U), &error), VIGIL_STATUS_OK);
+    ASSERT_EQ(vigil_chunk_write_opcode(&chunk, VIGIL_OPCODE_RETURN, Span(20U, 4U, 5U), &error), VIGIL_STATUS_OK);
+    stats.fail_after = stats.calls + 1U;
     EXPECT_EQ(vigil_vm_execute(vm, &chunk, &result, &error), VIGIL_STATUS_INVALID_ARGUMENT);
     EXPECT_EQ(error.type, VIGIL_STATUS_INVALID_ARGUMENT);
     CloseVmTestContext(&runtime, &vm, &chunk, &result);
