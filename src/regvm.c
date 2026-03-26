@@ -1524,7 +1524,8 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
         for (uint32_t _i = 0; _i < (count); _i++) { \
             uint8_t _br = (uint8_t)((base_reg) + _i); \
             if (vs.top < (int)vs.local_count) { \
-                uint8_t _r = vs_push(&vs); \
+                /* Push-to-position local: force identity register. */ \
+                uint8_t _r = vs_push_at(&vs, (uint8_t)vs.top); \
                 if (_r != _br) \
                     TR_EMIT(vigil_reg_abc(VREG_MOVE, _r, _br, 0)); \
             } else { \
