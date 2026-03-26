@@ -2547,19 +2547,20 @@ static vigil_status_t regvm_drain_defers(vigil_vm_t *vm, size_t frame_idx, vigil
     return VIGIL_STATUS_OK;
 }
 
-/* Decode int64 from a nanbox that may be inline or a bigint object. */
+/* Decode int64 from a nanbox — handles both inline and bigint encoding.
+   For bigint objects we must go through the value-layer API to read the
+   full 64-bit value stored on the heap. */
 static inline int64_t regvm_decode_int(uint64_t v)
 {
     if (VIGIL_UNLIKELY(vigil_nanbox_is_bigint(v)))
-        return vigil_value_as_int(&v);
+        return vigil_value_as_int((const vigil_value_t *)&v);
     return vigil_nanbox_decode_int(v);
 }
 
-/* Decode uint64 from a nanbox that may be inline or a biguint object. */
 static inline uint64_t regvm_decode_uint(uint64_t v)
 {
     if (VIGIL_UNLIKELY(vigil_nanbox_is_biguint(v)))
-        return vigil_value_as_uint(&v);
+        return vigil_value_as_uint((const vigil_value_t *)&v);
     return vigil_nanbox_decode_uint(v);
 }
 
