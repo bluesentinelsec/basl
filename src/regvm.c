@@ -22,7 +22,6 @@
 #include "internal/vigil_vm_internal.h"
 #include "value_internal.h"
 #include "vigil/chunk.h"
-#include "vm_ops_arith.h"
 #include "vm_ops_collection.h"
 #include "vm_ops_convert.h"
 #include "vm_ops_string.h"

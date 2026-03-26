@@ -39,7 +39,6 @@
 #include "value_internal.h"
 #include "vigil/string.h"
 #include "vigil/vm.h"
-#include "vm_ops_arith.h"
 #include "vm_ops_collection.h"
 #include "vm_ops_convert.h"
 #include "vm_ops_string.h"
@@ -401,121 +400,6 @@ vigil_value_t vigil_vm_pop_or_nil(vigil_vm_t *vm)
     vm->stack_count -= 1U;
     return value;
 }
-
-
-
-
-
-vigil_status_t vigil_vm_invoke_value_call(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
-{
-    vigil_value_t callee_value;
-    vigil_object_t *callee;
-    const vigil_object_t *function;
-    size_t callee_slot;
-    vigil_status_t status;
-
-    if (arg_count + 1U > vm->stack_count)
-    {
-        vigil_error_set_literal(error, VIGIL_STATUS_INTERNAL, "call arguments are missing from the stack");
-        return VIGIL_STATUS_INTERNAL;
-    }
-
-    callee_slot = vm->stack_count - (arg_count + 1U);
-    callee_value = vm->stack[callee_slot];
-    callee = ((vigil_object_t *)vigil_nanbox_decode_ptr(callee_value));
-    if (!vigil_nanbox_is_object(callee_value) || callee == NULL ||
-        (vigil_object_type(callee) != VIGIL_OBJECT_FUNCTION && vigil_object_type(callee) != VIGIL_OBJECT_CLOSURE))
-    {
-        vigil_value_release(&callee_value);
-        vigil_error_set_literal(error, VIGIL_STATUS_INVALID_ARGUMENT, "call target is not a function");
-        return VIGIL_STATUS_INVALID_ARGUMENT;
-    }
-    if (vigil_callable_object_arity(callee) != arg_count)
-    {
-        vigil_value_release(&callee_value);
-        vigil_error_set_literal(error, VIGIL_STATUS_INVALID_ARGUMENT, "call arity does not match function signature");
-        return VIGIL_STATUS_INVALID_ARGUMENT;
-    }
-
-    vigil_object_retain(callee);
-    function = vigil_callable_object_function(callee);
-    if (arg_count != 0U)
-    {
-        memmove(&vm->stack[callee_slot], &vm->stack[callee_slot + 1U], arg_count * sizeof(*vm->stack));
-        vm->stack_count -= 1U;
-    }
-    else
-    {
-        vm->stack_count -= 1U;
-    }
-    vigil_value_release(&callee_value);
-    status = vigil_vm_push_frame(vm, callee, function, vigil_callable_object_chunk(callee), callee_slot, error);
-    vigil_object_release(&callee);
-    return status;
-}
-
-vigil_status_t vigil_vm_invoke_interface_call(vigil_vm_t *vm, vigil_vm_frame_t *frame, size_t interface_index,
-                                                     size_t method_index, size_t arg_count, vigil_error_t *error)
-{
-    const vigil_object_t *callee;
-    const vigil_value_t *receiver;
-    size_t base_slot;
-    size_t class_index;
-
-    if (arg_count + 1U > vm->stack_count)
-    {
-        vigil_error_set_literal(error, VIGIL_STATUS_INTERNAL, "call arguments are missing from the stack");
-        return VIGIL_STATUS_INTERNAL;
-    }
-
-    base_slot = vm->stack_count - (arg_count + 1U);
-    receiver = &vm->stack[base_slot];
-    if (!vigil_nanbox_is_object(*receiver) ||
-        vigil_object_type((vigil_object_t *)vigil_nanbox_decode_ptr(*receiver)) != VIGIL_OBJECT_INSTANCE)
-    {
-        vigil_error_set_literal(error, VIGIL_STATUS_INVALID_ARGUMENT,
-                                "interface call requires a class instance receiver");
-        return VIGIL_STATUS_INVALID_ARGUMENT;
-    }
-    if (frame == NULL || frame->function == NULL)
-    {
-        vigil_error_set_literal(error, VIGIL_STATUS_INTERNAL, "call requires a function-backed frame");
-        return VIGIL_STATUS_INTERNAL;
-    }
-
-    class_index = vigil_instance_object_class_index((vigil_object_t *)vigil_nanbox_decode_ptr(*receiver));
-    callee =
-        vigil_function_object_resolve_interface_method(frame->function, class_index, interface_index, method_index);
-    if (callee == NULL || vigil_object_type(callee) != VIGIL_OBJECT_FUNCTION)
-    {
-        vigil_error_set_literal(error, VIGIL_STATUS_INTERNAL, "interface call target is invalid");
-        return VIGIL_STATUS_INTERNAL;
-    }
-    if (vigil_function_object_arity(callee) != arg_count + 1U)
-    {
-        vigil_error_set_literal(error, VIGIL_STATUS_INVALID_ARGUMENT, "call arity does not match function signature");
-        return VIGIL_STATUS_INVALID_ARGUMENT;
-    }
-
-    return vigil_vm_push_frame(vm, callee, callee, vigil_function_object_chunk(callee), base_slot, error);
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

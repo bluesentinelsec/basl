@@ -101,7 +101,6 @@ add_library(vigil_core OBJECT
     src/type.c
     src/value.c
     src/vm.c
-    src/vm_ops_arith.c
     src/regvm.c
     src/vm_ops_collection.c
     src/vm_ops_convert.c
