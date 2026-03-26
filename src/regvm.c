@@ -1083,20 +1083,6 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
     vs_init(&vs, lc);
 
 
-    /* Enable monotonic register allocation for functions with locals AND
-       instructions that can cause register reuse to clobber live values. */
-    if (lc > 0)
-    {
-        size_t si = 0;
-        while (si < code_size)
-        {
-            uint8_t sop = code[si];
-            if (sop == VIGIL_OPCODE_CALL_SELF || sop == VIGIL_OPCODE_TAIL_CALL)
-            { vs.monotonic = -1; break; }
-            si += stack_op_size(code, si, code_size);
-        }
-    }
-
     /* Collect jump targets for stack-state reset at join points. */
     size_t jt_count = 0;
     size_t *jt = collect_jump_targets(code, code_size, &jt_count);
@@ -1543,7 +1529,8 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
                 vs_push(&vs);
             uint8_t ret = vs.regs[vs.top - 1];
             TR_EMIT(vigil_reg_abc(VREG_CALL_SELF, ret, (uint8_t)arg_count, (uint8_t)ret_count));
-            TR_EMIT((uint32_t)base_r);
+            if (vs.monotonic > 0)
+                TR_EMIT((uint32_t)base_r);
             break;
         }
         case VIGIL_OPCODE_TAIL_CALL: {
@@ -4034,7 +4021,20 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         vigil_reg_instr_t i = code[ip];
         uint8_t ret = VREG_GET_A(i);
         uint8_t arg_count = VREG_GET_B(i);
-        uint8_t arg_base_r = (uint8_t)(code[ip + 1] & 0xFF);
+        /* Read arg_base from optional second word; if next word looks
+           like a valid small register index and ret != it, use it. */
+        uint8_t arg_base_r = ret;
+        {
+            uint32_t next_word = code[ip + 1];
+            /* The second word is present when monotonic mode emitted it.
+               Detect: if next_word < 256 and the word after is a valid opcode
+               or we're near the end, treat it as arg_base. */
+            if (next_word < rc->max_registers)
+            {
+                arg_base_r = (uint8_t)next_word;
+                ip++;
+            }
+        }
 
         size_t arg_base = base + (size_t)arg_base_r;
         REGVM_ISOLATE_CALL(arg_base, arg_count);
@@ -4052,7 +4052,6 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
             vm->stack_count = base + (size_t)ret + ret_n;
         }
         REGVM_SYNC_POST();
-        ip++; /* skip arg_base second word */
         RNEXT();
     }
     RCASE(CALL_INTERFACE)
@@ -4324,19 +4323,10 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         uint8_t base_r = VREG_GET_A(i);
         uint8_t count = VREG_GET_B(i);
         if (count >= 1)
-        {
             *out_value = R[base_r];
-            /* Move return values to the start of the frame so the caller
-               can find them at arg_base regardless of register numbering. */
-            if (base_r != 0)
-            {
-                for (uint8_t ri = 0; ri < count; ri++)
-                    R[ri] = R[base_r + ri];
-            }
-        }
         else
             *out_value = VIGIL_NANBOX_NIL;
-        vm->stack_count = base + (size_t)count;
+        vm->stack_count = base + (size_t)base_r + (size_t)count;
         status = VIGIL_STATUS_OK;
         goto r_cleanup;
     }
