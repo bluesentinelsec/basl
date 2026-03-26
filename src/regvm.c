@@ -1157,7 +1157,7 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
     int *reg_at = calloc(code_size + 1, sizeof(int));
     if (!depth_at || !reg_at)
     {
-        free(depth_at); free(reg_at);
+        free(depth_at);
         free(reg_at);
         free(jt);
         return VIGIL_STATUS_OUT_OF_MEMORY;
@@ -1191,7 +1191,14 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
            differs from the expected depth, a branch left its result
            at a different position. Emit a MOVE to normalize. */
         if (depth_at[start_ip] >= 0)
+        {
             vs.top = depth_at[start_ip];
+            if (reg_at[start_ip] >= 0 && vs.top > 0 && vs.regs[vs.top - 1] != (uint8_t)reg_at[start_ip])
+            {
+                uint8_t expected = (uint8_t)reg_at[start_ip];
+                TR_EMIT(vigil_reg_abc(VREG_MOVE, vs.regs[vs.top - 1], expected, 0));
+            }
+        }
 
         switch (op)
         {
@@ -1473,10 +1480,6 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
             jpatch_add(&patches, rc->code_count, target, 0, vs.top);
             RECORD_DEPTH(target, vs.top);
             TR_EMIT(vigil_reg_asbx(VREG_JMP, 0, 0));
-            /* Record the peeked register at both the jump target AND the
-               fall-through so POP+push reuses the same register. */
-            if (ip <= code_size && reg_at[ip] == -1)
-                reg_at[ip] = cond;
             break;
         }
 
@@ -2239,16 +2242,19 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
     }
 
     rc->max_registers = vs.next_reg;
+    rc->span_map_count = rc->code_count;
 
     free(jt);
-    free(depth_at); free(reg_at);
+    free(depth_at);
+    free(reg_at);
     omap_free(&omap);
     jpatch_free(&patches);
     return VIGIL_STATUS_OK;
 
 tr_fail:
     free(jt);
-    free(depth_at); free(reg_at);
+    free(depth_at);
+    free(reg_at);
     omap_free(&omap);
     jpatch_free(&patches);
     vigil_reg_chunk_free(rc, runtime);
@@ -2638,11 +2644,25 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         patched = 1;
     }
 
+#define REGVM_DEBUG_HOOK()                                                                                             \
+    do                                                                                                                 \
+    {                                                                                                                  \
+        if (VIGIL_UNLIKELY(vm->debug_hook != NULL))                                                                    \
+        {                                                                                                              \
+            size_t _saved = frame->ip;                                                                                 \
+            frame->ip = (ip < rc->span_map_count) ? rc->span_map[ip] : 0;                                             \
+            if (vm->debug_hook(vm, vm->debug_hook_userdata) != 0)                                                      \
+            { frame->ip = _saved; status = VIGIL_STATUS_OK; goto r_cleanup; }                                          \
+            frame->ip = _saved;                                                                                        \
+        }                                                                                                              \
+    } while (0)
+
 #define RDISPATCH() goto *dtable[VREG_GET_OP(code[ip])]
 #define RNEXT()                                                                                                        \
     do                                                                                                                 \
     {                                                                                                                  \
         ip++;                                                                                                          \
+        REGVM_DEBUG_HOOK();                                                                                            \
         RDISPATCH();                                                                                                   \
     } while (0)
 #define RCASE(op) r_##op:
@@ -2653,10 +2673,12 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
 #endif
 
 #if REGVM_COMPUTED_GOTO
+    REGVM_DEBUG_HOOK();
     RDISPATCH();
 #else
     while (ip < code_count)
     {
+        REGVM_DEBUG_HOOK();
         switch (VREG_GET_OP(code[ip]))
         {
 #endif
