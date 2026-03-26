@@ -4931,14 +4931,18 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         /* Fast path: inline return to caller (no defers, not top-level). */
         if (VIGIL_LIKELY(frame->defer_count == 0 && vm->frame_count > initial_frame_count))
         {
-            /* Release callee-owned objects above return values. */
+            /* Release all callee register objects except return values. */
             if (has_reg_objects)
             {
-                size_t callee_base = base;
-                size_t skip = (size_t)base_r + (size_t)count;
-                for (size_t ri = skip; ri < (size_t)rc->max_registers; ri++)
-                    if (vigil_nanbox_has_object(vm->stack[callee_base + ri]))
-                        vigil_value_release(&vm->stack[callee_base + ri]);
+                size_t cb = base;
+                size_t rlo = (size_t)base_r;
+                size_t rhi = rlo + (size_t)count;
+                for (size_t ri = 0; ri < (size_t)rc->max_registers; ri++)
+                {
+                    if (ri >= rlo && ri < rhi) continue;
+                    if (vigil_nanbox_has_object(vm->stack[cb + ri]))
+                        vigil_value_release(&vm->stack[cb + ri]);
+                }
             }
 
             vm->frame_count -= 1U;
@@ -4974,10 +4978,13 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         {
             if (has_reg_objects)
             {
-                size_t skip2 = (size_t)base_r + (size_t)count;
-                for (size_t ri2 = skip2; ri2 < (size_t)rc->max_registers; ri2++)
+                size_t rlo2 = (size_t)base_r, rhi2 = rlo2 + (size_t)count;
+                for (size_t ri2 = 0; ri2 < (size_t)rc->max_registers; ri2++)
+                {
+                    if (ri2 >= rlo2 && ri2 < rhi2) continue;
                     if (vigil_nanbox_has_object(vm->stack[base + ri2]))
                         vigil_value_release(&vm->stack[base + ri2]);
+                }
             }
 
             vm->frame_count -= 1U;
