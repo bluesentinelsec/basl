@@ -3472,6 +3472,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
             if (status == VIGIL_STATUS_OK)
             {
                 R[rd] = result;
+                has_reg_objects = 1;
                 RNEXT();
             }
         }
@@ -3888,7 +3889,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
             goto r_cleanup;
         }
         vigil_object_retain((vigil_object_t *)fn);
-        vigil_value_init_object(&R[VREG_GET_A(i)], (vigil_object_t **)&fn);
+        has_reg_objects = 1; vigil_value_init_object(&R[VREG_GET_A(i)], (vigil_object_t **)&fn);
         RNEXT();
     }
     RCASE(NEW_CLOSURE)
@@ -3910,7 +3911,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
                                           (size_t)cap_count, &closure, error);
         if (status != VIGIL_STATUS_OK)
             goto r_cleanup;
-        vigil_value_init_object(&R[VREG_GET_A(i)], &closure);
+        has_reg_objects = 1; vigil_value_init_object(&R[VREG_GET_A(i)], &closure);
         RNEXT();
     }
 
@@ -4192,7 +4193,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         vigil_value_t *fields = (field_count > 0) ? &R[fields_base] : NULL;
         status = vigil_instance_object_new(vm->runtime, (size_t)ci, fields, (size_t)field_count, &inst, error);
         if (status != VIGIL_STATUS_OK) goto r_cleanup;
-        vigil_value_init_object(&R[dest], &inst);
+        has_reg_objects = 1; vigil_value_init_object(&R[dest], &inst);
         ip++;
         RNEXT();
     }
@@ -4205,7 +4206,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         vigil_value_t *items = (count > 0) ? &R[dest] : NULL;
         status = vigil_array_object_new(vm->runtime, items, (size_t)count, &arr, error);
         if (status != VIGIL_STATUS_OK) goto r_cleanup;
-        vigil_value_init_object(&R[dest], &arr);
+        has_reg_objects = 1; vigil_value_init_object(&R[dest], &arr);
         REGVM_SYNC_POST();
         RNEXT();
     }
@@ -4224,7 +4225,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
             status = vigil_map_object_set(map, key, val, error);
             if (status != VIGIL_STATUS_OK) { vigil_object_release(&map); goto r_cleanup; }
         }
-        vigil_value_init_object(&R[dest], &map);
+        has_reg_objects = 1; vigil_value_init_object(&R[dest], &map);
         REGVM_SYNC_POST();
         RNEXT();
     }
@@ -4616,7 +4617,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
 
         /* Self-call: same rc/code/sc. Just switch base/ip/R. */
         frame = &vm->frames[vm->frame_count - 1];
-        base = arg_base;
+        base = arg_base; has_reg_objects = 0;
         ip = 0;
         if (VIGIL_UNLIKELY(vm->stack_capacity < base + (size_t)rc->max_registers))
         {
@@ -4986,7 +4987,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
             sc = rc->stack_chunk;
             base = frame->base_slot;
             ip = frame->ip;
-            R = vm->stack + base;
+            R = vm->stack + base; has_reg_objects = 1;
             if (ip >= 2 && VREG_GET_OP(code[ip - 2]) == VREG_CALL_SELF)
             {
                 uint8_t cs_ret = VREG_GET_A(code[ip - 2]);
