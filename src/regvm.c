@@ -1109,7 +1109,25 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
 
     uint8_t lc = count_locals(code, code_size);
     vstack_t vs;
+    /* Compute arity from debug local table: count locals with scope_start_ip=0. */
+    uint8_t arity = 0;
+    {
+        const vigil_debug_local_table_t *dlt = &stack_chunk->debug_locals;
+        for (size_t di = 0; di < dlt->count; di++)
+        {
+            if (dlt->locals[di].scope_start_ip == 0 && dlt->locals[di].slot < lc)
+                arity++;
+        }
+    }
     vs_init(&vs, lc);
+    /* Pre-initialize param slots: params are at R[0..arity-1]. */
+    if (arity > 0)
+    {
+        vs.top = (int)arity;
+        vs.next_reg = arity;
+        for (uint8_t i = 0; i < arity; i++)
+            vs.regs[i] = i;
+    }
 
     /* Disable bump allocation for functions without CALL_SELF.
        These don't have register reuse issues and need identity
