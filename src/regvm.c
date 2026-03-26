@@ -1111,10 +1111,22 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
     vstack_t vs;
     vs_init(&vs, lc);
 
-    /* The bump allocator is always active. Functions with CALL_SELF
-       benefit from fresh registers preventing clobbering. Functions
-       without CALL_SELF also benefit because push-to-position locals
-       created by CALL returns use CALL_RET_PUSH with explicit MOVs. */
+    /* Disable bump allocation for functions without CALL_SELF.
+       These don't have register reuse issues and need identity
+       mapping for push-to-position locals. */
+    if (lc > 0)
+    {
+        int has_call_self = 0;
+        size_t si = 0;
+        while (si < code_size)
+        {
+            if (code[si] == VIGIL_OPCODE_CALL_SELF)
+            { has_call_self = 1; break; }
+            si += stack_op_size(code, si, code_size);
+        }
+        if (!has_call_self)
+            vs.local_count = 255; /* identity mapping always */
+    }
 
 
     /* Collect jump targets for stack-state reset at join points. */
