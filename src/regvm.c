@@ -4231,9 +4231,10 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         R = vm->stack + base;
         if (status == VIGIL_STATUS_OK && vm->stack_count > arg_base)
         {
-            *out_value = vm->stack[arg_base];
-            vm->stack[base + ret] = vm->stack[arg_base];
-            vm->stack_count = base + (size_t)ret + 1;
+            vigil_value_t rv = vm->stack[arg_base];
+            *out_value = rv;
+            R[0] = rv;
+            vm->stack_count = base + 1;
         }
         goto r_cleanup;
     }
