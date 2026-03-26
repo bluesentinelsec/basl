@@ -1999,23 +1999,29 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
             break;
         }
         case VIGIL_OPCODE_ARRAY_POP: {
+            /* Stack: arr, default. Pop 2, push 2 (value, err). */
+            SYNC_PACK(2);
+            uint8_t def = vs_pop(&vs);
             uint8_t arr = vs_pop(&vs);
-            uint8_t r1 = vs_push(&vs);
-            uint8_t r2 = vs_push(&vs);
-            (void)r2;
-            TR_EMIT(vigil_reg_abc(VREG_ARRAY_POP, r1, arr, r2));
+            uint8_t r1 = vs_push_at(&vs, arr);
+            uint8_t r2 = vs_push_at(&vs, (uint8_t)(arr + 1));
+            (void)r1; (void)r2;
+            TR_EMIT(vigil_reg_abc(VREG_ARRAY_POP, arr, arr, def));
             ip += 1;
             break;
         }
         case VIGIL_OPCODE_ARRAY_GET_SAFE:
         case VIGIL_OPCODE_ARRAY_SET_SAFE: {
+            /* Stack: arr, idx, third (default or value). Pop 3, push 2. */
+            SYNC_PACK(3);
+            uint8_t third = vs_pop(&vs);
             uint8_t idx = vs_pop(&vs);
             uint8_t arr = vs_pop(&vs);
             uint8_t r1 = vs_push_at(&vs, arr);
             uint8_t r2 = vs_push_at(&vs, (uint8_t)(arr + 1));
-            (void)r2;
+            (void)r1; (void)r2; (void)idx;
             uint8_t rop = (op == VIGIL_OPCODE_ARRAY_GET_SAFE) ? VREG_ARRAY_GET_SAFE : VREG_ARRAY_SET_SAFE;
-            TR_EMIT(vigil_reg_abc(rop, r1, arr, idx));
+            TR_EMIT(vigil_reg_abc(rop, arr, arr, third));
             ip += 1;
             break;
         }
@@ -2043,17 +2049,18 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
         case VIGIL_OPCODE_MAP_GET_SAFE:
         case VIGIL_OPCODE_MAP_SET_SAFE:
         case VIGIL_OPCODE_MAP_REMOVE_SAFE: {
+            /* Stack: map, key, third (default or value). Pop 3, push 2. */
+            SYNC_PACK(3);
+            uint8_t third = vs_pop(&vs);
             uint8_t key = vs_pop(&vs);
             uint8_t map = vs_pop(&vs);
             uint8_t r1 = vs_push_at(&vs, map);
             uint8_t r2 = vs_push_at(&vs, (uint8_t)(map + 1));
-            (void)r2;
+            (void)r1; (void)r2; (void)key;
             uint8_t rop = VREG_MAP_GET_SAFE;
-            if (op == VIGIL_OPCODE_MAP_SET_SAFE)
-                rop = VREG_MAP_SET_SAFE;
-            if (op == VIGIL_OPCODE_MAP_REMOVE_SAFE)
-                rop = VREG_MAP_REMOVE_SAFE;
-            TR_EMIT(vigil_reg_abc(rop, r1, map, key));
+            if (op == VIGIL_OPCODE_MAP_SET_SAFE) rop = VREG_MAP_SET_SAFE;
+            if (op == VIGIL_OPCODE_MAP_REMOVE_SAFE) rop = VREG_MAP_REMOVE_SAFE;
+            TR_EMIT(vigil_reg_abc(rop, map, map, third));
             ip += 1;
             break;
         }
@@ -4253,7 +4260,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
     RCASE(ARRAY_POP)
     {
         vigil_reg_instr_t i = code[ip];
-        REGVM_SYNC_PRE(VREG_GET_B(i));
+        REGVM_SYNC_PRE(VREG_GET_C(i));
         frame->ip = 0;
         status = vigil_vm_op_array_pop(vm, frame, error);
         if (status != VIGIL_STATUS_OK) goto r_cleanup;
