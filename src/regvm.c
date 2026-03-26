@@ -3471,6 +3471,8 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
             status = vigil_vm_concat_strings(vm, &R[ra], &R[rb], &result, error);
             if (status == VIGIL_STATUS_OK)
             {
+                if (vigil_nanbox_has_object(R[rd]) && &R[rd] != &R[ra] && &R[rd] != &R[rb])
+                    vigil_value_release(&R[rd]);
                 R[rd] = result;
                 has_reg_objects = 1;
                 RNEXT();
