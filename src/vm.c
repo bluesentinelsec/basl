@@ -2274,7 +2274,8 @@ vigil_status_t vigil_vm_execute_call(vigil_vm_t *vm, const vigil_object_t *calle
         return VIGIL_STATUS_INTERNAL;
     }
 
-    size_t base_slot = vm->stack_count - arg_count;
+    size_t arg_base = vm->stack_count - arg_count;
+    size_t base_slot = vm->stack_count; /* separate window */
     vigil_chunk_t *callee_chunk = (vigil_chunk_t *)vigil_callable_object_chunk(callee);
     if (!callee_chunk)
     {
@@ -2323,13 +2324,27 @@ vigil_status_t vigil_vm_execute_call(vigil_vm_t *vm, const vigil_object_t *calle
         callee_chunk->reg_cache = rc;
     }
 
-    /* Retain object args so the callee's r_cleanup can safely release them
-       without dropping the caller's reference in the shared register window. */
+    /* Copy args to callee's separate window (retain objects). */
     {
-        size_t arity = callee_chunk->reg_cache->arity;
-        for (size_t a = 0; a < arity && base_slot + a < vm->stack_count; a++)
+        const vigil_reg_chunk_t *rcc = callee_chunk->reg_cache;
+        size_t arity = rcc->arity;
+        size_t n = arity < arg_count ? arity : arg_count;
+        size_t need = base_slot + (size_t)rcc->max_registers;
+        if (vm->stack_capacity < need)
+        {
+            vigil_status_t gs = vigil_vm_grow_stack(vm, need + 16, error);
+            if (gs != VIGIL_STATUS_OK) return gs;
+        }
+        if (vm->stack_count < need)
+            vm->stack_count = need;
+        for (size_t a = 0; a < n; a++)
+        {
+            vm->stack[base_slot + a] = vm->stack[arg_base + a];
             if (vigil_nanbox_has_object(vm->stack[base_slot + a]))
                 vigil_object_retain((vigil_object_t *)vigil_nanbox_decode_ptr(vm->stack[base_slot + a]));
+        }
+        for (size_t z = n; z < rcc->max_registers; z++)
+            vm->stack[base_slot + z] = VIGIL_NANBOX_NIL;
     }
 
     vigil_value_t dummy = {0};
@@ -2338,6 +2353,27 @@ vigil_status_t vigil_vm_execute_call(vigil_vm_t *vm, const vigil_object_t *calle
     /* Pop the callee frame. */
     if (vm->frame_count > 0)
         vm->frame_count -= 1U;
+
+    /* Copy ALL return values from callee's window to caller's expected position.
+       The RETURN handler set stack_count = base + base_r + count. The translator
+       moves return values to R[0..count-1], so they start at base_slot. */
+    {
+        size_t ret_count = (vm->stack_count > base_slot) ? (vm->stack_count - base_slot) : 0;
+        if (arg_base != base_slot) /* only copy if windows are actually separate */
+        {
+            for (size_t r = 0; r < ret_count; r++)
+            {
+                if (arg_base + r < vm->stack_capacity)
+                {
+                    if (vigil_nanbox_has_object(vm->stack[arg_base + r]))
+                        vigil_value_release(&vm->stack[arg_base + r]);
+                    vm->stack[arg_base + r] = vm->stack[base_slot + r];
+                    vm->stack[base_slot + r] = VIGIL_NANBOX_NIL;
+                }
+            }
+        }
+        vm->stack_count = arg_base + ret_count;
+    }
 
     return status;
 }
