@@ -77,6 +77,8 @@ typedef struct
     uint8_t next_reg;
     uint8_t local_count;
     int locals_done;
+    uint8_t need_release; /* 255 = none, else register to release before write */
+    uint32_t obj_written[8]; /* bitmap: registers that may hold objects */
 } vstack_t;
 
 static void vs_init(vstack_t *vs, uint8_t lc)
@@ -85,7 +87,24 @@ static void vs_init(vstack_t *vs, uint8_t lc)
     vs->next_reg = lc > 0 ? lc : 1;
     vs->local_count = lc;
     vs->locals_done = (lc == 0);
+    vs->need_release = 255;
     memset(vs->regs, 0, sizeof(vs->regs));
+    memset(vs->obj_written, 0, sizeof(vs->obj_written));
+}
+
+static int vs_is_obj(const vstack_t *vs, uint8_t reg)
+{
+    return (vs->obj_written[reg / 32] >> (reg % 32)) & 1;
+}
+
+static void vs_mark_obj(vstack_t *vs, uint8_t reg)
+{
+    vs->obj_written[reg / 32] |= (uint32_t)1 << (reg % 32);
+}
+
+static void vs_clear_obj(vstack_t *vs, uint8_t reg)
+{
+    vs->obj_written[reg / 32] &= ~((uint32_t)1 << (reg % 32));
 }
 
 static uint8_t vs_push(vstack_t *vs)
@@ -103,6 +122,9 @@ static uint8_t vs_push(vstack_t *vs)
     vs->top++;
     if (r >= vs->next_reg)
         vs->next_reg = r + 1;
+    /* Emit release if register was previously written (may hold object). */
+    vs->need_release = vs_is_obj(vs, r) ? r : 255;
+    vs_mark_obj(vs, r); /* conservatively mark all registers */
     return r;
 }
 
@@ -112,13 +134,18 @@ static uint8_t vs_push_at(vstack_t *vs, uint8_t reg)
     vs->top++;
     if (reg >= vs->next_reg)
         vs->next_reg = reg + 1;
+    /* Don't release — the op reads from this register before writing. */
+    vs->need_release = 255;
+    vs_mark_obj(vs, reg);
     return reg;
 }
 
 static uint8_t vs_pop(vstack_t *vs)
 {
     vs->top--;
-    return vs->regs[vs->top];
+    uint8_t r = vs->regs[vs->top];
+    vs_clear_obj(vs, r); /* value consumed — no longer needs release */
+    return r;
 }
 
 static uint8_t vs_peek(const vstack_t *vs, int depth)
@@ -1000,11 +1027,28 @@ int vigil_reg_chunk_is_translatable(const vigil_chunk_t *stack_chunk)
 #define TR_EMIT(instr)                                                                                                 \
     do                                                                                                                 \
     {                                                                                                                  \
+        if (vs.need_release != 255)                                                                                    \
+        {                                                                                                              \
+            vigil_status_t _r = emit(rc, vigil_reg_abc(VREG_RELEASE, vs.need_release, 0, 0), start_ip);                \
+            vs_clear_obj(&vs, vs.need_release);                                                                        \
+            vs.need_release = 255;                                                                                     \
+            if (_r != VIGIL_STATUS_OK) goto tr_fail;                                                                   \
+        }                                                                                                              \
         vigil_status_t _s = emit(rc, (instr), start_ip);                                                               \
         if (_s != VIGIL_STATUS_OK)                                                                                     \
             goto tr_fail;                                                                                              \
     } while (0)
 
+/* Emit RELEASE for register dst if it may hold an object. */
+#define TR_RELEASE(dst)                                                                                                \
+    do                                                                                                                 \
+    {                                                                                                                  \
+        if (vs_is_obj(&vs, (dst)))                                                                                     \
+            TR_EMIT(vigil_reg_abc(VREG_RELEASE, (dst), 0, 0));                                                         \
+    } while (0)
+
+/* Mark register as holding an object (for future RELEASE). */
+#define TR_MARK_OBJ(dst) vs_mark_obj(&vs, (dst))
 
 /* Pack top n virtual stack values into consecutive registers ending at
    the highest. Emits MOV instructions for any gaps. */
@@ -2740,6 +2784,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
             [VREG_LT] = &&r_LT,
             [VREG_LE] = &&r_LE,
             [VREG_DUP] = &&r_DUP,
+            [VREG_RELEASE] = &&r_RELEASE,
             [VREG_TO_U8] = &&r_TO_U8,
             [VREG_TO_U32] = &&r_TO_U32,
             [VREG_TO_U64] = &&r_TO_U64,
@@ -2896,6 +2941,11 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         vigil_reg_instr_t i = code[ip];
         RRELEASE(VREG_GET_A(i));
         VIGIL_VM_VALUE_COPY(&R[VREG_GET_A(i)], &R[VREG_GET_B(i)]);
+        RNEXT();
+    }
+    RCASE(RELEASE)
+    {
+        RRELEASE(VREG_GET_A(code[ip]));
         RNEXT();
     }
 

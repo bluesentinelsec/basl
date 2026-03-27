@@ -221,6 +221,7 @@ typedef enum vigil_reg_op
 
     /* DUP — needed for some patterns during translation */
     VREG_DUP = 125, /* A B      R[A] = R[B] (with retain) */
+    VREG_RELEASE = 126, /* A        release object in R[A] if present */
 
     VREG_OP_COUNT
 } vigil_reg_op_t;
