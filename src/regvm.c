@@ -2868,7 +2868,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         uint8_t dst = VREG_GET_A(i), src = VREG_GET_B(i);
         if (dst != src)
         {
-            if (dst >= rc->arity) RRELEASE(dst);
+            RRELEASE(dst);
             if (vigil_nanbox_has_object(R[src]))
                 VIGIL_VM_VALUE_COPY(&R[dst], &R[src]);
             else
@@ -3599,7 +3599,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         vigil_reg_instr_t i = code[ip];
         uint8_t dst = VREG_GET_A(i);
         vigil_value_t res = vigil_nanbox_from_bool(vigil_vm_values_equal(&R[VREG_GET_B(i)], &R[VREG_GET_C(i)]));
-        if (dst >= rc->arity) RRELEASE(dst);
+        RRELEASE(dst);
         R[dst] = res;
         RNEXT();
     }
@@ -3840,7 +3840,9 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
             error->type = VIGIL_STATUS_INVALID_ARGUMENT;
             goto r_cleanup;
         }
+        RRELEASE(dst);
         R[dst] = str_val;
+        has_reg_objects = 1;
         RNEXT();
     }
 
@@ -4392,7 +4394,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
             error->type = VIGIL_STATUS_INVALID_ARGUMENT;
             goto r_cleanup;
         }
-        RRELEASE(VREG_GET_A(i)); VIGIL_VM_VALUE_COPY(&R[VREG_GET_A(i)], &result);
+        RRELEASE(VREG_GET_A(i)); VIGIL_VM_VALUE_COPY(&R[VREG_GET_A(i)], &result); has_reg_objects = 1;
         VIGIL_VM_VALUE_RELEASE(&result);
         RNEXT();
     }
@@ -4410,7 +4412,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
             status = VIGIL_STATUS_INVALID_ARGUMENT;
             goto r_cleanup;
         }
-        RRELEASE(VREG_GET_A(i)); VIGIL_VM_VALUE_COPY(&R[VREG_GET_A(i)], &result);
+        RRELEASE(VREG_GET_A(i)); VIGIL_VM_VALUE_COPY(&R[VREG_GET_A(i)], &result); has_reg_objects = 1;
         VIGIL_VM_VALUE_RELEASE(&result);
         ip += 2;
         RNEXT();
