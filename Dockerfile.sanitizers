@@ -1,0 +1,29 @@
+FROM --platform=linux/amd64 ubuntu:24.04
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    clang libclang-rt-18-dev cmake make python3 \
+    libcurl4-openssl-dev libffi-dev git ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /vigil
+COPY . .
+
+# Configure + Build — matches CI sanitizer job
+SHELL ["/bin/bash", "-c"]
+RUN SAN="-fsanitize=address,undefined" && \
+    cmake -S . -B build \
+      -DVIGIL_BUILD_TESTS=ON \
+      -DCMAKE_BUILD_TYPE=Debug \
+      -DCMAKE_C_COMPILER=clang \
+      -DCMAKE_CXX_COMPILER=clang++ \
+      -DCMAKE_C_FLAGS_DEBUG="$SAN -fno-omit-frame-pointer" \
+      -DCMAKE_CXX_FLAGS_DEBUG="$SAN -fno-omit-frame-pointer" \
+      -DCMAKE_EXE_LINKER_FLAGS_DEBUG="$SAN" \
+      -DCMAKE_SHARED_LINKER_FLAGS_DEBUG="$SAN" \
+      -DCMAKE_MODULE_LINKER_FLAGS_DEBUG="$SAN" && \
+    cmake --build build --config Debug -j$(nproc)
+
+# Default: run with leak detection (no suppressions) so we see all leaks
+ENV ASAN_OPTIONS="detect_leaks=1:halt_on_error=1"
+ENV UBSAN_OPTIONS="print_stacktrace=1:halt_on_error=1"
+CMD ["ctest", "--test-dir", "build", "--output-on-failure", "-C", "Debug"]
