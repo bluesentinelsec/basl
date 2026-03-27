@@ -4278,6 +4278,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         status = vigil_instance_object_new(vm->runtime, (size_t)ci, fields, (size_t)field_count, &inst, error);
         if (status != VIGIL_STATUS_OK) goto r_cleanup;
         RRELEASE(dest); has_reg_objects = 1; vigil_value_init_object(&R[dest], &inst);
+        REGVM_SYNC_POST();
         ip++;
         RNEXT();
     }
