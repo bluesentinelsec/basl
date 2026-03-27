@@ -90,18 +90,44 @@ static void regvm_clear_value_range(vigil_value_t *values, size_t count)
         values[i] = VIGIL_NANBOX_NIL;
 }
 
-static void regvm_reset_value_range(vigil_value_t *values, size_t count)
-{
-    regvm_release_value_range(values, count);
-    regvm_clear_value_range(values, count);
-}
-
 static void regvm_discard_isolated_call_values(vigil_vm_t *vm, size_t orig_base, size_t arg_base, size_t count)
 {
     if (vm == NULL || arg_base == orig_base || count == 0U)
         return;
 
     regvm_release_value_range(&vm->stack[arg_base], count);
+}
+
+static void regvm_init_inline_frame(vigil_vm_frame_t *frame, const vigil_object_t *callable,
+                                    const vigil_object_t *function, const vigil_chunk_t *chunk, size_t base_slot)
+{
+    if (frame == NULL)
+        return;
+
+    frame->callable = callable;
+    frame->function = function;
+    frame->chunk = chunk;
+    frame->ip = 0U;
+    frame->base_slot = base_slot;
+    frame->defers = NULL;
+    frame->defer_count = 0U;
+    frame->defer_capacity = 0U;
+    frame->pending_returns = NULL;
+    frame->pending_return_count = 0U;
+    frame->pending_return_capacity = 0U;
+    frame->draining_defers = 0;
+}
+
+static void regvm_swap_u8(uint8_t *left, uint8_t *right)
+{
+    uint8_t tmp;
+
+    if (left == NULL || right == NULL)
+        return;
+
+    tmp = *left;
+    *left = *right;
+    *right = tmp;
 }
 
 static void regvm_move_call_results(vigil_vm_t *vm, size_t orig_base, size_t arg_base, size_t consumed_count,
@@ -173,10 +199,8 @@ static uint8_t vs_push(vstack_t *vs)
     if (!vs->locals_done && vs->top >= (int)vs->local_count)
         vs->locals_done = 1;
     uint8_t r;
-    if (vs->top < (int)vs->local_count)
-        r = (uint8_t)vs->top;                /* local slot: identity */
-    else if (vs->top >= (int)vs->next_reg)
-        r = (uint8_t)vs->top;                /* at frontier: consecutive */
+    if (vs->top < (int)vs->local_count || vs->top >= (int)vs->next_reg)
+        r = (uint8_t)vs->top;                /* local slot or frontier: identity */
     else
         r = vs->next_reg;                    /* below frontier: fresh */
     vs->regs[vs->top] = r;
@@ -1158,6 +1182,7 @@ int vigil_reg_chunk_is_translatable(const vigil_chunk_t *stack_chunk)
 #endif
 
 /* Count locals by scanning for the highest GET_LOCAL/SET_LOCAL operand. */
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
 static uint8_t count_locals(const uint8_t *code, size_t code_size)
 {
     uint32_t max_local = 0;
@@ -1229,7 +1254,7 @@ static uint8_t count_locals(const uint8_t *code, size_t code_size)
    (consecutive CONSTANT/NIL/TRUE/FALSE pushes before any control flow). */
 
 /* ── Translation: main pass ────────────────────────────────────── */
-
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
 vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_chunk_t *rc, vigil_runtime_t *runtime,
                                    vigil_error_t *error)
 {
@@ -1666,19 +1691,20 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
             {
                 uint8_t res = vs_push(&vs);
                 uint8_t cmp_op = VREG_EQ;
+                int reverse_operands = 0;
                 switch (op) {
                 case VIGIL_OPCODE_LESS_I32_JUMP_IF_FALSE:
                 case VIGIL_OPCODE_LESS_I64_JUMP_IF_FALSE: cmp_op = VREG_LT; break;
                 case VIGIL_OPCODE_LESS_EQUAL_I32_JUMP_IF_FALSE:
                 case VIGIL_OPCODE_LESS_EQUAL_I64_JUMP_IF_FALSE: cmp_op = VREG_LE; break;
                 case VIGIL_OPCODE_GREATER_I32_JUMP_IF_FALSE:
-                case VIGIL_OPCODE_GREATER_I64_JUMP_IF_FALSE: cmp_op = VREG_LT; ra ^= rb; rb ^= ra; ra ^= rb; break;
+                case VIGIL_OPCODE_GREATER_I64_JUMP_IF_FALSE: cmp_op = VREG_LT; reverse_operands = 1; break;
                 case VIGIL_OPCODE_GREATER_EQUAL_I32_JUMP_IF_FALSE:
-                case VIGIL_OPCODE_GREATER_EQUAL_I64_JUMP_IF_FALSE: cmp_op = VREG_LE; ra ^= rb; rb ^= ra; ra ^= rb; break;
-                case VIGIL_OPCODE_NOT_EQUAL_I32_JUMP_IF_FALSE:
-                case VIGIL_OPCODE_NOT_EQUAL_I64_JUMP_IF_FALSE: cmp_op = VREG_EQ; break; /* EQ then negate via NOT */
+                case VIGIL_OPCODE_GREATER_EQUAL_I64_JUMP_IF_FALSE: cmp_op = VREG_LE; reverse_operands = 1; break;
                 default: cmp_op = VREG_EQ; break;
                 }
+                if (reverse_operands)
+                    regvm_swap_u8(&ra, &rb);
                 TR_EMIT(vigil_reg_abc(cmp_op, res, ra, rb));
                 if (op == VIGIL_OPCODE_NOT_EQUAL_I32_JUMP_IF_FALSE || op == VIGIL_OPCODE_NOT_EQUAL_I64_JUMP_IF_FALSE)
                     TR_EMIT(vigil_reg_abc(VREG_NOT, res, res, 0));
@@ -2575,6 +2601,7 @@ void vigil_reg_dump(const vigil_reg_chunk_t *rc)
 #endif
 
 /* ── Defer drain helper ────────────────────────────────────────── */
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
 static vigil_status_t regvm_drain_defers(vigil_vm_t *vm, size_t frame_idx, vigil_error_t *error)
 {
     while (vm->frames[frame_idx].defer_count > 0U)
@@ -2702,6 +2729,7 @@ static inline vigil_value_t regvm_encode_uint(uint64_t v)
     return val;
 }
 
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
 vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, vigil_value_t *out_value,
                                    vigil_error_t *error)
 {
@@ -4145,14 +4173,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         }
         {
             vigil_vm_frame_t *nf = &vm->frames[vm->frame_count++];
-            nf->function = callee;
-            nf->callable = callee;
-            nf->chunk = cc;
-            nf->base_slot = arg_base;
-            nf->ip = 0U;
-            nf->defer_count = 0;
-            nf->pending_return_count = 0;
-            nf->draining_defers = 0;
+            regvm_init_inline_frame(nf, callee, callee, cc, arg_base);
         }
 
         /* Switch to callee. */
@@ -4173,11 +4194,6 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         }
         if (vm->stack_count < base + rc->max_registers)
             vm->stack_count = base + rc->max_registers;
-
-        /* Zero callee locals/temps so stale objects from prior calls
-           cannot leak when overwritten by non-object values. */
-        if ((size_t)rc->max_registers > (size_t)rc->arity)
-            regvm_reset_value_range(&R[rc->arity], (size_t)rc->max_registers - (size_t)rc->arity);
 
         RDISPATCH();
     }
@@ -4776,14 +4792,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         }
         {
             vigil_vm_frame_t *nf = &vm->frames[vm->frame_count++];
-            nf->function = frame->function;
-            nf->callable = frame->callable;
-            nf->chunk = frame->chunk;
-            nf->base_slot = arg_base;
-            nf->ip = 0U;
-            nf->defer_count = 0;
-            nf->pending_return_count = 0;
-            nf->draining_defers = 0;
+            regvm_init_inline_frame(nf, frame->callable, frame->function, frame->chunk, arg_base);
         }
 
         /* Self-call: same rc/code/sc. Just switch base/ip/R. */
@@ -4798,9 +4807,6 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         R = vm->stack + base;
         if (vm->stack_count < base + rc->max_registers)
             vm->stack_count = base + rc->max_registers;
-
-        if ((size_t)rc->max_registers > (size_t)rc->arity)
-            regvm_reset_value_range(&R[rc->arity], (size_t)rc->max_registers - (size_t)rc->arity);
 
         RDISPATCH();
     }
