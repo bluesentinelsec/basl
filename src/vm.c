@@ -80,12 +80,27 @@ static void vigil_vm_release_stack(vigil_vm_t *vm)
         return;
     }
 
-    for (i = 0U; i < vm->stack_count; ++i)
+    for (i = 0U; i < vm->stack_capacity; ++i)
     {
         vigil_value_release(&vm->stack[i]);
     }
 
     vm->stack_count = 0U;
+}
+
+static void vigil_vm_release_value_range(vigil_value_t *values, size_t count)
+{
+    size_t i;
+
+    if (values == NULL)
+    {
+        return;
+    }
+
+    for (i = 0U; i < count; ++i)
+    {
+        vigil_value_release(&values[i]);
+    }
 }
 
 static void vigil_vm_defer_action_clear(vigil_runtime_t *runtime, vigil_vm_defer_action_t *action)
@@ -248,6 +263,7 @@ vigil_status_t vigil_vm_grow_stack(vigil_vm_t *vm, size_t minimum_capacity, vigi
         {
             return status;
         }
+        memset(memory, 0, next_capacity * sizeof(*vm->stack));
     }
     else
     {
@@ -380,6 +396,7 @@ vigil_status_t vigil_vm_push(vigil_vm_t *vm, const vigil_value_t *value, vigil_e
         return status;
     }
 
+    vigil_value_release(&vm->stack[vm->stack_count]);
     vm->stack[vm->stack_count] = vigil_value_copy(value);
     vm->stack_count += 1U;
     return VIGIL_STATUS_OK;
@@ -2155,8 +2172,10 @@ static void vigil_vm_push_parse_error(vigil_vm_t *vm, vigil_value_t default_val,
     vigil_vm_ensure_stack(vm, 2U);
     if (vigil_error_object_new_cstr(vm->runtime, msg, 8, &err_obj, &err) != VIGIL_STATUS_OK)
         err_obj = NULL;
+    vigil_value_release(&vm->stack[vm->stack_count]);
     vm->stack[vm->stack_count] = default_val;
     vm->stack_count += 1U;
+    vigil_value_release(&vm->stack[vm->stack_count]);
     vm->stack[vm->stack_count] =
         err_obj != NULL ? vigil_nanbox_encode_object(err_obj) : vigil_runtime_ok_error_value(vm->runtime);
     vm->stack_count += 1U;
@@ -2170,8 +2189,10 @@ static void vigil_vm_push_parse_ok(vigil_vm_t *vm, vigil_value_t val)
     vigil_vm_ensure_stack(vm, 2U);
     /* The ok sentinel has a saturated refcount (immortal), so we skip
        the atomic retain.  POP's release will decrement harmlessly. */
+    vigil_value_release(&vm->stack[vm->stack_count]);
     vm->stack[vm->stack_count] = val;
     vm->stack_count += 1U;
+    vigil_value_release(&vm->stack[vm->stack_count]);
     vm->stack[vm->stack_count] = ok;
     vm->stack_count += 1U;
 }
@@ -2179,17 +2200,20 @@ static void vigil_vm_push_parse_ok(vigil_vm_t *vm, vigil_value_t val)
 /* Parse intrinsic: pop string, push (i32, err). */
 void vigil_vm_parse_i32(vigil_vm_t *vm)
 {
+    vigil_value_t input;
     vigil_object_t *obj;
     const char *s;
     char *end;
     long val;
 
     vm->stack_count -= 1U;
-    obj = (vigil_object_t *)vigil_nanbox_decode_ptr(vm->stack[vm->stack_count]);
+    input = vm->stack[vm->stack_count];
+    vm->stack[vm->stack_count] = VIGIL_NANBOX_NIL;
+    obj = (vigil_object_t *)vigil_nanbox_decode_ptr(input);
     s = vigil_string_object_c_str(obj);
     if (s == NULL || *s == '\0')
     {
-        vigil_object_release(&obj);
+        vigil_value_release(&input);
         vigil_vm_push_parse_error(vm, vigil_nanbox_encode_int(0), "empty string");
         return;
     }
@@ -2197,28 +2221,31 @@ void vigil_vm_parse_i32(vigil_vm_t *vm)
     val = strtol(s, &end, 10);
     if (errno != 0 || end == s || *end != '\0' || val < INT32_MIN || val > INT32_MAX)
     {
-        vigil_object_release(&obj);
+        vigil_value_release(&input);
         vigil_vm_push_parse_error(vm, vigil_nanbox_encode_int(0), "invalid integer");
         return;
     }
-    vigil_object_release(&obj);
+    vigil_value_release(&input);
     vigil_vm_push_parse_ok(vm, vigil_nanbox_encode_int((int64_t)val));
 }
 
 /* Parse intrinsic: pop string, push (f64, err). */
 void vigil_vm_parse_f64(vigil_vm_t *vm)
 {
+    vigil_value_t input;
     vigil_object_t *obj;
     const char *s;
     char *end;
     double val;
 
     vm->stack_count -= 1U;
-    obj = (vigil_object_t *)vigil_nanbox_decode_ptr(vm->stack[vm->stack_count]);
+    input = vm->stack[vm->stack_count];
+    vm->stack[vm->stack_count] = VIGIL_NANBOX_NIL;
+    obj = (vigil_object_t *)vigil_nanbox_decode_ptr(input);
     s = vigil_string_object_c_str(obj);
     if (s == NULL || *s == '\0')
     {
-        vigil_object_release(&obj);
+        vigil_value_release(&input);
         vigil_vm_push_parse_error(vm, vigil_nanbox_encode_double(0.0), "empty string");
         return;
     }
@@ -2226,36 +2253,39 @@ void vigil_vm_parse_f64(vigil_vm_t *vm)
     val = strtod(s, &end);
     if (errno != 0 || end == s || *end != '\0')
     {
-        vigil_object_release(&obj);
+        vigil_value_release(&input);
         vigil_vm_push_parse_error(vm, vigil_nanbox_encode_double(0.0), "invalid float");
         return;
     }
-    vigil_object_release(&obj);
+    vigil_value_release(&input);
     vigil_vm_push_parse_ok(vm, vigil_nanbox_encode_double(val));
 }
 
 /* Parse intrinsic: pop string, push (bool, err). */
 void vigil_vm_parse_bool(vigil_vm_t *vm)
 {
+    vigil_value_t input;
     vigil_object_t *obj;
     const char *s;
 
     vm->stack_count -= 1U;
-    obj = (vigil_object_t *)vigil_nanbox_decode_ptr(vm->stack[vm->stack_count]);
+    input = vm->stack[vm->stack_count];
+    vm->stack[vm->stack_count] = VIGIL_NANBOX_NIL;
+    obj = (vigil_object_t *)vigil_nanbox_decode_ptr(input);
     s = vigil_string_object_c_str(obj);
     if (s != NULL && (strcmp(s, "true") == 0 || strcmp(s, "1") == 0))
     {
-        vigil_object_release(&obj);
+        vigil_value_release(&input);
         vigil_vm_push_parse_ok(vm, vigil_nanbox_from_bool(1));
         return;
     }
     if (s != NULL && (strcmp(s, "false") == 0 || strcmp(s, "0") == 0))
     {
-        vigil_object_release(&obj);
+        vigil_value_release(&input);
         vigil_vm_push_parse_ok(vm, vigil_nanbox_from_bool(0));
         return;
     }
-    vigil_object_release(&obj);
+    vigil_value_release(&input);
     vigil_vm_push_parse_error(vm, vigil_nanbox_from_bool(0), "invalid boolean");
 }
 
@@ -2265,6 +2295,9 @@ void vigil_vm_parse_bool(vigil_vm_t *vm)
 vigil_status_t vigil_vm_execute_call(vigil_vm_t *vm, const vigil_object_t *callee, size_t arg_count,
                                      vigil_error_t *error)
 {
+    const vigil_reg_chunk_t *callee_rc;
+    vigil_status_t status;
+
     /* Handle native functions directly — they have no chunk to translate. */
     if (callee && vigil_object_type(callee) == VIGIL_OBJECT_NATIVE_FUNCTION)
     {
@@ -2308,33 +2341,24 @@ vigil_status_t vigil_vm_execute_call(vigil_vm_t *vm, const vigil_object_t *calle
         vm->frame_count += 1U;
     }
 
-    /* Translate (with caching) and execute via the register VM. */
-    if (callee_chunk->reg_cache == NULL)
-    {
-        vigil_reg_chunk_t *rc = malloc(sizeof(*rc));
-        if (!rc)
-            return VIGIL_STATUS_OUT_OF_MEMORY;
-        rc->arity = (uint8_t)vigil_function_object_arity(vigil_callable_object_function(callee));
-        vigil_status_t s = vigil_reg_translate(callee_chunk, rc, vm->runtime, error);
-        if (s != VIGIL_STATUS_OK)
-        {
-            free(rc);
-            return s;
-        }
-        callee_chunk->reg_cache = rc;
-    }
+    /* Translate on first use and publish the cache exactly once. */
+    status = vigil_chunk_ensure_reg_cache(callee_chunk,
+                                          (uint8_t)vigil_function_object_arity(vigil_callable_object_function(callee)),
+                                          &callee_rc, error);
+    if (status != VIGIL_STATUS_OK)
+        return status;
 
     /* Copy args to callee's separate window (retain objects). */
     {
-        const vigil_reg_chunk_t *rcc = callee_chunk->reg_cache;
-        size_t arity = rcc->arity;
+        size_t arity = callee_rc->arity;
         size_t n = arity < arg_count ? arity : arg_count;
-        size_t need = base_slot + (size_t)rcc->max_registers;
+        size_t need = base_slot + (size_t)callee_rc->max_registers;
         if (vm->stack_capacity < need)
         {
             vigil_status_t gs = vigil_vm_grow_stack(vm, need + 16, error);
             if (gs != VIGIL_STATUS_OK) return gs;
         }
+        vigil_vm_release_value_range(&vm->stack[base_slot], (size_t)callee_rc->max_registers);
         if (vm->stack_count < need)
             vm->stack_count = need;
         for (size_t a = 0; a < n; a++)
@@ -2343,12 +2367,12 @@ vigil_status_t vigil_vm_execute_call(vigil_vm_t *vm, const vigil_object_t *calle
             if (vigil_nanbox_has_object(vm->stack[base_slot + a]))
                 vigil_object_retain((vigil_object_t *)vigil_nanbox_decode_ptr(vm->stack[base_slot + a]));
         }
-        for (size_t z = n; z < rcc->max_registers; z++)
+        for (size_t z = n; z < callee_rc->max_registers; z++)
             vm->stack[base_slot + z] = VIGIL_NANBOX_NIL;
     }
 
     vigil_value_t dummy = {0};
-    vigil_status_t status = vigil_regvm_execute(vm, callee_chunk->reg_cache, &dummy, error);
+    status = vigil_regvm_execute(vm, callee_rc, &dummy, error);
 
     /* Pop the callee frame. */
     if (vm->frame_count > 0)
@@ -2358,19 +2382,33 @@ vigil_status_t vigil_vm_execute_call(vigil_vm_t *vm, const vigil_object_t *calle
        The RETURN handler set stack_count = base + base_r + count. The translator
        moves return values to R[0..count-1], so they start at base_slot. */
     {
-        size_t ret_count = (vm->stack_count > base_slot) ? (vm->stack_count - base_slot) : 0;
-        if (arg_base != base_slot) /* only copy if windows are actually separate */
+        size_t ret_count = (vm->stack_count > base_slot) ? (vm->stack_count - base_slot) : 0U;
+        size_t callee_regs = (size_t)callee_rc->max_registers;
+
+        if (ret_count > callee_regs)
         {
-            for (size_t r = 0; r < ret_count; r++)
-            {
-                if (arg_base + r < vm->stack_capacity)
-                {
-                    if (vigil_nanbox_has_object(vm->stack[arg_base + r]))
-                        vigil_value_release(&vm->stack[arg_base + r]);
-                    vm->stack[arg_base + r] = vm->stack[base_slot + r];
-                    vm->stack[base_slot + r] = VIGIL_NANBOX_NIL;
-                }
-            }
+            ret_count = callee_regs;
+        }
+
+        if (arg_base == base_slot)
+        {
+            for (size_t r = ret_count; r < callee_regs; r++)
+                vigil_value_release(&vm->stack[base_slot + r]);
+            vm->stack_count = base_slot + ret_count;
+            return status;
+        }
+
+        vigil_vm_release_value_range(&vm->stack[arg_base], arg_count);
+
+        for (size_t r = ret_count; r < callee_regs; r++)
+        {
+            vigil_value_release(&vm->stack[base_slot + r]);
+        }
+
+        for (size_t r = 0U; r < ret_count; r++)
+        {
+            vm->stack[arg_base + r] = vm->stack[base_slot + r];
+            vm->stack[base_slot + r] = VIGIL_NANBOX_NIL;
         }
         vm->stack_count = arg_base + ret_count;
     }
@@ -2383,6 +2421,7 @@ vigil_status_t vigil_vm_execute_function(vigil_vm_t *vm, const vigil_object_t *f
                                          vigil_error_t *error)
 {
     vigil_status_t status;
+    const vigil_reg_chunk_t *fn_rc;
 
     status = vigil_vm_validate(vm, error);
     if (status != VIGIL_STATUS_OK)
@@ -2429,33 +2468,22 @@ vigil_status_t vigil_vm_execute_function(vigil_vm_t *vm, const vigil_object_t *f
         if (status != VIGIL_STATUS_OK)
             return status;
 
-        /* Translate (with caching) and execute via the register VM. */
-        if (fn_chunk->reg_cache == NULL)
+        status = vigil_chunk_ensure_reg_cache(fn_chunk, (uint8_t)arity, &fn_rc, error);
+        if (status != VIGIL_STATUS_OK)
         {
-            vigil_reg_chunk_t *rc = malloc(sizeof(*rc));
-            if (!rc)
-            {
-                vigil_vm_release_stack(vm);
-                vigil_vm_clear_frames(vm);
-                return VIGIL_STATUS_OUT_OF_MEMORY;
-            }
-            rc->arity = (uint8_t)arity;
-            status = vigil_reg_translate(fn_chunk, rc, vm->runtime, error);
-            if (status != VIGIL_STATUS_OK)
-            {
-                free(rc);
-                vigil_vm_release_stack(vm);
-                vigil_vm_clear_frames(vm);
-                return status;
-            }
-            fn_chunk->reg_cache = rc;
+            vigil_vm_release_stack(vm);
+            vigil_vm_clear_frames(vm);
+            return status;
         }
 
-        status = vigil_regvm_execute(vm, fn_chunk->reg_cache, out_value, error);
+        status = vigil_regvm_execute(vm, fn_rc, out_value, error);
         {
-            size_t nregs = (size_t)fn_chunk->reg_cache->max_registers;
-            for (size_t ri = 0; ri < nregs && ri < vm->stack_capacity; ri++)
-                vm->stack[ri] = VIGIL_NANBOX_NIL;
+            size_t nregs = (size_t)fn_rc->max_registers;
+            if (status != VIGIL_STATUS_OK)
+                *out_value = VIGIL_NANBOX_NIL;
+            if (status == VIGIL_STATUS_OK && vigil_nanbox_has_object(*out_value))
+                vigil_object_retain((vigil_object_t *)vigil_nanbox_decode_ptr(*out_value));
+            vigil_vm_release_value_range(vm->stack, nregs < vm->stack_capacity ? nregs : vm->stack_capacity);
         }
         vm->stack_count = 0;
         vigil_vm_clear_frames(vm);
@@ -2472,28 +2500,20 @@ vigil_status_t vigil_vm_execute_function(vigil_vm_t *vm, const vigil_object_t *f
             return VIGIL_STATUS_INVALID_ARGUMENT;
         }
         vigil_chunk_t *chunk = (vigil_chunk_t *)frame->chunk;
-        if (chunk->reg_cache == NULL)
-        {
-            vigil_reg_chunk_t *rc = malloc(sizeof(*rc));
-            if (!rc)
-                return VIGIL_STATUS_OUT_OF_MEMORY;
-            rc->arity = 0; /* REPL/top-level: no params */
-            status = vigil_reg_translate(chunk, rc, vm->runtime, error);
-            if (status != VIGIL_STATUS_OK)
-            {
-                free(rc);
-                return status;
-            }
-            chunk->reg_cache = rc;
-        }
+        status = vigil_chunk_ensure_reg_cache(chunk, 0U, &fn_rc, error);
+        if (status != VIGIL_STATUS_OK)
+            return status;
 
-        status = vigil_regvm_execute(vm, chunk->reg_cache, out_value, error);
+        status = vigil_regvm_execute(vm, fn_rc, out_value, error);
         if (vm->in_regvm_call)
             return status;
         {
-            size_t nregs = (size_t)chunk->reg_cache->max_registers;
-            for (size_t ri = 0; ri < nregs && ri < vm->stack_capacity; ri++)
-                vm->stack[ri] = VIGIL_NANBOX_NIL;
+            size_t nregs = (size_t)fn_rc->max_registers;
+            if (status != VIGIL_STATUS_OK)
+                *out_value = VIGIL_NANBOX_NIL;
+            if (status == VIGIL_STATUS_OK && vigil_nanbox_has_object(*out_value))
+                vigil_object_retain((vigil_object_t *)vigil_nanbox_decode_ptr(*out_value));
+            vigil_vm_release_value_range(vm->stack, nregs < vm->stack_capacity ? nregs : vm->stack_capacity);
         }
         vm->stack_count = 0;
         vigil_vm_clear_frames(vm);

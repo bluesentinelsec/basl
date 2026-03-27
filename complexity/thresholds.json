@@ -66,6 +66,39 @@
       }
     },
     {
+      "path": "src/compiler.c",
+      "thresholds": {
+        "ccn": 25,
+        "length": 130
+      }
+    },
+    {
+      "path": "src/regvm.c",
+      "thresholds": {
+        "ccn": 370,
+        "length": 2600
+      }
+    },
+    {
+      "path": "src/vm.c",
+      "thresholds": {
+        "ccn": 24,
+        "length": 125
+      }
+    },
+    {
+      "path": "tests/chunk_test.c",
+      "thresholds": {
+        "ccn": 18
+      }
+    },
+    {
+      "path": "tests/compiler_test.c",
+      "thresholds": {
+        "length": 125
+      }
+    },
+    {
       "path_prefix": "src/platform/",
       "thresholds": {
         "ccn": 24,

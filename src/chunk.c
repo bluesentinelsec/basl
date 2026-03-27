@@ -6,7 +6,12 @@
 
 #include "internal/vigil_internal.h"
 #include "internal/vigil_regvm.h"
+#include "platform/platform.h"
 #include "vigil/chunk.h"
+
+#define VIGIL_REG_CACHE_STATE_EMPTY 0LL
+#define VIGIL_REG_CACHE_STATE_BUILDING 1LL
+#define VIGIL_REG_CACHE_STATE_READY 2LL
 
 static const char *const kVigilOpcodeNames[VIGIL_OPCODE_MULTIPLY_F64_STORE + 1] = {
     [VIGIL_OPCODE_CONSTANT] = "CONSTANT",
@@ -232,6 +237,73 @@ static vigil_status_t vigil_chunk_append_formatted(vigil_string_t *output, vigil
     }
 
     return vigil_string_append(output, line, (size_t)written, error);
+}
+
+vigil_status_t vigil_chunk_ensure_reg_cache(vigil_chunk_t *chunk, uint8_t arity,
+                                            const vigil_reg_chunk_t **out_reg_cache, vigil_error_t *error)
+{
+    vigil_reg_chunk_t *reg_cache;
+    vigil_status_t status;
+
+    if (out_reg_cache == NULL)
+    {
+        vigil_error_set_literal(error, VIGIL_STATUS_INVALID_ARGUMENT, "out_reg_cache must not be null");
+        return VIGIL_STATUS_INVALID_ARGUMENT;
+    }
+
+    *out_reg_cache = NULL;
+
+    if (chunk == NULL)
+    {
+        vigil_error_set_literal(error, VIGIL_STATUS_INVALID_ARGUMENT, "chunk must not be null");
+        return VIGIL_STATUS_INVALID_ARGUMENT;
+    }
+
+    for (;;)
+    {
+        int64_t state = vigil_atomic_load(&chunk->reg_cache_state);
+
+        if (state == VIGIL_REG_CACHE_STATE_READY)
+        {
+            reg_cache = chunk->reg_cache;
+            if (reg_cache == NULL)
+            {
+                vigil_error_set_literal(error, VIGIL_STATUS_INTERNAL, "chunk reg_cache ready state was null");
+                return VIGIL_STATUS_INTERNAL;
+            }
+            *out_reg_cache = reg_cache;
+            return VIGIL_STATUS_OK;
+        }
+
+        if (state == VIGIL_REG_CACHE_STATE_EMPTY &&
+            vigil_atomic_cas(&chunk->reg_cache_state, VIGIL_REG_CACHE_STATE_EMPTY, VIGIL_REG_CACHE_STATE_BUILDING))
+        {
+            reg_cache = malloc(sizeof(*reg_cache));
+            if (reg_cache == NULL)
+            {
+                vigil_atomic_store(&chunk->reg_cache_state, VIGIL_REG_CACHE_STATE_EMPTY);
+                return VIGIL_STATUS_OUT_OF_MEMORY;
+            }
+
+            reg_cache->arity = arity;
+            status = vigil_reg_translate(chunk, reg_cache, chunk->runtime, error);
+            if (status != VIGIL_STATUS_OK)
+            {
+                free(reg_cache);
+                vigil_atomic_store(&chunk->reg_cache_state, VIGIL_REG_CACHE_STATE_EMPTY);
+                return status;
+            }
+
+            chunk->reg_cache = reg_cache;
+            vigil_atomic_store(&chunk->reg_cache_state, VIGIL_REG_CACHE_STATE_READY);
+            *out_reg_cache = reg_cache;
+            return VIGIL_STATUS_OK;
+        }
+
+        while (vigil_atomic_load(&chunk->reg_cache_state) == VIGIL_REG_CACHE_STATE_BUILDING)
+        {
+        }
+    }
 }
 
 static vigil_status_t vigil_chunk_require_operand_bytes(const vigil_chunk_t *chunk, size_t offset, size_t bytes,
@@ -801,6 +873,7 @@ void vigil_chunk_clear(vigil_chunk_t *chunk)
         free(chunk->reg_cache);
         chunk->reg_cache = NULL;
     }
+    vigil_atomic_store(&chunk->reg_cache_state, VIGIL_REG_CACHE_STATE_EMPTY);
 
     vigil_byte_buffer_clear(&chunk->code);
     chunk->span_count = 0U;
@@ -828,6 +901,7 @@ void vigil_chunk_free(vigil_chunk_t *chunk)
         free(chunk->reg_cache);
         chunk->reg_cache = NULL;
     }
+    vigil_atomic_store(&chunk->reg_cache_state, VIGIL_REG_CACHE_STATE_EMPTY);
 
     vigil_chunk_clear(chunk);
     vigil_byte_buffer_free(&chunk->code);

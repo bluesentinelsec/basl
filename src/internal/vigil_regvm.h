@@ -292,6 +292,8 @@ int vigil_reg_chunk_is_translatable(const vigil_chunk_t *stack_chunk);
 
 void vigil_reg_chunk_init(vigil_reg_chunk_t *rc);
 void vigil_reg_chunk_free(vigil_reg_chunk_t *rc, vigil_runtime_t *runtime);
+vigil_status_t vigil_chunk_ensure_reg_cache(vigil_chunk_t *chunk, uint8_t arity,
+                                            const vigil_reg_chunk_t **out_reg_cache, vigil_error_t *error);
 
 /* ── Register VM execution ─────────────────────────────────────── */
 

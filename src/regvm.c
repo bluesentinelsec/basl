@@ -68,6 +68,65 @@ static vigil_status_t emit(vigil_reg_chunk_t *rc, vigil_reg_instr_t instr, size_
     return VIGIL_STATUS_OK;
 }
 
+static void regvm_release_value_range(vigil_value_t *values, size_t count)
+{
+    size_t i;
+
+    if (values == NULL)
+        return;
+
+    for (i = 0U; i < count; i++)
+        vigil_value_release(&values[i]);
+}
+
+static void regvm_clear_value_range(vigil_value_t *values, size_t count)
+{
+    size_t i;
+
+    if (values == NULL)
+        return;
+
+    for (i = 0U; i < count; i++)
+        values[i] = VIGIL_NANBOX_NIL;
+}
+
+static void regvm_reset_value_range(vigil_value_t *values, size_t count)
+{
+    regvm_release_value_range(values, count);
+    regvm_clear_value_range(values, count);
+}
+
+static void regvm_discard_isolated_call_values(vigil_vm_t *vm, size_t orig_base, size_t arg_base, size_t count)
+{
+    if (vm == NULL || arg_base == orig_base || count == 0U)
+        return;
+
+    regvm_release_value_range(&vm->stack[arg_base], count);
+}
+
+static void regvm_move_call_results(vigil_vm_t *vm, size_t orig_base, size_t arg_base, size_t consumed_count,
+                                    size_t temp_count, size_t ret_count)
+{
+    if (vm == NULL)
+        return;
+
+    if (arg_base == orig_base)
+    {
+        for (size_t i = ret_count; i < consumed_count; i++)
+            vigil_value_release(&vm->stack[orig_base + i]);
+        vm->stack_count = orig_base + ret_count;
+        return;
+    }
+
+    regvm_release_value_range(&vm->stack[orig_base], consumed_count);
+    for (size_t i = ret_count; i < temp_count; i++)
+        vigil_value_release(&vm->stack[arg_base + i]);
+    if (ret_count > 0U)
+        memmove(&vm->stack[orig_base], &vm->stack[arg_base], ret_count * sizeof(vigil_value_t));
+    regvm_clear_value_range(&vm->stack[arg_base], ret_count);
+    vm->stack_count = orig_base + ret_count;
+}
+
 /* ── Virtual stack ─────────────────────────────────────────────── */
 
 typedef struct
@@ -1038,13 +1097,13 @@ int vigil_reg_chunk_is_translatable(const vigil_chunk_t *stack_chunk)
     {                                                                                                                  \
         if (vs.need_release != 255)                                                                                    \
         {                                                                                                              \
-            vigil_status_t _r = emit(rc, vigil_reg_abc(VREG_RELEASE, vs.need_release, 0, 0), start_ip);                \
+            vigil_status_t _release_status = emit(rc, vigil_reg_abc(VREG_RELEASE, vs.need_release, 0, 0), start_ip);   \
             vs_clear_obj(&vs, vs.need_release);                                                                        \
             vs.need_release = 255;                                                                                     \
-            if (_r != VIGIL_STATUS_OK) goto tr_fail;                                                                   \
+            if (_release_status != VIGIL_STATUS_OK) goto tr_fail;                                                      \
         }                                                                                                              \
-        vigil_status_t _s = emit(rc, (instr), start_ip);                                                               \
-        if (_s != VIGIL_STATUS_OK)                                                                                     \
+        vigil_status_t _emit_status = emit(rc, (instr), start_ip);                                                     \
+        if (_emit_status != VIGIL_STATUS_OK)                                                                           \
             goto tr_fail;                                                                                              \
     } while (0)
 
@@ -1690,9 +1749,9 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
             uint8_t _br = (uint8_t)((base_reg) + _i); \
             if (vs.top < (int)vs.local_count) { \
                 /* Push-to-position local: force identity register. */ \
-                uint8_t _r = vs_push_at(&vs, (uint8_t)vs.top); \
-                if (_r != _br) \
-                    TR_EMIT(vigil_reg_abc(VREG_MOVE, _r, _br, 0)); \
+                uint8_t _ret_reg = vs_push_at(&vs, (uint8_t)vs.top); \
+                if (_ret_reg != _br) \
+                    TR_EMIT(vigil_reg_abc(VREG_MOVE, _ret_reg, _br, 0)); \
             } else { \
                 vs_push_at(&vs, _br); \
             } \
@@ -2567,8 +2626,10 @@ static vigil_status_t regvm_drain_defers(vigil_vm_t *vm, size_t frame_idx, vigil
                     vigil_object_t *callee_obj = (vigil_object_t *)vigil_nanbox_decode_ptr(cv);
                     /* Shift args down over the callee slot. */
                     size_t real_args = total - 1;
+                    vigil_value_release(&vm->stack[callee_slot]);
                     if (real_args > 0)
                         memmove(&vm->stack[callee_slot], &vm->stack[callee_slot + 1], real_args * sizeof(vigil_value_t));
+                    vm->stack[callee_slot + real_args] = VIGIL_NANBOX_NIL;
                     vm->stack_count -= 1;
                     s = vigil_vm_execute_call(vm, callee_obj, real_args, error);
                 }
@@ -2703,6 +2764,13 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
     }
 
 #define RRELEASE(reg) do { if (vigil_nanbox_has_object(R[(reg)])) vigil_value_release(&R[(reg)]); } while (0)
+#define RSTORE(reg, value_expr)                                                                                       \
+    do                                                                                                               \
+    {                                                                                                                \
+        vigil_value_t _rstore_value = (value_expr);                                                                  \
+        RRELEASE(reg);                                                                                               \
+        R[(reg)] = _rstore_value;                                                                                    \
+    } while (0)
 
 #if REGVM_COMPUTED_GOTO
     _Pragma("GCC diagnostic push") _Pragma("GCC diagnostic ignored \"-Wpedantic\"")
@@ -2932,17 +3000,17 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
     }
     RCASE(LOAD_NIL)
     {
-        R[VREG_GET_A(code[ip])] = VIGIL_NANBOX_NIL;
+        RSTORE(VREG_GET_A(code[ip]), VIGIL_NANBOX_NIL);
         RNEXT();
     }
     RCASE(LOAD_TRUE)
     {
-        R[VREG_GET_A(code[ip])] = VIGIL_NANBOX_TRUE;
+        RSTORE(VREG_GET_A(code[ip]), VIGIL_NANBOX_TRUE);
         RNEXT();
     }
     RCASE(LOAD_FALSE)
     {
-        R[VREG_GET_A(code[ip])] = VIGIL_NANBOX_FALSE;
+        RSTORE(VREG_GET_A(code[ip]), VIGIL_NANBOX_FALSE);
         RNEXT();
     }
     RCASE(DUP)
@@ -2967,7 +3035,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         int32_t r;
         if (VIGIL_UNLIKELY(VIGIL_I32_ADD_OVERFLOW(a, b, &r)))
             goto r_overflow;
-        R[VREG_GET_A(i)] = vigil_nanbox_encode_i32(r);
+        RSTORE(VREG_GET_A(i), vigil_nanbox_encode_i32(r));
         RNEXT();
     }
     RCASE(SUB_I32)
@@ -2978,7 +3046,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         int32_t r;
         if (VIGIL_UNLIKELY(VIGIL_I32_SUB_OVERFLOW(a, b, &r)))
             goto r_overflow;
-        R[VREG_GET_A(i)] = vigil_nanbox_encode_i32(r);
+        RSTORE(VREG_GET_A(i), vigil_nanbox_encode_i32(r));
         RNEXT();
     }
     RCASE(MUL_I32)
@@ -2989,7 +3057,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         int32_t r;
         if (VIGIL_UNLIKELY(VIGIL_I32_MUL_OVERFLOW(a, b, &r)))
             goto r_overflow;
-        R[VREG_GET_A(i)] = vigil_nanbox_encode_i32(r);
+        RSTORE(VREG_GET_A(i), vigil_nanbox_encode_i32(r));
         RNEXT();
     }
     RCASE(DIV_I32)
@@ -2999,7 +3067,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         int32_t b = vigil_nanbox_decode_i32(R[VREG_GET_C(i)]);
         if (VIGIL_UNLIKELY(b == 0))
             goto r_divzero;
-        R[VREG_GET_A(i)] = vigil_nanbox_encode_i32(a / b);
+        RSTORE(VREG_GET_A(i), vigil_nanbox_encode_i32(a / b));
         RNEXT();
     }
     RCASE(MOD_I32)
@@ -3009,7 +3077,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         int32_t b = vigil_nanbox_decode_i32(R[VREG_GET_C(i)]);
         if (VIGIL_UNLIKELY(b == 0))
             goto r_divzero;
-        R[VREG_GET_A(i)] = vigil_nanbox_encode_i32(a % b);
+        RSTORE(VREG_GET_A(i), vigil_nanbox_encode_i32(a % b));
         RNEXT();
     }
 
@@ -3017,43 +3085,43 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
     RCASE(LT_I32)
     {
         vigil_reg_instr_t i = code[ip];
-        R[VREG_GET_A(i)] = vigil_nanbox_from_bool(vigil_nanbox_decode_i32(R[VREG_GET_B(i)]) <
-                                                  vigil_nanbox_decode_i32(R[VREG_GET_C(i)]));
+        RSTORE(VREG_GET_A(i), vigil_nanbox_from_bool(vigil_nanbox_decode_i32(R[VREG_GET_B(i)]) <
+                                                     vigil_nanbox_decode_i32(R[VREG_GET_C(i)])));
         RNEXT();
     }
     RCASE(LE_I32)
     {
         vigil_reg_instr_t i = code[ip];
-        R[VREG_GET_A(i)] = vigil_nanbox_from_bool(vigil_nanbox_decode_i32(R[VREG_GET_B(i)]) <=
-                                                  vigil_nanbox_decode_i32(R[VREG_GET_C(i)]));
+        RSTORE(VREG_GET_A(i), vigil_nanbox_from_bool(vigil_nanbox_decode_i32(R[VREG_GET_B(i)]) <=
+                                                     vigil_nanbox_decode_i32(R[VREG_GET_C(i)])));
         RNEXT();
     }
     RCASE(GT_I32)
     {
         vigil_reg_instr_t i = code[ip];
-        R[VREG_GET_A(i)] = vigil_nanbox_from_bool(vigil_nanbox_decode_i32(R[VREG_GET_B(i)]) >
-                                                  vigil_nanbox_decode_i32(R[VREG_GET_C(i)]));
+        RSTORE(VREG_GET_A(i), vigil_nanbox_from_bool(vigil_nanbox_decode_i32(R[VREG_GET_B(i)]) >
+                                                     vigil_nanbox_decode_i32(R[VREG_GET_C(i)])));
         RNEXT();
     }
     RCASE(GE_I32)
     {
         vigil_reg_instr_t i = code[ip];
-        R[VREG_GET_A(i)] = vigil_nanbox_from_bool(vigil_nanbox_decode_i32(R[VREG_GET_B(i)]) >=
-                                                  vigil_nanbox_decode_i32(R[VREG_GET_C(i)]));
+        RSTORE(VREG_GET_A(i), vigil_nanbox_from_bool(vigil_nanbox_decode_i32(R[VREG_GET_B(i)]) >=
+                                                     vigil_nanbox_decode_i32(R[VREG_GET_C(i)])));
         RNEXT();
     }
     RCASE(EQ_I32)
     {
         vigil_reg_instr_t i = code[ip];
-        R[VREG_GET_A(i)] = vigil_nanbox_from_bool(vigil_nanbox_decode_i32(R[VREG_GET_B(i)]) ==
-                                                  vigil_nanbox_decode_i32(R[VREG_GET_C(i)]));
+        RSTORE(VREG_GET_A(i), vigil_nanbox_from_bool(vigil_nanbox_decode_i32(R[VREG_GET_B(i)]) ==
+                                                     vigil_nanbox_decode_i32(R[VREG_GET_C(i)])));
         RNEXT();
     }
     RCASE(NE_I32)
     {
         vigil_reg_instr_t i = code[ip];
-        R[VREG_GET_A(i)] = vigil_nanbox_from_bool(vigil_nanbox_decode_i32(R[VREG_GET_B(i)]) !=
-                                                  vigil_nanbox_decode_i32(R[VREG_GET_C(i)]));
+        RSTORE(VREG_GET_A(i), vigil_nanbox_from_bool(vigil_nanbox_decode_i32(R[VREG_GET_B(i)]) !=
+                                                     vigil_nanbox_decode_i32(R[VREG_GET_C(i)])));
         RNEXT();
     }
 
@@ -3066,7 +3134,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         int64_t r;
         if (VIGIL_UNLIKELY(vigil_vm_checked_add(a, b, &r) != VIGIL_STATUS_OK))
             goto r_overflow;
-        R[VREG_GET_A(i)] = vigil_nanbox_encode_int(r);
+        RSTORE(VREG_GET_A(i), vigil_nanbox_encode_int(r));
         RNEXT();
     }
     RCASE(SUB_I64)
@@ -3077,7 +3145,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         int64_t r;
         if (VIGIL_UNLIKELY(vigil_vm_checked_subtract(a, b, &r) != VIGIL_STATUS_OK))
             goto r_overflow;
-        R[VREG_GET_A(i)] = vigil_nanbox_encode_int(r);
+        RSTORE(VREG_GET_A(i), vigil_nanbox_encode_int(r));
         RNEXT();
     }
     RCASE(MUL_I64)
@@ -3088,7 +3156,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         int64_t r;
         if (VIGIL_UNLIKELY(vigil_vm_checked_multiply(a, b, &r) != VIGIL_STATUS_OK))
             goto r_overflow;
-        R[VREG_GET_A(i)] = vigil_nanbox_encode_int(r);
+        RSTORE(VREG_GET_A(i), vigil_nanbox_encode_int(r));
         RNEXT();
     }
     RCASE(DIV_I64)
@@ -3101,7 +3169,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         int64_t r;
         if (VIGIL_UNLIKELY(vigil_vm_checked_divide(a, b, &r) != VIGIL_STATUS_OK))
             goto r_overflow;
-        R[VREG_GET_A(i)] = vigil_nanbox_encode_int(r);
+        RSTORE(VREG_GET_A(i), vigil_nanbox_encode_int(r));
         RNEXT();
     }
     RCASE(MOD_I64)
@@ -3114,7 +3182,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         int64_t r;
         if (VIGIL_UNLIKELY(vigil_vm_checked_modulo(a, b, &r) != VIGIL_STATUS_OK))
             goto r_overflow;
-        R[VREG_GET_A(i)] = vigil_nanbox_encode_int(r);
+        RSTORE(VREG_GET_A(i), vigil_nanbox_encode_int(r));
         RNEXT();
     }
 
@@ -3123,50 +3191,50 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
     {
         vigil_reg_instr_t i = code[ip];
         uint8_t rb = VREG_GET_B(i), rc2 = VREG_GET_C(i);
-        R[VREG_GET_A(i)] = (vigil_nanbox_is_uint(R[rb]) || vigil_nanbox_is_uint(R[rc2]))
-            ? vigil_nanbox_from_bool(regvm_decode_uint(R[rb]) < regvm_decode_uint(R[rc2]))
-            : vigil_nanbox_from_bool(regvm_decode_int(R[rb]) < regvm_decode_int(R[rc2]));
+        RSTORE(VREG_GET_A(i), (vigil_nanbox_is_uint(R[rb]) || vigil_nanbox_is_uint(R[rc2]))
+                                  ? vigil_nanbox_from_bool(regvm_decode_uint(R[rb]) < regvm_decode_uint(R[rc2]))
+                                  : vigil_nanbox_from_bool(regvm_decode_int(R[rb]) < regvm_decode_int(R[rc2])));
         RNEXT();
     }
     RCASE(LE_I64)
     {
         vigil_reg_instr_t i = code[ip];
         uint8_t rb = VREG_GET_B(i), rc2 = VREG_GET_C(i);
-        R[VREG_GET_A(i)] = (vigil_nanbox_is_uint(R[rb]) || vigil_nanbox_is_uint(R[rc2]))
-            ? vigil_nanbox_from_bool(regvm_decode_uint(R[rb]) <= regvm_decode_uint(R[rc2]))
-            : vigil_nanbox_from_bool(regvm_decode_int(R[rb]) <= regvm_decode_int(R[rc2]));
+        RSTORE(VREG_GET_A(i), (vigil_nanbox_is_uint(R[rb]) || vigil_nanbox_is_uint(R[rc2]))
+                                  ? vigil_nanbox_from_bool(regvm_decode_uint(R[rb]) <= regvm_decode_uint(R[rc2]))
+                                  : vigil_nanbox_from_bool(regvm_decode_int(R[rb]) <= regvm_decode_int(R[rc2])));
         RNEXT();
     }
     RCASE(GT_I64)
     {
         vigil_reg_instr_t i = code[ip];
         uint8_t rb = VREG_GET_B(i), rc2 = VREG_GET_C(i);
-        R[VREG_GET_A(i)] = (vigil_nanbox_is_uint(R[rb]) || vigil_nanbox_is_uint(R[rc2]))
-            ? vigil_nanbox_from_bool(regvm_decode_uint(R[rb]) > regvm_decode_uint(R[rc2]))
-            : vigil_nanbox_from_bool(regvm_decode_int(R[rb]) > regvm_decode_int(R[rc2]));
+        RSTORE(VREG_GET_A(i), (vigil_nanbox_is_uint(R[rb]) || vigil_nanbox_is_uint(R[rc2]))
+                                  ? vigil_nanbox_from_bool(regvm_decode_uint(R[rb]) > regvm_decode_uint(R[rc2]))
+                                  : vigil_nanbox_from_bool(regvm_decode_int(R[rb]) > regvm_decode_int(R[rc2])));
         RNEXT();
     }
     RCASE(GE_I64)
     {
         vigil_reg_instr_t i = code[ip];
         uint8_t rb = VREG_GET_B(i), rc2 = VREG_GET_C(i);
-        R[VREG_GET_A(i)] = (vigil_nanbox_is_uint(R[rb]) || vigil_nanbox_is_uint(R[rc2]))
-            ? vigil_nanbox_from_bool(regvm_decode_uint(R[rb]) >= regvm_decode_uint(R[rc2]))
-            : vigil_nanbox_from_bool(regvm_decode_int(R[rb]) >= regvm_decode_int(R[rc2]));
+        RSTORE(VREG_GET_A(i), (vigil_nanbox_is_uint(R[rb]) || vigil_nanbox_is_uint(R[rc2]))
+                                  ? vigil_nanbox_from_bool(regvm_decode_uint(R[rb]) >= regvm_decode_uint(R[rc2]))
+                                  : vigil_nanbox_from_bool(regvm_decode_int(R[rb]) >= regvm_decode_int(R[rc2])));
         RNEXT();
     }
     RCASE(EQ_I64)
     {
         vigil_reg_instr_t i = code[ip];
-        R[VREG_GET_A(i)] = vigil_nanbox_from_bool(regvm_decode_int(R[VREG_GET_B(i)]) ==
-                                                  regvm_decode_int(R[VREG_GET_C(i)]));
+        RSTORE(VREG_GET_A(i), vigil_nanbox_from_bool(regvm_decode_int(R[VREG_GET_B(i)]) ==
+                                                     regvm_decode_int(R[VREG_GET_C(i)])));
         RNEXT();
     }
     RCASE(NE_I64)
     {
         vigil_reg_instr_t i = code[ip];
-        R[VREG_GET_A(i)] = vigil_nanbox_from_bool(regvm_decode_int(R[VREG_GET_B(i)]) !=
-                                                  regvm_decode_int(R[VREG_GET_C(i)]));
+        RSTORE(VREG_GET_A(i), vigil_nanbox_from_bool(regvm_decode_int(R[VREG_GET_B(i)]) !=
+                                                     regvm_decode_int(R[VREG_GET_C(i)])));
         RNEXT();
     }
 
@@ -3176,7 +3244,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         vigil_reg_instr_t i = code[ip];
         double a = vigil_nanbox_decode_double(R[VREG_GET_B(i)]);
         double b = vigil_nanbox_decode_double(R[VREG_GET_C(i)]);
-        R[VREG_GET_A(i)] = vigil_nanbox_encode_double(a + b);
+        RSTORE(VREG_GET_A(i), vigil_nanbox_encode_double(a + b));
         RNEXT();
     }
     RCASE(SUB_F64)
@@ -3184,7 +3252,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         vigil_reg_instr_t i = code[ip];
         double a = vigil_nanbox_decode_double(R[VREG_GET_B(i)]);
         double b = vigil_nanbox_decode_double(R[VREG_GET_C(i)]);
-        R[VREG_GET_A(i)] = vigil_nanbox_encode_double(a - b);
+        RSTORE(VREG_GET_A(i), vigil_nanbox_encode_double(a - b));
         RNEXT();
     }
     RCASE(MUL_F64)
@@ -3192,7 +3260,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         vigil_reg_instr_t i = code[ip];
         double a = vigil_nanbox_decode_double(R[VREG_GET_B(i)]);
         double b = vigil_nanbox_decode_double(R[VREG_GET_C(i)]);
-        R[VREG_GET_A(i)] = vigil_nanbox_encode_double(a * b);
+        RSTORE(VREG_GET_A(i), vigil_nanbox_encode_double(a * b));
         RNEXT();
     }
     RCASE(DIV_F64)
@@ -3200,7 +3268,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         vigil_reg_instr_t i = code[ip];
         double a = vigil_nanbox_decode_double(R[VREG_GET_B(i)]);
         double b = vigil_nanbox_decode_double(R[VREG_GET_C(i)]);
-        R[VREG_GET_A(i)] = vigil_nanbox_encode_double(a / b);
+        RSTORE(VREG_GET_A(i), vigil_nanbox_encode_double(a / b));
         RNEXT();
     }
 
@@ -3208,25 +3276,25 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
     RCASE(MATH_SIN)
     {
         vigil_reg_instr_t i = code[ip];
-        R[VREG_GET_A(i)] = vigil_nanbox_encode_double(sin(vigil_nanbox_decode_double(R[VREG_GET_B(i)])));
+        RSTORE(VREG_GET_A(i), vigil_nanbox_encode_double(sin(vigil_nanbox_decode_double(R[VREG_GET_B(i)]))));
         RNEXT();
     }
     RCASE(MATH_COS)
     {
         vigil_reg_instr_t i = code[ip];
-        R[VREG_GET_A(i)] = vigil_nanbox_encode_double(cos(vigil_nanbox_decode_double(R[VREG_GET_B(i)])));
+        RSTORE(VREG_GET_A(i), vigil_nanbox_encode_double(cos(vigil_nanbox_decode_double(R[VREG_GET_B(i)]))));
         RNEXT();
     }
     RCASE(MATH_SQRT)
     {
         vigil_reg_instr_t i = code[ip];
-        R[VREG_GET_A(i)] = vigil_nanbox_encode_double(sqrt(vigil_nanbox_decode_double(R[VREG_GET_B(i)])));
+        RSTORE(VREG_GET_A(i), vigil_nanbox_encode_double(sqrt(vigil_nanbox_decode_double(R[VREG_GET_B(i)]))));
         RNEXT();
     }
     RCASE(MATH_LOG)
     {
         vigil_reg_instr_t i = code[ip];
-        R[VREG_GET_A(i)] = vigil_nanbox_encode_double(log(vigil_nanbox_decode_double(R[VREG_GET_B(i)])));
+        RSTORE(VREG_GET_A(i), vigil_nanbox_encode_double(log(vigil_nanbox_decode_double(R[VREG_GET_B(i)]))));
         RNEXT();
     }
     RCASE(MATH_POW)
@@ -3234,7 +3302,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         vigil_reg_instr_t i = code[ip];
         double a = vigil_nanbox_decode_double(R[VREG_GET_B(i)]);
         double b = vigil_nanbox_decode_double(R[VREG_GET_C(i)]);
-        R[VREG_GET_A(i)] = vigil_nanbox_encode_double(pow(a, b));
+        RSTORE(VREG_GET_A(i), vigil_nanbox_encode_double(pow(a, b)));
         RNEXT();
     }
 
@@ -3247,7 +3315,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         int32_t r;
         if (VIGIL_UNLIKELY(VIGIL_I32_ADD_OVERFLOW(v, (int32_t)delta, &r)))
             goto r_overflow;
-        R[VREG_GET_A(i)] = vigil_nanbox_encode_i32(r);
+        RSTORE(VREG_GET_A(i), vigil_nanbox_encode_i32(r));
         RNEXT();
     }
     RCASE(INC_I64)
@@ -3258,7 +3326,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         int64_t r;
         if (VIGIL_UNLIKELY(vigil_vm_checked_add(v, delta, &r) != VIGIL_STATUS_OK))
             goto r_overflow;
-        R[VREG_GET_A(i)] = vigil_nanbox_encode_int(r);
+        RSTORE(VREG_GET_A(i), vigil_nanbox_encode_int(r));
         RNEXT();
     }
 
@@ -3436,7 +3504,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         int32_t r;
         if (VIGIL_UNLIKELY(VIGIL_I32_ADD_OVERFLOW(val, (int32_t)delta, &r)))
             goto r_overflow;
-        R[idx] = vigil_nanbox_encode_i32(r);
+        RSTORE(idx, vigil_nanbox_encode_i32(r));
         int cont = 0;
         switch (cmp)
         {
@@ -3480,7 +3548,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         int64_t r;
         if (VIGIL_UNLIKELY(vigil_vm_checked_add(val, delta, &r) != VIGIL_STATUS_OK))
             goto r_overflow;
-        R[idx] = vigil_nanbox_encode_int(r);
+        RSTORE(idx, vigil_nanbox_encode_int(r));
         int cont = 0;
         switch (cmp)
         {
@@ -3531,7 +3599,8 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         /* Try f64 fast path. */
         if (vigil_nanbox_is_double(R[ra]) && vigil_nanbox_is_double(R[rb]))
         {
-            R[rd] = vigil_nanbox_encode_double(vigil_nanbox_decode_double(R[ra]) + vigil_nanbox_decode_double(R[rb]));
+            RSTORE(rd, vigil_nanbox_encode_double(vigil_nanbox_decode_double(R[ra]) +
+                                                 vigil_nanbox_decode_double(R[rb])));
             RNEXT();
         }
         /* String concatenation. */
@@ -3570,7 +3639,8 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         }
         if (vigil_nanbox_is_double(R[ra]) && vigil_nanbox_is_double(R[rb]))
         {
-            R[rd] = vigil_nanbox_encode_double(vigil_nanbox_decode_double(R[ra]) - vigil_nanbox_decode_double(R[rb]));
+            RSTORE(rd, vigil_nanbox_encode_double(vigil_nanbox_decode_double(R[ra]) -
+                                                 vigil_nanbox_decode_double(R[rb])));
             RNEXT();
         }
         status = VIGIL_STATUS_UNSUPPORTED;
@@ -3596,7 +3666,8 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         }
         if (vigil_nanbox_is_double(R[ra]) && vigil_nanbox_is_double(R[rb]))
         {
-            R[rd] = vigil_nanbox_encode_double(vigil_nanbox_decode_double(R[ra]) * vigil_nanbox_decode_double(R[rb]));
+            RSTORE(rd, vigil_nanbox_encode_double(vigil_nanbox_decode_double(R[ra]) *
+                                                 vigil_nanbox_decode_double(R[rb])));
             RNEXT();
         }
         status = VIGIL_STATUS_UNSUPPORTED;
@@ -3624,7 +3695,8 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         }
         if (vigil_nanbox_is_double(R[ra]) && vigil_nanbox_is_double(R[rb]))
         {
-            R[rd] = vigil_nanbox_encode_double(vigil_nanbox_decode_double(R[ra]) / vigil_nanbox_decode_double(R[rb]));
+            RSTORE(rd, vigil_nanbox_encode_double(vigil_nanbox_decode_double(R[ra]) /
+                                                 vigil_nanbox_decode_double(R[rb])));
             RNEXT();
         }
         status = VIGIL_STATUS_UNSUPPORTED;
@@ -3668,17 +3740,18 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         uint8_t ra = VREG_GET_B(i), rb = VREG_GET_C(i);
         if (vigil_nanbox_is_uint(R[ra]) || vigil_nanbox_is_uint(R[rb]))
         {
-            R[VREG_GET_A(i)] = vigil_nanbox_from_bool(regvm_decode_uint(R[ra]) < regvm_decode_uint(R[rb]));
+            RSTORE(VREG_GET_A(i), vigil_nanbox_from_bool(regvm_decode_uint(R[ra]) < regvm_decode_uint(R[rb])));
             RNEXT();
         }
         if (vigil_nanbox_is_int(R[ra]) && vigil_nanbox_is_int(R[rb]))
         {
-            R[VREG_GET_A(i)] = vigil_nanbox_from_bool(regvm_decode_int(R[ra]) < regvm_decode_int(R[rb]));
+            RSTORE(VREG_GET_A(i), vigil_nanbox_from_bool(regvm_decode_int(R[ra]) < regvm_decode_int(R[rb])));
             RNEXT();
         }
         if (vigil_nanbox_is_double(R[ra]) && vigil_nanbox_is_double(R[rb]))
         {
-            R[VREG_GET_A(i)] = vigil_nanbox_from_bool(vigil_nanbox_decode_double(R[ra]) < vigil_nanbox_decode_double(R[rb]));
+            RSTORE(VREG_GET_A(i), vigil_nanbox_from_bool(vigil_nanbox_decode_double(R[ra]) <
+                                                         vigil_nanbox_decode_double(R[rb])));
             RNEXT();
         }
         status = VIGIL_STATUS_UNSUPPORTED;
@@ -3690,17 +3763,18 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         uint8_t ra = VREG_GET_B(i), rb = VREG_GET_C(i);
         if (vigil_nanbox_is_uint(R[ra]) || vigil_nanbox_is_uint(R[rb]))
         {
-            R[VREG_GET_A(i)] = vigil_nanbox_from_bool(regvm_decode_uint(R[ra]) <= regvm_decode_uint(R[rb]));
+            RSTORE(VREG_GET_A(i), vigil_nanbox_from_bool(regvm_decode_uint(R[ra]) <= regvm_decode_uint(R[rb])));
             RNEXT();
         }
         if (vigil_nanbox_is_int(R[ra]) && vigil_nanbox_is_int(R[rb]))
         {
-            R[VREG_GET_A(i)] = vigil_nanbox_from_bool(regvm_decode_int(R[ra]) <= regvm_decode_int(R[rb]));
+            RSTORE(VREG_GET_A(i), vigil_nanbox_from_bool(regvm_decode_int(R[ra]) <= regvm_decode_int(R[rb])));
             RNEXT();
         }
         if (vigil_nanbox_is_double(R[ra]) && vigil_nanbox_is_double(R[rb]))
         {
-            R[VREG_GET_A(i)] = vigil_nanbox_from_bool(vigil_nanbox_decode_double(R[ra]) <= vigil_nanbox_decode_double(R[rb]));
+            RSTORE(VREG_GET_A(i), vigil_nanbox_from_bool(vigil_nanbox_decode_double(R[ra]) <=
+                                                         vigil_nanbox_decode_double(R[rb])));
             RNEXT();
         }
         status = VIGIL_STATUS_UNSUPPORTED;
@@ -3718,14 +3792,14 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
             int64_t r;
             if (VIGIL_LIKELY(vigil_vm_checked_negate(v, &r) == VIGIL_STATUS_OK))
             {
-                R[VREG_GET_A(i)] = regvm_encode_int(r);
+                RSTORE(VREG_GET_A(i), regvm_encode_int(r));
                 RNEXT();
             }
             goto r_overflow;
         }
         if (vigil_nanbox_is_double(R[src]))
         {
-            R[VREG_GET_A(i)] = vigil_nanbox_encode_double(-vigil_nanbox_decode_double(R[src]));
+            RSTORE(VREG_GET_A(i), vigil_nanbox_encode_double(-vigil_nanbox_decode_double(R[src])));
             RNEXT();
         }
         status = VIGIL_STATUS_UNSUPPORTED;
@@ -3734,8 +3808,8 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
     RCASE(NOT)
     {
         vigil_reg_instr_t i = code[ip];
-        R[VREG_GET_A(i)] =
-            vigil_nanbox_from_bool(R[VREG_GET_B(i)] == VIGIL_NANBOX_FALSE || R[VREG_GET_B(i)] == VIGIL_NANBOX_NIL);
+        RSTORE(VREG_GET_A(i),
+               vigil_nanbox_from_bool(R[VREG_GET_B(i)] == VIGIL_NANBOX_FALSE || R[VREG_GET_B(i)] == VIGIL_NANBOX_NIL));
         RNEXT();
     }
     RCASE(BNOT)
@@ -3743,7 +3817,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         vigil_reg_instr_t i = code[ip];
         if (vigil_nanbox_is_int(R[VREG_GET_B(i)]))
         {
-            R[VREG_GET_A(i)] = vigil_nanbox_encode_int(~regvm_decode_int(R[VREG_GET_B(i)]));
+            RSTORE(VREG_GET_A(i), vigil_nanbox_encode_int(~regvm_decode_int(R[VREG_GET_B(i)])));
             RNEXT();
         }
         status = VIGIL_STATUS_UNSUPPORTED;
@@ -3754,22 +3828,22 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
     RCASE(BAND)
     {
         vigil_reg_instr_t i = code[ip];
-        R[VREG_GET_A(i)] = vigil_nanbox_encode_int(regvm_decode_int(R[VREG_GET_B(i)]) &
-                                                   regvm_decode_int(R[VREG_GET_C(i)]));
+        RSTORE(VREG_GET_A(i), vigil_nanbox_encode_int(regvm_decode_int(R[VREG_GET_B(i)]) &
+                                                      regvm_decode_int(R[VREG_GET_C(i)])));
         RNEXT();
     }
     RCASE(BOR)
     {
         vigil_reg_instr_t i = code[ip];
-        R[VREG_GET_A(i)] = vigil_nanbox_encode_int(regvm_decode_int(R[VREG_GET_B(i)]) |
-                                                   regvm_decode_int(R[VREG_GET_C(i)]));
+        RSTORE(VREG_GET_A(i), vigil_nanbox_encode_int(regvm_decode_int(R[VREG_GET_B(i)]) |
+                                                      regvm_decode_int(R[VREG_GET_C(i)])));
         RNEXT();
     }
     RCASE(BXOR)
     {
         vigil_reg_instr_t i = code[ip];
-        R[VREG_GET_A(i)] = vigil_nanbox_encode_int(regvm_decode_int(R[VREG_GET_B(i)]) ^
-                                                   regvm_decode_int(R[VREG_GET_C(i)]));
+        RSTORE(VREG_GET_A(i), vigil_nanbox_encode_int(regvm_decode_int(R[VREG_GET_B(i)]) ^
+                                                      regvm_decode_int(R[VREG_GET_C(i)])));
         RNEXT();
     }
     RCASE(SHL)
@@ -3782,7 +3856,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
             uint64_t r;
             if (VIGIL_UNLIKELY(vigil_vm_checked_ushift_left(a, b, &r) != VIGIL_STATUS_OK))
                 goto r_overflow;
-            R[VREG_GET_A(i)] = regvm_encode_uint(r);
+            RSTORE(VREG_GET_A(i), regvm_encode_uint(r));
             RNEXT();
         }
         int64_t a = regvm_decode_int(R[VREG_GET_B(i)]);
@@ -3790,7 +3864,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         int64_t r;
         if (VIGIL_UNLIKELY(vigil_vm_checked_shift_left(a, b, &r) != VIGIL_STATUS_OK))
             goto r_overflow;
-        R[VREG_GET_A(i)] = regvm_encode_int(r);
+        RSTORE(VREG_GET_A(i), regvm_encode_int(r));
         RNEXT();
     }
     RCASE(SHR)
@@ -3803,7 +3877,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
             uint64_t r;
             if (VIGIL_UNLIKELY(vigil_vm_checked_ushift_right(a, b, &r) != VIGIL_STATUS_OK))
                 goto r_overflow;
-            R[VREG_GET_A(i)] = vigil_nanbox_encode_uint(r);
+            RSTORE(VREG_GET_A(i), vigil_nanbox_encode_uint(r));
             RNEXT();
         }
         int64_t a = regvm_decode_int(R[VREG_GET_B(i)]);
@@ -3811,7 +3885,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         int64_t r;
         if (VIGIL_UNLIKELY(vigil_vm_checked_shift_right(a, b, &r) != VIGIL_STATUS_OK))
             goto r_overflow;
-        R[VREG_GET_A(i)] = vigil_nanbox_encode_int(r);
+        RSTORE(VREG_GET_A(i), vigil_nanbox_encode_int(r));
         RNEXT();
     }
 
@@ -3823,18 +3897,18 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         if (vigil_nanbox_is_int(R[src]))
         {
             int64_t v = regvm_decode_int(R[src]);
-            R[VREG_GET_A(i)] = vigil_nanbox_encode_i32((int32_t)v);
+            RSTORE(VREG_GET_A(i), vigil_nanbox_encode_i32((int32_t)v));
             RNEXT();
         }
         if (vigil_nanbox_is_uint(R[src]))
         {
             uint64_t v = regvm_decode_uint(R[src]);
-            R[VREG_GET_A(i)] = vigil_nanbox_encode_i32((int32_t)v);
+            RSTORE(VREG_GET_A(i), vigil_nanbox_encode_i32((int32_t)v));
             RNEXT();
         }
         if (vigil_nanbox_is_double(R[src]))
         {
-            R[VREG_GET_A(i)] = vigil_nanbox_encode_i32((int32_t)vigil_nanbox_decode_double(R[src]));
+            RSTORE(VREG_GET_A(i), vigil_nanbox_encode_i32((int32_t)vigil_nanbox_decode_double(R[src])));
             RNEXT();
         }
         status = VIGIL_STATUS_UNSUPPORTED;
@@ -3844,19 +3918,27 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
     {
         vigil_reg_instr_t i = code[ip];
         uint8_t src = VREG_GET_B(i);
+        uint8_t dst = VREG_GET_A(i);
         if (vigil_nanbox_is_int(R[src]))
         {
-            R[VREG_GET_A(i)] = R[src];
+            if (dst != src)
+            {
+                RRELEASE(dst);
+                if (vigil_nanbox_has_object(R[src]))
+                    VIGIL_VM_VALUE_COPY(&R[dst], &R[src]);
+                else
+                    R[dst] = R[src];
+            }
             RNEXT();
         }
         if (vigil_nanbox_is_uint(R[src]))
         {
-            R[VREG_GET_A(i)] = vigil_nanbox_encode_int((int64_t)regvm_decode_uint(R[src]));
+            RSTORE(dst, vigil_nanbox_encode_int((int64_t)regvm_decode_uint(R[src])));
             RNEXT();
         }
         if (vigil_nanbox_is_double(R[src]))
         {
-            R[VREG_GET_A(i)] = vigil_nanbox_encode_int((int64_t)vigil_nanbox_decode_double(R[src]));
+            RSTORE(dst, vigil_nanbox_encode_int((int64_t)vigil_nanbox_decode_double(R[src])));
             RNEXT();
         }
         status = VIGIL_STATUS_UNSUPPORTED;
@@ -3868,17 +3950,17 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         uint8_t src = VREG_GET_B(i);
         if (vigil_nanbox_is_double(R[src]))
         {
-            R[VREG_GET_A(i)] = R[src];
+            RSTORE(VREG_GET_A(i), R[src]);
             RNEXT();
         }
         if (vigil_nanbox_is_int(R[src]))
         {
-            R[VREG_GET_A(i)] = vigil_nanbox_encode_double((double)regvm_decode_int(R[src]));
+            RSTORE(VREG_GET_A(i), vigil_nanbox_encode_double((double)regvm_decode_int(R[src])));
             RNEXT();
         }
         if (vigil_nanbox_is_uint(R[src]))
         {
-            R[VREG_GET_A(i)] = vigil_nanbox_encode_double((double)regvm_decode_uint(R[src]));
+            RSTORE(VREG_GET_A(i), vigil_nanbox_encode_double((double)regvm_decode_uint(R[src])));
             RNEXT();
         }
         status = VIGIL_STATUS_UNSUPPORTED;
@@ -3916,7 +3998,10 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
             status = VIGIL_STATUS_INTERNAL;
             goto r_cleanup;
         }
+        RRELEASE(VREG_GET_A(i));
         R[VREG_GET_A(i)] = gval;
+        if (vigil_nanbox_has_object(gval))
+            has_reg_objects = 1;
         RNEXT();
     }
     RCASE(SET_GLOBAL)
@@ -3938,7 +4023,10 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         {
             vigil_closure_object_get_capture((vigil_object_t *)frame->callable, (size_t)VREG_GET_Bx(i), &cval);
         }
+        RRELEASE(VREG_GET_A(i));
         R[VREG_GET_A(i)] = cval;
+        if (vigil_nanbox_has_object(cval))
+            has_reg_objects = 1;
         RNEXT();
     }
     RCASE(SET_CAPTURE)
@@ -4036,17 +4124,9 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
 
         vigil_chunk_t *cc = (vigil_chunk_t *)vigil_vm_function_chunk(callee);
         if (VIGIL_UNLIKELY(!cc)) { status = VIGIL_STATUS_INTERNAL; goto r_cleanup; }
-        const vigil_reg_chunk_t *callee_rc = cc->reg_cache;
-        if (VIGIL_UNLIKELY(!callee_rc))
-        {
-            vigil_reg_chunk_t *nrc = malloc(sizeof(*nrc));
-            if (!nrc) { status = VIGIL_STATUS_OUT_OF_MEMORY; goto r_cleanup; }
-            nrc->arity = (uint8_t)vigil_function_object_arity(callee);
-            status = vigil_reg_translate(cc, nrc, vm->runtime, error);
-            if (status != VIGIL_STATUS_OK) { free(nrc); goto r_cleanup; }
-            cc->reg_cache = nrc;
-            callee_rc = nrc;
-        }
+        const vigil_reg_chunk_t *callee_rc = NULL;
+        status = vigil_chunk_ensure_reg_cache(cc, (uint8_t)vigil_function_object_arity(callee), &callee_rc, error);
+        if (status != VIGIL_STATUS_OK) goto r_cleanup;
 
         /* Save caller ip. */
         frame->ip = ip + 1;
@@ -4096,8 +4176,8 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
 
         /* Zero callee locals/temps so stale objects from prior calls
            cannot leak when overwritten by non-object values. */
-        for (size_t _z = rc->arity; _z < rc->max_registers; _z++)
-            R[_z] = VIGIL_NANBOX_NIL;
+        if ((size_t)rc->max_registers > (size_t)rc->arity)
+            regvm_reset_value_range(&R[rc->arity], (size_t)rc->max_registers - (size_t)rc->arity);
 
         RDISPATCH();
     }
@@ -4251,7 +4331,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         if (!vigil_instance_object_get_field(o, (size_t)fi, &fv))
         { status = VIGIL_STATUS_INVALID_ARGUMENT; goto r_cleanup; }
         RRELEASE(VREG_GET_A(i));
-        VIGIL_VM_VALUE_COPY(&R[VREG_GET_A(i)], &fv);
+        R[VREG_GET_A(i)] = fv;
         RNEXT();
     }
     RCASE(SET_FIELD)
@@ -4485,7 +4565,8 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         vigil_reg_instr_t i = code[ip];
         uint8_t src = VREG_GET_B(i);
         uint8_t dst = VREG_GET_A(i);
-        has_reg_objects = 1; vigil_object_t *obj = (vigil_object_t *)vigil_nanbox_decode_ptr(R[src]);
+        has_reg_objects = 1;
+        vigil_object_t *obj = (vigil_object_t *)vigil_nanbox_decode_ptr(R[src]);
         const char *s = vigil_string_object_c_str(obj);
         if (s != NULL && *s != '\0')
         {
@@ -4493,8 +4574,8 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
             long val = strtol(s, &end, 10);
             if (errno == 0 && end != s && *end == '\0' && val >= INT32_MIN && val <= INT32_MAX)
             {
-                R[dst] = vigil_nanbox_encode_int((int64_t)val);
-                R[dst + 1] = vigil_runtime_ok_error_value(vm->runtime);
+                RSTORE(dst, vigil_nanbox_encode_int((int64_t)val));
+                RSTORE((uint8_t)(dst + 1U), vigil_runtime_ok_error_value(vm->runtime));
                 RNEXT();
             }
         }
@@ -4509,6 +4590,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         vigil_reg_instr_t i = code[ip];
         uint8_t src = VREG_GET_B(i);
         uint8_t dst = VREG_GET_A(i);
+        has_reg_objects = 1;
         vigil_object_t *obj = (vigil_object_t *)vigil_nanbox_decode_ptr(R[src]);
         const char *s = vigil_string_object_c_str(obj);
         if (s != NULL && *s != '\0')
@@ -4517,8 +4599,8 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
             double val = strtod(s, &end);
             if (errno == 0 && end != s && *end == '\0')
             {
-                R[dst] = vigil_nanbox_encode_double(val);
-                R[dst + 1] = vigil_runtime_ok_error_value(vm->runtime);
+                RSTORE(dst, vigil_nanbox_encode_double(val));
+                RSTORE((uint8_t)(dst + 1U), vigil_runtime_ok_error_value(vm->runtime));
                 RNEXT();
             }
         }
@@ -4532,19 +4614,20 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         vigil_reg_instr_t i = code[ip];
         uint8_t src = VREG_GET_B(i);
         uint8_t dst = VREG_GET_A(i);
+        has_reg_objects = 1;
         vigil_object_t *obj = (vigil_object_t *)vigil_nanbox_decode_ptr(R[src]);
         const char *s = vigil_string_object_c_str(obj);
         size_t len = s ? vigil_string_object_length(obj) : 0;
         if (len == 4 && memcmp(s, "true", 4) == 0)
         {
-            R[dst] = VIGIL_NANBOX_TRUE;
-            R[dst + 1] = vigil_runtime_ok_error_value(vm->runtime);
+            RSTORE(dst, VIGIL_NANBOX_TRUE);
+            RSTORE((uint8_t)(dst + 1U), vigil_runtime_ok_error_value(vm->runtime));
             RNEXT();
         }
         if (len == 5 && memcmp(s, "false", 5) == 0)
         {
-            R[dst] = VIGIL_NANBOX_FALSE;
-            R[dst + 1] = vigil_runtime_ok_error_value(vm->runtime);
+            RSTORE(dst, VIGIL_NANBOX_FALSE);
+            RSTORE((uint8_t)(dst + 1U), vigil_runtime_ok_error_value(vm->runtime));
             RNEXT();
         }
         REGVM_SYNC_PRE(src);
@@ -4632,13 +4715,18 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         size_t callee_slot = arg_base;
         vigil_value_t callee_val = vm->stack[callee_slot];
         if (!vigil_nanbox_is_object(callee_val))
-        { status = VIGIL_STATUS_INVALID_ARGUMENT; goto r_cleanup; }
+        {
+            regvm_discard_isolated_call_values(vm, orig_base, arg_base, total);
+            status = VIGIL_STATUS_INVALID_ARGUMENT;
+            goto r_cleanup;
+        }
         vigil_object_t *callee_obj = (vigil_object_t *)vigil_nanbox_decode_ptr(callee_val);
-        const vigil_object_t *fn_obj = vigil_callable_object_function(callee_obj);
-        if (!fn_obj) fn_obj = callee_obj;
+
+        vigil_value_release(&vm->stack[callee_slot]);
 
         if (arg_count > 0)
             memmove(&vm->stack[callee_slot], &vm->stack[callee_slot + 1], (size_t)arg_count * sizeof(vigil_value_t));
+        vm->stack[callee_slot + (size_t)arg_count] = VIGIL_NANBOX_NIL;
         vm->stack_count -= 1U;
         arg_base = callee_slot;
 
@@ -4652,11 +4740,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
 
         {
             size_t ret_n = vm->stack_count > arg_base ? vm->stack_count - arg_base : 0;
-            if (ret_n > 0)
-                memmove(&vm->stack[orig_base], &vm->stack[arg_base], ret_n * sizeof(vigil_value_t));
-                                if (arg_base != orig_base)
-                                    for (size_t _z = 0; _z < ret_n; _z++) vm->stack[arg_base + _z] = VIGIL_NANBOX_NIL;
-            vm->stack_count = orig_base + ret_n;
+            regvm_move_call_results(vm, orig_base, arg_base, total, (size_t)arg_count, ret_n);
         }
         REGVM_SYNC_POST();
         RNEXT();
@@ -4715,8 +4799,8 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         if (vm->stack_count < base + rc->max_registers)
             vm->stack_count = base + rc->max_registers;
 
-        for (size_t _z = rc->arity; _z < rc->max_registers; _z++)
-            R[_z] = VIGIL_NANBOX_NIL;
+        if ((size_t)rc->max_registers > (size_t)rc->arity)
+            regvm_reset_value_range(&R[rc->arity], (size_t)rc->max_registers - (size_t)rc->arity);
 
         RDISPATCH();
     }
@@ -4737,6 +4821,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         if (!vigil_nanbox_is_object(*receiver) ||
             vigil_object_type((vigil_object_t *)vigil_nanbox_decode_ptr(*receiver)) != VIGIL_OBJECT_INSTANCE)
         {
+            regvm_discard_isolated_call_values(vm, orig_base, arg_base, total);
             vigil_error_set_literal(error, VIGIL_STATUS_INVALID_ARGUMENT,
                                     "interface call requires a class instance receiver");
             status = VIGIL_STATUS_INVALID_ARGUMENT;
@@ -4746,7 +4831,12 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
             (vigil_object_t *)vigil_nanbox_decode_ptr(*receiver));
         const vigil_object_t *callee = vigil_function_object_resolve_interface_method(
             frame->function, class_index, (size_t)iface_idx, (size_t)method_idx);
-        if (!callee) { status = VIGIL_STATUS_INTERNAL; goto r_cleanup; }
+        if (!callee)
+        {
+            regvm_discard_isolated_call_values(vm, orig_base, arg_base, total);
+            status = VIGIL_STATUS_INTERNAL;
+            goto r_cleanup;
+        }
 
         size_t saved_ip = frame->ip;
         frame->ip = VIGIL_VM_CHUNK_CODE_SIZE(frame->chunk);
@@ -4758,11 +4848,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
 
         {
             size_t ret_n = vm->stack_count > arg_base ? vm->stack_count - arg_base : 0;
-            if (ret_n > 0)
-                memmove(&vm->stack[orig_base], &vm->stack[arg_base], ret_n * sizeof(vigil_value_t));
-                                if (arg_base != orig_base)
-                                    for (size_t _z = 0; _z < ret_n; _z++) vm->stack[arg_base + _z] = VIGIL_NANBOX_NIL;
-            vm->stack_count = orig_base + ret_n;
+            regvm_move_call_results(vm, orig_base, arg_base, total, total, ret_n);
         }
         REGVM_SYNC_POST();
         ip += 1;
@@ -4780,21 +4866,20 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         vm->stack_count = arg_base + (size_t)arg_count;
         const vigil_value_t *desc_val = VIGIL_VM_CHUNK_CONSTANT(sc, (size_t)ci);
         if (!desc_val || !vigil_nanbox_has_object(*desc_val))
-        { status = VIGIL_STATUS_UNSUPPORTED; goto r_cleanup; }
+        {
+            regvm_discard_isolated_call_values(vm, orig_base, arg_base, (size_t)arg_count);
+            status = VIGIL_STATUS_UNSUPPORTED;
+            goto r_cleanup;
+        }
         vigil_object_t *desc_obj = (vigil_object_t *)vigil_nanbox_decode_ptr(*desc_val);
         const char *desc = vigil_string_object_c_str(desc_obj);
         size_t desc_len = vigil_string_object_length(desc_obj);
         status = vigil_vm_call_extern_fn(vm, desc, desc_len, (size_t)arg_count, error);
         R = vm->stack + base;
         if (status != VIGIL_STATUS_OK) goto r_cleanup;
-        if (arg_base != orig_base)
         {
             size_t ret_n = vm->stack_count > arg_base ? vm->stack_count - arg_base : 0;
-            if (ret_n > 0)
-                memmove(&vm->stack[orig_base], &vm->stack[arg_base], ret_n * sizeof(vigil_value_t));
-                                if (arg_base != orig_base)
-                                    for (size_t _z = 0; _z < ret_n; _z++) vm->stack[arg_base + _z] = VIGIL_NANBOX_NIL;
-            vm->stack_count = orig_base + ret_n;
+            regvm_move_call_results(vm, orig_base, arg_base, (size_t)arg_count, (size_t)arg_count, ret_n);
         }
         REGVM_SYNC_POST();
         RNEXT();
@@ -4809,15 +4894,43 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         REGVM_ISOLATE_CALL(arg_base, arg_count);
         vm->stack_count = arg_base + (size_t)arg_count;
         const vigil_object_t *callee = vigil_vm_function_sibling(frame->function, (size_t)func_idx);
-        if (!callee) { status = VIGIL_STATUS_INTERNAL; goto r_cleanup; }
+        if (!callee)
+        {
+            regvm_discard_isolated_call_values(vm, base + (size_t)ret, arg_base, (size_t)arg_count);
+            status = VIGIL_STATUS_INTERNAL;
+            goto r_cleanup;
+        }
         status = vigil_vm_execute_call(vm, callee, (size_t)arg_count, error);
         R = vm->stack + base;
-        if (status == VIGIL_STATUS_OK && vm->stack_count > arg_base)
+        if (status == VIGIL_STATUS_OK)
         {
-            vigil_value_t rv = vm->stack[arg_base];
-            *out_value = rv;
-            R[0] = rv;
-            vm->stack_count = base + 1;
+            size_t ret_n = vm->stack_count > arg_base ? vm->stack_count - arg_base : 0U;
+
+            if (ret_n > 1U)
+                regvm_release_value_range(&vm->stack[arg_base + 1U], ret_n - 1U);
+
+            ret_base_r = 0U;
+            ret_count = ret_n > 0U ? 1U : 0U;
+            if (ret_n > 0U)
+            {
+                vigil_value_t rv = vm->stack[arg_base];
+
+                if (arg_base != base)
+                {
+                    RRELEASE(0);
+                    R[0] = rv;
+                    vm->stack[arg_base] = VIGIL_NANBOX_NIL;
+                }
+
+                *out_value = R[0];
+            }
+            else
+            {
+                RRELEASE(0);
+                R[0] = VIGIL_NANBOX_NIL;
+                *out_value = VIGIL_NANBOX_NIL;
+            }
+            vm->stack_count = base + (size_t)ret_count;
         }
         /* If we were pushed by an inline CALL, restore the caller. */
         if (vm->frame_count > initial_frame_count)
@@ -5128,12 +5241,15 @@ r_UNKNOWN:
     }
 #endif
 
-        r_overflow: vigil_error_set_literal(error, VIGIL_STATUS_INVALID_ARGUMENT, "integer arithmetic overflow or invalid operation");
-    return VIGIL_STATUS_INVALID_ARGUMENT;
+        r_overflow:
+    vigil_error_set_literal(error, VIGIL_STATUS_INVALID_ARGUMENT, "integer arithmetic overflow or invalid operation");
+    status = VIGIL_STATUS_INVALID_ARGUMENT;
+    goto r_cleanup;
 
 r_divzero:
     vigil_error_set_literal(error, VIGIL_STATUS_INVALID_ARGUMENT, "division by zero in register VM");
-    return VIGIL_STATUS_INVALID_ARGUMENT;
+    status = VIGIL_STATUS_INVALID_ARGUMENT;
+    goto r_cleanup;
 
 r_cleanup:
     if (has_reg_objects && R != NULL)
