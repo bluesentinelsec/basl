@@ -2655,6 +2655,9 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
 
 #define RRELEASE(reg) do { if (vigil_nanbox_has_object(R[(reg)])) vigil_value_release(&R[(reg)]); } while (0)
 
+
+#define RRELEASE(reg) do { if (vigil_nanbox_has_object(R[(reg)])) vigil_value_release(&R[(reg)]); } while (0)
+
 #if REGVM_COMPUTED_GOTO
     _Pragma("GCC diagnostic push") _Pragma("GCC diagnostic ignored \"-Wpedantic\"")
 
@@ -3598,7 +3601,10 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
     RCASE(EQ)
     {
         vigil_reg_instr_t i = code[ip];
-        R[VREG_GET_A(i)] = vigil_nanbox_from_bool(vigil_vm_values_equal(&R[VREG_GET_B(i)], &R[VREG_GET_C(i)]));
+        uint8_t dst = VREG_GET_A(i);
+        vigil_value_t res = vigil_nanbox_from_bool(vigil_vm_values_equal(&R[VREG_GET_B(i)], &R[VREG_GET_C(i)]));
+        if (dst >= rc->arity) RRELEASE(dst);
+        R[dst] = res;
         RNEXT();
     }
     RCASE(LT)
@@ -4582,6 +4588,8 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
             size_t ret_n = vm->stack_count > arg_base ? vm->stack_count - arg_base : 0;
             if (ret_n > 0)
                 memmove(&vm->stack[orig_base], &vm->stack[arg_base], ret_n * sizeof(vigil_value_t));
+                                if (arg_base != orig_base)
+                                    for (size_t _z = 0; _z < ret_n; _z++) vm->stack[arg_base + _z] = VIGIL_NANBOX_NIL;
             vm->stack_count = orig_base + ret_n;
         }
         REGVM_SYNC_POST();
@@ -4683,6 +4691,8 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
             size_t ret_n = vm->stack_count > arg_base ? vm->stack_count - arg_base : 0;
             if (ret_n > 0)
                 memmove(&vm->stack[orig_base], &vm->stack[arg_base], ret_n * sizeof(vigil_value_t));
+                                if (arg_base != orig_base)
+                                    for (size_t _z = 0; _z < ret_n; _z++) vm->stack[arg_base + _z] = VIGIL_NANBOX_NIL;
             vm->stack_count = orig_base + ret_n;
         }
         REGVM_SYNC_POST();
@@ -4713,6 +4723,8 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
             size_t ret_n = vm->stack_count > arg_base ? vm->stack_count - arg_base : 0;
             if (ret_n > 0)
                 memmove(&vm->stack[orig_base], &vm->stack[arg_base], ret_n * sizeof(vigil_value_t));
+                                if (arg_base != orig_base)
+                                    for (size_t _z = 0; _z < ret_n; _z++) vm->stack[arg_base + _z] = VIGIL_NANBOX_NIL;
             vm->stack_count = orig_base + ret_n;
         }
         REGVM_SYNC_POST();
