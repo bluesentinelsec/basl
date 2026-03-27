@@ -2652,6 +2652,9 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
 
 #define RRELEASE(reg) do { if (vigil_nanbox_has_object(R[(reg)])) vigil_value_release(&R[(reg)]); } while (0)
 
+
+#define RRELEASE(reg) do { if (vigil_nanbox_has_object(R[(reg)])) vigil_value_release(&R[(reg)]); } while (0)
+
 #if REGVM_COMPUTED_GOTO
     _Pragma("GCC diagnostic push") _Pragma("GCC diagnostic ignored \"-Wpedantic\"")
 
@@ -2863,10 +2866,15 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
     RCASE(MOVE)
     {
         vigil_reg_instr_t i = code[ip];
-        if (vigil_nanbox_has_object(R[VREG_GET_B(i)]))
-            VIGIL_VM_VALUE_COPY(&R[VREG_GET_A(i)], &R[VREG_GET_B(i)]);
-        else
-            R[VREG_GET_A(i)] = R[VREG_GET_B(i)];
+        uint8_t dst = VREG_GET_A(i), src = VREG_GET_B(i);
+        if (dst != src)
+        {
+            if (dst >= rc->arity) RRELEASE(dst);
+            if (vigil_nanbox_has_object(R[src]))
+                VIGIL_VM_VALUE_COPY(&R[dst], &R[src]);
+            else
+                R[dst] = R[src];
+        }
         RNEXT();
     }
     RCASE(LOAD_NIL)

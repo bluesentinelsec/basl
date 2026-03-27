@@ -2407,6 +2407,11 @@ vigil_status_t vigil_vm_execute_function(vigil_vm_t *vm, const vigil_object_t *f
         }
 
         status = vigil_regvm_execute(vm, fn_chunk->reg_cache, out_value, error);
+        {
+            size_t nregs = (size_t)fn_chunk->reg_cache->max_registers;
+            for (size_t ri = 0; ri < nregs && ri < vm->stack_capacity; ri++)
+                vm->stack[ri] = VIGIL_NANBOX_NIL;
+        }
         vm->stack_count = 0;
         vigil_vm_clear_frames(vm);
         return status;
@@ -2440,6 +2445,11 @@ vigil_status_t vigil_vm_execute_function(vigil_vm_t *vm, const vigil_object_t *f
         status = vigil_regvm_execute(vm, chunk->reg_cache, out_value, error);
         if (vm->in_regvm_call)
             return status;
+        {
+            size_t nregs = (size_t)chunk->reg_cache->max_registers;
+            for (size_t ri = 0; ri < nregs && ri < vm->stack_capacity; ri++)
+                vm->stack[ri] = VIGIL_NANBOX_NIL;
+        }
         vm->stack_count = 0;
         vigil_vm_clear_frames(vm);
         return status;
