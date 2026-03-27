@@ -4246,7 +4246,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         vigil_reg_instr_t i = code[ip];
         uint8_t obj = VREG_GET_B(i);
         uint8_t fi = VREG_GET_C(i);
-        vigil_object_t *o = (vigil_object_t *)vigil_nanbox_decode_ptr(R[obj]);
+        has_reg_objects = 1; vigil_object_t *o = (vigil_object_t *)vigil_nanbox_decode_ptr(R[obj]);
         vigil_value_t fv = {0};
         if (!vigil_instance_object_get_field(o, (size_t)fi, &fv))
         { status = VIGIL_STATUS_INVALID_ARGUMENT; goto r_cleanup; }
@@ -4260,7 +4260,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         uint8_t obj_r = VREG_GET_A(i);
         uint8_t fi = VREG_GET_B(i);
         uint8_t val_r = VREG_GET_C(i);
-        vigil_object_t *o = (vigil_object_t *)vigil_nanbox_decode_ptr(R[obj_r]);
+        has_reg_objects = 1; vigil_object_t *o = (vigil_object_t *)vigil_nanbox_decode_ptr(R[obj_r]);
         status = vigil_instance_object_set_field(o, (size_t)fi, &R[val_r], error);
         if (status != VIGIL_STATUS_OK) goto r_cleanup;
         RNEXT();
@@ -4485,7 +4485,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         vigil_reg_instr_t i = code[ip];
         uint8_t src = VREG_GET_B(i);
         uint8_t dst = VREG_GET_A(i);
-        vigil_object_t *obj = (vigil_object_t *)vigil_nanbox_decode_ptr(R[src]);
+        has_reg_objects = 1; vigil_object_t *obj = (vigil_object_t *)vigil_nanbox_decode_ptr(R[src]);
         const char *s = vigil_string_object_c_str(obj);
         if (s != NULL && *s != '\0')
         {
@@ -5025,13 +5025,13 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         /* Fast path: inline return to caller (no defers, not top-level). */
         if (VIGIL_LIKELY(frame->defer_count == 0 && vm->frame_count > initial_frame_count))
         {
-            /* Release all callee register objects except return values. */
+            /* Release callee-owned registers (skip args and return values). */
             if (has_reg_objects)
             {
                 size_t cb = base;
                 size_t rlo = (size_t)base_r;
                 size_t rhi = rlo + (size_t)count;
-                for (size_t ri = 0; ri < (size_t)rc->max_registers; ri++)
+                for (size_t ri = (size_t)rc->arity; ri < (size_t)rc->max_registers; ri++)
                 {
                     if (ri >= rlo && ri < rhi) continue;
                     if (vigil_nanbox_has_object(vm->stack[cb + ri]))
@@ -5083,7 +5083,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
             if (has_reg_objects)
             {
                 size_t rlo2 = (size_t)base_r, rhi2 = rlo2 + (size_t)count;
-                for (size_t ri2 = 0; ri2 < (size_t)rc->max_registers; ri2++)
+                for (size_t ri2 = (size_t)rc->arity; ri2 < (size_t)rc->max_registers; ri2++)
                 {
                     if (ri2 >= rlo2 && ri2 < rhi2) continue;
                     if (vigil_nanbox_has_object(vm->stack[base + ri2]))
