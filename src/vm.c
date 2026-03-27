@@ -2323,6 +2323,15 @@ vigil_status_t vigil_vm_execute_call(vigil_vm_t *vm, const vigil_object_t *calle
         callee_chunk->reg_cache = rc;
     }
 
+    /* Retain object args so the callee's r_cleanup can safely release them
+       without dropping the caller's reference in the shared register window. */
+    {
+        size_t arity = callee_chunk->reg_cache->arity;
+        for (size_t a = 0; a < arity && base_slot + a < vm->stack_count; a++)
+            if (vigil_nanbox_has_object(vm->stack[base_slot + a]))
+                vigil_object_retain((vigil_object_t *)vigil_nanbox_decode_ptr(vm->stack[base_slot + a]));
+    }
+
     vigil_value_t dummy = {0};
     vigil_status_t status = vigil_regvm_execute(vm, callee_chunk->reg_cache, &dummy, error);
 
