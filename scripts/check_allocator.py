@@ -52,6 +52,14 @@ EXEMPT_FILES = {
     "src/stdlib/fs.c",
     # Public API without runtime parameter.
     "src/value.c",
+    # Register VM translator uses raw malloc for internal temporary
+    # data structures (code arrays, jump tables, offset maps) that
+    # are freed within the same translation call.
+    "src/regvm.c",
+    # Chunk clear/free releases cached reg_chunk via free.
+    "src/chunk.c",
+    # VM execute paths allocate/free reg_chunk cache.
+    "src/vm.c",
     # Doc strings referencing unsafe.malloc etc.
     "src/doc_registry.c",
 }

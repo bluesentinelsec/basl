@@ -297,6 +297,9 @@ extern "C"
         VIGIL_OPCODE_MULTIPLY_F64_STORE = 188
     } vigil_opcode_t;
 
+    /* Forward-declare the register chunk for the translation cache. */
+    typedef struct vigil_reg_chunk vigil_reg_chunk_t;
+
     typedef struct vigil_chunk
     {
         vigil_runtime_t *runtime;
@@ -308,6 +311,10 @@ extern "C"
         size_t constant_count;
         size_t constant_capacity;
         vigil_debug_local_table_t debug_locals;
+        /* Cached register-VM translation (lazily populated, owned). */
+        vigil_reg_chunk_t *reg_cache;
+        /* Translation cache state: 0 = empty, 1 = translating, 2 = ready. */
+        volatile int64_t reg_cache_state;
     } vigil_chunk_t;
 
     VIGIL_API void vigil_chunk_init(vigil_chunk_t *chunk, vigil_runtime_t *runtime);

@@ -6583,7 +6583,7 @@ static vigil_status_t vigil_parser_parse_value_call(vigil_parser_state_t *state,
 }
 
 static vigil_status_t vigil_parser_emit_call(vigil_parser_state_t *state, vigil_source_span_t span, int defer_call,
-                                             size_t function_index, size_t arg_count)
+                                             size_t function_index, size_t arg_count, size_t return_count)
 {
     vigil_status_t status;
     if (defer_call)
@@ -6604,6 +6604,8 @@ static vigil_status_t vigil_parser_emit_call(vigil_parser_state_t *state, vigil_
     }
     if (status == VIGIL_STATUS_OK)
         status = vigil_parser_emit_u32(state, (uint32_t)arg_count, span);
+    if (status == VIGIL_STATUS_OK)
+        status = vigil_parser_emit_u32(state, (uint32_t)return_count, span);
     return status;
 }
 
@@ -6678,7 +6680,7 @@ static vigil_status_t vigil_parser_parse_call_resolved(vigil_parser_state_t *sta
     }
 
     {
-        status = vigil_parser_emit_call(state, call_span, defer_call, function_index, arg_count);
+        status = vigil_parser_emit_call(state, call_span, defer_call, function_index, arg_count, decl->return_count);
         if (status != VIGIL_STATUS_OK)
             return status;
     }
@@ -6739,7 +6741,14 @@ static vigil_status_t emit_constructor_call(vigil_parser_state_t *state, vigil_s
     }
     if (status != VIGIL_STATUS_OK)
         return status;
-    return vigil_parser_emit_u32(state, (uint32_t)arg_count, span);
+    status = vigil_parser_emit_u32(state, (uint32_t)arg_count, span);
+    if (status != VIGIL_STATUS_OK)
+        return status;
+    /* Constructors and NEW_INSTANCE return 1 value. Only CALL/DEFER_CALL
+       need the return_count operand; NEW_INSTANCE doesn't. */
+    if (decl->constructor_function_index != (size_t)-1)
+        return vigil_parser_emit_u32(state, 1U, span);
+    return VIGIL_STATUS_OK;
 }
 
 static vigil_status_t vigil_parser_parse_constructor_resolved(vigil_parser_state_t *state,
@@ -7145,6 +7154,8 @@ static vigil_status_t vigil_parser_emit_native_call(vigil_parser_state_t *state,
             status = vigil_parser_emit_u32(state, (uint32_t)const_idx, member_token->span);
         if (status == VIGIL_STATUS_OK)
             status = vigil_parser_emit_u32(state, (uint32_t)arg_count, member_token->span);
+        if (status == VIGIL_STATUS_OK)
+            status = vigil_parser_emit_u32(state, (uint32_t)fn->return_count, member_token->span);
         if (status != VIGIL_STATUS_OK)
             return status;
     }
@@ -7344,6 +7355,11 @@ static vigil_status_t vigil_parser_parse_native_static_method_call(vigil_parser_
         {
             return status;
         }
+        status = vigil_parser_emit_u32(state, (uint32_t)method->return_count, method_token->span);
+        if (status != VIGIL_STATUS_OK)
+        {
+            return status;
+        }
     }
 
     /* Set return type. */
@@ -7447,6 +7463,11 @@ static vigil_status_t vigil_parser_parse_native_method_call(vigil_parser_state_t
             return status;
         }
         status = vigil_parser_emit_u32(state, (uint32_t)(arg_count + 1U), method_token->span);
+        if (status != VIGIL_STATUS_OK)
+        {
+            return status;
+        }
+        status = vigil_parser_emit_u32(state, (uint32_t)method->return_count, method_token->span);
         if (status != VIGIL_STATUS_OK)
         {
             return status;
@@ -7755,6 +7776,11 @@ static vigil_status_t vigil_parser_parse_method_call(vigil_parser_state_t *state
         return status;
     }
     status = vigil_parser_emit_u32(state, (uint32_t)decl->param_count, method_token->span);
+    if (status != VIGIL_STATUS_OK)
+    {
+        return status;
+    }
+    status = vigil_parser_emit_u32(state, (uint32_t)decl->return_count, method_token->span);
     if (status != VIGIL_STATUS_OK)
     {
         return status;
@@ -10056,20 +10082,23 @@ static void vigil_parser_truncate_code(vigil_parser_state_t *state, size_t new_l
 
 static int vigil_parser_is_self_tail_call(const uint8_t *c, size_t len)
 {
-    return len >= 10U && c[len - 10U] == VIGIL_OPCODE_CALL_SELF && vigil_parser_trailing_return_is_single(c, len);
+    return len >= 14U && c[len - 14U] == VIGIL_OPCODE_CALL_SELF && vigil_parser_trailing_return_is_single(c, len);
 }
 
 static void vigil_parser_peephole_tail_call_self(vigil_parser_state_t *state, uint8_t *c, size_t len)
 {
+    /* CALL_SELF(9) = [opcode][arg_count(4)][ret_count(4)]
+       Convert to TAIL_CALL(9) = [opcode][func_idx(4)][arg_count(4)]
+       Then truncate RETURN(5). */
     uint8_t argc_bytes[4];
-    memcpy(argc_bytes, &c[len - 9U], 4U);
-    c[len - 10U] = VIGIL_OPCODE_TAIL_CALL;
-    c[len - 9U] = (uint8_t)(state->function_index & 0xFFU);
-    c[len - 8U] = (uint8_t)((state->function_index >> 8U) & 0xFFU);
-    c[len - 7U] = (uint8_t)((state->function_index >> 16U) & 0xFFU);
-    c[len - 6U] = (uint8_t)((state->function_index >> 24U) & 0xFFU);
-    memcpy(&c[len - 5U], argc_bytes, 4U);
-    vigil_parser_truncate_code(state, len - 1U);
+    memcpy(argc_bytes, &c[len - 13U], 4U); /* arg_count at offset 1..4 */
+    c[len - 14U] = VIGIL_OPCODE_TAIL_CALL;
+    c[len - 13U] = (uint8_t)(state->function_index & 0xFFU);
+    c[len - 12U] = (uint8_t)((state->function_index >> 8U) & 0xFFU);
+    c[len - 11U] = (uint8_t)((state->function_index >> 16U) & 0xFFU);
+    c[len - 10U] = (uint8_t)((state->function_index >> 24U) & 0xFFU);
+    memcpy(&c[len - 9U], argc_bytes, 4U);
+    vigil_parser_truncate_code(state, len - 5U);
 }
 
 // NOLINTNEXTLINE(readability-function-cognitive-complexity)
@@ -10117,14 +10146,16 @@ static void peephole_tail_call(vigil_parser_state_t *state)
 
     if (state->expected_return_count != 1U || state->defer_emitted)
         return;
-    if (len >= 14U && c[len - 14U] == VIGIL_OPCODE_CALL && c[len - 5U] == VIGIL_OPCODE_RETURN)
+    if (len >= 18U && c[len - 18U] == VIGIL_OPCODE_CALL && c[len - 5U] == VIGIL_OPCODE_RETURN)
     {
         uint32_t ret_count = (uint32_t)c[len - 4U] | ((uint32_t)c[len - 3U] << 8U) | ((uint32_t)c[len - 2U] << 16U) |
                              ((uint32_t)c[len - 1U] << 24U);
         if (ret_count == 1U)
         {
-            c[len - 14U] = VIGIL_OPCODE_TAIL_CALL;
-            vigil_parser_truncate_code(state, len - 5U);
+            /* Replace CALL(13)+RETURN(5)=18 with TAIL_CALL(9).
+               TAIL_CALL keeps [opcode][func_idx(4)][arg_count(4)], drops return_count+RETURN. */
+            c[len - 18U] = VIGIL_OPCODE_TAIL_CALL;
+            vigil_parser_truncate_code(state, len - 9U);
         }
     }
     else if (vigil_parser_is_self_tail_call(c, len))
@@ -13472,6 +13503,16 @@ static vigil_status_t vigil_compile_synthetic_constructor(vigil_program_state_t 
         goto cleanup;
     }
     status = vigil_parser_emit_u32(&state, init_arg_count, decl->name_span);
+    if (status != VIGIL_STATUS_OK)
+    {
+        goto cleanup;
+    }
+    {
+        /* Use init's return count, not the constructor's, so the register VM
+           translator tracks the correct number of return values. */
+        const vigil_function_decl_t *init_decl = &program->functions.functions[init_function_index];
+        status = vigil_parser_emit_u32(&state, (uint32_t)init_decl->return_count, decl->name_span);
+    }
     if (status != VIGIL_STATUS_OK)
     {
         goto cleanup;

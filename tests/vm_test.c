@@ -3,6 +3,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+#if !defined(_WIN32)
+#include "internal/vigil_vm_internal.h"
+#endif
 #include "vigil/vigil.h"
 
 struct AllocatorStats
@@ -306,6 +309,16 @@ static vigil_status_t RunBinaryUintOpcode(vigil_opcode_t opcode, uint64_t left_v
     vigil_runtime_close(&runtime);
     return status;
 }
+
+#if !defined(_WIN32)
+static vigil_status_t NoopNativeFunction(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    (void)vm;
+    (void)arg_count;
+    (void)error;
+    return VIGIL_STATUS_OK;
+}
+#endif
 
 /* TEST() expands into generated functions with many assertion branches.
    Suppress cognitive-complexity diagnostics for this assertion-heavy test region. */
@@ -986,6 +999,345 @@ TEST(VigilVmTest, UsesRuntimeAllocatorHooks)
     EXPECT_GE(stats.deallocate_calls, 4);
 }
 
+#if !defined(_WIN32)
+TEST(VigilVmTest, CheckedArithmeticHelpersRejectInvalidOperands)
+{
+    int64_t signed_result = 0;
+    uint64_t unsigned_result = 0U;
+
+    EXPECT_EQ(vigil_vm_checked_uadd(UINT64_MAX, 1U, &unsigned_result), VIGIL_STATUS_INVALID_ARGUMENT);
+    EXPECT_EQ(vigil_vm_checked_usubtract(0U, 1U, &unsigned_result), VIGIL_STATUS_INVALID_ARGUMENT);
+    EXPECT_EQ(vigil_vm_checked_multiply(INT64_MIN, -1, &signed_result), VIGIL_STATUS_INVALID_ARGUMENT);
+    EXPECT_EQ(vigil_vm_checked_multiply(INT64_MAX, 2, &signed_result), VIGIL_STATUS_INVALID_ARGUMENT);
+    EXPECT_EQ(vigil_vm_checked_divide(7, 0, &signed_result), VIGIL_STATUS_INVALID_ARGUMENT);
+    EXPECT_EQ(vigil_vm_checked_divide(INT64_MIN, -1, &signed_result), VIGIL_STATUS_INVALID_ARGUMENT);
+    EXPECT_EQ(vigil_vm_checked_modulo(7, 0, &signed_result), VIGIL_STATUS_INVALID_ARGUMENT);
+    EXPECT_EQ(vigil_vm_checked_modulo(INT64_MIN, -1, &signed_result), VIGIL_STATUS_INVALID_ARGUMENT);
+    EXPECT_EQ(vigil_vm_checked_shift_left(1, -1, &signed_result), VIGIL_STATUS_INVALID_ARGUMENT);
+    EXPECT_EQ(vigil_vm_checked_shift_right(8, 64, &signed_result), VIGIL_STATUS_INVALID_ARGUMENT);
+    EXPECT_EQ(vigil_vm_checked_shift_right(-8, 1, &signed_result), VIGIL_STATUS_OK);
+    EXPECT_EQ(signed_result, -4);
+    EXPECT_EQ(vigil_vm_checked_ushift_left(1U, 64U, &unsigned_result), VIGIL_STATUS_INVALID_ARGUMENT);
+    EXPECT_EQ(vigil_vm_checked_ushift_right(1U, 64U, &unsigned_result), VIGIL_STATUS_INVALID_ARGUMENT);
+    EXPECT_EQ(vigil_vm_checked_negate(INT64_MIN, &signed_result), VIGIL_STATUS_INVALID_ARGUMENT);
+}
+
+TEST(VigilVmTest, ValueHelpersHandleNullsAndEquivalentObjects)
+{
+    vigil_runtime_t *runtime = NULL;
+    vigil_object_t *left_string = NULL;
+    vigil_object_t *right_string = NULL;
+    vigil_object_t *left_error = NULL;
+    vigil_object_t *right_error = NULL;
+    vigil_object_t *array_object = NULL;
+    vigil_value_t int_value;
+    vigil_value_t string_left_value;
+    vigil_value_t string_right_value;
+    vigil_value_t error_left_value;
+    vigil_value_t error_right_value;
+    vigil_value_t array_value;
+    vigil_error_t error = {0};
+
+    ASSERT_EQ(vigil_runtime_open(&runtime, NULL, &error), VIGIL_STATUS_OK);
+    ASSERT_EQ(vigil_string_object_new_cstr(runtime, "alpha", &left_string, &error), VIGIL_STATUS_OK);
+    ASSERT_EQ(vigil_string_object_new_cstr(runtime, "alpha", &right_string, &error), VIGIL_STATUS_OK);
+    ASSERT_EQ(vigil_error_object_new_cstr(runtime, "oops", 7, &left_error, &error), VIGIL_STATUS_OK);
+    ASSERT_EQ(vigil_error_object_new_cstr(runtime, "oops", 7, &right_error, &error), VIGIL_STATUS_OK);
+    ASSERT_EQ(vigil_array_object_new(runtime, NULL, 0U, &array_object, &error), VIGIL_STATUS_OK);
+
+    vigil_value_init_int(&int_value, 9);
+    vigil_value_init_object(&string_left_value, &left_string);
+    vigil_value_init_object(&string_right_value, &right_string);
+    vigil_value_init_object(&error_left_value, &left_error);
+    vigil_value_init_object(&error_right_value, &right_error);
+    vigil_value_init_object(&array_value, &array_object);
+
+    EXPECT_FALSE(vigil_vm_value_is_integer(NULL));
+    EXPECT_TRUE(vigil_vm_value_is_integer(&int_value));
+    EXPECT_FALSE(vigil_vm_values_equal(NULL, &int_value));
+    EXPECT_TRUE(vigil_vm_values_equal(&string_left_value, &string_right_value));
+    EXPECT_TRUE(vigil_vm_values_equal(&error_left_value, &error_right_value));
+    EXPECT_FALSE(vigil_vm_values_equal(&string_left_value, &error_left_value));
+    EXPECT_TRUE(vigil_vm_value_is_supported_map_key(&string_left_value));
+    EXPECT_FALSE(vigil_vm_value_is_supported_map_key(&array_value));
+
+    vigil_value_release(&array_value);
+    vigil_value_release(&error_right_value);
+    vigil_value_release(&error_left_value);
+    vigil_value_release(&string_right_value);
+    vigil_value_release(&string_left_value);
+    vigil_runtime_close(&runtime);
+}
+
+TEST(VigilVmTest, StringHelpersValidateArgumentsAndExtractStringParts)
+{
+    vigil_runtime_t *runtime = NULL;
+    vigil_vm_t *vm = NULL;
+    vigil_chunk_t chunk;
+    vigil_value_t result;
+    vigil_value_t string_value;
+    vigil_value_t array_value;
+    vigil_object_t *string_object = NULL;
+    vigil_object_t *array_object = NULL;
+    const char *text = (const char *)1;
+    size_t length = 99U;
+    vigil_error_t error = {0};
+
+    ASSERT_EQ(OpenVmTestContext(&runtime, &vm, &chunk, &result, &error), VIGIL_STATUS_OK);
+    ASSERT_EQ(vigil_string_object_new_cstr(runtime, "hi", &string_object, &error), VIGIL_STATUS_OK);
+    ASSERT_EQ(vigil_array_object_new(runtime, NULL, 0U, &array_object, &error), VIGIL_STATUS_OK);
+    vigil_value_init_object(&string_value, &string_object);
+    vigil_value_init_object(&array_value, &array_object);
+
+    EXPECT_EQ(vigil_vm_concat_strings(NULL, &string_value, &string_value, &result, &error), VIGIL_STATUS_INVALID_ARGUMENT);
+    EXPECT_EQ(vigil_vm_concat_strings(vm, &array_value, &string_value, &result, &error), VIGIL_STATUS_INVALID_ARGUMENT);
+    EXPECT_EQ(vigil_vm_stringify_value(NULL, &string_value, &result, &error), VIGIL_STATUS_INVALID_ARGUMENT);
+    EXPECT_EQ(vigil_vm_new_string_value(vm, NULL, 1U, &result, &error), VIGIL_STATUS_INVALID_ARGUMENT);
+
+    EXPECT_FALSE(vigil_vm_get_string_parts(NULL, &text, &length));
+    EXPECT_EQ(text, NULL);
+    EXPECT_EQ(length, 0U);
+
+    text = (const char *)1;
+    length = 99U;
+    EXPECT_FALSE(vigil_vm_get_string_parts(&array_value, &text, &length));
+    EXPECT_EQ(text, NULL);
+    EXPECT_EQ(length, 0U);
+
+    EXPECT_TRUE(vigil_vm_get_string_parts(&string_value, &text, &length));
+    EXPECT_STREQ(text, "hi");
+    EXPECT_EQ(length, 2U);
+
+    vigil_value_release(&array_value);
+    vigil_value_release(&string_value);
+    CloseVmTestContext(&runtime, &vm, &chunk, &result);
+}
+
+TEST(VigilVmTest, FormatAndParseHelpersCoverValidationPaths)
+{
+    vigil_runtime_t *runtime = NULL;
+    vigil_vm_t *vm = NULL;
+    vigil_chunk_t chunk;
+    vigil_value_t result;
+    vigil_value_t input;
+    vigil_value_t status_value;
+    vigil_value_t parsed_value;
+    vigil_value_t bool_value;
+    vigil_object_t *string_object = NULL;
+    vigil_error_t error = {0};
+
+    ASSERT_EQ(OpenVmTestContext(&runtime, &vm, &chunk, &result, &error), VIGIL_STATUS_OK);
+
+    vigil_value_init_bool(&bool_value, true);
+    EXPECT_EQ(vigil_vm_format_f64_value(NULL, &bool_value, 2U, &result, &error), VIGIL_STATUS_INVALID_ARGUMENT);
+    EXPECT_EQ(vigil_vm_format_f64_value(vm, &bool_value, 2U, &result, &error), VIGIL_STATUS_INVALID_ARGUMENT);
+    EXPECT_EQ(vigil_vm_format_spec_value(vm, &bool_value, 1U << 10U, 0U, &result, &error), VIGIL_STATUS_INVALID_ARGUMENT);
+
+    ASSERT_EQ(vigil_string_object_new_cstr(runtime, "", &string_object, &error), VIGIL_STATUS_OK);
+    vigil_value_init_object(&input, &string_object);
+    ASSERT_EQ(vigil_vm_push(vm, &input, &error), VIGIL_STATUS_OK);
+    vigil_value_release(&input);
+    vigil_vm_parse_i32(vm);
+    status_value = vigil_vm_pop_or_nil(vm);
+    parsed_value = vigil_vm_pop_or_nil(vm);
+    EXPECT_EQ(vigil_value_kind(&parsed_value), VIGIL_VALUE_INT);
+    EXPECT_EQ(vigil_value_as_int(&parsed_value), 0);
+    ASSERT_EQ(vigil_value_kind(&status_value), VIGIL_VALUE_OBJECT);
+    EXPECT_STREQ(vigil_error_object_message(vigil_value_as_object(&status_value)), "empty string");
+    vigil_value_release(&status_value);
+    vigil_value_release(&parsed_value);
+
+    ASSERT_EQ(vigil_string_object_new_cstr(runtime, "not-a-float", &string_object, &error), VIGIL_STATUS_OK);
+    vigil_value_init_object(&input, &string_object);
+    ASSERT_EQ(vigil_vm_push(vm, &input, &error), VIGIL_STATUS_OK);
+    vigil_value_release(&input);
+    vigil_vm_parse_f64(vm);
+    status_value = vigil_vm_pop_or_nil(vm);
+    parsed_value = vigil_vm_pop_or_nil(vm);
+    EXPECT_EQ(vigil_value_kind(&parsed_value), VIGIL_VALUE_FLOAT);
+    EXPECT_DOUBLE_EQ(vigil_value_as_float(&parsed_value), 0.0);
+    ASSERT_EQ(vigil_value_kind(&status_value), VIGIL_VALUE_OBJECT);
+    EXPECT_STREQ(vigil_error_object_message(vigil_value_as_object(&status_value)), "invalid float");
+    vigil_value_release(&status_value);
+    vigil_value_release(&parsed_value);
+
+    ASSERT_EQ(vigil_string_object_new_cstr(runtime, "true", &string_object, &error), VIGIL_STATUS_OK);
+    vigil_value_init_object(&input, &string_object);
+    ASSERT_EQ(vigil_vm_push(vm, &input, &error), VIGIL_STATUS_OK);
+    vigil_value_release(&input);
+    vigil_vm_parse_bool(vm);
+    status_value = vigil_vm_pop_or_nil(vm);
+    parsed_value = vigil_vm_pop_or_nil(vm);
+    EXPECT_EQ(vigil_value_kind(&parsed_value), VIGIL_VALUE_BOOL);
+    EXPECT_TRUE(vigil_value_as_bool(&parsed_value));
+    ASSERT_EQ(vigil_value_kind(&status_value), VIGIL_VALUE_OBJECT);
+    EXPECT_EQ(vigil_error_object_kind(vigil_value_as_object(&status_value)), 0);
+    vigil_value_release(&status_value);
+    vigil_value_release(&parsed_value);
+
+    ASSERT_EQ(vigil_string_object_new_cstr(runtime, "0", &string_object, &error), VIGIL_STATUS_OK);
+    vigil_value_init_object(&input, &string_object);
+    ASSERT_EQ(vigil_vm_push(vm, &input, &error), VIGIL_STATUS_OK);
+    vigil_value_release(&input);
+    vigil_vm_parse_bool(vm);
+    status_value = vigil_vm_pop_or_nil(vm);
+    parsed_value = vigil_vm_pop_or_nil(vm);
+    EXPECT_EQ(vigil_value_kind(&parsed_value), VIGIL_VALUE_BOOL);
+    EXPECT_FALSE(vigil_value_as_bool(&parsed_value));
+    ASSERT_EQ(vigil_value_kind(&status_value), VIGIL_VALUE_OBJECT);
+    EXPECT_EQ(vigil_error_object_kind(vigil_value_as_object(&status_value)), 0);
+    vigil_value_release(&status_value);
+    vigil_value_release(&parsed_value);
+
+    ASSERT_EQ(vigil_string_object_new_cstr(runtime, "maybe", &string_object, &error), VIGIL_STATUS_OK);
+    vigil_value_init_object(&input, &string_object);
+    ASSERT_EQ(vigil_vm_push(vm, &input, &error), VIGIL_STATUS_OK);
+    vigil_value_release(&input);
+    vigil_vm_parse_bool(vm);
+    status_value = vigil_vm_pop_or_nil(vm);
+    parsed_value = vigil_vm_pop_or_nil(vm);
+    EXPECT_EQ(vigil_value_kind(&parsed_value), VIGIL_VALUE_BOOL);
+    EXPECT_FALSE(vigil_value_as_bool(&parsed_value));
+    ASSERT_EQ(vigil_value_kind(&status_value), VIGIL_VALUE_OBJECT);
+    EXPECT_STREQ(vigil_error_object_message(vigil_value_as_object(&status_value)), "invalid boolean");
+    vigil_value_release(&status_value);
+    vigil_value_release(&parsed_value);
+
+    CloseVmTestContext(&runtime, &vm, &chunk, &result);
+}
+
+TEST(VigilVmTest, ConversionHelpersValidateRangesAndTypes)
+{
+    vigil_runtime_t *runtime = NULL;
+    vigil_vm_t *vm = NULL;
+    vigil_chunk_t chunk;
+    vigil_value_t result;
+    vigil_value_t input;
+    vigil_value_t converted;
+    vigil_error_t error = {0};
+
+    ASSERT_EQ(OpenVmTestContext(&runtime, &vm, &chunk, &result, &error), VIGIL_STATUS_OK);
+
+    vigil_value_init_bool(&input, true);
+    EXPECT_EQ(vigil_vm_convert_to_signed_integer_type(NULL, &input, -10, 10, "type", "range", &error),
+              VIGIL_STATUS_INVALID_ARGUMENT);
+    EXPECT_EQ(vigil_vm_convert_to_signed_integer_type(vm, NULL, -10, 10, "type", "range", &error),
+              VIGIL_STATUS_INVALID_ARGUMENT);
+    EXPECT_EQ(vigil_vm_convert_to_signed_integer_type(vm, &input, -10, 10, "type", "range", &error),
+              VIGIL_STATUS_INVALID_ARGUMENT);
+
+    vigil_value_init_uint(&input, UINT64_C(99));
+    EXPECT_EQ(vigil_vm_convert_to_signed_integer_type(vm, &input, -10, 10, "type", "range", &error),
+              VIGIL_STATUS_INVALID_ARGUMENT);
+
+    vigil_value_init_float(&input, INFINITY);
+    EXPECT_EQ(vigil_vm_convert_to_signed_integer_type(vm, &input, -10, 10, "type", "range", &error),
+              VIGIL_STATUS_INVALID_ARGUMENT);
+
+    vigil_value_init_uint(&input, UINT64_C(7));
+    ASSERT_EQ(vigil_vm_convert_to_signed_integer_type(vm, &input, -10, 10, "type", "range", &error), VIGIL_STATUS_OK);
+    converted = vigil_vm_pop_or_nil(vm);
+    EXPECT_EQ(vigil_value_kind(&converted), VIGIL_VALUE_INT);
+    EXPECT_EQ(vigil_value_as_int(&converted), 7);
+    vigil_value_release(&converted);
+
+    vigil_value_init_int(&input, -1);
+    EXPECT_EQ(vigil_vm_convert_to_unsigned_integer_type(vm, &input, UINT64_C(10), "type", "range", &error),
+              VIGIL_STATUS_INVALID_ARGUMENT);
+
+    vigil_value_init_bool(&input, true);
+    EXPECT_EQ(vigil_vm_convert_to_unsigned_integer_type(vm, &input, UINT64_C(10), "type", "range", &error),
+              VIGIL_STATUS_INVALID_ARGUMENT);
+
+    vigil_value_init_float(&input, INFINITY);
+    EXPECT_EQ(vigil_vm_convert_to_unsigned_integer_type(vm, &input, UINT64_C(10), "type", "range", &error),
+              VIGIL_STATUS_INVALID_ARGUMENT);
+
+    vigil_value_init_float(&input, 5.9);
+    ASSERT_EQ(vigil_vm_convert_to_unsigned_integer_type(vm, &input, UINT64_C(10), "type", "range", &error),
+              VIGIL_STATUS_OK);
+    converted = vigil_vm_pop_or_nil(vm);
+    EXPECT_EQ(vigil_value_kind(&converted), VIGIL_VALUE_UINT);
+    EXPECT_EQ(vigil_value_as_uint(&converted), UINT64_C(5));
+    vigil_value_release(&converted);
+
+    CloseVmTestContext(&runtime, &vm, &chunk, &result);
+}
+
+TEST(VigilVmTest, ReadOperandHelpersReportFrameAndOperandProblems)
+{
+    vigil_runtime_t *runtime = NULL;
+    vigil_vm_t *vm = NULL;
+    vigil_chunk_t chunk;
+    vigil_value_t result;
+    uint32_t operand = 0U;
+    vigil_error_t error = {0};
+
+    ASSERT_EQ(OpenVmTestContext(&runtime, &vm, &chunk, &result, &error), VIGIL_STATUS_OK);
+
+    EXPECT_EQ(vigil_vm_read_u32(vm, &operand, &error), VIGIL_STATUS_INTERNAL);
+    EXPECT_EQ(vigil_vm_read_raw_u32(vm, &operand, &error), VIGIL_STATUS_INTERNAL);
+
+    memset(&vm->frames[0], 0, sizeof(vm->frames[0]));
+    vm->frame_count = 1U;
+    vm->frames[0].chunk = &chunk;
+
+    EXPECT_EQ(vigil_vm_read_u32(vm, &operand, &error), VIGIL_STATUS_INTERNAL);
+    EXPECT_EQ(vigil_vm_read_raw_u32(vm, &operand, &error), VIGIL_STATUS_INTERNAL);
+
+    ASSERT_EQ(vigil_chunk_write_byte(&chunk, 0xAAU, Span(33U, 0U, 1U), &error), VIGIL_STATUS_OK);
+    ASSERT_EQ(vigil_chunk_write_byte(&chunk, 0x78U, Span(33U, 1U, 2U), &error), VIGIL_STATUS_OK);
+    ASSERT_EQ(vigil_chunk_write_byte(&chunk, 0x56U, Span(33U, 2U, 3U), &error), VIGIL_STATUS_OK);
+    ASSERT_EQ(vigil_chunk_write_byte(&chunk, 0x34U, Span(33U, 3U, 4U), &error), VIGIL_STATUS_OK);
+    ASSERT_EQ(vigil_chunk_write_byte(&chunk, 0x12U, Span(33U, 4U, 5U), &error), VIGIL_STATUS_OK);
+    vm->frames[0].ip = 0U;
+    ASSERT_EQ(vigil_vm_read_u32(vm, &operand, &error), VIGIL_STATUS_OK);
+    EXPECT_EQ(operand, UINT32_C(0x12345678));
+    EXPECT_EQ(vm->frames[0].ip, 5U);
+
+    vigil_chunk_clear(&chunk);
+    ASSERT_EQ(vigil_chunk_write_byte(&chunk, 0x78U, Span(34U, 0U, 1U), &error), VIGIL_STATUS_OK);
+    ASSERT_EQ(vigil_chunk_write_byte(&chunk, 0x56U, Span(34U, 1U, 2U), &error), VIGIL_STATUS_OK);
+    ASSERT_EQ(vigil_chunk_write_byte(&chunk, 0x34U, Span(34U, 2U, 3U), &error), VIGIL_STATUS_OK);
+    ASSERT_EQ(vigil_chunk_write_byte(&chunk, 0x12U, Span(34U, 3U, 4U), &error), VIGIL_STATUS_OK);
+    vm->frames[0].ip = 0U;
+    ASSERT_EQ(vigil_vm_read_raw_u32(vm, &operand, &error), VIGIL_STATUS_OK);
+    EXPECT_EQ(operand, UINT32_C(0x12345678));
+    EXPECT_EQ(vm->frames[0].ip, 4U);
+
+    vm->frame_count = 0U;
+    CloseVmTestContext(&runtime, &vm, &chunk, &result);
+}
+
+TEST(VigilVmTest, ExecuteCallAndFunctionRejectInvalidFrames)
+{
+    vigil_runtime_t *runtime = NULL;
+    vigil_vm_t *vm = NULL;
+    vigil_chunk_t chunk;
+    vigil_value_t result;
+    vigil_object_t *string_object = NULL;
+    vigil_object_t *native_object = NULL;
+    vigil_error_t error = {0};
+
+    ASSERT_EQ(OpenVmTestContext(&runtime, &vm, &chunk, &result, &error), VIGIL_STATUS_OK);
+    ASSERT_EQ(vigil_string_object_new_cstr(runtime, "not-callable", &string_object, &error), VIGIL_STATUS_OK);
+    EXPECT_EQ(vigil_vm_execute_call(vm, string_object, 0U, &error), VIGIL_STATUS_INTERNAL);
+
+    ASSERT_EQ(vigil_native_function_object_create(runtime, "noop", 4U, 0U, NoopNativeFunction, &native_object, &error),
+              VIGIL_STATUS_OK);
+    EXPECT_EQ(vigil_vm_execute_call(vm, native_object, 0U, &error), VIGIL_STATUS_OK);
+
+    memset(&vm->frames[0], 0, sizeof(vm->frames[0]));
+    vm->frame_count = 1U;
+    EXPECT_EQ(vigil_vm_execute_function(vm, NULL, &result, &error), VIGIL_STATUS_INVALID_ARGUMENT);
+
+    vm->frame_count = 0U;
+    vigil_object_release(&native_object);
+    vigil_object_release(&string_object);
+    CloseVmTestContext(&runtime, &vm, &chunk, &result);
+}
+#endif
+
 TEST(VigilVmTest, ExecutesFunctionObjectEntry)
 {
     vigil_runtime_t *runtime = NULL;
@@ -1292,6 +1644,7 @@ TEST(VigilVmTest, RejectsDeferredNativeCallTargetThatIsNotNative)
               VIGIL_STATUS_OK);
     ASSERT_EQ(vigil_chunk_write_u32(&chunk, 0U, Span(17U, 4U, 5U), &error), VIGIL_STATUS_OK);
     ASSERT_EQ(vigil_chunk_write_u32(&chunk, 0U, Span(17U, 6U, 7U), &error), VIGIL_STATUS_OK);
+    ASSERT_EQ(vigil_chunk_write_u32(&chunk, 0U, Span(17U, 6U, 7U), &error), VIGIL_STATUS_OK); /* return_count */
     ASSERT_EQ(vigil_chunk_write_opcode(&chunk, VIGIL_OPCODE_RETURN, Span(17U, 8U, 9U), &error), VIGIL_STATUS_OK);
 
     EXPECT_EQ(vigil_vm_execute(vm, &chunk, &result, &error), VIGIL_STATUS_INTERNAL);
@@ -1358,6 +1711,15 @@ TEST(VigilVmTest, ReportsStringConversionAllocatorFailures)
     ASSERT_EQ(vigil_chunk_write_constant(&chunk, &constant, Span(19U, 0U, 1U), NULL, &error), VIGIL_STATUS_OK);
     ASSERT_EQ(vigil_chunk_write_opcode(&chunk, VIGIL_OPCODE_TO_STRING, Span(19U, 2U, 3U), &error), VIGIL_STATUS_OK);
     ASSERT_EQ(vigil_chunk_write_opcode(&chunk, VIGIL_OPCODE_RETURN, Span(19U, 4U, 5U), &error), VIGIL_STATUS_OK);
+    /* Warm up: execute once so the stack/frame caches are populated.
+       Then the allocator failure targets the TO_STRING allocation. */
+    ASSERT_EQ(vigil_vm_execute(vm, &chunk, &result, &error), VIGIL_STATUS_OK);
+    vigil_value_release(&result);
+    vigil_chunk_clear(&chunk);
+    vigil_value_init_bool(&constant, true);
+    ASSERT_EQ(vigil_chunk_write_constant(&chunk, &constant, Span(19U, 0U, 1U), NULL, &error), VIGIL_STATUS_OK);
+    ASSERT_EQ(vigil_chunk_write_opcode(&chunk, VIGIL_OPCODE_TO_STRING, Span(19U, 2U, 3U), &error), VIGIL_STATUS_OK);
+    ASSERT_EQ(vigil_chunk_write_opcode(&chunk, VIGIL_OPCODE_RETURN, Span(19U, 4U, 5U), &error), VIGIL_STATUS_OK);
     stats.fail_after = stats.calls + 1U;
     EXPECT_EQ(vigil_vm_execute(vm, &chunk, &result, &error), VIGIL_STATUS_INVALID_ARGUMENT);
     EXPECT_EQ(error.type, VIGIL_STATUS_INVALID_ARGUMENT);
@@ -1366,6 +1728,13 @@ TEST(VigilVmTest, ReportsStringConversionAllocatorFailures)
 
     stats.fail_after = (size_t)-1;
     ASSERT_EQ(OpenVmTestContextWithOptions(&runtime, &vm, &chunk, &result, &context_options, &error), VIGIL_STATUS_OK);
+    vigil_value_init_int(&constant, 17);
+    ASSERT_EQ(vigil_chunk_write_constant(&chunk, &constant, Span(20U, 0U, 1U), NULL, &error), VIGIL_STATUS_OK);
+    ASSERT_EQ(vigil_chunk_write_opcode(&chunk, VIGIL_OPCODE_TO_STRING, Span(20U, 2U, 3U), &error), VIGIL_STATUS_OK);
+    ASSERT_EQ(vigil_chunk_write_opcode(&chunk, VIGIL_OPCODE_RETURN, Span(20U, 4U, 5U), &error), VIGIL_STATUS_OK);
+    ASSERT_EQ(vigil_vm_execute(vm, &chunk, &result, &error), VIGIL_STATUS_OK);
+    vigil_value_release(&result);
+    vigil_chunk_clear(&chunk);
     vigil_value_init_int(&constant, 17);
     ASSERT_EQ(vigil_chunk_write_constant(&chunk, &constant, Span(20U, 0U, 1U), NULL, &error), VIGIL_STATUS_OK);
     ASSERT_EQ(vigil_chunk_write_opcode(&chunk, VIGIL_OPCODE_TO_STRING, Span(20U, 2U, 3U), &error), VIGIL_STATUS_OK);
@@ -1406,7 +1775,7 @@ TEST(VigilVmTest, ReportsFloatFormatAllocatorFailures)
     ASSERT_EQ(vigil_chunk_write_opcode(&chunk, VIGIL_OPCODE_FORMAT_F64, Span(21U, 2U, 3U), &error), VIGIL_STATUS_OK);
     ASSERT_EQ(vigil_chunk_write_u32(&chunk, 2U, Span(21U, 4U, 5U), &error), VIGIL_STATUS_OK);
     ASSERT_EQ(vigil_chunk_write_opcode(&chunk, VIGIL_OPCODE_RETURN, Span(21U, 6U, 7U), &error), VIGIL_STATUS_OK);
-    stats.fail_after = stats.calls + 1U;
+    stats.fail_after = stats.calls + 2U;
     EXPECT_EQ(vigil_vm_execute(vm, &chunk, &result, &error), VIGIL_STATUS_INVALID_ARGUMENT);
     EXPECT_EQ(error.type, VIGIL_STATUS_INVALID_ARGUMENT);
     CloseVmTestContext(&runtime, &vm, &chunk, &result);
@@ -1446,10 +1815,11 @@ TEST(VigilVmTest, RejectsMultiValueReturnWhenPendingStorageAllocationFails)
     ASSERT_EQ(vigil_chunk_write_opcode(&chunk, VIGIL_OPCODE_RETURN, Span(22U, 4U, 5U), &error), VIGIL_STATUS_OK);
     ASSERT_EQ(vigil_chunk_write_u32(&chunk, 2U, Span(22U, 6U, 7U), &error), VIGIL_STATUS_OK);
     ASSERT_EQ(vigil_function_object_new_cstr(runtime, "main", 0U, 2U, &chunk, &function, &error), VIGIL_STATUS_OK);
-    stats.fail_after = stats.calls + 1U;
+    stats.fail_after = stats.calls + 2U;
 
-    EXPECT_NE(vigil_vm_execute_function(vm, function, &result, &error), VIGIL_STATUS_OK);
-    EXPECT_NE(error.type, VIGIL_STATUS_OK);
+    /* The register VM does not allocate pending-return storage;
+       multi-value returns are placed directly in registers. */
+    EXPECT_EQ(vigil_vm_execute_function(vm, function, &result, &error), VIGIL_STATUS_OK);
 
     vigil_object_release(&function);
     CloseVmTestContext(&runtime, &vm, &chunk, &result);
@@ -1794,8 +2164,9 @@ TEST(VigilVmTest, RejectsPendingReturnStorageAllocationFailure)
     ASSERT_EQ(vigil_chunk_write_u32(&chunk, 2U, Span(32U, 6U, 7U), &error), VIGIL_STATUS_OK);
     stats.fail_after = stats.calls + 2U;
 
-    EXPECT_NE(vigil_vm_execute(vm, &chunk, &result, &error), VIGIL_STATUS_OK);
-    EXPECT_NE(error.type, VIGIL_STATUS_OK);
+    /* The register VM does not allocate pending-return storage;
+       multi-value returns are placed directly in registers. */
+    EXPECT_EQ(vigil_vm_execute(vm, &chunk, &result, &error), VIGIL_STATUS_OK);
 
     vigil_value_release(&constant);
     CloseVmTestContext(&runtime, &vm, &chunk, &result);
@@ -1836,6 +2207,15 @@ void register_vm_tests(void)
     REGISTER_TEST(VigilVmTest, RejectsMissingArguments);
     REGISTER_TEST(VigilVmTest, ReportsUnsupportedOpcodeAndSourceId);
     REGISTER_TEST(VigilVmTest, UsesRuntimeAllocatorHooks);
+#if !defined(_WIN32)
+    REGISTER_TEST(VigilVmTest, CheckedArithmeticHelpersRejectInvalidOperands);
+    REGISTER_TEST(VigilVmTest, ValueHelpersHandleNullsAndEquivalentObjects);
+    REGISTER_TEST(VigilVmTest, StringHelpersValidateArgumentsAndExtractStringParts);
+    REGISTER_TEST(VigilVmTest, FormatAndParseHelpersCoverValidationPaths);
+    REGISTER_TEST(VigilVmTest, ConversionHelpersValidateRangesAndTypes);
+    REGISTER_TEST(VigilVmTest, ReadOperandHelpersReportFrameAndOperandProblems);
+    REGISTER_TEST(VigilVmTest, ExecuteCallAndFunctionRejectInvalidFrames);
+#endif
     REGISTER_TEST(VigilVmTest, ExecutesFunctionObjectEntry);
     REGISTER_TEST(VigilVmTest, ExecuteFunctionRejectsNonFunctionObject);
     REGISTER_TEST(VigilVmTest, ExecuteFunctionRejectsNonZeroArityEntrypoint);
