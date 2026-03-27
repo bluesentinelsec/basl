@@ -3,7 +3,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+#if !defined(_WIN32)
 #include "internal/vigil_vm_internal.h"
+#endif
 #include "vigil/vigil.h"
 
 struct AllocatorStats
@@ -308,6 +310,7 @@ static vigil_status_t RunBinaryUintOpcode(vigil_opcode_t opcode, uint64_t left_v
     return status;
 }
 
+#if !defined(_WIN32)
 static vigil_status_t NoopNativeFunction(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
 {
     (void)vm;
@@ -315,6 +318,7 @@ static vigil_status_t NoopNativeFunction(vigil_vm_t *vm, size_t arg_count, vigil
     (void)error;
     return VIGIL_STATUS_OK;
 }
+#endif
 
 /* TEST() expands into generated functions with many assertion branches.
    Suppress cognitive-complexity diagnostics for this assertion-heavy test region. */
@@ -995,6 +999,7 @@ TEST(VigilVmTest, UsesRuntimeAllocatorHooks)
     EXPECT_GE(stats.deallocate_calls, 4);
 }
 
+#if !defined(_WIN32)
 TEST(VigilVmTest, CheckedArithmeticHelpersRejectInvalidOperands)
 {
     int64_t signed_result = 0;
@@ -1331,6 +1336,7 @@ TEST(VigilVmTest, ExecuteCallAndFunctionRejectInvalidFrames)
     vigil_object_release(&string_object);
     CloseVmTestContext(&runtime, &vm, &chunk, &result);
 }
+#endif
 
 TEST(VigilVmTest, ExecutesFunctionObjectEntry)
 {
@@ -2201,6 +2207,7 @@ void register_vm_tests(void)
     REGISTER_TEST(VigilVmTest, RejectsMissingArguments);
     REGISTER_TEST(VigilVmTest, ReportsUnsupportedOpcodeAndSourceId);
     REGISTER_TEST(VigilVmTest, UsesRuntimeAllocatorHooks);
+#if !defined(_WIN32)
     REGISTER_TEST(VigilVmTest, CheckedArithmeticHelpersRejectInvalidOperands);
     REGISTER_TEST(VigilVmTest, ValueHelpersHandleNullsAndEquivalentObjects);
     REGISTER_TEST(VigilVmTest, StringHelpersValidateArgumentsAndExtractStringParts);
@@ -2208,6 +2215,7 @@ void register_vm_tests(void)
     REGISTER_TEST(VigilVmTest, ConversionHelpersValidateRangesAndTypes);
     REGISTER_TEST(VigilVmTest, ReadOperandHelpersReportFrameAndOperandProblems);
     REGISTER_TEST(VigilVmTest, ExecuteCallAndFunctionRejectInvalidFrames);
+#endif
     REGISTER_TEST(VigilVmTest, ExecutesFunctionObjectEntry);
     REGISTER_TEST(VigilVmTest, ExecuteFunctionRejectsNonFunctionObject);
     REGISTER_TEST(VigilVmTest, ExecuteFunctionRejectsNonZeroArityEntrypoint);
