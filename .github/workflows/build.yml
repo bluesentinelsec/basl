@@ -267,11 +267,14 @@ jobs:
     runs-on: ubuntu-latest
     env:
       ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
-      LSAN_OPTIONS: suppressions=${{ github.workspace }}/.lsan_suppressions.txt
+      LSAN_OPTIONS: suppressions=${{ github.workspace }}/.lsan_suppressions.txt:print_suppressions=0
       UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
 
     steps:
       - uses: actions/checkout@v6
+
+      - name: Install llvm-symbolizer
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq llvm
 
       - name: Configure
         run: >
