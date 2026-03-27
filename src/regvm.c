@@ -4979,6 +4979,8 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
                 }
             }
 
+            /* Free the popped frame's defer array (allocated with raw realloc). */
+            { vigil_vm_frame_t *pf = frame; if (pf->defers) { free(pf->defers); pf->defers = NULL; } }
             vm->frame_count -= 1U;
             frame = &vm->frames[vm->frame_count - 1];
             rc = ((vigil_chunk_t *)frame->chunk)->reg_cache;
@@ -5029,6 +5031,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
                 }
             }
 
+            { vigil_vm_frame_t *pf = &vm->frames[vm->frame_count - 1]; if (pf->defers) { free(pf->defers); pf->defers = NULL; } }
             vm->frame_count -= 1U;
             frame = &vm->frames[vm->frame_count - 1];
             rc = ((vigil_chunk_t *)frame->chunk)->reg_cache;
