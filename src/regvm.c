@@ -3459,14 +3459,14 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         {
             uint64_t a = regvm_decode_uint(R[ra]), b = regvm_decode_uint(R[rb]), r;
             if (VIGIL_LIKELY(vigil_vm_checked_uadd(a, b, &r) == VIGIL_STATUS_OK))
-            { R[rd] = regvm_encode_uint(r); RNEXT(); }
+            { RRELEASE(rd); R[rd] = regvm_encode_uint(r); has_reg_objects = 1; RNEXT(); }
             goto r_overflow;
         }
         if (vigil_nanbox_is_int(R[ra]) && vigil_nanbox_is_int(R[rb]))
         {
             int64_t a = regvm_decode_int(R[ra]), b = regvm_decode_int(R[rb]), r;
             if (VIGIL_LIKELY(vigil_vm_checked_add(a, b, &r) == VIGIL_STATUS_OK))
-            { R[rd] = regvm_encode_int(r); RNEXT(); }
+            { RRELEASE(rd); R[rd] = regvm_encode_int(r); has_reg_objects = 1; RNEXT(); }
             goto r_overflow;
         }
         /* Try f64 fast path. */
@@ -3499,14 +3499,14 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         {
             uint64_t a = regvm_decode_uint(R[ra]), b = regvm_decode_uint(R[rb]), r;
             if (VIGIL_LIKELY(vigil_vm_checked_usubtract(a, b, &r) == VIGIL_STATUS_OK))
-            { R[rd] = regvm_encode_uint(r); RNEXT(); }
+            { RRELEASE(rd); R[rd] = regvm_encode_uint(r); has_reg_objects = 1; RNEXT(); }
             goto r_overflow;
         }
         if (vigil_nanbox_is_int(R[ra]) && vigil_nanbox_is_int(R[rb]))
         {
             int64_t a = regvm_decode_int(R[ra]), b = regvm_decode_int(R[rb]), r;
             if (VIGIL_LIKELY(vigil_vm_checked_subtract(a, b, &r) == VIGIL_STATUS_OK))
-            { R[rd] = regvm_encode_int(r); RNEXT(); }
+            { RRELEASE(rd); R[rd] = regvm_encode_int(r); has_reg_objects = 1; RNEXT(); }
             goto r_overflow;
         }
         if (vigil_nanbox_is_double(R[ra]) && vigil_nanbox_is_double(R[rb]))
@@ -3525,14 +3525,14 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         {
             uint64_t a = regvm_decode_uint(R[ra]), b = regvm_decode_uint(R[rb]), r;
             if (VIGIL_LIKELY(vigil_vm_checked_umultiply(a, b, &r) == VIGIL_STATUS_OK))
-            { R[rd] = regvm_encode_uint(r); RNEXT(); }
+            { RRELEASE(rd); R[rd] = regvm_encode_uint(r); has_reg_objects = 1; RNEXT(); }
             goto r_overflow;
         }
         if (vigil_nanbox_is_int(R[ra]) && vigil_nanbox_is_int(R[rb]))
         {
             int64_t a = regvm_decode_int(R[ra]), b = regvm_decode_int(R[rb]), r;
             if (VIGIL_LIKELY(vigil_vm_checked_multiply(a, b, &r) == VIGIL_STATUS_OK))
-            { R[rd] = regvm_encode_int(r); RNEXT(); }
+            { RRELEASE(rd); R[rd] = regvm_encode_int(r); has_reg_objects = 1; RNEXT(); }
             goto r_overflow;
         }
         if (vigil_nanbox_is_double(R[ra]) && vigil_nanbox_is_double(R[rb]))
@@ -3552,7 +3552,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
             uint64_t a = regvm_decode_uint(R[ra]), b = regvm_decode_uint(R[rb]), r;
             if (VIGIL_UNLIKELY(b == 0)) goto r_divzero;
             if (VIGIL_LIKELY(vigil_vm_checked_udivide(a, b, &r) == VIGIL_STATUS_OK))
-            { R[rd] = regvm_encode_uint(r); RNEXT(); }
+            { RRELEASE(rd); R[rd] = regvm_encode_uint(r); has_reg_objects = 1; RNEXT(); }
             goto r_overflow;
         }
         if (vigil_nanbox_is_int(R[ra]) && vigil_nanbox_is_int(R[rb]))
@@ -3560,7 +3560,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
             int64_t a = regvm_decode_int(R[ra]), b = regvm_decode_int(R[rb]), r;
             if (VIGIL_UNLIKELY(b == 0)) goto r_divzero;
             if (VIGIL_LIKELY(vigil_vm_checked_divide(a, b, &r) == VIGIL_STATUS_OK))
-            { R[rd] = regvm_encode_int(r); RNEXT(); }
+            { RRELEASE(rd); R[rd] = regvm_encode_int(r); has_reg_objects = 1; RNEXT(); }
             goto r_overflow;
         }
         if (vigil_nanbox_is_double(R[ra]) && vigil_nanbox_is_double(R[rb]))
@@ -3580,7 +3580,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
             uint64_t a = regvm_decode_uint(R[ra]), b = regvm_decode_uint(R[rb]), r;
             if (VIGIL_UNLIKELY(b == 0)) goto r_divzero;
             if (VIGIL_LIKELY(vigil_vm_checked_umodulo(a, b, &r) == VIGIL_STATUS_OK))
-            { R[rd] = regvm_encode_uint(r); RNEXT(); }
+            { RRELEASE(rd); R[rd] = regvm_encode_uint(r); has_reg_objects = 1; RNEXT(); }
             goto r_overflow;
         }
         if (vigil_nanbox_is_int(R[ra]) && vigil_nanbox_is_int(R[rb]))
@@ -3588,7 +3588,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
             int64_t a = regvm_decode_int(R[ra]), b = regvm_decode_int(R[rb]), r;
             if (VIGIL_UNLIKELY(b == 0)) goto r_divzero;
             if (VIGIL_LIKELY(vigil_vm_checked_modulo(a, b, &r) == VIGIL_STATUS_OK))
-            { R[rd] = regvm_encode_int(r); RNEXT(); }
+            { RRELEASE(rd); R[rd] = regvm_encode_int(r); has_reg_objects = 1; RNEXT(); }
             goto r_overflow;
         }
         status = VIGIL_STATUS_UNSUPPORTED;
@@ -4067,6 +4067,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
             goto r_cleanup;
 
         R = vm->stack + base;
+        has_reg_objects = 1;
         /* Return values are at stack[arg_base .. stack_count-1].
            They're already in the caller's register window. */
         if (vm->stack_count < base + rc->max_registers)
@@ -5004,7 +5005,15 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         if (frame->defer_count > 0U)
         {
             size_t fi = (size_t)(frame - vm->frames);
+            size_t pre_drain = vm->stack_count;
             status = regvm_drain_defers(vm, fi, error);
+            /* Release any return values left on the stack by deferred calls. */
+            while (vm->stack_count > pre_drain)
+            {
+                vm->stack_count--;
+                if (vigil_nanbox_has_object(vm->stack[vm->stack_count]))
+                    vigil_value_release(&vm->stack[vm->stack_count]);
+            }
             if (status != VIGIL_STATUS_OK) goto r_cleanup;
         }
         if (vm->frame_count > initial_frame_count)
