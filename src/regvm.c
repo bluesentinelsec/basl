@@ -78,6 +78,7 @@ typedef struct
     uint8_t local_count;
     int locals_done;
     uint8_t need_release; /* 255 = none, else register to release before write */
+    uint8_t last_pop[2]; /* last two popped registers (inputs to current op) */
     uint32_t obj_written[8]; /* bitmap: registers that may hold objects */
 } vstack_t;
 
@@ -88,6 +89,7 @@ static void vs_init(vstack_t *vs, uint8_t lc)
     vs->local_count = lc;
     vs->locals_done = (lc == 0);
     vs->need_release = 255;
+    vs->last_pop[0] = 255; vs->last_pop[1] = 255;
     memset(vs->regs, 0, sizeof(vs->regs));
     memset(vs->obj_written, 0, sizeof(vs->obj_written));
 }
@@ -122,9 +124,14 @@ static uint8_t vs_push(vstack_t *vs)
     vs->top++;
     if (r >= vs->next_reg)
         vs->next_reg = r + 1;
-    /* Emit release if register was previously written (may hold object). */
-    vs->need_release = vs_is_obj(vs, r) ? r : 255;
-    vs_mark_obj(vs, r); /* conservatively mark all registers */
+    /* Emit release if register was previously written and is NOT a current input. */
+    if (vs_is_obj(vs, r) && r != vs->last_pop[0] && r != vs->last_pop[1])
+        vs->need_release = r;
+    else
+        vs->need_release = 255;
+    vs_mark_obj(vs, r);
+    /* Reset pop tracking after push consumes the inputs. */
+    vs->last_pop[0] = 255; vs->last_pop[1] = 255;
     return r;
 }
 
@@ -144,7 +151,9 @@ static uint8_t vs_pop(vstack_t *vs)
 {
     vs->top--;
     uint8_t r = vs->regs[vs->top];
-    vs_clear_obj(vs, r); /* value consumed — no longer needs release */
+    /* Track last two pops so vs_push can avoid releasing inputs. */
+    vs->last_pop[1] = vs->last_pop[0];
+    vs->last_pop[0] = r;
     return r;
 }
 
