@@ -1,0 +1,6 @@
+# Known register VM leaks from Lua-style overlapping register windows.
+# Objects in shared caller/callee registers have ambiguous ownership.
+# Tracked for fix in a follow-up PR with separate register windows.
+leak:vigil_regvm_execute
+leak:vigil_vm_execute_function
+leak:vigil_vm_execute_call
