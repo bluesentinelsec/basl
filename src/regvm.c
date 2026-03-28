@@ -3190,7 +3190,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
 r_dispatch_switch_check:
     while (ip < code_count)
     {
-r_dispatch_switch:
+    r_dispatch_switch:
         REGVM_DEBUG_HOOK();
         switch (VREG_GET_OP(code[ip]))
         {
