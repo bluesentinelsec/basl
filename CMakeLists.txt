@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.21)
 
-project(vigil VERSION 0.2.0 LANGUAGES C)
+project(vigil VERSION 0.2.1 LANGUAGES C)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
