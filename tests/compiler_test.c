@@ -376,6 +376,24 @@ TEST(VigilCompilerTest, CompilesAndExecutesIfElseAndWhile)
               10);
 }
 
+TEST(VigilCompilerTest, CompilesAndExecutesTailCallInIfBranch)
+{
+    EXPECT_EQ(CompileAndRun(vigil_test_failed_, "fn one() -> i32 {"
+                                                "    return 1;"
+                                                "}"
+                                                "fn two() -> i32 {"
+                                                "    return 2;"
+                                                "}"
+                                                "fn main() -> i32 {"
+                                                "    bool flag = false;"
+                                                "    if (flag) {"
+                                                "        return one();"
+                                                "    }"
+                                                "    return two();"
+                                                "}"),
+              2);
+}
+
 TEST(VigilCompilerTest, CompilesAndExecutesBoolLocalsAndEquality)
 {
     EXPECT_EQ(CompileAndRun(vigil_test_failed_, "fn main() -> i32 {"
@@ -710,6 +728,29 @@ TEST(VigilCompilerTest, CompilesAndExecutesFallibleInitConstructorsWithGuard)
               13);
 }
 
+TEST(VigilCompilerTest, CompilesAndExecutesFallibleInitConstructorsReturningOk)
+{
+    EXPECT_EQ(CompileAndRun(vigil_test_failed_,
+                            "class SafeDiv {"
+                            "    i32 result;"
+                            "    fn init(i32 left, i32 right) -> err {"
+                            "        if (right == 0) {"
+                            "            return err(\"division by zero\", err.arg);"
+                            "        }"
+                            "        self.result = left / right;"
+                            "        return ok;"
+                            "    }"
+                            "}"
+                            "fn main() -> i32 {"
+                            "    SafeDiv value, err status = SafeDiv(10, 2);"
+                            "    if (value.result == 5 && status == ok) {"
+                            "        return 42;"
+                            "    }"
+                            "    return 0;"
+                            "}"),
+              42);
+}
+
 TEST(VigilCompilerTest, CompilesAndExecutesMethodsAcrossFiles)
 {
     const struct TestSource sources[] = {{"/project/model.vigil", "pub class Counter {"
@@ -1018,6 +1059,25 @@ TEST(VigilCompilerTest, CompilesAndExecutesStringBuiltInMethods)
     EXPECT_EQ(CompileAndRun(vigil_test_failed_, source), 19);
 }
 
+TEST(VigilCompilerTest, CompilesAndExecutesStringOrderingComparisons)
+{
+    const char *source = "\n"
+                         "fn main() -> i32 {\n"
+                         "    string low = \"a\";\n"
+                         "    string high = \"b\";\n"
+                         "    if (low < high &&\n"
+                         "        high > low &&\n"
+                         "        low <= low &&\n"
+                         "        high >= high) {\n"
+                         "        return 27;\n"
+                         "    }\n"
+                         "    return 0;\n"
+                         "}\n"
+                         "";
+
+    EXPECT_EQ(CompileAndRun(vigil_test_failed_, source), 27);
+}
+
 TEST(VigilCompilerTest, CompilesAndExecutesArrayBuiltInMethods)
 {
     const char *source = "\n"
@@ -1027,6 +1087,7 @@ TEST(VigilCompilerTest, CompilesAndExecutesArrayBuiltInMethods)
                          "    i32 hit, err hit_err = nums.get(1);\n"
                          "    err set_err = nums.set(0, 5);\n"
                          "    array<i32> prefix = nums.slice(0, 2);\n"
+                         "    err mutate_err = nums.set(1, 9);\n"
                          "    i32 popped, err pop_err = nums.pop();\n"
                          "    i32 missing, err missing_err = nums.get(99);\n"
                          "\n"
@@ -1034,8 +1095,11 @@ TEST(VigilCompilerTest, CompilesAndExecutesArrayBuiltInMethods)
                          "        hit == 2 &&\n"
                          "        hit_err == ok &&\n"
                          "        set_err == ok &&\n"
+                         "        mutate_err == ok &&\n"
+                         "        prefix.len() == 2 &&\n"
                          "        prefix.contains(5) &&\n"
                          "        prefix.contains(2) &&\n"
+                         "        !prefix.contains(9) &&\n"
                          "        popped == 3 &&\n"
                          "        pop_err == ok &&\n"
                          "        missing == 0 &&\n"
@@ -3146,6 +3210,7 @@ void register_compiler_tests(void)
     REGISTER_TEST(VigilCompilerTest, CompilesAndExecutesExplicitErrorValues);
     REGISTER_TEST(VigilCompilerTest, CompilesAndExecutesTupleBindingsAndGuard);
     REGISTER_TEST(VigilCompilerTest, CompilesAndExecutesIfElseAndWhile);
+    REGISTER_TEST(VigilCompilerTest, CompilesAndExecutesTailCallInIfBranch);
     REGISTER_TEST(VigilCompilerTest, CompilesAndExecutesBoolLocalsAndEquality);
     REGISTER_TEST(VigilCompilerTest, CompilesAndExecutesDirectFunctionCalls);
     REGISTER_TEST(VigilCompilerTest, CompilesAndExecutesRecursiveFunctionCalls);
@@ -3165,6 +3230,7 @@ void register_compiler_tests(void)
     REGISTER_TEST(VigilCompilerTest, CompilesAndExecutesFloatFieldsAndGlobals);
     REGISTER_TEST(VigilCompilerTest, CompilesAndExecutesInitBasedConstructors);
     REGISTER_TEST(VigilCompilerTest, CompilesAndExecutesFallibleInitConstructorsWithGuard);
+    REGISTER_TEST(VigilCompilerTest, CompilesAndExecutesFallibleInitConstructorsReturningOk);
     REGISTER_TEST(VigilCompilerTest, CompilesAndExecutesMethodsAcrossFiles);
     REGISTER_TEST(VigilCompilerTest, CompilesAndExecutesPublicInitConstructorsAcrossFiles);
     REGISTER_TEST(VigilCompilerTest, CompilesAndExecutesInterfacePolymorphismAcrossFiles);
@@ -3177,6 +3243,7 @@ void register_compiler_tests(void)
     REGISTER_TEST(VigilCompilerTest, CompilesAndExecutesStringsAndStringConstants);
     REGISTER_TEST(VigilCompilerTest, CompilesAndExecutesImportedStringConstantsAcrossFiles);
     REGISTER_TEST(VigilCompilerTest, CompilesAndExecutesStringBuiltInMethods);
+    REGISTER_TEST(VigilCompilerTest, CompilesAndExecutesStringOrderingComparisons);
     REGISTER_TEST(VigilCompilerTest, CompilesAndExecutesArrayBuiltInMethods);
     REGISTER_TEST(VigilCompilerTest, CompilesAndExecutesMapBuiltInMethods);
     REGISTER_TEST(VigilCompilerTest, CompilesAndExecutesTypedEmptyCollectionLiterals);

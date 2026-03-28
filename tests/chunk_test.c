@@ -105,11 +105,13 @@ static char *BuildOperandDisassemblyOutput(void)
         vigil_chunk_write_u32(&chunk, 2U, Span(1U, 0U, 0U), &error) != VIGIL_STATUS_OK ||
         vigil_chunk_write_u32(&chunk, 1U, Span(1U, 0U, 0U), &error) != VIGIL_STATUS_OK || /* return_count */
         AppendOpcodeU32(&chunk, VIGIL_OPCODE_CALL_VALUE, 9U, &error) != VIGIL_STATUS_OK ||
+        vigil_chunk_write_u32(&chunk, 1U, Span(1U, 0U, 0U), &error) != VIGIL_STATUS_OK || /* return_count */
         AppendOpcodeU32(&chunk, VIGIL_OPCODE_NEW_CLOSURE, 5U, &error) != VIGIL_STATUS_OK ||
         vigil_chunk_write_u32(&chunk, 3U, Span(1U, 0U, 0U), &error) != VIGIL_STATUS_OK ||
         AppendOpcodeU32(&chunk, VIGIL_OPCODE_CALL_INTERFACE, 1U, &error) != VIGIL_STATUS_OK ||
         vigil_chunk_write_u32(&chunk, 2U, Span(1U, 0U, 0U), &error) != VIGIL_STATUS_OK ||
         vigil_chunk_write_u32(&chunk, 4U, Span(1U, 0U, 0U), &error) != VIGIL_STATUS_OK ||
+        vigil_chunk_write_u32(&chunk, 5U, Span(1U, 0U, 0U), &error) != VIGIL_STATUS_OK || /* return_count */
         AppendOpcodeU32(&chunk, VIGIL_OPCODE_NEW_INSTANCE, 6U, &error) != VIGIL_STATUS_OK ||
         vigil_chunk_write_u32(&chunk, 1U, Span(1U, 0U, 0U), &error) != VIGIL_STATUS_OK ||
         AppendOpcodeU32(&chunk, VIGIL_OPCODE_NEW_ARRAY, 8U, &error) != VIGIL_STATUS_OK ||
@@ -344,8 +346,8 @@ TEST(VigilChunkTest, DisassembleFormatsOpcodesAndConstants)
 TEST(VigilChunkTest, DisassembleFormatsOperandInstructions)
 {
     static const char *const expected[] = {
-        "CALL 7 2",         "CALL_VALUE 9",  "NEW_CLOSURE 5 3", "CALL_INTERFACE 1 2 4",
-        "NEW_INSTANCE 6 1", "NEW_ARRAY 8 2", "GET_LOCAL 11",    "RETURN 1",
+        "CALL 7 2",           "CALL_VALUE 9 1", "NEW_CLOSURE 5 3", "CALL_INTERFACE 1 2 4 5",
+        "NEW_INSTANCE 6 1",   "NEW_ARRAY 8 2",  "GET_LOCAL 11",    "RETURN 1",
     };
     const char *text;
     const char *missing;

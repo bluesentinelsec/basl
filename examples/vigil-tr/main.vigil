@@ -2,14 +2,27 @@ import "args";
 import "fmt";
 import "readline";
 
+fn expand_set(string s) -> string {
+    if (s == "a-z") {
+        return "abcdefghijklmnopqrstuvwxyz";
+    }
+    if (s == "A-Z") {
+        return "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    }
+    if (s == "0-9") {
+        return "0123456789";
+    }
+    return s;
+}
+
 fn main() -> i32 {
     if (args.count() < 2) {
         fmt.eprintln("usage: tr SET1 SET2");
         return 1;
     }
 
-    string set1 = args.at(0);
-    string set2 = args.at(1);
+    string set1 = expand_set(args.at(0));
+    string set2 = expand_set(args.at(1));
 
     if (set1.len() != set2.len()) {
         fmt.eprintln("tr: SET1 and SET2 must be same length");

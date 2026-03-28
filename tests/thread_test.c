@@ -161,6 +161,39 @@ TEST(VigilThreadTest, SpawnWithMutexCoordination)
     EXPECT_EQ(r, 200);
 }
 
+TEST(VigilThreadTest, ReturnPeepholeDoesNotRewriteLoopOperandBytes)
+{
+    int64_t r = RunWithStdlib(vigil_test_failed_,
+                              "import \"atomic\";\n"
+                              "import \"thread\";\n"
+                              "const i64 POISON_PILL = i64(-999);\n"
+                              "fn rb_try_dequeue() -> i64 {\n"
+                              "    return POISON_PILL;\n"
+                              "}\n"
+                              "fn rb_dequeue(i64 shutdown_flag) -> i64 {\n"
+                              "    for (;;) {\n"
+                              "        i64 val = rb_try_dequeue();\n"
+                              "        if (val != POISON_PILL) {\n"
+                              "            return val;\n"
+                              "        }\n"
+                              "        if (atomic.load(shutdown_flag) != i64(0)) {\n"
+                              "            val = rb_try_dequeue();\n"
+                              "            if (val != POISON_PILL) {\n"
+                              "                return val;\n"
+                              "            }\n"
+                              "            return POISON_PILL;\n"
+                              "        }\n"
+                              "        thread.yield();\n"
+                              "    }\n"
+                              "    return POISON_PILL;\n"
+                              "}\n"
+                              "fn main() -> i32 {\n"
+                              "    i64 shutdown = atomic.new(i64(1));\n"
+                              "    return i32(rb_dequeue(shutdown));\n"
+                              "}\n");
+    EXPECT_EQ(r, -999);
+}
+
 #endif /* __EMSCRIPTEN__ */
 
 /* ── Registration ────────────────────────────────────────────────── */
@@ -173,5 +206,6 @@ void register_thread_tests(void)
     REGISTER_TEST(VigilThreadTest, SpawnClosureWithMultipleCaptures);
     REGISTER_TEST(VigilThreadTest, SpawnMultipleThreadsWithClosures);
     REGISTER_TEST(VigilThreadTest, SpawnWithMutexCoordination);
+    REGISTER_TEST(VigilThreadTest, ReturnPeepholeDoesNotRewriteLoopOperandBytes);
 #endif
 }

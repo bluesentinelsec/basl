@@ -347,23 +347,43 @@ static vigil_status_t vigil_chunk_disassemble_call(const vigil_chunk_t *chunk, s
 static vigil_status_t vigil_chunk_disassemble_call_value(const vigil_chunk_t *chunk, size_t *offset,
                                                          vigil_string_t *output, vigil_error_t *error)
 {
-    uint32_t operand;
+    vigil_opcode_t opcode;
+    uint32_t arg_count;
+    uint32_t ret_count;
     vigil_status_t status;
+
+    opcode = (vigil_opcode_t)chunk->code.data[*offset];
+    if (opcode == VIGIL_OPCODE_CALL_VALUE)
+    {
+        status = vigil_chunk_require_operand_bytes(chunk, *offset, 8U, "truncated indirect call instruction", error);
+        if (status != VIGIL_STATUS_OK)
+        {
+            return status;
+        }
+        arg_count = vigil_chunk_decode_u32(chunk->code.data, *offset + 1U);
+        ret_count = vigil_chunk_decode_u32(chunk->code.data, *offset + 5U);
+        status = vigil_chunk_append_formatted(output, error, "failed to format chunk indirect call operand", " %u %u",
+                                              arg_count, ret_count);
+        if (status != VIGIL_STATUS_OK)
+        {
+            return status;
+        }
+        *offset += 9U;
+        return VIGIL_STATUS_OK;
+    }
 
     status = vigil_chunk_require_operand_bytes(chunk, *offset, 4U, "truncated indirect call instruction", error);
     if (status != VIGIL_STATUS_OK)
     {
         return status;
     }
-
-    operand = vigil_chunk_decode_u32(chunk->code.data, *offset + 1U);
-    status =
-        vigil_chunk_append_formatted(output, error, "failed to format chunk indirect call operand", " %u", operand);
+    arg_count = vigil_chunk_decode_u32(chunk->code.data, *offset + 1U);
+    status = vigil_chunk_append_formatted(output, error, "failed to format chunk indirect call operand", " %u",
+                                          arg_count);
     if (status != VIGIL_STATUS_OK)
     {
         return status;
     }
-
     *offset += 5U;
     return VIGIL_STATUS_OK;
 }
@@ -397,12 +417,16 @@ static vigil_status_t vigil_chunk_disassemble_closure(const vigil_chunk_t *chunk
 static vigil_status_t vigil_chunk_disassemble_interface_call(const vigil_chunk_t *chunk, size_t *offset,
                                                              vigil_string_t *output, vigil_error_t *error)
 {
+    vigil_opcode_t opcode;
     uint32_t interface_index;
     uint32_t method_index;
     uint32_t arg_count;
+    uint32_t ret_count;
     vigil_status_t status;
 
-    status = vigil_chunk_require_operand_bytes(chunk, *offset, 12U, "truncated interface call instruction", error);
+    opcode = (vigil_opcode_t)chunk->code.data[*offset];
+    status = vigil_chunk_require_operand_bytes(chunk, *offset, opcode == VIGIL_OPCODE_CALL_INTERFACE ? 16U : 12U,
+                                               "truncated interface call instruction", error);
     if (status != VIGIL_STATUS_OK)
     {
         return status;
@@ -411,8 +435,45 @@ static vigil_status_t vigil_chunk_disassemble_interface_call(const vigil_chunk_t
     interface_index = vigil_chunk_decode_u32(chunk->code.data, *offset + 1U);
     method_index = vigil_chunk_decode_u32(chunk->code.data, *offset + 5U);
     arg_count = vigil_chunk_decode_u32(chunk->code.data, *offset + 9U);
-    status = vigil_chunk_append_formatted(output, error, "failed to format chunk interface call operand", " %u %u %u",
-                                          interface_index, method_index, arg_count);
+    if (opcode == VIGIL_OPCODE_CALL_INTERFACE)
+    {
+        ret_count = vigil_chunk_decode_u32(chunk->code.data, *offset + 13U);
+        status = vigil_chunk_append_formatted(output, error, "failed to format chunk interface call operand",
+                                              " %u %u %u %u", interface_index, method_index, arg_count, ret_count);
+    }
+    else
+    {
+        status = vigil_chunk_append_formatted(output, error, "failed to format chunk interface call operand",
+                                              " %u %u %u", interface_index, method_index, arg_count);
+    }
+    if (status != VIGIL_STATUS_OK)
+    {
+        return status;
+    }
+
+    *offset += opcode == VIGIL_OPCODE_CALL_INTERFACE ? 17U : 13U;
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t vigil_chunk_disassemble_call_extern(const vigil_chunk_t *chunk, size_t *offset,
+                                                          vigil_string_t *output, vigil_error_t *error)
+{
+    uint32_t descriptor_index;
+    uint32_t arg_count;
+    uint32_t ret_count;
+    vigil_status_t status;
+
+    status = vigil_chunk_require_operand_bytes(chunk, *offset, 12U, "truncated extern call instruction", error);
+    if (status != VIGIL_STATUS_OK)
+    {
+        return status;
+    }
+
+    descriptor_index = vigil_chunk_decode_u32(chunk->code.data, *offset + 1U);
+    arg_count = vigil_chunk_decode_u32(chunk->code.data, *offset + 5U);
+    ret_count = vigil_chunk_decode_u32(chunk->code.data, *offset + 9U);
+    status = vigil_chunk_append_formatted(output, error, "failed to format chunk extern call operand", " %u %u %u",
+                                          descriptor_index, arg_count, ret_count);
     if (status != VIGIL_STATUS_OK)
     {
         return status;
@@ -1145,6 +1206,10 @@ vigil_status_t vigil_chunk_disassemble(const vigil_chunk_t *chunk, vigil_string_
         else if (vigil_chunk_is_interface_call_opcode(opcode))
         {
             status = vigil_chunk_disassemble_interface_call(chunk, &offset, output, error);
+        }
+        else if (opcode == VIGIL_OPCODE_CALL_EXTERN)
+        {
+            status = vigil_chunk_disassemble_call_extern(chunk, &offset, output, error);
         }
         else if (vigil_chunk_is_two_u32_operand_opcode(opcode))
         {

@@ -79,6 +79,36 @@ static void regvm_release_value_range(vigil_value_t *values, size_t count)
         vigil_value_release(&values[i]);
 }
 
+static int regvm_compare_strings(vigil_value_t left, vigil_value_t right, int *out_cmp)
+{
+    const char *left_text;
+    const char *right_text;
+    size_t left_length;
+    size_t right_length;
+    size_t common_length;
+    int compared;
+
+    if (out_cmp == NULL)
+        return 0;
+
+    if (!vigil_vm_get_string_parts(&left, &left_text, &left_length) ||
+        !vigil_vm_get_string_parts(&right, &right_text, &right_length))
+        return 0;
+
+    common_length = left_length < right_length ? left_length : right_length;
+    compared = memcmp(left_text, right_text, common_length);
+    if (compared == 0)
+    {
+        if (left_length < right_length)
+            compared = -1;
+        else if (left_length > right_length)
+            compared = 1;
+    }
+
+    *out_cmp = compared;
+    return 1;
+}
+
 static void regvm_clear_value_range(vigil_value_t *values, size_t count)
 {
     size_t i;
@@ -90,32 +120,18 @@ static void regvm_clear_value_range(vigil_value_t *values, size_t count)
         values[i] = VIGIL_NANBOX_NIL;
 }
 
+static void regvm_release_and_clear_value_range(vigil_value_t *values, size_t count)
+{
+    regvm_release_value_range(values, count);
+    regvm_clear_value_range(values, count);
+}
+
 static void regvm_discard_isolated_call_values(vigil_vm_t *vm, size_t orig_base, size_t arg_base, size_t count)
 {
     if (vm == NULL || arg_base == orig_base || count == 0U)
         return;
 
-    regvm_release_value_range(&vm->stack[arg_base], count);
-}
-
-static void regvm_init_inline_frame(vigil_vm_frame_t *frame, const vigil_object_t *callable,
-                                    const vigil_object_t *function, const vigil_chunk_t *chunk, size_t base_slot)
-{
-    if (frame == NULL)
-        return;
-
-    frame->callable = callable;
-    frame->function = function;
-    frame->chunk = chunk;
-    frame->ip = 0U;
-    frame->base_slot = base_slot;
-    frame->defers = NULL;
-    frame->defer_count = 0U;
-    frame->defer_capacity = 0U;
-    frame->pending_returns = NULL;
-    frame->pending_return_count = 0U;
-    frame->pending_return_capacity = 0U;
-    frame->draining_defers = 0;
+    regvm_release_and_clear_value_range(&vm->stack[arg_base], count);
 }
 
 static void regvm_swap_u8(uint8_t *left, uint8_t *right)
@@ -133,24 +149,61 @@ static void regvm_swap_u8(uint8_t *left, uint8_t *right)
 static void regvm_move_call_results(vigil_vm_t *vm, size_t orig_base, size_t arg_base, size_t consumed_count,
                                     size_t temp_count, size_t ret_count)
 {
+    size_t consumed_tail;
+    size_t temp_tail;
+
     if (vm == NULL)
         return;
 
+    consumed_tail = consumed_count > ret_count ? consumed_count - ret_count : 0U;
+    temp_tail = temp_count > ret_count ? temp_count - ret_count : 0U;
+
     if (arg_base == orig_base)
     {
-        for (size_t i = ret_count; i < consumed_count; i++)
-            vigil_value_release(&vm->stack[orig_base + i]);
+        regvm_release_and_clear_value_range(&vm->stack[orig_base + ret_count], consumed_tail);
         vm->stack_count = orig_base + ret_count;
         return;
     }
 
-    regvm_release_value_range(&vm->stack[orig_base], consumed_count);
-    for (size_t i = ret_count; i < temp_count; i++)
-        vigil_value_release(&vm->stack[arg_base + i]);
+    regvm_release_and_clear_value_range(&vm->stack[orig_base], consumed_count);
+    regvm_release_and_clear_value_range(&vm->stack[arg_base + ret_count], temp_tail);
     if (ret_count > 0U)
         memmove(&vm->stack[orig_base], &vm->stack[arg_base], ret_count * sizeof(vigil_value_t));
     regvm_clear_value_range(&vm->stack[arg_base], ret_count);
     vm->stack_count = orig_base + ret_count;
+}
+
+static uint8_t regvm_helper_result_base(uint8_t top_reg, uint8_t pop_count)
+{
+    return (uint8_t)(top_reg + 1U - pop_count);
+}
+
+static void regvm_move_helper_results(vigil_vm_t *vm, size_t base, uint8_t src_base, uint8_t dst_base,
+                                      uint8_t result_count)
+{
+    vigil_value_t moved[8];
+    size_t source_end;
+    size_t i;
+
+    if (vm == NULL || result_count == 0U || src_base == dst_base)
+        return;
+
+    source_end = (size_t)src_base + (size_t)result_count;
+    for (i = 0U; i < (size_t)result_count; i++)
+    {
+        moved[i] = vm->stack[base + (size_t)src_base + i];
+        vm->stack[base + (size_t)src_base + i] = VIGIL_NANBOX_NIL;
+    }
+
+    for (i = 0U; i < (size_t)result_count; i++)
+    {
+        size_t dst = (size_t)dst_base + i;
+
+        if (dst < (size_t)src_base || dst >= source_end)
+            vigil_value_release(&vm->stack[base + dst]);
+
+        vm->stack[base + dst] = moved[i];
+    }
 }
 
 /* ── Virtual stack ─────────────────────────────────────────────── */
@@ -243,6 +296,178 @@ static uint8_t vs_pop(vstack_t *vs)
 static uint8_t vs_peek(const vstack_t *vs, int depth)
 {
     return vs->regs[vs->top - 1 - depth];
+}
+
+static uint8_t vs_result_base(const vstack_t *vs, uint8_t preferred)
+{
+    if (vs != NULL && vs->top < (int)vs->local_count)
+        return (uint8_t)vs->top;
+
+    return preferred;
+}
+
+static uint8_t vs_push_result(vstack_t *vs, uint8_t preferred)
+{
+    return vs_push_at(vs, vs_result_base(vs, preferred));
+}
+
+static int vs_uses_reg(const vstack_t *vs, uint8_t reg)
+{
+    size_t i;
+    size_t top;
+
+    if (vs == NULL || vs->top <= 0)
+        return 0;
+
+    top = (size_t)vs->top;
+    for (i = 0U; i < top; i++)
+    {
+        if (vs->regs[i] == reg)
+            return 1;
+    }
+
+    return 0;
+}
+
+static int regvm_find_scratch_reg(const vstack_t *current, const vstack_t *target)
+{
+    int reg;
+
+    for (reg = 0; reg <= UINT8_MAX; reg++)
+    {
+        uint8_t candidate = (uint8_t)reg;
+
+        if (!vs_uses_reg(current, candidate) && !vs_uses_reg(target, candidate))
+            return reg;
+    }
+
+    return -1;
+}
+
+static vigil_status_t regvm_normalize_stack(vigil_reg_chunk_t *rc, size_t span_idx, vstack_t *current,
+                                            const vstack_t *target, uint8_t *max_next_reg, vigil_error_t *error)
+{
+    uint8_t pending[256];
+    size_t slot_count;
+    size_t pending_count;
+    int scratch_reg;
+    int scratch_used;
+    size_t i;
+
+    if (current == NULL || target == NULL)
+        return VIGIL_STATUS_OK;
+
+    if (current->top != target->top)
+    {
+        vigil_error_set_literal(error, VIGIL_STATUS_INTERNAL, "regvm jump target stack depth mismatch");
+        return VIGIL_STATUS_INTERNAL;
+    }
+
+    slot_count = current->top > 0 ? (size_t)current->top : 0U;
+    memset(pending, 0, sizeof(pending));
+
+    pending_count = 0U;
+    for (i = 0U; i < slot_count; i++)
+    {
+        if (current->regs[i] != target->regs[i])
+        {
+            pending[i] = 1U;
+            pending_count += 1U;
+        }
+    }
+
+    scratch_reg = -1;
+    scratch_used = 0;
+
+    while (pending_count > 0U)
+    {
+        int progress = 0;
+
+        for (i = 0U; i < slot_count; i++)
+        {
+            size_t j;
+            uint8_t src;
+            uint8_t dst;
+            int dst_is_live_source;
+            vigil_status_t status;
+
+            if (pending[i] == 0U)
+                continue;
+
+            src = current->regs[i];
+            dst = target->regs[i];
+            dst_is_live_source = 0;
+            for (j = 0U; j < slot_count; j++)
+            {
+                if (j != i && pending[j] != 0U && current->regs[j] == dst)
+                {
+                    dst_is_live_source = 1;
+                    break;
+                }
+            }
+            if (dst_is_live_source)
+                continue;
+
+            status = emit(rc, vigil_reg_abc(VREG_MOVE, dst, src, 0), span_idx);
+            if (status != VIGIL_STATUS_OK)
+                return status;
+
+            current->regs[i] = dst;
+            pending[i] = 0U;
+            pending_count -= 1U;
+            progress = 1;
+        }
+
+        if (progress)
+            continue;
+
+        if (scratch_reg < 0)
+        {
+            scratch_reg = regvm_find_scratch_reg(current, target);
+            if (scratch_reg < 0)
+            {
+                vigil_error_set_literal(error, VIGIL_STATUS_INTERNAL,
+                                        "regvm could not allocate a scratch register for join normalization");
+                return VIGIL_STATUS_INTERNAL;
+            }
+            if (max_next_reg != NULL && (uint8_t)(scratch_reg + 1) > *max_next_reg)
+                *max_next_reg = (uint8_t)(scratch_reg + 1);
+        }
+
+        for (i = 0U; i < slot_count; i++)
+        {
+            uint8_t saved_src;
+            size_t j;
+            vigil_status_t status;
+
+            if (pending[i] == 0U)
+                continue;
+
+            saved_src = current->regs[i];
+            status = emit(rc, vigil_reg_abc(VREG_MOVE, (uint8_t)scratch_reg, saved_src, 0), span_idx);
+            if (status != VIGIL_STATUS_OK)
+                return status;
+
+            for (j = 0U; j < slot_count; j++)
+            {
+                if (pending[j] != 0U && current->regs[j] == saved_src)
+                    current->regs[j] = (uint8_t)scratch_reg;
+            }
+
+            scratch_used = 1;
+            break;
+        }
+    }
+
+    if (scratch_used)
+    {
+        vigil_status_t status = emit(rc, vigil_reg_abc(VREG_LOAD_NIL, (uint8_t)scratch_reg, 0, 0), span_idx);
+
+        if (status != VIGIL_STATUS_OK)
+            return status;
+    }
+
+    return VIGIL_STATUS_OK;
 }
 
 /* ── Bytecode readers ──────────────────────────────────────────── */
@@ -398,7 +623,6 @@ static size_t stack_op_size(const uint8_t *code, size_t ip, size_t code_size)
     case VIGIL_OPCODE_JUMP:
     case VIGIL_OPCODE_JUMP_IF_FALSE:
     case VIGIL_OPCODE_LOOP:
-    case VIGIL_OPCODE_CALL_VALUE:
     case VIGIL_OPCODE_GET_FIELD:
     case VIGIL_OPCODE_SET_FIELD:
     case VIGIL_OPCODE_FORMAT_F64:
@@ -437,7 +661,6 @@ static size_t stack_op_size(const uint8_t *code, size_t ip, size_t code_size)
     case VIGIL_OPCODE_NEW_INSTANCE:
     case VIGIL_OPCODE_CALL_SELF:
     case VIGIL_OPCODE_TAIL_CALL:
-    case VIGIL_OPCODE_CALL_EXTERN:
     case VIGIL_OPCODE_NEW_CLOSURE:
     case VIGIL_OPCODE_LOCALS_ADD_I64:
     case VIGIL_OPCODE_LOCALS_SUBTRACT_I64:
@@ -460,6 +683,11 @@ static size_t stack_op_size(const uint8_t *code, size_t ip, size_t code_size)
     case VIGIL_OPCODE_DEFER_CALL_VALUE:
         return 5;
 
+    /* 9-byte: opcode + u32 + u32 */
+    case VIGIL_OPCODE_CALL_VALUE:
+    case VIGIL_OPCODE_CALL_EXTERN:
+        return 9;
+
     /* 13-byte: opcode + u32 + u32 + u32 */
     case VIGIL_OPCODE_CALL:
     case VIGIL_OPCODE_DEFER_CALL:
@@ -479,8 +707,11 @@ static size_t stack_op_size(const uint8_t *code, size_t ip, size_t code_size)
     case VIGIL_OPCODE_LOCALS_ADD_F64_STORE:
     case VIGIL_OPCODE_LOCALS_SUBTRACT_F64_STORE:
     case VIGIL_OPCODE_LOCALS_MULTIPLY_F64_STORE:
-    case VIGIL_OPCODE_CALL_INTERFACE:
         return 13;
+
+    /* 17-byte: opcode + u32 + u32 + u32 + u32 */
+    case VIGIL_OPCODE_CALL_INTERFACE:
+        return 17;
 
     /* FORLOOP: opcode + u32 + i8 + u32 + u8 + u32 = 15 bytes */
     case VIGIL_OPCODE_FORLOOP_I32:
@@ -559,6 +790,19 @@ static size_t *collect_jump_targets(const uint8_t *code, size_t code_size, size_
     }
     *out_count = count;
     return targets;
+}
+
+static int jump_target_contains(const size_t *targets, size_t target_count, size_t target)
+{
+    size_t i;
+
+    for (i = 0U; i < target_count; i++)
+    {
+        if (targets[i] == target)
+            return 1;
+    }
+
+    return 0;
 }
 
 /* ── Offset map: stack bytecode offset → register instruction index ── */
@@ -745,39 +989,6 @@ static uint8_t map_binop(uint8_t stack_op)
         return VREG_SHR;
     default:
         return VREG_ADD; /* fallback */
-    }
-}
-
-static uint8_t map_cmp_jmp(uint8_t stack_op)
-{
-    switch (stack_op)
-    {
-    case VIGIL_OPCODE_LESS_I32_JUMP_IF_FALSE:
-        return VREG_LT_I32_JMP;
-    case VIGIL_OPCODE_LESS_EQUAL_I32_JUMP_IF_FALSE:
-        return VREG_LE_I32_JMP;
-    case VIGIL_OPCODE_GREATER_I32_JUMP_IF_FALSE:
-        return VREG_GT_I32_JMP;
-    case VIGIL_OPCODE_GREATER_EQUAL_I32_JUMP_IF_FALSE:
-        return VREG_GE_I32_JMP;
-    case VIGIL_OPCODE_EQUAL_I32_JUMP_IF_FALSE:
-        return VREG_EQ_I32_JMP;
-    case VIGIL_OPCODE_NOT_EQUAL_I32_JUMP_IF_FALSE:
-        return VREG_NE_I32_JMP;
-    case VIGIL_OPCODE_LESS_I64_JUMP_IF_FALSE:
-        return VREG_LT_I64_JMP;
-    case VIGIL_OPCODE_LESS_EQUAL_I64_JUMP_IF_FALSE:
-        return VREG_LE_I64_JMP;
-    case VIGIL_OPCODE_GREATER_I64_JUMP_IF_FALSE:
-        return VREG_GT_I64_JMP;
-    case VIGIL_OPCODE_GREATER_EQUAL_I64_JUMP_IF_FALSE:
-        return VREG_GE_I64_JMP;
-    case VIGIL_OPCODE_EQUAL_I64_JUMP_IF_FALSE:
-        return VREG_EQ_I64_JMP;
-    case VIGIL_OPCODE_NOT_EQUAL_I64_JUMP_IF_FALSE:
-        return VREG_NE_I64_JMP;
-    default:
-        return VREG_LT_I32_JMP;
     }
 }
 
@@ -1181,6 +1392,47 @@ int vigil_reg_chunk_is_translatable(const vigil_chunk_t *stack_chunk)
     } while (0)
 #endif
 
+/* Pack top n virtual stack values into consecutive registers starting at
+   the current first register. This preserves the aggregate result base. */
+#if defined(_MSC_VER)
+#define PACK_TOP_FROM_FIRST(n) \
+    do { \
+        __pragma(warning(push)) \
+        __pragma(warning(disable:4127)) \
+        if ((n) > 1) { \
+            uint8_t _base = vs.regs[vs.top - (int)(n)]; \
+            for (uint32_t _pi = 1; _pi < (uint32_t)(n); _pi++) { \
+                uint8_t _exp = (uint8_t)(_base + (uint8_t)_pi); \
+                int _slot = vs.top - (int)(n) + (int)_pi; \
+                uint8_t _act = vs.regs[_slot]; \
+                if (_act != _exp) { \
+                    TR_EMIT(vigil_reg_abc(VREG_MOVE, _exp, _act, 0)); \
+                    vs.regs[_slot] = _exp; \
+                    if (_exp >= vs.next_reg) vs.next_reg = _exp + 1; \
+                } \
+            } \
+        } \
+        __pragma(warning(pop)) \
+    } while (0)
+#else
+#define PACK_TOP_FROM_FIRST(n) \
+    do { \
+        if ((n) > 1) { \
+            uint8_t _base = vs.regs[vs.top - (int)(n)]; \
+            for (uint32_t _pi = 1; _pi < (uint32_t)(n); _pi++) { \
+                uint8_t _exp = (uint8_t)(_base + (uint8_t)_pi); \
+                int _slot = vs.top - (int)(n) + (int)_pi; \
+                uint8_t _act = vs.regs[_slot]; \
+                if (_act != _exp) { \
+                    TR_EMIT(vigil_reg_abc(VREG_MOVE, _exp, _act, 0)); \
+                    vs.regs[_slot] = _exp; \
+                    if (_exp >= vs.next_reg) vs.next_reg = _exp + 1; \
+                } \
+            } \
+        } \
+    } while (0)
+#endif
+
 /* Count locals by scanning for the highest GET_LOCAL/SET_LOCAL operand. */
 // NOLINTNEXTLINE(readability-function-cognitive-complexity)
 static uint8_t count_locals(const uint8_t *code, size_t code_size)
@@ -1259,10 +1511,10 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
                                    vigil_error_t *error)
 {
     (void)runtime;
-    (void)error;
 
     const uint8_t *code = stack_chunk->code.data;
     size_t code_size = stack_chunk->code.length;
+    vigil_status_t tr_status = VIGIL_STATUS_OK;
 
     uint8_t saved_arity = rc->arity;
     vigil_reg_chunk_init(rc);
@@ -1273,6 +1525,7 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
     vstack_t vs;
     /* Use the arity from the function object (set by the caller). */
     uint8_t arity = rc->arity;
+    uint8_t max_next_reg;
     vs_init(&vs, lc);
     /* Pre-initialize param slots: params are at R[0..arity-1]. */
     if (arity > 0)
@@ -1282,24 +1535,7 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
         for (uint8_t i = 0; i < arity; i++)
             vs.regs[i] = i;
     }
-
-    /* Disable bump allocation for functions without CALL_SELF.
-       These don't have register reuse issues and need identity
-       mapping for push-to-position locals. */
-    if (lc > 0)
-    {
-        int has_call_self = 0;
-        size_t si = 0;
-        while (si < code_size)
-        {
-            if (code[si] == VIGIL_OPCODE_CALL_SELF)
-            { has_call_self = 1; break; }
-            si += stack_op_size(code, si, code_size);
-        }
-        if (!has_call_self)
-            vs.local_count = 255; /* identity mapping always */
-    }
-
+    max_next_reg = vs.next_reg;
 
     /* Collect jump targets for stack-state reset at join points. */
     size_t jt_count = 0;
@@ -1314,51 +1550,70 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
        Populated when jumps are emitted; consulted at each instruction
        to restore the correct depth at jump targets. -1 = no entry. */
     int *depth_at = calloc(code_size + 1, sizeof(int));
-    int *reg_at = calloc(code_size + 1, sizeof(int));
-    if (!depth_at || !reg_at)
+    size_t *origin_at = calloc(code_size + 1, sizeof(size_t));
+    vstack_t *state_at = calloc(code_size + 1, sizeof(vstack_t));
+    if (!depth_at || !origin_at || !state_at)
     {
         free(depth_at);
-        free(reg_at);
+        free(origin_at);
+        free(state_at);
         free(jt);
         return VIGIL_STATUS_OUT_OF_MEMORY;
     }
     for (size_t di = 0; di <= code_size; di++)
     {
         depth_at[di] = -1;
-        reg_at[di] = -1;
+        origin_at[di] = (size_t)-1;
     }
 
 #define RECORD_DEPTH(off, d)                                                                                           \
     do                                                                                                                 \
     {                                                                                                                  \
-        if ((off) <= code_size && (depth_at[(off)] == -1 || (d) > depth_at[(off)]))                                    \
+        if ((off) <= code_size && depth_at[(off)] == -1)                                                               \
+        {                                                                                                              \
             depth_at[(off)] = (d);                                                                                     \
-        if ((off) <= code_size && reg_at[(off)] == -1 && vs.top > 0)                                                   \
-            reg_at[(off)] = vs.regs[vs.top - 1];                                                                       \
+            origin_at[(off)] = start_ip;                                                                               \
+            state_at[(off)] = vs;                                                                                      \
+        }                                                                                                              \
     } while (0)
 
     size_t ip = 0;
+    int reachable = 1;
+#define NORMALIZE_TO_TARGET(target_off)                                                                               \
+    do                                                                                                                \
+    {                                                                                                                 \
+        if (depth_at[(target_off)] >= 0)                                                                              \
+        {                                                                                                             \
+            vstack_t target_state = state_at[(target_off)];                                                           \
+            vigil_status_t normalize_status =                                                                         \
+                regvm_normalize_stack(rc, start_ip, &vs, &target_state, &max_next_reg, error);                       \
+                                                                                                                      \
+            if (normalize_status != VIGIL_STATUS_OK)                                                                  \
+            {                                                                                                         \
+                tr_status = normalize_status;                                                                         \
+                goto tr_status_fail;                                                                                  \
+            }                                                                                                         \
+            vs = target_state;                                                                                        \
+        }                                                                                                             \
+    } while (0)
     while (ip < code_size)
     {
         size_t start_ip = ip;
         uint8_t op = code[ip];
-
-
         /* Restore stack depth at jump targets. */
         if (depth_at[start_ip] >= 0)
         {
-            vs.top = depth_at[start_ip];
-            /* At a join point after short-circuit (&&/||), emit a MOV
-               to normalize the register BEFORE the omap entry. Jumps
-               targeting this offset land AFTER the MOV (via omap), so
-               the short-circuit path skips it. The fall-through path
-               executes it. */
-            if (reg_at[start_ip] >= 0 && vs.top > 0 && vs.regs[vs.top - 1] != (uint8_t)reg_at[start_ip])
+            if (reachable)
             {
-                uint8_t expected = (uint8_t)reg_at[start_ip];
-                TR_EMIT(vigil_reg_abc(VREG_MOVE, expected, vs.regs[vs.top - 1], 0));
-                vs.regs[vs.top - 1] = expected;
+                NORMALIZE_TO_TARGET(start_ip);
             }
+            vs = state_at[start_ip];
+            reachable = 1;
+        }
+        else if (!reachable)
+        {
+            ip += stack_op_size(code, ip, code_size);
+            continue;
         }
 
         /* Record offset mapping (after any normalization MOV). */
@@ -1508,7 +1763,7 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
         case VIGIL_OPCODE_TO_F64:
         case VIGIL_OPCODE_TO_STRING: {
             uint8_t src = vs_pop(&vs);
-            uint8_t dst = vs_push_at(&vs, src);
+            uint8_t dst = vs_push_result(&vs, src);
             TR_EMIT(vigil_reg_abc(map_conv(op), dst, src, 0));
             ip += 1;
             break;
@@ -1623,37 +1878,32 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
         case VIGIL_OPCODE_JUMP: {
             uint32_t off = rd_u32(code, &ip);
             size_t target = ip + (size_t)off;
+            NORMALIZE_TO_TARGET(target);
             /* Emit placeholder — will be patched. */
             jpatch_add(&patches, rc->code_count, target, 0, vs.top);
             RECORD_DEPTH(target, vs.top);
             TR_EMIT(vigil_reg_asbx(VREG_JMP, 0, 0));
+            reachable = depth_at[ip] < 0 && jump_target_contains(jt, jt_count, ip);
             break;
         }
         case VIGIL_OPCODE_LOOP: {
             uint32_t off = rd_u32(code, &ip);
             size_t target = ip - (size_t)off;
+            NORMALIZE_TO_TARGET(target);
             jpatch_add(&patches, rc->code_count, target, 1, vs.top);
             RECORD_DEPTH(target, vs.top);
             TR_EMIT(vigil_reg_asbx(VREG_JMP, 0, 0));
+            reachable = 0;
             break;
         }
         case VIGIL_OPCODE_JUMP_IF_FALSE: {
             uint32_t off = rd_u32(code, &ip);
             size_t target = ip + (size_t)off;
-            uint8_t cond = vs_peek(&vs, 0);
-            /* If a previous && already recorded a register at the target,
-               and our cond differs, emit a MOV so the short-circuit path
-               leaves the value at the expected register. */
-            if (reg_at[target] >= 0 && cond != (uint8_t)reg_at[target])
-                TR_EMIT(vigil_reg_abc(VREG_MOVE, (uint8_t)reg_at[target], cond, 0));
-            uint8_t test_reg = (reg_at[target] >= 0) ? (uint8_t)reg_at[target] : cond;
-            TR_EMIT(vigil_reg_abc(VREG_TEST, test_reg, 0, 0));
+            NORMALIZE_TO_TARGET(target);
+            TR_EMIT(vigil_reg_abc(VREG_TEST, vs_peek(&vs, 0), 0, 0));
             jpatch_add(&patches, rc->code_count, target, 0, vs.top);
             RECORD_DEPTH(target, vs.top);
             TR_EMIT(vigil_reg_asbx(VREG_JMP, 0, 0));
-            /* Mark the fall-through (POP) so it reuses the peeked register. */
-            if (ip <= code_size && reg_at[ip] == -1)
-                reg_at[ip] = cond;
             break;
         }
 
@@ -1674,56 +1924,48 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
             uint8_t rb = vs_pop(&vs);
             uint8_t ra = vs_pop(&vs);
             size_t target = ip + (size_t)off;
-            /* Detect && chain: trailing POP followed by another comparison
-               (GET_LOCAL or CONSTANT starts the next operand). */
-            int in_chain = 0;
-            if (ip < code_size && code[ip] == VIGIL_OPCODE_POP && ip + 1 < code_size)
+            uint8_t res = vs_push(&vs);
+            uint8_t cmp_op = VREG_EQ;
+            int reverse_operands = 0;
+
+            switch (op)
             {
-                uint8_t next = code[ip + 1];
-                in_chain = (next == VIGIL_OPCODE_GET_LOCAL || next == VIGIL_OPCODE_CONSTANT ||
-                            next == VIGIL_OPCODE_TRUE || next == VIGIL_OPCODE_FALSE ||
-                            next == VIGIL_OPCODE_NIL || next == VIGIL_OPCODE_GET_GLOBAL);
+            case VIGIL_OPCODE_LESS_I32_JUMP_IF_FALSE:
+            case VIGIL_OPCODE_LESS_I64_JUMP_IF_FALSE:
+                cmp_op = VREG_LT;
+                break;
+            case VIGIL_OPCODE_LESS_EQUAL_I32_JUMP_IF_FALSE:
+            case VIGIL_OPCODE_LESS_EQUAL_I64_JUMP_IF_FALSE:
+                cmp_op = VREG_LE;
+                break;
+            case VIGIL_OPCODE_GREATER_I32_JUMP_IF_FALSE:
+            case VIGIL_OPCODE_GREATER_I64_JUMP_IF_FALSE:
+                cmp_op = VREG_LT;
+                reverse_operands = 1;
+                break;
+            case VIGIL_OPCODE_GREATER_EQUAL_I32_JUMP_IF_FALSE:
+            case VIGIL_OPCODE_GREATER_EQUAL_I64_JUMP_IF_FALSE:
+                cmp_op = VREG_LE;
+                reverse_operands = 1;
+                break;
+            default:
+                cmp_op = VREG_EQ;
+                break;
             }
-            /* Also detect last condition in chain: target already has depth recorded. */
-            if (!in_chain && depth_at[target] >= 0)
-                in_chain = 1;
-            if (in_chain)
-            {
-                uint8_t res = vs_push(&vs);
-                uint8_t cmp_op = VREG_EQ;
-                int reverse_operands = 0;
-                switch (op) {
-                case VIGIL_OPCODE_LESS_I32_JUMP_IF_FALSE:
-                case VIGIL_OPCODE_LESS_I64_JUMP_IF_FALSE: cmp_op = VREG_LT; break;
-                case VIGIL_OPCODE_LESS_EQUAL_I32_JUMP_IF_FALSE:
-                case VIGIL_OPCODE_LESS_EQUAL_I64_JUMP_IF_FALSE: cmp_op = VREG_LE; break;
-                case VIGIL_OPCODE_GREATER_I32_JUMP_IF_FALSE:
-                case VIGIL_OPCODE_GREATER_I64_JUMP_IF_FALSE: cmp_op = VREG_LT; reverse_operands = 1; break;
-                case VIGIL_OPCODE_GREATER_EQUAL_I32_JUMP_IF_FALSE:
-                case VIGIL_OPCODE_GREATER_EQUAL_I64_JUMP_IF_FALSE: cmp_op = VREG_LE; reverse_operands = 1; break;
-                default: cmp_op = VREG_EQ; break;
-                }
-                if (reverse_operands)
-                    regvm_swap_u8(&ra, &rb);
-                TR_EMIT(vigil_reg_abc(cmp_op, res, ra, rb));
-                if (op == VIGIL_OPCODE_NOT_EQUAL_I32_JUMP_IF_FALSE || op == VIGIL_OPCODE_NOT_EQUAL_I64_JUMP_IF_FALSE)
-                    TR_EMIT(vigil_reg_abc(VREG_NOT, res, res, 0));
-                TR_EMIT(vigil_reg_abc(VREG_TEST, res, 0, 0));
-                jpatch_add(&patches, rc->code_count, target, 0, vs.top);
-                RECORD_DEPTH(target, vs.top);
-                TR_EMIT(vigil_reg_asbx(VREG_JMP, 0, 0));
-            }
-            else
-            {
-                if (target < code_size && code[target] == VIGIL_OPCODE_POP)
-                    target += 1;
-                TR_EMIT(vigil_reg_abc(map_cmp_jmp(op), ra, rb, 0));
-                jpatch_add(&patches, rc->code_count, target, 0, vs.top);
-                RECORD_DEPTH(target, vs.top);
-                TR_EMIT(vigil_reg_asbx(VREG_JMP, 0, 0));
-                if (ip < code_size && code[ip] == VIGIL_OPCODE_POP)
-                    ip += 1;
-            }
+
+            if (reverse_operands)
+                regvm_swap_u8(&ra, &rb);
+
+            TR_EMIT(vigil_reg_abc(cmp_op, res, ra, rb));
+            if (op == VIGIL_OPCODE_NOT_EQUAL_I32_JUMP_IF_FALSE || op == VIGIL_OPCODE_NOT_EQUAL_I64_JUMP_IF_FALSE)
+                TR_EMIT(vigil_reg_abc(VREG_NOT, res, res, 0));
+
+            NORMALIZE_TO_TARGET(target);
+
+            TR_EMIT(vigil_reg_abc(VREG_TEST, vs_peek(&vs, 0), 0, 0));
+            jpatch_add(&patches, rc->code_count, target, 0, vs.top);
+            RECORD_DEPTH(target, vs.top);
+            TR_EMIT(vigil_reg_asbx(VREG_JMP, 0, 0));
             break;
         }
 
@@ -1739,6 +1981,7 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
             uint32_t back = rd_raw_u32(code, &ip);
             size_t target = ip - (size_t)back;
             uint8_t rop = (op == VIGIL_OPCODE_FORLOOP_I32) ? VREG_FORLOOP_I32 : VREG_FORLOOP_I64;
+            NORMALIZE_TO_TARGET(target);
             /* Encode: A=local, B=delta, C=cmp. Next word: constant index.
                Third word: jump offset (patched). */
             TR_EMIT(vigil_reg_abc(rop, (uint8_t)idx, (uint8_t)delta, cmp));
@@ -1755,17 +1998,16 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
 
 #define PACK_CALL_ARGS(n) \
     do { \
-        if ((n) > 1) { \
-            uint8_t _first = vs.regs[vs.top - (int)(n)]; \
-            for (uint32_t _ai = 1; _ai < (uint32_t)(n); _ai++) { \
-                uint8_t _exp = _first + (uint8_t)_ai; \
+        if ((n) > 0) { \
+            uint8_t _base = vs.next_reg; \
+            for (uint32_t _ai = 0; _ai < (uint32_t)(n); _ai++) { \
+                uint8_t _exp = (uint8_t)(_base + (uint8_t)_ai); \
                 uint8_t _act = vs.regs[vs.top - (int)(n) + (int)_ai]; \
-                if (_act != _exp) { \
+                if (_act != _exp) \
                     TR_EMIT(vigil_reg_abc(VREG_MOVE, _exp, _act, 0)); \
-                    vs.regs[vs.top - (int)(n) + (int)_ai] = _exp; \
-                    if (_exp >= vs.next_reg) vs.next_reg = _exp + 1; \
-                } \
+                vs.regs[vs.top - (int)(n) + (int)_ai] = _exp; \
             } \
+            vs.next_reg = (uint8_t)(_base + (uint8_t)(n)); \
         } \
     } while (0)
 
@@ -1782,6 +2024,14 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
                 vs_push_at(&vs, _br); \
             } \
         } \
+    } while (0)
+
+#define PUSH_RESULT_REGS(preferred, count, out_base) \
+    do { \
+        uint8_t _result_base = vs_result_base(&vs, (preferred)); \
+        for (uint32_t _ri = 0; _ri < (uint32_t)(count); _ri++) \
+            vs_push_at(&vs, (uint8_t)(_result_base + (uint8_t)_ri)); \
+        (out_base) = _result_base; \
     } while (0)
 
         /* ── Calls ─────────────────────────────────────────────── */
@@ -1827,8 +2077,13 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
             uint8_t tc_base = (arg_count > 0) ? vs.regs[vs.top - (int)arg_count] : (uint8_t)vs.top;
             for (uint32_t i = 0; i < arg_count; i++)
                 vs_pop(&vs);
-            { uint8_t ret = vs_push_at(&vs, tc_base);
-              TR_EMIT(vigil_reg_abc(VREG_TAIL_CALL, ret, (uint8_t)func_idx, (uint8_t)arg_count)); }
+            {
+                uint8_t ret = vs_push_at(&vs, tc_base);
+
+                TR_EMIT(vigil_reg_abc(VREG_TAIL_CALL, ret, (uint8_t)func_idx, (uint8_t)arg_count));
+            }
+            /* TAIL_CALL does not fall through. Any following jump/cleanup bytecode is dead. */
+            reachable = 0;
             break;
         }
         case VIGIL_OPCODE_CALL_NATIVE: {
@@ -1837,7 +2092,8 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
             uint32_t ret_count = rd_raw_u32(code, &ip);
             PACK_CALL_ARGS(arg_count);
             uint8_t arg_base_r = (arg_count > 0) ? vs.regs[vs.top - (int)arg_count] : (uint8_t)vs.top;
-            TR_EMIT(vigil_reg_abc(VREG_CALL_NATIVE, arg_base_r, (uint8_t)ci, (uint8_t)arg_count));
+            TR_EMIT(vigil_reg_abc(VREG_CALL_NATIVE, arg_base_r, 0, (uint8_t)arg_count));
+            TR_EMIT(ci);
             for (uint32_t i = 0; i < arg_count; i++)
                 vs_pop(&vs);
             CALL_RET_PUSH(arg_base_r, ret_count);
@@ -1845,36 +2101,60 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
         }
         case VIGIL_OPCODE_CALL_VALUE: {
             uint32_t arg_count = rd_u32(code, &ip);
+            uint32_t ret_count = rd_raw_u32(code, &ip);
             PACK_CALL_ARGS(arg_count + 1);
             uint8_t callable_r = vs.regs[vs.top - (int)arg_count - 1];
+            int result_top = vs.top - (int)arg_count - 1;
+            uint8_t ret = callable_r;
             for (uint32_t i = 0; i < arg_count + 1; i++)
                 vs_pop(&vs);
-            { uint8_t ret = vs_push_at(&vs, callable_r);
-              TR_EMIT(vigil_reg_abx(VREG_CALL_VALUE, ret, (uint16_t)arg_count)); }
+            if (ret_count > 0)
+            {
+                CALL_RET_PUSH(callable_r, ret_count);
+                ret = vs.regs[result_top];
+            }
+            TR_EMIT(vigil_reg_abx(VREG_CALL_VALUE, ret, (uint16_t)arg_count));
+            TR_EMIT((uint32_t)callable_r);
             break;
         }
         case VIGIL_OPCODE_CALL_INTERFACE: {
             uint32_t iface_idx = rd_u32(code, &ip);
             uint32_t method_idx = rd_raw_u32(code, &ip);
             uint32_t arg_count = rd_raw_u32(code, &ip);
+            uint32_t ret_count = rd_raw_u32(code, &ip);
             PACK_CALL_ARGS(arg_count + 1);
             uint8_t receiver_r = vs.regs[vs.top - (int)arg_count - 1];
+            int result_top = vs.top - (int)arg_count - 1;
+            uint8_t ret = receiver_r;
             for (uint32_t i = 0; i < arg_count + 1; i++)
                 vs_pop(&vs);
-            { uint8_t ret = vs_push_at(&vs, receiver_r);
-              TR_EMIT(vigil_reg_abc(VREG_CALL_INTERFACE, ret, (uint8_t)iface_idx, (uint8_t)arg_count)); }
+            if (ret_count > 0)
+            {
+                CALL_RET_PUSH(receiver_r, ret_count);
+                ret = vs.regs[result_top];
+            }
+            TR_EMIT(vigil_reg_abc(VREG_CALL_INTERFACE, ret, (uint8_t)iface_idx, (uint8_t)arg_count));
             TR_EMIT((uint32_t)method_idx);
+            TR_EMIT((uint32_t)receiver_r);
             break;
         }
         case VIGIL_OPCODE_CALL_EXTERN: {
             uint32_t ci = rd_u32(code, &ip);
             uint32_t arg_count = rd_raw_u32(code, &ip);
+            uint32_t ret_count = rd_raw_u32(code, &ip);
             PACK_CALL_ARGS(arg_count);
             uint8_t ext_base = (arg_count > 0) ? vs.regs[vs.top - (int)arg_count] : (uint8_t)vs.top;
+            int result_top = vs.top - (int)arg_count;
+            uint8_t ret = ext_base;
             for (uint32_t i = 0; i < arg_count; i++)
                 vs_pop(&vs);
-            { uint8_t ret = vs_push_at(&vs, ext_base);
-              TR_EMIT(vigil_reg_abc(VREG_CALL_EXTERN, ret, (uint8_t)ci, (uint8_t)arg_count)); }
+            if (ret_count > 0)
+            {
+                CALL_RET_PUSH(ext_base, ret_count);
+                ret = vs.regs[result_top];
+            }
+            TR_EMIT(vigil_reg_abc(VREG_CALL_EXTERN, ret, (uint8_t)ci, (uint8_t)arg_count));
+            TR_EMIT((uint32_t)ext_base);
             break;
         }
 
@@ -1892,6 +2172,7 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
             }
             if (ret_count > (uint32_t)vs.top)
                 ret_count = (uint32_t)(vs.top > 0 ? vs.top : 0);
+            PACK_TOP_FROM_FIRST(ret_count);
             uint8_t base_r = 0;
             if (ret_count > 0 && vs.top > 0)
                 base_r = vs.regs[vs.top - (int)ret_count];
@@ -1909,6 +2190,7 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
             TR_EMIT(vigil_reg_abc(VREG_RETURN, base_r, (uint8_t)ret_count, 0));
             /* Don't reset vs.top — the jump target restoration at the
                next reachable instruction will set the correct depth. */
+            reachable = 0;
             break;
         }
 
@@ -1967,6 +2249,7 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
         case VIGIL_OPCODE_NEW_INSTANCE: {
             uint32_t ci = rd_u32(code, &ip);
             uint32_t field_count = rd_raw_u32(code, &ip);
+            PACK_TOP_FROM_FIRST(field_count);
             uint8_t fields_base = (field_count > 0) ? vs.regs[vs.top - (int)field_count] : 0;
             for (uint32_t i = 0; i < field_count; i++)
                 vs_pop(&vs);
@@ -1978,7 +2261,7 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
         case VIGIL_OPCODE_GET_FIELD: {
             uint32_t fi = rd_u32(code, &ip);
             uint8_t obj = vs_pop(&vs);
-            uint8_t r = vs_push_at(&vs, obj);
+            uint8_t r = vs_push_result(&vs, obj);
             TR_EMIT(vigil_reg_abc(VREG_GET_FIELD, r, obj, (uint8_t)fi));
             break;
         }
@@ -1994,6 +2277,7 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
             uint32_t type_idx = rd_u32(code, &ip);
             uint32_t count = rd_raw_u32(code, &ip);
             (void)type_idx;
+            PACK_TOP_FROM_FIRST(count);
             uint8_t first = (count > 0) ? vs.regs[vs.top - (int)count] : 0;
             for (uint32_t i = 0; i < count; i++)
                 vs_pop(&vs);
@@ -2005,6 +2289,7 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
             uint32_t type_idx = rd_u32(code, &ip);
             uint32_t count = rd_raw_u32(code, &ip);
             (void)type_idx;
+            PACK_TOP_FROM_FIRST(count * 2U);
             uint8_t first = (count > 0) ? vs.regs[vs.top - (int)(count * 2)] : 0;
             for (uint32_t i = 0; i < count * 2; i++)
                 vs_pop(&vs);
@@ -2016,7 +2301,7 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
             SYNC_PACK(2); uint8_t idx =
             vs_pop(&vs);
             uint8_t obj = vs_pop(&vs);
-            uint8_t r = vs_push_at(&vs, obj);
+            uint8_t r = vs_push_result(&vs, obj);
             TR_EMIT(vigil_reg_abc(VREG_GET_INDEX, r, obj, idx));
             ip += 1;
             break;
@@ -2032,14 +2317,14 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
         }
         case VIGIL_OPCODE_GET_COLLECTION_SIZE: {
             uint8_t obj = vs_pop(&vs);
-            uint8_t r = vs_push_at(&vs, obj);
+            uint8_t r = vs_push_result(&vs, obj);
             TR_EMIT(vigil_reg_abc(VREG_COLLECTION_SIZE, r, obj, 0));
             ip += 1;
             break;
         }
         case VIGIL_OPCODE_GET_STRING_SIZE: {
             uint8_t obj = vs_pop(&vs);
-            uint8_t r = vs_push_at(&vs, obj);
+            uint8_t r = vs_push_result(&vs, obj);
             TR_EMIT(vigil_reg_abc(VREG_COLLECTION_SIZE, r, obj, 1));
             ip += 1;
             break;
@@ -2093,32 +2378,32 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
         /* ── Parse intrinsics ──────────────────────────────────── */
         case VIGIL_OPCODE_PARSE_I32: {
             uint8_t str = vs_pop(&vs);
-            uint8_t r1 = vs_push_at(&vs, str);
-            uint8_t r2 = vs_push_at(&vs, (uint8_t)(str + 1));
-            TR_EMIT(vigil_reg_abc(VREG_PARSE_I32, r1, str, r2));
+            uint8_t result_base;
+            PUSH_RESULT_REGS(str, 2, result_base);
+            TR_EMIT(vigil_reg_abc(VREG_PARSE_I32, result_base, str, (uint8_t)(result_base + 1U)));
             ip += 1;
             break;
         }
         case VIGIL_OPCODE_PARSE_F64: {
             uint8_t str = vs_pop(&vs);
-            uint8_t r1 = vs_push_at(&vs, str);
-            uint8_t r2 = vs_push_at(&vs, (uint8_t)(str + 1));
-            TR_EMIT(vigil_reg_abc(VREG_PARSE_F64, r1, str, r2));
+            uint8_t result_base;
+            PUSH_RESULT_REGS(str, 2, result_base);
+            TR_EMIT(vigil_reg_abc(VREG_PARSE_F64, result_base, str, (uint8_t)(result_base + 1U)));
             ip += 1;
             break;
         }
         case VIGIL_OPCODE_PARSE_BOOL: {
             uint8_t str = vs_pop(&vs);
-            uint8_t r1 = vs_push_at(&vs, str);
-            uint8_t r2 = vs_push_at(&vs, (uint8_t)(str + 1));
-            TR_EMIT(vigil_reg_abc(VREG_PARSE_BOOL, r1, str, r2));
+            uint8_t result_base;
+            PUSH_RESULT_REGS(str, 2, result_base);
+            TR_EMIT(vigil_reg_abc(VREG_PARSE_BOOL, result_base, str, (uint8_t)(result_base + 1U)));
             ip += 1;
             break;
         }
 
         case VIGIL_OPCODE_CHAR_FROM_INT: {
             uint8_t val = vs_pop(&vs);
-            uint8_t r = vs_push_at(&vs, val);
+            uint8_t r = vs_push_result(&vs, val);
             TR_EMIT(vigil_reg_abc(VREG_CHAR_FROM_INT, r, val, 0));
             ip += 1;
             break;
@@ -2126,7 +2411,7 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
         case VIGIL_OPCODE_STRING_TO_C: {
             /* Pops string, pushes i32 codepoint. */
             uint8_t val = vs_pop(&vs);
-            uint8_t r = vs_push_at(&vs, val);
+            uint8_t r = vs_push_result(&vs, val);
             TR_EMIT(vigil_reg_abc(VREG_CHAR_FROM_INT, r, val, 1)); /* reuse with flag */
             ip += 1;
             break;
@@ -2141,8 +2426,7 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
             SYNC_PACK(2); uint8_t arg =
             vs_pop(&vs);
             uint8_t str = vs_pop(&vs);
-            (void)str;
-            uint8_t r = vs_push_at(&vs, str);
+            uint8_t r = vs_push_result(&vs, str);
             TR_EMIT(vigil_reg_abc(VREG_STRING_OP, r, arg, op));
             ip += 1;
             break;
@@ -2153,11 +2437,9 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
             SYNC_PACK(2); uint8_t arg =
             vs_pop(&vs);
             uint8_t str = vs_pop(&vs);
-            (void)str;
-            uint8_t r1 = vs_push_at(&vs, str);
-            uint8_t r2 = vs_push_at(&vs, (uint8_t)(str + 1));
-            (void)r1; (void)r2;
-            TR_EMIT(vigil_reg_abc(VREG_STRING_OP, str, arg, op));
+            uint8_t result_base;
+            PUSH_RESULT_REGS(str, 2, result_base);
+            TR_EMIT(vigil_reg_abc(VREG_STRING_OP, result_base, arg, op));
             ip += 1;
             break;
         }
@@ -2167,8 +2449,7 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
             uint8_t arg1 = vs_pop(&vs);
             (void)arg1;
             uint8_t str = vs_pop(&vs);
-            (void)str;
-            uint8_t r = vs_push_at(&vs, str);
+            uint8_t r = vs_push_result(&vs, str);
             TR_EMIT(vigil_reg_abc(VREG_STRING_OP, r, arg2, op));
             ip += 1;
             break;
@@ -2185,7 +2466,7 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
         case VIGIL_OPCODE_STRING_FIELDS: {
             /* One-arg string ops: pop 1, push 1. */
             uint8_t str = vs_pop(&vs);
-            uint8_t r = vs_push_at(&vs, str);
+            uint8_t r = vs_push_result(&vs, str);
             TR_EMIT(vigil_reg_abc(VREG_STRING_OP, r, str, op));
             ip += 1;
             break;
@@ -2193,10 +2474,10 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
         case VIGIL_OPCODE_STRING_SPLIT:
         case VIGIL_OPCODE_STRING_TRIM_PREFIX:
         case VIGIL_OPCODE_STRING_TRIM_SUFFIX: {
-            uint8_t arg = vs_pop(&vs);
+            SYNC_PACK(2); uint8_t arg =
+            vs_pop(&vs);
             uint8_t str = vs_pop(&vs);
-            (void)str;
-            uint8_t r = vs_push_at(&vs, str);
+            uint8_t r = vs_push_result(&vs, str);
             TR_EMIT(vigil_reg_abc(VREG_STRING_OP, r, arg, op));
             ip += 1;
             break;
@@ -2208,23 +2489,20 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
             uint8_t start_r = vs_pop(&vs);
             uint8_t str = vs_pop(&vs);
             (void)start_r; (void)end_r;
-            uint8_t r1 = vs_push_at(&vs, str);
-            uint8_t r2 = vs_push_at(&vs, (uint8_t)(str + 1));
-            (void)r1; (void)r2;
-            TR_EMIT(vigil_reg_abc(VREG_STRING_OP, str, end_r, op));
+            uint8_t result_base;
+            PUSH_RESULT_REGS(str, 2, result_base);
+            TR_EMIT(vigil_reg_abc(VREG_STRING_OP, result_base, end_r, op));
             ip += 1;
             break;
         }
         case VIGIL_OPCODE_STRING_CUT: {
-            /* Pop 2 (str, sep), push 2 (before, after). */
+            /* Pop 2 (str, sep), push 3 (before, after, found). */
             SYNC_PACK(2); uint8_t arg =
             vs_pop(&vs);
             uint8_t str = vs_pop(&vs);
-            (void)str;
-            uint8_t r1 = vs_push_at(&vs, str);
-            uint8_t r2 = vs_push_at(&vs, (uint8_t)(str + 1));
-            (void)r1; (void)r2;
-            TR_EMIT(vigil_reg_abc(VREG_STRING_OP, str, arg, op));
+            uint8_t result_base;
+            PUSH_RESULT_REGS(str, 3, result_base);
+            TR_EMIT(vigil_reg_abc(VREG_STRING_OP, result_base, arg, op));
             ip += 1;
             break;
         }
@@ -2233,8 +2511,7 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
         case VIGIL_OPCODE_STRING_JOIN: {
             SYNC_PACK(2); uint8_t arg = vs_pop(&vs);
             uint8_t str = vs_pop(&vs);
-            (void)str;
-            uint8_t r = vs_push_at(&vs, str);
+            uint8_t r = vs_push_result(&vs, str);
             TR_EMIT(vigil_reg_abc(VREG_STRING_OP, r, arg, op));
             ip += 1;
             break;
@@ -2244,11 +2521,9 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
             SYNC_PACK(2); uint8_t arg =
             vs_pop(&vs);
             uint8_t str = vs_pop(&vs);
-            (void)arg;
-            uint8_t r1 = vs_push_at(&vs, str);
-            uint8_t r2 = vs_push_at(&vs, (uint8_t)(str + 1));
-            (void)r1; (void)r2;
-            TR_EMIT(vigil_reg_abc(VREG_STRING_OP, str, arg, op));
+            uint8_t result_base;
+            PUSH_RESULT_REGS(str, 2, result_base);
+            TR_EMIT(vigil_reg_abc(VREG_STRING_OP, result_base, arg, op));
             ip += 1;
             break;
         }
@@ -2280,10 +2555,10 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
             uint8_t third = vs_pop(&vs);
             uint8_t idx = vs_pop(&vs);
             uint8_t arr = vs_pop(&vs);
-            uint8_t r1 = vs_push_at(&vs, arr);
-            uint8_t r2 = vs_push_at(&vs, (uint8_t)(arr + 1));
-            (void)r1; (void)r2; (void)idx;
-            TR_EMIT(vigil_reg_abc(VREG_ARRAY_GET_SAFE, arr, arr, third));
+            uint8_t result_base;
+            (void)idx;
+            PUSH_RESULT_REGS(arr, 2, result_base);
+            TR_EMIT(vigil_reg_abc(VREG_ARRAY_GET_SAFE, result_base, arr, third));
             ip += 1;
             break;
         }
@@ -2293,9 +2568,9 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
             uint8_t third = vs_pop(&vs);
             uint8_t idx = vs_pop(&vs);
             uint8_t arr = vs_pop(&vs);
-            uint8_t r1 = vs_push_at(&vs, arr);
-            (void)r1; (void)idx;
-            TR_EMIT(vigil_reg_abc(VREG_ARRAY_SET_SAFE, arr, arr, third));
+            uint8_t r1 = vs_push_result(&vs, arr);
+            (void)idx;
+            TR_EMIT(vigil_reg_abc(VREG_ARRAY_SET_SAFE, r1, arr, third));
             ip += 1;
             break;
         }
@@ -2305,15 +2580,16 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
             uint8_t start = vs_pop(&vs);
             (void)start;
             uint8_t arr = vs_pop(&vs);
-            uint8_t r1 = vs_push_at(&vs, arr);
+            uint8_t r1 = vs_push_result(&vs, arr);
             TR_EMIT(vigil_reg_abc(VREG_ARRAY_SLICE, r1, arr, end));
             ip += 1;
             break;
         }
         case VIGIL_OPCODE_ARRAY_CONTAINS: {
+            SYNC_PACK(2);
             uint8_t val = vs_pop(&vs);
             uint8_t arr = vs_pop(&vs);
-            uint8_t r = vs_push_at(&vs, arr);
+            uint8_t r = vs_push_result(&vs, arr);
             TR_EMIT(vigil_reg_abc(VREG_ARRAY_CONTAINS, r, arr, val));
             ip += 1;
             break;
@@ -2325,11 +2601,11 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
             uint8_t third = vs_pop(&vs);
             uint8_t key = vs_pop(&vs);
             uint8_t map = vs_pop(&vs);
-            uint8_t r1 = vs_push_at(&vs, map);
-            uint8_t r2 = vs_push_at(&vs, (uint8_t)(map + 1));
-            (void)r1; (void)r2; (void)key;
+            uint8_t result_base;
+            (void)key;
+            PUSH_RESULT_REGS(map, 2, result_base);
             uint8_t rop = (op == VIGIL_OPCODE_MAP_GET_SAFE) ? VREG_MAP_GET_SAFE : VREG_MAP_REMOVE_SAFE;
-            TR_EMIT(vigil_reg_abc(rop, map, map, third));
+            TR_EMIT(vigil_reg_abc(rop, result_base, map, third));
             ip += 1;
             break;
         }
@@ -2339,16 +2615,17 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
             uint8_t third = vs_pop(&vs);
             uint8_t key = vs_pop(&vs);
             uint8_t map = vs_pop(&vs);
-            uint8_t r1 = vs_push_at(&vs, map);
-            (void)r1; (void)key;
-            TR_EMIT(vigil_reg_abc(VREG_MAP_SET_SAFE, map, map, third));
+            uint8_t r1 = vs_push_result(&vs, map);
+            (void)key;
+            TR_EMIT(vigil_reg_abc(VREG_MAP_SET_SAFE, r1, map, third));
             ip += 1;
             break;
         }
         case VIGIL_OPCODE_MAP_HAS: {
+            SYNC_PACK(2);
             uint8_t key = vs_pop(&vs);
             uint8_t map = vs_pop(&vs);
-            uint8_t r = vs_push_at(&vs, map);
+            uint8_t r = vs_push_result(&vs, map);
             TR_EMIT(vigil_reg_abc(VREG_MAP_HAS, r, map, key));
             ip += 1;
             break;
@@ -2356,7 +2633,7 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
         case VIGIL_OPCODE_MAP_KEYS:
         case VIGIL_OPCODE_MAP_VALUES: {
             uint8_t map = vs_pop(&vs);
-            uint8_t r = vs_push_at(&vs, map);
+            uint8_t r = vs_push_result(&vs, map);
             uint8_t rop = (op == VIGIL_OPCODE_MAP_KEYS) ? VREG_MAP_KEYS : VREG_MAP_VALUES;
             TR_EMIT(vigil_reg_abc(rop, r, map, 0));
             ip += 1;
@@ -2364,9 +2641,10 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
         }
         case VIGIL_OPCODE_GET_MAP_KEY_AT:
         case VIGIL_OPCODE_GET_MAP_VALUE_AT: {
+            SYNC_PACK(2);
             uint8_t idx = vs_pop(&vs);
             uint8_t map = vs_pop(&vs);
-            uint8_t r = vs_push_at(&vs, map);
+            uint8_t r = vs_push_result(&vs, map);
             uint8_t rop = (op == VIGIL_OPCODE_GET_MAP_KEY_AT) ? VREG_MAP_KEY_AT : VREG_MAP_VALUE_AT;
             TR_EMIT(vigil_reg_abc(rop, r, map, idx));
             ip += 1;
@@ -2433,6 +2711,9 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
             ip += stack_op_size(code, ip, code_size);
             break;
         }
+
+        if (vs.next_reg > max_next_reg)
+            max_next_reg = vs.next_reg;
     }
 
     /* Record final offset mapping. */
@@ -2466,127 +2747,30 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
         rc->code[ri] = vigil_reg_asbx(VREG_GET_OP(rc->code[ri]), VREG_GET_A(rc->code[ri]), sbx);
     }
 
-    rc->max_registers = vs.next_reg;
+    rc->max_registers = max_next_reg;
     rc->span_map_count = rc->code_count;
 
     free(jt);
     free(depth_at);
-    free(reg_at);
+    free(origin_at);
+    free(state_at);
     omap_free(&omap);
     jpatch_free(&patches);
     return VIGIL_STATUS_OK;
 
-tr_fail:
+tr_status_fail:
     free(jt);
     free(depth_at);
-    free(reg_at);
+    free(origin_at);
+    free(state_at);
     omap_free(&omap);
     jpatch_free(&patches);
     vigil_reg_chunk_free(rc, runtime);
-    return VIGIL_STATUS_OUT_OF_MEMORY;
-}
+    return tr_status;
 
-/* ── Debug dump ────────────────────────────────────────────────── */
-
-static const char *reg_op_name(uint8_t op)
-{
-    static const char *names[] = {
-        [VREG_MOVE] = "MOVE",
-        [VREG_LOAD_K] = "LOAD_K",
-        [VREG_LOAD_NIL] = "LOAD_NIL",
-        [VREG_LOAD_TRUE] = "LOAD_T",
-        [VREG_LOAD_FALSE] = "LOAD_F",
-        [VREG_ADD] = "ADD",
-        [VREG_SUB] = "SUB",
-        [VREG_MUL] = "MUL",
-        [VREG_DIV] = "DIV",
-        [VREG_MOD] = "MOD",
-        [VREG_ADD_I32] = "ADD_I32",
-        [VREG_SUB_I32] = "SUB_I32",
-        [VREG_MUL_I32] = "MUL_I32",
-        [VREG_DIV_I32] = "DIV_I32",
-        [VREG_MOD_I32] = "MOD_I32",
-        [VREG_ADD_I64] = "ADD_I64",
-        [VREG_SUB_I64] = "SUB_I64",
-        [VREG_MUL_I64] = "MUL_I64",
-        [VREG_DIV_I64] = "DIV_I64",
-        [VREG_MOD_I64] = "MOD_I64",
-        [VREG_ADD_F64] = "ADD_F64",
-        [VREG_SUB_F64] = "SUB_F64",
-        [VREG_MUL_F64] = "MUL_F64",
-        [VREG_DIV_F64] = "DIV_F64",
-        [VREG_LT_I32] = "LT_I32",
-        [VREG_LE_I32] = "LE_I32",
-        [VREG_GT_I32] = "GT_I32",
-        [VREG_GE_I32] = "GE_I32",
-        [VREG_EQ_I32] = "EQ_I32",
-        [VREG_NE_I32] = "NE_I32",
-        [VREG_LT_I64] = "LT_I64",
-        [VREG_LE_I64] = "LE_I64",
-        [VREG_GT_I64] = "GT_I64",
-        [VREG_GE_I64] = "GE_I64",
-        [VREG_EQ_I64] = "EQ_I64",
-        [VREG_NE_I64] = "NE_I64",
-        [VREG_NEG] = "NEG",
-        [VREG_NOT] = "NOT",
-        [VREG_BNOT] = "BNOT",
-        [VREG_EQ] = "EQ",
-        [VREG_LT] = "LT",
-        [VREG_LE] = "LE",
-        [VREG_JMP] = "JMP",
-        [VREG_TEST] = "TEST",
-        [VREG_LT_I32_JMP] = "LT_I32_JMP",
-        [VREG_LE_I32_JMP] = "LE_I32_JMP",
-        [VREG_GT_I32_JMP] = "GT_I32_JMP",
-        [VREG_GE_I32_JMP] = "GE_I32_JMP",
-        [VREG_EQ_I32_JMP] = "EQ_I32_JMP",
-        [VREG_NE_I32_JMP] = "NE_I32_JMP",
-        [VREG_FORLOOP_I32] = "FORLOOP32",
-        [VREG_FORLOOP_I64] = "FORLOOP64",
-        [VREG_INC_I32] = "INC_I32",
-        [VREG_INC_I64] = "INC_I64",
-        [VREG_RETURN] = "RETURN",
-        [VREG_CALL] = "CALL",
-        [VREG_MATH_SIN] = "SIN",
-        [VREG_MATH_COS] = "COS",
-        [VREG_MATH_SQRT] = "SQRT",
-        [VREG_MATH_LOG] = "LOG",
-        [VREG_MATH_POW] = "POW",
-        [VREG_DUP] = "DUP",
-        [VREG_TO_I32] = "TO_I32",
-        [VREG_TO_I64] = "TO_I64",
-        [VREG_TO_F64] = "TO_F64",
-    };
-    if (op < sizeof(names) / sizeof(names[0]) && names[op])
-        return names[op];
-    return "???";
-}
-
-void vigil_reg_dump(const vigil_reg_chunk_t *rc)
-{
-    fprintf(stderr, "=== Register instructions: %zu, max_regs: %u ===\n", rc->code_count, rc->max_registers);
-    for (size_t i = 0; i < rc->code_count; i++)
-    {
-        vigil_reg_instr_t instr = rc->code[i];
-        uint8_t op = VREG_GET_OP(instr);
-        uint8_t a = VREG_GET_A(instr);
-        uint8_t b = VREG_GET_B(instr);
-        uint8_t c = VREG_GET_C(instr);
-        int16_t sbx = VREG_GET_sBx(instr);
-        uint16_t bx = VREG_GET_Bx(instr);
-
-        if (op == VREG_JMP)
-            fprintf(stderr, "  [%2zu] %-12s sBx=%d (→%zu)\n", i, reg_op_name(op), sbx, (size_t)((int)i + 1 + sbx));
-        else if (op == VREG_LOAD_K)
-            fprintf(stderr, "  [%2zu] %-12s R%u = K[%u]\n", i, reg_op_name(op), a, bx);
-        else if (op == VREG_TEST)
-            fprintf(stderr, "  [%2zu] %-12s R%u\n", i, reg_op_name(op), a);
-        else if (op == VREG_RETURN)
-            fprintf(stderr, "  [%2zu] %-12s R%u count=%u\n", i, reg_op_name(op), a, b);
-        else
-            fprintf(stderr, "  [%2zu] %-12s R%u R%u R%u (op=%u)\n", i, reg_op_name(op), a, b, c, op);
-    }
-    fprintf(stderr, "===\n");
+tr_fail:
+    tr_status = VIGIL_STATUS_OUT_OF_MEMORY;
+    goto tr_status_fail;
 }
 
 /* ══════════════════════════════════════════════════════════════════
@@ -2791,7 +2975,13 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         vm->stack_count = base + rc->max_registers;
     }
 
-#define RRELEASE(reg) do { if (vigil_nanbox_has_object(R[(reg)])) vigil_value_release(&R[(reg)]); } while (0)
+#define RRELEASE(reg)                                                                                                   \
+    do                                                                                                                  \
+    {                                                                                                                   \
+        if (vigil_nanbox_has_object(R[(reg)]))                                                                         \
+            vigil_value_release(&R[(reg)]);                                                                            \
+        R[(reg)] = VIGIL_NANBOX_NIL;                                                                                   \
+    } while (0)
 #define RSTORE(reg, value_expr)                                                                                       \
     do                                                                                                               \
     {                                                                                                                \
@@ -3766,6 +3956,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
     {
         vigil_reg_instr_t i = code[ip];
         uint8_t ra = VREG_GET_B(i), rb = VREG_GET_C(i);
+        int compared;
         if (vigil_nanbox_is_uint(R[ra]) || vigil_nanbox_is_uint(R[rb]))
         {
             RSTORE(VREG_GET_A(i), vigil_nanbox_from_bool(regvm_decode_uint(R[ra]) < regvm_decode_uint(R[rb])));
@@ -3782,6 +3973,11 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
                                                          vigil_nanbox_decode_double(R[rb])));
             RNEXT();
         }
+        if (regvm_compare_strings(R[ra], R[rb], &compared))
+        {
+            RSTORE(VREG_GET_A(i), vigil_nanbox_from_bool(compared < 0));
+            RNEXT();
+        }
         status = VIGIL_STATUS_UNSUPPORTED;
         goto r_cleanup;
     }
@@ -3789,6 +3985,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
     {
         vigil_reg_instr_t i = code[ip];
         uint8_t ra = VREG_GET_B(i), rb = VREG_GET_C(i);
+        int compared;
         if (vigil_nanbox_is_uint(R[ra]) || vigil_nanbox_is_uint(R[rb]))
         {
             RSTORE(VREG_GET_A(i), vigil_nanbox_from_bool(regvm_decode_uint(R[ra]) <= regvm_decode_uint(R[rb])));
@@ -3803,6 +4000,11 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         {
             RSTORE(VREG_GET_A(i), vigil_nanbox_from_bool(vigil_nanbox_decode_double(R[ra]) <=
                                                          vigil_nanbox_decode_double(R[rb])));
+            RNEXT();
+        }
+        if (regvm_compare_strings(R[ra], R[rb], &compared))
+        {
+            RSTORE(VREG_GET_A(i), vigil_nanbox_from_bool(compared <= 0));
             RNEXT();
         }
         status = VIGIL_STATUS_UNSUPPORTED;
@@ -4143,59 +4345,22 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         uint8_t arg_base_r = VREG_GET_A(i);
         uint8_t func_idx = VREG_GET_B(i);
         uint8_t arg_count = VREG_GET_C(i);
-
         size_t arg_base = base + (size_t)arg_base_r;
-
         const vigil_object_t *callee = vigil_vm_function_sibling(frame->function, (size_t)func_idx);
         if (VIGIL_UNLIKELY(!callee))
         { status = VIGIL_STATUS_INTERNAL; goto r_cleanup; }
-
-        vigil_chunk_t *cc = (vigil_chunk_t *)vigil_vm_function_chunk(callee);
-        if (VIGIL_UNLIKELY(!cc)) { status = VIGIL_STATUS_INTERNAL; goto r_cleanup; }
-        const vigil_reg_chunk_t *callee_rc = NULL;
-        status = vigil_chunk_ensure_reg_cache(cc, (uint8_t)vigil_function_object_arity(callee), &callee_rc, error);
-        if (status != VIGIL_STATUS_OK) goto r_cleanup;
-
-        /* Save caller ip. */
-        frame->ip = ip + 1;
-
-        /* Push callee frame (fast path). */
-        if (VIGIL_UNLIKELY(vm->frame_count >= vm->frame_capacity))
-        {
-            vm->stack_count = arg_base + (size_t)arg_count;
-            status = vigil_vm_execute_call(vm, callee, (size_t)arg_count, error);
-            frame = &vm->frames[vm->frame_count - 1];
-            R = vm->stack + base;
-            if (status != VIGIL_STATUS_OK) goto r_cleanup;
-            if (vm->stack_count < base + rc->max_registers)
-                vm->stack_count = base + rc->max_registers;
-            RNEXT();
-        }
-        {
-            vigil_vm_frame_t *nf = &vm->frames[vm->frame_count++];
-            regvm_init_inline_frame(nf, callee, callee, cc, arg_base);
-        }
-
-        /* Switch to callee. */
-        rc = callee_rc;
-        code = rc->code; code_count = rc->code_count;
-        sc = rc->stack_chunk;
+        size_t saved_ip = frame->ip;
+        frame->ip = VIGIL_VM_CHUNK_CODE_SIZE(frame->chunk);
+        vm->stack_count = arg_base + (size_t)arg_count;
+        status = vigil_vm_execute_call(vm, callee, (size_t)arg_count, error);
         frame = &vm->frames[vm->frame_count - 1];
-        base = arg_base; has_reg_objects = 0;
-        ip = 0;
+        frame->ip = saved_ip;
         R = vm->stack + base;
-
-        /* Grow stack only if needed (rare after warmup). */
-        if (VIGIL_UNLIKELY(vm->stack_capacity < base + (size_t)rc->max_registers))
-        {
-            status = vigil_vm_grow_stack(vm, base + (size_t)rc->max_registers + 16, error);
-            if (status != VIGIL_STATUS_OK) goto r_cleanup;
-            R = vm->stack + base;
-        }
+        if (status != VIGIL_STATUS_OK)
+            goto r_cleanup;
         if (vm->stack_count < base + rc->max_registers)
             vm->stack_count = base + rc->max_registers;
-
-        RDISPATCH();
+        RNEXT();
     }
 
     /* ── Native call ───────────────────────────────────────────── */
@@ -4203,9 +4368,16 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
     {
         vigil_reg_instr_t i = code[ip];
         uint8_t arg_base_r = VREG_GET_A(i);
-        uint8_t ci = VREG_GET_B(i);
         uint8_t arg_count = VREG_GET_C(i);
+        uint32_t ci;
 
+        if (VIGIL_UNLIKELY(ip + 1U >= code_count))
+        {
+            vigil_error_set_literal(error, VIGIL_STATUS_INTERNAL, "regvm native call missing constant operand");
+            status = VIGIL_STATUS_INTERNAL;
+            goto r_cleanup;
+        }
+        ci = code[ip + 1U];
         size_t arg_base = base + (size_t)arg_base_r;
         vm->stack_count = arg_base + (size_t)arg_count;
 
@@ -4228,6 +4400,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         if (vm->stack_count < base + rc->max_registers)
             vm->stack_count = base + rc->max_registers;
 
+        ip += 1U;
         RNEXT();
     }
 
@@ -4245,37 +4418,36 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         if (vm->stack_count < base + rc->max_registers)                                                                \
             vm->stack_count = base + rc->max_registers;                                                                \
     } while (0)
+#define REGVM_STACK_HELPER(top_reg, pop_count, dst_reg, ret_count, call_expr)                                          \
+    do                                                                                                                 \
+    {                                                                                                                  \
+        uint8_t _sync_top = (uint8_t)(top_reg);                                                                        \
+        REGVM_SYNC_PRE(_sync_top);                                                                                     \
+        frame->ip = 0;                                                                                                 \
+        status = (call_expr);                                                                                          \
+        if (status != VIGIL_STATUS_OK)                                                                                 \
+            goto r_cleanup;                                                                                            \
+        regvm_move_helper_results(vm, base, regvm_helper_result_base(_sync_top, (uint8_t)(pop_count)),               \
+                                  (uint8_t)(dst_reg), (uint8_t)(ret_count));                                           \
+        REGVM_SYNC_POST();                                                                                             \
+        RNEXT();                                                                                                       \
+    } while (0)
 
     /* ── Type conversions (unsigned) ───────────────────────────── */
     RCASE(TO_U8)
     {
         vigil_reg_instr_t i = code[ip];
-        REGVM_SYNC_PRE(VREG_GET_B(i));
-        frame->ip = 0;
-        status = vigil_vm_op_to_u8(vm, frame, error);
-        if (status != VIGIL_STATUS_OK) goto r_cleanup;
-        REGVM_SYNC_POST();
-        RNEXT();
+        REGVM_STACK_HELPER(VREG_GET_B(i), 1, VREG_GET_A(i), 1, vigil_vm_op_to_u8(vm, frame, error));
     }
     RCASE(TO_U32)
     {
         vigil_reg_instr_t i = code[ip];
-        REGVM_SYNC_PRE(VREG_GET_B(i));
-        frame->ip = 0;
-        status = vigil_vm_op_to_u32(vm, frame, error);
-        if (status != VIGIL_STATUS_OK) goto r_cleanup;
-        REGVM_SYNC_POST();
-        RNEXT();
+        REGVM_STACK_HELPER(VREG_GET_B(i), 1, VREG_GET_A(i), 1, vigil_vm_op_to_u32(vm, frame, error));
     }
     RCASE(TO_U64)
     {
         vigil_reg_instr_t i = code[ip];
-        REGVM_SYNC_PRE(VREG_GET_B(i));
-        frame->ip = 0;
-        status = vigil_vm_op_to_u64(vm, frame, error);
-        if (status != VIGIL_STATUS_OK) goto r_cleanup;
-        REGVM_SYNC_POST();
-        RNEXT();
+        REGVM_STACK_HELPER(VREG_GET_B(i), 1, VREG_GET_A(i), 1, vigil_vm_op_to_u64(vm, frame, error));
     }
 
     /* ── TESTSET ───────────────────────────────────────────────── */
@@ -4303,12 +4475,8 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
     RCASE(GET_INDEX)
     {
         vigil_reg_instr_t i = code[ip];
-        REGVM_SYNC_PRE(VREG_GET_C(i));
-        frame->ip = 0;
-        status = vigil_vm_op_get_index(vm, frame, error);
-        if (status != VIGIL_STATUS_OK) goto r_cleanup;
-        REGVM_SYNC_POST();
-        RNEXT();
+        uint8_t top = VREG_GET_B(i) > VREG_GET_C(i) ? VREG_GET_B(i) : VREG_GET_C(i);
+        REGVM_STACK_HELPER(top, 2, VREG_GET_A(i), 1, vigil_vm_op_get_index(vm, frame, error));
     }
     RCASE(SET_INDEX)
     {
@@ -4327,23 +4495,27 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
     {
         vigil_reg_instr_t i = code[ip];
         uint8_t c = VREG_GET_C(i);
-        REGVM_SYNC_PRE(VREG_GET_B(i));
-        frame->ip = 0;
         if (c == 1)
-            status = vigil_vm_op_get_string_size(vm, frame, error);
+            REGVM_STACK_HELPER(VREG_GET_B(i), 1, VREG_GET_A(i), 1, vigil_vm_op_get_string_size(vm, frame, error));
         else
-            status = vigil_vm_op_get_collection_size(vm, frame, error);
-        if (status != VIGIL_STATUS_OK) goto r_cleanup;
-        REGVM_SYNC_POST();
-        RNEXT();
+            REGVM_STACK_HELPER(VREG_GET_B(i), 1, VREG_GET_A(i), 1,
+                               vigil_vm_op_get_collection_size(vm, frame, error));
     }
     RCASE(GET_FIELD)
     {
         vigil_reg_instr_t i = code[ip];
         uint8_t obj = VREG_GET_B(i);
         uint8_t fi = VREG_GET_C(i);
-        has_reg_objects = 1; vigil_object_t *o = (vigil_object_t *)vigil_nanbox_decode_ptr(R[obj]);
+        vigil_object_t *o;
         vigil_value_t fv = {0};
+        if (!vigil_nanbox_is_object(R[obj]))
+        {
+            vigil_error_set_literal(error, VIGIL_STATUS_INVALID_ARGUMENT, "field access requires a class instance");
+            status = VIGIL_STATUS_INVALID_ARGUMENT;
+            goto r_cleanup;
+        }
+        has_reg_objects = 1;
+        o = (vigil_object_t *)vigil_nanbox_decode_ptr(R[obj]);
         if (!vigil_instance_object_get_field(o, (size_t)fi, &fv))
         { status = VIGIL_STATUS_INVALID_ARGUMENT; goto r_cleanup; }
         RRELEASE(VREG_GET_A(i));
@@ -4356,7 +4528,15 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         uint8_t obj_r = VREG_GET_A(i);
         uint8_t fi = VREG_GET_B(i);
         uint8_t val_r = VREG_GET_C(i);
-        has_reg_objects = 1; vigil_object_t *o = (vigil_object_t *)vigil_nanbox_decode_ptr(R[obj_r]);
+        vigil_object_t *o;
+        if (!vigil_nanbox_is_object(R[obj_r]))
+        {
+            vigil_error_set_literal(error, VIGIL_STATUS_INVALID_ARGUMENT, "field assignment requires a class instance");
+            status = VIGIL_STATUS_INVALID_ARGUMENT;
+            goto r_cleanup;
+        }
+        has_reg_objects = 1;
+        o = (vigil_object_t *)vigil_nanbox_decode_ptr(R[obj_r]);
         status = vigil_instance_object_set_field(o, (size_t)fi, &R[val_r], error);
         if (status != VIGIL_STATUS_OK) goto r_cleanup;
         RNEXT();
@@ -4416,32 +4596,17 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
     {
         vigil_reg_instr_t i = code[ip];
         uint8_t top = VREG_GET_B(i) > VREG_GET_C(i) ? VREG_GET_B(i) : VREG_GET_C(i);
-        REGVM_SYNC_PRE(top);
-        frame->ip = 0;
-        status = vigil_vm_op_new_error(vm, frame, error);
-        if (status != VIGIL_STATUS_OK) goto r_cleanup;
-        REGVM_SYNC_POST();
-        RNEXT();
+        REGVM_STACK_HELPER(top, 2, VREG_GET_A(i), 1, vigil_vm_op_new_error(vm, frame, error));
     }
     RCASE(GET_ERROR_KIND)
     {
         vigil_reg_instr_t i = code[ip];
-        REGVM_SYNC_PRE(VREG_GET_B(i));
-        frame->ip = 0;
-        status = vigil_vm_op_get_error_kind(vm, frame, error);
-        if (status != VIGIL_STATUS_OK) goto r_cleanup;
-        REGVM_SYNC_POST();
-        RNEXT();
+        REGVM_STACK_HELPER(VREG_GET_B(i), 1, VREG_GET_A(i), 1, vigil_vm_op_get_error_kind(vm, frame, error));
     }
     RCASE(GET_ERROR_MSG)
     {
         vigil_reg_instr_t i = code[ip];
-        REGVM_SYNC_PRE(VREG_GET_B(i));
-        frame->ip = 0;
-        status = vigil_vm_op_get_error_message(vm, frame, error);
-        if (status != VIGIL_STATUS_OK) goto r_cleanup;
-        REGVM_SYNC_POST();
-        RNEXT();
+        REGVM_STACK_HELPER(VREG_GET_B(i), 1, VREG_GET_A(i), 1, vigil_vm_op_get_error_message(vm, frame, error));
     }
 
     /* ── String ops ───────────────────────────────────────────── */
@@ -4450,6 +4615,8 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         vigil_reg_instr_t i = code[ip];
         uint8_t str_r = VREG_GET_B(i);
         uint8_t sub_op = VREG_GET_C(i);
+        uint8_t pop_count = 0;
+        uint8_t ret_count = 0;
         /* The string op may need 1-3 args on the stack depending on the
            sub-opcode.  The translator places them in consecutive registers
            ending at str_r.  Sync past the highest. */
@@ -4462,70 +4629,112 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         case VIGIL_OPCODE_STRING_CONTAINS:
         case VIGIL_OPCODE_STRING_STARTS_WITH:
         case VIGIL_OPCODE_STRING_ENDS_WITH:
+            pop_count = 2;
+            ret_count = 1;
             status = vigil_vm_op_string_search(vm, frame, (const uint8_t *)&sub_op, error);
             break;
         case VIGIL_OPCODE_STRING_REPLACE:
+            pop_count = 3;
+            ret_count = 1;
             status = vigil_vm_op_string_replace(vm, frame, error);
             break;
         case VIGIL_OPCODE_STRING_SPLIT:
+            pop_count = 2;
+            ret_count = 1;
             status = vigil_vm_op_string_split(vm, frame, error);
             break;
         case VIGIL_OPCODE_STRING_INDEX_OF:
+            pop_count = 2;
+            ret_count = 2;
             status = vigil_vm_op_string_index_of(vm, frame, error);
             break;
         case VIGIL_OPCODE_STRING_SUBSTR:
+            pop_count = 3;
+            ret_count = 2;
             status = vigil_vm_op_string_substr(vm, frame, error);
             break;
         case VIGIL_OPCODE_STRING_BYTES:
+            pop_count = 1;
+            ret_count = 1;
             status = vigil_vm_op_string_bytes(vm, frame, error);
             break;
         case VIGIL_OPCODE_STRING_CHAR_AT:
+            pop_count = 2;
+            ret_count = 2;
             status = vigil_vm_op_string_char_at(vm, frame, error);
             break;
         case VIGIL_OPCODE_STRING_TRIM:
         case VIGIL_OPCODE_STRING_TO_UPPER:
         case VIGIL_OPCODE_STRING_TO_LOWER:
+            pop_count = 1;
+            ret_count = 1;
             status = vigil_vm_op_string_transform(vm, frame, (const uint8_t *)&sub_op, error);
             break;
         case VIGIL_OPCODE_STRING_TRIM_LEFT:
         case VIGIL_OPCODE_STRING_TRIM_RIGHT:
+            pop_count = 1;
+            ret_count = 1;
             status = vigil_vm_op_string_trim_dir(vm, frame, (const uint8_t *)&sub_op, error);
             break;
         case VIGIL_OPCODE_STRING_REVERSE:
+            pop_count = 1;
+            ret_count = 1;
             status = vigil_vm_op_string_reverse(vm, frame, error);
             break;
         case VIGIL_OPCODE_STRING_IS_EMPTY:
+            pop_count = 1;
+            ret_count = 1;
             status = vigil_vm_op_string_is_empty(vm, frame, error);
             break;
         case VIGIL_OPCODE_STRING_CHAR_COUNT:
+            pop_count = 1;
+            ret_count = 1;
             status = vigil_vm_op_string_char_count(vm, frame, error);
             break;
         case VIGIL_OPCODE_STRING_REPEAT:
+            pop_count = 2;
+            ret_count = 1;
             status = vigil_vm_op_string_repeat(vm, frame, error);
             break;
         case VIGIL_OPCODE_STRING_COUNT:
+            pop_count = 2;
+            ret_count = 1;
             status = vigil_vm_op_string_count(vm, frame, error);
             break;
         case VIGIL_OPCODE_STRING_LAST_INDEX_OF:
+            pop_count = 2;
+            ret_count = 2;
             status = vigil_vm_op_string_last_index_of(vm, frame, error);
             break;
         case VIGIL_OPCODE_STRING_TRIM_PREFIX:
         case VIGIL_OPCODE_STRING_TRIM_SUFFIX:
+            pop_count = 2;
+            ret_count = 1;
             status = vigil_vm_op_string_trim_affix(vm, frame, (const uint8_t *)&sub_op, error);
             break;
         case VIGIL_OPCODE_STRING_TO_C:
+            pop_count = 1;
+            ret_count = 1;
             status = vigil_vm_op_string_to_c(vm, frame, error);
             break;
         case VIGIL_OPCODE_STRING_FIELDS:
+            pop_count = 1;
+            ret_count = 1;
             status = vigil_vm_op_string_fields(vm, frame, error);
             break;
         case VIGIL_OPCODE_STRING_EQUAL_FOLD:
+            pop_count = 2;
+            ret_count = 1;
             status = vigil_vm_op_string_equal_fold(vm, frame, error);
             break;
         case VIGIL_OPCODE_STRING_CUT:
+            pop_count = 2;
+            ret_count = 3;
             status = vigil_vm_op_string_cut(vm, frame, error);
             break;
         case VIGIL_OPCODE_STRING_JOIN:
+            pop_count = 2;
+            ret_count = 1;
             status = vigil_vm_op_string_join(vm, frame, error);
             break;
         default:
@@ -4533,6 +4742,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
             break;
         }
         if (status != VIGIL_STATUS_OK) goto r_cleanup;
+        regvm_move_helper_results(vm, base, regvm_helper_result_base(str_r, pop_count), VREG_GET_A(i), ret_count);
         REGVM_SYNC_POST();
         RNEXT();
     }
@@ -4598,6 +4808,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         /* Error path: fall back to stack-based implementation. */
         REGVM_SYNC_PRE(src);
         vigil_vm_parse_i32(vm);
+        regvm_move_helper_results(vm, base, regvm_helper_result_base(src, 1), dst, 2);
         REGVM_SYNC_POST();
         RNEXT();
     }
@@ -4622,6 +4833,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         }
         REGVM_SYNC_PRE(src);
         vigil_vm_parse_f64(vm);
+        regvm_move_helper_results(vm, base, regvm_helper_result_base(src, 1), dst, 2);
         REGVM_SYNC_POST();
         RNEXT();
     }
@@ -4648,6 +4860,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         }
         REGVM_SYNC_PRE(src);
         vigil_vm_parse_bool(vm);
+        regvm_move_helper_results(vm, base, regvm_helper_result_base(src, 1), dst, 2);
         REGVM_SYNC_POST();
         RNEXT();
     }
@@ -4722,9 +4935,18 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         vigil_reg_instr_t i = code[ip];
         uint8_t ret = VREG_GET_A(i);
         uint16_t arg_count = VREG_GET_Bx(i);
+        uint8_t arg_base_r;
         size_t orig_base = base + (size_t)ret;
-        size_t arg_base = orig_base;
         size_t total = (size_t)arg_count + 1U;
+
+        if (VIGIL_UNLIKELY(ip + 1U >= code_count))
+        {
+            vigil_error_set_literal(error, VIGIL_STATUS_INTERNAL, "regvm call_value missing argument base operand");
+            status = VIGIL_STATUS_INTERNAL;
+            goto r_cleanup;
+        }
+        arg_base_r = (uint8_t)(code[ip + 1U] & 0xFFU);
+        size_t arg_base = base + (size_t)arg_base_r;
         REGVM_ISOLATE_CALL(arg_base, total);
         vm->stack_count = arg_base + total;
 
@@ -4759,6 +4981,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
             regvm_move_call_results(vm, orig_base, arg_base, total, (size_t)arg_count, ret_n);
         }
         REGVM_SYNC_POST();
+        ip += 1U;
         RNEXT();
     }
     RCASE(CALL_SELF)
@@ -4767,48 +4990,24 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         uint8_t ret = VREG_GET_A(i);
         uint8_t arg_count = VREG_GET_B(i);
         uint8_t arg_base_r = (uint8_t)(code[ip + 1] & 0xFF);
-
+        size_t orig_base = base + (size_t)ret;
         size_t arg_base = base + (size_t)arg_base_r;
-
-        /* Save caller state. CALL_SELF is 2 words. */
-        frame->ip = ip + 2;
-
-        /* Push self-recursive frame (fast path). */
-        if (VIGIL_UNLIKELY(vm->frame_count >= vm->frame_capacity))
-        {
-            REGVM_ISOLATE_CALL(arg_base, arg_count);
-            vm->stack_count = arg_base + (size_t)arg_count;
-            status = vigil_vm_execute_call(vm, frame->function, (size_t)arg_count, error);
-            frame = &vm->frames[vm->frame_count - 1];
-            R = vm->stack + base;
-            if (status != VIGIL_STATUS_OK) goto r_cleanup;
-            if (vm->stack_count > arg_base)
-                R[ret] = vm->stack[arg_base];
-            vm->stack_count = base + (size_t)ret + 1;
-            if (vm->stack_count < base + rc->max_registers)
-                vm->stack_count = base + rc->max_registers;
-            ip++;
-            RNEXT();
-        }
-        {
-            vigil_vm_frame_t *nf = &vm->frames[vm->frame_count++];
-            regvm_init_inline_frame(nf, frame->callable, frame->function, frame->chunk, arg_base);
-        }
-
-        /* Self-call: same rc/code/sc. Just switch base/ip/R. */
+        size_t saved_ip = frame->ip;
+        frame->ip = VIGIL_VM_CHUNK_CODE_SIZE(frame->chunk);
+        vm->stack_count = arg_base + (size_t)arg_count;
+        status = vigil_vm_execute_call(vm, frame->function, (size_t)arg_count, error);
         frame = &vm->frames[vm->frame_count - 1];
-        base = arg_base; has_reg_objects = 0;
-        ip = 0;
-        if (VIGIL_UNLIKELY(vm->stack_capacity < base + (size_t)rc->max_registers))
-        {
-            status = vigil_vm_grow_stack(vm, base + (size_t)rc->max_registers + 16, error);
-            if (status != VIGIL_STATUS_OK) goto r_cleanup;
-        }
+        frame->ip = saved_ip;
         R = vm->stack + base;
-        if (vm->stack_count < base + rc->max_registers)
-            vm->stack_count = base + rc->max_registers;
-
-        RDISPATCH();
+        if (status != VIGIL_STATUS_OK)
+            goto r_cleanup;
+        {
+            size_t ret_n = vm->stack_count > arg_base ? vm->stack_count - arg_base : 0U;
+            regvm_move_call_results(vm, orig_base, arg_base, (size_t)arg_count, (size_t)arg_count, ret_n);
+        }
+        REGVM_SYNC_POST();
+        ip += 1;
+        RNEXT();
     }
     RCASE(CALL_INTERFACE)
     {
@@ -4816,10 +5015,21 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         uint8_t ret = VREG_GET_A(i);
         uint8_t iface_idx = VREG_GET_B(i);
         uint8_t arg_count = VREG_GET_C(i);
-        uint32_t method_idx = code[ip + 1];
+        uint32_t method_idx;
+        uint8_t arg_base_r;
         size_t total = (size_t)arg_count + 1U;
         size_t orig_base = base + (size_t)ret;
-        size_t arg_base = orig_base;
+
+        if (VIGIL_UNLIKELY(ip + 2U >= code_count))
+        {
+            vigil_error_set_literal(error, VIGIL_STATUS_INTERNAL,
+                                    "regvm interface call missing operand words");
+            status = VIGIL_STATUS_INTERNAL;
+            goto r_cleanup;
+        }
+        method_idx = code[ip + 1U];
+        arg_base_r = (uint8_t)(code[ip + 2U] & 0xFFU);
+        size_t arg_base = base + (size_t)arg_base_r;
         REGVM_ISOLATE_CALL(arg_base, total);
         vm->stack_count = arg_base + total;
 
@@ -4857,7 +5067,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
             regvm_move_call_results(vm, orig_base, arg_base, total, total, ret_n);
         }
         REGVM_SYNC_POST();
-        ip += 1;
+        ip += 2U;
         RNEXT();
     }
     RCASE(CALL_EXTERN)
@@ -4867,7 +5077,16 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         uint8_t ci = VREG_GET_B(i);
         uint8_t arg_count = VREG_GET_C(i);
         size_t orig_base = base + (size_t)ret;
-        size_t arg_base = orig_base;
+        uint8_t arg_base_r;
+
+        if (VIGIL_UNLIKELY(ip + 1U >= code_count))
+        {
+            vigil_error_set_literal(error, VIGIL_STATUS_INTERNAL, "regvm extern call missing argument base operand");
+            status = VIGIL_STATUS_INTERNAL;
+            goto r_cleanup;
+        }
+        arg_base_r = (uint8_t)(code[ip + 1U] & 0xFFU);
+        size_t arg_base = base + (size_t)arg_base_r;
         REGVM_ISOLATE_CALL(arg_base, arg_count);
         vm->stack_count = arg_base + (size_t)arg_count;
         const vigil_value_t *desc_val = VIGIL_VM_CHUNK_CONSTANT(sc, (size_t)ci);
@@ -4888,6 +5107,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
             regvm_move_call_results(vm, orig_base, arg_base, (size_t)arg_count, (size_t)arg_count, ret_n);
         }
         REGVM_SYNC_POST();
+        ip += 1U;
         RNEXT();
     }
     RCASE(TAIL_CALL)
@@ -4967,42 +5187,23 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
     RCASE(ARRAY_PUSH)
     {
         vigil_reg_instr_t i = code[ip];
-        REGVM_SYNC_PRE(VREG_GET_C(i));
-        frame->ip = 0;
-        status = vigil_vm_op_array_push(vm, frame, error);
-        if (status != VIGIL_STATUS_OK) goto r_cleanup;
-        REGVM_SYNC_POST();
-        RNEXT();
+        uint8_t top = VREG_GET_B(i) > VREG_GET_C(i) ? VREG_GET_B(i) : VREG_GET_C(i);
+        REGVM_STACK_HELPER(top, 2, VREG_GET_A(i), 0, vigil_vm_op_array_push(vm, frame, error));
     }
     RCASE(ARRAY_POP)
     {
         vigil_reg_instr_t i = code[ip];
-        REGVM_SYNC_PRE(VREG_GET_C(i));
-        frame->ip = 0;
-        status = vigil_vm_op_array_pop(vm, frame, error);
-        if (status != VIGIL_STATUS_OK) goto r_cleanup;
-        REGVM_SYNC_POST();
-        RNEXT();
+        REGVM_STACK_HELPER(VREG_GET_C(i), 2, VREG_GET_A(i), 2, vigil_vm_op_array_pop(vm, frame, error));
     }
     RCASE(ARRAY_GET_SAFE)
     {
         vigil_reg_instr_t i = code[ip];
-        REGVM_SYNC_PRE(VREG_GET_C(i));
-        frame->ip = 0;
-        status = vigil_vm_op_array_get_safe(vm, frame, error);
-        if (status != VIGIL_STATUS_OK) goto r_cleanup;
-        REGVM_SYNC_POST();
-        RNEXT();
+        REGVM_STACK_HELPER(VREG_GET_C(i), 3, VREG_GET_A(i), 2, vigil_vm_op_array_get_safe(vm, frame, error));
     }
     RCASE(ARRAY_SET_SAFE)
     {
         vigil_reg_instr_t i = code[ip];
-        REGVM_SYNC_PRE(VREG_GET_C(i));
-        frame->ip = 0;
-        status = vigil_vm_op_array_set_safe(vm, frame, error);
-        if (status != VIGIL_STATUS_OK) goto r_cleanup;
-        REGVM_SYNC_POST();
-        RNEXT();
+        REGVM_STACK_HELPER(VREG_GET_C(i), 3, VREG_GET_A(i), 1, vigil_vm_op_array_set_safe(vm, frame, error));
     }
     RCASE(ARRAY_SLICE)
     {
@@ -5010,121 +5211,67 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
         /* end register is at C (translator stored start in C, end is C+1 area) */
         uint8_t top = VREG_GET_C(i);
         if (VREG_GET_B(i) > top) top = VREG_GET_B(i);
-        REGVM_SYNC_PRE(top);
-        frame->ip = 0;
-        status = vigil_vm_op_array_slice(vm, frame, error);
-        if (status != VIGIL_STATUS_OK) goto r_cleanup;
-        REGVM_SYNC_POST();
-        RNEXT();
+        REGVM_STACK_HELPER(top, 3, VREG_GET_A(i), 1, vigil_vm_op_array_slice(vm, frame, error));
     }
     RCASE(ARRAY_CONTAINS)
     {
         vigil_reg_instr_t i = code[ip];
-        REGVM_SYNC_PRE(VREG_GET_C(i));
-        frame->ip = 0;
-        status = vigil_vm_op_array_contains(vm, frame, error);
-        if (status != VIGIL_STATUS_OK) goto r_cleanup;
-        REGVM_SYNC_POST();
-        RNEXT();
+        uint8_t top = VREG_GET_B(i) > VREG_GET_C(i) ? VREG_GET_B(i) : VREG_GET_C(i);
+        REGVM_STACK_HELPER(top, 2, VREG_GET_A(i), 1, vigil_vm_op_array_contains(vm, frame, error));
     }
 
     /* ── Map method ops ────────────────────────────────────────── */
     RCASE(MAP_GET_SAFE)
     {
         vigil_reg_instr_t i = code[ip];
-        REGVM_SYNC_PRE(VREG_GET_C(i));
-        frame->ip = 0;
-        status = vigil_vm_op_map_get_safe(vm, frame, error);
-        if (status != VIGIL_STATUS_OK) goto r_cleanup;
-        REGVM_SYNC_POST();
-        RNEXT();
+        REGVM_STACK_HELPER(VREG_GET_C(i), 3, VREG_GET_A(i), 2, vigil_vm_op_map_get_safe(vm, frame, error));
     }
     RCASE(MAP_SET_SAFE)
     {
         vigil_reg_instr_t i = code[ip];
-        REGVM_SYNC_PRE(VREG_GET_C(i));
-        frame->ip = 0;
-        status = vigil_vm_op_map_set_safe(vm, frame, error);
-        if (status != VIGIL_STATUS_OK) goto r_cleanup;
-        REGVM_SYNC_POST();
-        RNEXT();
+        REGVM_STACK_HELPER(VREG_GET_C(i), 3, VREG_GET_A(i), 1, vigil_vm_op_map_set_safe(vm, frame, error));
     }
     RCASE(MAP_REMOVE_SAFE)
     {
         vigil_reg_instr_t i = code[ip];
-        REGVM_SYNC_PRE(VREG_GET_C(i));
-        frame->ip = 0;
-        status = vigil_vm_op_map_remove_safe(vm, frame, error);
-        if (status != VIGIL_STATUS_OK) goto r_cleanup;
-        REGVM_SYNC_POST();
-        RNEXT();
+        REGVM_STACK_HELPER(VREG_GET_C(i), 3, VREG_GET_A(i), 2, vigil_vm_op_map_remove_safe(vm, frame, error));
     }
     RCASE(MAP_HAS)
     {
         vigil_reg_instr_t i = code[ip];
-        REGVM_SYNC_PRE(VREG_GET_C(i));
-        frame->ip = 0;
-        status = vigil_vm_op_map_has(vm, frame, error);
-        if (status != VIGIL_STATUS_OK) goto r_cleanup;
-        REGVM_SYNC_POST();
-        RNEXT();
+        REGVM_STACK_HELPER(VREG_GET_C(i), 2, VREG_GET_A(i), 1, vigil_vm_op_map_has(vm, frame, error));
     }
     RCASE(MAP_KEYS)
     {
         vigil_reg_instr_t i = code[ip];
-        REGVM_SYNC_PRE(VREG_GET_B(i));
-        frame->ip = 0;
         uint8_t keys_op = VIGIL_OPCODE_MAP_KEYS;
-        status = vigil_vm_op_map_keys_values(vm, frame, &keys_op, error);
-        if (status != VIGIL_STATUS_OK) goto r_cleanup;
-        REGVM_SYNC_POST();
-        RNEXT();
+        REGVM_STACK_HELPER(VREG_GET_B(i), 1, VREG_GET_A(i), 1, vigil_vm_op_map_keys_values(vm, frame, &keys_op, error));
     }
     RCASE(MAP_VALUES)
     {
         vigil_reg_instr_t i = code[ip];
-        REGVM_SYNC_PRE(VREG_GET_B(i));
-        frame->ip = 0;
         uint8_t vals_op = VIGIL_OPCODE_MAP_VALUES;
-        status = vigil_vm_op_map_keys_values(vm, frame, &vals_op, error);
-        if (status != VIGIL_STATUS_OK) goto r_cleanup;
-        REGVM_SYNC_POST();
-        RNEXT();
+        REGVM_STACK_HELPER(VREG_GET_B(i), 1, VREG_GET_A(i), 1, vigil_vm_op_map_keys_values(vm, frame, &vals_op, error));
     }
     RCASE(MAP_KEY_AT)
     {
         vigil_reg_instr_t i = code[ip];
-        REGVM_SYNC_PRE(VREG_GET_C(i));
-        frame->ip = 0;
-        status = vigil_vm_op_get_map_key_at(vm, frame, error);
-        if (status != VIGIL_STATUS_OK) goto r_cleanup;
-        REGVM_SYNC_POST();
-        RNEXT();
+        REGVM_STACK_HELPER(VREG_GET_C(i), 2, VREG_GET_A(i), 1, vigil_vm_op_get_map_key_at(vm, frame, error));
     }
     RCASE(MAP_VALUE_AT)
     {
         vigil_reg_instr_t i = code[ip];
-        REGVM_SYNC_PRE(VREG_GET_C(i));
-        frame->ip = 0;
-        status = vigil_vm_op_get_map_value_at(vm, frame, error);
-        if (status != VIGIL_STATUS_OK) goto r_cleanup;
-        REGVM_SYNC_POST();
-        RNEXT();
+        REGVM_STACK_HELPER(VREG_GET_C(i), 2, VREG_GET_A(i), 1, vigil_vm_op_get_map_value_at(vm, frame, error));
     }
 
     /* ── Char from int ─────────────────────────────────────────── */
     RCASE(CHAR_FROM_INT)
     {
         vigil_reg_instr_t i = code[ip];
-        REGVM_SYNC_PRE(VREG_GET_B(i));
-        frame->ip = 0;
         if (VREG_GET_C(i) == 1)
-            status = vigil_vm_op_string_to_c(vm, frame, error);
+            REGVM_STACK_HELPER(VREG_GET_B(i), 1, VREG_GET_A(i), 1, vigil_vm_op_string_to_c(vm, frame, error));
         else
-            status = vigil_vm_op_char_from_int(vm, frame, error);
-        if (status != VIGIL_STATUS_OK) goto r_cleanup;
-        REGVM_SYNC_POST();
-        RNEXT();
+            REGVM_STACK_HELPER(VREG_GET_B(i), 1, VREG_GET_A(i), 1, vigil_vm_op_char_from_int(vm, frame, error));
     }
 
     /* ── Return ────────────────────────────────────────────────── */

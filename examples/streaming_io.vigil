@@ -3,17 +3,17 @@ import "fs";
 
 fn main() -> i32 {
     // ── Write a file line by line with fs.Writer ──────────────────
-    fs.Writer w, error open_err = fs.Writer.open("greetings.txt");
-    if (open_err.kind != error.ok) {
-        fmt.println(f"open writer: {open_err.message}");
+    fs.Writer w, err open_err = fs.Writer.open("greetings.txt");
+    if (open_err != ok) {
+        fmt.println(f"open writer: {open_err.message()}");
         return 1;
     }
 
     array<string> names = ["Alice", "Bob", "Carol"];
     for name in names {
-        i32 n, error write_err = w.write_line(f"Hello, {name}!");
-        if (write_err.kind != error.ok) {
-            fmt.println(f"write: {write_err.message}");
+        i32 n, err write_err = w.write_line(f"Hello, {name}!");
+        if (write_err != ok) {
+            fmt.println(f"write: {write_err.message()}");
             w.close();
             return 1;
         }
@@ -21,20 +21,20 @@ fn main() -> i32 {
     w.close();
 
     // ── Read it back line by line with fs.Reader ──────────────────
-    fs.Reader r, error read_open_err = fs.Reader.open("greetings.txt");
-    if (read_open_err.kind != error.ok) {
-        fmt.println(f"open reader: {read_open_err.message}");
+    fs.Reader r, err read_open_err = fs.Reader.open("greetings.txt");
+    if (read_open_err != ok) {
+        fmt.println(f"open reader: {read_open_err.message()}");
         return 1;
     }
 
     fmt.println("Lines from file:");
     bool running = true;
     while (running) {
-        string line, error line_err = r.read_line();
-        if (line_err.kind == error.eof) {
+        string line, err line_err = r.read_line();
+        if (line_err.kind() == err.eof) {
             running = false;
-        } else if (line_err.kind != error.ok) {
-            fmt.println(f"read_line: {line_err.message}");
+        } else if (line_err != ok) {
+            fmt.println(f"read_line: {line_err.message()}");
             r.close();
             return 1;
         } else {
@@ -44,24 +44,29 @@ fn main() -> i32 {
     r.close();
 
     // ── Append a footer and read the whole file ───────────────────
-    fs.Writer wa, error append_err = fs.Writer.open_append("greetings.txt");
-    if (append_err.kind != error.ok) {
-        fmt.println(f"open_append: {append_err.message}");
+    fs.Writer wa, err append_err = fs.Writer.open_append("greetings.txt");
+    if (append_err != ok) {
+        fmt.println(f"open_append: {append_err.message()}");
         return 1;
     }
-    wa.write_line("--- end of greetings ---");
+    i32 footer_bytes, err footer_err = wa.write_line("--- end of greetings ---");
+    if (footer_err != ok) {
+        fmt.println(f"write footer: {footer_err.message()}");
+        wa.close();
+        return 1;
+    }
     wa.close();
 
-    fs.Reader r2, error r2_err = fs.Reader.open("greetings.txt");
-    if (r2_err.kind != error.ok) {
-        fmt.println(f"open reader2: {r2_err.message}");
+    fs.Reader r2, err r2_err = fs.Reader.open("greetings.txt");
+    if (r2_err != ok) {
+        fmt.println(f"open reader2: {r2_err.message()}");
         return 1;
     }
-    string all, error all_err = r2.read_all();
+    string all, err all_err = r2.read_all();
     r2.close();
 
-    if (all_err.kind != error.ok) {
-        fmt.println(f"read_all: {all_err.message}");
+    if (all_err != ok) {
+        fmt.println(f"read_all: {all_err.message()}");
         return 1;
     }
     fmt.println(f"\nFull file:\n{all}");

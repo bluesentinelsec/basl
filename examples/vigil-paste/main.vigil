@@ -19,6 +19,13 @@ fn main() -> i32 {
         }
         string content = fs.read(path);
         array<string> lines = content.split("\n");
+        if (lines.len() > 0 && lines[lines.len() - 1].is_empty()) {
+            string dropped, err pop_err = lines.pop();
+            if (pop_err != ok) {
+                fmt.eprintln(f"paste: cannot read {path}");
+                return 1;
+            }
+        }
         file_lines.push(lines);
     }
 
