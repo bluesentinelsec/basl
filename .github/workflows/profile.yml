@@ -1,9 +1,8 @@
 name: Profile
 
 on:
+  push:
   workflow_dispatch:
-  schedule:
-    - cron: '0 3 * * 1'  # Mondays at 03:00 UTC
 
 jobs:
   gprof:
@@ -29,7 +28,8 @@ jobs:
             -DVIGIL_BUILD_TESTS=OFF \
             -DCMAKE_BUILD_TYPE=RelWithDebInfo \
             -DCMAKE_C_FLAGS="-pg" \
-            -DCMAKE_EXE_LINKER_FLAGS="-pg"
+            -DCMAKE_EXE_LINKER_FLAGS="-pg" \
+            -DCMAKE_SHARED_LINKER_FLAGS="-pg"
 
       - name: Compile
         run: cmake --build build-profile
