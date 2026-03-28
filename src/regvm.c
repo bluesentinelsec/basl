@@ -3425,42 +3425,42 @@ r_dispatch_switch_check:
     {
         vigil_reg_instr_t i = code[ip];
         RSTORE_PRIM(VREG_GET_A(i), vigil_nanbox_from_bool(vigil_nanbox_decode_i32(R[VREG_GET_B(i)]) <
-                                                     vigil_nanbox_decode_i32(R[VREG_GET_C(i)])));
+                                                          vigil_nanbox_decode_i32(R[VREG_GET_C(i)])));
         RNEXT();
     }
     RCASE(LE_I32)
     {
         vigil_reg_instr_t i = code[ip];
         RSTORE_PRIM(VREG_GET_A(i), vigil_nanbox_from_bool(vigil_nanbox_decode_i32(R[VREG_GET_B(i)]) <=
-                                                     vigil_nanbox_decode_i32(R[VREG_GET_C(i)])));
+                                                          vigil_nanbox_decode_i32(R[VREG_GET_C(i)])));
         RNEXT();
     }
     RCASE(GT_I32)
     {
         vigil_reg_instr_t i = code[ip];
         RSTORE_PRIM(VREG_GET_A(i), vigil_nanbox_from_bool(vigil_nanbox_decode_i32(R[VREG_GET_B(i)]) >
-                                                     vigil_nanbox_decode_i32(R[VREG_GET_C(i)])));
+                                                          vigil_nanbox_decode_i32(R[VREG_GET_C(i)])));
         RNEXT();
     }
     RCASE(GE_I32)
     {
         vigil_reg_instr_t i = code[ip];
         RSTORE_PRIM(VREG_GET_A(i), vigil_nanbox_from_bool(vigil_nanbox_decode_i32(R[VREG_GET_B(i)]) >=
-                                                     vigil_nanbox_decode_i32(R[VREG_GET_C(i)])));
+                                                          vigil_nanbox_decode_i32(R[VREG_GET_C(i)])));
         RNEXT();
     }
     RCASE(EQ_I32)
     {
         vigil_reg_instr_t i = code[ip];
         RSTORE_PRIM(VREG_GET_A(i), vigil_nanbox_from_bool(vigil_nanbox_decode_i32(R[VREG_GET_B(i)]) ==
-                                                     vigil_nanbox_decode_i32(R[VREG_GET_C(i)])));
+                                                          vigil_nanbox_decode_i32(R[VREG_GET_C(i)])));
         RNEXT();
     }
     RCASE(NE_I32)
     {
         vigil_reg_instr_t i = code[ip];
         RSTORE_PRIM(VREG_GET_A(i), vigil_nanbox_from_bool(vigil_nanbox_decode_i32(R[VREG_GET_B(i)]) !=
-                                                     vigil_nanbox_decode_i32(R[VREG_GET_C(i)])));
+                                                          vigil_nanbox_decode_i32(R[VREG_GET_C(i)])));
         RNEXT();
     }
 
@@ -3531,8 +3531,8 @@ r_dispatch_switch_check:
         vigil_reg_instr_t i = code[ip];
         uint8_t rb = VREG_GET_B(i), rc2 = VREG_GET_C(i);
         RSTORE_PRIM(VREG_GET_A(i), (vigil_nanbox_is_uint(R[rb]) || vigil_nanbox_is_uint(R[rc2]))
-                                  ? vigil_nanbox_from_bool(regvm_decode_uint(R[rb]) < regvm_decode_uint(R[rc2]))
-                                  : vigil_nanbox_from_bool(regvm_decode_int(R[rb]) < regvm_decode_int(R[rc2])));
+                                       ? vigil_nanbox_from_bool(regvm_decode_uint(R[rb]) < regvm_decode_uint(R[rc2]))
+                                       : vigil_nanbox_from_bool(regvm_decode_int(R[rb]) < regvm_decode_int(R[rc2])));
         RNEXT();
     }
     RCASE(LE_I64)
@@ -3540,8 +3540,8 @@ r_dispatch_switch_check:
         vigil_reg_instr_t i = code[ip];
         uint8_t rb = VREG_GET_B(i), rc2 = VREG_GET_C(i);
         RSTORE_PRIM(VREG_GET_A(i), (vigil_nanbox_is_uint(R[rb]) || vigil_nanbox_is_uint(R[rc2]))
-                                  ? vigil_nanbox_from_bool(regvm_decode_uint(R[rb]) <= regvm_decode_uint(R[rc2]))
-                                  : vigil_nanbox_from_bool(regvm_decode_int(R[rb]) <= regvm_decode_int(R[rc2])));
+                                       ? vigil_nanbox_from_bool(regvm_decode_uint(R[rb]) <= regvm_decode_uint(R[rc2]))
+                                       : vigil_nanbox_from_bool(regvm_decode_int(R[rb]) <= regvm_decode_int(R[rc2])));
         RNEXT();
     }
     RCASE(GT_I64)
@@ -3549,8 +3549,8 @@ r_dispatch_switch_check:
         vigil_reg_instr_t i = code[ip];
         uint8_t rb = VREG_GET_B(i), rc2 = VREG_GET_C(i);
         RSTORE_PRIM(VREG_GET_A(i), (vigil_nanbox_is_uint(R[rb]) || vigil_nanbox_is_uint(R[rc2]))
-                                  ? vigil_nanbox_from_bool(regvm_decode_uint(R[rb]) > regvm_decode_uint(R[rc2]))
-                                  : vigil_nanbox_from_bool(regvm_decode_int(R[rb]) > regvm_decode_int(R[rc2])));
+                                       ? vigil_nanbox_from_bool(regvm_decode_uint(R[rb]) > regvm_decode_uint(R[rc2]))
+                                       : vigil_nanbox_from_bool(regvm_decode_int(R[rb]) > regvm_decode_int(R[rc2])));
         RNEXT();
     }
     RCASE(GE_I64)
@@ -3558,20 +3558,22 @@ r_dispatch_switch_check:
         vigil_reg_instr_t i = code[ip];
         uint8_t rb = VREG_GET_B(i), rc2 = VREG_GET_C(i);
         RSTORE_PRIM(VREG_GET_A(i), (vigil_nanbox_is_uint(R[rb]) || vigil_nanbox_is_uint(R[rc2]))
-                                  ? vigil_nanbox_from_bool(regvm_decode_uint(R[rb]) >= regvm_decode_uint(R[rc2]))
-                                  : vigil_nanbox_from_bool(regvm_decode_int(R[rb]) >= regvm_decode_int(R[rc2])));
+                                       ? vigil_nanbox_from_bool(regvm_decode_uint(R[rb]) >= regvm_decode_uint(R[rc2]))
+                                       : vigil_nanbox_from_bool(regvm_decode_int(R[rb]) >= regvm_decode_int(R[rc2])));
         RNEXT();
     }
     RCASE(EQ_I64)
     {
         vigil_reg_instr_t i = code[ip];
-        RSTORE_PRIM(VREG_GET_A(i), vigil_nanbox_from_bool(regvm_decode_int(R[VREG_GET_B(i)]) == regvm_decode_int(R[VREG_GET_C(i)])));
+        RSTORE_PRIM(VREG_GET_A(i),
+                    vigil_nanbox_from_bool(regvm_decode_int(R[VREG_GET_B(i)]) == regvm_decode_int(R[VREG_GET_C(i)])));
         RNEXT();
     }
     RCASE(NE_I64)
     {
         vigil_reg_instr_t i = code[ip];
-        RSTORE_PRIM(VREG_GET_A(i), vigil_nanbox_from_bool(regvm_decode_int(R[VREG_GET_B(i)]) != regvm_decode_int(R[VREG_GET_C(i)])));
+        RSTORE_PRIM(VREG_GET_A(i),
+                    vigil_nanbox_from_bool(regvm_decode_int(R[VREG_GET_B(i)]) != regvm_decode_int(R[VREG_GET_C(i)])));
         RNEXT();
     }
 
@@ -4162,7 +4164,8 @@ r_dispatch_switch_check:
         }
         if (vigil_nanbox_is_double(R[ra]) && vigil_nanbox_is_double(R[rb]))
         {
-            RSTORE_PRIM(VREG_GET_A(i), vigil_nanbox_from_bool(vigil_nanbox_decode_double(R[ra]) < vigil_nanbox_decode_double(R[rb])));
+            RSTORE_PRIM(VREG_GET_A(i),
+                        vigil_nanbox_from_bool(vigil_nanbox_decode_double(R[ra]) < vigil_nanbox_decode_double(R[rb])));
             RNEXT();
         }
         if (regvm_compare_strings(R[ra], R[rb], &compared))
@@ -4190,7 +4193,8 @@ r_dispatch_switch_check:
         }
         if (vigil_nanbox_is_double(R[ra]) && vigil_nanbox_is_double(R[rb]))
         {
-            RSTORE_PRIM(VREG_GET_A(i), vigil_nanbox_from_bool(vigil_nanbox_decode_double(R[ra]) <= vigil_nanbox_decode_double(R[rb])));
+            RSTORE_PRIM(VREG_GET_A(i),
+                        vigil_nanbox_from_bool(vigil_nanbox_decode_double(R[ra]) <= vigil_nanbox_decode_double(R[rb])));
             RNEXT();
         }
         if (regvm_compare_strings(R[ra], R[rb], &compared))
@@ -4229,7 +4233,8 @@ r_dispatch_switch_check:
     RCASE(NOT)
     {
         vigil_reg_instr_t i = code[ip];
-        RSTORE_PRIM(VREG_GET_A(i), vigil_nanbox_from_bool(R[VREG_GET_B(i)] == VIGIL_NANBOX_FALSE || R[VREG_GET_B(i)] == VIGIL_NANBOX_NIL));
+        RSTORE_PRIM(VREG_GET_A(i), vigil_nanbox_from_bool(R[VREG_GET_B(i)] == VIGIL_NANBOX_FALSE ||
+                                                          R[VREG_GET_B(i)] == VIGIL_NANBOX_NIL));
         RNEXT();
     }
     RCASE(BNOT)
@@ -4248,19 +4253,22 @@ r_dispatch_switch_check:
     RCASE(BAND)
     {
         vigil_reg_instr_t i = code[ip];
-        RSTORE_PRIM(VREG_GET_A(i), vigil_nanbox_encode_int(regvm_decode_int(R[VREG_GET_B(i)]) & regvm_decode_int(R[VREG_GET_C(i)])));
+        RSTORE_PRIM(VREG_GET_A(i),
+                    vigil_nanbox_encode_int(regvm_decode_int(R[VREG_GET_B(i)]) & regvm_decode_int(R[VREG_GET_C(i)])));
         RNEXT();
     }
     RCASE(BOR)
     {
         vigil_reg_instr_t i = code[ip];
-        RSTORE_PRIM(VREG_GET_A(i), vigil_nanbox_encode_int(regvm_decode_int(R[VREG_GET_B(i)]) | regvm_decode_int(R[VREG_GET_C(i)])));
+        RSTORE_PRIM(VREG_GET_A(i),
+                    vigil_nanbox_encode_int(regvm_decode_int(R[VREG_GET_B(i)]) | regvm_decode_int(R[VREG_GET_C(i)])));
         RNEXT();
     }
     RCASE(BXOR)
     {
         vigil_reg_instr_t i = code[ip];
-        RSTORE_PRIM(VREG_GET_A(i), vigil_nanbox_encode_int(regvm_decode_int(R[VREG_GET_B(i)]) ^ regvm_decode_int(R[VREG_GET_C(i)])));
+        RSTORE_PRIM(VREG_GET_A(i),
+                    vigil_nanbox_encode_int(regvm_decode_int(R[VREG_GET_B(i)]) ^ regvm_decode_int(R[VREG_GET_C(i)])));
         RNEXT();
     }
     RCASE(SHL)
