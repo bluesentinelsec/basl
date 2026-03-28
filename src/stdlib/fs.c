@@ -1651,12 +1651,12 @@ static vigil_status_t writer_open_impl(vigil_vm_t *vm, size_t arg_count, const c
 
 static vigil_status_t writer_open(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
 {
-    return writer_open_impl(vm, arg_count, "w", error);
+    return writer_open_impl(vm, arg_count, "wb", error);
 }
 
 static vigil_status_t writer_open_append(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
 {
-    return writer_open_impl(vm, arg_count, "a", error);
+    return writer_open_impl(vm, arg_count, "ab", error);
 }
 
 static vigil_status_t writer_write_impl(vigil_vm_t *vm, size_t arg_count, int newline, vigil_error_t *error)

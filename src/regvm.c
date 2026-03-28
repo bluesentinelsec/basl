@@ -134,6 +134,26 @@ static void regvm_discard_isolated_call_values(vigil_vm_t *vm, size_t orig_base,
     regvm_release_and_clear_value_range(&vm->stack[arg_base], count);
 }
 
+static void regvm_init_inline_frame(vigil_vm_frame_t *frame, const vigil_object_t *callable,
+                                    const vigil_object_t *function, const vigil_chunk_t *chunk, size_t base_slot)
+{
+    if (frame == NULL)
+        return;
+
+    frame->callable = callable;
+    frame->function = function;
+    frame->chunk = chunk;
+    frame->ip = 0U;
+    frame->base_slot = base_slot;
+    frame->defers = NULL;
+    frame->defer_count = 0U;
+    frame->defer_capacity = 0U;
+    frame->pending_returns = NULL;
+    frame->pending_return_count = 0U;
+    frame->pending_return_capacity = 0U;
+    frame->draining_defers = 0;
+}
+
 static void regvm_swap_u8(uint8_t *left, uint8_t *right)
 {
     uint8_t tmp;
@@ -1007,6 +1027,39 @@ static uint8_t map_unary(uint8_t stack_op)
         return VREG_BNOT;
     default:
         return VREG_NEG;
+    }
+}
+
+static uint8_t map_cmp_jmp(uint8_t stack_op)
+{
+    switch (stack_op)
+    {
+    case VIGIL_OPCODE_LESS_I32_JUMP_IF_FALSE:
+        return VREG_LT_I32_JMP;
+    case VIGIL_OPCODE_LESS_EQUAL_I32_JUMP_IF_FALSE:
+        return VREG_LE_I32_JMP;
+    case VIGIL_OPCODE_GREATER_I32_JUMP_IF_FALSE:
+        return VREG_GT_I32_JMP;
+    case VIGIL_OPCODE_GREATER_EQUAL_I32_JUMP_IF_FALSE:
+        return VREG_GE_I32_JMP;
+    case VIGIL_OPCODE_EQUAL_I32_JUMP_IF_FALSE:
+        return VREG_EQ_I32_JMP;
+    case VIGIL_OPCODE_NOT_EQUAL_I32_JUMP_IF_FALSE:
+        return VREG_NE_I32_JMP;
+    case VIGIL_OPCODE_LESS_I64_JUMP_IF_FALSE:
+        return VREG_LT_I64_JMP;
+    case VIGIL_OPCODE_LESS_EQUAL_I64_JUMP_IF_FALSE:
+        return VREG_LE_I64_JMP;
+    case VIGIL_OPCODE_GREATER_I64_JUMP_IF_FALSE:
+        return VREG_GT_I64_JMP;
+    case VIGIL_OPCODE_GREATER_EQUAL_I64_JUMP_IF_FALSE:
+        return VREG_GE_I64_JMP;
+    case VIGIL_OPCODE_EQUAL_I64_JUMP_IF_FALSE:
+        return VREG_EQ_I64_JMP;
+    case VIGIL_OPCODE_NOT_EQUAL_I64_JUMP_IF_FALSE:
+        return VREG_NE_I64_JMP;
+    default:
+        return VREG_LT_I32_JMP;
     }
 }
 
@@ -1897,48 +1950,86 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
             uint8_t rb = vs_pop(&vs);
             uint8_t ra = vs_pop(&vs);
             size_t target = ip + (size_t)off;
-            uint8_t res = vs_push(&vs);
-            uint8_t cmp_op = VREG_EQ;
-            int reverse_operands = 0;
+            size_t direct_target = target;
+            int in_chain = 0;
 
-            switch (op)
+            if (ip < code_size && code[ip] == VIGIL_OPCODE_POP && ip + 1 < code_size)
             {
-            case VIGIL_OPCODE_LESS_I32_JUMP_IF_FALSE:
-            case VIGIL_OPCODE_LESS_I64_JUMP_IF_FALSE:
-                cmp_op = VREG_LT;
-                break;
-            case VIGIL_OPCODE_LESS_EQUAL_I32_JUMP_IF_FALSE:
-            case VIGIL_OPCODE_LESS_EQUAL_I64_JUMP_IF_FALSE:
-                cmp_op = VREG_LE;
-                break;
-            case VIGIL_OPCODE_GREATER_I32_JUMP_IF_FALSE:
-            case VIGIL_OPCODE_GREATER_I64_JUMP_IF_FALSE:
-                cmp_op = VREG_LT;
-                reverse_operands = 1;
-                break;
-            case VIGIL_OPCODE_GREATER_EQUAL_I32_JUMP_IF_FALSE:
-            case VIGIL_OPCODE_GREATER_EQUAL_I64_JUMP_IF_FALSE:
-                cmp_op = VREG_LE;
-                reverse_operands = 1;
-                break;
-            default:
-                cmp_op = VREG_EQ;
-                break;
+                uint8_t next = code[ip + 1U];
+
+                in_chain =
+                    (next == VIGIL_OPCODE_GET_LOCAL || next == VIGIL_OPCODE_CONSTANT || next == VIGIL_OPCODE_TRUE ||
+                     next == VIGIL_OPCODE_FALSE || next == VIGIL_OPCODE_NIL || next == VIGIL_OPCODE_GET_GLOBAL);
             }
 
-            if (reverse_operands)
-                regvm_swap_u8(&ra, &rb);
+            if (!in_chain && ip < code_size && code[ip] == VIGIL_OPCODE_JUMP && target < code_size &&
+                code[target] == VIGIL_OPCODE_POP)
+            {
+                in_chain = 1;
+            }
 
-            TR_EMIT(vigil_reg_abc(cmp_op, res, ra, rb));
-            if (op == VIGIL_OPCODE_NOT_EQUAL_I32_JUMP_IF_FALSE || op == VIGIL_OPCODE_NOT_EQUAL_I64_JUMP_IF_FALSE)
-                TR_EMIT(vigil_reg_abc(VREG_NOT, res, res, 0));
+            if (direct_target < code_size && code[direct_target] == VIGIL_OPCODE_POP)
+                direct_target += 1U;
 
-            NORMALIZE_TO_TARGET(target);
+            if (!in_chain && (depth_at[target] >= 0 || depth_at[direct_target] >= 0))
+                in_chain = 1;
 
-            TR_EMIT(vigil_reg_abc(VREG_TEST, vs_peek(&vs, 0), 0, 0));
-            jpatch_add(&patches, rc->code_count, target, 0, vs.top);
-            RECORD_DEPTH(target, vs.top);
-            TR_EMIT(vigil_reg_asbx(VREG_JMP, 0, 0));
+            if (in_chain)
+            {
+                uint8_t res = vs_push(&vs);
+                uint8_t cmp_op = VREG_EQ;
+                int reverse_operands = 0;
+
+                switch (op)
+                {
+                case VIGIL_OPCODE_LESS_I32_JUMP_IF_FALSE:
+                case VIGIL_OPCODE_LESS_I64_JUMP_IF_FALSE:
+                    cmp_op = VREG_LT;
+                    break;
+                case VIGIL_OPCODE_LESS_EQUAL_I32_JUMP_IF_FALSE:
+                case VIGIL_OPCODE_LESS_EQUAL_I64_JUMP_IF_FALSE:
+                    cmp_op = VREG_LE;
+                    break;
+                case VIGIL_OPCODE_GREATER_I32_JUMP_IF_FALSE:
+                case VIGIL_OPCODE_GREATER_I64_JUMP_IF_FALSE:
+                    cmp_op = VREG_LT;
+                    reverse_operands = 1;
+                    break;
+                case VIGIL_OPCODE_GREATER_EQUAL_I32_JUMP_IF_FALSE:
+                case VIGIL_OPCODE_GREATER_EQUAL_I64_JUMP_IF_FALSE:
+                    cmp_op = VREG_LE;
+                    reverse_operands = 1;
+                    break;
+                default:
+                    cmp_op = VREG_EQ;
+                    break;
+                }
+
+                if (reverse_operands)
+                    regvm_swap_u8(&ra, &rb);
+
+                TR_EMIT(vigil_reg_abc(cmp_op, res, ra, rb));
+                if (op == VIGIL_OPCODE_NOT_EQUAL_I32_JUMP_IF_FALSE || op == VIGIL_OPCODE_NOT_EQUAL_I64_JUMP_IF_FALSE)
+                    TR_EMIT(vigil_reg_abc(VREG_NOT, res, res, 0));
+
+                NORMALIZE_TO_TARGET(target);
+
+                TR_EMIT(vigil_reg_abc(VREG_TEST, vs_peek(&vs, 0), 0, 0));
+                jpatch_add(&patches, rc->code_count, target, 0, vs.top);
+                RECORD_DEPTH(target, vs.top);
+                TR_EMIT(vigil_reg_asbx(VREG_JMP, 0, 0));
+            }
+            else
+            {
+                NORMALIZE_TO_TARGET(direct_target);
+
+                TR_EMIT(vigil_reg_abc(map_cmp_jmp(op), ra, rb, 0));
+                jpatch_add(&patches, rc->code_count, direct_target, 0, vs.top);
+                RECORD_DEPTH(direct_target, vs.top);
+                TR_EMIT(vigil_reg_asbx(VREG_JMP, 0, 0));
+                if (ip < code_size && code[ip] == VIGIL_OPCODE_POP)
+                    ip += 1U;
+            }
             break;
         }
 
@@ -2982,7 +3073,8 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
     do                                                                                                                 \
     {                                                                                                                  \
         vigil_value_t _rstore_value = (value_expr);                                                                    \
-        RRELEASE(reg);                                                                                                 \
+        if (vigil_nanbox_has_object(R[(reg)]))                                                                         \
+            vigil_value_release(&R[(reg)]);                                                                            \
         R[(reg)] = _rstore_value;                                                                                      \
     } while (0)
 
@@ -4444,18 +4536,58 @@ r_dispatch_switch_check:
             status = VIGIL_STATUS_INTERNAL;
             goto r_cleanup;
         }
-        size_t saved_ip = frame->ip;
-        frame->ip = VIGIL_VM_CHUNK_CODE_SIZE(frame->chunk);
-        vm->stack_count = arg_base + (size_t)arg_count;
-        status = vigil_vm_execute_call(vm, callee, (size_t)arg_count, error);
-        frame = &vm->frames[vm->frame_count - 1];
-        frame->ip = saved_ip;
-        R = vm->stack + base;
+        vigil_chunk_t *cc = (vigil_chunk_t *)vigil_callable_object_chunk(callee);
+        if (VIGIL_UNLIKELY(!cc))
+        {
+            status = VIGIL_STATUS_INTERNAL;
+            goto r_cleanup;
+        }
+        const vigil_reg_chunk_t *callee_rc = NULL;
+        status = vigil_chunk_ensure_reg_cache(cc, (uint8_t)vigil_function_object_arity(callee), &callee_rc, error);
         if (status != VIGIL_STATUS_OK)
             goto r_cleanup;
+
+        frame->ip = ip + 1U;
+
+        if (VIGIL_UNLIKELY(vm->frame_count >= vm->frame_capacity))
+        {
+            vm->stack_count = arg_base + (size_t)arg_count;
+            status = vigil_vm_execute_call(vm, callee, (size_t)arg_count, error);
+            frame = &vm->frames[vm->frame_count - 1U];
+            R = vm->stack + base;
+            if (status != VIGIL_STATUS_OK)
+                goto r_cleanup;
+            if (vm->stack_count < base + rc->max_registers)
+                vm->stack_count = base + rc->max_registers;
+            RNEXT();
+        }
+
+        {
+            vigil_vm_frame_t *nf = &vm->frames[vm->frame_count++];
+            regvm_init_inline_frame(nf, callee, callee, cc, arg_base);
+        }
+
+        rc = callee_rc;
+        code = rc->code;
+        code_count = rc->code_count;
+        sc = rc->stack_chunk;
+        frame = &vm->frames[vm->frame_count - 1U];
+        base = arg_base;
+        has_reg_objects = 0;
+        ip = 0U;
+        R = vm->stack + base;
+
+        if (VIGIL_UNLIKELY(vm->stack_capacity < base + (size_t)rc->max_registers))
+        {
+            status = vigil_vm_grow_stack(vm, base + (size_t)rc->max_registers + 16U, error);
+            if (status != VIGIL_STATUS_OK)
+                goto r_cleanup;
+            R = vm->stack + base;
+        }
         if (vm->stack_count < base + rc->max_registers)
             vm->stack_count = base + rc->max_registers;
-        RNEXT();
+
+        RDISPATCH();
     }
 
     /* ── Native call ───────────────────────────────────────────── */
@@ -5141,24 +5273,48 @@ r_dispatch_switch_check:
         uint8_t ret = VREG_GET_A(i);
         uint8_t arg_count = VREG_GET_B(i);
         uint8_t arg_base_r = (uint8_t)(code[ip + 1] & 0xFF);
-        size_t orig_base = base + (size_t)ret;
         size_t arg_base = base + (size_t)arg_base_r;
-        size_t saved_ip = frame->ip;
-        frame->ip = VIGIL_VM_CHUNK_CODE_SIZE(frame->chunk);
-        vm->stack_count = arg_base + (size_t)arg_count;
-        status = vigil_vm_execute_call(vm, frame->function, (size_t)arg_count, error);
-        frame = &vm->frames[vm->frame_count - 1];
-        frame->ip = saved_ip;
-        R = vm->stack + base;
-        if (status != VIGIL_STATUS_OK)
-            goto r_cleanup;
+
+        frame->ip = ip + 2U;
+
+        if (VIGIL_UNLIKELY(vm->frame_count >= vm->frame_capacity))
         {
-            size_t ret_n = vm->stack_count > arg_base ? vm->stack_count - arg_base : 0U;
-            regvm_move_call_results(vm, orig_base, arg_base, (size_t)arg_count, (size_t)arg_count, ret_n);
+            REGVM_ISOLATE_CALL(arg_base, arg_count);
+            vm->stack_count = arg_base + (size_t)arg_count;
+            status = vigil_vm_execute_call(vm, frame->function, (size_t)arg_count, error);
+            frame = &vm->frames[vm->frame_count - 1U];
+            R = vm->stack + base;
+            if (status != VIGIL_STATUS_OK)
+                goto r_cleanup;
+            if (vm->stack_count > arg_base)
+                R[ret] = vm->stack[arg_base];
+            vm->stack_count = base + (size_t)ret + 1U;
+            if (vm->stack_count < base + rc->max_registers)
+                vm->stack_count = base + rc->max_registers;
+            ip += 1U;
+            RNEXT();
         }
-        REGVM_SYNC_POST();
-        ip += 1;
-        RNEXT();
+
+        {
+            vigil_vm_frame_t *nf = &vm->frames[vm->frame_count++];
+            regvm_init_inline_frame(nf, frame->callable, frame->function, frame->chunk, arg_base);
+        }
+
+        frame = &vm->frames[vm->frame_count - 1U];
+        base = arg_base;
+        has_reg_objects = 0;
+        ip = 0U;
+        if (VIGIL_UNLIKELY(vm->stack_capacity < base + (size_t)rc->max_registers))
+        {
+            status = vigil_vm_grow_stack(vm, base + (size_t)rc->max_registers + 16U, error);
+            if (status != VIGIL_STATUS_OK)
+                goto r_cleanup;
+        }
+        R = vm->stack + base;
+        if (vm->stack_count < base + rc->max_registers)
+            vm->stack_count = base + rc->max_registers;
+
+        RDISPATCH();
     }
     RCASE(CALL_INTERFACE)
     {
