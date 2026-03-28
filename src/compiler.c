@@ -6463,6 +6463,7 @@ static vigil_status_t vigil_parser_parse_constructor_resolved(vigil_parser_state
                                                               vigil_source_span_t call_span, size_t class_index,
                                                               const vigil_class_decl_t *decl,
                                                               vigil_expression_result_t *out_result);
+static size_t vigil_parser_effective_call_return_count(vigil_parser_type_t return_type, size_t return_count);
 
 static vigil_status_t vigil_parser_parse_call(vigil_parser_state_t *state, const vigil_token_t *name_token,
                                               vigil_expression_result_t *out_result)
@@ -6483,6 +6484,7 @@ static vigil_status_t vigil_parser_parse_call(vigil_parser_state_t *state, const
     return vigil_parser_parse_call_resolved(state, name_token->span, function_index, decl, out_result);
 }
 
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
 static vigil_status_t vigil_parser_parse_value_call(vigil_parser_state_t *state, vigil_source_span_t call_span,
                                                     vigil_parser_type_t callee_type,
                                                     vigil_expression_result_t *out_result)
@@ -6576,8 +6578,22 @@ static vigil_status_t vigil_parser_parse_value_call(vigil_parser_state_t *state,
     }
     else
     {
-        vigil_expression_result_set_return_types(out_result, function_type->return_type, function_type->return_types,
-                                                 function_type->return_count);
+        size_t effective_return_count =
+            vigil_parser_effective_call_return_count(function_type->return_type, function_type->return_count);
+        status = vigil_parser_emit_u32(state, (uint32_t)effective_return_count, call_span);
+        if (status != VIGIL_STATUS_OK)
+        {
+            return status;
+        }
+        if (vigil_parser_type_is_void(function_type->return_type))
+        {
+            vigil_expression_result_set_type(out_result, vigil_binding_type_primitive(VIGIL_TYPE_VOID));
+        }
+        else
+        {
+            vigil_expression_result_set_return_types(out_result, function_type->return_type,
+                                                     function_type->return_types, function_type->return_count);
+        }
     }
     return VIGIL_STATUS_OK;
 }
@@ -6607,6 +6623,14 @@ static vigil_status_t vigil_parser_emit_call(vigil_parser_state_t *state, vigil_
     if (status == VIGIL_STATUS_OK)
         status = vigil_parser_emit_u32(state, (uint32_t)return_count, span);
     return status;
+}
+
+static size_t vigil_parser_effective_call_return_count(vigil_parser_type_t return_type, size_t return_count)
+{
+    if (return_count == 1U && vigil_parser_type_is_void(return_type))
+        return 0U;
+
+    return return_count;
 }
 
 static vigil_status_t vigil_parser_parse_call_resolved(vigil_parser_state_t *state, vigil_source_span_t call_span,
@@ -6680,7 +6704,10 @@ static vigil_status_t vigil_parser_parse_call_resolved(vigil_parser_state_t *sta
     }
 
     {
-        status = vigil_parser_emit_call(state, call_span, defer_call, function_index, arg_count, decl->return_count);
+        size_t effective_return_count = vigil_parser_effective_call_return_count(decl->return_type, decl->return_count);
+
+        status =
+            vigil_parser_emit_call(state, call_span, defer_call, function_index, arg_count, effective_return_count);
         if (status != VIGIL_STATUS_OK)
             return status;
     }
@@ -6692,6 +6719,10 @@ static vigil_status_t vigil_parser_parse_call_resolved(vigil_parser_state_t *sta
     if (defer_call)
     {
         state->defer_emitted = 1;
+        vigil_expression_result_set_type(out_result, vigil_binding_type_primitive(VIGIL_TYPE_VOID));
+    }
+    else if (vigil_parser_type_is_void(decl->return_type))
+    {
         vigil_expression_result_set_type(out_result, vigil_binding_type_primitive(VIGIL_TYPE_VOID));
     }
     else
@@ -6723,7 +6754,7 @@ static vigil_status_t vigil_parser_parse_constructor(vigil_parser_state_t *state
 
 static vigil_status_t emit_constructor_call(vigil_parser_state_t *state, vigil_source_span_t span,
                                             const vigil_class_decl_t *decl, size_t class_index, size_t arg_count,
-                                            int defer_call)
+                                            size_t constructor_return_count, int defer_call)
 {
     vigil_status_t status;
 
@@ -6744,10 +6775,10 @@ static vigil_status_t emit_constructor_call(vigil_parser_state_t *state, vigil_s
     status = vigil_parser_emit_u32(state, (uint32_t)arg_count, span);
     if (status != VIGIL_STATUS_OK)
         return status;
-    /* Constructors and NEW_INSTANCE return 1 value. Only CALL/DEFER_CALL
-       need the return_count operand; NEW_INSTANCE doesn't. */
+    /* NEW_INSTANCE returns one value directly. Synthetic constructor calls
+       must carry their real return count so regvm can model fallible init. */
     if (decl->constructor_function_index != (size_t)-1)
-        return vigil_parser_emit_u32(state, 1U, span);
+        return vigil_parser_emit_u32(state, (uint32_t)constructor_return_count, span);
     return VIGIL_STATUS_OK;
 }
 
@@ -6819,7 +6850,10 @@ static vigil_status_t vigil_parser_parse_constructor_resolved(vigil_parser_state
     if (arg_count != expected_arg_count || arg_count > UINT32_MAX || class_index > UINT32_MAX)
         return vigil_parser_report(state, call_span, "constructor argument count does not match class signature");
 
-    status = emit_constructor_call(state, call_span, decl, class_index, arg_count, defer_call);
+    status = emit_constructor_call(
+        state, call_span, decl, class_index, arg_count,
+        use_ctor_fn ? vigil_parser_effective_call_return_count(ctor_decl->return_type, ctor_decl->return_count) : 1U,
+        defer_call);
     if (status != VIGIL_STATUS_OK)
         return status;
 
@@ -7145,6 +7179,8 @@ static vigil_status_t vigil_parser_emit_native_call(vigil_parser_state_t *state,
     vigil_value_init_object(&native_val, &native_obj);
     {
         size_t const_idx = 0U;
+        size_t effective_return_count = vigil_parser_effective_call_return_count(
+            vigil_binding_type_primitive((vigil_type_kind_t)fn->return_type), fn->return_count);
         status = vigil_chunk_add_constant(&state->chunk, &native_val, &const_idx, state->program->error);
         vigil_value_release(&native_val);
         if (status == VIGIL_STATUS_OK)
@@ -7155,7 +7191,7 @@ static vigil_status_t vigil_parser_emit_native_call(vigil_parser_state_t *state,
         if (status == VIGIL_STATUS_OK)
             status = vigil_parser_emit_u32(state, (uint32_t)arg_count, member_token->span);
         if (status == VIGIL_STATUS_OK)
-            status = vigil_parser_emit_u32(state, (uint32_t)fn->return_count, member_token->span);
+            status = vigil_parser_emit_u32(state, (uint32_t)effective_return_count, member_token->span);
         if (status != VIGIL_STATUS_OK)
             return status;
     }
@@ -7191,6 +7227,15 @@ static size_t vigil_parser_resolve_return_class(const vigil_parser_state_t *stat
     return class_index;
 }
 
+static vigil_parser_type_t vigil_parser_resolve_native_method_result_type(const vigil_parser_state_t *state,
+                                                                          const vigil_native_class_method_t *method,
+                                                                          size_t class_index, int type_kind)
+{
+    if (type_kind == VIGIL_TYPE_OBJECT)
+        return vigil_binding_type_class(vigil_parser_resolve_return_class(state, method, class_index));
+    return vigil_binding_type_primitive((vigil_type_kind_t)type_kind);
+}
+
 /* Resolve the return type for a native class method, handling array returns. */
 static void vigil_parser_set_native_method_return_type(vigil_parser_state_t *state,
                                                        const vigil_native_class_method_t *method, size_t class_index,
@@ -7214,8 +7259,8 @@ static void vigil_parser_set_native_method_return_type(vigil_parser_state_t *sta
         }
         else if (method->return_type == VIGIL_TYPE_OBJECT)
         {
-            vigil_expression_result_set_type(
-                out_result, vigil_binding_type_class(vigil_parser_resolve_return_class(state, method, class_index)));
+            vigil_expression_result_set_type(out_result, vigil_parser_resolve_native_method_result_type(
+                                                             state, method, class_index, method->return_type));
         }
         else
         {
@@ -7232,16 +7277,18 @@ static void vigil_parser_set_native_method_return_type(vigil_parser_state_t *sta
         }
         else if (method->return_count == 2U)
         {
-            vigil_expression_result_set_pair(out_result,
-                                             vigil_binding_type_primitive((vigil_type_kind_t)method->return_types[0]),
-                                             vigil_binding_type_primitive((vigil_type_kind_t)method->return_types[1]));
+            vigil_expression_result_set_pair(
+                out_result,
+                vigil_parser_resolve_native_method_result_type(state, method, class_index, method->return_types[0]),
+                vigil_parser_resolve_native_method_result_type(state, method, class_index, method->return_types[1]));
         }
         else if (method->return_count >= 3U)
         {
             vigil_expression_result_set_triple(
-                out_result, vigil_binding_type_primitive((vigil_type_kind_t)method->return_types[0]),
-                vigil_binding_type_primitive((vigil_type_kind_t)method->return_types[1]),
-                vigil_binding_type_primitive((vigil_type_kind_t)method->return_types[2]));
+                out_result,
+                vigil_parser_resolve_native_method_result_type(state, method, class_index, method->return_types[0]),
+                vigil_parser_resolve_native_method_result_type(state, method, class_index, method->return_types[1]),
+                vigil_parser_resolve_native_method_result_type(state, method, class_index, method->return_types[2]));
         }
     }
 }
@@ -7355,7 +7402,11 @@ static vigil_status_t vigil_parser_parse_native_static_method_call(vigil_parser_
         {
             return status;
         }
-        status = vigil_parser_emit_u32(state, (uint32_t)method->return_count, method_token->span);
+        status = vigil_parser_emit_u32(
+            state,
+            (uint32_t)vigil_parser_effective_call_return_count(
+                vigil_binding_type_primitive((vigil_type_kind_t)method->return_type), method->return_count),
+            method_token->span);
         if (status != VIGIL_STATUS_OK)
         {
             return status;
@@ -7467,7 +7518,11 @@ static vigil_status_t vigil_parser_parse_native_method_call(vigil_parser_state_t
         {
             return status;
         }
-        status = vigil_parser_emit_u32(state, (uint32_t)method->return_count, method_token->span);
+        status = vigil_parser_emit_u32(
+            state,
+            (uint32_t)vigil_parser_effective_call_return_count(
+                vigil_binding_type_primitive((vigil_type_kind_t)method->return_type), method->return_count),
+            method_token->span);
         if (status != VIGIL_STATUS_OK)
         {
             return status;
@@ -7692,6 +7747,7 @@ static vigil_status_t vigil_parser_parse_qualified_symbol(vigil_parser_state_t *
     return parse_qualified_non_call(state, member_token, source_id, member_name, member_name_length, out_result);
 }
 
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
 static vigil_status_t vigil_parser_parse_method_call(vigil_parser_state_t *state, const vigil_token_t *method_token,
                                                      const vigil_class_method_t *method,
                                                      vigil_expression_result_t *out_result)
@@ -7780,7 +7836,9 @@ static vigil_status_t vigil_parser_parse_method_call(vigil_parser_state_t *state
     {
         return status;
     }
-    status = vigil_parser_emit_u32(state, (uint32_t)decl->return_count, method_token->span);
+    status = vigil_parser_emit_u32(
+        state, (uint32_t)vigil_parser_effective_call_return_count(decl->return_type, decl->return_count),
+        method_token->span);
     if (status != VIGIL_STATUS_OK)
     {
         return status;
@@ -7791,6 +7849,10 @@ static vigil_status_t vigil_parser_parse_method_call(vigil_parser_state_t *state
         state->defer_emitted = 1;
         vigil_expression_result_set_type(out_result, vigil_binding_type_primitive(VIGIL_TYPE_VOID));
     }
+    else if (vigil_parser_type_is_void(decl->return_type))
+    {
+        vigil_expression_result_set_type(out_result, vigil_binding_type_primitive(VIGIL_TYPE_VOID));
+    }
     else
     {
         vigil_expression_result_set_return_types(out_result, decl->return_type, vigil_function_return_types(decl),
@@ -7799,6 +7861,7 @@ static vigil_status_t vigil_parser_parse_method_call(vigil_parser_state_t *state
     return VIGIL_STATUS_OK;
 }
 
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
 static vigil_status_t vigil_parser_parse_interface_method_call(vigil_parser_state_t *state,
                                                                vigil_parser_type_t receiver_type, size_t method_index,
                                                                const vigil_token_t *method_token,
@@ -7897,8 +7960,22 @@ static vigil_status_t vigil_parser_parse_interface_method_call(vigil_parser_stat
     }
     else
     {
-        vigil_expression_result_set_return_types(out_result, method->return_type,
-                                                 vigil_interface_method_return_types(method), method->return_count);
+        size_t effective_return_count =
+            vigil_parser_effective_call_return_count(method->return_type, method->return_count);
+        status = vigil_parser_emit_u32(state, (uint32_t)effective_return_count, method_token->span);
+        if (status != VIGIL_STATUS_OK)
+        {
+            return status;
+        }
+        if (vigil_parser_type_is_void(method->return_type))
+        {
+            vigil_expression_result_set_type(out_result, vigil_binding_type_primitive(VIGIL_TYPE_VOID));
+        }
+        else
+        {
+            vigil_expression_result_set_return_types(out_result, method->return_type,
+                                                     vigil_interface_method_return_types(method), method->return_count);
+        }
     }
     return VIGIL_STATUS_OK;
 }
@@ -10073,6 +10150,129 @@ static int vigil_parser_trailing_return_is_single(const uint8_t *c, size_t len)
             ((uint32_t)c[len - 1U] << 24U)) == 1U;
 }
 
+static uint8_t compiler_stack_opcode_size(vigil_opcode_t opcode)
+{
+    static const struct
+    {
+        vigil_opcode_t opcode;
+        uint8_t size;
+    } sizes[] = {
+        {VIGIL_OPCODE_CONSTANT, 5U},
+        {VIGIL_OPCODE_RETURN, 5U},
+        {VIGIL_OPCODE_GET_LOCAL, 5U},
+        {VIGIL_OPCODE_SET_LOCAL, 5U},
+        {VIGIL_OPCODE_GET_GLOBAL, 5U},
+        {VIGIL_OPCODE_SET_GLOBAL, 5U},
+        {VIGIL_OPCODE_GET_FUNCTION, 5U},
+        {VIGIL_OPCODE_GET_CAPTURE, 5U},
+        {VIGIL_OPCODE_SET_CAPTURE, 5U},
+        {VIGIL_OPCODE_JUMP, 5U},
+        {VIGIL_OPCODE_JUMP_IF_FALSE, 5U},
+        {VIGIL_OPCODE_LOOP, 5U},
+        {VIGIL_OPCODE_FORMAT_F64, 5U},
+        {VIGIL_OPCODE_GET_FIELD, 5U},
+        {VIGIL_OPCODE_SET_FIELD, 5U},
+        {VIGIL_OPCODE_DEFER_CALL_VALUE, 5U},
+        {VIGIL_OPCODE_LESS_I32_JUMP_IF_FALSE, 5U},
+        {VIGIL_OPCODE_LESS_EQUAL_I32_JUMP_IF_FALSE, 5U},
+        {VIGIL_OPCODE_GREATER_I32_JUMP_IF_FALSE, 5U},
+        {VIGIL_OPCODE_GREATER_EQUAL_I32_JUMP_IF_FALSE, 5U},
+        {VIGIL_OPCODE_EQUAL_I32_JUMP_IF_FALSE, 5U},
+        {VIGIL_OPCODE_NOT_EQUAL_I32_JUMP_IF_FALSE, 5U},
+        {VIGIL_OPCODE_LESS_I64_JUMP_IF_FALSE, 5U},
+        {VIGIL_OPCODE_LESS_EQUAL_I64_JUMP_IF_FALSE, 5U},
+        {VIGIL_OPCODE_GREATER_I64_JUMP_IF_FALSE, 5U},
+        {VIGIL_OPCODE_GREATER_EQUAL_I64_JUMP_IF_FALSE, 5U},
+        {VIGIL_OPCODE_EQUAL_I64_JUMP_IF_FALSE, 5U},
+        {VIGIL_OPCODE_NOT_EQUAL_I64_JUMP_IF_FALSE, 5U},
+        {VIGIL_OPCODE_ADD_F64_STORE, 5U},
+        {VIGIL_OPCODE_SUBTRACT_F64_STORE, 5U},
+        {VIGIL_OPCODE_MULTIPLY_F64_STORE, 5U},
+        {VIGIL_OPCODE_INCREMENT_LOCAL_I32, 6U},
+        {VIGIL_OPCODE_INCREMENT_LOCAL_I64, 6U},
+        {VIGIL_OPCODE_NEW_CLOSURE, 9U},
+        {VIGIL_OPCODE_CALL_VALUE, 9U},
+        {VIGIL_OPCODE_NEW_INSTANCE, 9U},
+        {VIGIL_OPCODE_NEW_ARRAY, 9U},
+        {VIGIL_OPCODE_NEW_MAP, 9U},
+        {VIGIL_OPCODE_DEFER_NEW_INSTANCE, 9U},
+        {VIGIL_OPCODE_LOCALS_ADD_I64, 9U},
+        {VIGIL_OPCODE_LOCALS_SUBTRACT_I64, 9U},
+        {VIGIL_OPCODE_LOCALS_MULTIPLY_I64, 9U},
+        {VIGIL_OPCODE_LOCALS_MODULO_I64, 9U},
+        {VIGIL_OPCODE_LOCALS_LESS_I64, 9U},
+        {VIGIL_OPCODE_LOCALS_LESS_EQUAL_I64, 9U},
+        {VIGIL_OPCODE_LOCALS_GREATER_I64, 9U},
+        {VIGIL_OPCODE_LOCALS_GREATER_EQUAL_I64, 9U},
+        {VIGIL_OPCODE_LOCALS_EQUAL_I64, 9U},
+        {VIGIL_OPCODE_LOCALS_NOT_EQUAL_I64, 9U},
+        {VIGIL_OPCODE_TAIL_CALL, 9U},
+        {VIGIL_OPCODE_CALL_NATIVE, 13U},
+        {VIGIL_OPCODE_FORMAT_SPEC, 9U},
+        {VIGIL_OPCODE_CALL_SELF, 9U},
+        {VIGIL_OPCODE_LOCALS_ADD_F64, 9U},
+        {VIGIL_OPCODE_LOCALS_SUBTRACT_F64, 9U},
+        {VIGIL_OPCODE_LOCALS_MULTIPLY_F64, 9U},
+        {VIGIL_OPCODE_CALL, 13U},
+        {VIGIL_OPCODE_DEFER_CALL, 13U},
+        {VIGIL_OPCODE_CALL_INTERFACE, 17U},
+        {VIGIL_OPCODE_DEFER_CALL_INTERFACE, 13U},
+        {VIGIL_OPCODE_LOCALS_ADD_I32_STORE, 13U},
+        {VIGIL_OPCODE_LOCALS_SUBTRACT_I32_STORE, 13U},
+        {VIGIL_OPCODE_LOCALS_MULTIPLY_I32_STORE, 13U},
+        {VIGIL_OPCODE_LOCALS_LESS_I32_STORE, 13U},
+        {VIGIL_OPCODE_LOCALS_LESS_EQUAL_I32_STORE, 13U},
+        {VIGIL_OPCODE_LOCALS_GREATER_I32_STORE, 13U},
+        {VIGIL_OPCODE_LOCALS_GREATER_EQUAL_I32_STORE, 13U},
+        {VIGIL_OPCODE_LOCALS_EQUAL_I32_STORE, 13U},
+        {VIGIL_OPCODE_LOCALS_NOT_EQUAL_I32_STORE, 13U},
+        {VIGIL_OPCODE_LOCALS_MODULO_I32_STORE, 13U},
+        {VIGIL_OPCODE_DEFER_CALL_NATIVE, 13U},
+        {VIGIL_OPCODE_CALL_EXTERN, 9U},
+        {VIGIL_OPCODE_FORLOOP_I32, 15U},
+        {VIGIL_OPCODE_FORLOOP_I64, 15U},
+        {VIGIL_OPCODE_LOCALS_ADD_F64_STORE, 13U},
+        {VIGIL_OPCODE_LOCALS_SUBTRACT_F64_STORE, 13U},
+        {VIGIL_OPCODE_LOCALS_MULTIPLY_F64_STORE, 13U},
+    };
+    size_t index;
+
+    for (index = 0U; index < sizeof(sizes) / sizeof(sizes[0]); index += 1U)
+    {
+        if (sizes[index].opcode == opcode)
+            return sizes[index].size;
+    }
+
+    return 1U;
+}
+
+static size_t compiler_stack_op_size(const uint8_t *c, size_t ip, size_t len)
+{
+    size_t size;
+
+    if (ip >= len)
+        return 1U;
+
+    size = compiler_stack_opcode_size((vigil_opcode_t)c[ip]);
+    if (size > len - ip)
+        return len - ip;
+    return size;
+}
+
+static int compiler_is_instruction_boundary(const uint8_t *c, size_t len, size_t target)
+{
+    size_t ip = 0U;
+
+    while (ip < len)
+    {
+        if (ip == target)
+            return 1;
+        ip += compiler_stack_op_size(c, ip, len);
+    }
+
+    return target == len;
+}
+
 static void vigil_parser_truncate_code(vigil_parser_state_t *state, size_t new_len)
 {
     state->chunk.code.length = new_len;
@@ -10082,7 +10282,8 @@ static void vigil_parser_truncate_code(vigil_parser_state_t *state, size_t new_l
 
 static int vigil_parser_is_self_tail_call(const uint8_t *c, size_t len)
 {
-    return len >= 14U && c[len - 14U] == VIGIL_OPCODE_CALL_SELF && vigil_parser_trailing_return_is_single(c, len);
+    return len >= 14U && compiler_is_instruction_boundary(c, len - 5U, len - 14U) &&
+           c[len - 14U] == VIGIL_OPCODE_CALL_SELF && vigil_parser_trailing_return_is_single(c, len);
 }
 
 static void vigil_parser_peephole_tail_call_self(vigil_parser_state_t *state, uint8_t *c, size_t len)
@@ -10146,7 +10347,8 @@ static void peephole_tail_call(vigil_parser_state_t *state)
 
     if (state->expected_return_count != 1U || state->defer_emitted)
         return;
-    if (len >= 18U && c[len - 18U] == VIGIL_OPCODE_CALL && c[len - 5U] == VIGIL_OPCODE_RETURN)
+    if (len >= 18U && compiler_is_instruction_boundary(c, len - 5U, len - 18U) && c[len - 18U] == VIGIL_OPCODE_CALL &&
+        c[len - 5U] == VIGIL_OPCODE_RETURN)
     {
         uint32_t ret_count = (uint32_t)c[len - 4U] | ((uint32_t)c[len - 3U] << 8U) | ((uint32_t)c[len - 2U] << 16U) |
                              ((uint32_t)c[len - 1U] << 24U);
@@ -13508,10 +13710,10 @@ static vigil_status_t vigil_compile_synthetic_constructor(vigil_program_state_t 
         goto cleanup;
     }
     {
-        /* Use init's return count, not the constructor's, so the register VM
-           translator tracks the correct number of return values. */
         const vigil_function_decl_t *init_decl = &program->functions.functions[init_function_index];
-        status = vigil_parser_emit_u32(&state, (uint32_t)init_decl->return_count, decl->name_span);
+        size_t init_call_return_count =
+            vigil_parser_effective_call_return_count(init_decl->return_type, init_decl->return_count);
+        status = vigil_parser_emit_u32(&state, (uint32_t)init_call_return_count, decl->name_span);
     }
     if (status != VIGIL_STATUS_OK)
     {
@@ -13642,6 +13844,11 @@ static vigil_status_t vigil_compile_extern_fn(vigil_program_state_t *program, si
         if (status != VIGIL_STATUS_OK)
             goto cleanup;
         status = vigil_parser_emit_u32(&state, (uint32_t)decl->param_count, decl->name_span);
+        if (status != VIGIL_STATUS_OK)
+            goto cleanup;
+        status = vigil_parser_emit_u32(
+            &state, (uint32_t)vigil_parser_effective_call_return_count(decl->return_type, decl->return_count),
+            decl->name_span);
         if (status != VIGIL_STATUS_OK)
             goto cleanup;
     }

@@ -1651,12 +1651,12 @@ static vigil_status_t writer_open_impl(vigil_vm_t *vm, size_t arg_count, const c
 
 static vigil_status_t writer_open(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
 {
-    return writer_open_impl(vm, arg_count, "w", error);
+    return writer_open_impl(vm, arg_count, "wb", error);
 }
 
 static vigil_status_t writer_open_append(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
 {
-    return writer_open_impl(vm, arg_count, "a", error);
+    return writer_open_impl(vm, arg_count, "ab", error);
 }
 
 static vigil_status_t writer_write_impl(vigil_vm_t *vm, size_t arg_count, int newline, vigil_error_t *error)
@@ -1669,15 +1669,19 @@ static vigil_status_t writer_write_impl(vigil_vm_t *vm, size_t arg_count, int ne
     fs_writer_t *wr;
     size_t written;
 
-    vigil_vm_stack_pop_n(vm, arg_count);
-
     if (self == NULL || !get_string_arg(vm, base, 1, &str, &str_len))
+    {
+        vigil_vm_stack_pop_n(vm, arg_count);
         return push_zero_and_err(vm, "write: invalid argument", FS_ERR_IO, error);
+    }
 
     handle = get_handle_field(self, WF_HANDLE);
     wr = (fs_writer_t *)fs_registry_get(&g_writers, handle);
     if (wr == NULL || wr->closed)
+    {
+        vigil_vm_stack_pop_n(vm, arg_count);
         return push_zero_and_err(vm, "write: writer is closed", FS_ERR_IO, error);
+    }
 
     written = fwrite(str, 1, str_len, wr->fp);
     if (newline && written == str_len)
@@ -1687,8 +1691,12 @@ static vigil_status_t writer_write_impl(vigil_vm_t *vm, size_t arg_count, int ne
     }
 
     if (ferror(wr->fp))
+    {
+        vigil_vm_stack_pop_n(vm, arg_count);
         return push_zero_and_err(vm, "write: I/O error", FS_ERR_IO, error);
+    }
 
+    vigil_vm_stack_pop_n(vm, arg_count);
     return push_i32_and_ok(vm, (int64_t)written, error);
 }
 

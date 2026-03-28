@@ -3,20 +3,18 @@ import "fs";
 import "fmt";
 import "regex";
 
-fn grep_file(string filepath, string pattern, bool invertMatch, bool lineNumber, bool countOnly, bool filesWithMatches, bool printFilename) -> i32 {
+fn grep_count_matches(string filepath, string pattern, bool invertMatch) -> i32 {
     if (!fs.exists(filepath)) {
         fmt.eprintln(f"grep: {filepath}: No such file or directory");
         return 0;
     }
-    string content = fs.read(filepath);
 
+    string content = fs.read(filepath);
     array<string> lines = content.split("\n");
     i32 matchCount = 0;
 
     for (i32 i = 0; i < lines.len(); i++) {
         string line = lines[i];
-        i32 lineNum = i + 1;
-
         bool matches = regex.match(pattern, line);
         if (invertMatch) {
             matches = !matches;
@@ -24,33 +22,68 @@ fn grep_file(string filepath, string pattern, bool invertMatch, bool lineNumber,
 
         if (matches) {
             matchCount++;
-
-            if (!countOnly && !filesWithMatches) {
-                string prefix = "";
-                if (printFilename) {
-                    prefix = f"{filepath}:";
-                }
-                if (lineNumber) {
-                    fmt.println(f"{prefix}{lineNum}:{line}");
-                } else {
-                    fmt.println(f"{prefix}{line}");
-                }
-            }
         }
     }
 
-    if (filesWithMatches && matchCount > 0) {
-        fmt.println(filepath);
+    return matchCount;
+}
+
+fn grep_print_matches(string filepath, string pattern, bool invertMatch, bool lineNumber, bool printFilename) -> i32 {
+    i32 matchCount = 0;
+    if (!fs.exists(filepath)) {
+        fmt.eprintln(f"grep: {filepath}: No such file or directory");
+        return 0;
     }
+
+    string content = fs.read(filepath);
+    array<string> lines = content.split("\n");
+
+    for (i32 i = 0; i < lines.len(); i++) {
+        string line = lines[i];
+        i32 lineNum = i + 1;
+        bool matches = regex.match(pattern, line);
+        if (invertMatch) {
+            matches = !matches;
+        }
+        if (!matches) {
+            continue;
+        }
+
+        matchCount++;
+        if (printFilename && lineNumber) {
+            fmt.println(f"{filepath}:{lineNum}:{line}");
+        } else if (printFilename) {
+            fmt.println(f"{filepath}:{line}");
+        } else if (lineNumber) {
+            fmt.println(f"{lineNum}:{line}");
+        } else {
+            fmt.println(line);
+        }
+    }
+
+    return matchCount;
+}
+
+fn grep_file(string filepath, string pattern, bool invertMatch, bool lineNumber, bool countOnly, bool filesWithMatches, bool printFilename) -> i32 {
+    if (filesWithMatches) {
+        i32 matchCount = grep_count_matches(filepath, pattern, invertMatch);
+        if (matchCount > 0) {
+            fmt.println(filepath);
+        }
+        return matchCount;
+    }
+
     if (countOnly) {
+        i32 matchCount = grep_count_matches(filepath, pattern, invertMatch);
         if (printFilename) {
             fmt.println(f"{filepath}:{matchCount}");
         } else {
             fmt.println(f"{matchCount}");
         }
+        return matchCount;
     }
 
-    return matchCount;
+    return grep_print_matches(filepath, pattern, invertMatch, lineNumber, printFilename);
 }
 
 fn grep_recursive(string dirpath, string pattern, bool invertMatch, bool lineNumber, bool countOnly, bool filesWithMatches, bool printFilename) -> i32 {

@@ -253,43 +253,10 @@ fn run_progress_test() -> bool {
     return has_100;
 }
 // ── Section 6: Number Formatting ────────────────────────────────────────────
-// Thousands separators, currency, percentages — all manual since fmt has none.
+// Thousands separators, currency, percentages.
 /// Format an integer with thousands separators.
 fn fmt_thousands(i64 n) -> string {
-    bool neg = n < i64(0);
-    if (neg) {
-        n = - n;
-    }
-
-    string s = string(n);
-    i32 slen = s.len();
-    if (slen <= 3) {
-        if (neg) {
-            return "-" + s;
-        }
-
-        return s;
-    }
-
-    string result = "";
-    i32 count = 0;
-    i32 idx = slen - 1;
-    while (idx >= 0) {
-        string ch, err e = s.char_at(idx);
-        if (count > 0 && count % 3 == 0) {
-            result = "," + result;
-        }
-
-        result = ch + result;
-        count = count + 1;
-        idx = idx - 1;
-    }
-
-    if (neg) {
-        return "-" + result;
-    }
-
-    return result;
+    return f"{n:,}";
 }
 /// Format as currency (USD).
 fn fmt_currency(f64 amount) -> string {

@@ -1243,6 +1243,7 @@ vigil_status_t vigil_program_synthesize_class_constructor(vigil_program_state_t 
     size_t class_index;
     size_t ctor_index;
     size_t param_index;
+    int init_returns_err;
 
     init_method = NULL;
     init_decl = NULL;
@@ -1263,6 +1264,7 @@ vigil_status_t vigil_program_synthesize_class_constructor(vigil_program_state_t 
     {
         return vigil_compile_report(program, init_method->name_span, "init methods must return void or err");
     }
+    init_returns_err = vigil_parser_type_is_err(init_decl->return_type);
 
     status = vigil_program_grow_functions(program, program->functions.count + 1U);
     if (status != VIGIL_STATUS_OK)
@@ -1284,7 +1286,7 @@ vigil_status_t vigil_program_synthesize_class_constructor(vigil_program_state_t 
         vigil_binding_function_free(program->registry->runtime, ctor_decl);
         return status;
     }
-    if (vigil_parser_type_is_err(init_decl->return_type))
+    if (init_returns_err)
     {
         status = vigil_binding_function_add_return_type(program->registry->runtime, ctor_decl,
                                                         vigil_binding_type_primitive(VIGIL_TYPE_ERR), program->error);
