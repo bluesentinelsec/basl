@@ -2318,10 +2318,10 @@ vigil_status_t vigil_vm_execute_call(vigil_vm_t *vm, const vigil_object_t *calle
     }
 
     /* Push callee frame. */
+    /* clang-format off */
     if (vm->frame_count >= vm->frame_capacity)
     {
-        vigil_status_t s =
-            vigil_vm_push_frame(vm, callee, vigil_callable_object_function(callee), callee_chunk, base_slot, error);
+        vigil_status_t s = vigil_vm_push_frame(vm, callee, vigil_callable_object_function(callee), callee_chunk, base_slot, error);
         if (s != VIGIL_STATUS_OK)
             return s;
     }
@@ -2344,8 +2344,9 @@ vigil_status_t vigil_vm_execute_call(vigil_vm_t *vm, const vigil_object_t *calle
     }
 
     /* Translate on first use and publish the cache exactly once. */
-    status = vigil_chunk_ensure_reg_cache(
-        callee_chunk, (uint8_t)vigil_function_object_arity(vigil_callable_object_function(callee)), &callee_rc, error);
+    status = vigil_chunk_ensure_reg_cache(callee_chunk,
+                                          (uint8_t)vigil_function_object_arity(vigil_callable_object_function(callee)),
+                                          &callee_rc, error);
     if (status != VIGIL_STATUS_OK)
         return status;
 
@@ -2357,9 +2358,9 @@ vigil_status_t vigil_vm_execute_call(vigil_vm_t *vm, const vigil_object_t *calle
         if (vm->stack_capacity < need)
         {
             vigil_status_t gs = vigil_vm_grow_stack(vm, need + 16, error);
-            if (gs != VIGIL_STATUS_OK)
-                return gs;
+            if (gs != VIGIL_STATUS_OK) return gs;
         }
+        /* clang-format on */
         vigil_vm_release_value_range(&vm->stack[base_slot], (size_t)callee_rc->max_registers);
         if (vm->stack_count < need)
             vm->stack_count = need;

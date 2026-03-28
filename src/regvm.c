@@ -1359,87 +1359,41 @@ int vigil_reg_chunk_is_translatable(const vigil_chunk_t *stack_chunk)
 
 /* Pack top n virtual stack values into consecutive registers ending at
    the highest. Emits MOV instructions for any gaps. */
-#if defined(_MSC_VER)
 #define SYNC_PACK(n)                                                                                                   \
     do                                                                                                                 \
     {                                                                                                                  \
-        __pragma(warning(push)) __pragma(warning(disable : 4127)) if ((n) > 1)                                         \
+        uint32_t _count = (uint32_t)(n);                                                                               \
+        if (_count > 1U)                                                                                               \
         {                                                                                                              \
             uint8_t _hi = vs.regs[vs.top - 1];                                                                         \
-            for (int _si = 2; _si <= (int)(n); _si++)                                                                  \
+            for (uint32_t _si = 2U; _si <= _count; _si++)                                                              \
             {                                                                                                          \
-                uint8_t _exp = (uint8_t)(_hi - (_si - 1));                                                             \
-                uint8_t _act = vs.regs[vs.top - _si];                                                                  \
+                uint8_t _exp = (uint8_t)(_hi - (uint8_t)(_si - 1U));                                                   \
+                uint8_t _act = vs.regs[vs.top - (int)_si];                                                             \
                 if (_act != _exp)                                                                                      \
                 {                                                                                                      \
                     TR_EMIT(vigil_reg_abc(VREG_MOVE, _exp, _act, 0));                                                  \
-                    vs.regs[vs.top - _si] = _exp;                                                                      \
-                    if (_exp >= vs.next_reg)                                                                           \
-                        vs.next_reg = _exp + 1;                                                                        \
-                }                                                                                                      \
-            }                                                                                                          \
-        }                                                                                                              \
-        __pragma(warning(pop))                                                                                         \
-    } while (0)
-#else
-#define SYNC_PACK(n)                                                                                                   \
-    do                                                                                                                 \
-    {                                                                                                                  \
-        if ((n) > 1)                                                                                                   \
-        {                                                                                                              \
-            uint8_t _hi = vs.regs[vs.top - 1];                                                                         \
-            for (int _si = 2; _si <= (int)(n); _si++)                                                                  \
-            {                                                                                                          \
-                uint8_t _exp = (uint8_t)(_hi - (_si - 1));                                                             \
-                uint8_t _act = vs.regs[vs.top - _si];                                                                  \
-                if (_act != _exp)                                                                                      \
-                {                                                                                                      \
-                    TR_EMIT(vigil_reg_abc(VREG_MOVE, _exp, _act, 0));                                                  \
-                    vs.regs[vs.top - _si] = _exp;                                                                      \
+                    vs.regs[vs.top - (int)_si] = _exp;                                                                 \
                     if (_exp >= vs.next_reg)                                                                           \
                         vs.next_reg = _exp + 1;                                                                        \
                 }                                                                                                      \
             }                                                                                                          \
         }                                                                                                              \
     } while (0)
-#endif
 
 /* Pack top n virtual stack values into consecutive registers starting at
    the current first register. This preserves the aggregate result base. */
-#if defined(_MSC_VER)
 #define PACK_TOP_FROM_FIRST(n)                                                                                         \
     do                                                                                                                 \
     {                                                                                                                  \
-        __pragma(warning(push)) __pragma(warning(disable : 4127)) if ((n) > 1)                                         \
+        uint32_t _count = (uint32_t)(n);                                                                               \
+        if (_count > 1U)                                                                                               \
         {                                                                                                              \
-            uint8_t _base = vs.regs[vs.top - (int)(n)];                                                                \
-            for (uint32_t _pi = 1; _pi < (uint32_t)(n); _pi++)                                                         \
+            uint8_t _base = vs.regs[vs.top - (int)_count];                                                             \
+            for (uint32_t _pi = 1U; _pi < _count; _pi++)                                                               \
             {                                                                                                          \
                 uint8_t _exp = (uint8_t)(_base + (uint8_t)_pi);                                                        \
-                int _slot = vs.top - (int)(n) + (int)_pi;                                                              \
-                uint8_t _act = vs.regs[_slot];                                                                         \
-                if (_act != _exp)                                                                                      \
-                {                                                                                                      \
-                    TR_EMIT(vigil_reg_abc(VREG_MOVE, _exp, _act, 0));                                                  \
-                    vs.regs[_slot] = _exp;                                                                             \
-                    if (_exp >= vs.next_reg)                                                                           \
-                        vs.next_reg = _exp + 1;                                                                        \
-                }                                                                                                      \
-            }                                                                                                          \
-        }                                                                                                              \
-        __pragma(warning(pop))                                                                                         \
-    } while (0)
-#else
-#define PACK_TOP_FROM_FIRST(n)                                                                                         \
-    do                                                                                                                 \
-    {                                                                                                                  \
-        if ((n) > 1)                                                                                                   \
-        {                                                                                                              \
-            uint8_t _base = vs.regs[vs.top - (int)(n)];                                                                \
-            for (uint32_t _pi = 1; _pi < (uint32_t)(n); _pi++)                                                         \
-            {                                                                                                          \
-                uint8_t _exp = (uint8_t)(_base + (uint8_t)_pi);                                                        \
-                int _slot = vs.top - (int)(n) + (int)_pi;                                                              \
+                int _slot = vs.top - (int)_count + (int)_pi;                                                           \
                 uint8_t _act = vs.regs[_slot];                                                                         \
                 if (_act != _exp)                                                                                      \
                 {                                                                                                      \
@@ -1451,7 +1405,6 @@ int vigil_reg_chunk_is_translatable(const vigil_chunk_t *stack_chunk)
             }                                                                                                          \
         }                                                                                                              \
     } while (0)
-#endif
 
 /* Count locals by scanning for the highest GET_LOCAL/SET_LOCAL operand. */
 // NOLINTNEXTLINE(readability-function-cognitive-complexity)
