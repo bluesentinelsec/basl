@@ -1974,6 +1974,14 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
             if (!in_chain && (depth_at[target] >= 0 || depth_at[direct_target] >= 0))
                 in_chain = 1;
 
+            /* When the target has a POP that the else-path would skip, other
+               jumps (or the LOOP back-edge) may also reach that POP via the
+               jump-target list, creating a stack-depth mismatch.  Fall back
+               to the safe in_chain path which keeps the boolean on the stack
+               and lets the POP execute normally. */
+            if (!in_chain && direct_target != target)
+                in_chain = 1;
+
             if (in_chain)
             {
                 uint8_t res = vs_push(&vs);
