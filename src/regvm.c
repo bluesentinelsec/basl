@@ -2765,11 +2765,13 @@ tr_fail:
  * Register VM Dispatch Loop
  * ══════════════════════════════════════════════════════════════════ */
 
-/* Computed-goto detection. */
+/* Computed-goto detection. Allow local/toolchain overrides for debugging. */
+#ifndef REGVM_COMPUTED_GOTO
 #if defined(__GNUC__) || defined(__clang__)
 #define REGVM_COMPUTED_GOTO 1
 #else
 #define REGVM_COMPUTED_GOTO 0
+#endif
 #endif
 
 /* ── Defer drain helper ────────────────────────────────────────── */
@@ -3171,13 +3173,13 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
             frame->ip = _saved;                                                                                        \
         }                                                                                                              \
     } while (0)
-#define RDISPATCH() break
+#define RDISPATCH() goto r_dispatch_switch
 #define RNEXT()                                                                                                        \
     do                                                                                                                 \
     {                                                                                                                  \
         ip++;                                                                                                          \
-    } while (0);                                                                                                       \
-    break
+        goto r_dispatch_switch_check;                                                                                  \
+    } while (0)
 #define RCASE(op) case VREG_##op:
 #endif
 
@@ -3185,8 +3187,10 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
     REGVM_DEBUG_HOOK();
     RDISPATCH();
 #else
+r_dispatch_switch_check:
     while (ip < code_count)
     {
+r_dispatch_switch:
         REGVM_DEBUG_HOOK();
         switch (VREG_GET_OP(code[ip]))
         {
@@ -5563,6 +5567,9 @@ r_UNKNOWN:
             goto r_cleanup;
         }
     }
+    vigil_error_set_literal(error, VIGIL_STATUS_INTERNAL, "register VM fell off end of code");
+    status = VIGIL_STATUS_INTERNAL;
+    goto r_cleanup;
 #endif
 
         r_overflow: vigil_error_set_literal(error, VIGIL_STATUS_INVALID_ARGUMENT,
