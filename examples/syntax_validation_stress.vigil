@@ -313,14 +313,14 @@ fn test_conversions() -> void {
 // Doc: "Functions may return multiple values. Each binding is typed."
 fn divide(i32 a, i32 b) -> (i32, err) {
     if (b == 0) {
-        return (0, err("division by zero", err.arg));
+        return 0, err("division by zero", err.arg);
     }
 
-    return (a / b, ok);
+    return a / b, ok;
 }
 
 fn triple_return() -> (string, string, bool) {
-    return ("hello", "world", true);
+    return "hello", "world", true;
 }
 
 fn validate(i32 age) -> err {

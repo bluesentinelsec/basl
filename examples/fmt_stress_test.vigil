@@ -314,7 +314,7 @@ fn parse_i64_simple(string s) -> (i64, err) {
         i = i + 1;
     }
 
-    return (result, ok);
+    return result, ok;
 }
 /// Format as percentage.
 fn fmt_pct(f64 ratio) -> string {

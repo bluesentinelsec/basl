@@ -458,7 +458,7 @@ TEST(VigilVmTest, CompilesAndExecutesMultipleReturnValues)
 
     ASSERT_EQ(RunCompiledSource("\n"
                                 "fn pair(i32 value) -> (i32, i32) {\n"
-                                "    return (value, value + 1);\n"
+                                "    return value, value + 1;\n"
                                 "}\n"
                                 "\n"
                                 "fn main() -> i32 {\n"
@@ -485,7 +485,7 @@ TEST(VigilVmTest, CompilesAndExecutesDeferredMultipleReturnValues)
                                 "\n"
                                 "fn pair(i32 value) -> (i32, i32) {\n"
                                 "    defer bump();\n"
-                                "    return (value, value + 1);\n"
+                                "    return value, value + 1;\n"
                                 "}\n"
                                 "\n"
                                 "fn main() -> i32 {\n"

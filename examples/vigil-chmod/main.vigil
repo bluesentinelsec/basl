@@ -8,10 +8,10 @@ fn parse_octal(string s) -> (i32, err) {
     for (i32 i = 0; i < s.len(); i++) {
         string c, err ec = s.char_at(i);
         if (ec != ok) {
-            return (0, ec);
+            return 0, ec;
         }
         if (c < "0" || c > "7") {
-            return (0, err("invalid octal digit", err.parse));
+            return 0, err("invalid octal digit", err.parse);
         }
         i32 digit = 0;
         if (c == "0") { digit = 0; }
@@ -24,7 +24,7 @@ fn parse_octal(string s) -> (i32, err) {
         if (c == "7") { digit = 7; }
         result = result * 8 + digit;
     }
-    return (result, ok);
+    return result, ok;
 }
 
 fn main() -> i32 {

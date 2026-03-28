@@ -252,9 +252,9 @@ class DocsConformanceTest(unittest.TestCase):
             write_sources(root, {"main.vigil": """
                 fn risky(bool fail) -> (i32, err) {
                     if (fail) {
-                        return (0, err("bad", err.arg));
+                        return 0, err("bad", err.arg);
                     }
-                    return (42, ok);
+                    return 42, ok;
                 }
 
                 fn main() -> i32 {
@@ -278,9 +278,9 @@ class DocsConformanceTest(unittest.TestCase):
             write_sources(root, {"main.vigil": """
                 fn fallible(i32 x) -> (i32, err) {
                     if (x == 0) {
-                        return (0, err("zero", err.arg));
+                        return 0, err("zero", err.arg);
                     }
-                    return (x * 2, ok);
+                    return x * 2, ok;
                 }
 
                 fn main() -> i32 {
@@ -910,12 +910,12 @@ class RealProgramPatternsTest(unittest.TestCase):
             write_sources(root, {"main.vigil": """
                 fn lookup(string key) -> (string, err) {
                     if (key == "") {
-                        return ("", err("empty key", err.arg));
+                        return "", err("empty key", err.arg);
                     }
                     if (key == "missing") {
-                        return ("", err("not found", err.not_found));
+                        return "", err("not found", err.not_found);
                     }
-                    return ("value_" + key, ok);
+                    return "value_" + key, ok;
                 }
 
                 fn main() -> i32 {
@@ -1043,9 +1043,9 @@ class RealProgramPatternsTest(unittest.TestCase):
             write_sources(root, {"main.vigil": """
                 fn maybe(i32 x) -> (i32, err) {
                     if (x == 2) {
-                        return (0, err("skip", err.arg));
+                        return 0, err("skip", err.arg);
                     }
-                    return (x * 10, ok);
+                    return x * 10, ok;
                 }
 
                 fn main() -> i32 {
@@ -1104,9 +1104,9 @@ class RealProgramPatternsTest(unittest.TestCase):
 
                 fn maybe_val(i32 x) -> (i32, err) {
                     if (x < 0) {
-                        return (0, err("negative", err.arg));
+                        return 0, err("negative", err.arg);
                     }
-                    return (x, ok);
+                    return x, ok;
                 }
 
                 fn process(array<i32> items) -> i32 {
