@@ -850,6 +850,12 @@ class CompileErrorTest(unittest.TestCase):
             }
         """, "")  # any error about type mismatch
 
+    def test_rejects_parenthesized_multi_return(self) -> None:
+        self._err("""
+            fn pair() -> (i32, err) { return (42, ok); }
+            fn main() -> i32 { return 0; }
+        """, "does not use parentheses")
+
 
 class FStringAndStringTest(unittest.TestCase):
     """F-string edge cases and string operations."""
