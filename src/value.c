@@ -14,7 +14,7 @@ struct vigil_object
 {
     vigil_runtime_t *runtime;
     vigil_object_type_t type;
-    volatile int64_t ref_count; /* Atomic for thread safety */
+    int64_t ref_count;
 };
 
 typedef struct vigil_string_object
@@ -640,7 +640,7 @@ size_t vigil_object_ref_count(const vigil_object_t *object)
         return 0U;
     }
 
-    return (size_t)vigil_atomic_load(&object->ref_count);
+    return (size_t)object->ref_count;
 }
 
 void vigil_object_retain(vigil_object_t *object)
@@ -650,24 +650,20 @@ void vigil_object_retain(vigil_object_t *object)
         return;
     }
 
-    int64_t old = vigil_atomic_add(&object->ref_count, 1);
-    if (old == INT64_MAX)
-    {
-        abort();
-    }
+    object->ref_count++;
 }
 
 void vigil_object_make_immortal(vigil_object_t *object)
 {
     if (object != NULL)
-        vigil_atomic_store(&object->ref_count, INT64_MAX / 2);
+        object->ref_count = INT64_MAX / 2;
 }
 
 void vigil_object_force_destroy(vigil_object_t **object)
 {
     if (object == NULL || *object == NULL)
         return;
-    vigil_atomic_store(&(*object)->ref_count, 1);
+    (*object)->ref_count = 1;
     vigil_object_release(object);
 }
 
@@ -683,8 +679,7 @@ void vigil_object_release(vigil_object_t **object)
     resolved_object = *object;
     *object = NULL;
 
-    int64_t old = vigil_atomic_sub(&resolved_object->ref_count, 1);
-    if (old > 1)
+    if (--resolved_object->ref_count > 0)
     {
         return;
     }
