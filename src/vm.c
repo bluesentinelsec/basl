@@ -222,6 +222,16 @@ static void vigil_vm_clear_frames(vigil_vm_t *vm)
     vm->frame_count = 0U;
 }
 
+static void vigil_vm_pop_frame(vigil_vm_t *vm, size_t frame_idx)
+{
+    if (vm == NULL || vm->frame_count == 0U)
+    {
+        return;
+    }
+
+    vigil_vm_frame_clear(vm->runtime, &vm->frames[frame_idx]);
+    vm->frame_count -= 1U;
+}
 
 vigil_status_t vigil_vm_grow_stack(vigil_vm_t *vm, size_t minimum_capacity, vigil_error_t *error)
 {
@@ -417,10 +427,6 @@ vigil_value_t vigil_vm_pop_or_nil(vigil_vm_t *vm)
     vm->stack_count -= 1U;
     return value;
 }
-
-
-
-
 
 vigil_status_t vigil_vm_checked_add(int64_t left, int64_t right, int64_t *out_result)
 {
@@ -2143,7 +2149,7 @@ static vigil_status_t vigil_extern_call(vigil_vm_t *vm, const char *desc, size_t
 #endif
 
 vigil_status_t vigil_vm_call_extern_fn(vigil_vm_t *vm, const char *desc, size_t desc_len, size_t arg_count,
-                                           vigil_error_t *error)
+                                       vigil_error_t *error)
 {
     return vigil_extern_call(vm, desc, desc_len, arg_count, error);
 }
@@ -2319,7 +2325,8 @@ vigil_status_t vigil_vm_execute_call(vigil_vm_t *vm, const vigil_object_t *calle
     /* Push callee frame. */
     if (vm->frame_count >= vm->frame_capacity)
     {
-        vigil_status_t s = vigil_vm_push_frame(vm, callee, vigil_callable_object_function(callee), callee_chunk, base_slot, error);
+        vigil_status_t s =
+            vigil_vm_push_frame(vm, callee, vigil_callable_object_function(callee), callee_chunk, base_slot, error);
         if (s != VIGIL_STATUS_OK)
             return s;
     }
@@ -2342,9 +2349,8 @@ vigil_status_t vigil_vm_execute_call(vigil_vm_t *vm, const vigil_object_t *calle
     }
 
     /* Translate on first use and publish the cache exactly once. */
-    status = vigil_chunk_ensure_reg_cache(callee_chunk,
-                                          (uint8_t)vigil_function_object_arity(vigil_callable_object_function(callee)),
-                                          &callee_rc, error);
+    status = vigil_chunk_ensure_reg_cache(
+        callee_chunk, (uint8_t)vigil_function_object_arity(vigil_callable_object_function(callee)), &callee_rc, error);
     if (status != VIGIL_STATUS_OK)
         return status;
 
@@ -2356,7 +2362,8 @@ vigil_status_t vigil_vm_execute_call(vigil_vm_t *vm, const vigil_object_t *calle
         if (vm->stack_capacity < need)
         {
             vigil_status_t gs = vigil_vm_grow_stack(vm, need + 16, error);
-            if (gs != VIGIL_STATUS_OK) return gs;
+            if (gs != VIGIL_STATUS_OK)
+                return gs;
         }
         vigil_vm_release_value_range(&vm->stack[base_slot], (size_t)callee_rc->max_registers);
         if (vm->stack_count < need)
@@ -2372,11 +2379,11 @@ vigil_status_t vigil_vm_execute_call(vigil_vm_t *vm, const vigil_object_t *calle
     }
 
     vigil_value_t dummy = {0};
+    size_t callee_frame_idx = vm->frame_count > 0U ? vm->frame_count - 1U : 0U;
     status = vigil_regvm_execute(vm, callee_rc, &dummy, error);
 
     /* Pop the callee frame. */
-    if (vm->frame_count > 0)
-        vm->frame_count -= 1U;
+    vigil_vm_pop_frame(vm, callee_frame_idx);
 
     /* Copy ALL return values from callee's window to caller's expected position.
        The RETURN handler set stack_count = base + base_r + count. The translator

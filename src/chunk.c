@@ -378,8 +378,8 @@ static vigil_status_t vigil_chunk_disassemble_call_value(const vigil_chunk_t *ch
         return status;
     }
     arg_count = vigil_chunk_decode_u32(chunk->code.data, *offset + 1U);
-    status = vigil_chunk_append_formatted(output, error, "failed to format chunk indirect call operand", " %u",
-                                          arg_count);
+    status =
+        vigil_chunk_append_formatted(output, error, "failed to format chunk indirect call operand", " %u", arg_count);
     if (status != VIGIL_STATUS_OK)
     {
         return status;
@@ -626,6 +626,55 @@ static int vigil_chunk_is_u32_operand_opcode(vigil_opcode_t opcode)
         [VIGIL_OPCODE_NOT_EQUAL_I64_JUMP_IF_FALSE] = 1,
     };
     return (size_t)opcode < sizeof(table) && table[(size_t)opcode];
+}
+
+static vigil_status_t vigil_chunk_disassemble_instruction(const vigil_chunk_t *chunk, size_t *offset,
+                                                          vigil_string_t *output, vigil_error_t *error)
+{
+    vigil_opcode_t opcode = (vigil_opcode_t)chunk->code.data[*offset];
+
+    if (vigil_chunk_is_call_opcode(opcode))
+    {
+        return vigil_chunk_disassemble_call(chunk, offset, output, error);
+    }
+    if (vigil_chunk_is_call_value_opcode(opcode))
+    {
+        return vigil_chunk_disassemble_call_value(chunk, offset, output, error);
+    }
+    if (opcode == VIGIL_OPCODE_NEW_CLOSURE)
+    {
+        return vigil_chunk_disassemble_closure(chunk, offset, output, error);
+    }
+    if (vigil_chunk_is_interface_call_opcode(opcode))
+    {
+        return vigil_chunk_disassemble_interface_call(chunk, offset, output, error);
+    }
+    if (opcode == VIGIL_OPCODE_CALL_EXTERN)
+    {
+        return vigil_chunk_disassemble_call_extern(chunk, offset, output, error);
+    }
+    if (vigil_chunk_is_two_u32_operand_opcode(opcode))
+    {
+        return vigil_chunk_disassemble_two_u32_operands(
+            chunk, offset, output, error,
+            opcode == VIGIL_OPCODE_NEW_INSTANCE || opcode == VIGIL_OPCODE_DEFER_NEW_INSTANCE
+                ? "truncated constructor instruction"
+                : "truncated collection instruction",
+            opcode == VIGIL_OPCODE_NEW_INSTANCE || opcode == VIGIL_OPCODE_DEFER_NEW_INSTANCE
+                ? "failed to format chunk constructor operand"
+                : "failed to format chunk collection operand");
+    }
+    if (opcode == VIGIL_OPCODE_RETURN)
+    {
+        return vigil_chunk_disassemble_return(chunk, offset, output, error);
+    }
+    if (vigil_chunk_is_u32_operand_opcode(opcode))
+    {
+        return vigil_chunk_disassemble_u32_operand(chunk, offset, output, error);
+    }
+
+    *offset += 1U;
+    return VIGIL_STATUS_OK;
 }
 
 static vigil_status_t vigil_chunk_validate_mutable(const vigil_chunk_t *chunk, vigil_error_t *error)
@@ -1191,49 +1240,7 @@ vigil_status_t vigil_chunk_disassemble(const vigil_chunk_t *chunk, vigil_string_
             return status;
         }
 
-        if (vigil_chunk_is_call_opcode(opcode))
-        {
-            status = vigil_chunk_disassemble_call(chunk, &offset, output, error);
-        }
-        else if (vigil_chunk_is_call_value_opcode(opcode))
-        {
-            status = vigil_chunk_disassemble_call_value(chunk, &offset, output, error);
-        }
-        else if (opcode == VIGIL_OPCODE_NEW_CLOSURE)
-        {
-            status = vigil_chunk_disassemble_closure(chunk, &offset, output, error);
-        }
-        else if (vigil_chunk_is_interface_call_opcode(opcode))
-        {
-            status = vigil_chunk_disassemble_interface_call(chunk, &offset, output, error);
-        }
-        else if (opcode == VIGIL_OPCODE_CALL_EXTERN)
-        {
-            status = vigil_chunk_disassemble_call_extern(chunk, &offset, output, error);
-        }
-        else if (vigil_chunk_is_two_u32_operand_opcode(opcode))
-        {
-            status = vigil_chunk_disassemble_two_u32_operands(
-                chunk, &offset, output, error,
-                opcode == VIGIL_OPCODE_NEW_INSTANCE || opcode == VIGIL_OPCODE_DEFER_NEW_INSTANCE
-                    ? "truncated constructor instruction"
-                    : "truncated collection instruction",
-                opcode == VIGIL_OPCODE_NEW_INSTANCE || opcode == VIGIL_OPCODE_DEFER_NEW_INSTANCE
-                    ? "failed to format chunk constructor operand"
-                    : "failed to format chunk collection operand");
-        }
-        else if (opcode == VIGIL_OPCODE_RETURN)
-        {
-            status = vigil_chunk_disassemble_return(chunk, &offset, output, error);
-        }
-        else if (vigil_chunk_is_u32_operand_opcode(opcode))
-        {
-            status = vigil_chunk_disassemble_u32_operand(chunk, &offset, output, error);
-        }
-        else
-        {
-            offset += 1U;
-        }
+        status = vigil_chunk_disassemble_instruction(chunk, &offset, output, error);
 
         if (status != VIGIL_STATUS_OK)
         {

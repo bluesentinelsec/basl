@@ -730,24 +730,23 @@ TEST(VigilCompilerTest, CompilesAndExecutesFallibleInitConstructorsWithGuard)
 
 TEST(VigilCompilerTest, CompilesAndExecutesFallibleInitConstructorsReturningOk)
 {
-    EXPECT_EQ(CompileAndRun(vigil_test_failed_,
-                            "class SafeDiv {"
-                            "    i32 result;"
-                            "    fn init(i32 left, i32 right) -> err {"
-                            "        if (right == 0) {"
-                            "            return err(\"division by zero\", err.arg);"
-                            "        }"
-                            "        self.result = left / right;"
-                            "        return ok;"
-                            "    }"
-                            "}"
-                            "fn main() -> i32 {"
-                            "    SafeDiv value, err status = SafeDiv(10, 2);"
-                            "    if (value.result == 5 && status == ok) {"
-                            "        return 42;"
-                            "    }"
-                            "    return 0;"
-                            "}"),
+    EXPECT_EQ(CompileAndRun(vigil_test_failed_, "class SafeDiv {"
+                                                "    i32 result;"
+                                                "    fn init(i32 left, i32 right) -> err {"
+                                                "        if (right == 0) {"
+                                                "            return err(\"division by zero\", err.arg);"
+                                                "        }"
+                                                "        self.result = left / right;"
+                                                "        return ok;"
+                                                "    }"
+                                                "}"
+                                                "fn main() -> i32 {"
+                                                "    SafeDiv value, err status = SafeDiv(10, 2);"
+                                                "    if (value.result == 5 && status == ok) {"
+                                                "        return 42;"
+                                                "    }"
+                                                "    return 0;"
+                                                "}"),
               42);
 }
 

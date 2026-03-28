@@ -657,7 +657,8 @@ static const vigil_doc_entry_t fs_docs[] = {
     {"fs.Writer.flush", "fs.Writer.flush() -> err", "Flush buffered data.",
      "Flushes any buffered data to the underlying file system.", "err flush_err = w.flush()"},
     {"fs.Writer.close", "fs.Writer.close() -> err", "Close the file.",
-     "Flushes and closes the underlying file handle. Subsequent writes will return an error.", "err close_err = w.close()"},
+     "Flushes and closes the underlying file handle. Subsequent writes will return an error.",
+     "err close_err = w.close()"},
 };
 
 #define FS_COUNT (sizeof(fs_docs) / sizeof(fs_docs[0]))

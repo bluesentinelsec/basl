@@ -140,13 +140,13 @@ typedef enum vigil_reg_op
     VREG_NE_I64_JMP = 68,
 
     /* Calls */
-    VREG_CALL = 69,        /* A B C    call K[A] with B args at R[A+1], C returns */
-    VREG_CALL_NATIVE = 70, /* A C + u32 call native K[ip+1] with C args at R[A] */
-    VREG_CALL_VALUE = 71,  /* A Bx + u32  call value with Bx args from packed base at ip+1 */
-    VREG_CALL_SELF = 72,   /* A B      self-recurse with B args at R[A] */
+    VREG_CALL = 69,           /* A B C    call K[A] with B args at R[A+1], C returns */
+    VREG_CALL_NATIVE = 70,    /* A C + u32 call native K[ip+1] with C args at R[A] */
+    VREG_CALL_VALUE = 71,     /* A Bx + u32  call value with Bx args from packed base at ip+1 */
+    VREG_CALL_SELF = 72,      /* A B      self-recurse with B args at R[A] */
     VREG_CALL_INTERFACE = 73, /* A B C + u32 + u32 */
-    VREG_TAIL_CALL = 74, /* A B C    tail call K[A] with B args */
-    VREG_RETURN = 75,    /* A B      return B values starting at R[A] */
+    VREG_TAIL_CALL = 74,      /* A B C    tail call K[A] with B args */
+    VREG_RETURN = 75,         /* A B      return B values starting at R[A] */
 
     /* Globals and captures */
     VREG_GET_GLOBAL = 76,   /* A Bx     R[A] = globals[Bx] */
@@ -220,7 +220,7 @@ typedef enum vigil_reg_op
     VREG_CALL_EXTERN = 124, /* A B C + u32 */
 
     /* DUP — needed for some patterns during translation */
-    VREG_DUP = 125, /* A B      R[A] = R[B] (with retain) */
+    VREG_DUP = 125,     /* A B      R[A] = R[B] (with retain) */
     VREG_RELEASE = 126, /* A        release object in R[A] if present */
 
     VREG_OP_COUNT

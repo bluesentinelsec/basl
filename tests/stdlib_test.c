@@ -2243,24 +2243,34 @@ TEST(VigilStdlibCompressTest, GzipInfo)
               0);
 }
 
+#ifdef VIGIL_HAS_STDLIB_FS
 TEST(VigilStdlibFsTest, WriterOpenWriteAndWriteLine)
 {
-    int64_t result = RunWithStdlib(vigil_test_failed_, "import \"fs\";\n"
-                                                       "fn main() -> i32 {\n"
-                                                       "    string path = fs.temp_file(\"vigil-writer\");\n"
-                                                       "    fs.Writer w, err open_err = fs.Writer.open(path);\n"
-                                                       "    if (open_err != ok) { return 1; }\n"
-                                                       "    i32 n1, err e1 = w.write(\"hello\");\n"
-                                                       "    i32 n2, err e2 = w.write_line(\" world\");\n"
-                                                       "    err close_err = w.close();\n"
-                                                       "    string content = fs.read(path);\n"
-                                                       "    fs.remove(path);\n"
-                                                       "    if (e1 != ok || e2 != ok || close_err != ok) { return 2; }\n"
-                                                       "    if (n1 != 5 || n2 != 7) { return 3; }\n"
-                                                       "    if (content != \"hello world\\n\") { return 4; }\n"
-                                                       "    return 0;\n"
-                                                       "}\n");
+    int64_t result =
+        RunWithStdlib(vigil_test_failed_, "import \"fs\";\n"
+                                          "fn main() -> i32 {\n"
+                                          "    string path = fs.temp_file(\"vigil-writer\");\n"
+                                          "    fs.Writer w, err open_err = fs.Writer.open(path);\n"
+                                          "    if (open_err != ok) { return 1; }\n"
+                                          "    i32 n1, err e1 = w.write(\"hello\");\n"
+                                          "    i32 n2, err e2 = w.write_line(\" world\");\n"
+                                          "    err close_err = w.close();\n"
+                                          "    string content = fs.read(path);\n"
+                                          "    fs.remove(path);\n"
+                                          "    if (e1 != ok || e2 != ok || close_err != ok) { return 2; }\n"
+                                          "    if (n1 != 5 || n2 != 7) { return 3; }\n"
+                                          "    if (content != \"hello world\\n\") { return 4; }\n"
+                                          "    return 0;\n"
+                                          "}\n");
     EXPECT_EQ(result, 0);
+}
+#endif
+
+static void register_stdlib_fs_tests(void)
+{
+#ifdef VIGIL_HAS_STDLIB_FS
+    REGISTER_TEST(VigilStdlibFsTest, WriterOpenWriteAndWriteLine);
+#endif
 }
 
 void register_stdlib_tests(void)
@@ -2380,7 +2390,7 @@ void register_stdlib_tests(void)
     REGISTER_TEST(VigilStdlibCompressTest, TarGzCreate);
     REGISTER_TEST(VigilStdlibCompressTest, GzipDecompressMax);
     REGISTER_TEST(VigilStdlibCompressTest, GzipInfo);
-    REGISTER_TEST(VigilStdlibFsTest, WriterOpenWriteAndWriteLine);
+    register_stdlib_fs_tests();
 }
 
 /* ── Regex stdlib tests (exercises pattern cache) ────────────────── */
