@@ -19,17 +19,17 @@ pub fn print_counts(i32 lines, i32 words, i32 bytes, string label, bool show_lin
 
 pub fn process_file(string path, bool show_lines, bool show_words, bool show_bytes) -> (i32, i32, i32, err) {
     if (!fs.exists(path)) {
-        return (0, 0, 0, err("no such file or directory", err.not_found));
+        return 0, 0, 0, err("no such file or directory", err.not_found);
     }
     string content = fs.read(path);
 
     i32 lines, i32 words, i32 bytes, err e2 = counter.count_content(content);
     if (e2 != ok) {
-        return (0, 0, 0, e2);
+        return 0, 0, 0, e2;
     }
 
     print_counts(lines, words, bytes, path, show_lines, show_words, show_bytes);
-    return (lines, words, bytes, ok);
+    return lines, words, bytes, ok;
 }
 
 pub fn process_stdin(bool show_lines, bool show_words, bool show_bytes, string label) -> (i32, i32, i32, err) {
@@ -42,9 +42,9 @@ pub fn process_stdin(bool show_lines, bool show_words, bool show_bytes, string l
 
     i32 lines, i32 words, i32 bytes, err e2 = counter.count_content(content);
     if (e2 != ok) {
-        return (0, 0, 0, e2);
+        return 0, 0, 0, e2;
     }
 
     print_counts(lines, words, bytes, label, show_lines, show_words, show_bytes);
-    return (lines, words, bytes, ok);
+    return lines, words, bytes, ok;
 }

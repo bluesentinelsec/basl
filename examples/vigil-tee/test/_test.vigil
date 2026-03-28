@@ -12,12 +12,12 @@ fn get_temp_path(string filename) -> string {
 
 fn find_vigil_and_main() -> (string, string) {
     if (file.exists("vigil") && file.exists("examples/vigil-tee/main.vigil")) {
-        return ("./vigil", "examples/vigil-tee/main.vigil");
+        return "./vigil", "examples/vigil-tee/main.vigil";
     }
     if (file.exists("../../vigil") && file.exists("main.vigil")) {
-        return ("../../vigil", "main.vigil");
+        return "../../vigil", "main.vigil";
     }
-    return ("", "");
+    return "", "";
 }
 
 fn test_tee_single_file(test.T t) -> void {

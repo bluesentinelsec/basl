@@ -14,13 +14,13 @@ fn get_temp_path(string filename) -> string {
 fn find_vigil_and_main() -> (string, string) {
     // Try repo root first (when run from repo root)
     if (file.exists("vigil") && file.exists("examples/vigil-cat/main.vigil")) {
-        return ("./vigil", "examples/vigil-cat/main.vigil");
+        return "./vigil", "examples/vigil-cat/main.vigil";
     }
     // Try from examples/vigil-cat
     if (file.exists("../../vigil") && file.exists("main.vigil")) {
-        return ("../../vigil", "main.vigil");
+        return "../../vigil", "main.vigil";
     }
-    return ("", "");
+    return "", "";
 }
 
 fn test_cat_single_file(test.T t) -> void {

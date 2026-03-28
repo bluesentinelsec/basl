@@ -10310,9 +10310,11 @@ static vigil_status_t parse_multi_return_values(vigil_parser_state_t *state, con
     size_t return_index;
 
     vigil_expression_result_clear(&return_result);
-    status = vigil_parser_expect(state, VIGIL_TOKEN_LPAREN, "expected '(' after return for multi-value function", NULL);
-    if (status != VIGIL_STATUS_OK)
-        return status;
+
+    /* Parenthesized multi-return is no longer allowed. */
+    if (vigil_parser_check(state, VIGIL_TOKEN_LPAREN))
+        return vigil_parser_report(state, return_token->span,
+                                   "multi-value return does not use parentheses; write 'return a, b;'");
 
     for (return_index = 0U; return_index < state->expected_return_count; return_index += 1U)
     {
@@ -10337,7 +10339,7 @@ static vigil_status_t parse_multi_return_values(vigil_parser_state_t *state, con
         }
     }
 
-    return vigil_parser_expect(state, VIGIL_TOKEN_RPAREN, "expected ')' after return values", NULL);
+    return VIGIL_STATUS_OK;
 }
 
 static void peephole_tail_call(vigil_parser_state_t *state)

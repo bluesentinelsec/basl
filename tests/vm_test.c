@@ -458,7 +458,7 @@ TEST(VigilVmTest, CompilesAndExecutesMultipleReturnValues)
 
     ASSERT_EQ(RunCompiledSource("\n"
                                 "fn pair(i32 value) -> (i32, i32) {\n"
-                                "    return (value, value + 1);\n"
+                                "    return value, value + 1;\n"
                                 "}\n"
                                 "\n"
                                 "fn main() -> i32 {\n"
@@ -485,7 +485,7 @@ TEST(VigilVmTest, CompilesAndExecutesDeferredMultipleReturnValues)
                                 "\n"
                                 "fn pair(i32 value) -> (i32, i32) {\n"
                                 "    defer bump();\n"
-                                "    return (value, value + 1);\n"
+                                "    return value, value + 1;\n"
                                 "}\n"
                                 "\n"
                                 "fn main() -> i32 {\n"
@@ -1089,7 +1089,8 @@ TEST(VigilVmTest, StringHelpersValidateArgumentsAndExtractStringParts)
     vigil_value_init_object(&string_value, &string_object);
     vigil_value_init_object(&array_value, &array_object);
 
-    EXPECT_EQ(vigil_vm_concat_strings(NULL, &string_value, &string_value, &result, &error), VIGIL_STATUS_INVALID_ARGUMENT);
+    EXPECT_EQ(vigil_vm_concat_strings(NULL, &string_value, &string_value, &result, &error),
+              VIGIL_STATUS_INVALID_ARGUMENT);
     EXPECT_EQ(vigil_vm_concat_strings(vm, &array_value, &string_value, &result, &error), VIGIL_STATUS_INVALID_ARGUMENT);
     EXPECT_EQ(vigil_vm_stringify_value(NULL, &string_value, &result, &error), VIGIL_STATUS_INVALID_ARGUMENT);
     EXPECT_EQ(vigil_vm_new_string_value(vm, NULL, 1U, &result, &error), VIGIL_STATUS_INVALID_ARGUMENT);
@@ -1131,7 +1132,8 @@ TEST(VigilVmTest, FormatAndParseHelpersCoverValidationPaths)
     vigil_value_init_bool(&bool_value, true);
     EXPECT_EQ(vigil_vm_format_f64_value(NULL, &bool_value, 2U, &result, &error), VIGIL_STATUS_INVALID_ARGUMENT);
     EXPECT_EQ(vigil_vm_format_f64_value(vm, &bool_value, 2U, &result, &error), VIGIL_STATUS_INVALID_ARGUMENT);
-    EXPECT_EQ(vigil_vm_format_spec_value(vm, &bool_value, 1U << 10U, 0U, &result, &error), VIGIL_STATUS_INVALID_ARGUMENT);
+    EXPECT_EQ(vigil_vm_format_spec_value(vm, &bool_value, 1U << 10U, 0U, &result, &error),
+              VIGIL_STATUS_INVALID_ARGUMENT);
 
     ASSERT_EQ(vigil_string_object_new_cstr(runtime, "", &string_object, &error), VIGIL_STATUS_OK);
     vigil_value_init_object(&input, &string_object);

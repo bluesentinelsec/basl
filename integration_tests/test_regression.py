@@ -264,8 +264,8 @@ class RecursionAndControlFlowTest(unittest.TestCase):
     def test_nested_for_in_with_guard(self) -> None:
         self._run("""
             fn safe_div(i32 a, i32 b) -> (i32, err) {
-                if (b == 0) { return (0, err("zero", err.arg)); }
-                return (a / b, ok);
+                if (b == 0) { return 0, err("zero", err.arg); }
+                return a / b, ok;
             }
             fn main() -> i32 {
                 array<i32> divisors = [2, 0, 3, 0, 5];
@@ -523,7 +523,7 @@ class ErrorFlowTest(unittest.TestCase):
     def test_error_message_inspection(self) -> None:
         self._run("""
             fn fail() -> (i32, err) {
-                return (0, err("test error", err.not_found));
+                return 0, err("test error", err.not_found);
             }
             fn main() -> i32 {
                 i32 v, err e = fail();
@@ -538,9 +538,9 @@ class ErrorFlowTest(unittest.TestCase):
     def test_error_kind_routing(self) -> None:
         self._run("""
             fn fail(i32 mode) -> (i32, err) {
-                if (mode == 1) { return (0, err("a", err.not_found)); }
-                if (mode == 2) { return (0, err("b", err.permission)); }
-                return (42, ok);
+                if (mode == 1) { return 0, err("a", err.not_found); }
+                if (mode == 2) { return 0, err("b", err.permission); }
+                return 42, ok;
             }
             fn main() -> i32 {
                 i32 v1, err e1 = fail(1);
@@ -567,7 +567,7 @@ class ErrorFlowTest(unittest.TestCase):
     def test_guard_binds_value_on_success(self) -> None:
         self._run("""
             fn maybe(i32 x) -> (i32, err) {
-                return (x * 10, ok);
+                return x * 10, ok;
             }
             fn main() -> i32 {
                 guard i32 val, err e = maybe(5) {
@@ -579,7 +579,7 @@ class ErrorFlowTest(unittest.TestCase):
 
     def test_discard_error_with_underscore(self) -> None:
         self._run("""
-            fn pair() -> (i32, err) { return (42, ok); }
+            fn pair() -> (i32, err) { return 42, ok; }
             fn main() -> i32 {
                 i32 val, err _ = pair();
                 return val;
@@ -849,6 +849,12 @@ class CompileErrorTest(unittest.TestCase):
                 return 0;
             }
         """, "")  # any error about type mismatch
+
+    def test_rejects_parenthesized_multi_return(self) -> None:
+        self._err("""
+            fn pair() -> (i32, err) { return (42, ok); }
+            fn main() -> i32 { return 0; }
+        """, "does not use parentheses")
 
 
 class FStringAndStringTest(unittest.TestCase):

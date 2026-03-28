@@ -358,7 +358,7 @@ TEST_F(VigilDocTest, ComplexReturnTypes)
 {
     char *out = doc_render_helper(F,
                                   "pub fn get_pair() -> (i32, err) {\n"
-                                  "\treturn (0, ok);\n"
+                                  "\treturn 0, ok;\n"
                                   "}\n",
                                   NULL);
 
