@@ -222,14 +222,9 @@ static void vigil_vm_clear_frames(vigil_vm_t *vm)
     vm->frame_count = 0U;
 }
 
-static void vigil_vm_pop_frame(vigil_vm_t *vm, size_t frame_idx)
+static void vigil_vm_pop_frame(vigil_vm_t *vm)
 {
-    if (vm == NULL || vm->frame_count == 0U)
-    {
-        return;
-    }
-
-    vigil_vm_frame_clear(vm->runtime, &vm->frames[frame_idx]);
+    vigil_vm_frame_clear(vm->runtime, &vm->frames[vm->frame_count - 1U]);
     vm->frame_count -= 1U;
 }
 
@@ -2379,11 +2374,10 @@ vigil_status_t vigil_vm_execute_call(vigil_vm_t *vm, const vigil_object_t *calle
     }
 
     vigil_value_t dummy = {0};
-    size_t callee_frame_idx = vm->frame_count > 0U ? vm->frame_count - 1U : 0U;
     status = vigil_regvm_execute(vm, callee_rc, &dummy, error);
 
     /* Pop the callee frame. */
-    vigil_vm_pop_frame(vm, callee_frame_idx);
+    vigil_vm_pop_frame(vm);
 
     /* Copy ALL return values from callee's window to caller's expected position.
        The RETURN handler set stack_count = base + base_r + count. The translator

@@ -6484,6 +6484,7 @@ static vigil_status_t vigil_parser_parse_call(vigil_parser_state_t *state, const
     return vigil_parser_parse_call_resolved(state, name_token->span, function_index, decl, out_result);
 }
 
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
 static vigil_status_t vigil_parser_parse_value_call(vigil_parser_state_t *state, vigil_source_span_t call_span,
                                                     vigil_parser_type_t callee_type,
                                                     vigil_expression_result_t *out_result)
@@ -7746,6 +7747,7 @@ static vigil_status_t vigil_parser_parse_qualified_symbol(vigil_parser_state_t *
     return parse_qualified_non_call(state, member_token, source_id, member_name, member_name_length, out_result);
 }
 
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
 static vigil_status_t vigil_parser_parse_method_call(vigil_parser_state_t *state, const vigil_token_t *method_token,
                                                      const vigil_class_method_t *method,
                                                      vigil_expression_result_t *out_result)
@@ -7859,6 +7861,7 @@ static vigil_status_t vigil_parser_parse_method_call(vigil_parser_state_t *state
     return VIGIL_STATUS_OK;
 }
 
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
 static vigil_status_t vigil_parser_parse_interface_method_call(vigil_parser_state_t *state,
                                                                vigil_parser_type_t receiver_type, size_t method_index,
                                                                const vigil_token_t *method_token,
@@ -10149,90 +10152,98 @@ static int vigil_parser_trailing_return_is_single(const uint8_t *c, size_t len)
 
 static uint8_t compiler_stack_opcode_size(vigil_opcode_t opcode)
 {
-    static const uint8_t sizes[VIGIL_OPCODE_MULTIPLY_F64_STORE + 1U] = {
-        [VIGIL_OPCODE_CONSTANT] = 5U,
-        [VIGIL_OPCODE_RETURN] = 5U,
-        [VIGIL_OPCODE_GET_LOCAL] = 5U,
-        [VIGIL_OPCODE_SET_LOCAL] = 5U,
-        [VIGIL_OPCODE_GET_GLOBAL] = 5U,
-        [VIGIL_OPCODE_SET_GLOBAL] = 5U,
-        [VIGIL_OPCODE_GET_FUNCTION] = 5U,
-        [VIGIL_OPCODE_GET_CAPTURE] = 5U,
-        [VIGIL_OPCODE_SET_CAPTURE] = 5U,
-        [VIGIL_OPCODE_JUMP] = 5U,
-        [VIGIL_OPCODE_JUMP_IF_FALSE] = 5U,
-        [VIGIL_OPCODE_LOOP] = 5U,
-        [VIGIL_OPCODE_FORMAT_F64] = 5U,
-        [VIGIL_OPCODE_GET_FIELD] = 5U,
-        [VIGIL_OPCODE_SET_FIELD] = 5U,
-        [VIGIL_OPCODE_DEFER_CALL_VALUE] = 5U,
-        [VIGIL_OPCODE_LESS_I32_JUMP_IF_FALSE] = 5U,
-        [VIGIL_OPCODE_LESS_EQUAL_I32_JUMP_IF_FALSE] = 5U,
-        [VIGIL_OPCODE_GREATER_I32_JUMP_IF_FALSE] = 5U,
-        [VIGIL_OPCODE_GREATER_EQUAL_I32_JUMP_IF_FALSE] = 5U,
-        [VIGIL_OPCODE_EQUAL_I32_JUMP_IF_FALSE] = 5U,
-        [VIGIL_OPCODE_NOT_EQUAL_I32_JUMP_IF_FALSE] = 5U,
-        [VIGIL_OPCODE_LESS_I64_JUMP_IF_FALSE] = 5U,
-        [VIGIL_OPCODE_LESS_EQUAL_I64_JUMP_IF_FALSE] = 5U,
-        [VIGIL_OPCODE_GREATER_I64_JUMP_IF_FALSE] = 5U,
-        [VIGIL_OPCODE_GREATER_EQUAL_I64_JUMP_IF_FALSE] = 5U,
-        [VIGIL_OPCODE_EQUAL_I64_JUMP_IF_FALSE] = 5U,
-        [VIGIL_OPCODE_NOT_EQUAL_I64_JUMP_IF_FALSE] = 5U,
-        [VIGIL_OPCODE_ADD_F64_STORE] = 5U,
-        [VIGIL_OPCODE_SUBTRACT_F64_STORE] = 5U,
-        [VIGIL_OPCODE_MULTIPLY_F64_STORE] = 5U,
-        [VIGIL_OPCODE_INCREMENT_LOCAL_I32] = 6U,
-        [VIGIL_OPCODE_INCREMENT_LOCAL_I64] = 6U,
-        [VIGIL_OPCODE_NEW_CLOSURE] = 9U,
-        [VIGIL_OPCODE_CALL_VALUE] = 9U,
-        [VIGIL_OPCODE_NEW_INSTANCE] = 9U,
-        [VIGIL_OPCODE_NEW_ARRAY] = 9U,
-        [VIGIL_OPCODE_NEW_MAP] = 9U,
-        [VIGIL_OPCODE_DEFER_NEW_INSTANCE] = 9U,
-        [VIGIL_OPCODE_LOCALS_ADD_I64] = 9U,
-        [VIGIL_OPCODE_LOCALS_SUBTRACT_I64] = 9U,
-        [VIGIL_OPCODE_LOCALS_MULTIPLY_I64] = 9U,
-        [VIGIL_OPCODE_LOCALS_MODULO_I64] = 9U,
-        [VIGIL_OPCODE_LOCALS_LESS_I64] = 9U,
-        [VIGIL_OPCODE_LOCALS_LESS_EQUAL_I64] = 9U,
-        [VIGIL_OPCODE_LOCALS_GREATER_I64] = 9U,
-        [VIGIL_OPCODE_LOCALS_GREATER_EQUAL_I64] = 9U,
-        [VIGIL_OPCODE_LOCALS_EQUAL_I64] = 9U,
-        [VIGIL_OPCODE_LOCALS_NOT_EQUAL_I64] = 9U,
-        [VIGIL_OPCODE_TAIL_CALL] = 9U,
-        [VIGIL_OPCODE_CALL_NATIVE] = 13U,
-        [VIGIL_OPCODE_FORMAT_SPEC] = 9U,
-        [VIGIL_OPCODE_CALL_SELF] = 9U,
-        [VIGIL_OPCODE_LOCALS_ADD_F64] = 9U,
-        [VIGIL_OPCODE_LOCALS_SUBTRACT_F64] = 9U,
-        [VIGIL_OPCODE_LOCALS_MULTIPLY_F64] = 9U,
-        [VIGIL_OPCODE_CALL] = 13U,
-        [VIGIL_OPCODE_DEFER_CALL] = 13U,
-        [VIGIL_OPCODE_CALL_INTERFACE] = 17U,
-        [VIGIL_OPCODE_DEFER_CALL_INTERFACE] = 13U,
-        [VIGIL_OPCODE_LOCALS_ADD_I32_STORE] = 13U,
-        [VIGIL_OPCODE_LOCALS_SUBTRACT_I32_STORE] = 13U,
-        [VIGIL_OPCODE_LOCALS_MULTIPLY_I32_STORE] = 13U,
-        [VIGIL_OPCODE_LOCALS_LESS_I32_STORE] = 13U,
-        [VIGIL_OPCODE_LOCALS_LESS_EQUAL_I32_STORE] = 13U,
-        [VIGIL_OPCODE_LOCALS_GREATER_I32_STORE] = 13U,
-        [VIGIL_OPCODE_LOCALS_GREATER_EQUAL_I32_STORE] = 13U,
-        [VIGIL_OPCODE_LOCALS_EQUAL_I32_STORE] = 13U,
-        [VIGIL_OPCODE_LOCALS_NOT_EQUAL_I32_STORE] = 13U,
-        [VIGIL_OPCODE_LOCALS_MODULO_I32_STORE] = 13U,
-        [VIGIL_OPCODE_DEFER_CALL_NATIVE] = 13U,
-        [VIGIL_OPCODE_CALL_EXTERN] = 9U,
-        [VIGIL_OPCODE_FORLOOP_I32] = 15U,
-        [VIGIL_OPCODE_FORLOOP_I64] = 15U,
-        [VIGIL_OPCODE_LOCALS_ADD_F64_STORE] = 13U,
-        [VIGIL_OPCODE_LOCALS_SUBTRACT_F64_STORE] = 13U,
-        [VIGIL_OPCODE_LOCALS_MULTIPLY_F64_STORE] = 13U,
+    static const struct
+    {
+        vigil_opcode_t opcode;
+        uint8_t size;
+    } sizes[] = {
+        {VIGIL_OPCODE_CONSTANT, 5U},
+        {VIGIL_OPCODE_RETURN, 5U},
+        {VIGIL_OPCODE_GET_LOCAL, 5U},
+        {VIGIL_OPCODE_SET_LOCAL, 5U},
+        {VIGIL_OPCODE_GET_GLOBAL, 5U},
+        {VIGIL_OPCODE_SET_GLOBAL, 5U},
+        {VIGIL_OPCODE_GET_FUNCTION, 5U},
+        {VIGIL_OPCODE_GET_CAPTURE, 5U},
+        {VIGIL_OPCODE_SET_CAPTURE, 5U},
+        {VIGIL_OPCODE_JUMP, 5U},
+        {VIGIL_OPCODE_JUMP_IF_FALSE, 5U},
+        {VIGIL_OPCODE_LOOP, 5U},
+        {VIGIL_OPCODE_FORMAT_F64, 5U},
+        {VIGIL_OPCODE_GET_FIELD, 5U},
+        {VIGIL_OPCODE_SET_FIELD, 5U},
+        {VIGIL_OPCODE_DEFER_CALL_VALUE, 5U},
+        {VIGIL_OPCODE_LESS_I32_JUMP_IF_FALSE, 5U},
+        {VIGIL_OPCODE_LESS_EQUAL_I32_JUMP_IF_FALSE, 5U},
+        {VIGIL_OPCODE_GREATER_I32_JUMP_IF_FALSE, 5U},
+        {VIGIL_OPCODE_GREATER_EQUAL_I32_JUMP_IF_FALSE, 5U},
+        {VIGIL_OPCODE_EQUAL_I32_JUMP_IF_FALSE, 5U},
+        {VIGIL_OPCODE_NOT_EQUAL_I32_JUMP_IF_FALSE, 5U},
+        {VIGIL_OPCODE_LESS_I64_JUMP_IF_FALSE, 5U},
+        {VIGIL_OPCODE_LESS_EQUAL_I64_JUMP_IF_FALSE, 5U},
+        {VIGIL_OPCODE_GREATER_I64_JUMP_IF_FALSE, 5U},
+        {VIGIL_OPCODE_GREATER_EQUAL_I64_JUMP_IF_FALSE, 5U},
+        {VIGIL_OPCODE_EQUAL_I64_JUMP_IF_FALSE, 5U},
+        {VIGIL_OPCODE_NOT_EQUAL_I64_JUMP_IF_FALSE, 5U},
+        {VIGIL_OPCODE_ADD_F64_STORE, 5U},
+        {VIGIL_OPCODE_SUBTRACT_F64_STORE, 5U},
+        {VIGIL_OPCODE_MULTIPLY_F64_STORE, 5U},
+        {VIGIL_OPCODE_INCREMENT_LOCAL_I32, 6U},
+        {VIGIL_OPCODE_INCREMENT_LOCAL_I64, 6U},
+        {VIGIL_OPCODE_NEW_CLOSURE, 9U},
+        {VIGIL_OPCODE_CALL_VALUE, 9U},
+        {VIGIL_OPCODE_NEW_INSTANCE, 9U},
+        {VIGIL_OPCODE_NEW_ARRAY, 9U},
+        {VIGIL_OPCODE_NEW_MAP, 9U},
+        {VIGIL_OPCODE_DEFER_NEW_INSTANCE, 9U},
+        {VIGIL_OPCODE_LOCALS_ADD_I64, 9U},
+        {VIGIL_OPCODE_LOCALS_SUBTRACT_I64, 9U},
+        {VIGIL_OPCODE_LOCALS_MULTIPLY_I64, 9U},
+        {VIGIL_OPCODE_LOCALS_MODULO_I64, 9U},
+        {VIGIL_OPCODE_LOCALS_LESS_I64, 9U},
+        {VIGIL_OPCODE_LOCALS_LESS_EQUAL_I64, 9U},
+        {VIGIL_OPCODE_LOCALS_GREATER_I64, 9U},
+        {VIGIL_OPCODE_LOCALS_GREATER_EQUAL_I64, 9U},
+        {VIGIL_OPCODE_LOCALS_EQUAL_I64, 9U},
+        {VIGIL_OPCODE_LOCALS_NOT_EQUAL_I64, 9U},
+        {VIGIL_OPCODE_TAIL_CALL, 9U},
+        {VIGIL_OPCODE_CALL_NATIVE, 13U},
+        {VIGIL_OPCODE_FORMAT_SPEC, 9U},
+        {VIGIL_OPCODE_CALL_SELF, 9U},
+        {VIGIL_OPCODE_LOCALS_ADD_F64, 9U},
+        {VIGIL_OPCODE_LOCALS_SUBTRACT_F64, 9U},
+        {VIGIL_OPCODE_LOCALS_MULTIPLY_F64, 9U},
+        {VIGIL_OPCODE_CALL, 13U},
+        {VIGIL_OPCODE_DEFER_CALL, 13U},
+        {VIGIL_OPCODE_CALL_INTERFACE, 17U},
+        {VIGIL_OPCODE_DEFER_CALL_INTERFACE, 13U},
+        {VIGIL_OPCODE_LOCALS_ADD_I32_STORE, 13U},
+        {VIGIL_OPCODE_LOCALS_SUBTRACT_I32_STORE, 13U},
+        {VIGIL_OPCODE_LOCALS_MULTIPLY_I32_STORE, 13U},
+        {VIGIL_OPCODE_LOCALS_LESS_I32_STORE, 13U},
+        {VIGIL_OPCODE_LOCALS_LESS_EQUAL_I32_STORE, 13U},
+        {VIGIL_OPCODE_LOCALS_GREATER_I32_STORE, 13U},
+        {VIGIL_OPCODE_LOCALS_GREATER_EQUAL_I32_STORE, 13U},
+        {VIGIL_OPCODE_LOCALS_EQUAL_I32_STORE, 13U},
+        {VIGIL_OPCODE_LOCALS_NOT_EQUAL_I32_STORE, 13U},
+        {VIGIL_OPCODE_LOCALS_MODULO_I32_STORE, 13U},
+        {VIGIL_OPCODE_DEFER_CALL_NATIVE, 13U},
+        {VIGIL_OPCODE_CALL_EXTERN, 9U},
+        {VIGIL_OPCODE_FORLOOP_I32, 15U},
+        {VIGIL_OPCODE_FORLOOP_I64, 15U},
+        {VIGIL_OPCODE_LOCALS_ADD_F64_STORE, 13U},
+        {VIGIL_OPCODE_LOCALS_SUBTRACT_F64_STORE, 13U},
+        {VIGIL_OPCODE_LOCALS_MULTIPLY_F64_STORE, 13U},
     };
-    size_t index = (size_t)opcode;
+    size_t index;
 
-    if (index >= (sizeof(sizes) / sizeof(sizes[0])) || sizes[index] == 0U)
-        return 1U;
-    return sizes[index];
+    for (index = 0U; index < sizeof(sizes) / sizeof(sizes[0]); index += 1U)
+    {
+        if (sizes[index].opcode == opcode)
+            return sizes[index].size;
+    }
+
+    return 1U;
 }
 
 static size_t compiler_stack_op_size(const uint8_t *c, size_t ip, size_t len)

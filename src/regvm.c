@@ -346,6 +346,7 @@ static int regvm_find_scratch_reg(const vstack_t *current, const vstack_t *targe
     return -1;
 }
 
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
 static vigil_status_t regvm_normalize_stack(vigil_reg_chunk_t *rc, size_t span_idx, vstack_t *current,
                                             const vstack_t *target, uint8_t *max_next_reg, vigil_error_t *error)
 {
