@@ -10286,6 +10286,75 @@ static void peephole_tail_call(vigil_parser_state_t *state)
     }
 }
 
+static const char *return_value_required_message(const vigil_parser_state_t *state)
+{
+    return state->function_index == state->program->functions.main_index
+               ? "main entrypoint must return an i32 expression"
+               : "return statement requires a value";
+}
+
+static const char *return_type_mismatch_message(const vigil_parser_state_t *state)
+{
+    return state->function_index == state->program->functions.main_index
+               ? "main entrypoint must return an i32 expression"
+               : "return expression type does not match function return type";
+}
+
+static vigil_status_t validate_void_return_statement(vigil_parser_state_t *state, const vigil_token_t *return_token,
+                                                     const vigil_token_t *next_token)
+{
+    if (next_token != NULL && next_token->kind != VIGIL_TOKEN_SEMICOLON)
+        return vigil_parser_report(state, return_token->span, "void functions cannot return a value");
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t validate_single_return_statement(vigil_parser_state_t *state, const vigil_token_t *return_token,
+                                                       vigil_expression_result_t *return_result)
+{
+    vigil_status_t status;
+
+    status = vigil_parser_parse_expression_with_expected_type(state, state->expected_return_type, return_result);
+    if (status != VIGIL_STATUS_OK)
+        return status;
+    status = vigil_parser_require_scalar_expression(
+        state, return_token->span, return_result, "return statement requires the function's declared number of values");
+    if (status != VIGIL_STATUS_OK)
+        return status;
+    return vigil_parser_require_type(state, return_token->span, return_result->type, state->expected_return_type,
+                                     return_type_mismatch_message(state));
+}
+
+static vigil_status_t validate_return_statement(vigil_parser_state_t *state, const vigil_token_t *return_token,
+                                                const vigil_token_t *next_token,
+                                                vigil_expression_result_t *return_result, int *out_is_void_return)
+{
+    *out_is_void_return = 0;
+    if (state->expected_return_count == 1U && vigil_parser_type_is_void(state->expected_return_type))
+    {
+        *out_is_void_return = 1;
+        return validate_void_return_statement(state, return_token, next_token);
+    }
+    if (next_token != NULL && next_token->kind == VIGIL_TOKEN_SEMICOLON)
+        return vigil_parser_report(state, return_token->span, return_value_required_message(state));
+
+    if (state->expected_return_count > 1U)
+        return parse_multi_return_values(state, return_token);
+    return validate_single_return_statement(state, return_token, return_result);
+}
+
+static vigil_status_t emit_return_statement(vigil_parser_state_t *state, vigil_source_span_t span, int is_void_return)
+{
+    vigil_status_t status;
+
+    status =
+        emit_opcode_u32(state, VIGIL_OPCODE_RETURN, is_void_return ? 0U : (uint32_t)state->expected_return_count, span);
+    if (status != VIGIL_STATUS_OK)
+        return status;
+    if (!is_void_return)
+        peephole_tail_call(state);
+    return VIGIL_STATUS_OK;
+}
+
 static vigil_status_t vigil_parser_parse_return_statement(vigil_parser_state_t *state,
                                                           vigil_statement_result_t *out_result)
 {
@@ -10293,63 +10362,28 @@ static vigil_status_t vigil_parser_parse_return_statement(vigil_parser_state_t *
     const vigil_token_t *return_token;
     const vigil_token_t *next_token;
     vigil_expression_result_t return_result;
+    int is_void_return;
 
     vigil_expression_result_clear(&return_result);
+    is_void_return = 0;
 
     status = vigil_parser_expect(state, VIGIL_TOKEN_RETURN, "expected return statement", &return_token);
     if (status != VIGIL_STATUS_OK)
         return status;
 
     next_token = vigil_parser_peek(state);
-    if (state->expected_return_count == 1U && vigil_parser_type_is_void(state->expected_return_type))
-    {
-        if (next_token != NULL && next_token->kind != VIGIL_TOKEN_SEMICOLON)
-            return vigil_parser_report(state, return_token->span, "void functions cannot return a value");
-        status = vigil_parser_expect(state, VIGIL_TOKEN_SEMICOLON, "expected ';' after return", NULL);
-        if (status != VIGIL_STATUS_OK)
-            return status;
-        status = emit_opcode_u32(state, VIGIL_OPCODE_RETURN, 0U, return_token->span);
-        if (status != VIGIL_STATUS_OK)
-            return status;
-        vigil_statement_result_set_guaranteed_return(out_result, 1);
-        return VIGIL_STATUS_OK;
-    }
-    if (next_token != NULL && next_token->kind == VIGIL_TOKEN_SEMICOLON)
-        return vigil_parser_report(state, return_token->span,
-                                   state->function_index == state->program->functions.main_index
-                                       ? "main entrypoint must return an i32 expression"
-                                       : "return statement requires a value");
-
-    if (state->expected_return_count > 1U)
-    {
-        status = parse_multi_return_values(state, return_token);
-    }
-    else
-    {
-        status = vigil_parser_parse_expression_with_expected_type(state, state->expected_return_type, &return_result);
-        if (status != VIGIL_STATUS_OK)
-            return status;
-        status = vigil_parser_require_scalar_expression(
-            state, return_token->span, &return_result,
-            "return statement requires the function's declared number of values");
-        if (status != VIGIL_STATUS_OK)
-            return status;
-        status = vigil_parser_require_type(state, return_token->span, return_result.type, state->expected_return_type,
-                                           state->function_index == state->program->functions.main_index
-                                               ? "main entrypoint must return an i32 expression"
-                                               : "return expression type does not match function return type");
-    }
+    status = validate_return_statement(state, return_token, next_token, &return_result, &is_void_return);
     if (status != VIGIL_STATUS_OK)
         return status;
 
-    status = vigil_parser_expect(state, VIGIL_TOKEN_SEMICOLON, "expected ';' after return value", NULL);
+    status =
+        vigil_parser_expect(state, VIGIL_TOKEN_SEMICOLON,
+                            is_void_return ? "expected ';' after return" : "expected ';' after return value", NULL);
     if (status != VIGIL_STATUS_OK)
         return status;
-    status = emit_opcode_u32(state, VIGIL_OPCODE_RETURN, (uint32_t)state->expected_return_count, return_token->span);
+    status = emit_return_statement(state, return_token->span, is_void_return);
     if (status != VIGIL_STATUS_OK)
         return status;
-
-    peephole_tail_call(state);
     vigil_statement_result_set_guaranteed_return(out_result, 1);
     return VIGIL_STATUS_OK;
 }
@@ -12904,36 +12938,43 @@ static vigil_status_t resolve_compound_operator(vigil_parser_state_t *state, con
     return VIGIL_STATUS_OK;
 }
 
-static vigil_status_t parse_compound_assignment_value(vigil_parser_state_t *state, assignment_target_t *t,
+static vigil_status_t parse_compound_assignment_value(vigil_parser_state_t *state, const assignment_target_t *t,
                                                       const vigil_token_t *op, vigil_expression_result_t *value_result)
 {
     vigil_status_t status;
-    vigil_opcode_t opcode = VIGIL_OPCODE_ADD;
-
-    status = emit_compound_read_current(state, t, op->span);
-    if (status != VIGIL_STATUS_OK)
-        return status;
 
     if (op->kind == VIGIL_TOKEN_PLUS_PLUS || op->kind == VIGIL_TOKEN_MINUS_MINUS)
     {
-        status = parse_increment_decrement(state, t, op, &opcode);
-        if (status != VIGIL_STATUS_OK)
-            return status;
         value_result->type = t->target_type;
+        return VIGIL_STATUS_OK;
     }
-    else
-    {
-        status = vigil_parser_parse_expression(state, value_result);
-        if (status != VIGIL_STATUS_OK)
-            return status;
-        status = vigil_parser_require_scalar_expression(state, op->span, value_result,
-                                                        "assigned expression must be a single value");
-        if (status != VIGIL_STATUS_OK)
-            return status;
-        status = resolve_compound_operator(state, t, op, value_result, &opcode);
-        if (status != VIGIL_STATUS_OK)
-            return status;
-    }
+
+    status = vigil_parser_parse_expression(state, value_result);
+    if (status != VIGIL_STATUS_OK)
+        return status;
+    status = vigil_parser_require_scalar_expression(state, op->span, value_result,
+                                                    "assigned expression must be a single value");
+    if (status != VIGIL_STATUS_OK)
+        return status;
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t validate_compound_assignment_operation(vigil_parser_state_t *state, const assignment_target_t *t,
+                                                             const vigil_token_t *op,
+                                                             const vigil_expression_result_t *value_result,
+                                                             vigil_opcode_t *out_opcode)
+{
+    if (op->kind == VIGIL_TOKEN_PLUS_PLUS || op->kind == VIGIL_TOKEN_MINUS_MINUS)
+        return parse_increment_decrement(state, t, op, out_opcode);
+    return resolve_compound_operator(state, t, op, value_result, out_opcode);
+}
+
+static vigil_status_t emit_compound_assignment_operation(vigil_parser_state_t *state, const assignment_target_t *t,
+                                                         const vigil_token_t *op,
+                                                         const vigil_expression_result_t *value_result,
+                                                         vigil_opcode_t opcode)
+{
+    vigil_status_t status;
 
     opcode = vigil_parser_specialize_arith_opcode(opcode, t->target_type, value_result->type);
     status = vigil_parser_emit_opcode(state, opcode, op->span);
@@ -13051,6 +13092,15 @@ static vigil_status_t parse_simple_assignment(vigil_parser_state_t *state, const
                                      assign_type_mismatch_message(t));
 }
 
+static vigil_status_t validate_assignment_statement(vigil_parser_state_t *state, const assignment_target_t *t,
+                                                    const vigil_token_t *operator_token,
+                                                    vigil_expression_result_t *value_result)
+{
+    if (operator_token->kind == VIGIL_TOKEN_ASSIGN)
+        return parse_simple_assignment(state, t, operator_token, value_result);
+    return parse_compound_assignment_value(state, t, operator_token, value_result);
+}
+
 static vigil_status_t vigil_parser_parse_assignment_statement_internal(vigil_parser_state_t *state,
                                                                        vigil_statement_result_t *out_result,
                                                                        int expect_semicolon)
@@ -13059,9 +13109,11 @@ static vigil_status_t vigil_parser_parse_assignment_statement_internal(vigil_par
     assignment_target_t t;
     const vigil_token_t *operator_token;
     vigil_expression_result_t value_result;
+    vigil_opcode_t compound_opcode;
 
     assignment_target_init(&t);
     vigil_expression_result_clear(&value_result);
+    compound_opcode = VIGIL_OPCODE_ADD;
 
     status = resolve_assignment_target(state, &t);
     if (status != VIGIL_STATUS_OK)
@@ -13079,10 +13131,14 @@ static vigil_status_t vigil_parser_parse_assignment_statement_internal(vigil_par
         return vigil_parser_report(state, t.target_token->span, "expected assignment operator");
     vigil_parser_advance(state);
 
-    if (operator_token->kind == VIGIL_TOKEN_ASSIGN)
-        status = parse_simple_assignment(state, &t, operator_token, &value_result);
-    else
-        status = parse_compound_assignment_value(state, &t, operator_token, &value_result);
+    if (operator_token->kind != VIGIL_TOKEN_ASSIGN)
+    {
+        status = emit_compound_read_current(state, &t, operator_token->span);
+        if (status != VIGIL_STATUS_OK)
+            return status;
+    }
+
+    status = validate_assignment_statement(state, &t, operator_token, &value_result);
     if (status != VIGIL_STATUS_OK)
         return status;
 
@@ -13093,6 +13149,15 @@ static vigil_status_t vigil_parser_parse_assignment_statement_internal(vigil_par
             return status;
     }
 
+    if (operator_token->kind != VIGIL_TOKEN_ASSIGN)
+    {
+        status = validate_compound_assignment_operation(state, &t, operator_token, &value_result, &compound_opcode);
+        if (status != VIGIL_STATUS_OK)
+            return status;
+        status = emit_compound_assignment_operation(state, &t, operator_token, &value_result, compound_opcode);
+        if (status != VIGIL_STATUS_OK)
+            return status;
+    }
     status = emit_assignment_store(state, &t);
     if (status != VIGIL_STATUS_OK)
         return status;
