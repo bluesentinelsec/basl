@@ -12971,33 +12971,43 @@ static vigil_status_t try_compile_constructor_or_extern(vigil_program_state_t *p
     return VIGIL_STATUS_OK;
 }
 
+static vigil_status_t materialize_lowered_function_body(vigil_program_state_t *program,
+                                                        const vigil_function_decl_t *decl,
+                                                        vigil_lowered_function_body_t *body,
+                                                        vigil_object_t **out_object)
+{
+    vigil_status_t status;
+
+    *out_object = NULL;
+    status = vigil_function_object_new(program->registry->runtime, decl->name, decl->name_length, decl->param_count,
+                                       decl->return_count, &body->chunk, out_object, program->error);
+    if (status != VIGIL_STATUS_OK)
+    {
+        vigil_lowered_function_body_free(body);
+        return status;
+    }
+
+    memset(&body->chunk, 0, sizeof(body->chunk));
+    return VIGIL_STATUS_OK;
+}
+
 static vigil_status_t compile_function_body(vigil_program_state_t *program, size_t function_index,
                                             const vigil_parser_state_t *parent_state)
 {
     vigil_status_t status;
-    vigil_parser_state_t state;
     vigil_function_decl_t *decl;
     vigil_object_t *object;
-    vigil_statement_result_t body_result;
+    vigil_lowered_function_body_t body;
 
-    status = vigil_semantic_analyze_function_body(program, function_index, parent_state, &state, &body_result);
+    vigil_lowered_function_body_init(&body);
+    status = vigil_semantic_lower_function_body(program, function_index, parent_state, &body);
     if (status != VIGIL_STATUS_OK)
-    {
-        vigil_chunk_free(&state.chunk);
-        vigil_parser_state_free(&state);
         return status;
-    }
 
     decl = &program->functions.functions[function_index];
-    object = NULL;
-    status = vigil_function_object_new(program->registry->runtime, decl->name, decl->name_length, decl->param_count,
-                                       decl->return_count, &state.chunk, &object, program->error);
-    vigil_parser_state_free(&state);
+    status = materialize_lowered_function_body(program, decl, &body, &object);
     if (status != VIGIL_STATUS_OK)
-    {
-        vigil_chunk_free(&state.chunk);
         return status;
-    }
 
     decl->object = object;
     return VIGIL_STATUS_OK;

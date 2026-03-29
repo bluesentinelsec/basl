@@ -63,6 +63,11 @@ vigil_status_t vigil_program_parse_import(vigil_program_state_t *program, size_t
 vigil_status_t vigil_semantic_prepare_program(vigil_program_state_t *program, vigil_source_id_t source_id,
                                               vigil_compile_mode_t mode, int allow_repl_main_synthesis);
 vigil_status_t vigil_semantic_parse_program_declarations(vigil_program_state_t *program);
+void vigil_lowered_function_body_init(vigil_lowered_function_body_t *body);
+void vigil_lowered_function_body_free(vigil_lowered_function_body_t *body);
+vigil_status_t vigil_semantic_lower_function_body(vigil_program_state_t *program, size_t function_index,
+                                                  const vigil_parser_state_t *parent_state,
+                                                  vigil_lowered_function_body_t *out_body);
 vigil_status_t vigil_semantic_analyze_function_body(vigil_program_state_t *program, size_t function_index,
                                                     const vigil_parser_state_t *parent_state,
                                                     vigil_parser_state_t *state,

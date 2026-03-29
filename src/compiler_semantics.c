@@ -613,6 +613,24 @@ vigil_status_t vigil_semantic_prepare_program(vigil_program_state_t *program, vi
     return VIGIL_STATUS_OK;
 }
 
+void vigil_lowered_function_body_init(vigil_lowered_function_body_t *body)
+{
+    if (body == NULL)
+        return;
+
+    memset(body, 0, sizeof(*body));
+}
+
+void vigil_lowered_function_body_free(vigil_lowered_function_body_t *body)
+{
+    if (body == NULL)
+        return;
+
+    vigil_chunk_free(&body->chunk);
+    body->function_index = 0U;
+    body->guaranteed_return = 0;
+}
+
 vigil_status_t vigil_semantic_analyze_function_body(vigil_program_state_t *program, size_t function_index,
                                                     const vigil_parser_state_t *parent_state,
                                                     vigil_parser_state_t *state,
@@ -653,6 +671,38 @@ vigil_status_t vigil_semantic_analyze_function_body(vigil_program_state_t *progr
 
     decl = &program->functions.functions[function_index];
     return finalize_function_body_return_analysis(program, state, decl, function_index, out_body_result);
+}
+
+vigil_status_t vigil_semantic_lower_function_body(vigil_program_state_t *program, size_t function_index,
+                                                  const vigil_parser_state_t *parent_state,
+                                                  vigil_lowered_function_body_t *out_body)
+{
+    vigil_status_t status;
+    vigil_parser_state_t state;
+    vigil_statement_result_t body_result;
+
+    if (out_body == NULL)
+    {
+        vigil_error_set_literal(program == NULL ? NULL : program->error, VIGIL_STATUS_INVALID_ARGUMENT,
+                                "out_body must not be null");
+        return VIGIL_STATUS_INVALID_ARGUMENT;
+    }
+
+    vigil_lowered_function_body_init(out_body);
+    status = vigil_semantic_analyze_function_body(program, function_index, parent_state, &state, &body_result);
+    if (status != VIGIL_STATUS_OK)
+    {
+        vigil_chunk_free(&state.chunk);
+        vigil_parser_state_free(&state);
+        return status;
+    }
+
+    out_body->chunk = state.chunk;
+    memset(&state.chunk, 0, sizeof(state.chunk));
+    out_body->function_index = function_index;
+    out_body->guaranteed_return = body_result.guaranteed_return;
+    vigil_parser_state_free(&state);
+    return VIGIL_STATUS_OK;
 }
 
 vigil_status_t vigil_semantic_check_function_with_parent(vigil_program_state_t *program, size_t function_index,
