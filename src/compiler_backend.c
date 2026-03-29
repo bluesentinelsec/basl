@@ -10,6 +10,292 @@ static size_t backend_effective_call_return_count(vigil_parser_type_t return_typ
     return vigil_parser_type_is_void(return_type) ? 0U : return_count;
 }
 
+static size_t lowered_operand_byte_size(vigil_lowered_operand_kind_t kind)
+{
+    return kind == VIGIL_LOWERED_OPERAND_U32 ? 4U : 1U;
+}
+
+static size_t lowered_instruction_byte_size(const vigil_lowered_instruction_t *instruction)
+{
+    size_t size = 1U;
+    uint8_t operand_index;
+
+    for (operand_index = 0U; operand_index < instruction->operand_count; operand_index += 1U)
+        size += lowered_operand_byte_size(instruction->operands[operand_index].kind);
+    return size;
+}
+
+static vigil_lowered_instruction_t *lowered_last_instruction(vigil_parser_state_t *state)
+{
+    vigil_lowered_function_body_t *body = state->lowered_body;
+
+    if (body == NULL || body->instruction_count == 0U)
+        return NULL;
+    return &body->instructions[body->instruction_count - 1U];
+}
+
+void vigil_backend_lowered_replace_last_opcode(vigil_parser_state_t *state, vigil_opcode_t opcode)
+{
+    vigil_lowered_instruction_t *instruction = lowered_last_instruction(state);
+
+    if (instruction != NULL)
+        instruction->opcode = opcode;
+}
+
+void vigil_backend_lowered_fuse_last_two_get_local(vigil_parser_state_t *state, vigil_opcode_t opcode)
+{
+    vigil_lowered_function_body_t *body = state->lowered_body;
+    vigil_lowered_instruction_t *left;
+    vigil_lowered_instruction_t *right;
+
+    if (body == NULL || body->instruction_count < 2U)
+        return;
+
+    left = &body->instructions[body->instruction_count - 2U];
+    right = &body->instructions[body->instruction_count - 1U];
+    if (left->opcode != VIGIL_OPCODE_GET_LOCAL || right->opcode != VIGIL_OPCODE_GET_LOCAL ||
+        left->operand_count != 1U || right->operand_count != 1U)
+        return;
+
+    left->opcode = opcode;
+    left->operands[1] = right->operands[0];
+    left->operand_count = 2U;
+    body->instruction_count -= 1U;
+}
+
+vigil_status_t vigil_backend_lowered_patch_u32(vigil_parser_state_t *state, size_t operand_offset, uint32_t value)
+{
+    vigil_lowered_function_body_t *body = state->lowered_body;
+    size_t offset = 0U;
+    size_t instruction_index;
+    int retry = 0;
+
+    if (body == NULL)
+        return VIGIL_STATUS_OK;
+
+retry_scan:
+    offset = 0U;
+    for (instruction_index = 0U; instruction_index < body->instruction_count; instruction_index += 1U)
+    {
+        vigil_lowered_instruction_t *instruction = &body->instructions[instruction_index];
+        size_t instruction_offset = offset;
+        size_t operand_offset_in_instruction = instruction_offset + 1U;
+        uint8_t operand_index;
+
+        for (operand_index = 0U; operand_index < instruction->operand_count; operand_index += 1U)
+        {
+            size_t operand_size = lowered_operand_byte_size(instruction->operands[operand_index].kind);
+
+            if (instruction->operands[operand_index].kind == VIGIL_LOWERED_OPERAND_U32 &&
+                operand_offset == operand_offset_in_instruction)
+            {
+                instruction->operands[operand_index].value = value;
+                return VIGIL_STATUS_OK;
+            }
+
+            operand_offset_in_instruction += operand_size;
+        }
+
+        offset += lowered_instruction_byte_size(instruction);
+    }
+
+    if (!retry)
+    {
+        vigil_status_t sync_status =
+            vigil_lowered_function_body_sync_from_chunk(body, &state->chunk, state->program->error);
+        if (sync_status != VIGIL_STATUS_OK)
+            return sync_status;
+        retry = 1;
+        goto retry_scan;
+    }
+
+    vigil_error_set_literal(state->program->error, VIGIL_STATUS_INTERNAL, "lowered jump patch offset is out of range");
+    return VIGIL_STATUS_INTERNAL;
+}
+
+static void lowered_remove_trailing_instructions(vigil_parser_state_t *state, size_t remove_count)
+{
+    vigil_lowered_function_body_t *body = state->lowered_body;
+
+    if (body == NULL || remove_count > body->instruction_count)
+        return;
+    body->instruction_count -= remove_count;
+}
+
+void vigil_backend_lowered_rewrite_tail_call_self(vigil_parser_state_t *state)
+{
+    vigil_lowered_function_body_t *body = state->lowered_body;
+    vigil_lowered_instruction_t *call_instruction;
+
+    if (body == NULL || body->instruction_count < 2U)
+        return;
+
+    call_instruction = &body->instructions[body->instruction_count - 2U];
+    if (call_instruction->opcode != VIGIL_OPCODE_CALL_SELF || call_instruction->operand_count != 2U)
+        return;
+
+    call_instruction->opcode = VIGIL_OPCODE_TAIL_CALL;
+    call_instruction->operands[1].value = call_instruction->operands[0].value;
+    call_instruction->operands[0].value = (uint32_t)state->function_index;
+    lowered_remove_trailing_instructions(state, 1U);
+}
+
+void vigil_backend_lowered_rewrite_tail_call(vigil_parser_state_t *state)
+{
+    vigil_lowered_function_body_t *body = state->lowered_body;
+    vigil_lowered_instruction_t *call_instruction;
+
+    if (body == NULL || body->instruction_count < 2U)
+        return;
+
+    call_instruction = &body->instructions[body->instruction_count - 2U];
+    if (call_instruction->opcode != VIGIL_OPCODE_CALL || call_instruction->operand_count != 3U)
+        return;
+
+    call_instruction->opcode = VIGIL_OPCODE_TAIL_CALL;
+    call_instruction->operand_count = 2U;
+    lowered_remove_trailing_instructions(state, 1U);
+}
+
+void vigil_backend_lowered_rewrite_increment_local(vigil_parser_state_t *state, vigil_opcode_t opcode, int8_t delta)
+{
+    vigil_lowered_function_body_t *body = state->lowered_body;
+    vigil_lowered_instruction_t *instruction;
+
+    if (body == NULL || body->instruction_count < 5U)
+        return;
+
+    instruction = &body->instructions[body->instruction_count - 5U];
+    instruction->opcode = opcode;
+    instruction->operand_count = 2U;
+    instruction->operands[1].kind = VIGIL_LOWERED_OPERAND_I8;
+    instruction->operands[1].value = (uint8_t)delta;
+    lowered_remove_trailing_instructions(state, 4U);
+}
+
+void vigil_backend_lowered_rewrite_locals_store(vigil_parser_state_t *state, vigil_opcode_t opcode)
+{
+    vigil_lowered_function_body_t *body = state->lowered_body;
+    vigil_lowered_instruction_t *instruction;
+    vigil_lowered_instruction_t *set_local;
+
+    if (body == NULL || body->instruction_count < 3U)
+        return;
+
+    instruction = &body->instructions[body->instruction_count - 3U];
+    set_local = &body->instructions[body->instruction_count - 2U];
+    if (set_local->operand_count != 1U || instruction->operand_count != 2U)
+        return;
+
+    instruction->opcode = opcode;
+    instruction->operands[2] = instruction->operands[1];
+    instruction->operands[1] = instruction->operands[0];
+    instruction->operands[0] = set_local->operands[0];
+    instruction->operand_count = 3U;
+    lowered_remove_trailing_instructions(state, 2U);
+}
+
+void vigil_backend_lowered_rewrite_f64_store(vigil_parser_state_t *state, vigil_opcode_t opcode)
+{
+    vigil_lowered_function_body_t *body = state->lowered_body;
+    vigil_lowered_instruction_t *instruction;
+    vigil_lowered_instruction_t *set_local;
+
+    if (body == NULL || body->instruction_count < 3U)
+        return;
+
+    instruction = &body->instructions[body->instruction_count - 3U];
+    set_local = &body->instructions[body->instruction_count - 2U];
+    if (set_local->operand_count != 1U)
+        return;
+
+    instruction->opcode = opcode;
+    instruction->operands[0] = set_local->operands[0];
+    instruction->operand_count = 1U;
+    lowered_remove_trailing_instructions(state, 2U);
+}
+
+static int lowered_find_instruction_index_by_offset(const vigil_lowered_function_body_t *body, size_t target_offset,
+                                                    size_t *out_index)
+{
+    size_t offset = 0U;
+    size_t instruction_index;
+
+    if (body == NULL)
+        return 0;
+
+    for (instruction_index = 0U; instruction_index < body->instruction_count; instruction_index += 1U)
+    {
+        if (offset == target_offset)
+        {
+            *out_index = instruction_index;
+            return 1;
+        }
+        offset += lowered_instruction_byte_size(&body->instructions[instruction_index]);
+    }
+
+    return 0;
+}
+
+void vigil_backend_lowered_rewrite_forloop(vigil_parser_state_t *state, size_t loop_start, vigil_opcode_t opcode,
+                                           uint8_t cmp_type)
+{
+    vigil_lowered_function_body_t *body = state->lowered_body;
+    size_t condition_index;
+    vigil_lowered_instruction_t *condition_constant;
+    vigil_lowered_instruction_t *forloop_instruction;
+    size_t body_start_offset;
+    size_t forloop_end;
+    uint32_t back_off;
+
+    if (body == NULL || body->instruction_count < 2U)
+        return;
+    if (!lowered_find_instruction_index_by_offset(body, loop_start, &condition_index))
+        return;
+    if (condition_index + 1U >= body->instruction_count)
+        return;
+
+    condition_constant = &body->instructions[condition_index + 1U];
+    forloop_instruction = &body->instructions[body->instruction_count - 2U];
+    body_start_offset = loop_start + lowered_instruction_byte_size(&body->instructions[condition_index]) +
+                        lowered_instruction_byte_size(condition_constant);
+    if (body->instructions[condition_index + 2U].opcode == VIGIL_OPCODE_JUMP_IF_FALSE ||
+        body->instructions[condition_index + 2U].opcode == VIGIL_OPCODE_LESS_I32_JUMP_IF_FALSE ||
+        body->instructions[condition_index + 2U].opcode == VIGIL_OPCODE_LESS_EQUAL_I32_JUMP_IF_FALSE ||
+        body->instructions[condition_index + 2U].opcode == VIGIL_OPCODE_GREATER_I32_JUMP_IF_FALSE ||
+        body->instructions[condition_index + 2U].opcode == VIGIL_OPCODE_GREATER_EQUAL_I32_JUMP_IF_FALSE ||
+        body->instructions[condition_index + 2U].opcode == VIGIL_OPCODE_NOT_EQUAL_I32_JUMP_IF_FALSE ||
+        body->instructions[condition_index + 2U].opcode == VIGIL_OPCODE_LESS_I64_JUMP_IF_FALSE ||
+        body->instructions[condition_index + 2U].opcode == VIGIL_OPCODE_LESS_EQUAL_I64_JUMP_IF_FALSE ||
+        body->instructions[condition_index + 2U].opcode == VIGIL_OPCODE_GREATER_I64_JUMP_IF_FALSE ||
+        body->instructions[condition_index + 2U].opcode == VIGIL_OPCODE_GREATER_EQUAL_I64_JUMP_IF_FALSE ||
+        body->instructions[condition_index + 2U].opcode == VIGIL_OPCODE_NOT_EQUAL_I64_JUMP_IF_FALSE)
+    {
+        body_start_offset += lowered_instruction_byte_size(&body->instructions[condition_index + 2U]) +
+                             lowered_instruction_byte_size(&body->instructions[condition_index + 3U]);
+    }
+    else
+    {
+        body_start_offset += lowered_instruction_byte_size(&body->instructions[condition_index + 2U]) +
+                             lowered_instruction_byte_size(&body->instructions[condition_index + 3U]) +
+                             lowered_instruction_byte_size(&body->instructions[condition_index + 4U]) +
+                             lowered_instruction_byte_size(&body->instructions[condition_index + 5U]);
+    }
+
+    forloop_end = state->chunk.code.length;
+    back_off = (uint32_t)(forloop_end - body_start_offset);
+
+    forloop_instruction->opcode = opcode;
+    forloop_instruction->operand_count = 5U;
+    forloop_instruction->operands[1].kind = VIGIL_LOWERED_OPERAND_I8;
+    forloop_instruction->operands[2] = condition_constant->operands[0];
+    forloop_instruction->operands[3].kind = VIGIL_LOWERED_OPERAND_U8;
+    forloop_instruction->operands[3].value = cmp_type;
+    forloop_instruction->operands[4].kind = VIGIL_LOWERED_OPERAND_U32;
+    forloop_instruction->operands[4].value = back_off;
+    lowered_remove_trailing_instructions(state, 1U);
+}
+
 vigil_status_t vigil_compile_materialize_lowered_function_body(vigil_program_state_t *program,
                                                                const vigil_function_decl_t *decl,
                                                                vigil_lowered_function_body_t *body,
