@@ -23,26 +23,11 @@ class EditorListTest(unittest.TestCase):
     def test_list_shows_supported_editors(self):
         rc, out, _ = run_editor(["list"])
         self.assertEqual(rc, 0)
-        self.assertIn("nvim", out)
         self.assertIn("vim", out)
         self.assertIn("vscode", out)
 
 
 class EditorInstallTest(unittest.TestCase):
-    def test_install_nvim_creates_files(self):
-        with tempfile.TemporaryDirectory() as d:
-            rc, out, _ = run_editor(
-                ["install", "nvim"],
-                env_override={"XDG_CONFIG_HOME": d},
-            )
-            self.assertEqual(rc, 0, f"stderr: {out}")
-            lsp = Path(d) / "nvim" / "after" / "plugin" / "vigil.lua"
-            ft = Path(d) / "nvim" / "after" / "ftdetect" / "vigil.lua"
-            self.assertTrue(lsp.exists(), f"missing {lsp}")
-            self.assertTrue(ft.exists(), f"missing {ft}")
-            # Verify content references vigil lsp
-            self.assertIn("lsp", lsp.read_text())
-
     def test_install_vim_creates_files(self):
         with tempfile.TemporaryDirectory() as d:
             rc, out, _ = run_editor(
@@ -68,36 +53,26 @@ class EditorInstallTest(unittest.TestCase):
 class EditorUninstallTest(unittest.TestCase):
     def test_uninstall_removes_files(self):
         with tempfile.TemporaryDirectory() as d:
-            run_editor(["install", "nvim"], env_override={"XDG_CONFIG_HOME": d})
-            lsp = Path(d) / "nvim" / "after" / "plugin" / "vigil.lua"
-            self.assertTrue(lsp.exists())
-
-            rc, _, _ = run_editor(
-                ["uninstall", "nvim"],
-                env_override={"XDG_CONFIG_HOME": d},
-            )
+            run_editor(["install", "vim"], env_override={"HOME": d})
+            ft = Path(d) / ".vim" / "after" / "ftdetect" / "vigil.vim"
+            self.assertTrue(ft.exists())
+            rc, _, _ = run_editor(["uninstall", "vim"], env_override={"HOME": d})
             self.assertEqual(rc, 0)
-            self.assertFalse(lsp.exists())
+            self.assertFalse(ft.exists())
 
     def test_uninstall_when_not_installed_succeeds(self):
         with tempfile.TemporaryDirectory() as d:
-            rc, _, _ = run_editor(
-                ["uninstall", "nvim"],
-                env_override={"XDG_CONFIG_HOME": d},
-            )
+            rc, _, _ = run_editor(["uninstall", "vim"], env_override={"HOME": d})
             self.assertEqual(rc, 0)
 
 
 class EditorStatusTest(unittest.TestCase):
     def test_status_shows_installed(self):
         with tempfile.TemporaryDirectory() as d:
-            run_editor(["install", "nvim"], env_override={"XDG_CONFIG_HOME": d})
-            rc, out, _ = run_editor(
-                ["status"],
-                env_override={"XDG_CONFIG_HOME": d},
-            )
+            run_editor(["install", "vim"], env_override={"HOME": d})
+            rc, out, _ = run_editor(["status"], env_override={"HOME": d})
             self.assertEqual(rc, 0)
-            self.assertIn("nvim", out)
+            self.assertIn("vim", out)
             self.assertIn("installed", out)
 
     def test_status_empty_when_nothing_installed(self):

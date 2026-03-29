@@ -3031,7 +3031,7 @@ static int early_dispatch_editor(int argc, char **argv)
     }
     subcmd = argv[2];
 
-    /* Resolve config home: XDG_CONFIG_HOME or ~/.config for nvim/vscode, HOME for vim */
+    /* Resolve config home: XDG_CONFIG_HOME or ~/.config for vscode, HOME for vim */
     const char *home = getenv("HOME");
     const char *xdg = getenv("XDG_CONFIG_HOME");
     char config_home[1024];
@@ -3056,7 +3056,7 @@ static int early_dispatch_editor(int argc, char **argv)
         printf("Supported editors:\n\n");
         for (const char *const *e = editors; *e; e++)
         {
-            /* nvim/vscode use config_home, vim uses HOME */
+            /* vscode uses config_home, vim uses HOME */
             const char *base = (strcmp(*e, "vim") == 0) ? home : config_home;
             int installed = vigil_editor_is_installed(*e, base);
             printf("  %-12s %s\n", *e, installed ? "installed \xe2\x9c\x93" : "not installed");
