@@ -2,6 +2,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#ifndef _WIN32
+#include <sys/resource.h>
+#endif
 
 #ifdef _MSC_VER
 #define cli_strdup _strdup
@@ -3130,12 +3133,169 @@ static int early_dispatch_editor(int argc, char **argv)
     return 1;
 }
 
+/* ── profile command ──────────────────────────────────────────────── */
+
+#ifdef _WIN32
+#include <psapi.h>
+#include <windows.h>
+#endif
+
+static int64_t get_peak_rss_kb(void)
+{
+#if defined(_WIN32)
+    PROCESS_MEMORY_COUNTERS pmc;
+    if (GetProcessMemoryInfo(GetCurrentProcess(), &pmc, sizeof(pmc)))
+        return (int64_t)(pmc.PeakWorkingSetSize / 1024);
+    return 0;
+#elif defined(__APPLE__)
+    struct rusage ru;
+    if (getrusage(RUSAGE_SELF, &ru) == 0)
+        return (int64_t)(ru.ru_maxrss / 1024); /* bytes on macOS */
+    return 0;
+#else
+    struct rusage ru;
+    if (getrusage(RUSAGE_SELF, &ru) == 0)
+        return (int64_t)ru.ru_maxrss; /* KB on Linux */
+    return 0;
+#endif
+}
+
+static void profile_print_time(const char *label, double ms)
+{
+    if (ms >= 1000.0)
+        printf("  %-14s %.2f s\n", label, ms / 1000.0);
+    else
+        printf("  %-14s %.1f ms\n", label, ms);
+}
+
+static void profile_print_bytes(const char *label, int64_t bytes)
+{
+    if (bytes >= 1024 * 1024)
+        printf("  %-14s %.1f MB\n", label, (double)bytes / (1024.0 * 1024.0));
+    else if (bytes >= 1024)
+        printf("  %-14s %.1f KB\n", label, (double)bytes / 1024.0);
+    else
+        printf("  %-14s %lld B\n", label, (long long)bytes);
+}
+
+static int cmd_profile(const char *script_path)
+{
+    vigil_runtime_t *runtime = NULL;
+    vigil_vm_t *vm = NULL;
+    vigil_error_t error = {0};
+    vigil_source_registry_t registry;
+    vigil_diagnostic_list_t diagnostics;
+    vigil_value_t result;
+    vigil_source_id_t source_id = 0U;
+    vigil_object_t *function = NULL;
+    vigil_status_t status;
+    int exit_code = 0;
+
+    printf("Profiling %s...\n\n", script_path);
+
+    /* ── Setup ── */
+    if (vigil_runtime_open(&runtime, NULL, &error) != VIGIL_STATUS_OK)
+    {
+        fprintf(stderr, "failed to initialize runtime\n");
+        return 1;
+    }
+    if (vigil_vm_open(&vm, runtime, NULL, &error) != VIGIL_STATUS_OK)
+    {
+        vigil_runtime_close(&runtime);
+        return 1;
+    }
+    vigil_source_registry_init(&registry, runtime);
+    vigil_diagnostic_list_init(&diagnostics, runtime);
+    vigil_value_init_nil(&result);
+
+    /* ── Compile (timed) ── */
+    struct timespec t0, t1, t2;
+    clock_gettime(CLOCK_MONOTONIC, &t0);
+
+    {
+        char proj_root[4096];
+        const char *root = find_project_root(script_path, proj_root, sizeof(proj_root)) ? proj_root : NULL;
+        if (!register_source_tree(&registry, script_path, root, &source_id, &error))
+        {
+            fprintf(stderr, "error: %s\n", vigil_error_message(&error));
+            exit_code = 1;
+            goto prof_cleanup;
+        }
+    }
+    {
+        vigil_native_registry_t natives;
+        vigil_native_registry_init(&natives);
+        vigil_stdlib_register_all(&natives, &error);
+        vigil_plugin_register_all(&natives, &error);
+        status = vigil_compile_source_with_natives(&registry, source_id, &natives, &function, &diagnostics, &error);
+        vigil_native_registry_free(&natives);
+    }
+    if (status != VIGIL_STATUS_OK)
+    {
+        print_diagnostics(&registry, &diagnostics);
+        exit_code = 1;
+        goto prof_cleanup;
+    }
+
+    clock_gettime(CLOCK_MONOTONIC, &t1);
+
+    /* ── Execute (timed) ── */
+    status = vigil_vm_execute_function(vm, function, &result, &error);
+    clock_gettime(CLOCK_MONOTONIC, &t2);
+    vigil_object_release(&function);
+
+    if (status != VIGIL_STATUS_OK)
+    {
+        print_error(&registry, "execution failed", &error);
+        exit_code = 1;
+        goto prof_cleanup;
+    }
+
+    /* ── Report ── */
+    {
+        double compile_ms = (double)(t1.tv_sec - t0.tv_sec) * 1000.0 + (double)(t1.tv_nsec - t0.tv_nsec) / 1e6;
+        double execute_ms = (double)(t2.tv_sec - t1.tv_sec) * 1000.0 + (double)(t2.tv_nsec - t1.tv_nsec) / 1e6;
+        double total_ms = compile_ms + execute_ms;
+        int64_t peak_rss = get_peak_rss_kb();
+        int64_t alloc_count = vigil_runtime_alloc_count(runtime);
+        int64_t alloc_bytes = vigil_runtime_alloc_bytes(runtime);
+
+        printf("── Timing ──────────────────────────────\n");
+        profile_print_time("Total:", total_ms);
+        profile_print_time("Compile:", compile_ms);
+        profile_print_time("Execute:", execute_ms);
+        printf("\n── Memory ──────────────────────────────\n");
+        printf("  %-14s %.1f MB\n", "Peak RSS:", (double)peak_rss / 1024.0);
+        printf("  %-14s %lld\n", "Allocations:", (long long)alloc_count);
+        profile_print_bytes("Bytes alloc:", alloc_bytes);
+    }
+
+prof_cleanup:
+    vigil_value_release(&result);
+    vigil_diagnostic_list_free(&diagnostics);
+    vigil_source_registry_free(&registry);
+    vigil_vm_close(&vm);
+    vigil_runtime_close(&runtime);
+    return exit_code;
+}
+
+static int early_dispatch_profile(int argc, char **argv)
+{
+    if (argc < 3)
+    {
+        fprintf(stderr, "Usage: vigil profile <script.vigil>\n");
+        return 1;
+    }
+    return cmd_profile(argv[2]);
+}
+
 static const early_command_t early_commands[] = {
     {"run", early_dispatch_run},
     {"embed", early_dispatch_embed},
     {"test", (early_handler_t)vigil_cli_run_test_command},
     {"get", early_dispatch_get},
     {"editor", early_dispatch_editor},
+    {"profile", early_dispatch_profile},
     {NULL, NULL},
 };
 
