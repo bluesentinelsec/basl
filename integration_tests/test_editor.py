@@ -12,6 +12,11 @@ def run_editor(args, env_override=None):
     env = dict(os.environ)
     if env_override:
         env.update(env_override)
+        # Ensure both HOME and USERPROFILE are set for cross-platform compat
+        if "HOME" in env_override and "USERPROFILE" not in env_override:
+            env["USERPROFILE"] = env_override["HOME"]
+        if "USERPROFILE" in env_override and "HOME" not in env_override:
+            env["HOME"] = env_override["USERPROFILE"]
     r = subprocess.run(
         [VIGIL_BIN, "editor"] + args,
         capture_output=True, text=True, env=env, timeout=10,
