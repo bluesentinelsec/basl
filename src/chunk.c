@@ -483,6 +483,65 @@ static vigil_status_t vigil_chunk_disassemble_call_extern(const vigil_chunk_t *c
     return VIGIL_STATUS_OK;
 }
 
+static vigil_status_t vigil_chunk_disassemble_increment_local(const vigil_chunk_t *chunk, size_t *offset,
+                                                              vigil_string_t *output, vigil_error_t *error)
+{
+    uint32_t local_index;
+    int8_t delta;
+    vigil_status_t status;
+
+    status = vigil_chunk_require_operand_bytes(chunk, *offset, 5U, "truncated increment-local instruction", error);
+    if (status != VIGIL_STATUS_OK)
+    {
+        return status;
+    }
+
+    local_index = vigil_chunk_decode_u32(chunk->code.data, *offset + 1U);
+    delta = (int8_t)chunk->code.data[*offset + 5U];
+    status = vigil_chunk_append_formatted(output, error, "failed to format increment-local operands", " %u %d",
+                                          local_index, (int)delta);
+    if (status != VIGIL_STATUS_OK)
+    {
+        return status;
+    }
+
+    *offset += 6U;
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t vigil_chunk_disassemble_forloop(const vigil_chunk_t *chunk, size_t *offset,
+                                                      vigil_string_t *output, vigil_error_t *error)
+{
+    uint32_t local_index;
+    int8_t delta;
+    uint32_t limit_constant;
+    uint8_t comparison_kind;
+    uint32_t back_offset;
+    vigil_status_t status;
+
+    status = vigil_chunk_require_operand_bytes(chunk, *offset, 14U, "truncated for-loop instruction", error);
+    if (status != VIGIL_STATUS_OK)
+    {
+        return status;
+    }
+
+    local_index = vigil_chunk_decode_u32(chunk->code.data, *offset + 1U);
+    delta = (int8_t)chunk->code.data[*offset + 5U];
+    limit_constant = vigil_chunk_decode_u32(chunk->code.data, *offset + 6U);
+    comparison_kind = chunk->code.data[*offset + 10U];
+    back_offset = vigil_chunk_decode_u32(chunk->code.data, *offset + 11U);
+    status =
+        vigil_chunk_append_formatted(output, error, "failed to format for-loop operands", " %u %d %u %u %u",
+                                     local_index, (int)delta, limit_constant, (unsigned)comparison_kind, back_offset);
+    if (status != VIGIL_STATUS_OK)
+    {
+        return status;
+    }
+
+    *offset += 15U;
+    return VIGIL_STATUS_OK;
+}
+
 static vigil_status_t vigil_chunk_disassemble_two_u32_operands(const vigil_chunk_t *chunk, size_t *offset,
                                                                vigil_string_t *output, vigil_error_t *error,
                                                                const char *truncated_message,
@@ -594,6 +653,16 @@ static int vigil_chunk_is_two_u32_operand_opcode(vigil_opcode_t opcode)
            opcode == VIGIL_OPCODE_CALL_SELF;
 }
 
+static int vigil_chunk_is_increment_local_opcode(vigil_opcode_t opcode)
+{
+    return opcode == VIGIL_OPCODE_INCREMENT_LOCAL_I32 || opcode == VIGIL_OPCODE_INCREMENT_LOCAL_I64;
+}
+
+static int vigil_chunk_is_forloop_opcode(vigil_opcode_t opcode)
+{
+    return opcode == VIGIL_OPCODE_FORLOOP_I32 || opcode == VIGIL_OPCODE_FORLOOP_I64;
+}
+
 static int vigil_chunk_is_u32_operand_opcode(vigil_opcode_t opcode)
 {
     /* Lookup table avoids a long OR-chain that inflates cyclomatic complexity. */
@@ -663,6 +732,14 @@ static vigil_status_t vigil_chunk_disassemble_instruction(const vigil_chunk_t *c
             opcode == VIGIL_OPCODE_NEW_INSTANCE || opcode == VIGIL_OPCODE_DEFER_NEW_INSTANCE
                 ? "failed to format chunk constructor operand"
                 : "failed to format chunk collection operand");
+    }
+    if (vigil_chunk_is_increment_local_opcode(opcode))
+    {
+        return vigil_chunk_disassemble_increment_local(chunk, offset, output, error);
+    }
+    if (vigil_chunk_is_forloop_opcode(opcode))
+    {
+        return vigil_chunk_disassemble_forloop(chunk, offset, output, error);
     }
     if (opcode == VIGIL_OPCODE_RETURN)
     {

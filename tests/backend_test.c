@@ -53,6 +53,34 @@ static void InitBackendFixtures(int *vigil_test_failed_, backend_fixture_t *fixt
     ASSERT_EQ(vigil_diagnostic_list_count(&fixture->diagnostics), 0U);
 }
 
+static void MaterializeMainFunction(int *vigil_test_failed_, backend_fixture_t *fixture,
+                                    vigil_lowered_function_body_t *body, vigil_object_t **out_function)
+{
+    const vigil_function_decl_t *decl;
+
+    decl = vigil_binding_function_table_get(&fixture->program.functions, fixture->program.functions.main_index);
+    ASSERT_NE(decl, NULL);
+
+    vigil_lowered_function_body_init(body);
+    ASSERT_EQ(vigil_semantic_lower_function_body(&fixture->program, fixture->program.functions.main_index, NULL, body),
+              VIGIL_STATUS_OK);
+    *out_function = NULL;
+    ASSERT_EQ(vigil_compile_materialize_lowered_function_body(&fixture->program, decl, body, out_function),
+              VIGIL_STATUS_OK);
+    ASSERT_NE(*out_function, NULL);
+}
+
+static void ExpectChunkContains(int *vigil_test_failed_, vigil_runtime_t *runtime, const vigil_chunk_t *chunk,
+                                vigil_error_t *error, const char *needle)
+{
+    vigil_string_t output;
+
+    vigil_string_init(&output, runtime);
+    ASSERT_EQ(vigil_chunk_disassemble(chunk, &output, error), VIGIL_STATUS_OK);
+    EXPECT_TRUE(strstr(vigil_string_c_str(&output), needle) != NULL);
+    vigil_string_free(&output);
+}
+
 TEST(CompilerBackendTest, MaterializesLoweredMainFunctionBody)
 {
     static const char source[] = "fn main() -> i32 {"
@@ -61,20 +89,11 @@ TEST(CompilerBackendTest, MaterializesLoweredMainFunctionBody)
                                  "}";
     backend_fixture_t fixture;
     vigil_lowered_function_body_t body;
-    const vigil_function_decl_t *decl;
     vigil_object_t *function = NULL;
     vigil_value_t result;
 
     InitBackendFixtures(vigil_test_failed_, &fixture, source);
-
-    decl = vigil_binding_function_table_get(&fixture.program.functions, fixture.program.functions.main_index);
-    ASSERT_NE(decl, NULL);
-
-    vigil_lowered_function_body_init(&body);
-    ASSERT_EQ(vigil_semantic_lower_function_body(&fixture.program, fixture.program.functions.main_index, NULL, &body),
-              VIGIL_STATUS_OK);
-    ASSERT_EQ(vigil_compile_materialize_lowered_function_body(&fixture.program, decl, &body, &function),
-              VIGIL_STATUS_OK);
+    MaterializeMainFunction(vigil_test_failed_, &fixture, &body, &function);
     ASSERT_NE(function, NULL);
     EXPECT_STREQ(vigil_function_object_name(function), "main");
     EXPECT_EQ(vigil_function_object_arity(function), 0U);
@@ -85,6 +104,62 @@ TEST(CompilerBackendTest, MaterializesLoweredMainFunctionBody)
     ASSERT_EQ(vigil_vm_execute_function(fixture.vm, function, &result, &fixture.error), VIGIL_STATUS_OK);
     EXPECT_EQ(vigil_value_kind(&result), VIGIL_VALUE_INT);
     EXPECT_EQ(vigil_value_as_int(&result), 7);
+
+    vigil_value_release(&result);
+    vigil_object_release(&function);
+    FreeBackendFixtures(&fixture);
+}
+
+TEST(CompilerBackendTest, MaterializesLoweredConditionalBytecodeShape)
+{
+    static const char source[] = "fn main() -> i32 {"
+                                 "    if (1 < 2) {"
+                                 "        return 7;"
+                                 "    }"
+                                 "    return 4;"
+                                 "}";
+    backend_fixture_t fixture;
+    vigil_lowered_function_body_t body;
+    vigil_object_t *function;
+    vigil_value_t result;
+
+    InitBackendFixtures(vigil_test_failed_, &fixture, source);
+    MaterializeMainFunction(vigil_test_failed_, &fixture, &body, &function);
+
+    ExpectChunkContains(vigil_test_failed_, fixture.runtime, vigil_function_object_chunk(function), &fixture.error,
+                        "JUMP_IF_FALSE");
+    ExpectChunkContains(vigil_test_failed_, fixture.runtime, vigil_function_object_chunk(function), &fixture.error,
+                        "JUMP ");
+
+    vigil_value_init_nil(&result);
+    ASSERT_EQ(vigil_vm_execute_function(fixture.vm, function, &result, &fixture.error), VIGIL_STATUS_OK);
+    EXPECT_EQ(vigil_value_as_int(&result), 7);
+
+    vigil_value_release(&result);
+    vigil_object_release(&function);
+    FreeBackendFixtures(&fixture);
+}
+
+TEST(CompilerBackendTest, MaterializesLoweredForLoopProgram)
+{
+    static const char source[] = "fn main() -> i32 {"
+                                 "    i32 sum = 0;"
+                                 "    for (i32 i = 0; i < 5; i++) {"
+                                 "        sum += i;"
+                                 "    }"
+                                 "    return sum;"
+                                 "}";
+    backend_fixture_t fixture;
+    vigil_lowered_function_body_t body;
+    vigil_object_t *function;
+    vigil_value_t result;
+
+    InitBackendFixtures(vigil_test_failed_, &fixture, source);
+    MaterializeMainFunction(vigil_test_failed_, &fixture, &body, &function);
+
+    vigil_value_init_nil(&result);
+    ASSERT_EQ(vigil_vm_execute_function(fixture.vm, function, &result, &fixture.error), VIGIL_STATUS_OK);
+    EXPECT_EQ(vigil_value_as_int(&result), 10);
 
     vigil_value_release(&result);
     vigil_object_release(&function);
@@ -131,8 +206,41 @@ TEST(CompilerBackendTest, MaterializesSyntheticConstructorFunction)
     FreeBackendFixtures(&fixture);
 }
 
+TEST(CompilerBackendTest, MaterializesExternWrapperFunction)
+{
+    static const char source[] = "extern fn add(i32 a, i32 b) -> i32 from \"libm\";"
+                                 "fn main() -> i32 {"
+                                 "    return 0;"
+                                 "}";
+    backend_fixture_t fixture;
+    const vigil_extern_fn_decl_t *extern_decl;
+    vigil_function_decl_t *wrapper_decl;
+    int handled = 0;
+
+    InitBackendFixtures(vigil_test_failed_, &fixture, source);
+
+    ASSERT_EQ(fixture.program.extern_fn_count, 1U);
+    extern_decl = &fixture.program.extern_fns[0];
+    wrapper_decl = vigil_binding_function_table_get_mutable(&fixture.program.functions, extern_decl->function_index);
+    ASSERT_NE(wrapper_decl, NULL);
+    EXPECT_EQ(wrapper_decl->object, NULL);
+
+    ASSERT_EQ(
+        vigil_compile_backend_try_materialize_special_function(&fixture.program, extern_decl->function_index, &handled),
+        VIGIL_STATUS_OK);
+    EXPECT_EQ(handled, 1);
+    ASSERT_NE(wrapper_decl->object, NULL);
+    ExpectChunkContains(vigil_test_failed_, fixture.runtime, vigil_function_object_chunk(wrapper_decl->object),
+                        &fixture.error, "CALL_EXTERN");
+
+    FreeBackendFixtures(&fixture);
+}
+
 void register_backend_tests(void)
 {
     REGISTER_TEST(CompilerBackendTest, MaterializesLoweredMainFunctionBody);
+    REGISTER_TEST(CompilerBackendTest, MaterializesLoweredConditionalBytecodeShape);
+    REGISTER_TEST(CompilerBackendTest, MaterializesLoweredForLoopProgram);
     REGISTER_TEST(CompilerBackendTest, MaterializesSyntheticConstructorFunction);
+    REGISTER_TEST(CompilerBackendTest, MaterializesExternWrapperFunction);
 }

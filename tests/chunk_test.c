@@ -196,6 +196,39 @@ static char *BuildBareReturnDisassemblyOutput(void)
     return result;
 }
 
+static char *BuildLoopSpecializationDisassemblyOutput(void)
+{
+    vigil_runtime_t *runtime = NULL;
+    vigil_error_t error = {0};
+    vigil_chunk_t chunk;
+    vigil_string_t output;
+    char *result = NULL;
+
+    if (vigil_runtime_open(&runtime, NULL, &error) != VIGIL_STATUS_OK)
+    {
+        return NULL;
+    }
+    vigil_chunk_init(&chunk, runtime);
+    vigil_string_init(&output, runtime);
+
+    if (AppendOpcodeU32(&chunk, VIGIL_OPCODE_INCREMENT_LOCAL_I32, 2U, &error) == VIGIL_STATUS_OK &&
+        vigil_chunk_write_byte(&chunk, 1U, Span(1U, 0U, 0U), &error) == VIGIL_STATUS_OK &&
+        AppendOpcodeU32(&chunk, VIGIL_OPCODE_FORLOOP_I32, 2U, &error) == VIGIL_STATUS_OK &&
+        vigil_chunk_write_byte(&chunk, 1U, Span(1U, 0U, 0U), &error) == VIGIL_STATUS_OK &&
+        vigil_chunk_write_u32(&chunk, 3U, Span(1U, 0U, 0U), &error) == VIGIL_STATUS_OK &&
+        vigil_chunk_write_byte(&chunk, 0U, Span(1U, 0U, 0U), &error) == VIGIL_STATUS_OK &&
+        vigil_chunk_write_u32(&chunk, 12U, Span(1U, 0U, 0U), &error) == VIGIL_STATUS_OK &&
+        vigil_chunk_disassemble(&chunk, &output, &error) == VIGIL_STATUS_OK)
+    {
+        result = DuplicateString(vigil_string_c_str(&output));
+    }
+
+    vigil_string_free(&output);
+    vigil_chunk_free(&chunk);
+    vigil_runtime_close(&runtime);
+    return result;
+}
+
 static char *BuildDisassembleFailureMessage(vigil_opcode_t opcode)
 {
     vigil_runtime_t *runtime = NULL;
@@ -404,6 +437,18 @@ TEST(VigilChunkTest, DisassembleFormatsBareReturnWithoutOperand)
     free(text);
 }
 
+TEST(VigilChunkTest, DisassembleFormatsLoopSpecializationInstructions)
+{
+    static const char *const expected[] = {"INCREMENT_LOCAL_I32 2 1", "FORLOOP_I32 2 1 3 0 12"};
+    const char *missing;
+    char *text = BuildLoopSpecializationDisassemblyOutput();
+
+    ASSERT_NE(text, NULL);
+    missing = FindMissingSubstring(text, expected, sizeof(expected) / sizeof(expected[0]));
+    EXPECT_EQ(missing, NULL);
+    free(text);
+}
+
 TEST(VigilChunkTest, DisassembleRejectsTruncatedCallInstructions)
 {
     char *message = BuildDisassembleFailureMessage(VIGIL_OPCODE_CALL);
@@ -547,6 +592,7 @@ void register_chunk_tests(void)
     REGISTER_TEST(VigilChunkTest, DisassembleFormatsOpcodesAndConstants);
     REGISTER_TEST(VigilChunkTest, DisassembleFormatsOperandInstructions);
     REGISTER_TEST(VigilChunkTest, DisassembleFormatsBareReturnWithoutOperand);
+    REGISTER_TEST(VigilChunkTest, DisassembleFormatsLoopSpecializationInstructions);
     REGISTER_TEST(VigilChunkTest, DisassembleRejectsTruncatedCallInstructions);
     REGISTER_TEST(VigilChunkTest, DisassembleRejectsTruncatedCallValueInstructions);
     REGISTER_TEST(VigilChunkTest, DisassembleRejectsTruncatedClosureInstructions);
