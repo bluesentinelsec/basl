@@ -83,6 +83,7 @@ typedef struct vigil_array_object
     vigil_object_t base;
     vigil_value_t *items;
     size_t item_count;
+    size_t item_capacity;
 } vigil_array_object_t;
 
 typedef struct vigil_map_object
@@ -1423,6 +1424,7 @@ vigil_status_t vigil_array_object_new(vigil_runtime_t *runtime, const vigil_valu
 
         object->items = (vigil_value_t *)memory;
         object->item_count = item_count;
+        object->item_capacity = item_count;
         for (index = 0U; index < item_count; ++index)
         {
             object->items[index] = vigil_value_copy(&items[index]);
@@ -1466,6 +1468,7 @@ vigil_status_t vigil_array_object_append(vigil_object_t *object, const vigil_val
     vigil_value_t copy;
     void *memory;
     vigil_status_t status;
+    size_t new_capacity;
 
     vigil_error_clear(error);
     array_object = (vigil_array_object_t *)object;
@@ -1475,22 +1478,29 @@ vigil_status_t vigil_array_object_append(vigil_object_t *object, const vigil_val
         return VIGIL_STATUS_INVALID_ARGUMENT;
     }
 
-    memory = array_object->items;
-    if (array_object->item_count == 0U)
+    if (array_object->item_count == array_object->item_capacity)
     {
-        status = vigil_runtime_alloc(array_object->base.runtime, sizeof(*array_object->items), &memory, error);
-    }
-    else
-    {
-        status = vigil_runtime_realloc(array_object->base.runtime, &memory,
-                                       (array_object->item_count + 1U) * sizeof(*array_object->items), error);
-    }
-    if (status != VIGIL_STATUS_OK)
-    {
-        return status;
+        memory = array_object->items;
+        new_capacity = array_object->item_capacity == 0U ? 4U : array_object->item_capacity * 2U;
+        if (array_object->item_capacity == 0U)
+        {
+            status = vigil_runtime_alloc(array_object->base.runtime, new_capacity * sizeof(*array_object->items),
+                                         &memory, error);
+        }
+        else
+        {
+            status = vigil_runtime_realloc(array_object->base.runtime, &memory,
+                                           new_capacity * sizeof(*array_object->items), error);
+        }
+        if (status != VIGIL_STATUS_OK)
+        {
+            return status;
+        }
+
+        array_object->items = (vigil_value_t *)memory;
+        array_object->item_capacity = new_capacity;
     }
 
-    array_object->items = (vigil_value_t *)memory;
     copy = vigil_value_copy(value);
     array_object->items[array_object->item_count] = copy;
     array_object->item_count += 1U;
@@ -1500,10 +1510,7 @@ vigil_status_t vigil_array_object_append(vigil_object_t *object, const vigil_val
 int vigil_array_object_pop(vigil_object_t *object, vigil_value_t *out_value)
 {
     vigil_array_object_t *array_object;
-    vigil_error_t error;
     size_t index;
-    void *memory;
-    vigil_status_t status;
 
     if (out_value == NULL)
     {
@@ -1522,18 +1529,8 @@ int vigil_array_object_pop(vigil_object_t *object, vigil_value_t *out_value)
     array_object->item_count = index;
     if (index == 0U)
     {
-        memory = array_object->items;
-        vigil_runtime_free(array_object->base.runtime, &memory);
-        array_object->items = NULL;
+        /* Keep the allocation for reuse; repeated push/pop traffic is common. */
         return 1;
-    }
-
-    memory = array_object->items;
-    vigil_error_clear(&error);
-    status = vigil_runtime_realloc(array_object->base.runtime, &memory, index * sizeof(*array_object->items), &error);
-    if (status == VIGIL_STATUS_OK)
-    {
-        array_object->items = (vigil_value_t *)memory;
     }
     return 1;
 }
