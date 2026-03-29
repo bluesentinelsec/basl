@@ -16,6 +16,10 @@ plugins/
 **plugin.cmake:**
 
 ```cmake
+# Register the plugin with the Vigil build system.
+# This file is standard CMake — you can use find_package(), set variables,
+# add compile definitions, or any other CMake commands before or after
+# the vigil_add_plugin() call.
 vigil_add_plugin(NAME my_math SOURCES my_math.c)
 ```
 
@@ -28,16 +32,37 @@ vigil_add_plugin(NAME my_math SOURCES my_math.c)
 #include "vigil/vm.h"
 #include "internal/vigil_nanbox.h"
 
+/* ── Business logic ──────────────────────────────────────────────
+   Pure C functions that do the actual work. These don't know about
+   the Vigil VM — they just take inputs and return outputs. */
+
+static int32_t compute_square(int32_t x)
+{
+    return x * x;
+}
+
+/* ── VM glue ─────────────────────────────────────────────────────
+   Each exported function needs a thin wrapper that reads arguments
+   from the VM stack, calls the business logic, and pushes the
+   result back. This is the only boilerplate per function. */
+
 static vigil_status_t square(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
 {
+    /* Read arguments from the stack */
     size_t base = vigil_vm_stack_depth(vm) - arg_count;
     vigil_value_t v = vigil_vm_stack_get(vm, base);
     int32_t x = (int32_t)vigil_nanbox_decode_int(v);
+
+    /* Pop arguments, compute, push result */
     vigil_vm_stack_pop_n(vm, arg_count);
     vigil_value_t result;
-    vigil_value_init_int(&result, (int64_t)(x * x));
+    vigil_value_init_int(&result, (int64_t)compute_square(x));
     return vigil_vm_stack_push(vm, &result, error);
 }
+
+/* ── Module registration ─────────────────────────────────────────
+   Declare parameter types, build the function table, and export
+   the module. The symbol must be named vigil_plugin_<name>. */
 
 static const int i32_params[] = {VIGIL_TYPE_I32};
 
