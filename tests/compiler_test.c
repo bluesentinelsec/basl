@@ -3354,10 +3354,15 @@ static void register_compiler_defer_tests(void)
     REGISTER_TEST(VigilCompilerTest, CompilesExternFnDeclaration);
 }
 
-void register_compiler_tests(void)
+static void register_compiler_lowered_ir_tests(void)
 {
     REGISTER_TEST(VigilCompilerTest, LoweredFunctionBodyMatchesChunkDuringSemanticAnalysis);
     REGISTER_TEST(VigilCompilerTest, LoweredFunctionBodyVerifierRejectsChunkDrift);
+}
+
+void register_compiler_tests(void)
+{
+    register_compiler_lowered_ir_tests();
     REGISTER_TEST(VigilCompilerTest, CompilesAndExecutesArithmeticAndLocals);
     REGISTER_TEST(VigilCompilerTest, CompilesAndExecutesFloatArithmeticAndComparison);
     REGISTER_TEST(VigilCompilerTest, CompilesAndExecutesConversionsConstLocalsAndBitwiseNot);
