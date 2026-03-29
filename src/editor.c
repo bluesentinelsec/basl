@@ -32,11 +32,6 @@ static int pwrite_len(const char *path, const char *content, size_t length)
     return vigil_platform_write_file(path, content, length, NULL) == VIGIL_STATUS_OK;
 }
 
-static int pappend(const char *path, const char *content)
-{
-    return vigil_platform_append_file(path, content, strlen(content), NULL) == VIGIL_STATUS_OK;
-}
-
 static int pread(const char *path, char **out_content, size_t *out_length)
 {
     char *content = NULL;
@@ -401,7 +396,9 @@ static vigil_editor_result_t install_vscode(const char *vigil_bin, const char *h
         return result_err("path too long");
     printf("Creating %s\n", path);
     if (!pwrite(path, vscode_langconf))
+    {
         return result_err("failed to write language config");
+    }
 
     /* Install npm dependencies (not available on iOS/Android) */
 #if !defined(__APPLE__) || !defined(TARGET_OS_IPHONE)
@@ -507,6 +504,38 @@ static int emacs_init_block(char *buf, size_t cap, const char *mode_path)
     return 1;
 }
 
+static int emacs_write_init_with_block(const char *init_path, const char *existing, size_t existing_length,
+                                       const char *block)
+{
+    size_t block_length = strlen(block);
+    size_t needs_newline = 0;
+    size_t out_length;
+    char *out;
+
+    if (existing && strstr(existing, emacs_marker_begin) != NULL)
+        return 1;
+    if (existing_length > 0 && existing[existing_length - 1] != '\n')
+        needs_newline = 1;
+    out_length = existing_length + needs_newline + block_length;
+    out = (char *)malloc(out_length + 1);
+    if (!out)
+        return 0;
+    if (existing_length > 0)
+        memcpy(out, existing, existing_length);
+    if (needs_newline)
+        out[existing_length] = '\n';
+    memcpy(out + existing_length + needs_newline, block, block_length);
+    out[out_length] = '\0';
+
+    if (!pwrite_len(init_path, out, out_length))
+    {
+        free(out);
+        return 0;
+    }
+    free(out);
+    return 1;
+}
+
 static vigil_editor_result_t install_emacs(const char *vigil_bin, const char *home)
 {
     char dir[1024], init_path[1024], mode_path[1024], block[3072];
@@ -528,18 +557,10 @@ static vigil_editor_result_t install_emacs(const char *vigil_bin, const char *ho
 
     if (pread(init_path, &init_content, &init_length))
     {
-        if (strstr(init_content, emacs_marker_begin) == NULL)
+        if (!emacs_write_init_with_block(init_path, init_content, init_length, block))
         {
-            if (init_length > 0 && init_content[init_length - 1] != '\n' && !pappend(init_path, "\n"))
-            {
-                free(init_content);
-                return result_err("failed to update init.el");
-            }
-            if (!pappend(init_path, block))
-            {
-                free(init_content);
-                return result_err("failed to update init.el");
-            }
+            free(init_content);
+            return result_err("failed to update init.el");
         }
         free(init_content);
     }

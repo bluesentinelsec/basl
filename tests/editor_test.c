@@ -32,6 +32,15 @@ static void editor_test_sublime_syntax_path(char *buf, size_t cap, const char *t
 #endif
 }
 
+static void editor_test_nvim_ft_path(char *buf, size_t cap, const char *tmpdir)
+{
+#ifdef _WIN32
+    snprintf(buf, cap, "%s/AppData/Local/nvim/after/ftdetect/vigil.vim", tmpdir);
+#else
+    snprintf(buf, cap, "%s/.config/nvim/after/ftdetect/vigil.vim", tmpdir);
+#endif
+}
+
 static int editor_test_install_cycle_ok(const char *editor, const char *tmpdir, const char *installed_path)
 {
     vigil_editor_result_t r = vigil_editor_install(editor, "/usr/local/bin/vigil", tmpdir);
@@ -62,6 +71,35 @@ static int editor_test_emacs_init_contains(const char *path, const char *needle)
     found = strstr(content, needle) != NULL;
     free(content);
     return found;
+}
+
+static int editor_test_emacs_cycle_ok(const char *tmpdir)
+{
+    char mode_path[512];
+    char init_path[512];
+    vigil_editor_result_t r;
+
+    snprintf(mode_path, sizeof(mode_path), "%s/.emacs.d/vigil-mode.el", tmpdir);
+    snprintf(init_path, sizeof(init_path), "%s/.emacs.d/init.el", tmpdir);
+
+    r = vigil_editor_install("emacs", "/usr/local/bin/vigil", tmpdir);
+    if (r.status != VIGIL_STATUS_OK)
+        return 0;
+    if (vigil_editor_is_installed("emacs", tmpdir) != 1)
+        return 0;
+    if (editor_test_exists(mode_path) != 1)
+        return 0;
+    if (!editor_test_emacs_init_contains(init_path, "vigil-mode"))
+        return 0;
+
+    r = vigil_editor_uninstall("emacs", tmpdir);
+    if (r.status != VIGIL_STATUS_OK)
+        return 0;
+    if (vigil_editor_is_installed("emacs", tmpdir) != 0)
+        return 0;
+    if (editor_test_exists(mode_path) != 0)
+        return 0;
+    return 1;
 }
 
 /* ── supported editors ───────────────────────────────────────────── */
@@ -131,7 +169,7 @@ TEST(EditorIntegration, NvimInstallUninstallRoundTrip)
     char tmpdir[256];
     char ft[512];
     editor_test_tmpdir(tmpdir, sizeof(tmpdir), "nvim", __LINE__);
-    snprintf(ft, sizeof(ft), "%s/.config/nvim/after/ftdetect/vigil.vim", tmpdir);
+    editor_test_nvim_ft_path(ft, sizeof(ft), tmpdir);
     EXPECT_TRUE(editor_test_install_cycle_ok("nvim", tmpdir, ft));
     vigil_platform_remove_all(tmpdir, NULL);
 }
@@ -139,24 +177,8 @@ TEST(EditorIntegration, NvimInstallUninstallRoundTrip)
 TEST(EditorIntegration, EmacsInstallUninstallRoundTrip)
 {
     char tmpdir[256];
-    char mode_path[512];
-    char init_path[512];
-    vigil_editor_result_t r;
     editor_test_tmpdir(tmpdir, sizeof(tmpdir), "emacs", __LINE__);
-    snprintf(mode_path, sizeof(mode_path), "%s/.emacs.d/vigil-mode.el", tmpdir);
-    snprintf(init_path, sizeof(init_path), "%s/.emacs.d/init.el", tmpdir);
-
-    r = vigil_editor_install("emacs", "/usr/local/bin/vigil", tmpdir);
-    EXPECT_EQ(r.status, VIGIL_STATUS_OK);
-    EXPECT_EQ(vigil_editor_is_installed("emacs", tmpdir), 1);
-    EXPECT_EQ(editor_test_exists(mode_path), 1);
-    EXPECT_TRUE(editor_test_emacs_init_contains(init_path, "vigil-mode"));
-
-    r = vigil_editor_uninstall("emacs", tmpdir);
-    EXPECT_EQ(r.status, VIGIL_STATUS_OK);
-    EXPECT_EQ(vigil_editor_is_installed("emacs", tmpdir), 0);
-    EXPECT_EQ(editor_test_exists(mode_path), 0);
-
+    EXPECT_TRUE(editor_test_emacs_cycle_ok(tmpdir));
     vigil_platform_remove_all(tmpdir, NULL);
 }
 

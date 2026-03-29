@@ -44,8 +44,12 @@ class EditorInstallTest(unittest.TestCase):
                 env_override={"HOME": d},
             )
             self.assertEqual(rc, 0, f"stderr: {out}")
-            ft = Path(d) / ".config" / "nvim" / "after" / "ftdetect" / "vigil.vim"
-            syn = Path(d) / ".config" / "nvim" / "after" / "syntax" / "vigil.vim"
+            if os.name == "nt":
+                ft = Path(d) / "AppData" / "Local" / "nvim" / "after" / "ftdetect" / "vigil.vim"
+                syn = Path(d) / "AppData" / "Local" / "nvim" / "after" / "syntax" / "vigil.vim"
+            else:
+                ft = Path(d) / ".config" / "nvim" / "after" / "ftdetect" / "vigil.vim"
+                syn = Path(d) / ".config" / "nvim" / "after" / "syntax" / "vigil.vim"
             self.assertTrue(ft.exists())
             self.assertTrue(syn.exists())
 
