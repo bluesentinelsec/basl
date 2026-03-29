@@ -198,6 +198,20 @@ static void vigil_expression_result_copy(vigil_expression_result_t *result, cons
     }
 }
 
+static void vigil_statement_result_set_non_returning(vigil_statement_result_t *result)
+{
+    vigil_statement_result_set_guaranteed_return(result, 0);
+}
+
+static void vigil_statement_result_set_conditional(vigil_statement_result_t *result, int has_else_branch,
+                                                   const vigil_statement_result_t *then_result,
+                                                   const vigil_statement_result_t *else_result)
+{
+    vigil_statement_result_set_guaranteed_return(result, has_else_branch && then_result != NULL &&
+                                                             then_result->guaranteed_return && else_result != NULL &&
+                                                             else_result->guaranteed_return);
+}
+
 vigil_status_t vigil_parser_require_scalar_expression(vigil_parser_state_t *state, vigil_source_span_t span,
                                                       const vigil_expression_result_t *result, const char *message)
 {
@@ -4818,6 +4832,39 @@ static vigil_status_t vigil_parser_require_bool_type(vigil_parser_state_t *state
                                                      vigil_parser_type_t actual_type, const char *message)
 {
     return vigil_parser_require_type(state, span, actual_type, vigil_binding_type_primitive(VIGIL_TYPE_BOOL), message);
+}
+
+static vigil_status_t parse_bool_condition_expression(vigil_parser_state_t *state, vigil_source_span_t span,
+                                                      const char *scalar_message, const char *type_message,
+                                                      vigil_expression_result_t *condition_result)
+{
+    vigil_status_t status;
+
+    status = vigil_parser_parse_expression(state, condition_result);
+    if (status != VIGIL_STATUS_OK)
+        return status;
+    status = vigil_parser_require_scalar_expression(state, span, condition_result, scalar_message);
+    if (status != VIGIL_STATUS_OK)
+        return status;
+    return vigil_parser_require_bool_type(state, span, condition_result->type, type_message);
+}
+
+static vigil_status_t parse_parenthesized_bool_condition(vigil_parser_state_t *state,
+                                                         const vigil_token_t *keyword_token, const char *lparen_message,
+                                                         const char *rparen_message, const char *scalar_message,
+                                                         const char *type_message,
+                                                         vigil_expression_result_t *condition_result)
+{
+    vigil_status_t status;
+
+    status = vigil_parser_expect(state, VIGIL_TOKEN_LPAREN, lparen_message, NULL);
+    if (status != VIGIL_STATUS_OK)
+        return status;
+    status =
+        parse_bool_condition_expression(state, keyword_token->span, scalar_message, type_message, condition_result);
+    if (status != VIGIL_STATUS_OK)
+        return status;
+    return vigil_parser_expect(state, VIGIL_TOKEN_RPAREN, rparen_message, NULL);
 }
 
 static vigil_status_t vigil_parser_require_same_type(vigil_parser_state_t *state, vigil_source_span_t span,
@@ -10442,6 +10489,33 @@ static vigil_status_t guard_validate_targets(vigil_parser_state_t *state, const 
     return VIGIL_STATUS_OK;
 }
 
+static vigil_status_t guard_parse_bindings_and_initializer(vigil_parser_state_t *state,
+                                                           const vigil_token_t *guard_token,
+                                                           vigil_binding_target_list_t *targets,
+                                                           vigil_expression_result_t *initializer_result)
+{
+    vigil_status_t status;
+
+    status = vigil_parser_parse_binding_target_list(state, "unsupported guard binding type",
+                                                    "guard bindings cannot use type void",
+                                                    "expected guard binding name", targets);
+    if (status != VIGIL_STATUS_OK)
+        return status;
+    status = guard_validate_targets(state, guard_token, targets);
+    if (status != VIGIL_STATUS_OK)
+        return status;
+    status = vigil_parser_expect(state, VIGIL_TOKEN_ASSIGN, "expected '=' after guard bindings", NULL);
+    if (status != VIGIL_STATUS_OK)
+        return status;
+    status = vigil_parser_parse_expression_with_expected_type(
+        state, targets->count == 1U ? targets->items[0].type : vigil_binding_type_invalid(), initializer_result);
+    if (status != VIGIL_STATUS_OK)
+        return status;
+    return vigil_parser_require_binding_initializer_shape(state, guard_token->span, targets, initializer_result,
+                                                          "guard binding count does not match expression result count",
+                                                          "guard binding type does not match expression result type");
+}
+
 static vigil_status_t guard_emit_error_check(vigil_parser_state_t *state, vigil_source_span_t span, size_t error_slot,
                                              size_t *body_jump_offset, size_t *end_jump_offset)
 {
@@ -10485,40 +10559,7 @@ static vigil_status_t vigil_parser_parse_guard_statement(vigil_parser_state_t *s
     if (status != VIGIL_STATUS_OK)
         return status;
 
-    status = vigil_parser_parse_binding_target_list(state, "unsupported guard binding type",
-                                                    "guard bindings cannot use type void",
-                                                    "expected guard binding name", &targets);
-    if (status != VIGIL_STATUS_OK)
-    {
-        vigil_binding_target_list_free((vigil_program_state_t *)state->program, &targets);
-        return status;
-    }
-
-    status = guard_validate_targets(state, guard_token, &targets);
-    if (status != VIGIL_STATUS_OK)
-    {
-        vigil_binding_target_list_free((vigil_program_state_t *)state->program, &targets);
-        return status;
-    }
-
-    status = vigil_parser_expect(state, VIGIL_TOKEN_ASSIGN, "expected '=' after guard bindings", NULL);
-    if (status != VIGIL_STATUS_OK)
-    {
-        vigil_binding_target_list_free((vigil_program_state_t *)state->program, &targets);
-        return status;
-    }
-
-    status = vigil_parser_parse_expression_with_expected_type(
-        state, targets.count == 1U ? targets.items[0].type : vigil_binding_type_invalid(), &initializer_result);
-    if (status != VIGIL_STATUS_OK)
-    {
-        vigil_binding_target_list_free((vigil_program_state_t *)state->program, &targets);
-        return status;
-    }
-    status =
-        vigil_parser_require_binding_initializer_shape(state, guard_token->span, &targets, &initializer_result,
-                                                       "guard binding count does not match expression result count",
-                                                       "guard binding type does not match expression result type");
+    status = guard_parse_bindings_and_initializer(state, guard_token, &targets, &initializer_result);
     if (status != VIGIL_STATUS_OK)
     {
         vigil_binding_target_list_free((vigil_program_state_t *)state->program, &targets);
@@ -10547,7 +10588,7 @@ static vigil_status_t vigil_parser_parse_guard_statement(vigil_parser_state_t *s
     if (status != VIGIL_STATUS_OK)
         return status;
 
-    vigil_statement_result_set_guaranteed_return(out_result, 0);
+    vigil_statement_result_set_non_returning(out_result);
     return VIGIL_STATUS_OK;
 }
 
@@ -10573,30 +10614,9 @@ static vigil_status_t vigil_parser_parse_if_statement(vigil_parser_state_t *stat
         return status;
     }
 
-    status = vigil_parser_expect(state, VIGIL_TOKEN_LPAREN, "expected '(' after 'if'", NULL);
-    if (status != VIGIL_STATUS_OK)
-    {
-        return status;
-    }
-
-    status = vigil_parser_parse_expression(state, &condition_result);
-    if (status != VIGIL_STATUS_OK)
-    {
-        return status;
-    }
-    status = vigil_parser_require_scalar_expression(state, if_token->span, &condition_result,
-                                                    "if condition must be a single bool value");
-    if (status != VIGIL_STATUS_OK)
-    {
-        return status;
-    }
-    status = vigil_parser_require_bool_type(state, if_token->span, condition_result.type, "if condition must be bool");
-    if (status != VIGIL_STATUS_OK)
-    {
-        return status;
-    }
-
-    status = vigil_parser_expect(state, VIGIL_TOKEN_RPAREN, "expected ')' after if condition", NULL);
+    status = parse_parenthesized_bool_condition(
+        state, if_token, "expected '(' after 'if'", "expected ')' after if condition",
+        "if condition must be a single bool value", "if condition must be bool", &condition_result);
     if (status != VIGIL_STATUS_OK)
     {
         return status;
@@ -10655,8 +10675,7 @@ static vigil_status_t vigil_parser_parse_if_statement(vigil_parser_state_t *stat
     {
         return status;
     }
-    vigil_statement_result_set_guaranteed_return(out_result, has_else_branch && then_result.guaranteed_return &&
-                                                                 else_result.guaranteed_return);
+    vigil_statement_result_set_conditional(out_result, has_else_branch, &then_result, &else_result);
     return VIGIL_STATUS_OK;
 }
 
@@ -10919,31 +10938,9 @@ static vigil_status_t vigil_parser_parse_while_statement(vigil_parser_state_t *s
     }
 
     loop_start = vigil_chunk_code_size(&state->chunk);
-    status = vigil_parser_expect(state, VIGIL_TOKEN_LPAREN, "expected '(' after 'while'", NULL);
-    if (status != VIGIL_STATUS_OK)
-    {
-        return status;
-    }
-
-    status = vigil_parser_parse_expression(state, &condition_result);
-    if (status != VIGIL_STATUS_OK)
-    {
-        return status;
-    }
-    status = vigil_parser_require_scalar_expression(state, while_token->span, &condition_result,
-                                                    "while condition must be a single bool value");
-    if (status != VIGIL_STATUS_OK)
-    {
-        return status;
-    }
-    status =
-        vigil_parser_require_bool_type(state, while_token->span, condition_result.type, "while condition must be bool");
-    if (status != VIGIL_STATUS_OK)
-    {
-        return status;
-    }
-
-    status = vigil_parser_expect(state, VIGIL_TOKEN_RPAREN, "expected ')' after while condition", NULL);
+    status = parse_parenthesized_bool_condition(
+        state, while_token, "expected '(' after 'while'", "expected ')' after while condition",
+        "while condition must be a single bool value", "while condition must be bool", &condition_result);
     if (status != VIGIL_STATUS_OK)
     {
         return status;
@@ -11003,7 +11000,7 @@ cleanup_loop:
     vigil_parser_pop_loop(state);
     if (status == VIGIL_STATUS_OK)
     {
-        vigil_statement_result_set_guaranteed_return(out_result, 0);
+        vigil_statement_result_set_non_returning(out_result);
     }
     return status;
 }
@@ -11032,14 +11029,8 @@ static vigil_status_t parse_c_for_condition(vigil_parser_state_t *state, vigil_s
     if (!vigil_parser_check(state, VIGIL_TOKEN_SEMICOLON))
     {
         *has_condition = 1;
-        status = vigil_parser_parse_expression(state, &condition_result);
-        if (status != VIGIL_STATUS_OK)
-            return status;
-        status = vigil_parser_require_scalar_expression(state, span, &condition_result,
-                                                        "for condition must be a single bool value");
-        if (status != VIGIL_STATUS_OK)
-            return status;
-        status = vigil_parser_require_bool_type(state, span, condition_result.type, "for condition must be bool");
+        status = parse_bool_condition_expression(state, span, "for condition must be a single bool value",
+                                                 "for condition must be bool", &condition_result);
         if (status != VIGIL_STATUS_OK)
             return status;
     }
@@ -11160,7 +11151,7 @@ cleanup_loop:
     {
         status = vigil_parser_end_scope(state);
         if (status == VIGIL_STATUS_OK)
-            vigil_statement_result_set_guaranteed_return(out_result, 0);
+            vigil_statement_result_set_non_returning(out_result);
     }
     return status;
 }
@@ -11445,7 +11436,7 @@ static vigil_status_t vigil_parser_parse_for_in_statement(vigil_parser_state_t *
     {
         status = vigil_parser_end_scope(state);
         if (status == VIGIL_STATUS_OK)
-            vigil_statement_result_set_guaranteed_return(out_result, 0);
+            vigil_statement_result_set_non_returning(out_result);
     }
     return status;
 }
