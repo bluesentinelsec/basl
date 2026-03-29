@@ -43,6 +43,7 @@ static vigil_status_t vigil_parser_emit_integer_cast(vigil_parser_state_t *state
                                                      vigil_source_span_t span);
 static int vigil_opcode_produces_i64(vigil_opcode_t op);
 static int vigil_opcode_i32_to_i64(vigil_opcode_t op, vigil_opcode_t *out);
+static void lowered_fuse_last_two_get_local(vigil_parser_state_t *state, vigil_opcode_t opcode);
 // clang-format off
 static int vigil_parser_math_intrinsic_opcode(const vigil_native_module_t *, const char *, size_t);
 static int vigil_parser_parse_intrinsic_opcode(const vigil_native_module_t *, const char *, size_t);
@@ -4724,13 +4725,334 @@ static vigil_opcode_t vigil_parser_try_fuse_locals_i64(vigil_parser_state_t *sta
     {
         state->chunk.span_count -= 1U;
     }
+    lowered_fuse_last_two_get_local(state, fused);
 
     /* Return a sentinel so the caller knows NOT to emit the opcode */
     return (vigil_opcode_t)255;
 }
 
+static size_t lowered_operand_byte_size(vigil_lowered_operand_kind_t kind)
+{
+    return kind == VIGIL_LOWERED_OPERAND_U32 ? 4U : 1U;
+}
+
+static size_t lowered_instruction_byte_size(const vigil_lowered_instruction_t *instruction)
+{
+    size_t size = 1U;
+    uint8_t operand_index;
+
+    for (operand_index = 0U; operand_index < instruction->operand_count; operand_index += 1U)
+        size += lowered_operand_byte_size(instruction->operands[operand_index].kind);
+    return size;
+}
+
+static vigil_lowered_instruction_t *lowered_last_instruction(vigil_parser_state_t *state)
+{
+    vigil_lowered_function_body_t *body = state->lowered_body;
+
+    if (body == NULL || body->instruction_count == 0U)
+        return NULL;
+    return &body->instructions[body->instruction_count - 1U];
+}
+
+static vigil_status_t lowered_append_instruction(vigil_parser_state_t *state, vigil_opcode_t opcode,
+                                                 vigil_source_span_t span)
+{
+    vigil_lowered_instruction_t instruction;
+
+    if (state->lowered_body == NULL)
+        return VIGIL_STATUS_OK;
+
+    vigil_lowered_instruction_clear(&instruction);
+    instruction.opcode = opcode;
+    instruction.span = span;
+    return vigil_lowered_function_body_append(state->lowered_body, &instruction, state->program->error);
+}
+
+static vigil_status_t lowered_append_operand(vigil_parser_state_t *state, vigil_lowered_operand_kind_t kind,
+                                             uint32_t value)
+{
+    vigil_lowered_instruction_t *instruction = lowered_last_instruction(state);
+
+    if (state->lowered_body == NULL)
+        return VIGIL_STATUS_OK;
+    if (instruction == NULL || instruction->operand_count >= 5U)
+    {
+        vigil_error_set_literal(state->program->error, VIGIL_STATUS_INTERNAL, "lowered instruction operand overflow");
+        return VIGIL_STATUS_INTERNAL;
+    }
+    vigil_lowered_instruction_add_operand(instruction, kind, value);
+    return VIGIL_STATUS_OK;
+}
+
+static void lowered_replace_last_opcode(vigil_parser_state_t *state, vigil_opcode_t opcode)
+{
+    vigil_lowered_instruction_t *instruction = lowered_last_instruction(state);
+
+    if (instruction != NULL)
+        instruction->opcode = opcode;
+}
+
+static void lowered_fuse_last_two_get_local(vigil_parser_state_t *state, vigil_opcode_t opcode)
+{
+    vigil_lowered_function_body_t *body = state->lowered_body;
+    vigil_lowered_instruction_t *left;
+    vigil_lowered_instruction_t *right;
+
+    if (body == NULL || body->instruction_count < 2U)
+        return;
+
+    left = &body->instructions[body->instruction_count - 2U];
+    right = &body->instructions[body->instruction_count - 1U];
+    if (left->opcode != VIGIL_OPCODE_GET_LOCAL || right->opcode != VIGIL_OPCODE_GET_LOCAL ||
+        left->operand_count != 1U || right->operand_count != 1U)
+        return;
+
+    left->opcode = opcode;
+    left->operands[1] = right->operands[0];
+    left->operand_count = 2U;
+    body->instruction_count -= 1U;
+}
+
+static vigil_status_t lowered_patch_u32(vigil_parser_state_t *state, size_t operand_offset, uint32_t value)
+{
+    vigil_lowered_function_body_t *body = state->lowered_body;
+    size_t offset = 0U;
+    size_t instruction_index;
+    int retry = 0;
+
+    if (body == NULL)
+        return VIGIL_STATUS_OK;
+
+retry_scan:
+    offset = 0U;
+    for (instruction_index = 0U; instruction_index < body->instruction_count; instruction_index += 1U)
+    {
+        vigil_lowered_instruction_t *instruction = &body->instructions[instruction_index];
+        size_t instruction_offset = offset;
+        size_t operand_offset_in_instruction = instruction_offset + 1U;
+        uint8_t operand_index;
+
+        for (operand_index = 0U; operand_index < instruction->operand_count; operand_index += 1U)
+        {
+            size_t operand_size = lowered_operand_byte_size(instruction->operands[operand_index].kind);
+
+            if (instruction->operands[operand_index].kind == VIGIL_LOWERED_OPERAND_U32 &&
+                operand_offset == operand_offset_in_instruction)
+            {
+                instruction->operands[operand_index].value = value;
+                return VIGIL_STATUS_OK;
+            }
+
+            operand_offset_in_instruction += operand_size;
+        }
+
+        offset += lowered_instruction_byte_size(instruction);
+    }
+
+    if (!retry)
+    {
+        vigil_status_t sync_status =
+            vigil_lowered_function_body_sync_from_chunk(body, &state->chunk, state->program->error);
+        if (sync_status != VIGIL_STATUS_OK)
+            return sync_status;
+        retry = 1;
+        goto retry_scan;
+    }
+
+    vigil_error_set_literal(state->program->error, VIGIL_STATUS_INTERNAL, "lowered jump patch offset is out of range");
+    return VIGIL_STATUS_INTERNAL;
+}
+
+static void lowered_remove_trailing_instructions(vigil_parser_state_t *state, size_t remove_count)
+{
+    vigil_lowered_function_body_t *body = state->lowered_body;
+
+    if (body == NULL || remove_count > body->instruction_count)
+        return;
+    body->instruction_count -= remove_count;
+}
+
+static void lowered_rewrite_tail_call_self(vigil_parser_state_t *state)
+{
+    vigil_lowered_function_body_t *body = state->lowered_body;
+    vigil_lowered_instruction_t *call_instruction;
+
+    if (body == NULL || body->instruction_count < 2U)
+        return;
+
+    call_instruction = &body->instructions[body->instruction_count - 2U];
+    if (call_instruction->opcode != VIGIL_OPCODE_CALL_SELF || call_instruction->operand_count != 2U)
+        return;
+
+    call_instruction->opcode = VIGIL_OPCODE_TAIL_CALL;
+    call_instruction->operands[1].value = call_instruction->operands[0].value;
+    call_instruction->operands[0].value = (uint32_t)state->function_index;
+    lowered_remove_trailing_instructions(state, 1U);
+}
+
+static void lowered_rewrite_tail_call(vigil_parser_state_t *state)
+{
+    vigil_lowered_function_body_t *body = state->lowered_body;
+    vigil_lowered_instruction_t *call_instruction;
+
+    if (body == NULL || body->instruction_count < 2U)
+        return;
+
+    call_instruction = &body->instructions[body->instruction_count - 2U];
+    if (call_instruction->opcode != VIGIL_OPCODE_CALL || call_instruction->operand_count != 3U)
+        return;
+
+    call_instruction->opcode = VIGIL_OPCODE_TAIL_CALL;
+    call_instruction->operand_count = 2U;
+    lowered_remove_trailing_instructions(state, 1U);
+}
+
+static void lowered_rewrite_increment_local(vigil_parser_state_t *state, vigil_opcode_t opcode, int8_t delta)
+{
+    vigil_lowered_function_body_t *body = state->lowered_body;
+    vigil_lowered_instruction_t *instruction;
+
+    if (body == NULL || body->instruction_count < 5U)
+        return;
+
+    instruction = &body->instructions[body->instruction_count - 5U];
+    instruction->opcode = opcode;
+    instruction->operand_count = 2U;
+    instruction->operands[1].kind = VIGIL_LOWERED_OPERAND_I8;
+    instruction->operands[1].value = (uint8_t)delta;
+    lowered_remove_trailing_instructions(state, 4U);
+}
+
+static void lowered_rewrite_locals_store(vigil_parser_state_t *state, vigil_opcode_t opcode)
+{
+    vigil_lowered_function_body_t *body = state->lowered_body;
+    vigil_lowered_instruction_t *instruction;
+    vigil_lowered_instruction_t *set_local;
+
+    if (body == NULL || body->instruction_count < 3U)
+        return;
+
+    instruction = &body->instructions[body->instruction_count - 3U];
+    set_local = &body->instructions[body->instruction_count - 2U];
+    if (set_local->operand_count != 1U || instruction->operand_count != 2U)
+        return;
+
+    instruction->opcode = opcode;
+    instruction->operands[2] = instruction->operands[1];
+    instruction->operands[1] = instruction->operands[0];
+    instruction->operands[0] = set_local->operands[0];
+    instruction->operand_count = 3U;
+    lowered_remove_trailing_instructions(state, 2U);
+}
+
+static void lowered_rewrite_f64_store(vigil_parser_state_t *state, vigil_opcode_t opcode)
+{
+    vigil_lowered_function_body_t *body = state->lowered_body;
+    vigil_lowered_instruction_t *instruction;
+    vigil_lowered_instruction_t *set_local;
+
+    if (body == NULL || body->instruction_count < 3U)
+        return;
+
+    instruction = &body->instructions[body->instruction_count - 3U];
+    set_local = &body->instructions[body->instruction_count - 2U];
+    if (set_local->operand_count != 1U)
+        return;
+
+    instruction->opcode = opcode;
+    instruction->operands[0] = set_local->operands[0];
+    instruction->operand_count = 1U;
+    lowered_remove_trailing_instructions(state, 2U);
+}
+
+static int lowered_find_instruction_index_by_offset(const vigil_lowered_function_body_t *body, size_t target_offset,
+                                                    size_t *out_index)
+{
+    size_t offset = 0U;
+    size_t instruction_index;
+
+    if (body == NULL)
+        return 0;
+
+    for (instruction_index = 0U; instruction_index < body->instruction_count; instruction_index += 1U)
+    {
+        if (offset == target_offset)
+        {
+            *out_index = instruction_index;
+            return 1;
+        }
+        offset += lowered_instruction_byte_size(&body->instructions[instruction_index]);
+    }
+
+    return 0;
+}
+
+static void lowered_rewrite_forloop(vigil_parser_state_t *state, size_t loop_start, vigil_opcode_t opcode,
+                                    uint8_t cmp_type)
+{
+    vigil_lowered_function_body_t *body = state->lowered_body;
+    size_t condition_index;
+    vigil_lowered_instruction_t *condition_constant;
+    vigil_lowered_instruction_t *forloop_instruction;
+    size_t body_start_offset;
+    size_t forloop_pos;
+    size_t forloop_end;
+    uint32_t back_off;
+
+    if (body == NULL || body->instruction_count < 2U)
+        return;
+    if (!lowered_find_instruction_index_by_offset(body, loop_start, &condition_index))
+        return;
+    if (condition_index + 1U >= body->instruction_count)
+        return;
+
+    condition_constant = &body->instructions[condition_index + 1U];
+    forloop_instruction = &body->instructions[body->instruction_count - 2U];
+    body_start_offset = loop_start + lowered_instruction_byte_size(&body->instructions[condition_index]) +
+                        lowered_instruction_byte_size(condition_constant);
+    if (body->instructions[condition_index + 2U].opcode == VIGIL_OPCODE_JUMP_IF_FALSE ||
+        body->instructions[condition_index + 2U].opcode == VIGIL_OPCODE_LESS_I32_JUMP_IF_FALSE ||
+        body->instructions[condition_index + 2U].opcode == VIGIL_OPCODE_LESS_EQUAL_I32_JUMP_IF_FALSE ||
+        body->instructions[condition_index + 2U].opcode == VIGIL_OPCODE_GREATER_I32_JUMP_IF_FALSE ||
+        body->instructions[condition_index + 2U].opcode == VIGIL_OPCODE_GREATER_EQUAL_I32_JUMP_IF_FALSE ||
+        body->instructions[condition_index + 2U].opcode == VIGIL_OPCODE_NOT_EQUAL_I32_JUMP_IF_FALSE ||
+        body->instructions[condition_index + 2U].opcode == VIGIL_OPCODE_LESS_I64_JUMP_IF_FALSE ||
+        body->instructions[condition_index + 2U].opcode == VIGIL_OPCODE_LESS_EQUAL_I64_JUMP_IF_FALSE ||
+        body->instructions[condition_index + 2U].opcode == VIGIL_OPCODE_GREATER_I64_JUMP_IF_FALSE ||
+        body->instructions[condition_index + 2U].opcode == VIGIL_OPCODE_GREATER_EQUAL_I64_JUMP_IF_FALSE ||
+        body->instructions[condition_index + 2U].opcode == VIGIL_OPCODE_NOT_EQUAL_I64_JUMP_IF_FALSE)
+    {
+        body_start_offset += lowered_instruction_byte_size(&body->instructions[condition_index + 2U]) +
+                             lowered_instruction_byte_size(&body->instructions[condition_index + 3U]);
+    }
+    else
+    {
+        body_start_offset += lowered_instruction_byte_size(&body->instructions[condition_index + 2U]) +
+                             lowered_instruction_byte_size(&body->instructions[condition_index + 3U]) +
+                             lowered_instruction_byte_size(&body->instructions[condition_index + 4U]) +
+                             lowered_instruction_byte_size(&body->instructions[condition_index + 5U]);
+    }
+
+    forloop_pos = state->chunk.code.length - 11U;
+    forloop_end = forloop_pos + 15U;
+    back_off = (uint32_t)(forloop_end - body_start_offset);
+
+    forloop_instruction->opcode = opcode;
+    forloop_instruction->operand_count = 5U;
+    forloop_instruction->operands[1].kind = VIGIL_LOWERED_OPERAND_I8;
+    forloop_instruction->operands[2] = condition_constant->operands[0];
+    forloop_instruction->operands[3].kind = VIGIL_LOWERED_OPERAND_U8;
+    forloop_instruction->operands[3].value = cmp_type;
+    forloop_instruction->operands[4].kind = VIGIL_LOWERED_OPERAND_U32;
+    forloop_instruction->operands[4].value = back_off;
+    lowered_remove_trailing_instructions(state, 1U);
+}
+
 vigil_status_t vigil_parser_emit_opcode(vigil_parser_state_t *state, vigil_opcode_t opcode, vigil_source_span_t span)
 {
+    vigil_status_t status;
+
     /* Peephole: TO_I64 after an i32 arith op → rewrite op to i64 variant.
        Also skip TO_I64 when the previous CONSTANT pool entry is already
        VIGIL_VALUE_INT (i64 nanbox) — the cast is a no-op at runtime. */
@@ -4743,6 +5065,7 @@ vigil_status_t vigil_parser_emit_opcode(vigil_parser_state_t *state, vigil_opcod
         if (vigil_opcode_i32_to_i64(last, &promoted))
         {
             state->chunk.code.data[state->chunk.code.length - 1U] = (uint8_t)promoted;
+            lowered_replace_last_opcode(state, promoted);
             return VIGIL_STATUS_OK;
         }
         if (last == VIGIL_OPCODE_CONSTANT && state->chunk.code.length >= 5U)
@@ -4755,7 +5078,10 @@ vigil_status_t vigil_parser_emit_opcode(vigil_parser_state_t *state, vigil_opcod
                 return VIGIL_STATUS_OK;
         }
     }
-    return vigil_chunk_write_opcode(&state->chunk, opcode, span, state->program->error);
+    status = vigil_chunk_write_opcode(&state->chunk, opcode, span, state->program->error);
+    if (status != VIGIL_STATUS_OK)
+        return status;
+    return lowered_append_instruction(state, opcode, span);
 }
 
 /* Emit an i64 binary opcode, attempting superinstruction fusion first.
@@ -4826,7 +5152,10 @@ static vigil_status_t vigil_parser_emit_i32_binop(vigil_parser_state_t *state, v
 
 vigil_status_t vigil_parser_emit_u32(vigil_parser_state_t *state, uint32_t value, vigil_source_span_t span)
 {
-    return vigil_chunk_write_u32(&state->chunk, value, span, state->program->error);
+    vigil_status_t status = vigil_chunk_write_u32(&state->chunk, value, span, state->program->error);
+    if (status != VIGIL_STATUS_OK)
+        return status;
+    return lowered_append_operand(state, VIGIL_LOWERED_OPERAND_U32, value);
 }
 
 vigil_status_t emit_opcode_u32(vigil_parser_state_t *state, vigil_opcode_t opcode, uint32_t operand,
@@ -4903,6 +5232,7 @@ static vigil_status_t vigil_parser_emit_jump(vigil_parser_state_t *state, vigil_
             {
                 /* Overwrite the CMP byte with the fused opcode. */
                 state->chunk.code.data[len - 1U] = (uint8_t)fused;
+                lowered_replace_last_opcode(state, fused);
                 if (out_operand_offset != NULL)
                 {
                     *out_operand_offset = vigil_chunk_code_size(&state->chunk);
@@ -4943,7 +5273,7 @@ static vigil_status_t vigil_parser_patch_u32(vigil_parser_state_t *state, size_t
     code[operand_offset + 1U] = (uint8_t)((value >> 8U) & 0xffU);
     code[operand_offset + 2U] = (uint8_t)((value >> 16U) & 0xffU);
     code[operand_offset + 3U] = (uint8_t)((value >> 24U) & 0xffU);
-    return VIGIL_STATUS_OK;
+    return lowered_patch_u32(state, operand_offset, value);
 }
 
 static vigil_status_t vigil_parser_patch_jump(vigil_parser_state_t *state, size_t operand_offset)
@@ -9899,6 +10229,7 @@ static void vigil_parser_peephole_tail_call_self(vigil_parser_state_t *state, ui
     c[len - 10U] = (uint8_t)((state->function_index >> 24U) & 0xFFU);
     memcpy(&c[len - 9U], argc_bytes, 4U);
     vigil_parser_truncate_code(state, len - 5U);
+    lowered_rewrite_tail_call_self(state);
 }
 
 // NOLINTNEXTLINE(readability-function-cognitive-complexity)
@@ -9959,6 +10290,7 @@ static void peephole_tail_call(vigil_parser_state_t *state)
                TAIL_CALL keeps [opcode][func_idx(4)][arg_count(4)], drops return_count+RETURN. */
             c[len - 18U] = VIGIL_OPCODE_TAIL_CALL;
             vigil_parser_truncate_code(state, len - 9U);
+            lowered_rewrite_tail_call(state);
         }
     }
     else if (vigil_parser_is_self_tail_call(c, len))
@@ -10376,6 +10708,7 @@ static void peephole_forloop_i32(vigil_parser_state_t *state, size_t loop_start)
         c[forloop_pos + 13U] = (uint8_t)((back_off >> 16U) & 0xFF);
         c[forloop_pos + 14U] = (uint8_t)((back_off >> 24U) & 0xFF);
         state->chunk.code.length = forloop_pos + 15U;
+        lowered_rewrite_forloop(state, loop_start, VIGIL_OPCODE_FORLOOP_I32, cmp_type);
     }
 }
 
@@ -10479,6 +10812,7 @@ static void peephole_forloop_i64(vigil_parser_state_t *state, size_t loop_start)
         c[forloop_pos + 13U] = (uint8_t)((back_off >> 16U) & 0xFF);
         c[forloop_pos + 14U] = (uint8_t)((back_off >> 24U) & 0xFF);
         state->chunk.code.length = forloop_pos + 15U;
+        lowered_rewrite_forloop(state, loop_start, VIGIL_OPCODE_FORLOOP_I64, cmp_type);
     }
 }
 
@@ -10532,6 +10866,7 @@ static void peephole_forloop_i32_fused(vigil_parser_state_t *state, size_t loop_
         c[forloop_pos + 13U] = (uint8_t)((back_off >> 16U) & 0xFF);
         c[forloop_pos + 14U] = (uint8_t)((back_off >> 24U) & 0xFF);
         state->chunk.code.length = forloop_pos + 15U;
+        lowered_rewrite_forloop(state, loop_start, VIGIL_OPCODE_FORLOOP_I32, cmp_type);
     }
 }
 
@@ -11537,6 +11872,7 @@ static vigil_status_t vigil_parser_emit_integer_cast(vigil_parser_state_t *state
         if (vigil_opcode_i32_to_i64(last, &promoted))
         {
             state->chunk.code.data[state->chunk.code.length - 1U] = (uint8_t)promoted;
+            lowered_replace_last_opcode(state, promoted);
             return VIGIL_STATUS_OK;
         }
         /* If the last opcode was CONSTANT and its pool entry is already an i64
@@ -11959,6 +12295,7 @@ static void vigil_parser_peephole_increment_local_i32(vigil_parser_state_t *stat
     state->chunk.code.length = base + 6U;
     if (state->chunk.span_count > base + 6U)
         state->chunk.span_count = base + 6U;
+    lowered_rewrite_increment_local(state, VIGIL_OPCODE_INCREMENT_LOCAL_I32, (int8_t)val);
 }
 
 /* ── Peephole: rewrite GET_LOCAL + CONSTANT + ADD_I64/SUB_I64 + SET_LOCAL + POP
@@ -12013,6 +12350,7 @@ static void vigil_parser_peephole_increment_local_i64(vigil_parser_state_t *stat
     state->chunk.code.length = base + 6U;
     if (state->chunk.span_count > base + 6U)
         state->chunk.span_count = base + 6U;
+    lowered_rewrite_increment_local(state, VIGIL_OPCODE_INCREMENT_LOCAL_I64, (int8_t)val);
 }
 
 /* ── Peephole: rewrite LOCALS_*_I64 + SET_LOCAL + POP → LOCALS_*_I32_STORE. */
@@ -12102,6 +12440,7 @@ static void vigil_parser_peephole_locals_i32_store(vigil_parser_state_t *state)
     state->chunk.code.length = base + 13U;
     if (state->chunk.span_count > base + 13U)
         state->chunk.span_count = base + 13U;
+    lowered_rewrite_locals_store(state, store_op);
 }
 
 static vigil_opcode_t assign_get_opcode(const assignment_target_t *t)
@@ -12289,6 +12628,7 @@ static vigil_status_t emit_local_store(vigil_parser_state_t *state, const assign
                 state->chunk.code.length = len - 2U;
                 if (state->chunk.span_count > len - 2U)
                     state->chunk.span_count = len - 2U;
+                lowered_rewrite_f64_store(state, store_op);
             }
         }
     }
