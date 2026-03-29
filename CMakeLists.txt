@@ -82,6 +82,7 @@ add_library(vigil_core OBJECT
     src/compiler_program.c
     src/compiler_builtins.c
     src/compiler_bindings.c
+    src/compiler_semantics.c
     src/compiler_strings.c
     src/compiler_typeparsing.c
     src/compiler_declarations.c
