@@ -64,7 +64,7 @@ static vigil_status_t vigil_compile_function_with_parent(vigil_program_state_t *
                                                          const vigil_parser_state_t *parent_state);
 static vigil_status_t vigil_compile_extern_fn(vigil_program_state_t *program, size_t function_index,
                                               const vigil_extern_fn_decl_t *ext);
-static vigil_status_t vigil_program_parse_extern_fn(vigil_program_state_t *program, size_t *cursor, int is_public);
+vigil_status_t vigil_program_parse_extern_fn(vigil_program_state_t *program, size_t *cursor, int is_public);
 static vigil_status_t parse_fn_params(vigil_program_state_t *program, size_t *cursor, vigil_function_decl_t *decl);
 const vigil_token_t *vigil_parser_peek(const vigil_parser_state_t *state);
 int vigil_parser_check(const vigil_parser_state_t *state, vigil_token_kind_t kind);
@@ -2236,7 +2236,7 @@ int vigil_program_parse_optional_pub(const vigil_program_state_t *program, size_
     return 0;
 }
 
-static int vigil_program_is_global_variable_declaration_start(const vigil_program_state_t *program, size_t cursor)
+int vigil_program_is_global_variable_declaration_start(const vigil_program_state_t *program, size_t cursor)
 {
     const vigil_token_t *name_token = NULL;
     const vigil_token_t *assign_token;
@@ -4027,7 +4027,7 @@ static vigil_status_t parse_extern_from_clause(vigil_program_state_t *program, s
     return VIGIL_STATUS_OK;
 }
 
-static vigil_status_t vigil_program_parse_extern_fn(vigil_program_state_t *program, size_t *cursor, int is_public)
+vigil_status_t vigil_program_parse_extern_fn(vigil_program_state_t *program, size_t *cursor, int is_public)
 {
     vigil_status_t status;
     const vigil_token_t *token;
@@ -4301,7 +4301,7 @@ static vigil_status_t parse_fn_body_bounds(vigil_program_state_t *program, size_
     return VIGIL_STATUS_OK;
 }
 
-static vigil_status_t parse_fn_declaration(vigil_program_state_t *program, size_t *cursor, int is_public)
+vigil_status_t parse_fn_declaration(vigil_program_state_t *program, size_t *cursor, int is_public)
 {
     vigil_status_t status;
     const vigil_token_t *name_token = NULL;
@@ -4345,92 +4345,6 @@ static vigil_status_t parse_fn_declaration(vigil_program_state_t *program, size_
         return status;
 
     program->functions.count++;
-    return VIGIL_STATUS_OK;
-}
-
-static vigil_status_t parse_repl_trailing_statements(vigil_program_state_t *program, size_t cursor)
-{
-    size_t end_cursor = cursor;
-    size_t depth = 0;
-    while (1)
-    {
-        const vigil_token_t *t = vigil_program_token_at(program, end_cursor);
-        if (t == NULL || t->kind == VIGIL_TOKEN_EOF)
-            break;
-        if (t->kind == VIGIL_TOKEN_LBRACE)
-            depth++;
-        else if (t->kind == VIGIL_TOKEN_RBRACE && depth)
-            depth--;
-        end_cursor++;
-    }
-    program->repl_stmts_start = cursor;
-    program->repl_stmts_end = end_cursor;
-    return VIGIL_STATUS_OK;
-}
-
-/* Returns VIGIL_STATUS_OK and sets *done=1 to break the loop, or *done=0 to continue. */
-static vigil_status_t parse_one_declaration(vigil_program_state_t *program, size_t *cursor, int *done)
-{
-    vigil_status_t status;
-    const vigil_token_t *token;
-    int is_public;
-
-    *done = 0;
-    token = vigil_program_token_at(program, *cursor);
-    if (token == NULL || token->kind == VIGIL_TOKEN_EOF)
-    {
-        *done = 1;
-        return VIGIL_STATUS_OK;
-    }
-    is_public = vigil_program_parse_optional_pub(program, cursor);
-    token = vigil_program_token_at(program, *cursor);
-    if (token == NULL || token->kind == VIGIL_TOKEN_EOF)
-        return vigil_compile_report(program, vigil_program_eof_span(program), "expected declaration after 'pub'");
-
-    if (token->kind == VIGIL_TOKEN_IMPORT)
-    {
-        if (is_public)
-            return vigil_compile_report(program, token->span, "imports cannot be declared 'pub'");
-        return vigil_program_parse_import(program, cursor);
-    }
-    if (token->kind == VIGIL_TOKEN_CONST)
-        return vigil_program_parse_constant_declaration(program, cursor, is_public);
-    if (token->kind == VIGIL_TOKEN_ENUM)
-        return vigil_program_parse_enum_declaration(program, cursor, is_public);
-    if (token->kind == VIGIL_TOKEN_INTERFACE)
-        return vigil_program_parse_interface_declaration(program, cursor, is_public);
-    if (token->kind == VIGIL_TOKEN_CLASS)
-        return vigil_program_parse_class_declaration(program, cursor, is_public);
-    if (vigil_program_is_global_variable_declaration_start(program, *cursor))
-        return vigil_program_parse_global_variable_declaration(program, cursor, is_public);
-    if (token->kind == VIGIL_TOKEN_EXTERN)
-        return vigil_program_parse_extern_fn(program, cursor, is_public);
-    if (token->kind == VIGIL_TOKEN_FN)
-        return parse_fn_declaration(program, cursor, is_public);
-
-    if (program->compile_mode == VIGIL_COMPILE_MODE_REPL && !is_public)
-    {
-        status = parse_repl_trailing_statements(program, *cursor);
-        *done = 1;
-        return status;
-    }
-    return vigil_compile_report(program, token->span,
-                                "expected top-level 'import', 'const', 'enum', 'interface', 'class', variable "
-                                "declaration, 'extern fn', or 'fn'");
-}
-
-static vigil_status_t vigil_program_parse_declarations(vigil_program_state_t *program)
-{
-    vigil_status_t status;
-    size_t cursor = 0U;
-    int done = 0;
-
-    while (!done)
-    {
-        status = parse_one_declaration(program, &cursor, &done);
-        if (status != VIGIL_STATUS_OK)
-            return status;
-    }
     return VIGIL_STATUS_OK;
 }
 
@@ -4483,7 +4397,7 @@ vigil_status_t vigil_program_parse_source(vigil_program_state_t *program, vigil_
     previous_source = program->source;
     previous_tokens = program->tokens;
     vigil_program_set_module_context(program, source, program->modules[module_index].tokens);
-    status = vigil_program_parse_declarations(program);
+    status = vigil_semantic_parse_program_declarations(program);
     vigil_program_set_module_context(program, previous_source, previous_tokens);
     if (status != VIGIL_STATUS_OK)
     {

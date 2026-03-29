@@ -562,12 +562,15 @@ vigil_status_t vigil_program_parse_constant_expression(vigil_program_state_t *pr
 vigil_status_t vigil_program_parse_function_return_types(vigil_program_state_t *program, size_t *cursor,
                                                          const char *unsupported_message, vigil_function_decl_t *decl);
 int vigil_program_parse_optional_pub(const vigil_program_state_t *program, size_t *cursor);
+int vigil_program_is_global_variable_declaration_start(const vigil_program_state_t *program, size_t cursor);
 vigil_status_t vigil_program_parse_global_variable_declaration(vigil_program_state_t *program, size_t *cursor,
                                                                int is_public);
 vigil_status_t vigil_program_parse_constant_declaration(vigil_program_state_t *program, size_t *cursor, int is_public);
 vigil_status_t vigil_program_parse_enum_declaration(vigil_program_state_t *program, size_t *cursor, int is_public);
 vigil_status_t vigil_program_parse_interface_declaration(vigil_program_state_t *program, size_t *cursor, int is_public);
 vigil_status_t vigil_program_parse_class_declaration(vigil_program_state_t *program, size_t *cursor, int is_public);
+vigil_status_t vigil_program_parse_extern_fn(vigil_program_state_t *program, size_t *cursor, int is_public);
+vigil_status_t parse_fn_declaration(vigil_program_state_t *program, size_t *cursor, int is_public);
 
 /* compiler_strings.c — string/f-string parsing */
 vigil_status_t vigil_parser_parse_fstring_literal(vigil_parser_state_t *state, const vigil_token_t *token,
