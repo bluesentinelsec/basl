@@ -63,8 +63,8 @@ vigil_status_t vigil_program_parse_import(vigil_program_state_t *program, size_t
 vigil_status_t vigil_semantic_prepare_program(vigil_program_state_t *program, vigil_source_id_t source_id,
                                               vigil_compile_mode_t mode, int allow_repl_main_synthesis);
 vigil_status_t vigil_semantic_parse_program_declarations(vigil_program_state_t *program);
-void vigil_lowered_function_body_init(vigil_lowered_function_body_t *body);
-void vigil_lowered_function_body_free(vigil_lowered_function_body_t *body);
+VIGIL_API void vigil_lowered_function_body_init(vigil_lowered_function_body_t *body);
+VIGIL_API void vigil_lowered_function_body_free(vigil_lowered_function_body_t *body);
 void vigil_lowered_instruction_clear(vigil_lowered_instruction_t *instruction);
 void vigil_lowered_instruction_add_operand(vigil_lowered_instruction_t *instruction, vigil_lowered_operand_kind_t kind,
                                            uint32_t value);
@@ -72,14 +72,17 @@ vigil_status_t vigil_lowered_function_body_append(vigil_lowered_function_body_t 
                                                   const vigil_lowered_instruction_t *instruction, vigil_error_t *error);
 vigil_status_t vigil_lowered_function_body_sync_from_chunk(vigil_lowered_function_body_t *body,
                                                            const vigil_chunk_t *chunk, vigil_error_t *error);
+VIGIL_API vigil_status_t vigil_verify_lowered_function_body_matches_chunk(const vigil_lowered_function_body_t *body,
+                                                                          const vigil_chunk_t *chunk,
+                                                                          vigil_error_t *error);
 vigil_status_t vigil_semantic_lower_function_body(vigil_program_state_t *program, size_t function_index,
                                                   const vigil_parser_state_t *parent_state,
                                                   vigil_lowered_function_body_t *out_body);
-vigil_status_t vigil_semantic_analyze_function_body(vigil_program_state_t *program, size_t function_index,
-                                                    const vigil_parser_state_t *parent_state,
-                                                    vigil_lowered_function_body_t *lowered_body,
-                                                    vigil_parser_state_t *state,
-                                                    vigil_statement_result_t *out_body_result);
+VIGIL_API vigil_status_t vigil_semantic_analyze_function_body(vigil_program_state_t *program, size_t function_index,
+                                                              const vigil_parser_state_t *parent_state,
+                                                              vigil_lowered_function_body_t *lowered_body,
+                                                              vigil_parser_state_t *state,
+                                                              vigil_statement_result_t *out_body_result);
 vigil_status_t vigil_semantic_check_function_with_parent(vigil_program_state_t *program, size_t function_index,
                                                          const vigil_parser_state_t *parent_state);
 

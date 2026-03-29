@@ -457,7 +457,7 @@ vigil_status_t vigil_program_grow_constants(vigil_program_state_t *program, size
 vigil_status_t vigil_program_grow_globals(vigil_program_state_t *program, size_t minimum_capacity);
 void vigil_program_trim_text_range(const char *text, size_t start, size_t end, size_t *out_start, size_t *out_end);
 vigil_status_t vigil_program_grow_functions(vigil_program_state_t *program, size_t minimum_capacity);
-void vigil_program_free(vigil_program_state_t *program);
+VIGIL_API void vigil_program_free(vigil_program_state_t *program);
 vigil_status_t vigil_program_add_module_import(vigil_program_state_t *program, vigil_program_module_t *module,
                                                const char *alias, size_t alias_length, vigil_source_span_t alias_span,
                                                vigil_source_id_t source_id);
@@ -510,7 +510,7 @@ int vigil_parser_check(const vigil_parser_state_t *state, vigil_token_kind_t kin
 int vigil_parser_match(vigil_parser_state_t *state, vigil_token_kind_t kind);
 vigil_source_span_t vigil_parser_fallback_span(const vigil_parser_state_t *state);
 vigil_status_t vigil_parser_emit_u32(vigil_parser_state_t *state, uint32_t value, vigil_source_span_t span);
-void vigil_parser_state_free(vigil_parser_state_t *state);
+VIGIL_API void vigil_parser_state_free(vigil_parser_state_t *state);
 vigil_status_t vigil_compile_report(const vigil_program_state_t *program, vigil_source_span_t span,
                                     const char *message);
 const vigil_token_t *vigil_program_token_at(const vigil_program_state_t *program, size_t index);

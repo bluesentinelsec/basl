@@ -679,6 +679,121 @@ vigil_status_t vigil_lowered_function_body_sync_from_chunk(vigil_lowered_functio
     return VIGIL_STATUS_OK;
 }
 
+static int lowered_operands_equal(const vigil_lowered_operand_t *left, const vigil_lowered_operand_t *right)
+{
+    return left->kind == right->kind && left->value == right->value;
+}
+
+static int lowered_instructions_equal(const vigil_lowered_instruction_t *left, const vigil_lowered_instruction_t *right)
+{
+    uint8_t operand_index;
+
+    if (left->opcode != right->opcode || left->operand_count != right->operand_count)
+        return 0;
+
+    for (operand_index = 0U; operand_index < left->operand_count; operand_index += 1U)
+    {
+        if (!lowered_operands_equal(&left->operands[operand_index], &right->operands[operand_index]))
+            return 0;
+    }
+
+    return 1;
+}
+
+static void set_lowered_count_drift_error(vigil_error_t *error, size_t lowered_count, size_t chunk_count)
+{
+    static char message[128];
+
+    snprintf(message, sizeof(message), "lowered instruction count drifted from chunk (lowered=%zu chunk=%zu)",
+             lowered_count, chunk_count);
+    vigil_error_set_literal(error, VIGIL_STATUS_INTERNAL, message);
+}
+
+static void set_lowered_instruction_drift_error(vigil_error_t *error, size_t instruction_index,
+                                                const vigil_lowered_instruction_t *lowered,
+                                                const vigil_lowered_instruction_t *decoded)
+{
+    static char message[192];
+    uint8_t operand_index;
+    uint8_t mismatch_operand = 255U;
+
+    for (operand_index = 0U; operand_index < lowered->operand_count && operand_index < decoded->operand_count;
+         operand_index += 1U)
+    {
+        if (!lowered_operands_equal(&lowered->operands[operand_index], &decoded->operands[operand_index]))
+        {
+            mismatch_operand = operand_index;
+            break;
+        }
+    }
+
+    if (mismatch_operand != 255U)
+    {
+        snprintf(message, sizeof(message),
+                 "lowered instruction drifted from chunk at %zu (lowered=%s decoded=%s operand=%u lower_kind=%u "
+                 "chunk_kind=%u lower_value=%u chunk_value=%u)",
+                 instruction_index, vigil_opcode_name(lowered->opcode), vigil_opcode_name(decoded->opcode),
+                 (unsigned)mismatch_operand, (unsigned)lowered->operands[mismatch_operand].kind,
+                 (unsigned)decoded->operands[mismatch_operand].kind, lowered->operands[mismatch_operand].value,
+                 decoded->operands[mismatch_operand].value);
+    }
+    else
+    {
+        snprintf(message, sizeof(message),
+                 "lowered instruction drifted from chunk at %zu (lowered=%s decoded=%s lower_operands=%u "
+                 "chunk_operands=%u)",
+                 instruction_index, vigil_opcode_name(lowered->opcode), vigil_opcode_name(decoded->opcode),
+                 (unsigned)lowered->operand_count, (unsigned)decoded->operand_count);
+    }
+    vigil_error_set_literal(error, VIGIL_STATUS_INTERNAL, message);
+}
+
+vigil_status_t vigil_verify_lowered_function_body_matches_chunk(const vigil_lowered_function_body_t *body,
+                                                                const vigil_chunk_t *chunk, vigil_error_t *error)
+{
+    vigil_status_t status;
+    vigil_lowered_function_body_t decoded;
+    size_t instruction_index;
+
+    if (body == NULL || chunk == NULL)
+    {
+        vigil_error_set_literal(error, VIGIL_STATUS_INVALID_ARGUMENT,
+                                "lowered body verification arguments are invalid");
+        return VIGIL_STATUS_INVALID_ARGUMENT;
+    }
+
+    vigil_lowered_function_body_init(&decoded);
+    decoded.runtime = body->runtime;
+    status = vigil_lowered_function_body_sync_from_chunk(&decoded, chunk, error);
+    if (status != VIGIL_STATUS_OK)
+    {
+        vigil_lowered_function_body_free(&decoded);
+        return status;
+    }
+
+    if (body->instruction_count != decoded.instruction_count)
+    {
+        vigil_lowered_function_body_free(&decoded);
+        set_lowered_count_drift_error(error, body->instruction_count, decoded.instruction_count);
+        return VIGIL_STATUS_INTERNAL;
+    }
+
+    for (instruction_index = 0U; instruction_index < body->instruction_count; instruction_index += 1U)
+    {
+        if (!lowered_instructions_equal(&body->instructions[instruction_index],
+                                        &decoded.instructions[instruction_index]))
+        {
+            set_lowered_instruction_drift_error(error, instruction_index, &body->instructions[instruction_index],
+                                                &decoded.instructions[instruction_index]);
+            vigil_lowered_function_body_free(&decoded);
+            return VIGIL_STATUS_INTERNAL;
+        }
+    }
+
+    vigil_lowered_function_body_free(&decoded);
+    return VIGIL_STATUS_OK;
+}
+
 static void vigil_lowered_function_body_take_chunk_metadata(vigil_lowered_function_body_t *body, vigil_chunk_t *chunk)
 {
     body->constants = chunk->constants;
@@ -1051,7 +1166,8 @@ vigil_status_t vigil_semantic_lower_function_body(vigil_program_state_t *program
         return status;
     }
 
-    status = vigil_lowered_function_body_sync_from_chunk(out_body, &state.chunk, program->error);
+#ifdef VIGIL_VERIFY_LOWERED_IR
+    status = vigil_verify_lowered_function_body_matches_chunk(out_body, &state.chunk, program->error);
     if (status != VIGIL_STATUS_OK)
     {
         vigil_lowered_function_body_free(out_body);
@@ -1059,6 +1175,7 @@ vigil_status_t vigil_semantic_lower_function_body(vigil_program_state_t *program
         vigil_parser_state_free(&state);
         return status;
     }
+#endif
 
     vigil_lowered_function_body_take_chunk_metadata(out_body, &state.chunk);
     out_body->function_index = function_index;

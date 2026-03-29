@@ -380,6 +380,7 @@ endif()
 if(VIGIL_BUILD_TESTS)
     include(CTest)
     find_package(Python3 COMPONENTS Interpreter REQUIRED)
+    target_compile_definitions(vigil_core PRIVATE VIGIL_VERIFY_LOWERED_IR)
 
     # Expose http.c internals for unit testing.
     if(VIGIL_STDLIB_HTTP)
