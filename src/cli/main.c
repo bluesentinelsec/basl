@@ -1,6 +1,3 @@
-#ifdef _MSC_VER
-#define _CRT_SECURE_NO_WARNINGS
-#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -3026,8 +3023,17 @@ typedef struct
 
 static const char *editor_resolve_home(void)
 {
-#ifdef _WIN32
-    return getenv("USERPROFILE");
+#ifdef _MSC_VER
+    static char home_buf[1024];
+    char *val = NULL;
+    size_t len = 0;
+    if (_dupenv_s(&val, &len, "USERPROFILE") == 0 && val)
+    {
+        snprintf(home_buf, sizeof(home_buf), "%s", val);
+        free(val);
+        return home_buf;
+    }
+    return NULL;
 #else
     return getenv("HOME");
 #endif
