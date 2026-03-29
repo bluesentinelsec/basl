@@ -303,6 +303,16 @@ typedef struct vigil_statement_result
     int guaranteed_return;
 } vigil_statement_result_t;
 
+/* Minimal backend-facing lowered body artifact.
+ * The semantic layer owns production of this validated body representation,
+ * and the current bytecode backend materializes function objects from it. */
+typedef struct vigil_lowered_function_body
+{
+    vigil_chunk_t chunk;
+    size_t function_index;
+    int guaranteed_return;
+} vigil_lowered_function_body_t;
+
 typedef struct vigil_binding_target
 {
     vigil_parser_type_t type;
