@@ -14,6 +14,8 @@
 #include "vigil/source.h"
 #include "vigil/stdlib.h"
 
+#include "plugin_registry.h"
+
 /* ── Server State ─────────────────────────────────────────── */
 
 struct vigil_lsp_server
@@ -1191,7 +1193,6 @@ static vigil_status_t handle_completion(vigil_lsp_server_t *server, const vigil_
     size_t i, count;
 
     (void)params; /* Position not used yet - return all symbols */
-
     vigil_json_array_new(a, &result, error);
 
     count = vigil_debug_symbol_table_count(&server->index->symbols);
@@ -1272,6 +1273,7 @@ static vigil_status_t handle_completion(vigil_lsp_server_t *server, const vigil_
         vigil_native_registry_init(&natives);
         if (vigil_stdlib_register_all(&natives, error) == VIGIL_STATUS_OK)
         {
+            vigil_plugin_register_all(&natives, error);
             size_t mi;
             for (mi = 0; mi < natives.module_count; mi++)
             {
