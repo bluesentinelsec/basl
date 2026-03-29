@@ -42,6 +42,19 @@ static vigil_status_t vigil_parser_emit_integer_cast(vigil_parser_state_t *state
                                                      vigil_source_span_t span);
 static int vigil_opcode_produces_i64(vigil_opcode_t op);
 static int vigil_opcode_i32_to_i64(vigil_opcode_t op, vigil_opcode_t *out);
+static vigil_status_t vigil_compile_init_program(vigil_program_state_t *program,
+                                                 const vigil_source_registry_t *registry,
+                                                 const vigil_source_file_t *source,
+                                                 const vigil_native_registry_t *natives,
+                                                 vigil_diagnostic_list_t *diagnostics, vigil_error_t *error,
+                                                 vigil_compile_mode_t mode);
+static vigil_status_t vigil_compile_prepare_program(vigil_program_state_t *program, vigil_source_id_t source_id,
+                                                    vigil_compile_mode_t mode, int allow_repl_main_synthesis);
+static vigil_status_t vigil_analyze_function_body(vigil_program_state_t *program, size_t function_index,
+                                                  const vigil_parser_state_t *parent_state, vigil_parser_state_t *state,
+                                                  vigil_statement_result_t *out_body_result);
+static vigil_status_t vigil_check_function_with_parent(vigil_program_state_t *program, size_t function_index,
+                                                       const vigil_parser_state_t *parent_state);
 // clang-format off
 static int vigil_parser_math_intrinsic_opcode(const vigil_native_module_t *, const char *, size_t);
 static int vigil_parser_parse_intrinsic_opcode(const vigil_native_module_t *, const char *, size_t);
@@ -13708,68 +13721,117 @@ static vigil_status_t try_compile_constructor_or_extern(vigil_program_state_t *p
     return VIGIL_STATUS_OK;
 }
 
+static vigil_status_t try_check_constructor_or_extern(vigil_program_state_t *program, size_t function_index,
+                                                      int *handled)
+{
+    size_t class_index;
+
+    *handled = 0;
+    for (class_index = 0U; class_index < program->class_count; class_index += 1U)
+    {
+        const vigil_class_decl_t *class_decl = &program->classes[class_index];
+        const vigil_class_method_t *init_method;
+
+        if (class_decl->constructor_function_index != function_index)
+            continue;
+        init_method = NULL;
+        if (!vigil_class_decl_find_method(class_decl, "init", 4U, NULL, &init_method) || init_method == NULL)
+        {
+            vigil_error_set_literal(program->error, VIGIL_STATUS_INTERNAL, "class init declaration is missing");
+            return VIGIL_STATUS_INTERNAL;
+        }
+        *handled = 1;
+        return VIGIL_STATUS_OK;
+    }
+
+    for (size_t ei = 0; ei < program->extern_fn_count; ei++)
+    {
+        if (program->extern_fns[ei].function_index == function_index)
+        {
+            *handled = 1;
+            return VIGIL_STATUS_OK;
+        }
+    }
+
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t vigil_analyze_function_body(vigil_program_state_t *program, size_t function_index,
+                                                  const vigil_parser_state_t *parent_state, vigil_parser_state_t *state,
+                                                  vigil_statement_result_t *out_body_result)
+{
+    vigil_status_t status;
+    vigil_function_decl_t *decl = &program->functions.functions[function_index];
+    vigil_program_set_module_context(program, decl->source, decl->tokens);
+    memset(state, 0, sizeof(*state));
+    state->program = program;
+    state->parent = (vigil_parser_state_t *)parent_state;
+    state->current = decl->body_start;
+    state->body_end = decl->body_end;
+    state->function_index = function_index;
+    state->expected_return_type = decl->return_type;
+    state->expected_return_types = vigil_function_return_types(decl);
+    state->expected_return_count = decl->return_count;
+    vigil_chunk_init(&state->chunk, program->registry->runtime);
+    vigil_binding_scope_stack_init(&state->locals, program->registry->runtime);
+    vigil_binding_scope_stack_begin_scope(&state->locals);
+    vigil_statement_result_clear(out_body_result);
+
+    status = vigil_compile_seed_parameter_symbols(state, decl);
+    if (status != VIGIL_STATUS_OK)
+        return status;
+
+    if (function_index == program->functions.main_index)
+    {
+        status = vigil_compile_emit_global_initializers(program, state);
+        if (status != VIGIL_STATUS_OK)
+            return status;
+    }
+
+    status = vigil_parser_parse_block_contents(state, out_body_result);
+    if (status != VIGIL_STATUS_OK)
+        return status;
+
+    decl = &program->functions.functions[function_index];
+
+    if (!out_body_result->guaranteed_return && decl->return_count == 1U && vigil_parser_type_is_void(decl->return_type))
+    {
+        status = emit_implicit_void_return(state, decl->name_span);
+        if (status != VIGIL_STATUS_OK)
+            return status;
+        out_body_result->guaranteed_return = 1;
+    }
+
+    if (!out_body_result->guaranteed_return && program->compile_mode == VIGIL_COMPILE_MODE_REPL &&
+        function_index == program->functions.main_index)
+    {
+        status = emit_repl_synthetic_return(state, program, decl->name_span);
+        if (status != VIGIL_STATUS_OK)
+            return status;
+        out_body_result->guaranteed_return = 1;
+    }
+
+    return vigil_compile_require_function_returns(program, decl, function_index, out_body_result->guaranteed_return);
+}
+
 static vigil_status_t compile_function_body(vigil_program_state_t *program, size_t function_index,
                                             const vigil_parser_state_t *parent_state)
 {
     vigil_status_t status;
     vigil_parser_state_t state;
-    vigil_function_decl_t *decl = &program->functions.functions[function_index];
+    vigil_function_decl_t *decl;
     vigil_object_t *object;
     vigil_statement_result_t body_result;
 
-    memset(&state, 0, sizeof(state));
-    vigil_program_set_module_context(program, decl->source, decl->tokens);
-    state.program = program;
-    state.parent = (vigil_parser_state_t *)parent_state;
-    state.current = decl->body_start;
-    state.body_end = decl->body_end;
-    state.function_index = function_index;
-    state.expected_return_type = decl->return_type;
-    state.expected_return_types = vigil_function_return_types(decl);
-    state.expected_return_count = decl->return_count;
-    vigil_chunk_init(&state.chunk, program->registry->runtime);
-    vigil_binding_scope_stack_init(&state.locals, program->registry->runtime);
-    vigil_binding_scope_stack_begin_scope(&state.locals);
-    vigil_statement_result_clear(&body_result);
-
-    status = vigil_compile_seed_parameter_symbols(&state, decl);
+    status = vigil_analyze_function_body(program, function_index, parent_state, &state, &body_result);
     if (status != VIGIL_STATUS_OK)
-        goto cleanup;
-
-    if (function_index == program->functions.main_index)
     {
-        status = vigil_compile_emit_global_initializers(program, &state);
-        if (status != VIGIL_STATUS_OK)
-            goto cleanup;
+        vigil_chunk_free(&state.chunk);
+        vigil_parser_state_free(&state);
+        return status;
     }
-
-    status = vigil_parser_parse_block_contents(&state, &body_result);
-    if (status != VIGIL_STATUS_OK)
-        goto cleanup;
 
     decl = &program->functions.functions[function_index];
-
-    if (!body_result.guaranteed_return && decl->return_count == 1U && vigil_parser_type_is_void(decl->return_type))
-    {
-        status = emit_implicit_void_return(&state, decl->name_span);
-        if (status != VIGIL_STATUS_OK)
-            goto cleanup;
-        body_result.guaranteed_return = 1;
-    }
-
-    if (!body_result.guaranteed_return && program->compile_mode == VIGIL_COMPILE_MODE_REPL &&
-        function_index == program->functions.main_index)
-    {
-        status = emit_repl_synthetic_return(&state, program, decl->name_span);
-        if (status != VIGIL_STATUS_OK)
-            goto cleanup;
-        body_result.guaranteed_return = 1;
-    }
-
-    status = vigil_compile_require_function_returns(program, decl, function_index, body_result.guaranteed_return);
-    if (status != VIGIL_STATUS_OK)
-        goto cleanup;
-
     object = NULL;
     status = vigil_function_object_new(program->registry->runtime, decl->name, decl->name_length, decl->param_count,
                                        decl->return_count, &state.chunk, &object, program->error);
@@ -13779,13 +13841,9 @@ static vigil_status_t compile_function_body(vigil_program_state_t *program, size
         vigil_chunk_free(&state.chunk);
         return status;
     }
+
     decl->object = object;
     return VIGIL_STATUS_OK;
-
-cleanup:
-    vigil_chunk_free(&state.chunk);
-    vigil_parser_state_free(&state);
-    return status;
 }
 
 static vigil_status_t vigil_compile_function_with_parent(vigil_program_state_t *program, size_t function_index,
@@ -13811,6 +13869,24 @@ static vigil_status_t vigil_compile_function(vigil_program_state_t *program, siz
     return vigil_compile_function_with_parent(program, function_index, NULL);
 }
 
+static vigil_status_t vigil_check_function_with_parent(vigil_program_state_t *program, size_t function_index,
+                                                       const vigil_parser_state_t *parent_state)
+{
+    vigil_status_t status;
+    vigil_parser_state_t state;
+    vigil_statement_result_t body_result;
+    int handled = 0;
+
+    status = try_check_constructor_or_extern(program, function_index, &handled);
+    if (handled || status != VIGIL_STATUS_OK)
+        return status;
+
+    status = vigil_analyze_function_body(program, function_index, parent_state, &state, &body_result);
+    vigil_chunk_free(&state.chunk);
+    vigil_parser_state_free(&state);
+    return status;
+}
+
 static vigil_status_t vigil_compile_validate_inputs(const vigil_source_registry_t *registry,
                                                     vigil_diagnostic_list_t *diagnostics, vigil_object_t **out_function,
                                                     vigil_compile_mode_t mode, vigil_error_t *error)
@@ -13834,6 +13910,101 @@ static vigil_status_t vigil_compile_validate_inputs(const vigil_source_registry_
     return VIGIL_STATUS_OK;
 }
 
+static vigil_status_t vigil_check_validate_inputs(const vigil_source_registry_t *registry,
+                                                  vigil_diagnostic_list_t *diagnostics, vigil_error_t *error)
+{
+    if (registry == NULL)
+    {
+        vigil_error_set_literal(error, VIGIL_STATUS_INVALID_ARGUMENT, "source registry must not be null");
+        return VIGIL_STATUS_INVALID_ARGUMENT;
+    }
+    if (diagnostics == NULL)
+    {
+        vigil_error_set_literal(error, VIGIL_STATUS_INVALID_ARGUMENT, "diagnostic list must not be null");
+        return VIGIL_STATUS_INVALID_ARGUMENT;
+    }
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t vigil_compile_init_program(vigil_program_state_t *program,
+                                                 const vigil_source_registry_t *registry,
+                                                 const vigil_source_file_t *source,
+                                                 const vigil_native_registry_t *natives,
+                                                 vigil_diagnostic_list_t *diagnostics, vigil_error_t *error,
+                                                 vigil_compile_mode_t mode)
+{
+    memset(program, 0, sizeof(*program));
+    program->registry = registry;
+    program->diagnostics = diagnostics;
+    program->error = error;
+    program->natives = natives;
+    program->compile_mode = (int)mode;
+    vigil_binding_function_table_init(&program->functions, registry->runtime);
+    vigil_program_set_module_context(program, source, NULL);
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t vigil_compile_prepare_program(vigil_program_state_t *program, vigil_source_id_t source_id,
+                                                    vigil_compile_mode_t mode, int allow_repl_main_synthesis)
+{
+    vigil_status_t status;
+    const vigil_source_file_t *source = program->source;
+
+    status = vigil_program_parse_source(program, source_id);
+    if (status != VIGIL_STATUS_OK)
+    {
+        return status;
+    }
+
+    vigil_program_set_module_context(program, source, NULL);
+
+    if (allow_repl_main_synthesis && mode == VIGIL_COMPILE_MODE_REPL && !program->functions.has_main &&
+        (program->repl_stmts_start < program->repl_stmts_end || program->global_count > 0U))
+    {
+        vigil_binding_function_t *decl;
+        vigil_binding_type_t ret_type;
+        size_t mod_idx = 0;
+
+        status = vigil_program_grow_functions(program, program->functions.count + 1U);
+        if (status != VIGIL_STATUS_OK)
+        {
+            return status;
+        }
+        decl = &program->functions.functions[program->functions.count];
+        vigil_binding_function_init(decl);
+        decl->name = "main";
+        decl->name_length = 4U;
+        decl->name_span = vigil_program_eof_span(program);
+        decl->is_public = 0;
+        decl->source = source;
+        if (vigil_program_module_find(program, source_id, &mod_idx))
+        {
+            decl->tokens = program->modules[mod_idx].tokens;
+        }
+        decl->body_start = program->repl_stmts_start;
+        decl->body_end = program->repl_stmts_end;
+        memset(&ret_type, 0, sizeof(ret_type));
+        ret_type.kind = VIGIL_TYPE_I32;
+        decl->return_type = ret_type;
+        decl->return_count = 1U;
+        program->functions.main_index = program->functions.count;
+        program->functions.has_main = 1;
+        program->repl_has_statements = (program->repl_stmts_start < program->repl_stmts_end) ? 1 : 0;
+        program->functions.count += 1U;
+    }
+
+    if (!program->functions.has_main)
+    {
+        if (mode == VIGIL_COMPILE_MODE_REPL)
+        {
+            return VIGIL_STATUS_OK;
+        }
+        return vigil_compile_report(program, vigil_program_eof_span(program), "expected top-level function 'main'");
+    }
+
+    return VIGIL_STATUS_OK;
+}
+
 static vigil_status_t vigil_compile_all_functions(vigil_program_state_t *program)
 {
     vigil_status_t status;
@@ -13842,6 +14013,23 @@ static vigil_status_t vigil_compile_all_functions(vigil_program_state_t *program
     for (i = 0U; i < program->functions.count; ++i)
     {
         status = vigil_compile_function(program, i);
+        if (status != VIGIL_STATUS_OK)
+        {
+            return status;
+        }
+    }
+
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t vigil_check_all_functions(vigil_program_state_t *program)
+{
+    vigil_status_t status;
+    size_t i;
+
+    for (i = 0U; i < program->functions.count; ++i)
+    {
+        status = vigil_check_function_with_parent(program, i, NULL);
         if (status != VIGIL_STATUS_OK)
         {
             return status;
@@ -14000,24 +14188,16 @@ static vigil_status_t vigil_compile_attach_entrypoint(vigil_program_state_t *pro
     return VIGIL_STATUS_OK;
 }
 
-vigil_status_t vigil_compile_source_internal(const vigil_source_registry_t *registry, vigil_source_id_t source_id,
-                                             vigil_compile_mode_t mode, const vigil_native_registry_t *natives,
-                                             vigil_object_t **out_function, int *out_repl_has_statements,
-                                             vigil_diagnostic_list_t *diagnostics, vigil_error_t *error)
+vigil_status_t vigil_check_source_internal(const vigil_source_registry_t *registry, vigil_source_id_t source_id,
+                                           const vigil_native_registry_t *natives, vigil_diagnostic_list_t *diagnostics,
+                                           vigil_error_t *error)
 {
     vigil_status_t status;
     vigil_program_state_t program;
     const vigil_source_file_t *source;
 
     vigil_error_clear(error);
-    if (out_repl_has_statements)
-        *out_repl_has_statements = 0;
-    if (out_function != NULL)
-    {
-        *out_function = NULL;
-    }
-
-    status = vigil_compile_validate_inputs(registry, diagnostics, out_function, mode, error);
+    status = vigil_check_validate_inputs(registry, diagnostics, error);
     if (status != VIGIL_STATUS_OK)
     {
         return status;
@@ -14031,75 +14211,73 @@ vigil_status_t vigil_compile_source_internal(const vigil_source_registry_t *regi
         return VIGIL_STATUS_INVALID_ARGUMENT;
     }
 
-    memset(&program, 0, sizeof(program));
-    program.registry = registry;
-    program.diagnostics = diagnostics;
-    program.error = error;
-    program.natives = natives;
-    program.compile_mode = (int)mode;
-    vigil_binding_function_table_init(&program.functions, registry->runtime);
-    vigil_program_set_module_context(&program, source, NULL);
+    status = vigil_compile_init_program(&program, registry, source, natives, diagnostics, error,
+                                        VIGIL_COMPILE_MODE_BUILD_ENTRYPOINT);
+    if (status != VIGIL_STATUS_OK)
+    {
+        return status;
+    }
 
-    status = vigil_program_parse_source(&program, source_id);
+    status = vigil_compile_prepare_program(&program, source_id, VIGIL_COMPILE_MODE_BUILD_ENTRYPOINT, 0);
     if (status != VIGIL_STATUS_OK)
     {
         vigil_program_free(&program);
         return status;
     }
 
-    vigil_program_set_module_context(&program, source, NULL);
-
-    /* In REPL mode, synthesize fn main from top-level statements.
-       Also synthesize when there are globals (even without statements)
-       so their initializers get compiled and type-checked. */
-    if (mode == VIGIL_COMPILE_MODE_REPL && !program.functions.has_main &&
-        (program.repl_stmts_start < program.repl_stmts_end || program.global_count > 0U))
+    status = vigil_check_all_functions(&program);
+    if (status != VIGIL_STATUS_OK)
     {
-        vigil_binding_function_t *decl;
-        vigil_binding_type_t ret_type;
-        size_t mod_idx = 0;
-
-        status = vigil_program_grow_functions(&program, program.functions.count + 1U);
-        if (status != VIGIL_STATUS_OK)
-        {
-            vigil_program_free(&program);
-            return status;
-        }
-        decl = &program.functions.functions[program.functions.count];
-        vigil_binding_function_init(decl);
-        decl->name = "main";
-        decl->name_length = 4U;
-        decl->name_span = vigil_program_eof_span(&program);
-        decl->is_public = 0;
-        decl->source = source;
-        /* Retrieve the module's token list so the parser can read the body. */
-        if (vigil_program_module_find(&program, source_id, &mod_idx))
-        {
-            decl->tokens = program.modules[mod_idx].tokens;
-        }
-        decl->body_start = program.repl_stmts_start;
-        decl->body_end = program.repl_stmts_end;
-        memset(&ret_type, 0, sizeof(ret_type));
-        ret_type.kind = VIGIL_TYPE_I32;
-        decl->return_type = ret_type;
-        decl->return_count = 1U;
-        program.functions.main_index = program.functions.count;
-        program.functions.has_main = 1;
-        program.repl_has_statements = (program.repl_stmts_start < program.repl_stmts_end) ? 1 : 0;
-        program.functions.count += 1U;
-    }
-
-    if (!program.functions.has_main)
-    {
-        if (mode == VIGIL_COMPILE_MODE_REPL)
-        {
-            /* No statements and no main — nothing to execute. */
-            vigil_program_free(&program);
-            return VIGIL_STATUS_OK;
-        }
-        status = vigil_compile_report(&program, vigil_program_eof_span(&program), "expected top-level function 'main'");
         vigil_program_free(&program);
         return status;
+    }
+
+    vigil_program_free(&program);
+    return VIGIL_STATUS_OK;
+}
+
+vigil_status_t vigil_compile_source_internal(const vigil_source_registry_t *registry, vigil_source_id_t source_id,
+                                             vigil_compile_mode_t mode, const vigil_native_registry_t *natives,
+                                             vigil_object_t **out_function, int *out_repl_has_statements,
+                                             vigil_diagnostic_list_t *diagnostics, vigil_error_t *error)
+{
+    vigil_status_t status;
+    vigil_program_state_t program;
+    const vigil_source_file_t *source;
+
+    vigil_error_clear(error);
+    if (out_repl_has_statements)
+        *out_repl_has_statements = 0;
+    if (out_function != NULL)
+        *out_function = NULL;
+
+    status = vigil_compile_validate_inputs(registry, diagnostics, out_function, mode, error);
+    if (status != VIGIL_STATUS_OK)
+        return status;
+
+    source = vigil_source_registry_get(registry, source_id);
+    if (source == NULL)
+    {
+        vigil_error_set_literal(error, VIGIL_STATUS_INVALID_ARGUMENT,
+                                "source_id must reference a registered source file");
+        return VIGIL_STATUS_INVALID_ARGUMENT;
+    }
+
+    status = vigil_compile_init_program(&program, registry, source, natives, diagnostics, error, mode);
+    if (status != VIGIL_STATUS_OK)
+        return status;
+
+    status = vigil_compile_prepare_program(&program, source_id, mode, 1);
+    if (status != VIGIL_STATUS_OK)
+    {
+        vigil_program_free(&program);
+        return status;
+    }
+
+    if (!program.functions.has_main && mode == VIGIL_COMPILE_MODE_REPL)
+    {
+        vigil_program_free(&program);
+        return VIGIL_STATUS_OK;
     }
 
     status = vigil_compile_all_functions(&program);
@@ -14109,14 +14287,11 @@ vigil_status_t vigil_compile_source_internal(const vigil_source_registry_t *regi
         return status;
     }
 
-    if (mode == VIGIL_COMPILE_MODE_BUILD_ENTRYPOINT || mode == VIGIL_COMPILE_MODE_REPL)
+    status = vigil_compile_attach_entrypoint(&program, out_function);
+    if (status != VIGIL_STATUS_OK)
     {
-        status = vigil_compile_attach_entrypoint(&program, out_function);
-        if (status != VIGIL_STATUS_OK)
-        {
-            vigil_program_free(&program);
-            return status;
-        }
+        vigil_program_free(&program);
+        return status;
     }
 
     if (out_repl_has_statements)
@@ -14302,25 +14477,14 @@ vigil_status_t vigil_compile_source_with_debug_info(const vigil_source_registry_
         return VIGIL_STATUS_INVALID_ARGUMENT;
     }
 
-    memset(&program, 0, sizeof(program));
-    program.registry = registry;
-    program.diagnostics = diagnostics;
-    program.error = error;
-    program.natives = natives;
-    vigil_binding_function_table_init(&program.functions, registry->runtime);
-    vigil_program_set_module_context(&program, source, NULL);
+    status = vigil_compile_init_program(&program, registry, source, natives, diagnostics, error,
+                                        VIGIL_COMPILE_MODE_BUILD_ENTRYPOINT);
+    if (status != VIGIL_STATUS_OK)
+        return status;
 
-    status = vigil_program_parse_source(&program, source_id);
+    status = vigil_compile_prepare_program(&program, source_id, VIGIL_COMPILE_MODE_BUILD_ENTRYPOINT, 0);
     if (status != VIGIL_STATUS_OK)
     {
-        vigil_program_free(&program);
-        return status;
-    }
-
-    vigil_program_set_module_context(&program, source, NULL);
-    if (!program.functions.has_main)
-    {
-        status = vigil_compile_report(&program, vigil_program_eof_span(&program), "expected top-level function 'main'");
         vigil_program_free(&program);
         return status;
     }
