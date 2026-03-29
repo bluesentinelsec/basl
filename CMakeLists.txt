@@ -69,6 +69,7 @@ add_library(vigil_core OBJECT
     src/doc.c
     src/doc_registry.c
     src/embed.c
+    src/easy.c
     src/ffi_callback.c
     src/fmt.c
     src/pkg.c
@@ -393,6 +394,7 @@ if(VIGIL_BUILD_TESTS)
         tests/compiler_test.c
         tests/dap_test.c
         tests/doc_test.c
+        tests/embed_api_test.c
         tests/debug_info_test.c
         tests/debugger_test.c
         tests/diagnostic_test.c
