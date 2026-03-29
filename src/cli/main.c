@@ -3260,6 +3260,259 @@ static int early_dispatch_profile(int argc, char **argv)
     return cmd_profile(argv[2]);
 }
 
+/* ── complexity command ───────────────────────────────────────────── */
+
+typedef struct
+{
+    char name[128];
+    int ccn;
+    int lines;
+    int params;
+} ccn_entry_t;
+
+static int analyze_ccn_file(const char *path, vigil_runtime_t *runtime, int *total_funcs, int *max_ccn, int *sum_ccn)
+{
+    vigil_error_t error = {0};
+    vigil_source_registry_t registry;
+    vigil_diagnostic_list_t diagnostics;
+    vigil_token_list_t tokens;
+    vigil_source_id_t sid = 0;
+    vigil_status_t status;
+    size_t i, count;
+    const char *src_text;
+    size_t src_len;
+
+    vigil_source_registry_init(&registry, runtime);
+    vigil_diagnostic_list_init(&diagnostics, runtime);
+    vigil_token_list_init(&tokens, runtime);
+
+    {
+        char *file_text = NULL;
+        size_t file_len = 0;
+        const vigil_allocator_t *alloc = vigil_runtime_allocator(runtime);
+        status = vigil_platform_read_file(alloc, path, &file_text, &file_len, &error);
+        if (status != VIGIL_STATUS_OK)
+        {
+            fprintf(stderr, "error: cannot read %s\n", path);
+            goto ccn_cleanup;
+        }
+        status = vigil_source_registry_register(&registry, path, strlen(path), file_text, file_len, &sid, &error);
+        alloc->deallocate(alloc->user_data, file_text);
+        if (status != VIGIL_STATUS_OK)
+        {
+            fprintf(stderr, "error: cannot register %s\n", path);
+            goto ccn_cleanup;
+        }
+    }
+
+    status = vigil_lex_source(&registry, sid, &tokens, &diagnostics, &error);
+    if (status != VIGIL_STATUS_OK)
+        goto ccn_cleanup;
+
+    {
+        const vigil_source_file_t *sf = vigil_source_registry_get(&registry, sid);
+        src_text = vigil_string_c_str(&sf->text);
+        src_len = vigil_string_length(&sf->text);
+    }
+
+    printf("  %s\n", path);
+    count = vigil_token_list_count(&tokens);
+    i = 0;
+    while (i < count)
+    {
+        const vigil_token_t *tok = vigil_token_list_get(&tokens, i);
+        if (tok->kind != VIGIL_TOKEN_FN)
+        {
+            i++;
+            continue;
+        }
+        /* Found fn — next identifier is the name */
+        i++;
+        if (i >= count)
+            break;
+        tok = vigil_token_list_get(&tokens, i);
+        char fname[128] = {0};
+        if (tok->kind == VIGIL_TOKEN_IDENTIFIER &&
+            ((tok->span.end_offset > tok->span.start_offset) ? (tok->span.end_offset - tok->span.start_offset) : 0) <
+                sizeof(fname) &&
+            tok->span.start_offset + ((tok->span.end_offset > tok->span.start_offset)
+                                          ? (tok->span.end_offset - tok->span.start_offset)
+                                          : 0) <=
+                src_len)
+        {
+            memcpy(fname, src_text + tok->span.start_offset,
+                   ((tok->span.end_offset > tok->span.start_offset) ? (tok->span.end_offset - tok->span.start_offset)
+                                                                    : 0));
+        }
+        else
+        {
+            snprintf(fname, sizeof(fname), "<anonymous>");
+        }
+
+        /* Count params: scan to opening { counting commas between ( ) */
+        int params = 0;
+        int paren_depth = 0;
+        int found_body = 0;
+        size_t fn_start_line = tok->span.start_offset;
+        i++;
+        while (i < count)
+        {
+            tok = vigil_token_list_get(&tokens, i);
+            if (tok->kind == VIGIL_TOKEN_LPAREN)
+                paren_depth++;
+            else if (tok->kind == VIGIL_TOKEN_RPAREN)
+            {
+                paren_depth--;
+                if (paren_depth == 0 && params == 0)
+                {
+                    /* Check if parens were empty */
+                    const vigil_token_t *prev = (i > 0) ? vigil_token_list_get(&tokens, i - 1) : NULL;
+                    if (prev && prev->kind != VIGIL_TOKEN_LPAREN)
+                        params++;
+                }
+            }
+            else if (tok->kind == VIGIL_TOKEN_COMMA && paren_depth == 1)
+                params++;
+            else if (tok->kind == VIGIL_TOKEN_LBRACE && paren_depth == 0)
+            {
+                found_body = 1;
+                i++;
+                break;
+            }
+            i++;
+        }
+        if (!found_body)
+            continue;
+
+        /* Count CCN inside function body */
+        int ccn = 1;
+        int brace_depth = 1;
+
+        while (i < count && brace_depth > 0)
+        {
+            tok = vigil_token_list_get(&tokens, i);
+            if (tok->kind == VIGIL_TOKEN_LBRACE)
+                brace_depth++;
+            else if (tok->kind == VIGIL_TOKEN_RBRACE)
+                brace_depth--;
+            else if (tok->kind == VIGIL_TOKEN_IF || tok->kind == VIGIL_TOKEN_FOR || tok->kind == VIGIL_TOKEN_WHILE ||
+                     tok->kind == VIGIL_TOKEN_GUARD || tok->kind == VIGIL_TOKEN_CASE ||
+                     tok->kind == VIGIL_TOKEN_AMPERSAND_AMPERSAND || tok->kind == VIGIL_TOKEN_PIPE_PIPE ||
+                     tok->kind == VIGIL_TOKEN_QUESTION)
+                ccn++;
+            i++;
+        }
+
+        /* Estimate lines from span offsets */
+        int lines = 1;
+        {
+            size_t start = fn_start_line;
+            size_t end = (i < count) ? vigil_token_list_get(&tokens, i > 0 ? i - 1 : 0)->span.start_offset : src_len;
+            for (size_t j = start; j < end && j < src_len; j++)
+                if (src_text[j] == '\n')
+                    lines++;
+        }
+
+        const char *warn = (ccn >= 10) ? "  \xe2\x9a\xa0 high" : "";
+        printf("    %-24s ccn=%-4d lines=%-4d params=%d%s\n", fname, ccn, lines, params, warn);
+
+        (*total_funcs)++;
+        *sum_ccn += ccn;
+        if (ccn > *max_ccn)
+            *max_ccn = ccn;
+    }
+
+ccn_cleanup:
+    vigil_token_list_free(&tokens);
+    vigil_diagnostic_list_free(&diagnostics);
+    vigil_source_registry_free(&registry);
+    return status == VIGIL_STATUS_OK ? 0 : 1;
+}
+
+typedef struct
+{
+    vigil_runtime_t *runtime;
+    const char *base;
+    int *total_funcs;
+    int *max_ccn;
+    int *sum_ccn;
+} ccn_walk_ctx_t;
+
+static vigil_status_t ccn_walk_dir(const char *dir, ccn_walk_ctx_t *ctx);
+
+static vigil_status_t ccn_walk_cb(const char *name, int is_subdir, void *ud)
+{
+    ccn_walk_ctx_t *ctx = (ccn_walk_ctx_t *)ud;
+    char path[2048];
+    if (vigil_platform_path_join(ctx->base, name, path, sizeof(path), NULL) != VIGIL_STATUS_OK)
+        return VIGIL_STATUS_OK;
+    if (is_subdir)
+        return ccn_walk_dir(path, ctx);
+    size_t len = strlen(name);
+    if (len > 6 && strcmp(name + len - 6, ".vigil") == 0)
+        analyze_ccn_file(path, ctx->runtime, ctx->total_funcs, ctx->max_ccn, ctx->sum_ccn);
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t ccn_walk_dir(const char *dir, ccn_walk_ctx_t *ctx)
+{
+    const char *saved = ctx->base;
+    ctx->base = dir;
+    vigil_platform_list_dir(dir, ccn_walk_cb, ctx, NULL);
+    ctx->base = saved;
+    return VIGIL_STATUS_OK;
+}
+
+static int cmd_complexity(const char *target)
+{
+    vigil_runtime_t *runtime = NULL;
+    vigil_error_t error = {0};
+    int total_funcs = 0, max_ccn = 0, sum_ccn = 0;
+
+    if (vigil_runtime_open(&runtime, NULL, &error) != VIGIL_STATUS_OK)
+    {
+        fprintf(stderr, "failed to initialize runtime\n");
+        return 1;
+    }
+
+    /* Check if target is a directory or a file */
+    int is_dir = 0;
+    vigil_platform_is_directory(target, &is_dir);
+
+    if (!is_dir)
+    {
+        if (analyze_ccn_file(target, runtime, &total_funcs, &max_ccn, &sum_ccn) != 0)
+        {
+            vigil_runtime_close(&runtime);
+            return 1;
+        }
+    }
+    else
+    {
+        ccn_walk_ctx_t ctx = {runtime, target, &total_funcs, &max_ccn, &sum_ccn};
+        ccn_walk_dir(target, &ctx);
+    }
+
+    if (total_funcs > 0)
+    {
+        printf("\n  %d function%s, avg ccn=%.1f, max ccn=%d\n", total_funcs, total_funcs == 1 ? "" : "s",
+               (double)sum_ccn / (double)total_funcs, max_ccn);
+    }
+
+    vigil_runtime_close(&runtime);
+    return 0;
+}
+
+static int early_dispatch_complexity(int argc, char **argv)
+{
+    if (argc < 3)
+    {
+        fprintf(stderr, "Usage: vigil complexity <file.vigil|directory>\n");
+        return 1;
+    }
+    return cmd_complexity(argv[2]);
+}
+
 static const early_command_t early_commands[] = {
     {"run", early_dispatch_run},
     {"embed", early_dispatch_embed},
@@ -3267,6 +3520,7 @@ static const early_command_t early_commands[] = {
     {"get", early_dispatch_get},
     {"editor", early_dispatch_editor},
     {"profile", early_dispatch_profile},
+    {"complexity", early_dispatch_complexity},
     {NULL, NULL},
 };
 
