@@ -235,7 +235,8 @@ static vigil_editor_result_t install_vscode(const char *vigil_bin, const char *h
     if (!pwrite(path, vscode_langconf))
         return result_err("failed to write language-configuration.json");
 
-    /* Install npm dependencies */
+    /* Install npm dependencies (not available on iOS/Android) */
+#if !defined(__APPLE__) || !defined(TARGET_OS_IPHONE)
     printf("Running npm install in %s\n", ext_dir);
     {
         char cmd[1200];
@@ -248,6 +249,7 @@ static vigil_editor_result_t install_vscode(const char *vigil_bin, const char *h
         if (rc != 0)
             return result_err("npm install failed — is Node.js installed?");
     }
+#endif
 
     return result_ok("Done. Reload VS Code and open a .vigil file.\n"
                      "To undo: vigil editor uninstall vscode");
