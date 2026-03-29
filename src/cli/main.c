@@ -3057,7 +3057,7 @@ static int early_dispatch_editor(int argc, char **argv)
         for (const char *const *e = editors; *e; e++)
         {
             /* vscode uses config_home, vim uses HOME */
-            const char *base = (strcmp(*e, "vim") == 0) ? home : config_home;
+            const char *base = home;
             int installed = vigil_editor_is_installed(*e, base);
             printf("  %-12s %s\n", *e, installed ? "installed \xe2\x9c\x93" : "not installed");
         }
@@ -3070,7 +3070,7 @@ static int early_dispatch_editor(int argc, char **argv)
         int any = 0;
         for (const char *const *e = editors; *e; e++)
         {
-            const char *base = (strcmp(*e, "vim") == 0) ? home : config_home;
+            const char *base = home;
             if (vigil_editor_is_installed(*e, base))
             {
                 printf("%s: installed\n", *e);
@@ -3099,7 +3099,7 @@ static int early_dispatch_editor(int argc, char **argv)
             fprintf(stderr, "\n");
             return 1;
         }
-        const char *base = (strcmp(argv[3], "vim") == 0) ? home : config_home;
+        const char *base = home;
         r = vigil_editor_install(argv[3], vigil_bin, base);
         printf("%s\n", r.message);
         return r.status == VIGIL_STATUS_OK ? 0 : 1;
@@ -3118,7 +3118,7 @@ static int early_dispatch_editor(int argc, char **argv)
             fprintf(stderr, "error: unknown editor '%s'\n", argv[3]);
             return 1;
         }
-        const char *base = (strcmp(argv[3], "vim") == 0) ? home : config_home;
+        const char *base = home;
         r = vigil_editor_uninstall(argv[3], base);
         printf("%s\n", r.message);
         return r.status == VIGIL_STATUS_OK ? 0 : 1;
