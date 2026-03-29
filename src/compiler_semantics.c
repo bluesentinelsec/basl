@@ -356,26 +356,15 @@ static vigil_status_t finalize_function_body_return_analysis(vigil_program_state
                                                   vigil_statement_result_guarantees_return(body_result));
 }
 
-static uint32_t decode_lowered_u32(const uint8_t *bytes, size_t offset)
-{
-    uint32_t value;
-
-    value = (uint32_t)bytes[offset];
-    value |= (uint32_t)bytes[offset + 1U] << 8U;
-    value |= (uint32_t)bytes[offset + 2U] << 16U;
-    value |= (uint32_t)bytes[offset + 3U] << 24U;
-    return value;
-}
-
-static void vigil_lowered_instruction_clear(vigil_lowered_instruction_t *instruction)
+void vigil_lowered_instruction_clear(vigil_lowered_instruction_t *instruction)
 {
     if (instruction == NULL)
         return;
     memset(instruction, 0, sizeof(*instruction));
 }
 
-static void vigil_lowered_instruction_add_operand(vigil_lowered_instruction_t *instruction,
-                                                  vigil_lowered_operand_kind_t kind, uint32_t value)
+void vigil_lowered_instruction_add_operand(vigil_lowered_instruction_t *instruction, vigil_lowered_operand_kind_t kind,
+                                           uint32_t value)
 {
     uint8_t operand_index;
 
@@ -428,9 +417,8 @@ static vigil_status_t vigil_lowered_function_body_reserve(vigil_lowered_function
     return VIGIL_STATUS_OK;
 }
 
-static vigil_status_t vigil_lowered_function_body_append(vigil_lowered_function_body_t *body,
-                                                         const vigil_lowered_instruction_t *instruction,
-                                                         vigil_error_t *error)
+vigil_status_t vigil_lowered_function_body_append(vigil_lowered_function_body_t *body,
+                                                  const vigil_lowered_instruction_t *instruction, vigil_error_t *error)
 {
     vigil_status_t status;
 
@@ -441,6 +429,16 @@ static vigil_status_t vigil_lowered_function_body_append(vigil_lowered_function_
     body->instructions[body->instruction_count] = *instruction;
     body->instruction_count += 1U;
     return VIGIL_STATUS_OK;
+}
+
+static uint32_t decode_lowered_u32(const uint8_t *bytes, size_t offset)
+{
+    uint32_t value = (uint32_t)bytes[offset];
+
+    value |= (uint32_t)bytes[offset + 1U] << 8U;
+    value |= (uint32_t)bytes[offset + 2U] << 16U;
+    value |= (uint32_t)bytes[offset + 3U] << 24U;
+    return value;
 }
 
 static int vigil_lowered_opcode_has_u32_operand(vigil_opcode_t opcode)
@@ -564,12 +562,10 @@ static vigil_status_t vigil_decode_u32_operands(const vigil_chunk_t *chunk, size
                                                 vigil_lowered_instruction_t *instruction, uint8_t operand_count,
                                                 vigil_error_t *error)
 {
-    const uint8_t *code;
-    size_t instruction_end;
+    const uint8_t *code = vigil_chunk_code(chunk);
     size_t operand_index;
+    size_t instruction_end = *offset + 1U + (size_t)operand_count * 4U;
 
-    code = vigil_chunk_code(chunk);
-    instruction_end = *offset + 1U + (size_t)operand_count * 4U;
     if (instruction_end > vigil_chunk_code_size(chunk))
     {
         vigil_error_set_literal(error, VIGIL_STATUS_INTERNAL, "truncated lowered instruction");
@@ -578,8 +574,8 @@ static vigil_status_t vigil_decode_u32_operands(const vigil_chunk_t *chunk, size
 
     for (operand_index = 0U; operand_index < operand_count; operand_index += 1U)
     {
-        uint32_t operand = decode_lowered_u32(code, *offset + 1U + operand_index * 4U);
-        vigil_lowered_instruction_add_operand(instruction, VIGIL_LOWERED_OPERAND_U32, operand);
+        vigil_lowered_instruction_add_operand(instruction, VIGIL_LOWERED_OPERAND_U32,
+                                              decode_lowered_u32(code, *offset + 1U + operand_index * 4U));
     }
 
     *offset = instruction_end;
@@ -589,10 +585,8 @@ static vigil_status_t vigil_decode_u32_operands(const vigil_chunk_t *chunk, size
 static vigil_status_t vigil_decode_mixed_operands(const vigil_chunk_t *chunk, size_t *offset,
                                                   vigil_lowered_instruction_t *instruction, vigil_error_t *error)
 {
-    const uint8_t *code;
+    const uint8_t *code = vigil_chunk_code(chunk);
     size_t instruction_end;
-
-    code = vigil_chunk_code(chunk);
 
     if (vigil_lowered_opcode_has_local_delta_operands(instruction->opcode))
     {
@@ -658,13 +652,20 @@ static vigil_status_t vigil_decode_lowered_instruction(const vigil_chunk_t *chun
     return vigil_decode_u32_operands(chunk, offset, instruction, (uint8_t)operand_count, error);
 }
 
-static vigil_status_t vigil_lowered_function_body_decode_chunk(vigil_lowered_function_body_t *body,
-                                                               const vigil_chunk_t *chunk, vigil_error_t *error)
+vigil_status_t vigil_lowered_function_body_sync_from_chunk(vigil_lowered_function_body_t *body,
+                                                           const vigil_chunk_t *chunk, vigil_error_t *error)
 {
     vigil_status_t status;
     vigil_lowered_instruction_t instruction;
     size_t offset = 0U;
 
+    if (body == NULL || chunk == NULL)
+    {
+        vigil_error_set_literal(error, VIGIL_STATUS_INVALID_ARGUMENT, "lowered body sync arguments are invalid");
+        return VIGIL_STATUS_INVALID_ARGUMENT;
+    }
+
+    body->instruction_count = 0U;
     while (offset < vigil_chunk_code_size(chunk))
     {
         status = vigil_decode_lowered_instruction(chunk, &offset, &instruction, error);
@@ -981,6 +982,7 @@ void vigil_lowered_function_body_free(vigil_lowered_function_body_t *body)
 
 vigil_status_t vigil_semantic_analyze_function_body(vigil_program_state_t *program, size_t function_index,
                                                     const vigil_parser_state_t *parent_state,
+                                                    vigil_lowered_function_body_t *lowered_body,
                                                     vigil_parser_state_t *state,
                                                     vigil_statement_result_t *out_body_result)
 {
@@ -991,6 +993,7 @@ vigil_status_t vigil_semantic_analyze_function_body(vigil_program_state_t *progr
     memset(state, 0, sizeof(*state));
     state->program = program;
     state->parent = (vigil_parser_state_t *)parent_state;
+    state->lowered_body = lowered_body;
     state->current = decl->body_start;
     state->body_end = decl->body_end;
     state->function_index = function_index;
@@ -1038,7 +1041,8 @@ vigil_status_t vigil_semantic_lower_function_body(vigil_program_state_t *program
 
     vigil_lowered_function_body_init(out_body);
     out_body->runtime = program->registry->runtime;
-    status = vigil_semantic_analyze_function_body(program, function_index, parent_state, &state, &body_result);
+    status =
+        vigil_semantic_analyze_function_body(program, function_index, parent_state, out_body, &state, &body_result);
     if (status != VIGIL_STATUS_OK)
     {
         vigil_chunk_free(&state.chunk);
@@ -1046,7 +1050,7 @@ vigil_status_t vigil_semantic_lower_function_body(vigil_program_state_t *program
         return status;
     }
 
-    status = vigil_lowered_function_body_decode_chunk(out_body, &state.chunk, program->error);
+    status = vigil_lowered_function_body_sync_from_chunk(out_body, &state.chunk, program->error);
     if (status != VIGIL_STATUS_OK)
     {
         vigil_lowered_function_body_free(out_body);
@@ -1075,7 +1079,7 @@ vigil_status_t vigil_semantic_check_function_with_parent(vigil_program_state_t *
     if (handled || status != VIGIL_STATUS_OK)
         return status;
 
-    status = vigil_semantic_analyze_function_body(program, function_index, parent_state, &state, &body_result);
+    status = vigil_semantic_analyze_function_body(program, function_index, parent_state, NULL, &state, &body_result);
     vigil_chunk_free(&state.chunk);
     vigil_parser_state_free(&state);
     return status;

@@ -269,6 +269,7 @@ typedef struct vigil_parser_state
 {
     const vigil_program_state_t *program;
     struct vigil_parser_state *parent;
+    struct vigil_lowered_function_body *lowered_body;
     size_t current;
     size_t body_end;
     size_t function_index;
@@ -297,6 +298,8 @@ typedef struct vigil_constant_result
     vigil_parser_type_t type;
     vigil_value_t value;
 } vigil_constant_result_t;
+
+struct vigil_lowered_function_body;
 
 typedef struct vigil_statement_result
 {
