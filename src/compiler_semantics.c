@@ -189,6 +189,79 @@ static vigil_status_t vigil_semantic_synthesize_repl_main(vigil_program_state_t 
     return VIGIL_STATUS_OK;
 }
 
+static vigil_status_t parse_repl_trailing_statements(vigil_program_state_t *program, size_t cursor)
+{
+    size_t end_cursor = cursor;
+    size_t depth = 0U;
+
+    while (1)
+    {
+        const vigil_token_t *t = vigil_program_token_at(program, end_cursor);
+
+        if (t == NULL || t->kind == VIGIL_TOKEN_EOF)
+            break;
+        if (t->kind == VIGIL_TOKEN_LBRACE)
+            depth += 1U;
+        else if (t->kind == VIGIL_TOKEN_RBRACE && depth != 0U)
+            depth -= 1U;
+        end_cursor += 1U;
+    }
+    program->repl_stmts_start = cursor;
+    program->repl_stmts_end = end_cursor;
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t parse_one_declaration(vigil_program_state_t *program, size_t *cursor, int *done)
+{
+    vigil_status_t status;
+    const vigil_token_t *token;
+    int is_public;
+
+    *done = 0;
+    token = vigil_program_token_at(program, *cursor);
+    if (token == NULL || token->kind == VIGIL_TOKEN_EOF)
+    {
+        *done = 1;
+        return VIGIL_STATUS_OK;
+    }
+    is_public = vigil_program_parse_optional_pub(program, cursor);
+    token = vigil_program_token_at(program, *cursor);
+    if (token == NULL || token->kind == VIGIL_TOKEN_EOF)
+        return vigil_compile_report(program, vigil_program_eof_span(program), "expected declaration after 'pub'");
+
+    if (token->kind == VIGIL_TOKEN_IMPORT)
+    {
+        if (is_public)
+            return vigil_compile_report(program, token->span, "imports cannot be declared 'pub'");
+        return vigil_program_parse_import(program, cursor);
+    }
+    if (token->kind == VIGIL_TOKEN_CONST)
+        return vigil_program_parse_constant_declaration(program, cursor, is_public);
+    if (token->kind == VIGIL_TOKEN_ENUM)
+        return vigil_program_parse_enum_declaration(program, cursor, is_public);
+    if (token->kind == VIGIL_TOKEN_INTERFACE)
+        return vigil_program_parse_interface_declaration(program, cursor, is_public);
+    if (token->kind == VIGIL_TOKEN_CLASS)
+        return vigil_program_parse_class_declaration(program, cursor, is_public);
+    if (vigil_program_is_global_variable_declaration_start(program, *cursor))
+        return vigil_program_parse_global_variable_declaration(program, cursor, is_public);
+    if (token->kind == VIGIL_TOKEN_EXTERN)
+        return vigil_program_parse_extern_fn(program, cursor, is_public);
+    if (token->kind == VIGIL_TOKEN_FN)
+        return parse_fn_declaration(program, cursor, is_public);
+
+    if (program->compile_mode == VIGIL_COMPILE_MODE_REPL && !is_public)
+    {
+        status = parse_repl_trailing_statements(program, *cursor);
+        *done = 1;
+        return status;
+    }
+
+    return vigil_compile_report(program, token->span,
+                                "expected top-level 'import', 'const', 'enum', 'interface', 'class', variable "
+                                "declaration, 'extern fn', or 'fn'");
+}
+
 static vigil_status_t emit_implicit_void_return(vigil_parser_state_t *state, vigil_source_span_t span)
 {
     return emit_opcode_u32(state, VIGIL_OPCODE_RETURN, 0U, span);
@@ -453,6 +526,21 @@ vigil_status_t vigil_program_parse_import(vigil_program_state_t *program, size_t
 cleanup:
     vigil_string_free(&import_path);
     return status;
+}
+
+vigil_status_t vigil_semantic_parse_program_declarations(vigil_program_state_t *program)
+{
+    vigil_status_t status;
+    size_t cursor = 0U;
+    int done = 0;
+
+    while (!done)
+    {
+        status = parse_one_declaration(program, &cursor, &done);
+        if (status != VIGIL_STATUS_OK)
+            return status;
+    }
+    return VIGIL_STATUS_OK;
 }
 
 vigil_status_t vigil_semantic_prepare_program(vigil_program_state_t *program, vigil_source_id_t source_id,
