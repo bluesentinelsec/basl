@@ -9,6 +9,99 @@
 
 #include "platform/platform.h"
 
+static int editor_test_exists(const char *path)
+{
+    int exists = 0;
+    vigil_platform_file_exists(path, &exists);
+    return exists;
+}
+
+static void editor_test_tmpdir(char *buf, size_t cap, const char *name, int line)
+{
+    snprintf(buf, cap, "/tmp/vigil_editor_test_%s_%d", name, line);
+}
+
+static void editor_test_sublime_syntax_path(char *buf, size_t cap, const char *tmpdir)
+{
+#ifdef __APPLE__
+    snprintf(buf, cap, "%s/Library/Application Support/Sublime Text/Packages/Vigil/Vigil.sublime-syntax", tmpdir);
+#elif defined(_WIN32)
+    snprintf(buf, cap, "%s/AppData/Roaming/Sublime Text/Packages/Vigil/Vigil.sublime-syntax", tmpdir);
+#else
+    snprintf(buf, cap, "%s/.config/sublime-text/Packages/Vigil/Vigil.sublime-syntax", tmpdir);
+#endif
+}
+
+static void editor_test_nvim_ft_path(char *buf, size_t cap, const char *tmpdir)
+{
+#ifdef _WIN32
+    snprintf(buf, cap, "%s/AppData/Local/nvim/after/ftdetect/vigil.vim", tmpdir);
+#else
+    snprintf(buf, cap, "%s/.config/nvim/after/ftdetect/vigil.vim", tmpdir);
+#endif
+}
+
+static int editor_test_install_cycle_ok(const char *editor, const char *tmpdir, const char *installed_path)
+{
+    vigil_editor_result_t r = vigil_editor_install(editor, "/usr/local/bin/vigil", tmpdir);
+    if (r.status != VIGIL_STATUS_OK)
+        return 0;
+    if (vigil_editor_is_installed(editor, tmpdir) != 1)
+        return 0;
+    if (editor_test_exists(installed_path) != 1)
+        return 0;
+
+    r = vigil_editor_uninstall(editor, tmpdir);
+    if (r.status != VIGIL_STATUS_OK)
+        return 0;
+    if (vigil_editor_is_installed(editor, tmpdir) != 0)
+        return 0;
+    if (editor_test_exists(installed_path) != 0)
+        return 0;
+    return 1;
+}
+
+static int editor_test_emacs_init_contains(const char *path, const char *needle)
+{
+    char *content = NULL;
+    size_t length = 0;
+    int found = 0;
+    if (vigil_platform_read_file(NULL, path, &content, &length, NULL) != VIGIL_STATUS_OK)
+        return 0;
+    found = strstr(content, needle) != NULL;
+    free(content);
+    return found;
+}
+
+static int editor_test_emacs_cycle_ok(const char *tmpdir)
+{
+    char mode_path[512];
+    char init_path[512];
+    vigil_editor_result_t r;
+
+    snprintf(mode_path, sizeof(mode_path), "%s/.emacs.d/vigil-mode.el", tmpdir);
+    snprintf(init_path, sizeof(init_path), "%s/.emacs.d/init.el", tmpdir);
+
+    r = vigil_editor_install("emacs", "/usr/local/bin/vigil", tmpdir);
+    if (r.status != VIGIL_STATUS_OK)
+        return 0;
+    if (vigil_editor_is_installed("emacs", tmpdir) != 1)
+        return 0;
+    if (editor_test_exists(mode_path) != 1)
+        return 0;
+    if (!editor_test_emacs_init_contains(init_path, "vigil-mode"))
+        return 0;
+
+    r = vigil_editor_uninstall("emacs", tmpdir);
+    if (r.status != VIGIL_STATUS_OK)
+        return 0;
+    if (vigil_editor_is_installed("emacs", tmpdir) != 0)
+        return 0;
+    if (editor_test_exists(mode_path) != 0)
+        return 0;
+    return 1;
+}
+
 /* ── supported editors ───────────────────────────────────────────── */
 
 TEST(EditorIntegration, SupportedListIsNonEmpty)
@@ -21,12 +114,14 @@ TEST(EditorIntegration, SupportedListIsNonEmpty)
 TEST(EditorIntegration, IsSupportedRecognizesKnownEditors)
 {
     EXPECT_EQ(vigil_editor_is_supported("vim"), 1);
+    EXPECT_EQ(vigil_editor_is_supported("nvim"), 1);
     EXPECT_EQ(vigil_editor_is_supported("vscode"), 1);
+    EXPECT_EQ(vigil_editor_is_supported("emacs"), 1);
+    EXPECT_EQ(vigil_editor_is_supported("sublime"), 1);
 }
 
 TEST(EditorIntegration, IsSupportedRejectsUnknown)
 {
-    EXPECT_EQ(vigil_editor_is_supported("emacs"), 0);
     EXPECT_EQ(vigil_editor_is_supported("notepad"), 0);
     EXPECT_EQ(vigil_editor_is_supported(NULL), 0);
 }
@@ -69,11 +164,39 @@ TEST(EditorIntegration, VscodeInstallUninstallRoundTrip)
     vigil_platform_remove_all(tmpdir, NULL);
 }
 
+TEST(EditorIntegration, NvimInstallUninstallRoundTrip)
+{
+    char tmpdir[256];
+    char ft[512];
+    editor_test_tmpdir(tmpdir, sizeof(tmpdir), "nvim", __LINE__);
+    editor_test_nvim_ft_path(ft, sizeof(ft), tmpdir);
+    EXPECT_TRUE(editor_test_install_cycle_ok("nvim", tmpdir, ft));
+    vigil_platform_remove_all(tmpdir, NULL);
+}
+
+TEST(EditorIntegration, EmacsInstallUninstallRoundTrip)
+{
+    char tmpdir[256];
+    editor_test_tmpdir(tmpdir, sizeof(tmpdir), "emacs", __LINE__);
+    EXPECT_TRUE(editor_test_emacs_cycle_ok(tmpdir));
+    vigil_platform_remove_all(tmpdir, NULL);
+}
+
+TEST(EditorIntegration, SublimeInstallUninstallRoundTrip)
+{
+    char tmpdir[256];
+    char syntax_path[512];
+    editor_test_tmpdir(tmpdir, sizeof(tmpdir), "sublime", __LINE__);
+    editor_test_sublime_syntax_path(syntax_path, sizeof(syntax_path), tmpdir);
+    EXPECT_TRUE(editor_test_install_cycle_ok("sublime", tmpdir, syntax_path));
+    vigil_platform_remove_all(tmpdir, NULL);
+}
+
 /* ── error handling ──────────────────────────────────────────────── */
 
 TEST(EditorIntegration, UnknownEditorReturnsError)
 {
-    vigil_editor_result_t r = vigil_editor_install("emacs", "/usr/bin/vigil", "/tmp");
+    vigil_editor_result_t r = vigil_editor_install("fleet", "/usr/bin/vigil", "/tmp");
     EXPECT_NE(r.status, VIGIL_STATUS_OK);
 }
 
@@ -93,7 +216,10 @@ void register_editor_tests(void)
     REGISTER_TEST(EditorIntegration, IsSupportedRecognizesKnownEditors);
     REGISTER_TEST(EditorIntegration, IsSupportedRejectsUnknown);
     REGISTER_TEST(EditorIntegration, VimInstallUninstallRoundTrip);
+    REGISTER_TEST(EditorIntegration, NvimInstallUninstallRoundTrip);
     REGISTER_TEST(EditorIntegration, VscodeInstallUninstallRoundTrip);
+    REGISTER_TEST(EditorIntegration, EmacsInstallUninstallRoundTrip);
+    REGISTER_TEST(EditorIntegration, SublimeInstallUninstallRoundTrip);
     REGISTER_TEST(EditorIntegration, UnknownEditorReturnsError);
     REGISTER_TEST(EditorIntegration, NullArgsReturnError);
 }
