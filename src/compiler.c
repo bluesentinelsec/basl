@@ -49,8 +49,6 @@ static vigil_status_t vigil_compile_init_program(vigil_program_state_t *program,
                                                  const vigil_native_registry_t *natives,
                                                  vigil_diagnostic_list_t *diagnostics, vigil_error_t *error,
                                                  vigil_compile_mode_t mode);
-static vigil_status_t vigil_compile_prepare_program(vigil_program_state_t *program, vigil_source_id_t source_id,
-                                                    vigil_compile_mode_t mode, int allow_repl_main_synthesis);
 // clang-format off
 static int vigil_parser_math_intrinsic_opcode(const vigil_native_module_t *, const char *, size_t);
 static int vigil_parser_parse_intrinsic_opcode(const vigil_native_module_t *, const char *, size_t);
@@ -428,8 +426,7 @@ int vigil_program_names_equal(const char *left, size_t left_length, const char *
     return left != NULL && right != NULL && left_length == right_length && memcmp(left, right, left_length) == 0;
 }
 
-static int vigil_program_module_find(const vigil_program_state_t *program, vigil_source_id_t source_id,
-                                     size_t *out_index)
+int vigil_program_module_find(const vigil_program_state_t *program, vigil_source_id_t source_id, size_t *out_index)
 {
     size_t i;
 
@@ -457,7 +454,7 @@ static int vigil_program_module_find(const vigil_program_state_t *program, vigil
     return 0;
 }
 
-static vigil_program_module_t *vigil_program_current_module(vigil_program_state_t *program)
+vigil_program_module_t *vigil_program_current_module(vigil_program_state_t *program)
 {
     size_t module_index;
 
@@ -471,7 +468,7 @@ static vigil_program_module_t *vigil_program_current_module(vigil_program_state_
     return &program->modules[module_index];
 }
 
-static const vigil_program_module_t *vigil_program_current_module_const(const vigil_program_state_t *program)
+const vigil_program_module_t *vigil_program_current_module_const(const vigil_program_state_t *program)
 {
     size_t module_index;
 
@@ -607,9 +604,9 @@ static int vigil_program_module_find_import(const vigil_program_module_t *module
     return 0;
 }
 
-static vigil_status_t vigil_program_add_module_import(vigil_program_state_t *program, vigil_program_module_t *module,
-                                                      const char *alias, size_t alias_length,
-                                                      vigil_source_span_t alias_span, vigil_source_id_t source_id)
+vigil_status_t vigil_program_add_module_import(vigil_program_state_t *program, vigil_program_module_t *module,
+                                               const char *alias, size_t alias_length, vigil_source_span_t alias_span,
+                                               vigil_source_id_t source_id)
 {
     vigil_status_t status;
     vigil_module_import_t *import_decl;
@@ -691,8 +688,8 @@ static int vigil_program_path_is_absolute(const char *path, size_t length)
     return length >= 2U && ((path[0] >= 'A' && path[0] <= 'Z') || (path[0] >= 'a' && path[0] <= 'z')) && path[1] == ':';
 }
 
-static vigil_status_t vigil_program_resolve_import_path(const vigil_program_state_t *program, const char *import_text,
-                                                        size_t import_length, vigil_string_t *out_path)
+vigil_status_t vigil_program_resolve_import_path(const vigil_program_state_t *program, const char *import_text,
+                                                 size_t import_length, vigil_string_t *out_path)
 {
     vigil_status_t status;
     const char *base_path;
@@ -769,8 +766,8 @@ static vigil_status_t vigil_program_resolve_import_path(const vigil_program_stat
     return VIGIL_STATUS_OK;
 }
 
-static int vigil_program_find_source_by_path(const vigil_program_state_t *program, const char *path, size_t path_length,
-                                             vigil_source_id_t *out_source_id)
+int vigil_program_find_source_by_path(const vigil_program_state_t *program, const char *path, size_t path_length,
+                                      vigil_source_id_t *out_source_id)
 {
     size_t i;
     const vigil_source_file_t *source;
@@ -2074,7 +2071,7 @@ vigil_status_t vigil_program_add_param(vigil_program_state_t *program, vigil_fun
     return status;
 }
 
-static vigil_status_t vigil_program_parse_source(vigil_program_state_t *program, vigil_source_id_t source_id);
+vigil_status_t vigil_program_parse_source(vigil_program_state_t *program, vigil_source_id_t source_id);
 const vigil_token_t *vigil_program_cursor_peek(const vigil_program_state_t *program, size_t cursor);
 const vigil_token_t *vigil_program_cursor_advance(const vigil_program_state_t *program, size_t *cursor);
 int vigil_program_find_top_level_function_name_in_source(const vigil_program_state_t *program,
@@ -2082,29 +2079,8 @@ int vigil_program_find_top_level_function_name_in_source(const vigil_program_sta
                                                          size_t name_length, size_t *out_index,
                                                          const vigil_function_decl_t **out_decl);
 
-static vigil_status_t vigil_program_parse_import_target(const vigil_program_state_t *program,
-                                                        const vigil_token_t *token, vigil_string_t *out_path)
-{
-    const char *text;
-    size_t length;
-
-    if (token == NULL || (token->kind != VIGIL_TOKEN_STRING_LITERAL && token->kind != VIGIL_TOKEN_RAW_STRING_LITERAL))
-    {
-        return vigil_compile_report(program, token == NULL ? vigil_program_eof_span(program) : token->span,
-                                    "expected import path string literal");
-    }
-
-    text = vigil_program_token_text(program, token, &length);
-    if (text == NULL || length < 2U)
-    {
-        return vigil_compile_report(program, token->span, "import path is invalid");
-    }
-
-    return vigil_program_resolve_import_path(program, text + 1U, length - 2U, out_path);
-}
-
-static vigil_status_t vigil_program_register_native_function_types(vigil_program_state_t *program,
-                                                                   const vigil_native_module_t *mod)
+vigil_status_t vigil_program_register_native_function_types(vigil_program_state_t *program,
+                                                            const vigil_native_module_t *mod)
 {
     vigil_status_t status;
     size_t fi;
@@ -2127,9 +2103,8 @@ static vigil_status_t vigil_program_register_native_function_types(vigil_program
     return VIGIL_STATUS_OK;
 }
 
-static vigil_status_t vigil_program_register_native_classes(vigil_program_state_t *program,
-                                                            const vigil_native_module_t *mod,
-                                                            vigil_source_id_t source_id)
+vigil_status_t vigil_program_register_native_classes(vigil_program_state_t *program, const vigil_native_module_t *mod,
+                                                     vigil_source_id_t source_id)
 {
     vigil_status_t status;
     size_t ci;
@@ -2228,205 +2203,6 @@ static vigil_status_t vigil_program_register_native_classes(vigil_program_state_
         program->class_count += 1U;
     }
     return VIGIL_STATUS_OK;
-}
-
-static vigil_status_t check_stdlib_availability(vigil_program_state_t *program, const vigil_token_t *target_token)
-{
-    char message[128];
-    const char *raw_import = NULL;
-    size_t raw_import_len = 0U;
-    int written;
-
-    if (program->natives == NULL || target_token == NULL)
-        return VIGIL_STATUS_OK;
-
-    raw_import = vigil_program_token_text(program, target_token, &raw_import_len);
-    if (raw_import != NULL && raw_import_len >= 2U)
-    {
-        raw_import += 1U;
-        raw_import_len -= 2U;
-    }
-    else
-    {
-        raw_import = "";
-        raw_import_len = 0U;
-    }
-
-    if (!vigil_stdlib_is_known_module(raw_import, raw_import_len))
-        return VIGIL_STATUS_OK;
-
-    written = snprintf(message, sizeof(message), "stdlib module '%.*s' is not available in this build",
-                       (int)raw_import_len, raw_import);
-    if (written < 0 || (size_t)written >= sizeof(message))
-        return vigil_compile_report(program, target_token->span, "stdlib module is not available in this build");
-    return vigil_compile_report(program, target_token->span, message);
-}
-
-static vigil_status_t register_native_import(vigil_program_state_t *program, size_t native_idx,
-                                             vigil_source_id_t source_id)
-{
-    vigil_status_t status;
-
-    status = vigil_program_register_native_function_types(program, program->natives->modules[native_idx]);
-    if (status != VIGIL_STATUS_OK)
-        return status;
-    if (program->natives->modules[native_idx]->class_count > 0U)
-        return vigil_program_register_native_classes(program, program->natives->modules[native_idx], source_id);
-    return VIGIL_STATUS_OK;
-}
-
-static int resolve_native_import(vigil_program_state_t *program, const vigil_token_t *target_token, size_t *native_idx,
-                                 vigil_source_id_t *source_id)
-{
-    const char *raw_import;
-    size_t raw_import_len;
-
-    if (program->natives == NULL)
-        return 0;
-    raw_import = vigil_program_token_text(program, target_token, &raw_import_len);
-    if (raw_import != NULL && raw_import_len >= 2U)
-    {
-        raw_import += 1U;
-        raw_import_len -= 2U;
-    }
-    if (raw_import != NULL &&
-        vigil_native_registry_find_index(program->natives, raw_import, raw_import_len, native_idx))
-    {
-        *source_id = VIGIL_NATIVE_SOURCE_ID(*native_idx);
-        return 1;
-    }
-    return 0;
-}
-
-static vigil_status_t parse_import_alias(vigil_program_state_t *program, size_t *cursor,
-                                         const vigil_token_t **out_alias_token, const char **out_alias_text,
-                                         size_t *out_alias_length)
-{
-    const vigil_token_t *token = vigil_program_token_at(program, *cursor);
-    if (token == NULL || token->kind != VIGIL_TOKEN_AS)
-        return VIGIL_STATUS_OK;
-    *cursor += 1U;
-    *out_alias_token = vigil_program_token_at(program, *cursor);
-    if (*out_alias_token == NULL || (*out_alias_token)->kind != VIGIL_TOKEN_IDENTIFIER)
-        return vigil_compile_report(program, token->span, "expected import alias name");
-    *out_alias_text = vigil_program_token_text(program, *out_alias_token, out_alias_length);
-    *cursor += 1U;
-    return VIGIL_STATUS_OK;
-}
-
-static void resolve_import_alias_default(const vigil_program_state_t *program, int native_found, size_t native_idx,
-                                         const vigil_string_t *import_path, const char **alias_text,
-                                         size_t *alias_length)
-{
-    if (*alias_text != NULL)
-        return;
-    if (native_found)
-    {
-        *alias_text = program->natives->modules[native_idx]->name;
-        *alias_length = program->natives->modules[native_idx]->name_length;
-    }
-    else
-    {
-        vigil_program_import_default_alias(vigil_string_c_str(import_path), vigil_string_length(import_path),
-                                           alias_text, alias_length);
-    }
-}
-
-static vigil_status_t resolve_import_source(vigil_program_state_t *program, int native_found,
-                                            const vigil_token_t *import_target_token, const vigil_token_t *semi_token,
-                                            const vigil_string_t *import_path, vigil_source_id_t *imported_source_id)
-{
-    vigil_status_t status;
-    if (!native_found && program->natives != NULL && import_target_token != NULL)
-    {
-        status = check_stdlib_availability(program, import_target_token);
-        if (status != VIGIL_STATUS_OK)
-            return status;
-    }
-    if (!native_found && !vigil_program_find_source_by_path(program, vigil_string_c_str(import_path),
-                                                            vigil_string_length(import_path), imported_source_id))
-    {
-        return vigil_compile_report(program, import_target_token == NULL ? semi_token->span : import_target_token->span,
-                                    "imported source is not registered");
-    }
-    return VIGIL_STATUS_OK;
-}
-
-static vigil_status_t vigil_program_parse_import(vigil_program_state_t *program, size_t *cursor)
-{
-    vigil_status_t status;
-    const vigil_token_t *token;
-    const vigil_token_t *import_target_token;
-    const vigil_token_t *alias_token = NULL;
-    const char *alias_text = NULL;
-    size_t alias_length = 0U;
-    vigil_string_t import_path;
-    vigil_source_id_t imported_source_id = 0U;
-    vigil_program_module_t *module;
-    size_t native_idx = 0U;
-    int native_found = 0;
-
-    vigil_string_init(&import_path, program->registry->runtime);
-
-    token = vigil_program_token_at(program, *cursor);
-    if (token == NULL || token->kind != VIGIL_TOKEN_IMPORT)
-    {
-        status = vigil_compile_report(program, token == NULL ? vigil_program_eof_span(program) : token->span,
-                                      "expected 'import'");
-        goto cleanup;
-    }
-    *cursor += 1U;
-
-    import_target_token = vigil_program_token_at(program, *cursor);
-    native_found = resolve_native_import(program, import_target_token, &native_idx, &imported_source_id);
-    status = vigil_program_parse_import_target(program, import_target_token, &import_path);
-    if (status != VIGIL_STATUS_OK)
-        goto cleanup;
-    *cursor += 1U;
-
-    status = parse_import_alias(program, cursor, &alias_token, &alias_text, &alias_length);
-    if (status != VIGIL_STATUS_OK)
-        goto cleanup;
-
-    token = vigil_program_token_at(program, *cursor);
-    if (token == NULL || token->kind != VIGIL_TOKEN_SEMICOLON)
-    {
-        status = vigil_compile_report(program, token == NULL ? vigil_program_eof_span(program) : token->span,
-                                      "expected ';' after import");
-        goto cleanup;
-    }
-    *cursor += 1U;
-
-    status =
-        resolve_import_source(program, native_found, import_target_token, token, &import_path, &imported_source_id);
-    if (status != VIGIL_STATUS_OK)
-        goto cleanup;
-
-    module = vigil_program_current_module(program);
-    if (module == NULL)
-    {
-        vigil_error_set_literal(program->error, VIGIL_STATUS_INTERNAL,
-                                "current module must be available while parsing imports");
-        status = VIGIL_STATUS_INTERNAL;
-        goto cleanup;
-    }
-    resolve_import_alias_default(program, native_found, native_idx, &import_path, &alias_text, &alias_length);
-    if (alias_token != NULL && program->natives != NULL && vigil_stdlib_is_known_module(alias_text, alias_length))
-    {
-        status = vigil_compile_report(program, alias_token->span, "import alias shadows a standard library module");
-        goto cleanup;
-    }
-    status = vigil_program_add_module_import(program, module, alias_text, alias_length,
-                                             alias_token == NULL ? token->span : alias_token->span, imported_source_id);
-    if (status != VIGIL_STATUS_OK)
-        goto cleanup;
-
-    status = native_found ? register_native_import(program, native_idx, imported_source_id)
-                          : vigil_program_parse_source(program, imported_source_id);
-
-cleanup:
-    vigil_string_free(&import_path);
-    return status;
 }
 
 const vigil_token_t *vigil_program_cursor_peek(const vigil_program_state_t *program, size_t cursor)
@@ -4658,7 +4434,7 @@ static vigil_status_t vigil_program_parse_declarations(vigil_program_state_t *pr
     return VIGIL_STATUS_OK;
 }
 
-static vigil_status_t vigil_program_parse_source(vigil_program_state_t *program, vigil_source_id_t source_id)
+vigil_status_t vigil_program_parse_source(vigil_program_state_t *program, vigil_source_id_t source_id)
 {
     vigil_status_t status;
     const vigil_source_file_t *previous_source;
@@ -13399,67 +13175,6 @@ static vigil_status_t vigil_compile_init_program(vigil_program_state_t *program,
     return VIGIL_STATUS_OK;
 }
 
-static vigil_status_t vigil_compile_prepare_program(vigil_program_state_t *program, vigil_source_id_t source_id,
-                                                    vigil_compile_mode_t mode, int allow_repl_main_synthesis)
-{
-    vigil_status_t status;
-    const vigil_source_file_t *source = program->source;
-
-    status = vigil_program_parse_source(program, source_id);
-    if (status != VIGIL_STATUS_OK)
-    {
-        return status;
-    }
-
-    vigil_program_set_module_context(program, source, NULL);
-
-    if (allow_repl_main_synthesis && mode == VIGIL_COMPILE_MODE_REPL && !program->functions.has_main &&
-        (program->repl_stmts_start < program->repl_stmts_end || program->global_count > 0U))
-    {
-        vigil_binding_function_t *decl;
-        vigil_binding_type_t ret_type;
-        size_t mod_idx = 0;
-
-        status = vigil_program_grow_functions(program, program->functions.count + 1U);
-        if (status != VIGIL_STATUS_OK)
-        {
-            return status;
-        }
-        decl = &program->functions.functions[program->functions.count];
-        vigil_binding_function_init(decl);
-        decl->name = "main";
-        decl->name_length = 4U;
-        decl->name_span = vigil_program_eof_span(program);
-        decl->is_public = 0;
-        decl->source = source;
-        if (vigil_program_module_find(program, source_id, &mod_idx))
-        {
-            decl->tokens = program->modules[mod_idx].tokens;
-        }
-        decl->body_start = program->repl_stmts_start;
-        decl->body_end = program->repl_stmts_end;
-        memset(&ret_type, 0, sizeof(ret_type));
-        ret_type.kind = VIGIL_TYPE_I32;
-        decl->return_type = ret_type;
-        decl->return_count = 1U;
-        program->functions.main_index = program->functions.count;
-        program->functions.has_main = 1;
-        program->repl_has_statements = (program->repl_stmts_start < program->repl_stmts_end) ? 1 : 0;
-        program->functions.count += 1U;
-    }
-
-    if (!program->functions.has_main)
-    {
-        if (mode == VIGIL_COMPILE_MODE_REPL)
-        {
-            return VIGIL_STATUS_OK;
-        }
-        return vigil_compile_report(program, vigil_program_eof_span(program), "expected top-level function 'main'");
-    }
-
-    return VIGIL_STATUS_OK;
-}
-
 static vigil_status_t vigil_compile_all_functions(vigil_program_state_t *program)
 {
     vigil_status_t status;
@@ -13673,7 +13388,7 @@ vigil_status_t vigil_check_source_internal(const vigil_source_registry_t *regist
         return status;
     }
 
-    status = vigil_compile_prepare_program(&program, source_id, VIGIL_COMPILE_MODE_BUILD_ENTRYPOINT, 0);
+    status = vigil_semantic_prepare_program(&program, source_id, VIGIL_COMPILE_MODE_BUILD_ENTRYPOINT, 0);
     if (status != VIGIL_STATUS_OK)
     {
         vigil_program_free(&program);
@@ -13722,7 +13437,7 @@ vigil_status_t vigil_compile_source_internal(const vigil_source_registry_t *regi
     if (status != VIGIL_STATUS_OK)
         return status;
 
-    status = vigil_compile_prepare_program(&program, source_id, mode, 1);
+    status = vigil_semantic_prepare_program(&program, source_id, mode, 1);
     if (status != VIGIL_STATUS_OK)
     {
         vigil_program_free(&program);
@@ -13937,7 +13652,7 @@ vigil_status_t vigil_compile_source_with_debug_info(const vigil_source_registry_
     if (status != VIGIL_STATUS_OK)
         return status;
 
-    status = vigil_compile_prepare_program(&program, source_id, VIGIL_COMPILE_MODE_BUILD_ENTRYPOINT, 0);
+    status = vigil_semantic_prepare_program(&program, source_id, VIGIL_COMPILE_MODE_BUILD_ENTRYPOINT, 0);
     if (status != VIGIL_STATUS_OK)
     {
         vigil_program_free(&program);
