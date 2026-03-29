@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/ioctl.h>
+#include <sys/resource.h>
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <sys/wait.h>
@@ -316,6 +317,18 @@ vigil_status_t vigil_platform_self_exe(char *out_buf, size_t buf_size, vigil_err
     }
     out_buf[(size_t)len] = '\0';
     return VIGIL_STATUS_OK;
+#endif
+}
+
+VIGIL_API int64_t vigil_platform_peak_rss_kb(void)
+{
+    struct rusage ru;
+    if (getrusage(RUSAGE_SELF, &ru) != 0)
+        return 0;
+#ifdef __APPLE__
+    return (int64_t)(ru.ru_maxrss / 1024); /* bytes on macOS */
+#else
+    return (int64_t)ru.ru_maxrss; /* KB on Linux */
 #endif
 }
 

@@ -231,6 +231,16 @@ vigil_status_t vigil_runtime_push_ok_error(vigil_runtime_t *runtime, vigil_vm_t 
     return s;
 }
 
+int64_t vigil_runtime_alloc_count(const vigil_runtime_t *runtime)
+{
+    return runtime ? runtime->alloc_count : 0;
+}
+
+int64_t vigil_runtime_alloc_bytes(const vigil_runtime_t *runtime)
+{
+    return runtime ? runtime->alloc_bytes : 0;
+}
+
 vigil_value_t vigil_runtime_ok_error_value(vigil_runtime_t *runtime)
 {
     return vigil_nanbox_encode_object(runtime->ok_error);

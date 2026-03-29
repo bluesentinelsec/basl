@@ -94,6 +94,11 @@ vigil_status_t vigil_platform_self_exe(char *out_buf, size_t buf_size, vigil_err
     return VIGIL_STATUS_UNSUPPORTED;
 }
 
+int64_t vigil_platform_peak_rss_kb(void)
+{
+    return 0;
+}
+
 vigil_status_t vigil_platform_make_executable(const char *path, vigil_error_t *error)
 {
     (void)path;

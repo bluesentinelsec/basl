@@ -66,6 +66,9 @@ extern "C"
      */
     VIGIL_API vigil_status_t vigil_platform_self_exe(char *out_buf, size_t buf_size, vigil_error_t *error);
 
+    /* Returns peak resident set size in kilobytes, or 0 on failure. */
+    VIGIL_API int64_t vigil_platform_peak_rss_kb(void);
+
     /*
      * Make a file executable (no-op on Windows).
      */

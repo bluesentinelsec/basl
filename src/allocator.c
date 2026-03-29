@@ -60,6 +60,8 @@ vigil_status_t vigil_runtime_alloc(vigil_runtime_t *runtime, size_t size, void *
         return VIGIL_STATUS_OUT_OF_MEMORY;
     }
 
+    runtime->alloc_count++;
+    runtime->alloc_bytes += (int64_t)size;
     memset(*out_memory, 0, size);
     return VIGIL_STATUS_OK;
 }

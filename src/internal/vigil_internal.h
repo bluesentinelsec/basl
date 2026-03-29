@@ -54,6 +54,10 @@ struct vigil_runtime
     vigil_vm_t **vm_registry;
     size_t vm_registry_count;
     size_t vm_registry_capacity;
+
+    /* Allocation counters for profiling. */
+    int64_t alloc_count;
+    int64_t alloc_bytes;
 };
 
 typedef struct vigil_runtime_interface_impl_init
