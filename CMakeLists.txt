@@ -392,6 +392,7 @@ if(VIGIL_BUILD_TESTS)
         tests/array_test.c
         tests/vigil_new_test.c
         tests/binding_test.c
+        tests/backend_test.c
         tests/checker_test.c
         tests/chunk_test.c
         tests/cli_frontend_test.c
