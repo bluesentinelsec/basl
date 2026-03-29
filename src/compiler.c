@@ -25,12 +25,7 @@ static vigil_status_t vigil_parser_parse_assignment_statement_internal(vigil_par
 static vigil_status_t vigil_parser_parse_expression_statement_internal(vigil_parser_state_t *state,
                                                                        vigil_statement_result_t *out_result,
                                                                        int expect_semicolon);
-static vigil_status_t vigil_parser_parse_variable_declaration(vigil_parser_state_t *state,
-                                                              vigil_statement_result_t *out_result);
 vigil_status_t vigil_parser_parse_expression(vigil_parser_state_t *state, vigil_expression_result_t *out_result);
-static vigil_status_t vigil_parser_parse_expression_with_expected_type(vigil_parser_state_t *state,
-                                                                       vigil_parser_type_t expected_type,
-                                                                       vigil_expression_result_t *out_result);
 static int vigil_parser_is_variable_declaration_start(const vigil_parser_state_t *state);
 static vigil_status_t vigil_parser_parse_declaration(vigil_parser_state_t *state, vigil_statement_result_t *out_result);
 static vigil_status_t vigil_parser_parse_switch_statement(vigil_parser_state_t *state,
@@ -223,7 +218,7 @@ void vigil_constant_result_release(vigil_constant_result_t *result)
     result->type = vigil_binding_type_invalid();
 }
 
-static void vigil_binding_target_list_init(vigil_binding_target_list_t *list)
+void vigil_binding_target_list_init(vigil_binding_target_list_t *list)
 {
     if (list == NULL)
     {
@@ -233,7 +228,7 @@ static void vigil_binding_target_list_init(vigil_binding_target_list_t *list)
     memset(list, 0, sizeof(*list));
 }
 
-static void vigil_binding_target_list_free(vigil_program_state_t *program, vigil_binding_target_list_t *list)
+void vigil_binding_target_list_free(vigil_program_state_t *program, vigil_binding_target_list_t *list)
 {
     void *memory;
 
@@ -304,9 +299,9 @@ static vigil_status_t vigil_binding_target_list_grow(vigil_program_state_t *prog
     return VIGIL_STATUS_OK;
 }
 
-static vigil_status_t vigil_binding_target_list_append(vigil_program_state_t *program,
-                                                       vigil_binding_target_list_t *list, vigil_parser_type_t type,
-                                                       const vigil_token_t *name_token, int is_discard)
+vigil_status_t vigil_binding_target_list_append(vigil_program_state_t *program, vigil_binding_target_list_t *list,
+                                                vigil_parser_type_t type, const vigil_token_t *name_token,
+                                                int is_discard)
 {
     vigil_status_t status;
     vigil_binding_target_t *target;
@@ -325,7 +320,7 @@ static vigil_status_t vigil_binding_target_list_append(vigil_program_state_t *pr
     return VIGIL_STATUS_OK;
 }
 
-static vigil_parser_type_t vigil_expression_result_type_at(const vigil_expression_result_t *result, size_t index)
+vigil_parser_type_t vigil_expression_result_type_at(const vigil_expression_result_t *result, size_t index)
 {
     if (result == NULL || index >= result->type_count)
     {
@@ -4714,9 +4709,7 @@ static vigil_status_t vigil_program_parse_source(vigil_program_state_t *program,
     return VIGIL_STATUS_OK;
 }
 
-static const vigil_token_t *vigil_parser_previous(const vigil_parser_state_t *state);
-
-static vigil_source_span_t vigil_parser_fallback_span(const vigil_parser_state_t *state)
+vigil_source_span_t vigil_parser_fallback_span(const vigil_parser_state_t *state)
 {
     vigil_source_span_t span;
     const vigil_token_t *token;
@@ -4747,7 +4740,7 @@ const vigil_token_t *vigil_parser_peek(const vigil_parser_state_t *state)
     return vigil_program_token_at(state->program, state->current);
 }
 
-static const vigil_token_t *vigil_parser_previous(const vigil_parser_state_t *state)
+const vigil_token_t *vigil_parser_previous(const vigil_parser_state_t *state)
 {
     if (state == NULL || state->current == 0U)
     {
@@ -4780,7 +4773,7 @@ static const vigil_token_t *vigil_parser_advance(vigil_parser_state_t *state)
     return vigil_parser_previous(state);
 }
 
-static int vigil_parser_match(vigil_parser_state_t *state, vigil_token_kind_t kind)
+int vigil_parser_match(vigil_parser_state_t *state, vigil_token_kind_t kind)
 {
     if (!vigil_parser_check(state, kind))
     {
@@ -5733,8 +5726,8 @@ int vigil_program_find_top_level_function_name_in_source(const vigil_program_sta
     return 0;
 }
 
-static vigil_status_t vigil_parser_declare_local_symbol(vigil_parser_state_t *state, const vigil_token_t *name_token,
-                                                        vigil_parser_type_t type, int is_const, size_t *out_index)
+vigil_status_t vigil_parser_declare_local_symbol(vigil_parser_state_t *state, const vigil_token_t *name_token,
+                                                 vigil_parser_type_t type, int is_const, size_t *out_index)
 {
     vigil_status_t status;
     const char *name;
@@ -5774,93 +5767,8 @@ static int vigil_parser_token_is_discard_identifier(const vigil_parser_state_t *
     return text != NULL && length == 1U && text[0] == '_';
 }
 
-static vigil_status_t vigil_parser_parse_binding_target_list(vigil_parser_state_t *state,
-                                                             const char *unsupported_type_message,
-                                                             const char *non_void_message, const char *name_message,
-                                                             vigil_binding_target_list_t *targets)
-{
-    vigil_status_t status;
-    vigil_parser_type_t declared_type;
-    const vigil_token_t *name_token = NULL;
-    const vigil_token_t *type_token;
-
-    if (state == NULL || targets == NULL)
-    {
-        vigil_error_set_literal(state == NULL ? NULL : state->program->error, VIGIL_STATUS_INVALID_ARGUMENT,
-                                "binding target list arguments are invalid");
-        return VIGIL_STATUS_INVALID_ARGUMENT;
-    }
-
-    do
-    {
-        status = vigil_program_parse_type_reference(state->program, &state->current, unsupported_type_message,
-                                                    &declared_type);
-        if (status != VIGIL_STATUS_OK)
-        {
-            return status;
-        }
-
-        type_token = vigil_parser_previous(state);
-        status = vigil_program_require_non_void_type(
-            state->program, type_token == NULL ? vigil_parser_fallback_span(state) : type_token->span, declared_type,
-            non_void_message);
-        if (status != VIGIL_STATUS_OK)
-        {
-            return status;
-        }
-
-        status = vigil_parser_expect(state, VIGIL_TOKEN_IDENTIFIER, name_message, &name_token);
-        if (status != VIGIL_STATUS_OK)
-        {
-            return status;
-        }
-
-        status =
-            vigil_binding_target_list_append((vigil_program_state_t *)state->program, targets, declared_type,
-                                             name_token, vigil_parser_token_is_discard_identifier(state, name_token));
-        if (status != VIGIL_STATUS_OK)
-        {
-            return status;
-        }
-    } while (vigil_parser_match(state, VIGIL_TOKEN_COMMA));
-
-    return VIGIL_STATUS_OK;
-}
-
-static vigil_status_t vigil_parser_require_binding_initializer_shape(
-    vigil_parser_state_t *state, vigil_source_span_t span, const vigil_binding_target_list_t *targets,
-    const vigil_expression_result_t *initializer_result, const char *count_message, const char *type_message)
-{
-    vigil_status_t status;
-    size_t index;
-
-    if (targets == NULL || initializer_result == NULL)
-    {
-        vigil_error_set_literal(state == NULL ? NULL : state->program->error, VIGIL_STATUS_INVALID_ARGUMENT,
-                                "binding initializer arguments are invalid");
-        return VIGIL_STATUS_INVALID_ARGUMENT;
-    }
-
-    if (initializer_result->type_count != targets->count)
-    {
-        return vigil_parser_report(state, span, count_message);
-    }
-
-    for (index = 0U; index < targets->count; index += 1U)
-    {
-        status = vigil_parser_require_type(state, span, vigil_expression_result_type_at(initializer_result, index),
-                                           targets->items[index].type, type_message);
-        if (status != VIGIL_STATUS_OK)
-        {
-            return status;
-        }
-    }
-
-    return VIGIL_STATUS_OK;
-}
-
-static vigil_status_t vigil_parser_bind_targets(vigil_parser_state_t *state, const vigil_binding_target_list_t *targets,
-                                                int is_const, size_t *out_last_slot)
+vigil_status_t vigil_parser_bind_targets(vigil_parser_state_t *state, const vigil_binding_target_list_t *targets,
+                                         int is_const, size_t *out_last_slot)
 {
     vigil_status_t status;
     size_t index;
@@ -6444,9 +6352,6 @@ static vigil_status_t vigil_parser_end_scope(vigil_parser_state_t *state)
 }
 
 vigil_status_t vigil_parser_parse_expression(vigil_parser_state_t *state, vigil_expression_result_t *out_result);
-static vigil_status_t vigil_parser_parse_expression_with_expected_type(vigil_parser_state_t *state,
-                                                                       vigil_parser_type_t expected_type,
-                                                                       vigil_expression_result_t *out_result);
 static vigil_status_t vigil_parser_parse_statement(vigil_parser_state_t *state, vigil_statement_result_t *out_result);
 
 static vigil_status_t vigil_parser_parse_call(vigil_parser_state_t *state, const vigil_token_t *name_token,
@@ -10032,9 +9937,9 @@ vigil_status_t vigil_parser_parse_expression(vigil_parser_state_t *state, vigil_
     return vigil_parser_parse_ternary(state, out_result);
 }
 
-static vigil_status_t vigil_parser_parse_expression_with_expected_type(vigil_parser_state_t *state,
-                                                                       vigil_parser_type_t expected_type,
-                                                                       vigil_expression_result_t *out_result)
+vigil_status_t vigil_parser_parse_expression_with_expected_type(vigil_parser_state_t *state,
+                                                                vigil_parser_type_t expected_type,
+                                                                vigil_expression_result_t *out_result)
 {
     vigil_status_t status;
     const vigil_token_t *token;
@@ -13289,141 +13194,6 @@ static vigil_status_t vigil_parser_parse_statement(vigil_parser_state_t *state, 
     }
 
     return vigil_parser_parse_expression_statement(state, out_result);
-}
-
-static vigil_status_t vigil_parser_parse_variable_declaration(vigil_parser_state_t *state,
-                                                              vigil_statement_result_t *out_result)
-{
-    vigil_status_t status;
-    vigil_binding_target_list_t targets;
-    vigil_expression_result_t initializer_result;
-
-    vigil_binding_target_list_init(&targets);
-    vigil_expression_result_clear(&initializer_result);
-
-    status = vigil_parser_parse_binding_target_list(state, "unsupported local variable type",
-                                                    "local variables cannot use type void",
-                                                    "expected local variable name", &targets);
-    if (status != VIGIL_STATUS_OK)
-    {
-        vigil_binding_target_list_free((vigil_program_state_t *)state->program, &targets);
-        return status;
-    }
-
-    if (!vigil_parser_match(state, VIGIL_TOKEN_ASSIGN))
-    {
-        status = vigil_parser_report(state, targets.items[0].name_token->span,
-                                     "variables must be initialized at declaration");
-        vigil_binding_target_list_free((vigil_program_state_t *)state->program, &targets);
-        return status;
-    }
-
-    status = vigil_parser_parse_expression_with_expected_type(
-        state, targets.count == 1U ? targets.items[0].type : vigil_binding_type_invalid(), &initializer_result);
-    if (status != VIGIL_STATUS_OK)
-    {
-        vigil_binding_target_list_free((vigil_program_state_t *)state->program, &targets);
-        return status;
-    }
-    status = vigil_parser_require_binding_initializer_shape(
-        state, targets.items[0].name_token->span, &targets, &initializer_result,
-        targets.count == 1U ? "initializer must be a single value"
-                            : "initializer return shape does not match declaration",
-        targets.count == 1U ? "initializer type does not match local variable type"
-                            : "initializer type does not match local binding type");
-    if (status != VIGIL_STATUS_OK)
-    {
-        vigil_binding_target_list_free((vigil_program_state_t *)state->program, &targets);
-        return status;
-    }
-
-    status = vigil_parser_expect(state, VIGIL_TOKEN_SEMICOLON, "expected ';' after local declaration", NULL);
-    if (status != VIGIL_STATUS_OK)
-    {
-        vigil_binding_target_list_free((vigil_program_state_t *)state->program, &targets);
-        return status;
-    }
-
-    status = vigil_parser_bind_targets(state, &targets, 0, NULL);
-    if (status != VIGIL_STATUS_OK)
-    {
-        vigil_binding_target_list_free((vigil_program_state_t *)state->program, &targets);
-        return status;
-    }
-    vigil_binding_target_list_free((vigil_program_state_t *)state->program, &targets);
-    vigil_statement_result_set_guaranteed_return(out_result, 0);
-    return VIGIL_STATUS_OK;
-}
-
-static vigil_status_t vigil_parser_parse_const_declaration(vigil_parser_state_t *state,
-                                                           vigil_statement_result_t *out_result)
-{
-    vigil_status_t status;
-    const vigil_token_t *const_token = NULL;
-    const vigil_token_t *name_token = NULL;
-    vigil_parser_type_t declared_type;
-    vigil_expression_result_t initializer_result;
-
-    vigil_expression_result_clear(&initializer_result);
-    status = vigil_parser_expect(state, VIGIL_TOKEN_CONST, "expected 'const'", &const_token);
-    if (status != VIGIL_STATUS_OK)
-    {
-        return status;
-    }
-
-    status = vigil_program_parse_type_reference(state->program, &state->current, "unsupported local constant type",
-                                                &declared_type);
-    if (status != VIGIL_STATUS_OK)
-    {
-        return status;
-    }
-    status = vigil_program_require_non_void_type(
-        state->program, vigil_parser_previous(state) == NULL ? const_token->span : vigil_parser_previous(state)->span,
-        declared_type, "local constants cannot use type void");
-    if (status != VIGIL_STATUS_OK)
-    {
-        return status;
-    }
-    status = vigil_parser_expect(state, VIGIL_TOKEN_IDENTIFIER, "expected local constant name", &name_token);
-    if (status != VIGIL_STATUS_OK)
-    {
-        return status;
-    }
-    status = vigil_parser_expect(state, VIGIL_TOKEN_ASSIGN, "constants must be initialized at declaration", NULL);
-    if (status != VIGIL_STATUS_OK)
-    {
-        return status;
-    }
-    status = vigil_parser_parse_expression_with_expected_type(state, declared_type, &initializer_result);
-    if (status != VIGIL_STATUS_OK)
-    {
-        return status;
-    }
-    status = vigil_parser_require_scalar_expression(state, name_token->span, &initializer_result,
-                                                    "initializer must be a single value");
-    if (status != VIGIL_STATUS_OK)
-    {
-        return status;
-    }
-    status = vigil_parser_require_type(state, name_token->span, initializer_result.type, declared_type,
-                                       "initializer type does not match local constant type");
-    if (status != VIGIL_STATUS_OK)
-    {
-        return status;
-    }
-    status = vigil_parser_expect(state, VIGIL_TOKEN_SEMICOLON, "expected ';' after local constant declaration", NULL);
-    if (status != VIGIL_STATUS_OK)
-    {
-        return status;
-    }
-
-    status = vigil_parser_declare_local_symbol(state, name_token, declared_type, 1, NULL);
-    if (status != VIGIL_STATUS_OK)
-    {
-        return status;
-    }
-    vigil_statement_result_set_guaranteed_return(out_result, 0);
-    return VIGIL_STATUS_OK;
 }
 
 static int vigil_parser_is_variable_declaration_start(const vigil_parser_state_t *state)
