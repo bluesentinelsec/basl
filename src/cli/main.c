@@ -2,9 +2,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#ifndef _WIN32
-#include <sys/resource.h>
-#endif
 
 #ifdef _MSC_VER
 #define cli_strdup _strdup
@@ -3135,23 +3132,6 @@ static int early_dispatch_editor(int argc, char **argv)
 
 /* ── profile command ──────────────────────────────────────────────── */
 
-static int64_t get_peak_rss_kb(void)
-{
-#if defined(__APPLE__)
-    struct rusage ru;
-    if (getrusage(RUSAGE_SELF, &ru) == 0)
-        return (int64_t)(ru.ru_maxrss / 1024); /* bytes on macOS */
-    return 0;
-#elif !defined(_WIN32)
-    struct rusage ru;
-    if (getrusage(RUSAGE_SELF, &ru) == 0)
-        return (int64_t)ru.ru_maxrss; /* KB on Linux */
-    return 0;
-#else
-    return 0;
-#endif
-}
-
 static void profile_print_time(const char *label, double ms)
 {
     if (ms >= 1000.0)
@@ -3248,7 +3228,7 @@ static int cmd_profile(const char *script_path)
         double compile_ms = (double)(t1.tv_sec - t0.tv_sec) * 1000.0 + (double)(t1.tv_nsec - t0.tv_nsec) / 1e6;
         double execute_ms = (double)(t2.tv_sec - t1.tv_sec) * 1000.0 + (double)(t2.tv_nsec - t1.tv_nsec) / 1e6;
         double total_ms = compile_ms + execute_ms;
-        int64_t peak_rss = get_peak_rss_kb();
+        int64_t peak_rss = vigil_platform_peak_rss_kb();
         int64_t alloc_count = vigil_runtime_alloc_count(runtime);
         int64_t alloc_bytes = vigil_runtime_alloc_bytes(runtime);
 

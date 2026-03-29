@@ -9,6 +9,7 @@
 #define WIN32_LEAN_AND_MEAN
 #include <direct.h>
 #include <windows.h>
+#include <psapi.h>
 #include <wincrypt.h>
 // clang-format on
 
@@ -301,6 +302,14 @@ vigil_status_t vigil_platform_self_exe(char *out_buf, size_t buf_size, vigil_err
         return VIGIL_STATUS_INTERNAL;
     }
     return VIGIL_STATUS_OK;
+}
+
+int64_t vigil_platform_peak_rss_kb(void)
+{
+    PROCESS_MEMORY_COUNTERS pmc;
+    if (GetProcessMemoryInfo(GetCurrentProcess(), &pmc, sizeof(pmc)))
+        return (int64_t)(pmc.PeakWorkingSetSize / 1024);
+    return 0;
 }
 
 vigil_status_t vigil_platform_make_executable(const char *path, vigil_error_t *error)
