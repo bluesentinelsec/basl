@@ -1045,6 +1045,7 @@ vigil_status_t vigil_semantic_lower_function_body(vigil_program_state_t *program
         vigil_semantic_analyze_function_body(program, function_index, parent_state, out_body, &state, &body_result);
     if (status != VIGIL_STATUS_OK)
     {
+        vigil_lowered_function_body_free(out_body);
         vigil_chunk_free(&state.chunk);
         vigil_parser_state_free(&state);
         return status;
