@@ -56,17 +56,54 @@ static void InitBackendFixtures(int *vigil_test_failed_, backend_fixture_t *fixt
 static void MaterializeMainFunction(int *vigil_test_failed_, backend_fixture_t *fixture,
                                     vigil_lowered_function_body_t *body, vigil_object_t **out_function)
 {
-    const vigil_function_decl_t *decl;
+    vigil_function_decl_t *decl =
+        vigil_binding_function_table_get_mutable(&fixture->program.functions, fixture->program.functions.main_index);
 
-    decl = vigil_binding_function_table_get(&fixture->program.functions, fixture->program.functions.main_index);
     ASSERT_NE(decl, NULL);
-
     vigil_lowered_function_body_init(body);
     ASSERT_EQ(vigil_semantic_lower_function_body(&fixture->program, fixture->program.functions.main_index, NULL, body),
               VIGIL_STATUS_OK);
-    *out_function = NULL;
-    ASSERT_EQ(vigil_compile_materialize_lowered_function_body(&fixture->program, decl, body, out_function),
+    ASSERT_EQ(decl->object, NULL);
+    ASSERT_EQ(vigil_compile_materialize_lowered_function_body(&fixture->program, decl, body, &decl->object),
               VIGIL_STATUS_OK);
+    *out_function = decl->object;
+    ASSERT_NE(*out_function, NULL);
+}
+
+static const vigil_function_decl_t *FindFunctionDecl(const vigil_program_state_t *program, const char *name)
+{
+    size_t index;
+    size_t name_length = strlen(name);
+
+    for (index = 0U; index < program->functions.count; index += 1U)
+    {
+        const vigil_function_decl_t *decl = &program->functions.functions[index];
+
+        if (decl->name_length == name_length && strncmp(decl->name, name, name_length) == 0)
+            return decl;
+    }
+
+    return NULL;
+}
+
+static void MaterializeNamedFunction(int *vigil_test_failed_, backend_fixture_t *fixture, const char *name,
+                                     vigil_lowered_function_body_t *body, vigil_object_t **out_function)
+{
+    const vigil_function_decl_t *found_decl = FindFunctionDecl(&fixture->program, name);
+    vigil_function_decl_t *decl;
+    size_t function_index;
+
+    ASSERT_NE(found_decl, NULL);
+    function_index = (size_t)(found_decl - fixture->program.functions.functions);
+    decl = vigil_binding_function_table_get_mutable(&fixture->program.functions, function_index);
+    ASSERT_NE(decl, NULL);
+
+    vigil_lowered_function_body_init(body);
+    ASSERT_EQ(vigil_semantic_lower_function_body(&fixture->program, function_index, NULL, body), VIGIL_STATUS_OK);
+    ASSERT_EQ(decl->object, NULL);
+    ASSERT_EQ(vigil_compile_materialize_lowered_function_body(&fixture->program, decl, body, &decl->object),
+              VIGIL_STATUS_OK);
+    *out_function = decl->object;
     ASSERT_NE(*out_function, NULL);
 }
 
@@ -78,6 +115,78 @@ static void ExpectChunkContains(int *vigil_test_failed_, vigil_runtime_t *runtim
     vigil_string_init(&output, runtime);
     ASSERT_EQ(vigil_chunk_disassemble(chunk, &output, error), VIGIL_STATUS_OK);
     EXPECT_TRUE(strstr(vigil_string_c_str(&output), needle) != NULL);
+    vigil_string_free(&output);
+}
+
+static int ChunkContainsOpcodeLine(vigil_runtime_t *runtime, const vigil_chunk_t *chunk, vigil_error_t *error,
+                                   const char *opcode_name)
+{
+    vigil_string_t output;
+    const char *text;
+    size_t opcode_length = strlen(opcode_name);
+    int found = 0;
+
+    vigil_string_init(&output, runtime);
+    if (vigil_chunk_disassemble(chunk, &output, error) != VIGIL_STATUS_OK)
+    {
+        vigil_string_free(&output);
+        return -1;
+    }
+
+    text = vigil_string_c_str(&output);
+    while (text != NULL && *text != '\0')
+    {
+        const char *line_end = strchr(text, '\n');
+        const char *space = strchr(text, ' ');
+        const char *opcode_start;
+
+        if (space == NULL || (line_end != NULL && space > line_end))
+            break;
+
+        while (*space == ' ')
+            space += 1;
+        opcode_start = space;
+        if (strncmp(opcode_start, opcode_name, opcode_length) == 0 &&
+            (opcode_start[opcode_length] == '\0' || opcode_start[opcode_length] == ' ' ||
+             opcode_start[opcode_length] == '\n'))
+        {
+            found = 1;
+            break;
+        }
+
+        text = line_end == NULL ? NULL : line_end + 1;
+    }
+
+    vigil_string_free(&output);
+    return found;
+}
+
+static void ExpectChunkContainsOpcodeLine(int *vigil_test_failed_, vigil_runtime_t *runtime, const vigil_chunk_t *chunk,
+                                          vigil_error_t *error, const char *opcode_name)
+{
+    int found = ChunkContainsOpcodeLine(runtime, chunk, error, opcode_name);
+
+    ASSERT_NE(found, -1);
+    EXPECT_TRUE(found == 1);
+}
+
+static void ExpectChunkNotContainsOpcodeLine(int *vigil_test_failed_, vigil_runtime_t *runtime,
+                                             const vigil_chunk_t *chunk, vigil_error_t *error, const char *opcode_name)
+{
+    int found = ChunkContainsOpcodeLine(runtime, chunk, error, opcode_name);
+
+    ASSERT_NE(found, -1);
+    EXPECT_TRUE(found == 0);
+}
+
+static void ExpectChunkNotContains(int *vigil_test_failed_, vigil_runtime_t *runtime, const vigil_chunk_t *chunk,
+                                   vigil_error_t *error, const char *needle)
+{
+    vigil_string_t output;
+
+    vigil_string_init(&output, runtime);
+    ASSERT_EQ(vigil_chunk_disassemble(chunk, &output, error), VIGIL_STATUS_OK);
+    EXPECT_TRUE(strstr(vigil_string_c_str(&output), needle) == NULL);
     vigil_string_free(&output);
 }
 
@@ -106,7 +215,6 @@ TEST(CompilerBackendTest, MaterializesLoweredMainFunctionBody)
     EXPECT_EQ(vigil_value_as_int(&result), 7);
 
     vigil_value_release(&result);
-    vigil_object_release(&function);
     FreeBackendFixtures(&fixture);
 }
 
@@ -130,13 +238,16 @@ TEST(CompilerBackendTest, MaterializesLoweredConditionalBytecodeShape)
                         "JUMP_IF_FALSE");
     ExpectChunkContains(vigil_test_failed_, fixture.runtime, vigil_function_object_chunk(function), &fixture.error,
                         "JUMP ");
+    ExpectChunkNotContains(vigil_test_failed_, fixture.runtime, vigil_function_object_chunk(function), &fixture.error,
+                           "JUMP_IF_FALSE 0");
+    ExpectChunkNotContains(vigil_test_failed_, fixture.runtime, vigil_function_object_chunk(function), &fixture.error,
+                           "JUMP 0");
 
     vigil_value_init_nil(&result);
     ASSERT_EQ(vigil_vm_execute_function(fixture.vm, function, &result, &fixture.error), VIGIL_STATUS_OK);
     EXPECT_EQ(vigil_value_as_int(&result), 7);
 
     vigil_value_release(&result);
-    vigil_object_release(&function);
     FreeBackendFixtures(&fixture);
 }
 
@@ -162,7 +273,52 @@ TEST(CompilerBackendTest, MaterializesLoweredForLoopProgram)
     EXPECT_EQ(vigil_value_as_int(&result), 10);
 
     vigil_value_release(&result);
-    vigil_object_release(&function);
+    FreeBackendFixtures(&fixture);
+}
+
+TEST(CompilerBackendTest, MaterializesSelfTailCallFunction)
+{
+    static const char source[] = "fn bounce(i32 n, i32 acc) -> i32 {"
+                                 "    if (n == 0) {"
+                                 "        return acc;"
+                                 "    }"
+                                 "    return bounce(n - 1, acc + 1);"
+                                 "}"
+                                 "fn main() -> i32 { return 0; }";
+    backend_fixture_t fixture;
+    vigil_lowered_function_body_t body;
+    vigil_object_t *function = NULL;
+
+    InitBackendFixtures(vigil_test_failed_, &fixture, source);
+    MaterializeNamedFunction(vigil_test_failed_, &fixture, "bounce", &body, &function);
+
+    ExpectChunkContainsOpcodeLine(vigil_test_failed_, fixture.runtime, vigil_function_object_chunk(function),
+                                  &fixture.error, "TAIL_CALL");
+    ExpectChunkNotContainsOpcodeLine(vigil_test_failed_, fixture.runtime, vigil_function_object_chunk(function),
+                                     &fixture.error, "CALL_SELF");
+    FreeBackendFixtures(&fixture);
+}
+
+TEST(CompilerBackendTest, MaterializesTailCallBetweenFunctions)
+{
+    static const char source[] = "fn leaf(i32 n) -> i32 {"
+                                 "    return n + 1;"
+                                 "}"
+                                 "fn caller(i32 n) -> i32 {"
+                                 "    return leaf(n);"
+                                 "}"
+                                 "fn main() -> i32 { return 0; }";
+    backend_fixture_t fixture;
+    vigil_lowered_function_body_t body;
+    vigil_object_t *function = NULL;
+
+    InitBackendFixtures(vigil_test_failed_, &fixture, source);
+    MaterializeNamedFunction(vigil_test_failed_, &fixture, "caller", &body, &function);
+
+    ExpectChunkContainsOpcodeLine(vigil_test_failed_, fixture.runtime, vigil_function_object_chunk(function),
+                                  &fixture.error, "TAIL_CALL");
+    ExpectChunkNotContainsOpcodeLine(vigil_test_failed_, fixture.runtime, vigil_function_object_chunk(function),
+                                     &fixture.error, "CALL");
     FreeBackendFixtures(&fixture);
 }
 
@@ -241,6 +397,8 @@ void register_backend_tests(void)
     REGISTER_TEST(CompilerBackendTest, MaterializesLoweredMainFunctionBody);
     REGISTER_TEST(CompilerBackendTest, MaterializesLoweredConditionalBytecodeShape);
     REGISTER_TEST(CompilerBackendTest, MaterializesLoweredForLoopProgram);
+    REGISTER_TEST(CompilerBackendTest, MaterializesSelfTailCallFunction);
+    REGISTER_TEST(CompilerBackendTest, MaterializesTailCallBetweenFunctions);
     REGISTER_TEST(CompilerBackendTest, MaterializesSyntheticConstructorFunction);
     REGISTER_TEST(CompilerBackendTest, MaterializesExternWrapperFunction);
 }

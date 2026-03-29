@@ -650,7 +650,7 @@ static int vigil_chunk_is_two_u32_operand_opcode(vigil_opcode_t opcode)
 {
     return opcode == VIGIL_OPCODE_NEW_INSTANCE || opcode == VIGIL_OPCODE_NEW_ARRAY || opcode == VIGIL_OPCODE_NEW_MAP ||
            opcode == VIGIL_OPCODE_DEFER_NEW_INSTANCE || opcode == VIGIL_OPCODE_FORMAT_SPEC ||
-           opcode == VIGIL_OPCODE_CALL_SELF;
+           opcode == VIGIL_OPCODE_TAIL_CALL || opcode == VIGIL_OPCODE_CALL_SELF;
 }
 
 static int vigil_chunk_is_increment_local_opcode(vigil_opcode_t opcode)
@@ -726,10 +726,12 @@ static vigil_status_t vigil_chunk_disassemble_instruction(const vigil_chunk_t *c
     {
         return vigil_chunk_disassemble_two_u32_operands(
             chunk, offset, output, error,
-            opcode == VIGIL_OPCODE_NEW_INSTANCE || opcode == VIGIL_OPCODE_DEFER_NEW_INSTANCE
+            opcode == VIGIL_OPCODE_TAIL_CALL ? "truncated tail-call instruction"
+            : opcode == VIGIL_OPCODE_NEW_INSTANCE || opcode == VIGIL_OPCODE_DEFER_NEW_INSTANCE
                 ? "truncated constructor instruction"
                 : "truncated collection instruction",
-            opcode == VIGIL_OPCODE_NEW_INSTANCE || opcode == VIGIL_OPCODE_DEFER_NEW_INSTANCE
+            opcode == VIGIL_OPCODE_TAIL_CALL ? "failed to format tail-call operand"
+            : opcode == VIGIL_OPCODE_NEW_INSTANCE || opcode == VIGIL_OPCODE_DEFER_NEW_INSTANCE
                 ? "failed to format chunk constructor operand"
                 : "failed to format chunk collection operand");
     }
