@@ -15,6 +15,8 @@
 #include "vigil/dap.h"
 #include "vigil/doc.h"
 #include "vigil/doc_registry.h"
+#include "vigil/easy.h"
+#include "vigil/editor.h"
 #include "vigil/embed.h"
 #include "vigil/fmt.h"
 #include "vigil/lsp.h"
@@ -3019,11 +3021,121 @@ typedef struct
     early_handler_t handler;
 } early_command_t;
 
+static const char *editor_resolve_home(void)
+{
+#ifdef _MSC_VER
+    static char home_buf[1024];
+    char *val = NULL;
+    size_t len = 0;
+    if (_dupenv_s(&val, &len, "USERPROFILE") == 0 && val)
+    {
+        snprintf(home_buf, sizeof(home_buf), "%s", val);
+        free(val);
+        return home_buf;
+    }
+    return NULL;
+#else
+    return getenv("HOME");
+#endif
+}
+
+static int editor_cmd_list(const char *home)
+{
+    const char *const *editors = vigil_editor_supported();
+    printf("Supported editors:\n\n");
+    for (const char *const *e = editors; *e; e++)
+        printf("  %-12s %s\n", *e, vigil_editor_is_installed(*e, home) ? "installed \xe2\x9c\x93" : "not installed");
+    return 0;
+}
+
+static int editor_cmd_status(const char *home)
+{
+    const char *const *editors = vigil_editor_supported();
+    int any = 0;
+    for (const char *const *e = editors; *e; e++)
+    {
+        if (vigil_editor_is_installed(*e, home))
+        {
+            printf("%s: installed\n", *e);
+            any = 1;
+        }
+    }
+    if (!any)
+        printf("No editor integrations installed.\n");
+    return 0;
+}
+
+static int editor_cmd_install(const char *name, const char *vigil_bin, const char *home)
+{
+    if (!vigil_editor_is_supported(name))
+    {
+        fprintf(stderr, "error: unknown editor '%s'\nSupported: ", name);
+        for (const char *const *e = vigil_editor_supported(); *e; e++)
+            fprintf(stderr, "%s ", *e);
+        fprintf(stderr, "\n");
+        return 1;
+    }
+    vigil_editor_result_t r = vigil_editor_install(name, vigil_bin, home);
+    printf("%s\n", r.message);
+    return r.status == VIGIL_STATUS_OK ? 0 : 1;
+}
+
+static int editor_cmd_uninstall(const char *name, const char *home)
+{
+    if (!vigil_editor_is_supported(name))
+    {
+        fprintf(stderr, "error: unknown editor '%s'\n", name);
+        return 1;
+    }
+    vigil_editor_result_t r = vigil_editor_uninstall(name, home);
+    printf("%s\n", r.message);
+    return r.status == VIGIL_STATUS_OK ? 0 : 1;
+}
+
+static int early_dispatch_editor(int argc, char **argv)
+{
+    if (argc < 3)
+    {
+        fprintf(stderr, "Usage: vigil editor <list|install|uninstall|status> [editor]\n");
+        return 1;
+    }
+    const char *subcmd = argv[2];
+    const char *home = editor_resolve_home();
+    if (!home || !home[0])
+    {
+        fprintf(stderr, "error: cannot determine home directory\n");
+        return 1;
+    }
+    char vigil_bin[1024];
+    if (vigil_platform_self_exe(vigil_bin, sizeof(vigil_bin), NULL) != VIGIL_STATUS_OK)
+        snprintf(vigil_bin, sizeof(vigil_bin), "vigil");
+
+    if (strcmp(subcmd, "list") == 0)
+        return editor_cmd_list(home);
+    if (strcmp(subcmd, "status") == 0)
+        return editor_cmd_status(home);
+    if (strcmp(subcmd, "install") == 0 || strcmp(subcmd, "uninstall") == 0)
+    {
+        if (argc < 4)
+        {
+            fprintf(stderr, "Usage: vigil editor %s <editor>\n", subcmd);
+            return 1;
+        }
+        if (strcmp(subcmd, "install") == 0)
+            return editor_cmd_install(argv[3], vigil_bin, home);
+        return editor_cmd_uninstall(argv[3], home);
+    }
+    fprintf(stderr, "Unknown subcommand: %s\n", subcmd);
+    fprintf(stderr, "Usage: vigil editor <list|install|uninstall|status> [editor]\n");
+    return 1;
+}
+
 static const early_command_t early_commands[] = {
     {"run", early_dispatch_run},
     {"embed", early_dispatch_embed},
     {"test", (early_handler_t)vigil_cli_run_test_command},
     {"get", early_dispatch_get},
+    {"editor", early_dispatch_editor},
     {NULL, NULL},
 };
 
