@@ -128,6 +128,34 @@ TEST(VigilCheckerTest, ReportsMissingReturnOnSomePaths)
     FreeCheckerFixtures(&runtime, &registry, &diagnostics);
 }
 
+TEST(VigilCheckerTest, ReportsMissingReturnForSwitchWithoutDefault)
+{
+    vigil_runtime_t *runtime = NULL;
+    vigil_error_t error = {0};
+    vigil_source_registry_t registry;
+    vigil_diagnostic_list_t diagnostics;
+    vigil_source_id_t source_id;
+
+    InitCheckerFixtures(vigil_test_failed_, &runtime, &registry, &diagnostics, &error);
+
+    source_id = RegisterSource(vigil_test_failed_, &registry, "missing_switch_return.vigil",
+                               "fn choose(bool ready) -> i32 {"
+                               "    switch (ready) {"
+                               "        case true:"
+                               "            return 1;"
+                               "    }"
+                               "}"
+                               "fn main() -> i32 {"
+                               "    return choose(false);"
+                               "}",
+                               &error);
+
+    ExpectSingleCheckerDiagnostic(vigil_test_failed_, &registry, source_id, &diagnostics, &error,
+                                  "function must return a value on all paths");
+
+    FreeCheckerFixtures(&runtime, &registry, &diagnostics);
+}
+
 TEST(VigilCheckerTest, RequiresMainFunctionForCheckSource)
 {
     vigil_runtime_t *runtime = NULL;
@@ -175,6 +203,7 @@ void register_checker_tests(void)
     REGISTER_TEST(VigilCheckerTest, ValidatesWellTypedProgramWithoutDiagnostics);
     REGISTER_TEST(VigilCheckerTest, ReportsSemanticErrorsWithoutProducingEntrypoint);
     REGISTER_TEST(VigilCheckerTest, ReportsMissingReturnOnSomePaths);
+    REGISTER_TEST(VigilCheckerTest, ReportsMissingReturnForSwitchWithoutDefault);
     REGISTER_TEST(VigilCheckerTest, RequiresMainFunctionForCheckSource);
     REGISTER_TEST(VigilCheckerTest, ValidatesArguments);
 }

@@ -203,13 +203,37 @@ static void vigil_statement_result_set_non_returning(vigil_statement_result_t *r
     vigil_statement_result_set_guaranteed_return(result, 0);
 }
 
+static int vigil_statement_result_guarantees_return(const vigil_statement_result_t *result)
+{
+    return result != NULL && result->guaranteed_return;
+}
+
+static void vigil_statement_result_merge_sequence(vigil_statement_result_t *result,
+                                                  const vigil_statement_result_t *next_result)
+{
+    vigil_statement_result_set_guaranteed_return(result, vigil_statement_result_guarantees_return(result) ||
+                                                             vigil_statement_result_guarantees_return(next_result));
+}
+
 static void vigil_statement_result_set_conditional(vigil_statement_result_t *result, int has_else_branch,
                                                    const vigil_statement_result_t *then_result,
                                                    const vigil_statement_result_t *else_result)
 {
-    vigil_statement_result_set_guaranteed_return(result, has_else_branch && then_result != NULL &&
-                                                             then_result->guaranteed_return && else_result != NULL &&
-                                                             else_result->guaranteed_return);
+    vigil_statement_result_set_guaranteed_return(result, has_else_branch &&
+                                                             vigil_statement_result_guarantees_return(then_result) &&
+                                                             vigil_statement_result_guarantees_return(else_result));
+}
+
+static void vigil_statement_result_set_switch(vigil_statement_result_t *result, int has_default,
+                                              int all_branches_return)
+{
+    vigil_statement_result_set_guaranteed_return(result, has_default && all_branches_return);
+}
+
+static void vigil_return_analysis_merge_switch_branch(int *all_branches_return,
+                                                      const vigil_statement_result_t *branch_result)
+{
+    *all_branches_return = *all_branches_return && vigil_statement_result_guarantees_return(branch_result);
 }
 
 vigil_status_t vigil_parser_require_scalar_expression(vigil_parser_state_t *state, vigil_source_span_t span,
@@ -11487,10 +11511,7 @@ static vigil_status_t vigil_parser_parse_switch_case_contents(vigil_parser_state
         {
             return status;
         }
-        if (declaration_result.guaranteed_return)
-        {
-            block_result.guaranteed_return = 1;
-        }
+        vigil_statement_result_merge_sequence(&block_result, &declaration_result);
     }
 
     vigil_statement_result_set_guaranteed_return(out_result, block_result.guaranteed_return);
@@ -11515,7 +11536,7 @@ static vigil_status_t parse_switch_default_case(vigil_parser_state_t *state, con
     status = vigil_parser_parse_switch_case_contents(state, &case_body_result);
     if (status != VIGIL_STATUS_OK)
         return status;
-    *all_branches_return = *all_branches_return && case_body_result.guaranteed_return;
+    vigil_return_analysis_merge_switch_branch(all_branches_return, &case_body_result);
     status = vigil_parser_grow_jump_offsets(state, end_jumps, end_jump_capacity, *end_jump_count + 1U,
                                             "switch jump table allocation overflow");
     if (status != VIGIL_STATUS_OK)
@@ -11622,7 +11643,7 @@ static vigil_status_t parse_switch_case_branch(vigil_parser_state_t *state, cons
     status = vigil_parser_parse_switch_case_contents(state, &case_body_result);
     if (status != VIGIL_STATUS_OK)
         return status;
-    *all_branches_return = *all_branches_return && case_body_result.guaranteed_return;
+    vigil_return_analysis_merge_switch_branch(all_branches_return, &case_body_result);
     status = vigil_parser_grow_jump_offsets(state, &js->end_jumps, &js->end_jump_capacity, js->end_jump_count + 1U,
                                             "switch jump table allocation overflow");
     if (status != VIGIL_STATUS_OK)
@@ -11728,7 +11749,7 @@ static vigil_status_t vigil_parser_parse_switch_statement(vigil_parser_state_t *
             goto cleanup;
     }
 
-    vigil_statement_result_set_guaranteed_return(out_result, has_default && all_branches_return);
+    vigil_statement_result_set_switch(out_result, has_default, all_branches_return);
     status = VIGIL_STATUS_OK;
 
 cleanup:
@@ -13379,10 +13400,7 @@ static vigil_status_t vigil_parser_parse_block_contents(vigil_parser_state_t *st
         {
             return status;
         }
-        if (declaration_result.guaranteed_return)
-        {
-            block_result.guaranteed_return = 1;
-        }
+        vigil_statement_result_merge_sequence(&block_result, &declaration_result);
     }
 
     vigil_statement_result_set_guaranteed_return(out_result, block_result.guaranteed_return);
@@ -13780,6 +13798,35 @@ static vigil_status_t emit_repl_synthetic_return(vigil_parser_state_t *state, vi
     return emit_opcode_u32(state, VIGIL_OPCODE_RETURN, 1U, span);
 }
 
+static vigil_status_t finalize_function_body_return_analysis(vigil_program_state_t *program,
+                                                             vigil_parser_state_t *state, vigil_function_decl_t *decl,
+                                                             size_t function_index,
+                                                             vigil_statement_result_t *body_result)
+{
+    vigil_status_t status;
+
+    if (!vigil_statement_result_guarantees_return(body_result) && decl->return_count == 1U &&
+        vigil_parser_type_is_void(decl->return_type))
+    {
+        status = emit_implicit_void_return(state, decl->name_span);
+        if (status != VIGIL_STATUS_OK)
+            return status;
+        vigil_statement_result_set_guaranteed_return(body_result, 1);
+    }
+
+    if (!vigil_statement_result_guarantees_return(body_result) && program->compile_mode == VIGIL_COMPILE_MODE_REPL &&
+        function_index == program->functions.main_index)
+    {
+        status = emit_repl_synthetic_return(state, program, decl->name_span);
+        if (status != VIGIL_STATUS_OK)
+            return status;
+        vigil_statement_result_set_guaranteed_return(body_result, 1);
+    }
+
+    return vigil_compile_require_function_returns(program, decl, function_index,
+                                                  vigil_statement_result_guarantees_return(body_result));
+}
+
 static vigil_status_t try_compile_constructor_or_extern(vigil_program_state_t *program, size_t function_index,
                                                         int *handled)
 {
@@ -13883,25 +13930,7 @@ static vigil_status_t vigil_analyze_function_body(vigil_program_state_t *program
         return status;
 
     decl = &program->functions.functions[function_index];
-
-    if (!out_body_result->guaranteed_return && decl->return_count == 1U && vigil_parser_type_is_void(decl->return_type))
-    {
-        status = emit_implicit_void_return(state, decl->name_span);
-        if (status != VIGIL_STATUS_OK)
-            return status;
-        out_body_result->guaranteed_return = 1;
-    }
-
-    if (!out_body_result->guaranteed_return && program->compile_mode == VIGIL_COMPILE_MODE_REPL &&
-        function_index == program->functions.main_index)
-    {
-        status = emit_repl_synthetic_return(state, program, decl->name_span);
-        if (status != VIGIL_STATUS_OK)
-            return status;
-        out_body_result->guaranteed_return = 1;
-    }
-
-    return vigil_compile_require_function_returns(program, decl, function_index, out_body_result->guaranteed_return);
+    return finalize_function_body_return_analysis(program, state, decl, function_index, out_body_result);
 }
 
 static vigil_status_t compile_function_body(vigil_program_state_t *program, size_t function_index,
