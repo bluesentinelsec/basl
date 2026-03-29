@@ -85,11 +85,15 @@ TEST(EmbedAPI, FloatResult)
 
 /* ── null safety ─────────────────────────────────────────────────── */
 
-TEST(EmbedAPI, NullInputsHandledGracefully)
+TEST(EmbedAPI, NullRunInputsReturnNegativeOne)
 {
     EXPECT_EQ(vigil_run_string(NULL), -1);
     EXPECT_EQ(vigil_run_bytes(NULL, 0), -1);
     EXPECT_EQ(vigil_run_file(NULL), -1);
+}
+
+TEST(EmbedAPI, NullStateAccessIsSafe)
+{
     EXPECT_EQ(vigil_has_error(NULL), 0);
     EXPECT_EQ(vigil_get_error(NULL), NULL);
     EXPECT_EQ(vigil_get_result_int(NULL), 0);
@@ -109,5 +113,6 @@ void register_embed_api_tests(void)
     REGISTER_TEST(EmbedAPI, DoBytesExposesResult);
     REGISTER_TEST(EmbedAPI, ErrorExposesMessage);
     REGISTER_TEST(EmbedAPI, FloatResult);
-    REGISTER_TEST(EmbedAPI, NullInputsHandledGracefully);
+    REGISTER_TEST(EmbedAPI, NullRunInputsReturnNegativeOne);
+    REGISTER_TEST(EmbedAPI, NullStateAccessIsSafe);
 }
