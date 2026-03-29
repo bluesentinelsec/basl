@@ -1,0 +1,98 @@
+{
+  "layers": [
+    {
+      "name": "public_api",
+      "paths": [
+        "include/vigil/*.h"
+      ]
+    },
+    {
+      "name": "runtime_shared",
+      "paths": [
+        "src/internal/vigil_internal.h"
+      ],
+      "allow": [
+        "public_api"
+      ]
+    },
+    {
+      "name": "compiler_shared",
+      "paths": [
+        "src/internal/vigil_binding.h",
+        "src/internal/vigil_compiler_internal.h",
+        "src/internal/vigil_compiler_types.h"
+      ],
+      "allow": [
+        "public_api",
+        "compiler_shared"
+      ]
+    },
+    {
+      "name": "checker",
+      "paths": [
+        "src/checker.c"
+      ],
+      "allow": [
+        "public_api",
+        "compiler_shared"
+      ]
+    },
+    {
+      "name": "compiler_frontend",
+      "paths": [
+        "src/compiler.c"
+      ],
+      "allow": [
+        "public_api",
+        "runtime_shared",
+        "compiler_shared",
+        "compiler_semantics",
+        "compiler_backend"
+      ]
+    },
+    {
+      "name": "compiler_semantics",
+      "paths": [
+        "src/compiler_semantics.c",
+        "src/internal/vigil_compiler_semantics.h"
+      ],
+      "allow": [
+        "public_api",
+        "runtime_shared",
+        "compiler_shared",
+        "compiler_semantics"
+      ]
+    },
+    {
+      "name": "compiler_backend",
+      "paths": [
+        "src/compiler_backend.c",
+        "src/internal/vigil_compiler_backend.h"
+      ],
+      "allow": [
+        "public_api",
+        "runtime_shared",
+        "compiler_shared",
+        "compiler_semantics",
+        "compiler_backend"
+      ]
+    },
+    {
+      "name": "runtime_vm",
+      "paths": [
+        "src/chunk.c",
+        "src/regvm.c",
+        "src/value_internal.h",
+        "src/vm.c",
+        "src/vm_ops_*.h",
+        "src/internal/vigil_regvm.h",
+        "src/internal/vigil_vm_internal.h"
+      ],
+      "allow": [
+        "public_api",
+        "runtime_shared",
+        "runtime_vm"
+      ]
+    }
+  ]
+}
