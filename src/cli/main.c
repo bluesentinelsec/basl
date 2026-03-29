@@ -3481,7 +3481,11 @@ static int cmd_complexity(const char *target)
 
     if (!is_dir)
     {
-        analyze_ccn_file(target, runtime, &total_funcs, &max_ccn, &sum_ccn);
+        if (analyze_ccn_file(target, runtime, &total_funcs, &max_ccn, &sum_ccn) != 0)
+        {
+            vigil_runtime_close(&runtime);
+            return 1;
+        }
     }
     else
     {
