@@ -24,6 +24,8 @@
 #include "vigil/toml.h"
 #include "vigil/vigil.h"
 
+#include "plugin_registry.h"
+
 /* ── Shared helpers ──────────────────────────────────────────────── */
 
 static void log_cli_message(vigil_runtime_t *runtime, vigil_log_level_t level, const char *message,
@@ -152,6 +154,7 @@ static int cmd_run(const char *script_path, const char *const *script_argv, size
         vigil_native_registry_t natives;
         vigil_native_registry_init(&natives);
         vigil_stdlib_register_all(&natives, &error);
+        vigil_plugin_register_all(&natives, &error);
         status = vigil_compile_source_with_natives(&registry, source_id, &natives, &function, &diagnostics, &error);
         vigil_native_registry_free(&natives);
     }
@@ -233,6 +236,7 @@ static int cmd_check(const char *script_path)
         vigil_native_registry_t natives;
         vigil_native_registry_init(&natives);
         vigil_stdlib_register_all(&natives, &error);
+        vigil_plugin_register_all(&natives, &error);
         status = vigil_check_source(&registry, source_id, &natives, &diagnostics, &error);
         vigil_native_registry_free(&natives);
     }
@@ -554,6 +558,7 @@ static int cmd_debug(const char *script_path)
         vigil_native_registry_t natives;
         vigil_native_registry_init(&natives);
         vigil_stdlib_register_all(&natives, &error);
+        vigil_plugin_register_all(&natives, &error);
         status = vigil_compile_source_with_natives(&registry, source_id, &natives, &function, &diagnostics, &error);
         vigil_native_registry_free(&natives);
     }
@@ -1146,6 +1151,7 @@ static vigil_status_t debug_compile_source(vigil_source_registry_t *registry, vi
 
     vigil_native_registry_init(&natives);
     vigil_stdlib_register_all(&natives, error);
+    vigil_plugin_register_all(&natives, error);
     status =
         vigil_compile_source_with_debug_info(registry, source_id, &natives, out_function, diagnostics, symbols, error);
     vigil_native_registry_free(&natives);
@@ -1482,6 +1488,7 @@ static int packaged_compile_and_run(vigil_runtime_t *runtime, vigil_vm_t *vm, vi
         vigil_native_registry_t natives;
         vigil_native_registry_init(&natives);
         vigil_stdlib_register_all(&natives, &error);
+        vigil_plugin_register_all(&natives, &error);
         status = vigil_compile_source_with_natives(registry, source_id, &natives, &function, &diagnostics, &error);
         vigil_native_registry_free(&natives);
     }
@@ -2329,7 +2336,8 @@ static int repl_compile_and_run(vigil_runtime_t *runtime, const char *source_tex
                     import_text = cli_source_token_text(source, path_token, &import_length);
                     if (!import_text || import_length < 2)
                         break;
-                    if (!vigil_stdlib_is_known_module(import_text + 1, import_length - 2))
+                    if (!vigil_stdlib_is_known_module(import_text + 1, import_length - 2) &&
+                        !vigil_plugin_is_known_module(import_text + 1, import_length - 2))
                     {
                         vigil_string_t import_path;
                         vigil_string_init(&import_path, runtime);
@@ -2356,6 +2364,7 @@ static int repl_compile_and_run(vigil_runtime_t *runtime, const char *source_tex
         vigil_object_t *function = NULL;
         vigil_native_registry_init(&natives);
         vigil_stdlib_register_all(&natives, &error);
+        vigil_plugin_register_all(&natives, &error);
         status = vigil_compile_source_repl(&registry, source_id, &natives, &function, out_has_statements, &diagnostics,
                                            &error);
         vigil_native_registry_free(&natives);

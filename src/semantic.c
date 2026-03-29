@@ -8,6 +8,8 @@
 #include "vigil/stdlib.h"
 #include "vigil/value.h"
 
+#include "plugin_registry.h"
+
 /* ── Type Utilities ───────────────────────────────────────── */
 
 vigil_semantic_type_t vigil_semantic_type_invalid(void)
@@ -423,6 +425,7 @@ vigil_status_t vigil_semantic_index_analyze(vigil_semantic_index_t *index, vigil
     /* Initialize natives and file symbols. */
     vigil_native_registry_init(&natives);
     vigil_stdlib_register_all(&natives, error);
+    vigil_plugin_register_all(&natives, error);
     vigil_debug_symbol_table_init(&file_symbols, index->runtime);
     symbols_initialized = 1;
 

@@ -8,6 +8,8 @@
 #include "vigil/stdlib.h"
 #include "vigil/token.h"
 
+#include "plugin_registry.h"
+
 static void set_cli_frontend_error(vigil_error_t *error, vigil_status_t type, const char *message)
 {
     if (error == NULL)
@@ -278,6 +280,8 @@ static int register_single_import(import_register_context_t *context, const vigi
     if (import_text == NULL || import_length < 2U)
         return 1;
     if (vigil_stdlib_is_known_module(import_text + 1U, import_length - 2U))
+        return 1;
+    if (vigil_plugin_is_known_module(import_text + 1U, import_length - 2U))
         return 1;
 
     vigil_string_init(&import_path, context->runtime);

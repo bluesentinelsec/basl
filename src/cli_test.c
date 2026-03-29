@@ -14,6 +14,8 @@
 #include "vigil/stdlib.h"
 #include "vigil/vigil.h"
 
+#include "plugin_registry.h"
+
 typedef struct
 {
     char name[256];
@@ -291,6 +293,7 @@ static vigil_status_t compile_test_source(vigil_source_registry_t *registry, vig
 
     vigil_native_registry_init(&natives);
     vigil_stdlib_register_all(&natives, error);
+    vigil_plugin_register_all(&natives, error);
     status = vigil_compile_source_with_natives(registry, source_id, &natives, out_function, diagnostics, error);
     vigil_native_registry_free(&natives);
     return status;
