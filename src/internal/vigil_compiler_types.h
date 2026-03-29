@@ -303,12 +303,40 @@ typedef struct vigil_statement_result
     int guaranteed_return;
 } vigil_statement_result_t;
 
+typedef enum vigil_lowered_operand_kind
+{
+    VIGIL_LOWERED_OPERAND_U32 = 0,
+    VIGIL_LOWERED_OPERAND_I8 = 1,
+    VIGIL_LOWERED_OPERAND_U8 = 2
+} vigil_lowered_operand_kind_t;
+
+typedef struct vigil_lowered_operand
+{
+    vigil_lowered_operand_kind_t kind;
+    uint32_t value;
+} vigil_lowered_operand_t;
+
+typedef struct vigil_lowered_instruction
+{
+    vigil_opcode_t opcode;
+    vigil_source_span_t span;
+    vigil_lowered_operand_t operands[5];
+    uint8_t operand_count;
+} vigil_lowered_instruction_t;
+
 /* Minimal backend-facing lowered body artifact.
  * The semantic layer owns production of this validated body representation,
  * and the current bytecode backend materializes function objects from it. */
 typedef struct vigil_lowered_function_body
 {
-    vigil_chunk_t chunk;
+    vigil_runtime_t *runtime;
+    vigil_lowered_instruction_t *instructions;
+    size_t instruction_count;
+    size_t instruction_capacity;
+    vigil_value_t *constants;
+    size_t constant_count;
+    size_t constant_capacity;
+    vigil_debug_local_table_t debug_locals;
     size_t function_index;
     int guaranteed_return;
 } vigil_lowered_function_body_t;
