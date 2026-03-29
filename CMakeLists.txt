@@ -183,7 +183,7 @@ option(VIGIL_PLUGINS "Build plugins from plugins/ directory" ON)
 
 set(VIGIL_PLUGIN_SOURCES "")
 set(VIGIL_PLUGIN_EXTERN_DECLS "")
-set(VIGIL_PLUGIN_TABLE_ENTRIES "")
+set(VIGIL_PLUGIN_TABLE_FILL "")
 set(VIGIL_PLUGIN_COUNT 0)
 
 if(VIGIL_PLUGINS)
@@ -211,8 +211,8 @@ if(VIGIL_PLUGINS)
 
             string(APPEND VIGIL_PLUGIN_EXTERN_DECLS
                 "extern VIGIL_API const vigil_native_module_t vigil_plugin_${_PLUG_NAME};\n")
-            string(APPEND VIGIL_PLUGIN_TABLE_ENTRIES
-                "    {\"${_PLUG_NAME}\", ${_plug_name_len}U, &vigil_plugin_${_PLUG_NAME}},\n")
+            string(APPEND VIGIL_PLUGIN_TABLE_FILL
+                "    table[i].name = \"${_PLUG_NAME}\"; table[i].name_length = ${_plug_name_len}U; table[i].module = &vigil_plugin_${_PLUG_NAME}; i++;\n")
 
             # Track libraries to link later.
             foreach(_lib ${_PLUG_LIBRARIES})

@@ -15,6 +15,9 @@ extern "C"
 
 @VIGIL_PLUGIN_EXTERN_DECLS@
 
+/* Number of real plugin entries. */
+#define VIGIL_PLUGIN_COUNT (@VIGIL_PLUGIN_COUNT@U)
+
 typedef struct vigil_plugin_entry
 {
     const char *name;
@@ -22,21 +25,23 @@ typedef struct vigil_plugin_entry
     const vigil_native_module_t *module;
 } vigil_plugin_entry_t;
 
-static const vigil_plugin_entry_t vigil_plugin_table_[] = {
-@VIGIL_PLUGIN_TABLE_ENTRIES@
-    {NULL, 0U, NULL} /* sentinel */
-};
-
-/* Number of real (non-sentinel) plugin entries. */
-#define VIGIL_PLUGIN_COUNT (@VIGIL_PLUGIN_COUNT@U)
+static inline void vigil_plugin_fill_table_(vigil_plugin_entry_t *table)
+{
+    size_t i = 0;
+    (void)i;
+    (void)table;
+@VIGIL_PLUGIN_TABLE_FILL@
+}
 
 static inline int vigil_plugin_is_known_module(const char *name, size_t name_length)
 {
+    vigil_plugin_entry_t table[@VIGIL_PLUGIN_COUNT@U + 1U];
     size_t i;
+    vigil_plugin_fill_table_(table);
     for (i = 0U; i < VIGIL_PLUGIN_COUNT; i++)
     {
-        if (vigil_plugin_table_[i].name_length == name_length &&
-            memcmp(vigil_plugin_table_[i].name, name, name_length) == 0)
+        if (table[i].name_length == name_length &&
+            memcmp(table[i].name, name, name_length) == 0)
             return 1;
     }
     return 0;
@@ -44,10 +49,12 @@ static inline int vigil_plugin_is_known_module(const char *name, size_t name_len
 
 static inline vigil_status_t vigil_plugin_register_all(vigil_native_registry_t *registry, vigil_error_t *error)
 {
+    vigil_plugin_entry_t table[@VIGIL_PLUGIN_COUNT@U + 1U];
     size_t i;
+    vigil_plugin_fill_table_(table);
     for (i = 0U; i < VIGIL_PLUGIN_COUNT; i++)
     {
-        vigil_status_t s = vigil_native_registry_add(registry, vigil_plugin_table_[i].module, error);
+        vigil_status_t s = vigil_native_registry_add(registry, table[i].module, error);
         if (s != VIGIL_STATUS_OK)
             return s;
     }
