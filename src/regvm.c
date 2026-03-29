@@ -2873,6 +2873,96 @@ tr_fail:
 #endif
 #endif
 
+static inline int regvm_try_add_i64(int64_t left, int64_t right, int64_t *out_result)
+{
+#if defined(__has_builtin)
+#if __has_builtin(__builtin_add_overflow)
+    return !__builtin_add_overflow(left, right, out_result);
+#endif
+#endif
+    return vigil_vm_checked_add(left, right, out_result) == VIGIL_STATUS_OK;
+}
+
+static inline int regvm_try_subtract_i64(int64_t left, int64_t right, int64_t *out_result)
+{
+#if defined(__has_builtin)
+#if __has_builtin(__builtin_sub_overflow)
+    return !__builtin_sub_overflow(left, right, out_result);
+#endif
+#endif
+    return vigil_vm_checked_subtract(left, right, out_result) == VIGIL_STATUS_OK;
+}
+
+static inline int regvm_try_multiply_i64(int64_t left, int64_t right, int64_t *out_result)
+{
+#if defined(__has_builtin)
+#if __has_builtin(__builtin_mul_overflow)
+    return !__builtin_mul_overflow(left, right, out_result);
+#endif
+#endif
+    return vigil_vm_checked_multiply(left, right, out_result) == VIGIL_STATUS_OK;
+}
+
+static inline int regvm_try_add_u64(uint64_t left, uint64_t right, uint64_t *out_result)
+{
+#if defined(__has_builtin)
+#if __has_builtin(__builtin_add_overflow)
+    return !__builtin_add_overflow(left, right, out_result);
+#endif
+#endif
+    return vigil_vm_checked_uadd(left, right, out_result) == VIGIL_STATUS_OK;
+}
+
+static inline int regvm_try_subtract_u64(uint64_t left, uint64_t right, uint64_t *out_result)
+{
+    if (left < right)
+        return 0;
+    *out_result = left - right;
+    return 1;
+}
+
+static inline int regvm_try_multiply_u64(uint64_t left, uint64_t right, uint64_t *out_result)
+{
+#if defined(__has_builtin)
+#if __has_builtin(__builtin_mul_overflow)
+    return !__builtin_mul_overflow(left, right, out_result);
+#endif
+#endif
+    return vigil_vm_checked_umultiply(left, right, out_result) == VIGIL_STATUS_OK;
+}
+
+static inline int regvm_try_divide_i64(int64_t left, int64_t right, int64_t *out_result)
+{
+    if (right == 0 || (left == INT64_MIN && right == -1))
+        return 0;
+    *out_result = left / right;
+    return 1;
+}
+
+static inline int regvm_try_divide_u64(uint64_t left, uint64_t right, uint64_t *out_result)
+{
+    if (right == 0U)
+        return 0;
+    *out_result = left / right;
+    return 1;
+}
+
+static inline int regvm_try_modulo_i64(int64_t left, int64_t right, int64_t *out_result)
+{
+    if (right == 0 || (left == INT64_MIN && right == -1))
+        return 0;
+    *out_result = left % right;
+    return 1;
+}
+
+static inline int regvm_try_modulo_u64(uint64_t left, uint64_t right, uint64_t *out_result)
+{
+    if (right == 0U)
+        return 0;
+    *out_result = left % right;
+    return 1;
+}
+
 /* ── Defer drain helper ────────────────────────────────────────── */
 // NOLINTNEXTLINE(readability-function-cognitive-complexity)
 static vigil_status_t regvm_drain_defers(vigil_vm_t *vm, size_t frame_idx, vigil_error_t *error)
@@ -3465,7 +3555,7 @@ r_dispatch_switch_check:
         int64_t a = regvm_decode_int(R[VREG_GET_B(i)]);
         int64_t b = regvm_decode_int(R[VREG_GET_C(i)]);
         int64_t r;
-        if (VIGIL_UNLIKELY(vigil_vm_checked_add(a, b, &r) != VIGIL_STATUS_OK))
+        if (VIGIL_UNLIKELY(!regvm_try_add_i64(a, b, &r)))
             goto r_overflow;
         RSTORE(VREG_GET_A(i), vigil_nanbox_encode_int(r));
         RNEXT();
@@ -3476,7 +3566,7 @@ r_dispatch_switch_check:
         int64_t a = regvm_decode_int(R[VREG_GET_B(i)]);
         int64_t b = regvm_decode_int(R[VREG_GET_C(i)]);
         int64_t r;
-        if (VIGIL_UNLIKELY(vigil_vm_checked_subtract(a, b, &r) != VIGIL_STATUS_OK))
+        if (VIGIL_UNLIKELY(!regvm_try_subtract_i64(a, b, &r)))
             goto r_overflow;
         RSTORE(VREG_GET_A(i), vigil_nanbox_encode_int(r));
         RNEXT();
@@ -3487,7 +3577,7 @@ r_dispatch_switch_check:
         int64_t a = regvm_decode_int(R[VREG_GET_B(i)]);
         int64_t b = regvm_decode_int(R[VREG_GET_C(i)]);
         int64_t r;
-        if (VIGIL_UNLIKELY(vigil_vm_checked_multiply(a, b, &r) != VIGIL_STATUS_OK))
+        if (VIGIL_UNLIKELY(!regvm_try_multiply_i64(a, b, &r)))
             goto r_overflow;
         RSTORE(VREG_GET_A(i), vigil_nanbox_encode_int(r));
         RNEXT();
@@ -3500,7 +3590,7 @@ r_dispatch_switch_check:
         if (VIGIL_UNLIKELY(b == 0))
             goto r_divzero;
         int64_t r;
-        if (VIGIL_UNLIKELY(vigil_vm_checked_divide(a, b, &r) != VIGIL_STATUS_OK))
+        if (VIGIL_UNLIKELY(!regvm_try_divide_i64(a, b, &r)))
             goto r_overflow;
         RSTORE(VREG_GET_A(i), vigil_nanbox_encode_int(r));
         RNEXT();
@@ -3513,7 +3603,7 @@ r_dispatch_switch_check:
         if (VIGIL_UNLIKELY(b == 0))
             goto r_divzero;
         int64_t r;
-        if (VIGIL_UNLIKELY(vigil_vm_checked_modulo(a, b, &r) != VIGIL_STATUS_OK))
+        if (VIGIL_UNLIKELY(!regvm_try_modulo_i64(a, b, &r)))
             goto r_overflow;
         RSTORE(VREG_GET_A(i), vigil_nanbox_encode_int(r));
         RNEXT();
@@ -3657,7 +3747,7 @@ r_dispatch_switch_check:
         int64_t v = regvm_decode_int(R[VREG_GET_A(i)]);
         int64_t delta = (int64_t)(int8_t)VREG_GET_B(i);
         int64_t r;
-        if (VIGIL_UNLIKELY(vigil_vm_checked_add(v, delta, &r) != VIGIL_STATUS_OK))
+        if (VIGIL_UNLIKELY(!regvm_try_add_i64(v, delta, &r)))
             goto r_overflow;
         RSTORE(VREG_GET_A(i), vigil_nanbox_encode_int(r));
         RNEXT();
@@ -3899,7 +3989,7 @@ r_dispatch_switch_check:
         int64_t limit = regvm_decode_int(*kv);
         int64_t val = regvm_decode_int(R[idx]);
         int64_t r;
-        if (VIGIL_UNLIKELY(vigil_vm_checked_add(val, delta, &r) != VIGIL_STATUS_OK))
+        if (VIGIL_UNLIKELY(!regvm_try_add_i64(val, delta, &r)))
             goto r_overflow;
         RSTORE(idx, vigil_nanbox_encode_int(r));
         int cont = 0;
@@ -3938,7 +4028,7 @@ r_dispatch_switch_check:
         if (vigil_nanbox_is_uint(R[ra]) || vigil_nanbox_is_uint(R[rb]))
         {
             uint64_t a = regvm_decode_uint(R[ra]), b = regvm_decode_uint(R[rb]), r;
-            if (VIGIL_LIKELY(vigil_vm_checked_uadd(a, b, &r) == VIGIL_STATUS_OK))
+            if (VIGIL_LIKELY(regvm_try_add_u64(a, b, &r)))
             {
                 RRELEASE(rd);
                 R[rd] = regvm_encode_uint(r);
@@ -3950,7 +4040,7 @@ r_dispatch_switch_check:
         if (vigil_nanbox_is_int(R[ra]) && vigil_nanbox_is_int(R[rb]))
         {
             int64_t a = regvm_decode_int(R[ra]), b = regvm_decode_int(R[rb]), r;
-            if (VIGIL_LIKELY(vigil_vm_checked_add(a, b, &r) == VIGIL_STATUS_OK))
+            if (VIGIL_LIKELY(regvm_try_add_i64(a, b, &r)))
             {
                 RRELEASE(rd);
                 R[rd] = regvm_encode_int(r);
@@ -3989,7 +4079,7 @@ r_dispatch_switch_check:
         if (vigil_nanbox_is_uint(R[ra]) || vigil_nanbox_is_uint(R[rb]))
         {
             uint64_t a = regvm_decode_uint(R[ra]), b = regvm_decode_uint(R[rb]), r;
-            if (VIGIL_LIKELY(vigil_vm_checked_usubtract(a, b, &r) == VIGIL_STATUS_OK))
+            if (VIGIL_LIKELY(regvm_try_subtract_u64(a, b, &r)))
             {
                 RRELEASE(rd);
                 R[rd] = regvm_encode_uint(r);
@@ -4001,7 +4091,7 @@ r_dispatch_switch_check:
         if (vigil_nanbox_is_int(R[ra]) && vigil_nanbox_is_int(R[rb]))
         {
             int64_t a = regvm_decode_int(R[ra]), b = regvm_decode_int(R[rb]), r;
-            if (VIGIL_LIKELY(vigil_vm_checked_subtract(a, b, &r) == VIGIL_STATUS_OK))
+            if (VIGIL_LIKELY(regvm_try_subtract_i64(a, b, &r)))
             {
                 RRELEASE(rd);
                 R[rd] = regvm_encode_int(r);
@@ -4026,7 +4116,7 @@ r_dispatch_switch_check:
         if (vigil_nanbox_is_uint(R[ra]) || vigil_nanbox_is_uint(R[rb]))
         {
             uint64_t a = regvm_decode_uint(R[ra]), b = regvm_decode_uint(R[rb]), r;
-            if (VIGIL_LIKELY(vigil_vm_checked_umultiply(a, b, &r) == VIGIL_STATUS_OK))
+            if (VIGIL_LIKELY(regvm_try_multiply_u64(a, b, &r)))
             {
                 RRELEASE(rd);
                 R[rd] = regvm_encode_uint(r);
@@ -4038,7 +4128,7 @@ r_dispatch_switch_check:
         if (vigil_nanbox_is_int(R[ra]) && vigil_nanbox_is_int(R[rb]))
         {
             int64_t a = regvm_decode_int(R[ra]), b = regvm_decode_int(R[rb]), r;
-            if (VIGIL_LIKELY(vigil_vm_checked_multiply(a, b, &r) == VIGIL_STATUS_OK))
+            if (VIGIL_LIKELY(regvm_try_multiply_i64(a, b, &r)))
             {
                 RRELEASE(rd);
                 R[rd] = regvm_encode_int(r);
@@ -4065,7 +4155,7 @@ r_dispatch_switch_check:
             uint64_t a = regvm_decode_uint(R[ra]), b = regvm_decode_uint(R[rb]), r;
             if (VIGIL_UNLIKELY(b == 0))
                 goto r_divzero;
-            if (VIGIL_LIKELY(vigil_vm_checked_udivide(a, b, &r) == VIGIL_STATUS_OK))
+            if (VIGIL_LIKELY(regvm_try_divide_u64(a, b, &r)))
             {
                 RRELEASE(rd);
                 R[rd] = regvm_encode_uint(r);
@@ -4079,7 +4169,7 @@ r_dispatch_switch_check:
             int64_t a = regvm_decode_int(R[ra]), b = regvm_decode_int(R[rb]), r;
             if (VIGIL_UNLIKELY(b == 0))
                 goto r_divzero;
-            if (VIGIL_LIKELY(vigil_vm_checked_divide(a, b, &r) == VIGIL_STATUS_OK))
+            if (VIGIL_LIKELY(regvm_try_divide_i64(a, b, &r)))
             {
                 RRELEASE(rd);
                 R[rd] = regvm_encode_int(r);
@@ -4106,7 +4196,7 @@ r_dispatch_switch_check:
             uint64_t a = regvm_decode_uint(R[ra]), b = regvm_decode_uint(R[rb]), r;
             if (VIGIL_UNLIKELY(b == 0))
                 goto r_divzero;
-            if (VIGIL_LIKELY(vigil_vm_checked_umodulo(a, b, &r) == VIGIL_STATUS_OK))
+            if (VIGIL_LIKELY(regvm_try_modulo_u64(a, b, &r)))
             {
                 RRELEASE(rd);
                 R[rd] = regvm_encode_uint(r);
@@ -4120,7 +4210,7 @@ r_dispatch_switch_check:
             int64_t a = regvm_decode_int(R[ra]), b = regvm_decode_int(R[rb]), r;
             if (VIGIL_UNLIKELY(b == 0))
                 goto r_divzero;
-            if (VIGIL_LIKELY(vigil_vm_checked_modulo(a, b, &r) == VIGIL_STATUS_OK))
+            if (VIGIL_LIKELY(regvm_try_modulo_i64(a, b, &r)))
             {
                 RRELEASE(rd);
                 R[rd] = regvm_encode_int(r);
