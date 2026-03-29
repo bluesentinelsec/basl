@@ -356,6 +356,341 @@ static vigil_status_t finalize_function_body_return_analysis(vigil_program_state
                                                   vigil_statement_result_guarantees_return(body_result));
 }
 
+static uint32_t decode_lowered_u32(const uint8_t *bytes, size_t offset)
+{
+    uint32_t value;
+
+    value = (uint32_t)bytes[offset];
+    value |= (uint32_t)bytes[offset + 1U] << 8U;
+    value |= (uint32_t)bytes[offset + 2U] << 16U;
+    value |= (uint32_t)bytes[offset + 3U] << 24U;
+    return value;
+}
+
+static void vigil_lowered_instruction_clear(vigil_lowered_instruction_t *instruction)
+{
+    if (instruction == NULL)
+        return;
+    memset(instruction, 0, sizeof(*instruction));
+}
+
+static void vigil_lowered_instruction_add_operand(vigil_lowered_instruction_t *instruction,
+                                                  vigil_lowered_operand_kind_t kind, uint32_t value)
+{
+    uint8_t operand_index;
+
+    if (instruction == NULL || instruction->operand_count >= 5U)
+        return;
+
+    operand_index = instruction->operand_count;
+    instruction->operands[operand_index].kind = kind;
+    instruction->operands[operand_index].value = value;
+    instruction->operand_count += 1U;
+}
+
+static vigil_status_t vigil_lowered_function_body_reserve(vigil_lowered_function_body_t *body, size_t minimum_capacity,
+                                                          vigil_error_t *error)
+{
+    vigil_lowered_instruction_t *instructions;
+    void *memory = NULL;
+    size_t new_capacity;
+    vigil_status_t status;
+
+    if (body->instruction_capacity >= minimum_capacity)
+        return VIGIL_STATUS_OK;
+
+    new_capacity = body->instruction_capacity == 0U ? 16U : body->instruction_capacity;
+    while (new_capacity < minimum_capacity)
+    {
+        if (new_capacity > SIZE_MAX / 2U)
+        {
+            vigil_error_set_literal(error, VIGIL_STATUS_OUT_OF_MEMORY, "lowered instruction capacity overflow");
+            return VIGIL_STATUS_OUT_OF_MEMORY;
+        }
+        new_capacity *= 2U;
+    }
+
+    if (body->instructions == NULL)
+    {
+        status = vigil_runtime_alloc(body->runtime, new_capacity * sizeof(*body->instructions), &memory, error);
+    }
+    else
+    {
+        memory = body->instructions;
+        status = vigil_runtime_realloc(body->runtime, &memory, new_capacity * sizeof(*body->instructions), error);
+    }
+    if (status != VIGIL_STATUS_OK)
+        return status;
+
+    instructions = (vigil_lowered_instruction_t *)memory;
+    body->instructions = instructions;
+    body->instruction_capacity = new_capacity;
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t vigil_lowered_function_body_append(vigil_lowered_function_body_t *body,
+                                                         const vigil_lowered_instruction_t *instruction,
+                                                         vigil_error_t *error)
+{
+    vigil_status_t status;
+
+    status = vigil_lowered_function_body_reserve(body, body->instruction_count + 1U, error);
+    if (status != VIGIL_STATUS_OK)
+        return status;
+
+    body->instructions[body->instruction_count] = *instruction;
+    body->instruction_count += 1U;
+    return VIGIL_STATUS_OK;
+}
+
+static int vigil_lowered_opcode_has_u32_operand(vigil_opcode_t opcode)
+{
+    switch (opcode)
+    {
+    case VIGIL_OPCODE_CONSTANT:
+    case VIGIL_OPCODE_GET_LOCAL:
+    case VIGIL_OPCODE_SET_LOCAL:
+    case VIGIL_OPCODE_GET_GLOBAL:
+    case VIGIL_OPCODE_SET_GLOBAL:
+    case VIGIL_OPCODE_GET_FUNCTION:
+    case VIGIL_OPCODE_GET_CAPTURE:
+    case VIGIL_OPCODE_SET_CAPTURE:
+    case VIGIL_OPCODE_JUMP:
+    case VIGIL_OPCODE_JUMP_IF_FALSE:
+    case VIGIL_OPCODE_LOOP:
+    case VIGIL_OPCODE_FORMAT_F64:
+    case VIGIL_OPCODE_GET_FIELD:
+    case VIGIL_OPCODE_SET_FIELD:
+    case VIGIL_OPCODE_ADD_F64_STORE:
+    case VIGIL_OPCODE_SUBTRACT_F64_STORE:
+    case VIGIL_OPCODE_MULTIPLY_F64_STORE:
+    case VIGIL_OPCODE_LESS_I32_JUMP_IF_FALSE:
+    case VIGIL_OPCODE_LESS_EQUAL_I32_JUMP_IF_FALSE:
+    case VIGIL_OPCODE_GREATER_I32_JUMP_IF_FALSE:
+    case VIGIL_OPCODE_GREATER_EQUAL_I32_JUMP_IF_FALSE:
+    case VIGIL_OPCODE_EQUAL_I32_JUMP_IF_FALSE:
+    case VIGIL_OPCODE_NOT_EQUAL_I32_JUMP_IF_FALSE:
+    case VIGIL_OPCODE_LESS_I64_JUMP_IF_FALSE:
+    case VIGIL_OPCODE_LESS_EQUAL_I64_JUMP_IF_FALSE:
+    case VIGIL_OPCODE_GREATER_I64_JUMP_IF_FALSE:
+    case VIGIL_OPCODE_GREATER_EQUAL_I64_JUMP_IF_FALSE:
+    case VIGIL_OPCODE_EQUAL_I64_JUMP_IF_FALSE:
+    case VIGIL_OPCODE_NOT_EQUAL_I64_JUMP_IF_FALSE:
+    case VIGIL_OPCODE_RETURN:
+    case VIGIL_OPCODE_DEFER_CALL_VALUE:
+        return 1;
+    default:
+        return 0;
+    }
+}
+
+static int vigil_lowered_opcode_has_two_u32_operands(vigil_opcode_t opcode)
+{
+    switch (opcode)
+    {
+    case VIGIL_OPCODE_NEW_INSTANCE:
+    case VIGIL_OPCODE_NEW_ARRAY:
+    case VIGIL_OPCODE_NEW_MAP:
+    case VIGIL_OPCODE_DEFER_NEW_INSTANCE:
+    case VIGIL_OPCODE_FORMAT_SPEC:
+    case VIGIL_OPCODE_CALL_SELF:
+    case VIGIL_OPCODE_TAIL_CALL:
+    case VIGIL_OPCODE_NEW_CLOSURE:
+    case VIGIL_OPCODE_CALL_VALUE:
+    case VIGIL_OPCODE_LOCALS_ADD_I64:
+    case VIGIL_OPCODE_LOCALS_SUBTRACT_I64:
+    case VIGIL_OPCODE_LOCALS_MULTIPLY_I64:
+    case VIGIL_OPCODE_LOCALS_MODULO_I64:
+    case VIGIL_OPCODE_LOCALS_LESS_I64:
+    case VIGIL_OPCODE_LOCALS_LESS_EQUAL_I64:
+    case VIGIL_OPCODE_LOCALS_GREATER_I64:
+    case VIGIL_OPCODE_LOCALS_GREATER_EQUAL_I64:
+    case VIGIL_OPCODE_LOCALS_EQUAL_I64:
+    case VIGIL_OPCODE_LOCALS_NOT_EQUAL_I64:
+    case VIGIL_OPCODE_LOCALS_ADD_F64:
+    case VIGIL_OPCODE_LOCALS_SUBTRACT_F64:
+    case VIGIL_OPCODE_LOCALS_MULTIPLY_F64:
+        return 1;
+    default:
+        return 0;
+    }
+}
+
+static int vigil_lowered_opcode_has_three_u32_operands(vigil_opcode_t opcode)
+{
+    switch (opcode)
+    {
+    case VIGIL_OPCODE_CALL:
+    case VIGIL_OPCODE_DEFER_CALL:
+    case VIGIL_OPCODE_CALL_NATIVE:
+    case VIGIL_OPCODE_DEFER_CALL_NATIVE:
+    case VIGIL_OPCODE_CALL_EXTERN:
+    case VIGIL_OPCODE_DEFER_CALL_INTERFACE:
+    case VIGIL_OPCODE_LOCALS_ADD_I32_STORE:
+    case VIGIL_OPCODE_LOCALS_SUBTRACT_I32_STORE:
+    case VIGIL_OPCODE_LOCALS_MULTIPLY_I32_STORE:
+    case VIGIL_OPCODE_LOCALS_LESS_I32_STORE:
+    case VIGIL_OPCODE_LOCALS_LESS_EQUAL_I32_STORE:
+    case VIGIL_OPCODE_LOCALS_GREATER_I32_STORE:
+    case VIGIL_OPCODE_LOCALS_GREATER_EQUAL_I32_STORE:
+    case VIGIL_OPCODE_LOCALS_EQUAL_I32_STORE:
+    case VIGIL_OPCODE_LOCALS_NOT_EQUAL_I32_STORE:
+    case VIGIL_OPCODE_LOCALS_MODULO_I32_STORE:
+    case VIGIL_OPCODE_LOCALS_ADD_F64_STORE:
+    case VIGIL_OPCODE_LOCALS_SUBTRACT_F64_STORE:
+    case VIGIL_OPCODE_LOCALS_MULTIPLY_F64_STORE:
+        return 1;
+    default:
+        return 0;
+    }
+}
+
+static int vigil_lowered_opcode_has_four_u32_operands(vigil_opcode_t opcode)
+{
+    return opcode == VIGIL_OPCODE_CALL_INTERFACE;
+}
+
+static int vigil_lowered_opcode_has_local_delta_operands(vigil_opcode_t opcode)
+{
+    return opcode == VIGIL_OPCODE_INCREMENT_LOCAL_I32 || opcode == VIGIL_OPCODE_INCREMENT_LOCAL_I64;
+}
+
+static int vigil_lowered_opcode_has_forloop_operands(vigil_opcode_t opcode)
+{
+    return opcode == VIGIL_OPCODE_FORLOOP_I32 || opcode == VIGIL_OPCODE_FORLOOP_I64;
+}
+
+static vigil_status_t vigil_decode_u32_operands(const vigil_chunk_t *chunk, size_t *offset,
+                                                vigil_lowered_instruction_t *instruction, uint8_t operand_count,
+                                                vigil_error_t *error)
+{
+    const uint8_t *code;
+    size_t instruction_end;
+    size_t operand_index;
+
+    code = vigil_chunk_code(chunk);
+    instruction_end = *offset + 1U + (size_t)operand_count * 4U;
+    if (instruction_end > vigil_chunk_code_size(chunk))
+    {
+        vigil_error_set_literal(error, VIGIL_STATUS_INTERNAL, "truncated lowered instruction");
+        return VIGIL_STATUS_INTERNAL;
+    }
+
+    for (operand_index = 0U; operand_index < operand_count; operand_index += 1U)
+    {
+        uint32_t operand = decode_lowered_u32(code, *offset + 1U + operand_index * 4U);
+        vigil_lowered_instruction_add_operand(instruction, VIGIL_LOWERED_OPERAND_U32, operand);
+    }
+
+    *offset = instruction_end;
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t vigil_decode_mixed_operands(const vigil_chunk_t *chunk, size_t *offset,
+                                                  vigil_lowered_instruction_t *instruction, vigil_error_t *error)
+{
+    const uint8_t *code;
+    size_t instruction_end;
+
+    code = vigil_chunk_code(chunk);
+
+    if (vigil_lowered_opcode_has_local_delta_operands(instruction->opcode))
+    {
+        instruction_end = *offset + 6U;
+        if (instruction_end > vigil_chunk_code_size(chunk))
+        {
+            vigil_error_set_literal(error, VIGIL_STATUS_INTERNAL, "truncated lowered increment instruction");
+            return VIGIL_STATUS_INTERNAL;
+        }
+        vigil_lowered_instruction_add_operand(instruction, VIGIL_LOWERED_OPERAND_U32,
+                                              decode_lowered_u32(code, *offset + 1U));
+        vigil_lowered_instruction_add_operand(instruction, VIGIL_LOWERED_OPERAND_I8, code[*offset + 5U]);
+        *offset = instruction_end;
+        return VIGIL_STATUS_OK;
+    }
+
+    instruction_end = *offset + 15U;
+    if (instruction_end > vigil_chunk_code_size(chunk))
+    {
+        vigil_error_set_literal(error, VIGIL_STATUS_INTERNAL, "truncated lowered for-loop instruction");
+        return VIGIL_STATUS_INTERNAL;
+    }
+
+    vigil_lowered_instruction_add_operand(instruction, VIGIL_LOWERED_OPERAND_U32,
+                                          decode_lowered_u32(code, *offset + 1U));
+    vigil_lowered_instruction_add_operand(instruction, VIGIL_LOWERED_OPERAND_I8, code[*offset + 5U]);
+    vigil_lowered_instruction_add_operand(instruction, VIGIL_LOWERED_OPERAND_U32,
+                                          decode_lowered_u32(code, *offset + 6U));
+    vigil_lowered_instruction_add_operand(instruction, VIGIL_LOWERED_OPERAND_U8, code[*offset + 10U]);
+    vigil_lowered_instruction_add_operand(instruction, VIGIL_LOWERED_OPERAND_U32,
+                                          decode_lowered_u32(code, *offset + 11U));
+    *offset = instruction_end;
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t vigil_decode_lowered_instruction(const vigil_chunk_t *chunk, size_t *offset,
+                                                       vigil_lowered_instruction_t *instruction, vigil_error_t *error)
+{
+    size_t operand_count = 0U;
+
+    vigil_lowered_instruction_clear(instruction);
+    instruction->span = vigil_chunk_span_at(chunk, *offset);
+    instruction->opcode = (vigil_opcode_t)vigil_chunk_code(chunk)[*offset];
+
+    if (vigil_lowered_opcode_has_u32_operand(instruction->opcode))
+        operand_count = 1U;
+    else if (vigil_lowered_opcode_has_two_u32_operands(instruction->opcode))
+        operand_count = 2U;
+    else if (vigil_lowered_opcode_has_three_u32_operands(instruction->opcode))
+        operand_count = 3U;
+    else if (vigil_lowered_opcode_has_four_u32_operands(instruction->opcode))
+        operand_count = 4U;
+    else if (vigil_lowered_opcode_has_local_delta_operands(instruction->opcode) ||
+             vigil_lowered_opcode_has_forloop_operands(instruction->opcode))
+        return vigil_decode_mixed_operands(chunk, offset, instruction, error);
+
+    if (operand_count == 0U)
+    {
+        *offset += 1U;
+        return VIGIL_STATUS_OK;
+    }
+
+    return vigil_decode_u32_operands(chunk, offset, instruction, (uint8_t)operand_count, error);
+}
+
+static vigil_status_t vigil_lowered_function_body_decode_chunk(vigil_lowered_function_body_t *body,
+                                                               const vigil_chunk_t *chunk, vigil_error_t *error)
+{
+    vigil_status_t status;
+    vigil_lowered_instruction_t instruction;
+    size_t offset = 0U;
+
+    while (offset < vigil_chunk_code_size(chunk))
+    {
+        status = vigil_decode_lowered_instruction(chunk, &offset, &instruction, error);
+        if (status != VIGIL_STATUS_OK)
+            return status;
+        status = vigil_lowered_function_body_append(body, &instruction, error);
+        if (status != VIGIL_STATUS_OK)
+            return status;
+    }
+
+    return VIGIL_STATUS_OK;
+}
+
+static void vigil_lowered_function_body_take_chunk_metadata(vigil_lowered_function_body_t *body, vigil_chunk_t *chunk)
+{
+    body->constants = chunk->constants;
+    body->constant_count = chunk->constant_count;
+    body->constant_capacity = chunk->constant_capacity;
+    chunk->constants = NULL;
+    chunk->constant_count = 0U;
+    chunk->constant_capacity = 0U;
+
+    body->debug_locals = chunk->debug_locals;
+    memset(&chunk->debug_locals, 0, sizeof(chunk->debug_locals));
+}
+
 static vigil_status_t try_check_constructor_or_extern(vigil_program_state_t *program, size_t function_index,
                                                       int *handled)
 {
@@ -623,12 +958,25 @@ void vigil_lowered_function_body_init(vigil_lowered_function_body_t *body)
 
 void vigil_lowered_function_body_free(vigil_lowered_function_body_t *body)
 {
+    size_t constant_index;
+    void *memory;
+
     if (body == NULL)
         return;
 
-    vigil_chunk_free(&body->chunk);
-    body->function_index = 0U;
-    body->guaranteed_return = 0;
+    memory = body->instructions;
+    if (body->runtime != NULL)
+        vigil_runtime_free(body->runtime, &memory);
+
+    for (constant_index = 0U; constant_index < body->constant_count; constant_index += 1U)
+        vigil_value_release(&body->constants[constant_index]);
+
+    memory = body->constants;
+    if (body->runtime != NULL)
+        vigil_runtime_free(body->runtime, &memory);
+
+    vigil_debug_local_table_free(&body->debug_locals);
+    memset(body, 0, sizeof(*body));
 }
 
 vigil_status_t vigil_semantic_analyze_function_body(vigil_program_state_t *program, size_t function_index,
@@ -689,6 +1037,7 @@ vigil_status_t vigil_semantic_lower_function_body(vigil_program_state_t *program
     }
 
     vigil_lowered_function_body_init(out_body);
+    out_body->runtime = program->registry->runtime;
     status = vigil_semantic_analyze_function_body(program, function_index, parent_state, &state, &body_result);
     if (status != VIGIL_STATUS_OK)
     {
@@ -697,10 +1046,19 @@ vigil_status_t vigil_semantic_lower_function_body(vigil_program_state_t *program
         return status;
     }
 
-    out_body->chunk = state.chunk;
-    memset(&state.chunk, 0, sizeof(state.chunk));
+    status = vigil_lowered_function_body_decode_chunk(out_body, &state.chunk, program->error);
+    if (status != VIGIL_STATUS_OK)
+    {
+        vigil_lowered_function_body_free(out_body);
+        vigil_chunk_free(&state.chunk);
+        vigil_parser_state_free(&state);
+        return status;
+    }
+
+    vigil_lowered_function_body_take_chunk_metadata(out_body, &state.chunk);
     out_body->function_index = function_index;
     out_body->guaranteed_return = body_result.guaranteed_return;
+    vigil_chunk_free(&state.chunk);
     vigil_parser_state_free(&state);
     return VIGIL_STATUS_OK;
 }
