@@ -7,6 +7,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "platform/platform.h"
+
 /* ── supported editors ───────────────────────────────────────────── */
 
 TEST(EditorIntegration, SupportedListIsNonEmpty)
@@ -44,13 +46,15 @@ TEST(EditorIntegration, VimInstallUninstallRoundTrip)
     EXPECT_EQ(r.status, VIGIL_STATUS_OK);
     EXPECT_EQ(vigil_editor_is_installed("vim", tmpdir), 0);
 
-    char cmd[512];
-    snprintf(cmd, sizeof(cmd), "rm -rf %s", tmpdir);
-    system(cmd);
+    vigil_platform_remove_all(tmpdir, NULL);
 }
 
 TEST(EditorIntegration, VscodeInstallUninstallRoundTrip)
 {
+    /* Skip if npm is not available (e.g., CI sanitizer containers). */
+    if (system("npm --version > /dev/null 2>&1") != 0)
+        return;
+
     char tmpdir[256];
     snprintf(tmpdir, sizeof(tmpdir), "/tmp/vigil_editor_test_vsc_%d", __LINE__);
 
@@ -62,9 +66,7 @@ TEST(EditorIntegration, VscodeInstallUninstallRoundTrip)
     EXPECT_EQ(r.status, VIGIL_STATUS_OK);
     EXPECT_EQ(vigil_editor_is_installed("vscode", tmpdir), 0);
 
-    char cmd[512];
-    snprintf(cmd, sizeof(cmd), "rm -rf %s", tmpdir);
-    system(cmd);
+    vigil_platform_remove_all(tmpdir, NULL);
 }
 
 /* ── error handling ──────────────────────────────────────────────── */

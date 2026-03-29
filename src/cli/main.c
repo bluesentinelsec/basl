@@ -3031,15 +3031,13 @@ static int early_dispatch_editor(int argc, char **argv)
     }
     subcmd = argv[2];
 
-    /* Resolve config home: XDG_CONFIG_HOME or ~/.config for vscode, HOME for vim */
+    /* Resolve home directory — used as base for all editor integrations. */
     const char *home = getenv("HOME");
-    const char *xdg = getenv("XDG_CONFIG_HOME");
-    char config_home[1024];
-    if (xdg && xdg[0])
-        snprintf(config_home, sizeof(config_home), "%s", xdg);
-    else if (home && home[0])
-        snprintf(config_home, sizeof(config_home), "%s/.config", home);
-    else
+#ifdef _WIN32
+    if (!home || !home[0])
+        home = getenv("USERPROFILE");
+#endif
+    if (!home || !home[0])
     {
         fprintf(stderr, "error: cannot determine home directory\n");
         return 1;
@@ -3056,7 +3054,7 @@ static int early_dispatch_editor(int argc, char **argv)
         printf("Supported editors:\n\n");
         for (const char *const *e = editors; *e; e++)
         {
-            /* vscode uses config_home, vim uses HOME */
+
             const char *base = home;
             int installed = vigil_editor_is_installed(*e, base);
             printf("  %-12s %s\n", *e, installed ? "installed \xe2\x9c\x93" : "not installed");
