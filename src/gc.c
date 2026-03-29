@@ -206,7 +206,7 @@ static void break_if_garbage(vigil_gc_t *gc, vigil_value_t *slot)
     if (child == NULL || child->gc_refs != 0)
         return;
     child_hdr = (gc_object_header_t *)child->object;
-    vigil_atomic_sub(&child_hdr->ref_count, 1);
+    child_hdr->ref_count -= 1;
     *slot = VIGIL_NANBOX_NIL;
 }
 
@@ -385,7 +385,7 @@ size_t vigil_gc_collect(vigil_gc_t *gc)
     for (node = gc->sentinel.next; node != &gc->sentinel; node = node->next)
     {
         header = (gc_object_header_t *)node->object;
-        node->gc_refs = vigil_atomic_load(&header->ref_count);
+        node->gc_refs = header->ref_count;
     }
 
     /* Phase 2: Subtract internal references. */
