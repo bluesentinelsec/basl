@@ -433,7 +433,11 @@ void vigil_expression_result_set_pair(vigil_expression_result_t *result, vigil_p
                                       vigil_parser_type_t second_type);
 void vigil_expression_result_set_triple(vigil_expression_result_t *result, vigil_parser_type_t first_type,
                                         vigil_parser_type_t second_type, vigil_parser_type_t third_type);
+vigil_parser_type_t vigil_expression_result_type_at(const vigil_expression_result_t *result, size_t index);
 vigil_status_t vigil_parser_parse_expression(vigil_parser_state_t *state, vigil_expression_result_t *out_result);
+vigil_status_t vigil_parser_parse_expression_with_expected_type(vigil_parser_state_t *state,
+                                                                vigil_parser_type_t expected_type,
+                                                                vigil_expression_result_t *out_result);
 vigil_status_t vigil_parser_report(vigil_parser_state_t *state, vigil_source_span_t span, const char *message);
 vigil_status_t vigil_parser_require_scalar_expression(vigil_parser_state_t *state, vigil_source_span_t span,
                                                       const vigil_expression_result_t *result, const char *message);
@@ -445,7 +449,10 @@ vigil_parser_type_t vigil_program_array_type_element(const vigil_program_state_t
 vigil_parser_type_t vigil_program_map_type_key(const vigil_program_state_t *program, vigil_parser_type_t map_type);
 vigil_parser_type_t vigil_program_map_type_value(const vigil_program_state_t *program, vigil_parser_type_t map_type);
 const vigil_token_t *vigil_parser_peek(const vigil_parser_state_t *state);
+const vigil_token_t *vigil_parser_previous(const vigil_parser_state_t *state);
 int vigil_parser_check(const vigil_parser_state_t *state, vigil_token_kind_t kind);
+int vigil_parser_match(vigil_parser_state_t *state, vigil_token_kind_t kind);
+vigil_source_span_t vigil_parser_fallback_span(const vigil_parser_state_t *state);
 vigil_status_t vigil_parser_emit_u32(vigil_parser_state_t *state, uint32_t value, vigil_source_span_t span);
 vigil_status_t vigil_compile_report(const vigil_program_state_t *program, vigil_source_span_t span,
                                     const char *message);
@@ -503,6 +510,25 @@ int vigil_enum_decl_find_member(const vigil_enum_decl_t *decl, const char *name,
                                 const vigil_enum_member_t **out_member);
 int vigil_interface_decl_find_method(const vigil_interface_decl_t *decl, const char *name, size_t name_length,
                                      size_t *out_index, const vigil_interface_method_t **out_method);
+void vigil_binding_target_list_init(vigil_binding_target_list_t *list);
+void vigil_binding_target_list_free(vigil_program_state_t *program, vigil_binding_target_list_t *list);
+vigil_status_t vigil_binding_target_list_append(vigil_program_state_t *program, vigil_binding_target_list_t *list,
+                                                vigil_parser_type_t type, const vigil_token_t *name_token,
+                                                int is_discard);
+vigil_status_t vigil_parser_parse_binding_target_list(vigil_parser_state_t *state, const char *unsupported_type_message,
+                                                      const char *non_void_message, const char *name_message,
+                                                      vigil_binding_target_list_t *targets);
+vigil_status_t vigil_parser_require_binding_initializer_shape(vigil_parser_state_t *state, vigil_source_span_t span,
+                                                              const vigil_binding_target_list_t *targets,
+                                                              const vigil_expression_result_t *initializer_result,
+                                                              const char *count_message, const char *type_message);
+vigil_status_t vigil_parser_parse_variable_declaration(vigil_parser_state_t *state,
+                                                       vigil_statement_result_t *out_result);
+vigil_status_t vigil_parser_parse_const_declaration(vigil_parser_state_t *state, vigil_statement_result_t *out_result);
+vigil_status_t vigil_parser_declare_local_symbol(vigil_parser_state_t *state, const vigil_token_t *name_token,
+                                                 vigil_parser_type_t type, int is_const, size_t *out_index);
+vigil_status_t vigil_parser_bind_targets(vigil_parser_state_t *state, const vigil_binding_target_list_t *targets,
+                                         int is_const, size_t *out_last_slot);
 vigil_status_t vigil_program_add_param(vigil_program_state_t *program, vigil_function_decl_t *decl,
                                        vigil_parser_type_t type, const vigil_token_t *name_token);
 vigil_status_t vigil_program_parse_constant_expression(vigil_program_state_t *program, size_t *cursor,
