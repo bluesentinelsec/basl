@@ -13132,7 +13132,7 @@ static vigil_status_t vigil_parser_parse_assignment_statement_internal(vigil_par
 {
     vigil_status_t status;
     assignment_target_t t;
-    const vigil_token_t *operator_token;
+    const vigil_token_t *operator_token = NULL;
     vigil_expression_result_t value_result;
     vigil_opcode_t compound_opcode;
 
