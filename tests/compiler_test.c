@@ -167,6 +167,54 @@ static void ExpectSingleCompilerDiagnostic(int *vigil_test_failed_, const char *
     EXPECT_STREQ(actual_message, expected_message);
 }
 
+static void ExpectSingleCompilerDiagnosticMulti(int *vigil_test_failed_, const struct TestSource *sources,
+                                                size_t source_count, const char *entry_path,
+                                                const char *expected_message)
+{
+    vigil_runtime_t *runtime = NULL;
+    vigil_error_t error = {0};
+    vigil_source_registry_t registry;
+    vigil_diagnostic_list_t diagnostics;
+    vigil_object_t *function = NULL;
+    vigil_source_id_t source_id = 0U;
+    const char *actual_message = NULL;
+    size_t index;
+    vigil_status_t status;
+
+    (void)vigil_test_failed_;
+    ASSERT_EQ(vigil_runtime_open(&runtime, NULL, &error), VIGIL_STATUS_OK);
+    vigil_source_registry_init(&registry, runtime);
+    vigil_diagnostic_list_init(&diagnostics, runtime);
+
+    for (index = 0U; index < source_count; index += 1U)
+    {
+        RegisterSource(vigil_test_failed_, &registry, sources[index].path, sources[index].text, &error);
+    }
+    for (index = 1U; index <= vigil_source_registry_count(&registry); index += 1U)
+    {
+        const vigil_source_file_t *source = vigil_source_registry_get(&registry, (vigil_source_id_t)index);
+
+        if (source != NULL && strcmp(vigil_string_c_str(&source->path), entry_path) == 0)
+        {
+            source_id = source->id;
+            break;
+        }
+    }
+
+    ASSERT_NE(source_id, 0U);
+    status = vigil_compile_source(&registry, source_id, &function, &diagnostics, &error);
+    ASSERT_EQ(status, VIGIL_STATUS_SYNTAX_ERROR);
+    ASSERT_EQ(vigil_diagnostic_list_count(&diagnostics), 1U);
+    actual_message = vigil_string_c_str(&vigil_diagnostic_list_get(&diagnostics, 0U)->message);
+    EXPECT_STREQ(actual_message, expected_message);
+
+    if (function != NULL)
+        vigil_object_release(&function);
+    vigil_diagnostic_list_free(&diagnostics);
+    vigil_source_registry_free(&registry);
+    vigil_runtime_close(&runtime);
+}
+
 TEST(VigilCompilerTest, CompilesAndExecutesArithmeticAndLocals)
 {
     EXPECT_EQ(CompileAndRun(vigil_test_failed_, "fn main() -> i32 {"
@@ -1980,6 +2028,19 @@ TEST(VigilCompilerTest, RejectsAssignmentToImportedConstants)
     vigil_runtime_close(&runtime);
 }
 
+TEST(VigilCompilerTest, RejectsAssignmentToImportedFunctions)
+{
+    const struct TestSource sources[] = {{"/project/lib.vigil", "pub fn value() -> i32 { return 3; }"},
+                                         {"/project/main.vigil", "import \"lib\";"
+                                                                 "fn main() -> i32 {"
+                                                                 "    lib.value = 4;"
+                                                                 "    return 0;"
+                                                                 "}"}};
+
+    ExpectSingleCompilerDiagnosticMulti(vigil_test_failed_, sources, 2U, "/project/main.vigil",
+                                        "module member is not assignable");
+}
+
 TEST(VigilCompilerTest, RejectsClassesMissingInterfaceMethods)
 {
     vigil_runtime_t *runtime = NULL;
@@ -3282,6 +3343,7 @@ void register_compiler_tests(void)
     REGISTER_TEST(VigilCompilerTest, RejectsMissingEnumMemberSeparator);
     REGISTER_TEST(VigilCompilerTest, RejectsQualifiedAccessToNonPublicModuleMembers);
     REGISTER_TEST(VigilCompilerTest, RejectsAssignmentToImportedConstants);
+    REGISTER_TEST(VigilCompilerTest, RejectsAssignmentToImportedFunctions);
     REGISTER_TEST(VigilCompilerTest, RejectsClassesMissingInterfaceMethods);
     REGISTER_TEST(VigilCompilerTest, RejectsNonVoidInitMethods);
     REGISTER_TEST(VigilCompilerTest, RejectsInterfaceMethodsWithWrongSignature);

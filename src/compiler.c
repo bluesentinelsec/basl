@@ -12645,6 +12645,11 @@ static uint32_t assign_target_slot(const assignment_target_t *t)
     return (uint32_t)t->local_index;
 }
 
+static int assignment_target_is_composite(const assignment_target_t *t)
+{
+    return t->is_field_assignment || t->is_index_assignment;
+}
+
 static vigil_status_t emit_get_target_base(vigil_parser_state_t *state, assignment_target_t *t,
                                            vigil_source_span_t span)
 {
@@ -12696,6 +12701,27 @@ static vigil_status_t resolve_nonlocal_target(vigil_parser_state_t *state, assig
     return VIGIL_STATUS_OK;
 }
 
+static vigil_status_t validate_assignment_target_writable(vigil_parser_state_t *state, const assignment_target_t *t)
+{
+    if (t->is_const_local && !assignment_target_is_composite(t))
+        return vigil_parser_report(state, t->target_token->span, "cannot assign to const local variable");
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t parse_assignment_operator(vigil_parser_state_t *state, const assignment_target_t *t,
+                                                const vigil_token_t **out_operator_token)
+{
+    const vigil_token_t *operator_token;
+
+    operator_token = vigil_parser_peek(state);
+    if (operator_token == NULL || !vigil_parser_is_assignment_operator(operator_token->kind))
+        return vigil_parser_report(state, t->target_token->span, "expected assignment operator");
+
+    vigil_parser_advance(state);
+    *out_operator_token = operator_token;
+    return VIGIL_STATUS_OK;
+}
+
 static vigil_status_t resolve_assignment_target(vigil_parser_state_t *state, assignment_target_t *t)
 {
     vigil_status_t status;
@@ -12736,13 +12762,11 @@ static int at_assignment_operator(const vigil_parser_state_t *state)
     return t != NULL && vigil_parser_is_assignment_operator(t->kind);
 }
 
-static vigil_status_t parse_assignment_dot_chain(vigil_parser_state_t *state, assignment_target_t *t)
+static vigil_status_t resolve_assignment_field_target(vigil_parser_state_t *state, assignment_target_t *t)
 {
     vigil_status_t status;
     const vigil_token_t *field_token = NULL;
 
-    t->is_field_assignment = 1;
-    t->is_index_assignment = 0;
     status = vigil_parser_expect(state, VIGIL_TOKEN_IDENTIFIER, "expected field name after '.'", &field_token);
     if (status != VIGIL_STATUS_OK)
         return status;
@@ -12752,18 +12776,14 @@ static vigil_status_t parse_assignment_dot_chain(vigil_parser_state_t *state, as
     status = vigil_parser_lookup_field(state, t->target_type, field_token, &t->field_index, &t->field);
     if (status != VIGIL_STATUS_OK)
         return status;
+
     t->target_type = t->field->type;
-
-    if (at_assignment_operator(state))
-        return VIGIL_STATUS_OK;
-
-    status = vigil_parser_emit_opcode(state, VIGIL_OPCODE_GET_FIELD, field_token->span);
-    if (status != VIGIL_STATUS_OK)
-        return status;
-    return vigil_parser_emit_u32(state, (uint32_t)t->field_index, field_token->span);
+    t->is_field_assignment = 1;
+    t->is_index_assignment = 0;
+    return VIGIL_STATUS_OK;
 }
 
-static vigil_status_t parse_assignment_index_chain(vigil_parser_state_t *state, assignment_target_t *t)
+static vigil_status_t resolve_assignment_index_target(vigil_parser_state_t *state, assignment_target_t *t)
 {
     vigil_status_t status;
     vigil_expression_result_t index_result;
@@ -12807,11 +12827,25 @@ static vigil_status_t parse_assignment_index_chain(vigil_parser_state_t *state, 
     t->target_type = indexed_type;
     t->is_field_assignment = 0;
     t->is_index_assignment = 1;
+    return VIGIL_STATUS_OK;
+}
 
-    if (at_assignment_operator(state))
-        return VIGIL_STATUS_OK;
+static vigil_status_t emit_assignment_intermediate_target(vigil_parser_state_t *state, assignment_target_t *t)
+{
+    vigil_status_t status;
+    vigil_source_span_t span;
 
-    return vigil_parser_emit_opcode(state, VIGIL_OPCODE_GET_INDEX, t->name_token->span);
+    span = t->target_token == NULL ? t->name_token->span : t->target_token->span;
+    if (t->is_field_assignment)
+    {
+        status = vigil_parser_emit_opcode(state, VIGIL_OPCODE_GET_FIELD, span);
+        if (status != VIGIL_STATUS_OK)
+            return status;
+        return vigil_parser_emit_u32(state, (uint32_t)t->field_index, span);
+    }
+    if (t->is_index_assignment)
+        return vigil_parser_emit_opcode(state, VIGIL_OPCODE_GET_INDEX, span);
+    return emit_get_target_base(state, t, span);
 }
 
 static vigil_status_t parse_assignment_chain(vigil_parser_state_t *state, assignment_target_t *t)
@@ -12820,19 +12854,19 @@ static vigil_status_t parse_assignment_chain(vigil_parser_state_t *state, assign
 
     while (vigil_parser_check(state, VIGIL_TOKEN_DOT) || vigil_parser_check(state, VIGIL_TOKEN_LBRACKET))
     {
-        status = emit_get_target_base(state, t, t->name_token->span);
+        status = emit_assignment_intermediate_target(state, t);
         if (status != VIGIL_STATUS_OK)
             return status;
 
         if (vigil_parser_match(state, VIGIL_TOKEN_DOT))
         {
-            status = parse_assignment_dot_chain(state, t);
+            status = resolve_assignment_field_target(state, t);
             if (status != VIGIL_STATUS_OK)
                 return status;
         }
         else if (vigil_parser_match(state, VIGIL_TOKEN_LBRACKET))
         {
-            status = parse_assignment_index_chain(state, t);
+            status = resolve_assignment_index_target(state, t);
             if (status != VIGIL_STATUS_OK)
                 return status;
         }
@@ -13098,7 +13132,7 @@ static vigil_status_t vigil_parser_parse_assignment_statement_internal(vigil_par
 {
     vigil_status_t status;
     assignment_target_t t;
-    const vigil_token_t *operator_token;
+    const vigil_token_t *operator_token = NULL;
     vigil_expression_result_t value_result;
     vigil_opcode_t compound_opcode;
 
@@ -13114,13 +13148,13 @@ static vigil_status_t vigil_parser_parse_assignment_statement_internal(vigil_par
     if (status != VIGIL_STATUS_OK)
         return status;
 
-    if (t.is_const_local && !t.is_field_assignment && !t.is_index_assignment)
-        return vigil_parser_report(state, t.target_token->span, "cannot assign to const local variable");
+    status = validate_assignment_target_writable(state, &t);
+    if (status != VIGIL_STATUS_OK)
+        return status;
 
-    operator_token = vigil_parser_peek(state);
-    if (operator_token == NULL || !vigil_parser_is_assignment_operator(operator_token->kind))
-        return vigil_parser_report(state, t.target_token->span, "expected assignment operator");
-    vigil_parser_advance(state);
+    status = parse_assignment_operator(state, &t, &operator_token);
+    if (status != VIGIL_STATUS_OK)
+        return status;
 
     if (operator_token->kind != VIGIL_TOKEN_ASSIGN)
     {
