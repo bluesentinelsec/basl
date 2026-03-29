@@ -365,6 +365,9 @@ void vigil_program_set_module_context(vigil_program_state_t *program, const vigi
 vigil_status_t vigil_program_grow_modules(vigil_program_state_t *program, size_t minimum_capacity);
 void vigil_program_import_default_alias(const char *path, size_t path_length, const char **out_alias,
                                         size_t *out_alias_length);
+int vigil_program_module_find(const vigil_program_state_t *program, vigil_source_id_t source_id, size_t *out_index);
+vigil_program_module_t *vigil_program_current_module(vigil_program_state_t *program);
+const vigil_program_module_t *vigil_program_current_module_const(const vigil_program_state_t *program);
 void vigil_class_decl_free(vigil_program_state_t *program, vigil_class_decl_t *decl);
 vigil_status_t vigil_program_grow_classes(vigil_program_state_t *program, size_t minimum_capacity);
 void vigil_interface_decl_free(vigil_program_state_t *program, vigil_interface_decl_t *decl);
@@ -414,6 +417,14 @@ vigil_status_t vigil_program_grow_globals(vigil_program_state_t *program, size_t
 void vigil_program_trim_text_range(const char *text, size_t start, size_t end, size_t *out_start, size_t *out_end);
 vigil_status_t vigil_program_grow_functions(vigil_program_state_t *program, size_t minimum_capacity);
 void vigil_program_free(vigil_program_state_t *program);
+vigil_status_t vigil_program_add_module_import(vigil_program_state_t *program, vigil_program_module_t *module,
+                                               const char *alias, size_t alias_length, vigil_source_span_t alias_span,
+                                               vigil_source_id_t source_id);
+vigil_status_t vigil_program_resolve_import_path(const vigil_program_state_t *program, const char *import_text,
+                                                 size_t import_length, vigil_string_t *out_path);
+int vigil_program_find_source_by_path(const vigil_program_state_t *program, const char *path, size_t path_length,
+                                      vigil_source_id_t *out_source_id);
+vigil_status_t vigil_program_parse_source(vigil_program_state_t *program, vigil_source_id_t source_id);
 
 /* compiler.c — shared helpers used by extracted modules */
 void vigil_expression_result_clear(vigil_expression_result_t *result);
@@ -577,5 +588,9 @@ vigil_status_t vigil_compile_seed_parameter_symbols(vigil_parser_state_t *state,
 vigil_status_t vigil_compile_emit_global_initializers(vigil_program_state_t *program, vigil_parser_state_t *state);
 vigil_status_t vigil_compile_require_function_returns(vigil_program_state_t *program, const vigil_function_decl_t *decl,
                                                       size_t function_index, int guaranteed_return);
+vigil_status_t vigil_program_register_native_function_types(vigil_program_state_t *program,
+                                                            const vigil_native_module_t *mod);
+vigil_status_t vigil_program_register_native_classes(vigil_program_state_t *program, const vigil_native_module_t *mod,
+                                                     vigil_source_id_t source_id);
 
 #endif

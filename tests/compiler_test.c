@@ -1996,6 +1996,16 @@ TEST(VigilCompilerTest, RejectsQualifiedAccessToNonPublicModuleMembers)
     vigil_runtime_close(&runtime);
 }
 
+TEST(VigilCompilerTest, RejectsImportAliasThatShadowsStdlibModule)
+{
+    const struct TestSource sources[] = {{"/project/lib.vigil", "pub fn value() -> i32 { return 1; }"},
+                                         {"/project/main.vigil", "import \"lib\" as math;\n"
+                                                                 "fn main() -> i32 { return 0; }\n"}};
+
+    ExpectSingleCompilerDiagnosticMulti(vigil_test_failed_, sources, sizeof(sources) / sizeof(sources[0]),
+                                        "/project/main.vigil", "import alias shadows a standard library module");
+}
+
 TEST(VigilCompilerTest, RejectsAssignmentToImportedConstants)
 {
     vigil_runtime_t *runtime = NULL;
@@ -3342,6 +3352,7 @@ void register_compiler_tests(void)
     REGISTER_TEST(VigilCompilerTest, RejectsEnumMembersWithNonI32Values);
     REGISTER_TEST(VigilCompilerTest, RejectsMissingEnumMemberSeparator);
     REGISTER_TEST(VigilCompilerTest, RejectsQualifiedAccessToNonPublicModuleMembers);
+    REGISTER_TEST(VigilCompilerTest, RejectsImportAliasThatShadowsStdlibModule);
     REGISTER_TEST(VigilCompilerTest, RejectsAssignmentToImportedConstants);
     REGISTER_TEST(VigilCompilerTest, RejectsAssignmentToImportedFunctions);
     REGISTER_TEST(VigilCompilerTest, RejectsClassesMissingInterfaceMethods);
