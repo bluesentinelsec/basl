@@ -118,7 +118,9 @@ static void vscode_pkg_content(char *buf, size_t cap, const char *vigil_bin)
              "  \"displayName\": \"Vigil\",\n"
              "  \"description\": \"Vigil language support\",\n"
              "  \"version\": \"0.1.0\",\n"
+             "  \"publisher\": \"local\",\n"
              "  \"engines\": { \"vscode\": \"^1.75.0\" },\n"
+             "  \"activationEvents\": [\"onLanguage:vigil\"],\n"
              "  \"contributes\": {\n"
              "    \"languages\": [{\n"
              "      \"id\": \"vigil\",\n"
@@ -126,7 +128,10 @@ static void vscode_pkg_content(char *buf, size_t cap, const char *vigil_bin)
              "      \"configuration\": \"./language-configuration.json\"\n"
              "    }]\n"
              "  },\n"
-             "  \"main\": \"./extension.js\"\n"
+             "  \"main\": \"./extension.js\",\n"
+             "  \"dependencies\": {\n"
+             "    \"vscode-languageclient\": \"^9.0.1\"\n"
+             "  }\n"
              "}\n");
     (void)vigil_bin;
 }
@@ -255,14 +260,24 @@ static vigil_editor_result_t install_vscode(const char *vigil_bin, const char *h
     if (!write_file(lang_path, vscode_langconf))
         return result_err("failed to write language-configuration.json");
 
-    return result_ok("Done. To undo: vigil editor uninstall vscode");
+    printf("Running npm install in %s\n", ext_dir);
+    {
+        char cmd[1200];
+        snprintf(cmd, sizeof(cmd), "cd \"%s\" && npm install --silent 2>&1", ext_dir);
+        int rc = system(cmd);
+        if (rc != 0)
+            return result_err("npm install failed — is Node.js installed?");
+    }
+
+    return result_ok("Done. Reload VS Code and open a .vigil file.\n"
+                     "To undo: vigil editor uninstall vscode");
 }
 
 static vigil_editor_result_t uninstall_vscode(const char *home)
 {
     char ext_dir[1024], path[1024];
     path_join(ext_dir, sizeof(ext_dir), home, vscode_ext_relpath);
-    const char *files[] = {"package.json", "extension.js", "language-configuration.json", NULL};
+    const char *files[] = {"package.json", "extension.js", "language-configuration.json", "package-lock.json", NULL};
     for (const char *const *f = files; *f; f++)
     {
         path_join(path, sizeof(path), ext_dir, *f);
@@ -271,6 +286,14 @@ static vigil_editor_result_t uninstall_vscode(const char *home)
             printf("Removing %s\n", path);
             remove(path);
         }
+    }
+    /* Remove node_modules */
+    path_join(path, sizeof(path), ext_dir, "node_modules");
+    {
+        char cmd[1200];
+        snprintf(cmd, sizeof(cmd), "rm -rf \"%s\" 2>/dev/null", path);
+        printf("Removing %s\n", path);
+        system(cmd);
     }
     return result_ok("Done.");
 }
