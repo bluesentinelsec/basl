@@ -43,12 +43,6 @@ static vigil_status_t vigil_parser_emit_integer_cast(vigil_parser_state_t *state
                                                      vigil_source_span_t span);
 static int vigil_opcode_produces_i64(vigil_opcode_t op);
 static int vigil_opcode_i32_to_i64(vigil_opcode_t op, vigil_opcode_t *out);
-static vigil_status_t vigil_compile_init_program(vigil_program_state_t *program,
-                                                 const vigil_source_registry_t *registry,
-                                                 const vigil_source_file_t *source,
-                                                 const vigil_native_registry_t *natives,
-                                                 vigil_diagnostic_list_t *diagnostics, vigil_error_t *error,
-                                                 vigil_compile_mode_t mode);
 // clang-format off
 static int vigil_parser_math_intrinsic_opcode(const vigil_native_module_t *, const char *, size_t);
 static int vigil_parser_parse_intrinsic_opcode(const vigil_native_module_t *, const char *, size_t);
@@ -13055,40 +13049,6 @@ static vigil_status_t vigil_compile_validate_inputs(const vigil_source_registry_
     return VIGIL_STATUS_OK;
 }
 
-static vigil_status_t vigil_check_validate_inputs(const vigil_source_registry_t *registry,
-                                                  vigil_diagnostic_list_t *diagnostics, vigil_error_t *error)
-{
-    if (registry == NULL)
-    {
-        vigil_error_set_literal(error, VIGIL_STATUS_INVALID_ARGUMENT, "source registry must not be null");
-        return VIGIL_STATUS_INVALID_ARGUMENT;
-    }
-    if (diagnostics == NULL)
-    {
-        vigil_error_set_literal(error, VIGIL_STATUS_INVALID_ARGUMENT, "diagnostic list must not be null");
-        return VIGIL_STATUS_INVALID_ARGUMENT;
-    }
-    return VIGIL_STATUS_OK;
-}
-
-static vigil_status_t vigil_compile_init_program(vigil_program_state_t *program,
-                                                 const vigil_source_registry_t *registry,
-                                                 const vigil_source_file_t *source,
-                                                 const vigil_native_registry_t *natives,
-                                                 vigil_diagnostic_list_t *diagnostics, vigil_error_t *error,
-                                                 vigil_compile_mode_t mode)
-{
-    memset(program, 0, sizeof(*program));
-    program->registry = registry;
-    program->diagnostics = diagnostics;
-    program->error = error;
-    program->natives = natives;
-    program->compile_mode = (int)mode;
-    vigil_binding_function_table_init(&program->functions, registry->runtime);
-    vigil_program_set_module_context(program, source, NULL);
-    return VIGIL_STATUS_OK;
-}
-
 static vigil_status_t vigil_compile_all_functions(vigil_program_state_t *program)
 {
     vigil_status_t status;
@@ -13097,23 +13057,6 @@ static vigil_status_t vigil_compile_all_functions(vigil_program_state_t *program
     for (i = 0U; i < program->functions.count; ++i)
     {
         status = vigil_compile_function(program, i);
-        if (status != VIGIL_STATUS_OK)
-        {
-            return status;
-        }
-    }
-
-    return VIGIL_STATUS_OK;
-}
-
-static vigil_status_t vigil_check_all_functions(vigil_program_state_t *program)
-{
-    vigil_status_t status;
-    size_t i;
-
-    for (i = 0U; i < program->functions.count; ++i)
-    {
-        status = vigil_semantic_check_function_with_parent(program, i, NULL);
         if (status != VIGIL_STATUS_OK)
         {
             return status;
@@ -13272,54 +13215,6 @@ static vigil_status_t vigil_compile_attach_entrypoint(vigil_program_state_t *pro
     return VIGIL_STATUS_OK;
 }
 
-vigil_status_t vigil_check_source_internal(const vigil_source_registry_t *registry, vigil_source_id_t source_id,
-                                           const vigil_native_registry_t *natives, vigil_diagnostic_list_t *diagnostics,
-                                           vigil_error_t *error)
-{
-    vigil_status_t status;
-    vigil_program_state_t program;
-    const vigil_source_file_t *source;
-
-    vigil_error_clear(error);
-    status = vigil_check_validate_inputs(registry, diagnostics, error);
-    if (status != VIGIL_STATUS_OK)
-    {
-        return status;
-    }
-
-    source = vigil_source_registry_get(registry, source_id);
-    if (source == NULL)
-    {
-        vigil_error_set_literal(error, VIGIL_STATUS_INVALID_ARGUMENT,
-                                "source_id must reference a registered source file");
-        return VIGIL_STATUS_INVALID_ARGUMENT;
-    }
-
-    status = vigil_compile_init_program(&program, registry, source, natives, diagnostics, error,
-                                        VIGIL_COMPILE_MODE_BUILD_ENTRYPOINT);
-    if (status != VIGIL_STATUS_OK)
-    {
-        return status;
-    }
-
-    status = vigil_semantic_prepare_program(&program, source_id, VIGIL_COMPILE_MODE_BUILD_ENTRYPOINT, 0);
-    if (status != VIGIL_STATUS_OK)
-    {
-        vigil_program_free(&program);
-        return status;
-    }
-
-    status = vigil_check_all_functions(&program);
-    if (status != VIGIL_STATUS_OK)
-    {
-        vigil_program_free(&program);
-        return status;
-    }
-
-    vigil_program_free(&program);
-    return VIGIL_STATUS_OK;
-}
-
 vigil_status_t vigil_compile_source_internal(const vigil_source_registry_t *registry, vigil_source_id_t source_id,
                                              vigil_compile_mode_t mode, const vigil_native_registry_t *natives,
                                              vigil_object_t **out_function, int *out_repl_has_statements,
@@ -13327,7 +13222,6 @@ vigil_status_t vigil_compile_source_internal(const vigil_source_registry_t *regi
 {
     vigil_status_t status;
     vigil_program_state_t program;
-    const vigil_source_file_t *source;
 
     vigil_error_clear(error);
     if (out_repl_has_statements)
@@ -13339,24 +13233,9 @@ vigil_status_t vigil_compile_source_internal(const vigil_source_registry_t *regi
     if (status != VIGIL_STATUS_OK)
         return status;
 
-    source = vigil_source_registry_get(registry, source_id);
-    if (source == NULL)
-    {
-        vigil_error_set_literal(error, VIGIL_STATUS_INVALID_ARGUMENT,
-                                "source_id must reference a registered source file");
-        return VIGIL_STATUS_INVALID_ARGUMENT;
-    }
-
-    status = vigil_compile_init_program(&program, registry, source, natives, diagnostics, error, mode);
+    status = vigil_semantic_prepare_source_internal(registry, source_id, mode, natives, diagnostics, &program, error);
     if (status != VIGIL_STATUS_OK)
         return status;
-
-    status = vigil_semantic_prepare_program(&program, source_id, mode, 1);
-    if (status != VIGIL_STATUS_OK)
-    {
-        vigil_program_free(&program);
-        return status;
-    }
 
     if (!program.functions.has_main && mode == VIGIL_COMPILE_MODE_REPL)
     {
@@ -13540,7 +13419,6 @@ vigil_status_t vigil_compile_source_with_debug_info(const vigil_source_registry_
 {
     vigil_status_t status;
     vigil_program_state_t program;
-    const vigil_source_file_t *source;
 
     vigil_error_clear(error);
     if (out_function != NULL)
@@ -13553,25 +13431,10 @@ vigil_status_t vigil_compile_source_with_debug_info(const vigil_source_registry_
     if (status != VIGIL_STATUS_OK)
         return status;
 
-    source = vigil_source_registry_get(registry, source_id);
-    if (source == NULL)
-    {
-        vigil_error_set_literal(error, VIGIL_STATUS_INVALID_ARGUMENT,
-                                "source_id must reference a registered source file");
-        return VIGIL_STATUS_INVALID_ARGUMENT;
-    }
-
-    status = vigil_compile_init_program(&program, registry, source, natives, diagnostics, error,
-                                        VIGIL_COMPILE_MODE_BUILD_ENTRYPOINT);
+    status = vigil_semantic_prepare_source_internal(registry, source_id, VIGIL_COMPILE_MODE_BUILD_ENTRYPOINT, natives,
+                                                    diagnostics, &program, error);
     if (status != VIGIL_STATUS_OK)
         return status;
-
-    status = vigil_semantic_prepare_program(&program, source_id, VIGIL_COMPILE_MODE_BUILD_ENTRYPOINT, 0);
-    if (status != VIGIL_STATUS_OK)
-    {
-        vigil_program_free(&program);
-        return status;
-    }
 
     status = vigil_compile_all_functions(&program);
     if (status != VIGIL_STATUS_OK)
