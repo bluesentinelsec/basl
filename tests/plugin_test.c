@@ -65,39 +65,6 @@ static int64_t RunWithPlugins(int *vigil_test_failed_, const char *source_text)
     return output;
 }
 
-#ifdef _WIN32
-#include <io.h>
-#define dup _dup
-#define dup2 _dup2
-#define fileno _fileno
-#define close _close
-#else
-#include <unistd.h>
-#endif
-
-static char *RunPluginCaptureStdout(int *vigil_test_failed_, const char *source_text)
-{
-    FILE *tmp = tmpfile();
-    int saved = dup(fileno(stdout));
-    fflush(stdout);
-    dup2(fileno(tmp), fileno(stdout));
-    int64_t rc = RunWithPlugins(vigil_test_failed_, source_text);
-    fflush(stdout);
-    dup2(saved, fileno(stdout));
-    close(saved);
-    EXPECT_EQ(rc, 0);
-    long len = ftell(tmp);
-    rewind(tmp);
-    char *buf = (char *)malloc((size_t)len + 1);
-    if (buf)
-    {
-        size_t n = fread(buf, 1, (size_t)len, tmp);
-        buf[n] = '\0';
-    }
-    fclose(tmp);
-    return buf;
-}
-
 #endif /* VIGIL_PLUGIN_COUNT > 0 */
 
 /* ── registry tests ──────────────────────────────────────────────── */
@@ -171,14 +138,14 @@ TEST(PluginRegistry, PluginNegate)
 
 TEST(PluginRegistry, PluginStringReturn)
 {
-    char *out = RunPluginCaptureStdout(vigil_test_failed_, "import \"test_plugin\";\n"
-                                                           "import \"fmt\";\n"
-                                                           "fn main() -> i32 {\n"
-                                                           "    fmt.println(test_plugin.greet());\n"
-                                                           "    return 0;\n"
-                                                           "}\n");
-    EXPECT_STREQ(out, "hello from plugin\n");
-    free(out);
+    int64_t result = RunWithPlugins(vigil_test_failed_, "import \"test_plugin\";\n"
+                                                        "fn main() -> i32 {\n"
+                                                        "    if (test_plugin.greet() == \"hello from plugin\") {\n"
+                                                        "        return 1;\n"
+                                                        "    }\n"
+                                                        "    return 0;\n"
+                                                        "}\n");
+    EXPECT_EQ(result, 1);
 }
 
 TEST(PluginRegistry, PluginCoexistsWithStdlib)
