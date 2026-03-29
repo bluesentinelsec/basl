@@ -3181,8 +3181,7 @@ static int cmd_profile(const char *script_path)
     vigil_value_init_nil(&result);
 
     /* ── Compile (timed) ── */
-    struct timespec t0, t1, t2;
-    clock_gettime(CLOCK_MONOTONIC, &t0);
+    double t0 = (double)clock() / CLOCKS_PER_SEC * 1000.0;
 
     {
         char proj_root[4096];
@@ -3209,11 +3208,11 @@ static int cmd_profile(const char *script_path)
         goto prof_cleanup;
     }
 
-    clock_gettime(CLOCK_MONOTONIC, &t1);
+    double t1 = (double)clock() / CLOCKS_PER_SEC * 1000.0;
 
     /* ── Execute (timed) ── */
     status = vigil_vm_execute_function(vm, function, &result, &error);
-    clock_gettime(CLOCK_MONOTONIC, &t2);
+    double t2 = (double)clock() / CLOCKS_PER_SEC * 1000.0;
     vigil_object_release(&function);
 
     if (status != VIGIL_STATUS_OK)
@@ -3225,8 +3224,8 @@ static int cmd_profile(const char *script_path)
 
     /* ── Report ── */
     {
-        double compile_ms = (double)(t1.tv_sec - t0.tv_sec) * 1000.0 + (double)(t1.tv_nsec - t0.tv_nsec) / 1e6;
-        double execute_ms = (double)(t2.tv_sec - t1.tv_sec) * 1000.0 + (double)(t2.tv_nsec - t1.tv_nsec) / 1e6;
+        double compile_ms = t1 - t0;
+        double execute_ms = t2 - t1;
         double total_ms = compile_ms + execute_ms;
         int64_t peak_rss = vigil_platform_peak_rss_kb();
         int64_t alloc_count = vigil_runtime_alloc_count(runtime);
