@@ -75,30 +75,16 @@ static vigil_editor_result_t result_err(const char *msg)
 
 /* ── config path helpers ─────────────────────────────────────────── */
 
-static int xdg_config_home(char *buf, size_t cap, const char *home)
-{
-    const char *xdg = getenv("XDG_CONFIG_HOME");
-    if (xdg && xdg[0])
-    {
-        snprintf(buf, cap, "%s", xdg);
-        return 1;
-    }
-    return pjoin(buf, cap, home, ".config");
-}
-
 static int nvim_root(char *buf, size_t cap, const char *home)
 {
 #ifdef _WIN32
-    const char *local = getenv("LOCALAPPDATA");
-    if (local && local[0] && pjoin(buf, cap, local, "nvim"))
-        return 1;
     if (!pjoin(buf, cap, home, "AppData"))
         return 0;
     if (!pjoin(buf, cap, buf, "Local"))
         return 0;
     return pjoin(buf, cap, buf, "nvim");
 #else
-    if (!xdg_config_home(buf, cap, home))
+    if (!pjoin(buf, cap, home, ".config"))
         return 0;
     return pjoin(buf, cap, buf, "nvim");
 #endif
@@ -107,13 +93,6 @@ static int nvim_root(char *buf, size_t cap, const char *home)
 static int sublime_root(char *buf, size_t cap, const char *home)
 {
 #ifdef _WIN32
-    const char *appdata = getenv("APPDATA");
-    if (appdata && appdata[0])
-    {
-        if (!pjoin(buf, cap, appdata, "Sublime Text"))
-            return 0;
-        return pjoin(buf, cap, buf, "Packages");
-    }
     if (!pjoin(buf, cap, home, "AppData"))
         return 0;
     if (!pjoin(buf, cap, buf, "Roaming"))
@@ -130,7 +109,7 @@ static int sublime_root(char *buf, size_t cap, const char *home)
         return 0;
     return pjoin(buf, cap, buf, "Packages");
 #else
-    if (!xdg_config_home(buf, cap, home))
+    if (!pjoin(buf, cap, home, ".config"))
         return 0;
     if (!pjoin(buf, cap, buf, "sublime-text"))
         return 0;
@@ -175,8 +154,13 @@ static const char emacs_mode_content[] =
     "    table))\n"
     "\n"
     "(defconst vigil-font-lock-keywords\n"
-    "  '((\"\\\\_<\\\\(fn\\\\|return\\\\|if\\\\|else\\\\|for\\\\|while\\\\|break\\\\|continue\\\\|import\\\\|const\\\\|defer\\\\|guard\\\\|switch\\\\|case\\\\|default\\\\|enum\\\\|class\\\\|interface\\\\|pub\\\\|new\\\\|self\\\\|true\\\\|false\\\\|nil\\\\|ok\\\\|err\\\\|in\\\\)\\\\_>\" . font-lock-keyword-face)\n"
-    "    (\"\\\\_<\\\\(i32\\\\|i64\\\\|f64\\\\|u8\\\\|u32\\\\|u64\\\\|bool\\\\|string\\\\|void\\\\|array\\\\|map\\\\|err\\\\)\\\\_>\" . font-lock-type-face)))\n"
+    "  "
+    "'((\"\\\\_<\\\\(fn\\\\|return\\\\|if\\\\|else\\\\|for\\\\|while\\\\|break\\\\|continue\\\\|import\\\\|const\\\\|"
+    "defer\\\\|guard\\\\|switch\\\\|case\\\\|default\\\\|enum\\\\|class\\\\|interface\\\\|pub\\\\|new\\\\|self\\\\|"
+    "true\\\\|false\\\\|nil\\\\|ok\\\\|err\\\\|in\\\\)\\\\_>\" . font-lock-keyword-face)\n"
+    "    "
+    "(\"\\\\_<\\\\(i32\\\\|i64\\\\|f64\\\\|u8\\\\|u32\\\\|u64\\\\|bool\\\\|string\\\\|void\\\\|array\\\\|map\\\\|"
+    "err\\\\)\\\\_>\" . font-lock-type-face)))\n"
     "\n"
     "(define-derived-mode vigil-mode prog-mode \"Vigil\"\n"
     "  \"Major mode for editing Vigil files.\"\n"
@@ -202,7 +186,9 @@ static const char sublime_syntax_content[] =
     "    - match: '\"'\n"
     "      scope: punctuation.definition.string.begin.vigil\n"
     "      push: string\n"
-    "    - match: '\\\\b(fn|return|if|else|for|while|break|continue|import|const|defer|guard|switch|case|default|enum|class|interface|pub|new|self|true|false|nil|ok|err|in)\\\\b'\n"
+    "    - match: "
+    "'\\\\b(fn|return|if|else|for|while|break|continue|import|const|defer|guard|switch|case|default|enum|class|"
+    "interface|pub|new|self|true|false|nil|ok|err|in)\\\\b'\n"
     "      scope: keyword.control.vigil\n"
     "    - match: '\\\\b(i32|i64|f64|u8|u32|u64|bool|string|void|array|map|err)\\\\b'\n"
     "      scope: storage.type.vigil\n"
@@ -223,8 +209,7 @@ static int ensure_dir(const char *path)
 static vigil_editor_result_t install_vim_family(const char *editor_name, const char *root)
 {
     char ft_path[1024], syn_path[1024], dir[1024];
-    if (!pjoin(dir, sizeof(dir), root, "after") ||
-        !pjoin(dir, sizeof(dir), dir, "ftdetect"))
+    if (!pjoin(dir, sizeof(dir), root, "after") || !pjoin(dir, sizeof(dir), dir, "ftdetect"))
         return result_err("path too long");
     if (!ensure_dir(dir))
         return result_err("failed to create filetype directory");
@@ -269,8 +254,8 @@ static vigil_editor_result_t uninstall_vim_family(const char *root)
 static int is_installed_vim_family(const char *root)
 {
     char path[1024], dir[1024];
-    if (!pjoin(dir, sizeof(dir), root, "after") ||
-        !pjoin(dir, sizeof(dir), dir, "ftdetect") || !pjoin(path, sizeof(path), dir, "vigil.vim"))
+    if (!pjoin(dir, sizeof(dir), root, "after") || !pjoin(dir, sizeof(dir), dir, "ftdetect") ||
+        !pjoin(path, sizeof(path), dir, "vigil.vim"))
         return 0;
     return pexists(path);
 }
