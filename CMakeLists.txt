@@ -80,6 +80,7 @@ add_library(vigil_core OBJECT
     src/lsp.c
     src/debugger.c
     src/compiler_program.c
+    src/compiler_backend.c
     src/compiler_builtins.c
     src/compiler_bindings.c
     src/compiler_semantics.c
