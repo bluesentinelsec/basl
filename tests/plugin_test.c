@@ -91,8 +91,8 @@ static char *RunPluginCaptureStdout(int *vigil_test_failed_, const char *source_
     char *buf = (char *)malloc((size_t)len + 1);
     if (buf)
     {
-        fread(buf, 1, (size_t)len, tmp);
-        buf[len] = '\0';
+        size_t n = fread(buf, 1, (size_t)len, tmp);
+        buf[n] = '\0';
     }
     fclose(tmp);
     return buf;
@@ -151,52 +151,48 @@ TEST(PluginRegistry, PluginIsKnownModule)
 
 TEST(PluginRegistry, PluginFunctionCallViaVM)
 {
-    int64_t result = RunWithPlugins(vigil_test_failed_,
-        "import \"test_plugin\";\n"
-        "fn main() -> i32 {\n"
-        "    i32 x = test_plugin.add(2, 3);\n"
-        "    return x;\n"
-        "}\n");
+    int64_t result = RunWithPlugins(vigil_test_failed_, "import \"test_plugin\";\n"
+                                                        "fn main() -> i32 {\n"
+                                                        "    i32 x = test_plugin.add(2, 3);\n"
+                                                        "    return x;\n"
+                                                        "}\n");
     EXPECT_EQ(result, 5);
 }
 
 TEST(PluginRegistry, PluginNegate)
 {
-    int64_t result = RunWithPlugins(vigil_test_failed_,
-        "import \"test_plugin\";\n"
-        "fn main() -> i32 {\n"
-        "    i32 x = test_plugin.negate(42);\n"
-        "    return x;\n"
-        "}\n");
+    int64_t result = RunWithPlugins(vigil_test_failed_, "import \"test_plugin\";\n"
+                                                        "fn main() -> i32 {\n"
+                                                        "    i32 x = test_plugin.negate(42);\n"
+                                                        "    return x;\n"
+                                                        "}\n");
     EXPECT_EQ(result, -42);
 }
 
 TEST(PluginRegistry, PluginStringReturn)
 {
-    char *out = RunPluginCaptureStdout(vigil_test_failed_,
-        "import \"test_plugin\";\n"
-        "import \"fmt\";\n"
-        "fn main() -> i32 {\n"
-        "    fmt.println(test_plugin.greet());\n"
-        "    return 0;\n"
-        "}\n");
+    char *out = RunPluginCaptureStdout(vigil_test_failed_, "import \"test_plugin\";\n"
+                                                           "import \"fmt\";\n"
+                                                           "fn main() -> i32 {\n"
+                                                           "    fmt.println(test_plugin.greet());\n"
+                                                           "    return 0;\n"
+                                                           "}\n");
     EXPECT_STREQ(out, "hello from plugin\n");
     free(out);
 }
 
 TEST(PluginRegistry, PluginCoexistsWithStdlib)
 {
-    int64_t result = RunWithPlugins(vigil_test_failed_,
-        "import \"test_plugin\";\n"
-        "import \"math\";\n"
-        "fn main() -> i32 {\n"
-        "    i32 sum = test_plugin.add(10, 20);\n"
-        "    f64 pi = math.pi();\n"
-        "    if (pi > 3.0 && sum == 30) {\n"
-        "        return 1;\n"
-        "    }\n"
-        "    return 0;\n"
-        "}\n");
+    int64_t result = RunWithPlugins(vigil_test_failed_, "import \"test_plugin\";\n"
+                                                        "import \"math\";\n"
+                                                        "fn main() -> i32 {\n"
+                                                        "    i32 sum = test_plugin.add(10, 20);\n"
+                                                        "    f64 pi = math.pi();\n"
+                                                        "    if (pi > 3.0 && sum == 30) {\n"
+                                                        "        return 1;\n"
+                                                        "    }\n"
+                                                        "    return 0;\n"
+                                                        "}\n");
     EXPECT_EQ(result, 1);
 }
 

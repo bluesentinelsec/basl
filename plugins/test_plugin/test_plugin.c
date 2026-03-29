@@ -40,9 +40,9 @@ static vigil_status_t tp_push_string(vigil_vm_t *vm, const char *s, vigil_error_
         return st;
     vigil_value_t val;
     vigil_value_init_object(&val, &obj);
+    vigil_object_release(&obj);
     st = vigil_vm_stack_push(vm, &val, error);
-    if (st != VIGIL_STATUS_OK)
-        vigil_object_release(&obj);
+    vigil_value_release(&val);
     return st;
 }
 
@@ -88,10 +88,5 @@ static const vigil_native_module_function_t tp_functions[] = {
 
 /* ── module export ───────────────────────────────────────────────── */
 
-VIGIL_API const vigil_native_module_t vigil_plugin_test_plugin = {
-    "test_plugin",
-    11U,
-    tp_functions,
-    TP_FUNCTION_COUNT,
-    NULL,
-    0U};
+VIGIL_API const vigil_native_module_t vigil_plugin_test_plugin = {"test_plugin",     11U,  tp_functions,
+                                                                  TP_FUNCTION_COUNT, NULL, 0U};

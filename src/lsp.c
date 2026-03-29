@@ -1193,7 +1193,6 @@ static vigil_status_t handle_completion(vigil_lsp_server_t *server, const vigil_
     size_t i, count;
 
     (void)params; /* Position not used yet - return all symbols */
-
     vigil_json_array_new(a, &result, error);
 
     count = vigil_debug_symbol_table_count(&server->index->symbols);

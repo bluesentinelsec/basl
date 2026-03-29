@@ -2270,6 +2270,11 @@ static int repl_bracket_depth(const char *text)
     return depth;
 }
 
+static int is_known_import(const char *name, size_t length)
+{
+    return vigil_stdlib_is_known_module(name, length) || vigil_plugin_is_known_module(name, length);
+}
+
 /* Try to compile source in REPL mode.  If out_function is non-NULL after
    a successful call, the source contained executable statements.  If NULL,
    it contained only declarations.  Returns 1 on success. */
@@ -2336,8 +2341,7 @@ static int repl_compile_and_run(vigil_runtime_t *runtime, const char *source_tex
                     import_text = cli_source_token_text(source, path_token, &import_length);
                     if (!import_text || import_length < 2)
                         break;
-                    if (!vigil_stdlib_is_known_module(import_text + 1, import_length - 2) &&
-                        !vigil_plugin_is_known_module(import_text + 1, import_length - 2))
+                    if (!is_known_import(import_text + 1, import_length - 2))
                     {
                         vigil_string_t import_path;
                         vigil_string_init(&import_path, runtime);

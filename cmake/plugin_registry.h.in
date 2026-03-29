@@ -4,6 +4,7 @@
 
 #include <string.h>
 
+#include "vigil/export.h"
 #include "vigil/native_module.h"
 #include "vigil/status.h"
 

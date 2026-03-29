@@ -210,7 +210,7 @@ if(VIGIL_PLUGINS)
             endforeach()
 
             string(APPEND VIGIL_PLUGIN_EXTERN_DECLS
-                "extern const vigil_native_module_t vigil_plugin_${_PLUG_NAME};\n")
+                "extern VIGIL_API const vigil_native_module_t vigil_plugin_${_PLUG_NAME};\n")
             string(APPEND VIGIL_PLUGIN_TABLE_ENTRIES
                 "    {\"${_PLUG_NAME}\", ${_plug_name_len}U, &vigil_plugin_${_PLUG_NAME}},\n")
 
