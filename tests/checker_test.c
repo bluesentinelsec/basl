@@ -11,6 +11,37 @@ static vigil_source_id_t RegisterSource(int *vigil_test_failed_, vigil_source_re
     return source_id;
 }
 
+static void FreeCheckerFixtures(vigil_runtime_t **runtime, vigil_source_registry_t *registry,
+                                vigil_diagnostic_list_t *diagnostics)
+{
+    vigil_diagnostic_list_free(diagnostics);
+    vigil_source_registry_free(registry);
+    vigil_runtime_close(runtime);
+}
+
+static void InitCheckerFixtures(int *vigil_test_failed_, vigil_runtime_t **runtime, vigil_source_registry_t *registry,
+                                vigil_diagnostic_list_t *diagnostics, vigil_error_t *error)
+{
+    (void)vigil_test_failed_;
+    ASSERT_EQ(vigil_runtime_open(runtime, NULL, error), VIGIL_STATUS_OK);
+    vigil_source_registry_init(registry, *runtime);
+    vigil_diagnostic_list_init(diagnostics, *runtime);
+}
+
+static void ExpectSingleCheckerDiagnostic(int *vigil_test_failed_, vigil_source_registry_t *registry,
+                                          vigil_source_id_t source_id, vigil_diagnostic_list_t *diagnostics,
+                                          vigil_error_t *error, const char *message)
+{
+    const vigil_diagnostic_t *diagnostic;
+
+    (void)vigil_test_failed_;
+    EXPECT_EQ(vigil_check_source(registry, source_id, NULL, diagnostics, error), VIGIL_STATUS_SYNTAX_ERROR);
+    ASSERT_EQ(vigil_diagnostic_list_count(diagnostics), 1U);
+    diagnostic = vigil_diagnostic_list_get(diagnostics, 0U);
+    ASSERT_NE(diagnostic, NULL);
+    EXPECT_STREQ(vigil_string_c_str(&diagnostic->message), message);
+}
+
 TEST(VigilCheckerTest, ValidatesWellTypedProgramWithoutDiagnostics)
 {
     vigil_runtime_t *runtime = NULL;
@@ -19,9 +50,7 @@ TEST(VigilCheckerTest, ValidatesWellTypedProgramWithoutDiagnostics)
     vigil_diagnostic_list_t diagnostics;
     vigil_source_id_t source_id;
 
-    ASSERT_EQ(vigil_runtime_open(&runtime, NULL, &error), VIGIL_STATUS_OK);
-    vigil_source_registry_init(&registry, runtime);
-    vigil_diagnostic_list_init(&diagnostics, runtime);
+    InitCheckerFixtures(vigil_test_failed_, &runtime, &registry, &diagnostics, &error);
 
     source_id = RegisterSource(vigil_test_failed_, &registry, "main.vigil",
                                "fn add(i32 left, i32 right) -> i32 {"
@@ -42,9 +71,7 @@ TEST(VigilCheckerTest, ValidatesWellTypedProgramWithoutDiagnostics)
     EXPECT_EQ(vigil_check_source(&registry, source_id, NULL, &diagnostics, &error), VIGIL_STATUS_OK);
     EXPECT_EQ(vigil_diagnostic_list_count(&diagnostics), 0U);
 
-    vigil_diagnostic_list_free(&diagnostics);
-    vigil_source_registry_free(&registry);
-    vigil_runtime_close(&runtime);
+    FreeCheckerFixtures(&runtime, &registry, &diagnostics);
 }
 
 TEST(VigilCheckerTest, ReportsSemanticErrorsWithoutProducingEntrypoint)
@@ -54,11 +81,8 @@ TEST(VigilCheckerTest, ReportsSemanticErrorsWithoutProducingEntrypoint)
     vigil_source_registry_t registry;
     vigil_diagnostic_list_t diagnostics;
     vigil_source_id_t source_id;
-    const vigil_diagnostic_t *diagnostic;
 
-    ASSERT_EQ(vigil_runtime_open(&runtime, NULL, &error), VIGIL_STATUS_OK);
-    vigil_source_registry_init(&registry, runtime);
-    vigil_diagnostic_list_init(&diagnostics, runtime);
+    InitCheckerFixtures(vigil_test_failed_, &runtime, &registry, &diagnostics, &error);
 
     source_id = RegisterSource(vigil_test_failed_, &registry, "bad.vigil",
                                "fn is_ready() -> bool {"
@@ -71,16 +95,10 @@ TEST(VigilCheckerTest, ReportsSemanticErrorsWithoutProducingEntrypoint)
                                "}",
                                &error);
 
-    EXPECT_EQ(vigil_check_source(&registry, source_id, NULL, &diagnostics, &error), VIGIL_STATUS_SYNTAX_ERROR);
-    ASSERT_EQ(vigil_diagnostic_list_count(&diagnostics), 1U);
-    diagnostic = vigil_diagnostic_list_get(&diagnostics, 0U);
-    ASSERT_NE(diagnostic, NULL);
-    EXPECT_STREQ(vigil_string_c_str(&diagnostic->message),
-                 "assigned expression type does not match local variable type");
+    ExpectSingleCheckerDiagnostic(vigil_test_failed_, &registry, source_id, &diagnostics, &error,
+                                  "assigned expression type does not match local variable type");
 
-    vigil_diagnostic_list_free(&diagnostics);
-    vigil_source_registry_free(&registry);
-    vigil_runtime_close(&runtime);
+    FreeCheckerFixtures(&runtime, &registry, &diagnostics);
 }
 
 TEST(VigilCheckerTest, ReportsMissingReturnOnSomePaths)
@@ -90,11 +108,8 @@ TEST(VigilCheckerTest, ReportsMissingReturnOnSomePaths)
     vigil_source_registry_t registry;
     vigil_diagnostic_list_t diagnostics;
     vigil_source_id_t source_id;
-    const vigil_diagnostic_t *diagnostic;
 
-    ASSERT_EQ(vigil_runtime_open(&runtime, NULL, &error), VIGIL_STATUS_OK);
-    vigil_source_registry_init(&registry, runtime);
-    vigil_diagnostic_list_init(&diagnostics, runtime);
+    InitCheckerFixtures(vigil_test_failed_, &runtime, &registry, &diagnostics, &error);
 
     source_id = RegisterSource(vigil_test_failed_, &registry, "missing_return.vigil",
                                "fn choose(bool ready) -> i32 {"
@@ -107,15 +122,10 @@ TEST(VigilCheckerTest, ReportsMissingReturnOnSomePaths)
                                "}",
                                &error);
 
-    EXPECT_EQ(vigil_check_source(&registry, source_id, NULL, &diagnostics, &error), VIGIL_STATUS_SYNTAX_ERROR);
-    ASSERT_EQ(vigil_diagnostic_list_count(&diagnostics), 1U);
-    diagnostic = vigil_diagnostic_list_get(&diagnostics, 0U);
-    ASSERT_NE(diagnostic, NULL);
-    EXPECT_STREQ(vigil_string_c_str(&diagnostic->message), "function must return a value on all paths");
+    ExpectSingleCheckerDiagnostic(vigil_test_failed_, &registry, source_id, &diagnostics, &error,
+                                  "function must return a value on all paths");
 
-    vigil_diagnostic_list_free(&diagnostics);
-    vigil_source_registry_free(&registry);
-    vigil_runtime_close(&runtime);
+    FreeCheckerFixtures(&runtime, &registry, &diagnostics);
 }
 
 TEST(VigilCheckerTest, RequiresMainFunctionForCheckSource)
@@ -125,11 +135,8 @@ TEST(VigilCheckerTest, RequiresMainFunctionForCheckSource)
     vigil_source_registry_t registry;
     vigil_diagnostic_list_t diagnostics;
     vigil_source_id_t source_id;
-    const vigil_diagnostic_t *diagnostic;
 
-    ASSERT_EQ(vigil_runtime_open(&runtime, NULL, &error), VIGIL_STATUS_OK);
-    vigil_source_registry_init(&registry, runtime);
-    vigil_diagnostic_list_init(&diagnostics, runtime);
+    InitCheckerFixtures(vigil_test_failed_, &runtime, &registry, &diagnostics, &error);
 
     source_id = RegisterSource(vigil_test_failed_, &registry, "lib_only.vigil",
                                "pub fn twice(i32 value) -> i32 {"
@@ -137,15 +144,10 @@ TEST(VigilCheckerTest, RequiresMainFunctionForCheckSource)
                                "}",
                                &error);
 
-    EXPECT_EQ(vigil_check_source(&registry, source_id, NULL, &diagnostics, &error), VIGIL_STATUS_SYNTAX_ERROR);
-    ASSERT_EQ(vigil_diagnostic_list_count(&diagnostics), 1U);
-    diagnostic = vigil_diagnostic_list_get(&diagnostics, 0U);
-    ASSERT_NE(diagnostic, NULL);
-    EXPECT_STREQ(vigil_string_c_str(&diagnostic->message), "expected top-level function 'main'");
+    ExpectSingleCheckerDiagnostic(vigil_test_failed_, &registry, source_id, &diagnostics, &error,
+                                  "expected top-level function 'main'");
 
-    vigil_diagnostic_list_free(&diagnostics);
-    vigil_source_registry_free(&registry);
-    vigil_runtime_close(&runtime);
+    FreeCheckerFixtures(&runtime, &registry, &diagnostics);
 }
 
 TEST(VigilCheckerTest, ValidatesArguments)
@@ -159,17 +161,13 @@ TEST(VigilCheckerTest, ValidatesArguments)
     ASSERT_EQ(vigil_check_source(NULL, source_id, NULL, &diagnostics, &error), VIGIL_STATUS_INVALID_ARGUMENT);
     EXPECT_STREQ(vigil_error_message(&error), "source registry must not be null");
 
-    ASSERT_EQ(vigil_runtime_open(&runtime, NULL, &error), VIGIL_STATUS_OK);
-    vigil_source_registry_init(&registry, runtime);
-    vigil_diagnostic_list_init(&diagnostics, runtime);
+    InitCheckerFixtures(vigil_test_failed_, &runtime, &registry, &diagnostics, &error);
     source_id = RegisterSource(vigil_test_failed_, &registry, "main.vigil", "fn main() -> i32 { return 0; }", &error);
 
     EXPECT_EQ(vigil_check_source(&registry, source_id, NULL, NULL, &error), VIGIL_STATUS_INVALID_ARGUMENT);
     EXPECT_STREQ(vigil_error_message(&error), "diagnostic list must not be null");
 
-    vigil_diagnostic_list_free(&diagnostics);
-    vigil_source_registry_free(&registry);
-    vigil_runtime_close(&runtime);
+    FreeCheckerFixtures(&runtime, &registry, &diagnostics);
 }
 
 void register_checker_tests(void)
