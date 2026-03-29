@@ -3114,22 +3114,15 @@ static int early_dispatch_editor(int argc, char **argv)
         return editor_cmd_list(home);
     if (strcmp(subcmd, "status") == 0)
         return editor_cmd_status(home);
-    if (strcmp(subcmd, "install") == 0)
+    if (strcmp(subcmd, "install") == 0 || strcmp(subcmd, "uninstall") == 0)
     {
         if (argc < 4)
         {
-            fprintf(stderr, "Usage: vigil editor install <editor>\n");
+            fprintf(stderr, "Usage: vigil editor %s <editor>\n", subcmd);
             return 1;
         }
-        return editor_cmd_install(argv[3], vigil_bin, home);
-    }
-    if (strcmp(subcmd, "uninstall") == 0)
-    {
-        if (argc < 4)
-        {
-            fprintf(stderr, "Usage: vigil editor uninstall <editor>\n");
-            return 1;
-        }
+        if (strcmp(subcmd, "install") == 0)
+            return editor_cmd_install(argv[3], vigil_bin, home);
         return editor_cmd_uninstall(argv[3], home);
     }
     fprintf(stderr, "Unknown subcommand: %s\n", subcmd);

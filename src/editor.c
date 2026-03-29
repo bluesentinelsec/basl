@@ -247,7 +247,7 @@ static vigil_editor_result_t install_vscode(const char *vigil_bin, const char *h
 #endif
         int rc = system(cmd);
         if (rc != 0)
-            return result_err("npm install failed — is Node.js installed?");
+            return result_err("npm install failed - is Node.js installed?");
     }
 #endif
 
