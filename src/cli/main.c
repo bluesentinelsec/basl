@@ -15,6 +15,8 @@
 #include "vigil/dap.h"
 #include "vigil/doc.h"
 #include "vigil/doc_registry.h"
+#include "vigil/easy.h"
+#include "vigil/editor.h"
 #include "vigil/embed.h"
 #include "vigil/fmt.h"
 #include "vigil/lsp.h"
@@ -3019,11 +3021,120 @@ typedef struct
     early_handler_t handler;
 } early_command_t;
 
+static int early_dispatch_editor(int argc, char **argv)
+{
+    const char *subcmd;
+    if (argc < 3)
+    {
+        fprintf(stderr, "Usage: vigil editor <list|install|uninstall|status> [editor]\n");
+        return 1;
+    }
+    subcmd = argv[2];
+
+    /* Resolve config home: XDG_CONFIG_HOME or ~/.config for nvim/vscode, HOME for vim */
+    const char *home = getenv("HOME");
+    const char *xdg = getenv("XDG_CONFIG_HOME");
+    char config_home[1024];
+    if (xdg && xdg[0])
+        snprintf(config_home, sizeof(config_home), "%s", xdg);
+    else if (home && home[0])
+        snprintf(config_home, sizeof(config_home), "%s/.config", home);
+    else
+    {
+        fprintf(stderr, "error: cannot determine home directory\n");
+        return 1;
+    }
+
+    /* Resolve vigil binary path */
+    char vigil_bin[1024];
+    if (vigil_platform_self_exe(vigil_bin, sizeof(vigil_bin), NULL) != VIGIL_STATUS_OK)
+        snprintf(vigil_bin, sizeof(vigil_bin), "vigil");
+
+    if (strcmp(subcmd, "list") == 0)
+    {
+        const char *const *editors = vigil_editor_supported();
+        printf("Supported editors:\n\n");
+        for (const char *const *e = editors; *e; e++)
+        {
+            /* nvim/vscode use config_home, vim uses HOME */
+            const char *base = (strcmp(*e, "vim") == 0) ? home : config_home;
+            int installed = vigil_editor_is_installed(*e, base);
+            printf("  %-12s %s\n", *e, installed ? "installed \xe2\x9c\x93" : "not installed");
+        }
+        return 0;
+    }
+
+    if (strcmp(subcmd, "status") == 0)
+    {
+        const char *const *editors = vigil_editor_supported();
+        int any = 0;
+        for (const char *const *e = editors; *e; e++)
+        {
+            const char *base = (strcmp(*e, "vim") == 0) ? home : config_home;
+            if (vigil_editor_is_installed(*e, base))
+            {
+                printf("%s: installed\n", *e);
+                any = 1;
+            }
+        }
+        if (!any)
+            printf("No editor integrations installed.\n");
+        return 0;
+    }
+
+    if (strcmp(subcmd, "install") == 0)
+    {
+        vigil_editor_result_t r;
+        if (argc < 4)
+        {
+            fprintf(stderr, "Usage: vigil editor install <editor>\n");
+            return 1;
+        }
+        if (!vigil_editor_is_supported(argv[3]))
+        {
+            fprintf(stderr, "error: unknown editor '%s'\n", argv[3]);
+            fprintf(stderr, "Supported: ");
+            for (const char *const *e = vigil_editor_supported(); *e; e++)
+                fprintf(stderr, "%s ", *e);
+            fprintf(stderr, "\n");
+            return 1;
+        }
+        const char *base = (strcmp(argv[3], "vim") == 0) ? home : config_home;
+        r = vigil_editor_install(argv[3], vigil_bin, base);
+        printf("%s\n", r.message);
+        return r.status == VIGIL_STATUS_OK ? 0 : 1;
+    }
+
+    if (strcmp(subcmd, "uninstall") == 0)
+    {
+        vigil_editor_result_t r;
+        if (argc < 4)
+        {
+            fprintf(stderr, "Usage: vigil editor uninstall <editor>\n");
+            return 1;
+        }
+        if (!vigil_editor_is_supported(argv[3]))
+        {
+            fprintf(stderr, "error: unknown editor '%s'\n", argv[3]);
+            return 1;
+        }
+        const char *base = (strcmp(argv[3], "vim") == 0) ? home : config_home;
+        r = vigil_editor_uninstall(argv[3], base);
+        printf("%s\n", r.message);
+        return r.status == VIGIL_STATUS_OK ? 0 : 1;
+    }
+
+    fprintf(stderr, "Unknown subcommand: %s\n", subcmd);
+    fprintf(stderr, "Usage: vigil editor <list|install|uninstall|status> [editor]\n");
+    return 1;
+}
+
 static const early_command_t early_commands[] = {
     {"run", early_dispatch_run},
     {"embed", early_dispatch_embed},
     {"test", (early_handler_t)vigil_cli_run_test_command},
     {"get", early_dispatch_get},
+    {"editor", early_dispatch_editor},
     {NULL, NULL},
 };
 

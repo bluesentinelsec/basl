@@ -52,6 +52,7 @@ extern void register_vm_ops_string_tests(void);
 extern void register_vm_tests(void);
 extern void register_plugin_tests(void);
 extern void register_embed_api_tests(void);
+extern void register_editor_tests(void);
 
 int main(void)
 {
@@ -106,5 +107,6 @@ int main(void)
     register_vm_tests();
     register_plugin_tests();
     register_embed_api_tests();
+    register_editor_tests();
     return vigil_test_run_all_();
 }

@@ -54,6 +54,8 @@ EXEMPT_FILES = {
     "src/value.c",
     # Embedding API — owns state lifecycle, uses calloc/free for vigil_state_t.
     "src/easy.c",
+    # Editor integration — writes config files with stdio, no runtime context.
+    "src/editor.c",
     # Register VM translator uses raw malloc for internal temporary
     # data structures (code arrays, jump tables, offset maps) that
     # are freed within the same translation call.
