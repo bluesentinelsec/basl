@@ -1,6 +1,7 @@
 """Integration tests for 'vigil editor' CLI command."""
 import os
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -29,10 +30,25 @@ class EditorListTest(unittest.TestCase):
         rc, out, _ = run_editor(["list"])
         self.assertEqual(rc, 0)
         self.assertIn("vim", out)
+        self.assertIn("nvim", out)
         self.assertIn("vscode", out)
+        self.assertIn("emacs", out)
+        self.assertIn("sublime", out)
 
 
 class EditorInstallTest(unittest.TestCase):
+    def test_install_nvim_creates_files(self):
+        with tempfile.TemporaryDirectory() as d:
+            rc, out, _ = run_editor(
+                ["install", "nvim"],
+                env_override={"HOME": d},
+            )
+            self.assertEqual(rc, 0, f"stderr: {out}")
+            ft = Path(d) / ".config" / "nvim" / "after" / "ftdetect" / "vigil.vim"
+            syn = Path(d) / ".config" / "nvim" / "after" / "syntax" / "vigil.vim"
+            self.assertTrue(ft.exists())
+            self.assertTrue(syn.exists())
+
     def test_install_vim_creates_files(self):
         with tempfile.TemporaryDirectory() as d:
             rc, out, _ = run_editor(
@@ -45,6 +61,34 @@ class EditorInstallTest(unittest.TestCase):
             self.assertTrue(ft.exists())
             self.assertTrue(syn.exists())
 
+    def test_install_emacs_creates_mode_and_init(self):
+        with tempfile.TemporaryDirectory() as d:
+            rc, out, _ = run_editor(
+                ["install", "emacs"],
+                env_override={"HOME": d},
+            )
+            self.assertEqual(rc, 0, f"stderr: {out}")
+            mode_file = Path(d) / ".emacs.d" / "vigil-mode.el"
+            init_file = Path(d) / ".emacs.d" / "init.el"
+            self.assertTrue(mode_file.exists())
+            self.assertTrue(init_file.exists())
+            self.assertIn("vigil-mode", init_file.read_text())
+
+    def test_install_sublime_creates_syntax(self):
+        with tempfile.TemporaryDirectory() as d:
+            rc, out, _ = run_editor(
+                ["install", "sublime"],
+                env_override={"HOME": d},
+            )
+            self.assertEqual(rc, 0, f"stderr: {out}")
+            if os.name == "nt":
+                syntax = Path(d) / "AppData" / "Roaming" / "Sublime Text" / "Packages" / "Vigil" / "Vigil.sublime-syntax"
+            elif sys.platform == "darwin":
+                syntax = Path(d) / "Library" / "Application Support" / "Sublime Text" / "Packages" / "Vigil" / "Vigil.sublime-syntax"
+            else:
+                syntax = Path(d) / ".config" / "sublime-text" / "Packages" / "Vigil" / "Vigil.sublime-syntax"
+            self.assertTrue(syntax.exists())
+
     def test_install_unknown_editor_fails(self):
         rc, _, err = run_editor(["install", "notepad"])
         self.assertNotEqual(rc, 0)
@@ -56,6 +100,15 @@ class EditorInstallTest(unittest.TestCase):
 
 
 class EditorUninstallTest(unittest.TestCase):
+    def test_uninstall_emacs_removes_mode_file(self):
+        with tempfile.TemporaryDirectory() as d:
+            run_editor(["install", "emacs"], env_override={"HOME": d})
+            mode_file = Path(d) / ".emacs.d" / "vigil-mode.el"
+            self.assertTrue(mode_file.exists())
+            rc, _, _ = run_editor(["uninstall", "emacs"], env_override={"HOME": d})
+            self.assertEqual(rc, 0)
+            self.assertFalse(mode_file.exists())
+
     def test_uninstall_removes_files(self):
         with tempfile.TemporaryDirectory() as d:
             run_editor(["install", "vim"], env_override={"HOME": d})
@@ -74,10 +127,10 @@ class EditorUninstallTest(unittest.TestCase):
 class EditorStatusTest(unittest.TestCase):
     def test_status_shows_installed(self):
         with tempfile.TemporaryDirectory() as d:
-            run_editor(["install", "vim"], env_override={"HOME": d})
+            run_editor(["install", "nvim"], env_override={"HOME": d})
             rc, out, _ = run_editor(["status"], env_override={"HOME": d})
             self.assertEqual(rc, 0)
-            self.assertIn("vim", out)
+            self.assertIn("nvim", out)
             self.assertIn("installed", out)
 
     def test_status_empty_when_nothing_installed(self):
