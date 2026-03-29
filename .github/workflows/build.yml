@@ -271,6 +271,9 @@ jobs:
       - name: Check core portability
         run: python3 scripts/check_core_portability.py
 
+      - name: Check architecture boundaries
+        run: python3 scripts/check_architecture.py
+
       - name: Check stdlib portability
         run: python3 scripts/check_stdlib_portability.py
 
