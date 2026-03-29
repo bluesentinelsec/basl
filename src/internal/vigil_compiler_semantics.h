@@ -34,6 +34,10 @@ typedef struct
     int is_capture_local;
 } assignment_target_t;
 
+typedef int (*vigil_semantic_stop_predicate_t)(const vigil_parser_state_t *state);
+typedef vigil_status_t (*vigil_semantic_parse_step_t)(vigil_parser_state_t *state,
+                                                      vigil_statement_result_t *out_result);
+
 void vigil_statement_result_set_non_returning(vigil_statement_result_t *result);
 int vigil_statement_result_guarantees_return(const vigil_statement_result_t *result);
 void vigil_statement_result_merge_sequence(vigil_statement_result_t *result,
@@ -50,6 +54,10 @@ vigil_status_t parse_parenthesized_bool_condition(vigil_parser_state_t *state, c
                                                   const char *lparen_message, const char *rparen_message,
                                                   const char *scalar_message, const char *type_message,
                                                   vigil_expression_result_t *condition_result);
+vigil_status_t vigil_semantic_parse_statement_sequence(vigil_parser_state_t *state,
+                                                       vigil_statement_result_t *out_result,
+                                                       vigil_semantic_parse_step_t parse_step,
+                                                       vigil_semantic_stop_predicate_t should_stop);
 
 void assignment_target_init(assignment_target_t *t);
 int assignment_target_is_composite(const assignment_target_t *t);

@@ -77,6 +77,37 @@ vigil_status_t parse_parenthesized_bool_condition(vigil_parser_state_t *state, c
     return vigil_parser_expect(state, VIGIL_TOKEN_RPAREN, rparen_message, NULL);
 }
 
+vigil_status_t vigil_semantic_parse_statement_sequence(vigil_parser_state_t *state,
+                                                       vigil_statement_result_t *out_result,
+                                                       vigil_semantic_parse_step_t parse_step,
+                                                       vigil_semantic_stop_predicate_t should_stop)
+{
+    vigil_status_t status;
+    vigil_statement_result_t step_result;
+    vigil_statement_result_t block_result;
+
+    if (state == NULL || parse_step == NULL || should_stop == NULL)
+    {
+        vigil_error_set_literal(state == NULL ? NULL : state->program->error, VIGIL_STATUS_INVALID_ARGUMENT,
+                                "semantic statement sequence arguments are invalid");
+        return VIGIL_STATUS_INVALID_ARGUMENT;
+    }
+
+    vigil_statement_result_clear(&step_result);
+    vigil_statement_result_clear(&block_result);
+
+    while (!vigil_parser_is_at_end(state) && !should_stop(state))
+    {
+        status = parse_step(state, &step_result);
+        if (status != VIGIL_STATUS_OK)
+            return status;
+        vigil_statement_result_merge_sequence(&block_result, &step_result);
+    }
+
+    vigil_statement_result_set_guaranteed_return(out_result, block_result.guaranteed_return);
+    return VIGIL_STATUS_OK;
+}
+
 void assignment_target_init(assignment_target_t *t)
 {
     t->name_token = NULL;

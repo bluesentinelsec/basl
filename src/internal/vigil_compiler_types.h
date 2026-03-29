@@ -451,6 +451,7 @@ vigil_parser_type_t vigil_program_map_type_value(const vigil_program_state_t *pr
 const vigil_token_t *vigil_parser_peek(const vigil_parser_state_t *state);
 const vigil_token_t *vigil_parser_advance(vigil_parser_state_t *state);
 const vigil_token_t *vigil_parser_previous(const vigil_parser_state_t *state);
+int vigil_parser_is_at_end(const vigil_parser_state_t *state);
 int vigil_parser_check(const vigil_parser_state_t *state, vigil_token_kind_t kind);
 int vigil_parser_match(vigil_parser_state_t *state, vigil_token_kind_t kind);
 vigil_source_span_t vigil_parser_fallback_span(const vigil_parser_state_t *state);
