@@ -43,6 +43,40 @@ jobs:
       - name: Test
         run: ctest --test-dir build --output-on-failure -C Release
 
+      - name: Resolve artifact name
+        id: meta
+        shell: bash
+        run: |
+          version=$(grep 'project(vigil VERSION' CMakeLists.txt | sed 's/.*VERSION \([^ ]*\).*/\1/')
+          case "${{ runner.os }}" in
+            Linux)   os=linux ;;
+            macOS)   os=macos ;;
+            Windows) os=windows ;;
+          esac
+          case "${{ runner.arch }}" in
+            X64)   cpu=amd64 ;;
+            ARM64) cpu=arm64 ;;
+          esac
+          echo "name=vigil-${version}-${os}-${cpu}" >> "$GITHUB_OUTPUT"
+
+      - name: Stage artifact
+        shell: bash
+        run: |
+          mkdir -p artifact
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            cp build/Release/vigil.exe artifact/
+            cp build/Release/vigil.dll artifact/ 2>/dev/null || true
+          else
+            cp build/vigil artifact/
+            cp build/libvigil.* artifact/
+          fi
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.meta.outputs.name }}
+          path: artifact/
+
   native-minimal:
     timeout-minutes: 15
     strategy:
