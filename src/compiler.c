@@ -4772,7 +4772,7 @@ int vigil_parser_check(const vigil_parser_state_t *state, vigil_token_kind_t kin
     return token != NULL && token->kind == kind;
 }
 
-static int vigil_parser_is_at_end(const vigil_parser_state_t *state)
+int vigil_parser_is_at_end(const vigil_parser_state_t *state)
 {
     return vigil_parser_peek(state) == NULL;
 }
@@ -10024,6 +10024,8 @@ vigil_status_t vigil_parser_parse_expression_with_expected_type(vigil_parser_sta
 
 static vigil_status_t vigil_parser_parse_block_contents(vigil_parser_state_t *state,
                                                         vigil_statement_result_t *out_result);
+static int vigil_parser_should_stop_block_contents(const vigil_parser_state_t *state);
+static int vigil_parser_should_stop_switch_case_contents(const vigil_parser_state_t *state);
 
 static vigil_status_t vigil_parser_parse_block_statement(vigil_parser_state_t *state,
                                                          vigil_statement_result_t *out_result)
@@ -11419,33 +11421,8 @@ static vigil_status_t vigil_parser_parse_for_statement(vigil_parser_state_t *sta
 static vigil_status_t vigil_parser_parse_switch_case_contents(vigil_parser_state_t *state,
                                                               vigil_statement_result_t *out_result)
 {
-    vigil_status_t status;
-    vigil_statement_result_t declaration_result;
-    vigil_statement_result_t block_result;
-    const vigil_token_t *token;
-
-    vigil_statement_result_clear(&declaration_result);
-    vigil_statement_result_clear(&block_result);
-
-    while (!vigil_parser_is_at_end(state))
-    {
-        token = vigil_parser_peek(state);
-        if (token == NULL || token->kind == VIGIL_TOKEN_RBRACE || token->kind == VIGIL_TOKEN_CASE ||
-            token->kind == VIGIL_TOKEN_DEFAULT)
-        {
-            break;
-        }
-
-        status = vigil_parser_parse_declaration(state, &declaration_result);
-        if (status != VIGIL_STATUS_OK)
-        {
-            return status;
-        }
-        vigil_statement_result_merge_sequence(&block_result, &declaration_result);
-    }
-
-    vigil_statement_result_set_guaranteed_return(out_result, block_result.guaranteed_return);
-    return VIGIL_STATUS_OK;
+    return vigil_semantic_parse_statement_sequence(state, out_result, vigil_parser_parse_declaration,
+                                                   vigil_parser_should_stop_switch_case_contents);
 }
 
 static vigil_status_t parse_switch_default_case(vigil_parser_state_t *state, const vigil_token_t *token,
@@ -12839,6 +12816,20 @@ static vigil_status_t vigil_parser_parse_statement(vigil_parser_state_t *state, 
     return vigil_parser_parse_expression_statement(state, out_result);
 }
 
+static int vigil_parser_should_stop_block_contents(const vigil_parser_state_t *state)
+{
+    return vigil_parser_check(state, VIGIL_TOKEN_RBRACE);
+}
+
+static int vigil_parser_should_stop_switch_case_contents(const vigil_parser_state_t *state)
+{
+    const vigil_token_t *token;
+
+    token = vigil_parser_peek(state);
+    return token == NULL || token->kind == VIGIL_TOKEN_RBRACE || token->kind == VIGIL_TOKEN_CASE ||
+           token->kind == VIGIL_TOKEN_DEFAULT;
+}
+
 static int vigil_parser_is_variable_declaration_start(const vigil_parser_state_t *state)
 {
     const vigil_token_t *token;
@@ -12905,25 +12896,8 @@ static vigil_status_t vigil_parser_parse_declaration(vigil_parser_state_t *state
 static vigil_status_t vigil_parser_parse_block_contents(vigil_parser_state_t *state,
                                                         vigil_statement_result_t *out_result)
 {
-    vigil_status_t status;
-    vigil_statement_result_t declaration_result;
-    vigil_statement_result_t block_result;
-
-    vigil_statement_result_clear(&declaration_result);
-    vigil_statement_result_clear(&block_result);
-
-    while (!vigil_parser_is_at_end(state) && !vigil_parser_check(state, VIGIL_TOKEN_RBRACE))
-    {
-        status = vigil_parser_parse_declaration(state, &declaration_result);
-        if (status != VIGIL_STATUS_OK)
-        {
-            return status;
-        }
-        vigil_statement_result_merge_sequence(&block_result, &declaration_result);
-    }
-
-    vigil_statement_result_set_guaranteed_return(out_result, block_result.guaranteed_return);
-    return VIGIL_STATUS_OK;
+    return vigil_semantic_parse_statement_sequence(state, out_result, vigil_parser_parse_declaration,
+                                                   vigil_parser_should_stop_block_contents);
 }
 
 static vigil_status_t vigil_compile_seed_parameter_symbols(vigil_parser_state_t *state,
