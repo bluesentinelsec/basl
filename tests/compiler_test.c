@@ -3,6 +3,8 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "internal/vigil_compiler_internal.h"
+#include "internal/vigil_compiler_semantics.h"
 #include "vigil/vigil.h"
 
 struct TestSource
@@ -155,6 +157,100 @@ static void CompileSingleDiagnosticMessage(const char *source_text, char *messag
     vigil_diagnostic_list_free(&diagnostics);
     vigil_source_registry_free(&registry);
     vigil_runtime_close(&runtime);
+}
+
+static void FreePreparedProgramFixtures(vigil_runtime_t **runtime, vigil_program_state_t *program,
+                                        vigil_source_registry_t *registry, vigil_diagnostic_list_t *diagnostics)
+{
+    vigil_program_free(program);
+    vigil_diagnostic_list_free(diagnostics);
+    vigil_source_registry_free(registry);
+    vigil_runtime_close(runtime);
+}
+
+static void InitPreparedProgramFixtures(int *vigil_test_failed_, vigil_runtime_t **runtime,
+                                        vigil_source_registry_t *registry, vigil_diagnostic_list_t *diagnostics,
+                                        vigil_program_state_t *program, const char *source_text, vigil_error_t *error)
+{
+    vigil_source_id_t source_id;
+
+    (void)vigil_test_failed_;
+    ASSERT_EQ(vigil_runtime_open(runtime, NULL, error), VIGIL_STATUS_OK);
+    vigil_source_registry_init(registry, *runtime);
+    vigil_diagnostic_list_init(diagnostics, *runtime);
+    source_id = RegisterSource(vigil_test_failed_, registry, "main.vigil", source_text, error);
+    ASSERT_EQ(vigil_semantic_prepare_source_internal(registry, source_id, VIGIL_COMPILE_MODE_BUILD_ENTRYPOINT, NULL,
+                                                     diagnostics, program, error),
+              VIGIL_STATUS_OK);
+    ASSERT_EQ(vigil_diagnostic_list_count(diagnostics), 0U);
+}
+
+TEST(VigilCompilerTest, LoweredFunctionBodyMatchesChunkDuringSemanticAnalysis)
+{
+    static const char source[] = "fn helper(i32 base) -> i32 {"
+                                 "    i32 total = base + 3;"
+                                 "    if (total > 4) {"
+                                 "        return total;"
+                                 "    }"
+                                 "    return total + 1;"
+                                 "}"
+                                 "fn main() -> i32 {"
+                                 "    return helper(2);"
+                                 "}";
+    vigil_runtime_t *runtime = NULL;
+    vigil_error_t error = {0};
+    vigil_source_registry_t registry;
+    vigil_diagnostic_list_t diagnostics;
+    vigil_program_state_t program;
+    vigil_lowered_function_body_t body;
+    vigil_parser_state_t state;
+    vigil_statement_result_t result;
+
+    InitPreparedProgramFixtures(vigil_test_failed_, &runtime, &registry, &diagnostics, &program, source, &error);
+
+    vigil_lowered_function_body_init(&body);
+    body.runtime = runtime;
+    ASSERT_EQ(
+        vigil_semantic_analyze_function_body(&program, program.functions.main_index, NULL, &body, &state, &result),
+        VIGIL_STATUS_OK);
+    EXPECT_EQ(vigil_verify_lowered_function_body_matches_chunk(&body, &state.chunk, &error), VIGIL_STATUS_OK);
+
+    vigil_chunk_free(&state.chunk);
+    vigil_parser_state_free(&state);
+    vigil_lowered_function_body_free(&body);
+    FreePreparedProgramFixtures(&runtime, &program, &registry, &diagnostics);
+}
+
+TEST(VigilCompilerTest, LoweredFunctionBodyVerifierRejectsChunkDrift)
+{
+    static const char source[] = "fn main() -> i32 { return 7; }";
+    vigil_runtime_t *runtime = NULL;
+    vigil_error_t error = {0};
+    vigil_source_registry_t registry;
+    vigil_diagnostic_list_t diagnostics;
+    vigil_program_state_t program;
+    vigil_lowered_function_body_t body;
+    vigil_parser_state_t state;
+    vigil_statement_result_t result;
+
+    InitPreparedProgramFixtures(vigil_test_failed_, &runtime, &registry, &diagnostics, &program, source, &error);
+
+    vigil_lowered_function_body_init(&body);
+    body.runtime = runtime;
+    ASSERT_EQ(
+        vigil_semantic_analyze_function_body(&program, program.functions.main_index, NULL, &body, &state, &result),
+        VIGIL_STATUS_OK);
+    ASSERT_TRUE(body.instruction_count > 0U);
+    body.instructions[0].opcode = VIGIL_OPCODE_FALSE;
+
+    vigil_error_clear(&error);
+    EXPECT_EQ(vigil_verify_lowered_function_body_matches_chunk(&body, &state.chunk, &error), VIGIL_STATUS_INTERNAL);
+    EXPECT_TRUE(strstr(vigil_error_message(&error), "lowered instruction drifted from chunk") != NULL);
+
+    vigil_chunk_free(&state.chunk);
+    vigil_parser_state_free(&state);
+    vigil_lowered_function_body_free(&body);
+    FreePreparedProgramFixtures(&runtime, &program, &registry, &diagnostics);
 }
 
 static void ExpectSingleCompilerDiagnostic(int *vigil_test_failed_, const char *source_text,
@@ -3260,6 +3356,8 @@ static void register_compiler_defer_tests(void)
 
 void register_compiler_tests(void)
 {
+    REGISTER_TEST(VigilCompilerTest, LoweredFunctionBodyMatchesChunkDuringSemanticAnalysis);
+    REGISTER_TEST(VigilCompilerTest, LoweredFunctionBodyVerifierRejectsChunkDrift);
     REGISTER_TEST(VigilCompilerTest, CompilesAndExecutesArithmeticAndLocals);
     REGISTER_TEST(VigilCompilerTest, CompilesAndExecutesFloatArithmeticAndComparison);
     REGISTER_TEST(VigilCompilerTest, CompilesAndExecutesConversionsConstLocalsAndBitwiseNot);

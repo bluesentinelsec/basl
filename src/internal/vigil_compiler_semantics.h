@@ -72,6 +72,8 @@ vigil_status_t vigil_lowered_function_body_append(vigil_lowered_function_body_t 
                                                   const vigil_lowered_instruction_t *instruction, vigil_error_t *error);
 vigil_status_t vigil_lowered_function_body_sync_from_chunk(vigil_lowered_function_body_t *body,
                                                            const vigil_chunk_t *chunk, vigil_error_t *error);
+vigil_status_t vigil_verify_lowered_function_body_matches_chunk(const vigil_lowered_function_body_t *body,
+                                                                const vigil_chunk_t *chunk, vigil_error_t *error);
 vigil_status_t vigil_semantic_lower_function_body(vigil_program_state_t *program, size_t function_index,
                                                   const vigil_parser_state_t *parent_state,
                                                   vigil_lowered_function_body_t *out_body);

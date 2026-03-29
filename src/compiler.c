@@ -40,6 +40,8 @@ vigil_status_t vigil_parser_emit_f64_constant(vigil_parser_state_t *state, doubl
 vigil_status_t vigil_parser_emit_string_constant_text(vigil_parser_state_t *state, vigil_source_span_t span,
                                                       const char *text, size_t length);
 vigil_status_t vigil_parser_emit_ok_constant(vigil_parser_state_t *state, vigil_source_span_t span);
+static vigil_status_t vigil_parser_emit_constant_value(vigil_parser_state_t *state, const vigil_value_t *value,
+                                                       vigil_source_span_t span);
 static vigil_status_t vigil_parser_emit_integer_cast(vigil_parser_state_t *state, vigil_parser_type_t target_type,
                                                      vigil_source_span_t span);
 static int vigil_opcode_produces_i64(vigil_opcode_t op);
@@ -1855,7 +1857,7 @@ vigil_status_t vigil_parser_emit_string_constant_text(vigil_parser_state_t *stat
     if (status == VIGIL_STATUS_OK)
     {
         vigil_value_init_object(&value, &object);
-        status = vigil_chunk_write_constant(&state->chunk, &value, span, NULL, state->program->error);
+        status = vigil_parser_emit_constant_value(state, &value, span);
     }
     vigil_value_release(&value);
     vigil_object_release(&object);
@@ -4995,7 +4997,6 @@ static void lowered_rewrite_forloop(vigil_parser_state_t *state, size_t loop_sta
     vigil_lowered_instruction_t *condition_constant;
     vigil_lowered_instruction_t *forloop_instruction;
     size_t body_start_offset;
-    size_t forloop_pos;
     size_t forloop_end;
     uint32_t back_off;
 
@@ -5033,8 +5034,7 @@ static void lowered_rewrite_forloop(vigil_parser_state_t *state, size_t loop_sta
                              lowered_instruction_byte_size(&body->instructions[condition_index + 5U]);
     }
 
-    forloop_pos = state->chunk.code.length - 11U;
-    forloop_end = forloop_pos + 15U;
+    forloop_end = state->chunk.code.length;
     back_off = (uint32_t)(forloop_end - body_start_offset);
 
     forloop_instruction->opcode = opcode;
@@ -5164,6 +5164,21 @@ vigil_status_t emit_opcode_u32(vigil_parser_state_t *state, vigil_opcode_t opcod
     if (status != VIGIL_STATUS_OK)
         return status;
     return vigil_parser_emit_u32(state, operand, span);
+}
+
+static vigil_status_t vigil_parser_emit_constant_value(vigil_parser_state_t *state, const vigil_value_t *value,
+                                                       vigil_source_span_t span)
+{
+    vigil_status_t status;
+    size_t constant_index = 0U;
+
+    status = vigil_chunk_write_constant(&state->chunk, value, span, &constant_index, state->program->error);
+    if (status != VIGIL_STATUS_OK)
+        return status;
+    status = lowered_append_instruction(state, VIGIL_OPCODE_CONSTANT, span);
+    if (status != VIGIL_STATUS_OK)
+        return status;
+    return lowered_append_operand(state, VIGIL_LOWERED_OPERAND_U32, (uint32_t)constant_index);
 }
 
 static vigil_opcode_t vigil_parser_fuse_cmp_i32_jump(vigil_opcode_t cmp)
@@ -5887,7 +5902,7 @@ vigil_status_t vigil_parser_emit_ok_constant(vigil_parser_state_t *state, vigil_
         return status;
     }
     vigil_value_init_object(&value, &object);
-    status = vigil_chunk_write_constant(&state->chunk, &value, span, NULL, state->program->error);
+    status = vigil_parser_emit_constant_value(state, &value, span);
     vigil_value_release(&value);
     return status;
 }
@@ -7239,7 +7254,7 @@ static vigil_status_t vigil_parser_parse_native_static_method_call(vigil_parser_
     /* Push class_index as hidden first arg so the C impl can create
      * instances of the correct class. */
     vigil_value_init_int(&ci_val, (int64_t)class_index);
-    status = vigil_chunk_write_constant(&state->chunk, &ci_val, method_token->span, NULL, state->program->error);
+    status = vigil_parser_emit_constant_value(state, &ci_val, method_token->span);
     vigil_value_release(&ci_val);
     if (status != VIGIL_STATUS_OK)
     {
@@ -7487,7 +7502,7 @@ static vigil_status_t parse_qualified_enum_member(vigil_parser_state_t *state, c
         return vigil_parser_report(state, member_token->span, "module member is not public");
 
     vigil_value_init_int(&value, enum_member->value);
-    status = vigil_chunk_write_constant(&state->chunk, &value, enum_member_token->span, NULL, state->program->error);
+    status = vigil_parser_emit_constant_value(state, &value, enum_member_token->span);
     vigil_value_release(&value);
     if (status != VIGIL_STATUS_OK)
         return status;
@@ -7578,8 +7593,7 @@ static vigil_status_t parse_qualified_non_call(vigil_parser_state_t *state, cons
     {
         if (!vigil_program_is_constant_public(constant))
             return vigil_parser_report(state, member_token->span, "module member is not public");
-        status = vigil_chunk_write_constant(&state->chunk, &constant->value, member_token->span, NULL,
-                                            state->program->error);
+        status = vigil_parser_emit_constant_value(state, &constant->value, member_token->span);
         if (status != VIGIL_STATUS_OK)
             return status;
         vigil_expression_result_set_type(out_result, constant->type);
@@ -8487,7 +8501,7 @@ static vigil_status_t parse_identifier_enum_member(vigil_parser_state_t *state, 
             vigil_builtin_error_kind_by_name(member_text, member_length, &error_kind))
         {
             vigil_value_init_int(&value, error_kind);
-            status = vigil_chunk_write_constant(&state->chunk, &value, member_token->span, NULL, state->program->error);
+            status = vigil_parser_emit_constant_value(state, &value, member_token->span);
             if (status != VIGIL_STATUS_OK)
                 return status;
             vigil_expression_result_set_type(out_result, vigil_binding_type_primitive(VIGIL_TYPE_I32));
@@ -8499,7 +8513,7 @@ static vigil_status_t parse_identifier_enum_member(vigil_parser_state_t *state, 
             member_text, member_length, &enum_index, &enum_member))
         return vigil_parser_report(state, member_token->span, "unknown enum member");
     vigil_value_init_int(&value, enum_member->value);
-    status = vigil_chunk_write_constant(&state->chunk, &value, member_token->span, NULL, state->program->error);
+    status = vigil_parser_emit_constant_value(state, &value, member_token->span);
     vigil_value_release(&value);
     if (status != VIGIL_STATUS_OK)
         return status;
@@ -8541,7 +8555,7 @@ static vigil_status_t parse_identifier_variable(vigil_parser_state_t *state, con
         }
         return vigil_parser_report(state, token->span, "unknown local variable");
     }
-    status = vigil_chunk_write_constant(&state->chunk, &constant->value, token->span, NULL, state->program->error);
+    status = vigil_parser_emit_constant_value(state, &constant->value, token->span);
     if (status != VIGIL_STATUS_OK)
         return status;
     vigil_expression_result_set_type(out_result, constant->type);
@@ -8803,7 +8817,7 @@ static vigil_status_t parse_primary_int_literal(vigil_parser_state_t *state, con
     status = vigil_parser_parse_int_literal(state, token, &value, &local_type);
     if (status != VIGIL_STATUS_OK)
         return status;
-    status = vigil_chunk_write_constant(&state->chunk, &value, token->span, NULL, state->program->error);
+    status = vigil_parser_emit_constant_value(state, &value, token->span);
     vigil_value_release(&value);
     if (status != VIGIL_STATUS_OK)
         return status;
@@ -8821,7 +8835,7 @@ static vigil_status_t parse_primary_string_literal(vigil_parser_state_t *state, 
     status = vigil_program_parse_string_literal_value(state->program, token, &string_value);
     if (status != VIGIL_STATUS_OK)
         return status;
-    status = vigil_chunk_write_constant(&state->chunk, &string_value, token->span, NULL, state->program->error);
+    status = vigil_parser_emit_constant_value(state, &string_value, token->span);
     vigil_value_release(&string_value);
     if (status != VIGIL_STATUS_OK)
         return status;
@@ -8839,7 +8853,7 @@ static vigil_status_t parse_primary_float_literal(vigil_parser_state_t *state, c
     status = vigil_parser_parse_float_literal(state, token, &float_value);
     if (status != VIGIL_STATUS_OK)
         return status;
-    status = vigil_chunk_write_constant(&state->chunk, &float_value, token->span, NULL, state->program->error);
+    status = vigil_parser_emit_constant_value(state, &float_value, token->span);
     vigil_value_release(&float_value);
     if (status != VIGIL_STATUS_OK)
         return status;
@@ -11791,7 +11805,7 @@ static vigil_status_t vigil_parser_emit_i32_constant(vigil_parser_state_t *state
     vigil_value_t constant;
 
     vigil_value_init_int(&constant, value);
-    status = vigil_chunk_write_constant(&state->chunk, &constant, span, NULL, state->program->error);
+    status = vigil_parser_emit_constant_value(state, &constant, span);
     vigil_value_release(&constant);
     return status;
 }
@@ -11802,7 +11816,7 @@ vigil_status_t vigil_parser_emit_f64_constant(vigil_parser_state_t *state, doubl
     vigil_value_t constant;
 
     vigil_value_init_float(&constant, value);
-    status = vigil_chunk_write_constant(&state->chunk, &constant, span, NULL, state->program->error);
+    status = vigil_parser_emit_constant_value(state, &constant, span);
     vigil_value_release(&constant);
     return status;
 }
