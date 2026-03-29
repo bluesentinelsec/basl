@@ -3135,27 +3135,19 @@ static int early_dispatch_editor(int argc, char **argv)
 
 /* ── profile command ──────────────────────────────────────────────── */
 
-#ifdef _WIN32
-#include <psapi.h>
-#include <windows.h>
-#endif
-
 static int64_t get_peak_rss_kb(void)
 {
-#if defined(_WIN32)
-    PROCESS_MEMORY_COUNTERS pmc;
-    if (GetProcessMemoryInfo(GetCurrentProcess(), &pmc, sizeof(pmc)))
-        return (int64_t)(pmc.PeakWorkingSetSize / 1024);
-    return 0;
-#elif defined(__APPLE__)
+#if defined(__APPLE__)
     struct rusage ru;
     if (getrusage(RUSAGE_SELF, &ru) == 0)
         return (int64_t)(ru.ru_maxrss / 1024); /* bytes on macOS */
     return 0;
-#else
+#elif !defined(_WIN32)
     struct rusage ru;
     if (getrusage(RUSAGE_SELF, &ru) == 0)
         return (int64_t)ru.ru_maxrss; /* KB on Linux */
+    return 0;
+#else
     return 0;
 #endif
 }

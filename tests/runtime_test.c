@@ -360,6 +360,23 @@ TEST(VigilRuntimeTest, VmOpenFailsWhenRegistryAllocFails)
 
 // NOLINTEND(readability-function-cognitive-complexity)
 
+TEST(VigilRuntimeTest, AllocCountersTrackAllocations)
+{
+    vigil_runtime_t *runtime = NULL;
+    vigil_error_t error = {0};
+    void *mem = NULL;
+
+    ASSERT_EQ(vigil_runtime_open(&runtime, NULL, &error), VIGIL_STATUS_OK);
+    int64_t before = vigil_runtime_alloc_count(runtime);
+    ASSERT_EQ(vigil_runtime_alloc(runtime, 64U, &mem, &error), VIGIL_STATUS_OK);
+    EXPECT_EQ(vigil_runtime_alloc_count(runtime), before + 1);
+    EXPECT_GE(vigil_runtime_alloc_bytes(runtime), 64);
+    EXPECT_EQ(vigil_runtime_alloc_count(NULL), 0);
+    EXPECT_EQ(vigil_runtime_alloc_bytes(NULL), 0);
+    vigil_runtime_free(runtime, &mem);
+    vigil_runtime_close(&runtime);
+}
+
 void register_runtime_tests(void)
 {
     REGISTER_TEST(VigilRuntimeTest, RuntimeOpensAndClosesWithDefaultAllocator);
@@ -375,4 +392,5 @@ void register_runtime_tests(void)
     REGISTER_TEST(VigilRuntimeTest, VmRegistryGrowsBeyondInitialCapacity);
     REGISTER_TEST(VigilRuntimeTest, VmRegistryUnregisterNonLastVm);
     REGISTER_TEST(VigilRuntimeTest, VmOpenFailsWhenRegistryAllocFails);
+    REGISTER_TEST(VigilRuntimeTest, AllocCountersTrackAllocations);
 }
