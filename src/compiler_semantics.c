@@ -189,6 +189,46 @@ static vigil_status_t vigil_semantic_synthesize_repl_main(vigil_program_state_t 
     return VIGIL_STATUS_OK;
 }
 
+static vigil_status_t vigil_semantic_validate_prepare_inputs(const vigil_source_registry_t *registry,
+                                                             vigil_diagnostic_list_t *diagnostics,
+                                                             vigil_program_state_t *out_program, vigil_error_t *error)
+{
+    if (registry == NULL)
+    {
+        vigil_error_set_literal(error, VIGIL_STATUS_INVALID_ARGUMENT, "source registry must not be null");
+        return VIGIL_STATUS_INVALID_ARGUMENT;
+    }
+    if (diagnostics == NULL)
+    {
+        vigil_error_set_literal(error, VIGIL_STATUS_INVALID_ARGUMENT, "diagnostic list must not be null");
+        return VIGIL_STATUS_INVALID_ARGUMENT;
+    }
+    if (out_program == NULL)
+    {
+        vigil_error_set_literal(error, VIGIL_STATUS_INVALID_ARGUMENT, "out_program must not be null");
+        return VIGIL_STATUS_INVALID_ARGUMENT;
+    }
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t vigil_semantic_init_program(vigil_program_state_t *program,
+                                                  const vigil_source_registry_t *registry,
+                                                  const vigil_source_file_t *source,
+                                                  const vigil_native_registry_t *natives,
+                                                  vigil_diagnostic_list_t *diagnostics, vigil_error_t *error,
+                                                  vigil_compile_mode_t mode)
+{
+    memset(program, 0, sizeof(*program));
+    program->registry = registry;
+    program->diagnostics = diagnostics;
+    program->error = error;
+    program->natives = natives;
+    program->compile_mode = (int)mode;
+    vigil_binding_function_table_init(&program->functions, registry->runtime);
+    vigil_program_set_module_context(program, source, NULL);
+    return VIGIL_STATUS_OK;
+}
+
 static vigil_status_t parse_repl_trailing_statements(vigil_program_state_t *program, size_t cursor)
 {
     size_t end_cursor = cursor;
@@ -631,6 +671,60 @@ vigil_status_t vigil_semantic_check_function_with_parent(vigil_program_state_t *
     vigil_chunk_free(&state.chunk);
     vigil_parser_state_free(&state);
     return status;
+}
+
+vigil_status_t vigil_semantic_prepare_source_internal(const vigil_source_registry_t *registry,
+                                                      vigil_source_id_t source_id, vigil_compile_mode_t mode,
+                                                      const vigil_native_registry_t *natives,
+                                                      vigil_diagnostic_list_t *diagnostics,
+                                                      vigil_program_state_t *out_program, vigil_error_t *error)
+{
+    vigil_status_t status;
+    const vigil_source_file_t *source;
+
+    vigil_error_clear(error);
+    status = vigil_semantic_validate_prepare_inputs(registry, diagnostics, out_program, error);
+    if (status != VIGIL_STATUS_OK)
+        return status;
+
+    source = vigil_source_registry_get(registry, source_id);
+    if (source == NULL)
+    {
+        vigil_error_set_literal(error, VIGIL_STATUS_INVALID_ARGUMENT,
+                                "source_id must reference a registered source file");
+        return VIGIL_STATUS_INVALID_ARGUMENT;
+    }
+
+    status = vigil_semantic_init_program(out_program, registry, source, natives, diagnostics, error, mode);
+    if (status != VIGIL_STATUS_OK)
+        return status;
+
+    status = vigil_semantic_prepare_program(out_program, source_id, mode, mode == VIGIL_COMPILE_MODE_REPL);
+    if (status != VIGIL_STATUS_OK)
+    {
+        vigil_program_free(out_program);
+        return status;
+    }
+
+    return VIGIL_STATUS_OK;
+}
+
+vigil_status_t vigil_semantic_validate_program_internal(vigil_program_state_t *program)
+{
+    vigil_status_t status;
+    size_t i;
+
+    if (program == NULL)
+        return VIGIL_STATUS_INVALID_ARGUMENT;
+
+    for (i = 0U; i < program->functions.count; ++i)
+    {
+        status = vigil_semantic_check_function_with_parent(program, i, NULL);
+        if (status != VIGIL_STATUS_OK)
+            return status;
+    }
+
+    return VIGIL_STATUS_OK;
 }
 
 void assignment_target_init(assignment_target_t *t)
