@@ -7,5 +7,7 @@ vigil_status_t vigil_compile_materialize_lowered_function_body(vigil_program_sta
                                                                const vigil_function_decl_t *decl,
                                                                vigil_lowered_function_body_t *body,
                                                                vigil_object_t **out_object);
+vigil_status_t vigil_compile_backend_try_materialize_special_function(vigil_program_state_t *program,
+                                                                      size_t function_index, int *handled);
 
 #endif
