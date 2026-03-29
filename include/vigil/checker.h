@@ -15,7 +15,7 @@ extern "C"
     /*
      * Validates a VIGIL source file without returning an executable entrypoint.
      * Diagnostics describe syntax and semantic errors discovered during lexing,
-     * declaration parsing, and function-body compilation.
+     * declaration parsing, and the semantic function-body validation pass.
      * If |natives| is non-NULL, native stdlib modules are recognized during
      * type checking; otherwise imports of native modules will be rejected.
      */

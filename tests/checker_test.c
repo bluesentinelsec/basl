@@ -118,6 +118,36 @@ TEST(VigilCheckerTest, ReportsMissingReturnOnSomePaths)
     vigil_runtime_close(&runtime);
 }
 
+TEST(VigilCheckerTest, RequiresMainFunctionForCheckSource)
+{
+    vigil_runtime_t *runtime = NULL;
+    vigil_error_t error = {0};
+    vigil_source_registry_t registry;
+    vigil_diagnostic_list_t diagnostics;
+    vigil_source_id_t source_id;
+    const vigil_diagnostic_t *diagnostic;
+
+    ASSERT_EQ(vigil_runtime_open(&runtime, NULL, &error), VIGIL_STATUS_OK);
+    vigil_source_registry_init(&registry, runtime);
+    vigil_diagnostic_list_init(&diagnostics, runtime);
+
+    source_id = RegisterSource(vigil_test_failed_, &registry, "lib_only.vigil",
+                               "pub fn twice(i32 value) -> i32 {"
+                               "    return value * 2;"
+                               "}",
+                               &error);
+
+    EXPECT_EQ(vigil_check_source(&registry, source_id, NULL, &diagnostics, &error), VIGIL_STATUS_SYNTAX_ERROR);
+    ASSERT_EQ(vigil_diagnostic_list_count(&diagnostics), 1U);
+    diagnostic = vigil_diagnostic_list_get(&diagnostics, 0U);
+    ASSERT_NE(diagnostic, NULL);
+    EXPECT_STREQ(vigil_string_c_str(&diagnostic->message), "expected top-level function 'main'");
+
+    vigil_diagnostic_list_free(&diagnostics);
+    vigil_source_registry_free(&registry);
+    vigil_runtime_close(&runtime);
+}
+
 TEST(VigilCheckerTest, ValidatesArguments)
 {
     vigil_runtime_t *runtime = NULL;
@@ -147,5 +177,6 @@ void register_checker_tests(void)
     REGISTER_TEST(VigilCheckerTest, ValidatesWellTypedProgramWithoutDiagnostics);
     REGISTER_TEST(VigilCheckerTest, ReportsSemanticErrorsWithoutProducingEntrypoint);
     REGISTER_TEST(VigilCheckerTest, ReportsMissingReturnOnSomePaths);
+    REGISTER_TEST(VigilCheckerTest, RequiresMainFunctionForCheckSource);
     REGISTER_TEST(VigilCheckerTest, ValidatesArguments);
 }
