@@ -58,6 +58,12 @@ vigil_status_t vigil_semantic_parse_statement_sequence(vigil_parser_state_t *sta
                                                        vigil_statement_result_t *out_result,
                                                        vigil_semantic_parse_step_t parse_step,
                                                        vigil_semantic_stop_predicate_t should_stop);
+vigil_status_t vigil_semantic_analyze_function_body(vigil_program_state_t *program, size_t function_index,
+                                                    const vigil_parser_state_t *parent_state,
+                                                    vigil_parser_state_t *state,
+                                                    vigil_statement_result_t *out_body_result);
+vigil_status_t vigil_semantic_check_function_with_parent(vigil_program_state_t *program, size_t function_index,
+                                                         const vigil_parser_state_t *parent_state);
 
 void assignment_target_init(assignment_target_t *t);
 int assignment_target_is_composite(const assignment_target_t *t);
