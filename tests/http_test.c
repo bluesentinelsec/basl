@@ -55,20 +55,17 @@ typedef struct
 } http_conn_t;
 
 extern char *ensure_hdr_capacity(char *buf, size_t *cap, size_t len);
-extern int parse_request_line(const char *buf, const char *line_end, char **method_out,
-                              char **path_out);
+extern int parse_request_line(const char *buf, const char *line_end, char **method_out, char **path_out);
 extern int parse_content_length(const char *headers, size_t *out);
-extern int recv_body_bytes(vigil_socket_t sock, char *body, const char *bstart, size_t already,
-                           size_t content_length);
-extern char *recv_request_body(vigil_socket_t sock, const char *headers, const char *bstart,
-                               size_t already, size_t *body_len_out);
+extern int recv_body_bytes(vigil_socket_t sock, char *body, const char *bstart, size_t already, size_t content_length);
+extern char *recv_request_body(vigil_socket_t sock, const char *headers, const char *bstart, size_t already,
+                               size_t *body_len_out);
 extern char *recv_request_headers(vigil_socket_t sock, size_t *out_len);
 extern int parse_incoming_request(http_conn_t *conn);
 
 #ifdef VIGIL_ENABLE_BEARSSL_TLS
-extern int bearssl_https_insecure_request(const char *method, const parsed_url_t *url,
-                                          const char *headers, const char *body,
-                                          size_t body_len, http_response_t *resp);
+extern int bearssl_https_insecure_request(const char *method, const parsed_url_t *url, const char *headers,
+                                          const char *body, size_t body_len, http_response_t *resp);
 #endif
 
 /* ── URL parsing tests (table-style) ─────────────────────────────── */
@@ -166,8 +163,7 @@ static void test_server_func(void *arg)
     vigil_platform_tcp_close(client, NULL);
 }
 
-static int start_test_server_port(test_server_t *srv, const char *response, int port,
-                                   vigil_platform_thread_t **thread)
+static int start_test_server_port(test_server_t *srv, const char *response, int port, vigil_platform_thread_t **thread)
 {
     memset(srv, 0, sizeof(*srv));
     srv->listener = VIGIL_INVALID_SOCKET;
@@ -648,8 +644,8 @@ TEST(VigilHttpTest, BuildRequestHeadersCookieOnly)
 
 /* ── do_request: 307 preserves method ───────────────────────────── */
 
-#define REDIR_307_PORT    18795
-#define DEST_307_PORT     18796
+#define REDIR_307_PORT 18795
+#define DEST_307_PORT 18796
 
 typedef struct
 {
@@ -766,8 +762,7 @@ TEST(VigilHttpTest, DoRequestRedirectLocationTooLong)
 {
     /* Location value > 4095 bytes: find_location_header returns NULL,
      * the redirect is silently dropped, and the 302 is returned as-is. */
-    memcpy(g_long_loc_response,
-           "HTTP/1.1 302 Found\r\nLocation: http://", 37);
+    memcpy(g_long_loc_response, "HTTP/1.1 302 Found\r\nLocation: http://", 37);
     memset(g_long_loc_response + 37, 'x', 4200);
     memcpy(g_long_loc_response + 37 + 4200, "/\r\nContent-Length: 0\r\n\r\n", 24);
     g_long_loc_response[37 + 4200 + 24] = '\0';
@@ -1027,10 +1022,8 @@ static void tls_server_func(void *arg)
         return;
 
     br_skey_decoder_init(&srv->kctx);
-    br_skey_decoder_push(&srv->kctx, vigil_test_tls_key_der,
-                         vigil_test_tls_key_der_len);
-    if (br_skey_decoder_last_error(&srv->kctx) != 0 ||
-        br_skey_decoder_key_type(&srv->kctx) != BR_KEYTYPE_EC)
+    br_skey_decoder_push(&srv->kctx, vigil_test_tls_key_der, vigil_test_tls_key_der_len);
+    if (br_skey_decoder_last_error(&srv->kctx) != 0 || br_skey_decoder_key_type(&srv->kctx) != BR_KEYTYPE_EC)
     {
         vigil_platform_tcp_close(client, NULL);
         return;
@@ -1050,8 +1043,7 @@ static void tls_server_func(void *arg)
     br_ssl_server_reset(&sc);
 
     br_sslio_context ioc;
-    br_sslio_init(&ioc, &sc.eng, tls_srv_read_cb, &client,
-                  tls_srv_write_cb, &client);
+    br_sslio_init(&ioc, &sc.eng, tls_srv_read_cb, &client, tls_srv_write_cb, &client);
 
     /* Drain the request (enough to unblock the client write). */
     char req[4096];
@@ -1063,8 +1055,7 @@ static void tls_server_func(void *arg)
     vigil_platform_tcp_close(client, NULL);
 }
 
-static int start_tls_server(tls_test_server_t *srv, const char *response,
-                            int port, vigil_platform_thread_t **thread)
+static int start_tls_server(tls_test_server_t *srv, const char *response, int port, vigil_platform_thread_t **thread)
 {
     memset(srv, 0, sizeof(*srv));
     srv->listener = VIGIL_INVALID_SOCKET;
@@ -1133,9 +1124,7 @@ TEST(VigilHttpTest, BearSslHttpsPost)
 
     const char *body = "payload";
     http_response_t resp;
-    int rc = bearssl_https_insecure_request("POST", &url,
-                                            "Content-Type: text/plain\r\n",
-                                            body, strlen(body), &resp);
+    int rc = bearssl_https_insecure_request("POST", &url, "Content-Type: text/plain\r\n", body, strlen(body), &resp);
     EXPECT_EQ(rc, 0);
     EXPECT_EQ(resp.status_code, 201);
     response_free(&resp);
@@ -1262,9 +1251,8 @@ static void incoming_sender_func(void *arg)
 }
 
 /* ctx must be caller-owned (stack or otherwise) and outlive the joined thread. */
-static vigil_socket_t connect_to_incoming_sender(incoming_sender_ctx_t *ctx, int port,
-                                                  const char *request,
-                                                  vigil_platform_thread_t **thr_out)
+static vigil_socket_t connect_to_incoming_sender(incoming_sender_ctx_t *ctx, int port, const char *request,
+                                                 vigil_platform_thread_t **thr_out)
 {
     ctx->port = port;
     ctx->request = request;
@@ -1302,8 +1290,7 @@ TEST(VigilHttpTest, ParseIncomingRequestGet)
     vigil_platform_thread_join(thr, NULL);
 
     EXPECT_EQ(rc, 0);
-    EXPECT_TRUE(conn.method && conn.path &&
-                strcmp(conn.method, "GET") == 0 && strcmp(conn.path, "/hello") == 0);
+    EXPECT_TRUE(conn.method && conn.path && strcmp(conn.method, "GET") == 0 && strcmp(conn.path, "/hello") == 0);
     EXPECT_EQ(conn.body_len, 0u);
     free(conn.method);
     free(conn.path);
@@ -1319,8 +1306,7 @@ TEST(VigilHttpTest, ParseIncomingRequestPost)
                       "test_body";
     incoming_sender_ctx_t ctx;
     vigil_platform_thread_t *thr = NULL;
-    vigil_socket_t sock =
-        connect_to_incoming_sender(&ctx, PARSE_INCOMING_PORT + 1, req, &thr);
+    vigil_socket_t sock = connect_to_incoming_sender(&ctx, PARSE_INCOMING_PORT + 1, req, &thr);
     if (sock == VIGIL_INVALID_SOCKET)
         return;
 
@@ -1332,9 +1318,8 @@ TEST(VigilHttpTest, ParseIncomingRequestPost)
     vigil_platform_thread_join(thr, NULL);
 
     EXPECT_EQ(rc, 0);
-    EXPECT_TRUE(conn.method && conn.path && conn.body &&
-                strcmp(conn.method, "POST") == 0 && strcmp(conn.path, "/submit") == 0 &&
-                strcmp(conn.body, "test_body") == 0);
+    EXPECT_TRUE(conn.method && conn.path && conn.body && strcmp(conn.method, "POST") == 0 &&
+                strcmp(conn.path, "/submit") == 0 && strcmp(conn.body, "test_body") == 0);
     EXPECT_EQ(conn.body_len, 9u);
     free(conn.method);
     free(conn.path);
@@ -1348,8 +1333,7 @@ TEST(VigilHttpTest, ParseIncomingRequestMalformed)
     const char *req = "BADREQUEST\r\n\r\n";
     incoming_sender_ctx_t ctx;
     vigil_platform_thread_t *thr = NULL;
-    vigil_socket_t sock =
-        connect_to_incoming_sender(&ctx, PARSE_INCOMING_PORT + 2, req, &thr);
+    vigil_socket_t sock = connect_to_incoming_sender(&ctx, PARSE_INCOMING_PORT + 2, req, &thr);
     if (sock == VIGIL_INVALID_SOCKET)
         return;
 
@@ -1540,8 +1524,7 @@ TEST(VigilHttpTest, RecvRequestBodyWithRecv)
     /* content_length > already: recv_request_body must read from socket. */
     incoming_sender_ctx_t ctx;
     vigil_platform_thread_t *thr = NULL;
-    vigil_socket_t sock =
-        connect_to_incoming_sender(&ctx, RECV_REQUEST_BODY_PORT, "abcde", &thr);
+    vigil_socket_t sock = connect_to_incoming_sender(&ctx, RECV_REQUEST_BODY_PORT, "abcde", &thr);
     if (sock == VIGIL_INVALID_SOCKET)
         return;
 
@@ -1565,8 +1548,7 @@ TEST(VigilHttpTest, ParseIncomingRequestConnectionClosed)
     /* Sender closes without \r\n\r\n: recv_request_headers returns NULL. */
     incoming_sender_ctx_t ctx;
     vigil_platform_thread_t *thr = NULL;
-    vigil_socket_t sock =
-        connect_to_incoming_sender(&ctx, PARSE_INC_CLOSED_PORT, "GET /path HTTP/1.1\r\n", &thr);
+    vigil_socket_t sock = connect_to_incoming_sender(&ctx, PARSE_INC_CLOSED_PORT, "GET /path HTTP/1.1\r\n", &thr);
     if (sock == VIGIL_INVALID_SOCKET)
         return;
 
@@ -1592,8 +1574,7 @@ TEST(VigilHttpTest, ParseIncomingRequestBodyTooLarge)
                       "\r\n";
     incoming_sender_ctx_t ctx;
     vigil_platform_thread_t *thr = NULL;
-    vigil_socket_t sock =
-        connect_to_incoming_sender(&ctx, PARSE_INC_TOOLARGE_PORT, req, &thr);
+    vigil_socket_t sock = connect_to_incoming_sender(&ctx, PARSE_INC_TOOLARGE_PORT, req, &thr);
     if (sock == VIGIL_INVALID_SOCKET)
         return;
 

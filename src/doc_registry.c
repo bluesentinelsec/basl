@@ -1335,12 +1335,58 @@ static const vigil_doc_entry_t readline_docs[] = {
 
 #define READLINE_COUNT (sizeof(readline_docs) / sizeof(readline_docs[0]))
 
+/* ── sdl module ──────────────────────────────────────────────────── */
+
+static const vigil_doc_entry_t sdl_docs[] = {
+    {"sdl", NULL, "SDL3 multimedia library bindings.",
+     "Provides access to SDL3 for window management, rendering, input,\n"
+     "audio, and more. The SDL3 library is statically linked into Vigil.\n"
+     "Disable at build time with -DVIGIL_PLUGIN_SDL=OFF.",
+     "import \"sdl\";\n\n"
+     "sdl.init(sdl.INIT_VIDEO());\n"
+     "defer sdl.quit();"},
+    {"sdl.init", "sdl.init(flags: i32) -> (bool, err)", "Initialize SDL subsystems.",
+     "Initializes the SDL library. Pass one or more INIT_* flag constants\n"
+     "combined with bitwise OR. Returns (true, ok) on success.",
+     "bool ok, err e = sdl.init(sdl.INIT_VIDEO() | sdl.INIT_AUDIO());\n"
+     "defer sdl.quit();"},
+    {"sdl.init_sub_system", "sdl.init_sub_system(flags: i32) -> (bool, err)", "Initialize additional SDL subsystems.",
+     "Initialize subsystems that were not included in the initial sdl.init() call.",
+     "sdl.init_sub_system(sdl.INIT_JOYSTICK())"},
+    {"sdl.quit_sub_system", "sdl.quit_sub_system(flags: i32) -> void", "Shut down specific SDL subsystems.",
+     "Shuts down the specified subsystems without quitting SDL entirely.", "sdl.quit_sub_system(sdl.INIT_AUDIO())"},
+    {"sdl.quit", "sdl.quit() -> void", "Clean up all initialized SDL subsystems.",
+     "Call this when done with SDL. Typically used with defer.", "defer sdl.quit();"},
+    {"sdl.was_init", "sdl.was_init(flags: i32) -> i32", "Check which subsystems are initialized.",
+     "Returns a mask of the specified subsystems that are currently initialized.",
+     "i32 active = sdl.was_init(sdl.INIT_VIDEO())"},
+    {"sdl.get_error", "sdl.get_error() -> string", "Get the last SDL error message.",
+     "Returns the error message for the last SDL function that failed.", "string msg = sdl.get_error()"},
+    {"sdl.get_version", "sdl.get_version() -> i32", "Get the linked SDL version.",
+     "Returns the version as a packed integer. Use bitwise operations to\n"
+     "extract major/minor/patch: major = v / 1000000, minor = (v / 1000) % 1000,\n"
+     "patch = v % 1000.",
+     "i32 v = sdl.get_version()"},
+    {"sdl.get_revision", "sdl.get_revision() -> string", "Get the SDL revision string.",
+     "Returns the source revision of the linked SDL library.", "string rev = sdl.get_revision()"},
+    {"sdl.INIT_VIDEO", "sdl.INIT_VIDEO() -> i32", "Video subsystem init flag.", NULL, NULL},
+    {"sdl.INIT_AUDIO", "sdl.INIT_AUDIO() -> i32", "Audio subsystem init flag.", NULL, NULL},
+    {"sdl.INIT_CAMERA", "sdl.INIT_CAMERA() -> i32", "Camera subsystem init flag.", NULL, NULL},
+    {"sdl.INIT_EVENTS", "sdl.INIT_EVENTS() -> i32", "Events subsystem init flag.", NULL, NULL},
+    {"sdl.INIT_JOYSTICK", "sdl.INIT_JOYSTICK() -> i32", "Joystick subsystem init flag.", NULL, NULL},
+    {"sdl.INIT_HAPTIC", "sdl.INIT_HAPTIC() -> i32", "Haptic (force feedback) subsystem init flag.", NULL, NULL},
+    {"sdl.INIT_GAMEPAD", "sdl.INIT_GAMEPAD() -> i32", "Gamepad subsystem init flag.", NULL, NULL},
+    {"sdl.INIT_SENSOR", "sdl.INIT_SENSOR() -> i32", "Sensor subsystem init flag.", NULL, NULL},
+};
+
+#define SDL_DOC_COUNT (sizeof(sdl_docs) / sizeof(sdl_docs[0]))
+
 /* ── Module List ──────────────────────────────────────────── */
 
 static const char *module_names[] = {
-    "builtins", "compress", "crypto", "csv",  "ffi",  "fmt",      "fs",     "http",    "log",
-    "math",     "net",      "parse",  "args", "json", "readline", "test",   "strings", "regex",
-    "random",   "time",     "unsafe", "url",  "yaml", "thread",   "atomic",
+    "builtins", "compress", "crypto", "csv",    "ffi",  "fmt",      "fs",     "http",   "json",
+    "log",      "math",     "net",    "parse",  "args", "readline", "sdl",    "test",   "strings",
+    "regex",    "random",   "time",   "unsafe", "url",  "yaml",     "thread", "atomic",
 };
 
 #define MODULE_COUNT (sizeof(module_names) / sizeof(module_names[0]))
@@ -1380,6 +1426,7 @@ static const doc_module_table_entry_t doc_module_table[] = {
     {"unsafe", unsafe_docs, UNSAFE_COUNT},
     {"parse", parse_docs, PARSE_COUNT},
     {"readline", readline_docs, READLINE_COUNT},
+    {"sdl", sdl_docs, SDL_DOC_COUNT},
 };
 
 #define DOC_MODULE_TABLE_COUNT (sizeof(doc_module_table) / sizeof(doc_module_table[0]))

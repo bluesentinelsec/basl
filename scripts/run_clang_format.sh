@@ -42,6 +42,6 @@ echo "using $clang_format: $("$clang_format" --version)" >&2
 if [ "$#" -gt 0 ]; then
     "$clang_format" $format_args "$@"
 else
-    find src include tests \( -name '*.c' -o -name '*.h' \) -print0 \
+    find src include tests plugins \( -name '*.c' -o -name '*.h' \) -print0 \
         | xargs -0 "$clang_format" $format_args
 fi

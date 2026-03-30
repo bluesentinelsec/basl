@@ -12,7 +12,7 @@ concurrency:
 
 jobs:
   native-full:
-    timeout-minutes: 15
+    timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:
@@ -29,10 +29,22 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Install SDL3 build dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq \
+            libasound2-dev libpulse-dev libx11-dev libxext-dev \
+            libxrandr-dev libxcursor-dev libxfixes-dev libxi-dev libxss-dev \
+            libxtst-dev libxkbcommon-dev libdrm-dev libgbm-dev \
+            libgl-dev libgles-dev libegl-dev libdbus-1-dev libudev-dev \
+            libwayland-dev libdecor-0-dev wayland-protocols
+
       - name: Configure
         run: >
           cmake -S . -B build
           -DVIGIL_BUILD_TESTS=ON
+          -DVIGIL_PLUGIN_SDL=ON
           -DVIGIL_STDLIB_FFI=ON
           -DVIGIL_STDLIB_FS=ON
           -DVIGIL_STDLIB_HTTP=ON
@@ -145,10 +157,22 @@ jobs:
         if: runner.os == 'Windows'
         run: pip install pytest wexpect
 
+      - name: Install SDL3 build dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq \
+            libasound2-dev libpulse-dev libx11-dev libxext-dev \
+            libxrandr-dev libxcursor-dev libxfixes-dev libxi-dev libxss-dev \
+            libxtst-dev libxkbcommon-dev libdrm-dev libgbm-dev \
+            libgl-dev libgles-dev libegl-dev libdbus-1-dev libudev-dev \
+            libwayland-dev libdecor-0-dev wayland-protocols
+
       - name: Configure
         run: >
           cmake -S . -B build
           -DVIGIL_BUILD_TESTS=OFF
+          -DVIGIL_PLUGIN_SDL=ON
           -DVIGIL_STDLIB_FFI=ON
           -DVIGIL_STDLIB_FS=ON
           -DVIGIL_STDLIB_HTTP=ON
@@ -231,7 +255,7 @@ jobs:
           version: latest
 
       - name: Configure
-        run: emcmake cmake -S . -B build -DVIGIL_BUILD_TESTS=OFF -DCMAKE_BUILD_TYPE=Release
+        run: emcmake cmake -S . -B build -DVIGIL_BUILD_TESTS=OFF -DVIGIL_PLUGIN_SDL=ON -DCMAKE_BUILD_TYPE=Release
 
       - name: Build
         run: cmake --build build
@@ -255,7 +279,7 @@ jobs:
         env:
           CLANG_FORMAT_BIN: /usr/bin/clang-format-18
         run: |
-          mapfile -t files < <(git diff --name-only --diff-filter=ACMR origin/main...HEAD -- '*.c' '*.h')
+          mapfile -t files < <(git diff --name-only --diff-filter=ACMR origin/main...HEAD -- '*.c' '*.h' | grep -v '^deps/')
           if [ "${#files[@]}" -eq 0 ]; then
             echo "No C or header changes to format-check."
             exit 0
@@ -284,13 +308,21 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - name: Install valgrind
-        run: sudo apt-get update && sudo apt-get install -y valgrind
+      - name: Install valgrind and SDL3 build dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq valgrind \
+            libasound2-dev libpulse-dev libx11-dev libxext-dev \
+            libxrandr-dev libxcursor-dev libxfixes-dev libxi-dev libxss-dev \
+            libxtst-dev libxkbcommon-dev libdrm-dev libgbm-dev \
+            libgl-dev libgles-dev libegl-dev libdbus-1-dev libudev-dev \
+            libwayland-dev libdecor-0-dev wayland-protocols
 
       - name: Configure
         run: >
           cmake -S . -B build
           -DVIGIL_BUILD_TESTS=ON
+          -DVIGIL_PLUGIN_SDL=ON
           -DCMAKE_BUILD_TYPE=Debug
           -DCMAKE_C_FLAGS_DEBUG="-g -O0 -Wno-format-truncation"
 
@@ -317,13 +349,21 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - name: Install llvm-symbolizer
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq llvm
+      - name: Install llvm-symbolizer and SDL3 build dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq llvm \
+            libasound2-dev libpulse-dev libx11-dev libxext-dev \
+            libxrandr-dev libxcursor-dev libxfixes-dev libxi-dev libxss-dev \
+            libxtst-dev libxkbcommon-dev libdrm-dev libgbm-dev \
+            libgl-dev libgles-dev libegl-dev libdbus-1-dev libudev-dev \
+            libwayland-dev libdecor-0-dev wayland-protocols
 
       - name: Configure
         run: >
           cmake -S . -B build
           -DVIGIL_BUILD_TESTS=ON
+          -DVIGIL_PLUGIN_SDL=ON
           -DCMAKE_BUILD_TYPE=Debug
           -DCMAKE_C_COMPILER=clang
           -DCMAKE_CXX_COMPILER=clang++

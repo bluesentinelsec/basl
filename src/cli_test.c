@@ -92,7 +92,6 @@ static void sl_free(str_list_t *sl)
     memset(sl, 0, sizeof(*sl));
 }
 
-
 static void collect_test_files(str_list_t *out, const char *dir)
 {
     vigil_error_t err;
