@@ -1,0 +1,90 @@
+// sdl_gamepad.vigil — Slice 9 demo: gamepad input
+//
+// Displays gamepad state: buttons, axes, and rumble on South button press.
+// Press Escape or close the window to quit.
+
+import "sdl";
+import "fmt";
+
+fn main() -> i32 {
+    bool init_ok, err ie = sdl.init(sdl.INIT_VIDEO() | sdl.INIT_GAMEPAD());
+    if (ie != ok) {
+        fmt.eprintln(f"SDL init failed: {ie.message()}");
+        return 1;
+    }
+    defer sdl.quit();
+
+    sdl.Window win, err we = sdl.Window.create("Gamepad Demo", 640, 480, 0);
+    if (we != ok) {
+        fmt.eprintln(f"Window failed: {we.message()}");
+        return 1;
+    }
+
+    sdl.Renderer ren, err re = sdl.Renderer.create(win, "");
+    if (re != ok) {
+        fmt.eprintln(f"Renderer failed: {re.message()}");
+        win.destroy();
+        return 1;
+    }
+
+    sdl.Event ev, err ee = sdl.Event.new();
+    if (ee != ok) {
+        fmt.eprintln(f"Event alloc failed: {ee.message()}");
+        ren.destroy();
+        win.destroy();
+        return 1;
+    }
+
+    fmt.println("Waiting for gamepad... Press Escape to quit.");
+
+    bool running = true;
+    bool gp_open = false;
+    while (running) {
+        while (ev.poll()) {
+            i32 t = ev.type();
+            if (t == sdl.EVENT_QUIT()) {
+                running = false;
+            } else if (t == sdl.EVENT_GAMEPAD_ADDED()) {
+                fmt.println("Gamepad connected!");
+            } else if (t == sdl.EVENT_GAMEPAD_REMOVED()) {
+                fmt.println("Gamepad disconnected.");
+            } else if (t == sdl.EVENT_GAMEPAD_BUTTON_DOWN()) {
+                fmt.println(f"Button {ev.gamepad_button()} pressed");
+            } else if (t == sdl.EVENT_GAMEPAD_AXIS_MOTION()) {
+                i32 axis = ev.gamepad_axis();
+                i32 val = ev.gamepad_axis_value();
+                if (val > 8000 || val < -8000) {
+                    fmt.println(f"Axis {axis} = {val}");
+                }
+            }
+        }
+
+        if (sdl.is_key_pressed(sdl.SCANCODE_ESCAPE())) {
+            running = false;
+        }
+
+        // Try to open first gamepad if not yet open
+        if (!gp_open && sdl.has_gamepad()) {
+            i32 count = sdl.get_gamepad_count();
+            if (count > 0) {
+                i32 id = sdl.get_gamepad_id(0);
+                sdl.Gamepad gp, err ge = sdl.Gamepad.open(id);
+                if (ge == ok) {
+                    string name = gp.get_name();
+                    fmt.println(f"Opened gamepad: {name}");
+                    gp_open = true;
+                    gp.close();
+                }
+            }
+        }
+
+        bool c1, err e1 = ren.set_draw_color(30, 30, 30, 255);
+        bool c2, err e2 = ren.clear();
+        bool c3, err e3 = ren.present();
+        sdl.delay(16);
+    }
+
+    ren.destroy();
+    win.destroy();
+    return 0;
+}
