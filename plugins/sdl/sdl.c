@@ -673,6 +673,12 @@ static const int p_f64_f64_str[] = {VIGIL_TYPE_F64, VIGIL_TYPE_F64, VIGIL_TYPE_S
 static const int p_f64[] = {VIGIL_TYPE_F64};
 static const int p_obj[] = {VIGIL_TYPE_OBJECT};
 static const int p_obj_i32_i32[] = {VIGIL_TYPE_OBJECT, VIGIL_TYPE_I32, VIGIL_TYPE_I32};
+static const int p_i32_i32_i32_i32_i32[] = {VIGIL_TYPE_I32, VIGIL_TYPE_I32, VIGIL_TYPE_I32, VIGIL_TYPE_I32,
+                                            VIGIL_TYPE_I32};
+static const int p_i32_f64[] = {VIGIL_TYPE_I32, VIGIL_TYPE_F64};
+/* blit: obj dst + sx, sy, sw, sh, dx, dy */
+static const int p_obj_i32x6[] = {VIGIL_TYPE_OBJECT, VIGIL_TYPE_I32, VIGIL_TYPE_I32, VIGIL_TYPE_I32,
+                                  VIGIL_TYPE_I32,    VIGIL_TYPE_I32, VIGIL_TYPE_I32};
 static const int p_i32_i32[] = {VIGIL_TYPE_I32, VIGIL_TYPE_I32};
 static const int p_i32_i32_i32_i32[] = {VIGIL_TYPE_I32, VIGIL_TYPE_I32, VIGIL_TYPE_I32, VIGIL_TYPE_I32};
 static const int p_str_i32_i32_i32[] = {VIGIL_TYPE_STRING, VIGIL_TYPE_I32, VIGIL_TYPE_I32, VIGIL_TYPE_I32};
@@ -3124,6 +3130,285 @@ SDL_CONST_FN(FOLDER_PICTURES, SDL_FOLDER_PICTURES)
 SDL_CONST_FN(FOLDER_SAVEDGAMES, SDL_FOLDER_SAVEDGAMES)
 SDL_CONST_FN(FOLDER_SCREENSHOTS, SDL_FOLDER_SCREENSHOTS)
 SDL_CONST_FN(FOLDER_VIDEOS, SDL_FOLDER_VIDEOS)
+
+/* ── Slice 20: Surface Operations ─────────────────────────────────── */
+
+static vigil_status_t sdl_surface_clear(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, SURF_HANDLE);
+    float r = (float)sdl_arg_f64(vm, base, 1);
+    float g = (float)sdl_arg_f64(vm, base, 2);
+    float b = (float)sdl_arg_f64(vm, base, 3);
+    float a = (float)sdl_arg_f64(vm, base, 4);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Surface *s = (SDL_Surface *)SDL_HANDLE_GET(surfaces, h);
+    if (s && SDL_ClearSurface(s, r, g, b, a))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+static vigil_status_t sdl_surface_fill_rect(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, SURF_HANDLE);
+    int32_t x = sdl_arg_i32(vm, base, 1), y = sdl_arg_i32(vm, base, 2);
+    int32_t w = sdl_arg_i32(vm, base, 3), ht = sdl_arg_i32(vm, base, 4);
+    int32_t color = sdl_arg_i32(vm, base, 5);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Surface *s = (SDL_Surface *)SDL_HANDLE_GET(surfaces, h);
+    if (!s)
+        return sdl_push_bool_sdl_err(vm, SDL_ERR_ARG, error);
+    SDL_Rect rect = {x, y, w, ht};
+    if (SDL_FillSurfaceRect(s, (w == 0 && ht == 0) ? NULL : &rect, (Uint32)color))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+static vigil_status_t sdl_surface_flip(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, SURF_HANDLE);
+    int32_t flip = sdl_arg_i32(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Surface *s = (SDL_Surface *)SDL_HANDLE_GET(surfaces, h);
+    if (s && SDL_FlipSurface(s, (SDL_FlipMode)flip))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+static vigil_status_t sdl_surface_set_color_mod(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, SURF_HANDLE);
+    Uint8 r = (Uint8)sdl_arg_i32(vm, base, 1), g = (Uint8)sdl_arg_i32(vm, base, 2), b = (Uint8)sdl_arg_i32(vm, base, 3);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Surface *s = (SDL_Surface *)SDL_HANDLE_GET(surfaces, h);
+    if (s && SDL_SetSurfaceColorMod(s, r, g, b))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+static vigil_status_t sdl_surface_set_alpha_mod(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, SURF_HANDLE);
+    Uint8 a = (Uint8)sdl_arg_i32(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Surface *s = (SDL_Surface *)SDL_HANDLE_GET(surfaces, h);
+    if (s && SDL_SetSurfaceAlphaMod(s, a))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+static vigil_status_t sdl_surface_set_blend_mode(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, SURF_HANDLE);
+    int32_t mode = sdl_arg_i32(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Surface *s = (SDL_Surface *)SDL_HANDLE_GET(surfaces, h);
+    if (s && SDL_SetSurfaceBlendMode(s, (SDL_BlendMode)mode))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+static vigil_status_t sdl_surface_set_color_key(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, SURF_HANDLE);
+    int32_t enabled = sdl_arg_i32(vm, base, 1);
+    int32_t key = sdl_arg_i32(vm, base, 2);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Surface *s = (SDL_Surface *)SDL_HANDLE_GET(surfaces, h);
+    if (s && SDL_SetSurfaceColorKey(s, enabled != 0, (Uint32)key))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+/* surf.blit(dst_surf, i32 sx, sy, sw, sh, dx, dy) -> (bool, err) */
+static vigil_status_t sdl_surface_blit(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t sh = sdl_field_i64(vm, base, SURF_HANDLE);
+    int64_t dh = sdl_field_i64(vm, base + 1, SURF_HANDLE);
+    int32_t sx = sdl_arg_i32(vm, base, 2), sy = sdl_arg_i32(vm, base, 3);
+    int32_t sw = sdl_arg_i32(vm, base, 4), sht = sdl_arg_i32(vm, base, 5);
+    int32_t dx = sdl_arg_i32(vm, base, 6), dy = sdl_arg_i32(vm, base, 7);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Surface *src = (SDL_Surface *)SDL_HANDLE_GET(surfaces, sh);
+    SDL_Surface *dst = (SDL_Surface *)SDL_HANDLE_GET(surfaces, dh);
+    if (!src || !dst)
+        return sdl_push_bool_sdl_err(vm, SDL_ERR_ARG, error);
+    SDL_Rect srect = {sx, sy, sw, sht};
+    SDL_Rect drect = {dx, dy, 0, 0};
+    int use_src = (sw > 0 || sht > 0);
+    if (SDL_BlitSurface(src, use_src ? &srect : NULL, dst, &drect))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+/* ── Slice 21: Window Getters ─────────────────────────────────────── */
+
+static vigil_status_t sdl_window_get_pixel_density(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, WIN_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Window *win = (SDL_Window *)SDL_HANDLE_GET(windows, h);
+    return sdl_push_f64(vm, win ? (double)SDL_GetWindowPixelDensity(win) : 1.0, error);
+}
+
+static vigil_status_t sdl_window_get_mouse_grab(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, WIN_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Window *win = (SDL_Window *)SDL_HANDLE_GET(windows, h);
+    return sdl_push_bool(vm, win && SDL_GetWindowMouseGrab(win), error);
+}
+
+static vigil_status_t sdl_window_get_keyboard_grab(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, WIN_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Window *win = (SDL_Window *)SDL_HANDLE_GET(windows, h);
+    return sdl_push_bool(vm, win && SDL_GetWindowKeyboardGrab(win), error);
+}
+
+static vigil_status_t sdl_window_get_relative_mouse(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, WIN_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Window *win = (SDL_Window *)SDL_HANDLE_GET(windows, h);
+    return sdl_push_bool(vm, win && SDL_GetWindowRelativeMouseMode(win), error);
+}
+
+static vigil_status_t sdl_window_set_progress(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, WIN_HANDLE);
+    int32_t state = sdl_arg_i32(vm, base, 1);
+    float value = (float)sdl_arg_f64(vm, base, 2);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Window *win = (SDL_Window *)SDL_HANDLE_GET(windows, h);
+    if (!win)
+        return sdl_push_bool_sdl_err(vm, SDL_ERR_ARG, error);
+    if (!SDL_SetWindowProgressState(win, (SDL_ProgressState)state))
+        return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+    if (value >= 0.0f)
+        SDL_SetWindowProgressValue(win, value);
+    return sdl_push_bool_ok(vm, error);
+}
+
+static vigil_status_t sdl_window_set_aspect_ratio(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, WIN_HANDLE);
+    float mn = (float)sdl_arg_f64(vm, base, 1);
+    float mx = (float)sdl_arg_f64(vm, base, 2);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Window *win = (SDL_Window *)SDL_HANDLE_GET(windows, h);
+    if (win && SDL_SetWindowAspectRatio(win, mn, mx))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+/* ── Slice 22: Gamepad Extras ─────────────────────────────────────── */
+
+static vigil_status_t sdl_gamepad_connected(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, GP_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Gamepad *gp = (SDL_Gamepad *)SDL_HANDLE_GET(gamepads, h);
+    return sdl_push_bool(vm, gp && SDL_GamepadConnected(gp), error);
+}
+
+static vigil_status_t sdl_gamepad_get_type(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, GP_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Gamepad *gp = (SDL_Gamepad *)SDL_HANDLE_GET(gamepads, h);
+    return sdl_push_i32(vm, gp ? (int32_t)SDL_GetGamepadType(gp) : 0, error);
+}
+
+static vigil_status_t sdl_gamepad_get_power_percent(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, GP_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    int percent = -1;
+    SDL_Gamepad *gp = (SDL_Gamepad *)SDL_HANDLE_GET(gamepads, h);
+    if (gp)
+        SDL_GetGamepadPowerInfo(gp, &percent);
+    return sdl_push_i32(vm, (int32_t)percent, error);
+}
+
+static vigil_status_t sdl_gamepad_set_led(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, GP_HANDLE);
+    Uint8 r = (Uint8)sdl_arg_i32(vm, base, 1);
+    Uint8 g = (Uint8)sdl_arg_i32(vm, base, 2);
+    Uint8 b = (Uint8)sdl_arg_i32(vm, base, 3);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Gamepad *gp = (SDL_Gamepad *)SDL_HANDLE_GET(gamepads, h);
+    if (gp && SDL_SetGamepadLED(gp, r, g, b))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+static vigil_status_t sdl_gamepad_rumble_triggers(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, GP_HANDLE);
+    int32_t left = sdl_arg_i32(vm, base, 1), right = sdl_arg_i32(vm, base, 2), dur = sdl_arg_i32(vm, base, 3);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Gamepad *gp = (SDL_Gamepad *)SDL_HANDLE_GET(gamepads, h);
+    if (gp && SDL_RumbleGamepadTriggers(gp, (Uint16)left, (Uint16)right, (Uint32)dur))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+static vigil_status_t sdl_gamepad_has_axis(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, GP_HANDLE);
+    int32_t axis = sdl_arg_i32(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Gamepad *gp = (SDL_Gamepad *)SDL_HANDLE_GET(gamepads, h);
+    return sdl_push_bool(vm, gp && SDL_GamepadHasAxis(gp, (SDL_GamepadAxis)axis), error);
+}
+
+static vigil_status_t sdl_gamepad_has_button(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, GP_HANDLE);
+    int32_t btn = sdl_arg_i32(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Gamepad *gp = (SDL_Gamepad *)SDL_HANDLE_GET(gamepads, h);
+    return sdl_push_bool(vm, gp && SDL_GamepadHasButton(gp, (SDL_GamepadButton)btn), error);
+}
+
+static vigil_status_t sdl_fn_update_gamepads(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_UpdateGamepads();
+    return VIGIL_STATUS_OK;
+}
+
+/* Progress state constants */
+SDL_CONST_FN(PROGRESS_NONE, SDL_PROGRESS_STATE_NONE)
+SDL_CONST_FN(PROGRESS_INDETERMINATE, SDL_PROGRESS_STATE_INDETERMINATE)
+SDL_CONST_FN(PROGRESS_NORMAL, SDL_PROGRESS_STATE_NORMAL)
+SDL_CONST_FN(PROGRESS_PAUSED, SDL_PROGRESS_STATE_PAUSED)
+SDL_CONST_FN(PROGRESS_ERROR, SDL_PROGRESS_STATE_ERROR)
+
 /* Texture access constants */
 SDL_CONST_FN(TEXTUREACCESS_STATIC, SDL_TEXTUREACCESS_STATIC)
 SDL_CONST_FN(TEXTUREACCESS_STREAMING, SDL_TEXTUREACCESS_STREAMING)
@@ -3445,6 +3730,14 @@ static const vigil_native_module_function_t sdl_functions[] = {
     SDL_CONST_ENTRY("FOLDER_SAVEDGAMES", FOLDER_SAVEDGAMES),
     SDL_CONST_ENTRY("FOLDER_SCREENSHOTS", FOLDER_SCREENSHOTS),
     SDL_CONST_ENTRY("FOLDER_VIDEOS", FOLDER_VIDEOS),
+    /* Gamepad extras (slice 22) */
+    SDL_FN_VOID("update_gamepads", 15U, sdl_fn_update_gamepads, 0U, NULL),
+    /* Progress state constants (slice 21) */
+    SDL_CONST_ENTRY("PROGRESS_NONE", PROGRESS_NONE),
+    SDL_CONST_ENTRY("PROGRESS_INDETERMINATE", PROGRESS_INDETERMINATE),
+    SDL_CONST_ENTRY("PROGRESS_NORMAL", PROGRESS_NORMAL),
+    SDL_CONST_ENTRY("PROGRESS_PAUSED", PROGRESS_PAUSED),
+    SDL_CONST_ENTRY("PROGRESS_ERROR", PROGRESS_ERROR),
     /* Display info (slice 11) */
     SDL_FN("get_display_count", 17U, sdl_fn_get_display_count, 0U, NULL, VIGIL_TYPE_I32),
     SDL_FN("get_display_name", 16U, sdl_fn_get_display_name, 1U, p_i32, VIGIL_TYPE_STRING),
@@ -3501,6 +3794,13 @@ static const vigil_native_class_method_t sdl_window_methods[] = {
     SDL_METHOD("get_size_in_pixels", 18U, sdl_window_get_size_in_pixels, 0U, NULL, VIGIL_TYPE_I32, 2U, rt_i32_i32),
     SDL_METHOD("get_display_scale", 17U, sdl_window_get_display_scale, 0U, NULL, VIGIL_TYPE_F64, 1U, NULL),
     SDL_METHOD("set_relative_mouse", 18U, sdl_window_set_relative_mouse, 1U, p_i32, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
+    /* Slice 21: window getters */
+    SDL_METHOD("get_pixel_density", 17U, sdl_window_get_pixel_density, 0U, NULL, VIGIL_TYPE_F64, 1U, NULL),
+    SDL_METHOD("get_mouse_grab", 14U, sdl_window_get_mouse_grab, 0U, NULL, VIGIL_TYPE_BOOL, 1U, NULL),
+    SDL_METHOD("get_keyboard_grab", 17U, sdl_window_get_keyboard_grab, 0U, NULL, VIGIL_TYPE_BOOL, 1U, NULL),
+    SDL_METHOD("get_relative_mouse", 18U, sdl_window_get_relative_mouse, 0U, NULL, VIGIL_TYPE_BOOL, 1U, NULL),
+    SDL_METHOD("set_progress", 12U, sdl_window_set_progress, 2U, p_i32_f64, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
+    SDL_METHOD("set_aspect_ratio", 16U, sdl_window_set_aspect_ratio, 2U, p_f64_f64, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
 };
 
 /* ── Renderer class descriptor ───────────────────────────────────── */
@@ -3582,6 +3882,15 @@ static const vigil_native_class_method_t sdl_surface_methods[] = {
     SDL_STATIC("load", 4U, sdl_surface_load, 1U, p_str, VIGIL_TYPE_OBJECT, 2U, rt_obj_err),
     SDL_STATIC("load_bmp", 8U, sdl_surface_load_bmp, 1U, p_str, VIGIL_TYPE_OBJECT, 2U, rt_obj_err),
     SDL_METHOD("destroy", 7U, sdl_surface_destroy, 0U, NULL, VIGIL_TYPE_VOID, 0U, NULL),
+    /* Slice 20: surface ops */
+    SDL_METHOD("clear", 5U, sdl_surface_clear, 4U, p_f64_f64_f64_f64, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
+    SDL_METHOD("fill_rect", 9U, sdl_surface_fill_rect, 5U, p_i32_i32_i32_i32_i32, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
+    SDL_METHOD("flip", 4U, sdl_surface_flip, 1U, p_i32, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
+    SDL_METHOD("set_color_mod", 13U, sdl_surface_set_color_mod, 3U, p_i32_i32_i32, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
+    SDL_METHOD("set_alpha_mod", 13U, sdl_surface_set_alpha_mod, 1U, p_i32, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
+    SDL_METHOD("set_blend_mode", 14U, sdl_surface_set_blend_mode, 1U, p_i32, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
+    SDL_METHOD("set_color_key", 13U, sdl_surface_set_color_key, 2U, p_i32_i32, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
+    SDL_METHOD("blit", 4U, sdl_surface_blit, 7U, p_obj_i32x6, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
 };
 
 /* ── Texture class descriptor ────────────────────────────────────── */
@@ -3642,6 +3951,14 @@ static const vigil_native_class_method_t sdl_gamepad_methods[] = {
     SDL_METHOD("get_axis", 8U, sdl_gamepad_get_axis, 1U, p_i32, VIGIL_TYPE_I32, 1U, NULL),
     SDL_METHOD("get_button", 10U, sdl_gamepad_get_button, 1U, p_i32, VIGIL_TYPE_BOOL, 1U, NULL),
     SDL_METHOD("rumble", 6U, sdl_gamepad_rumble, 3U, p_i32_i32_i32, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
+    /* Slice 22: gamepad extras */
+    SDL_METHOD("connected", 9U, sdl_gamepad_connected, 0U, NULL, VIGIL_TYPE_BOOL, 1U, NULL),
+    SDL_METHOD("get_type", 8U, sdl_gamepad_get_type, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL),
+    SDL_METHOD("get_power_percent", 17U, sdl_gamepad_get_power_percent, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL),
+    SDL_METHOD("set_led", 7U, sdl_gamepad_set_led, 3U, p_i32_i32_i32, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
+    SDL_METHOD("rumble_triggers", 15U, sdl_gamepad_rumble_triggers, 3U, p_i32_i32_i32, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
+    SDL_METHOD("has_axis", 8U, sdl_gamepad_has_axis, 1U, p_i32, VIGIL_TYPE_BOOL, 1U, NULL),
+    SDL_METHOD("has_button", 10U, sdl_gamepad_has_button, 1U, p_i32, VIGIL_TYPE_BOOL, 1U, NULL),
 };
 
 static const vigil_native_class_t sdl_classes[] = {
