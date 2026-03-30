@@ -671,6 +671,7 @@ static const int p_i32_str_str[] = {VIGIL_TYPE_I32, VIGIL_TYPE_STRING, VIGIL_TYP
 static const int p_f64_f64_str[] = {VIGIL_TYPE_F64, VIGIL_TYPE_F64, VIGIL_TYPE_STRING};
 static const int p_f64[] = {VIGIL_TYPE_F64};
 static const int p_obj[] = {VIGIL_TYPE_OBJECT};
+static const int p_obj_i32_i32[] = {VIGIL_TYPE_OBJECT, VIGIL_TYPE_I32, VIGIL_TYPE_I32};
 static const int p_i32_i32[] = {VIGIL_TYPE_I32, VIGIL_TYPE_I32};
 static const int p_i32_i32_i32_i32[] = {VIGIL_TYPE_I32, VIGIL_TYPE_I32, VIGIL_TYPE_I32, VIGIL_TYPE_I32};
 static const int p_str_i32_i32_i32[] = {VIGIL_TYPE_STRING, VIGIL_TYPE_I32, VIGIL_TYPE_I32, VIGIL_TYPE_I32};
@@ -2645,6 +2646,313 @@ SDL_CONST_FN(FLASH_CANCEL, SDL_FLASH_CANCEL)
 SDL_CONST_FN(FLASH_BRIEFLY, SDL_FLASH_BRIEFLY)
 SDL_CONST_FN(FLASH_UNTIL_FOCUSED, SDL_FLASH_UNTIL_FOCUSED)
 
+/* ── Slice 14: Extended Audio ─────────────────────────────────────── */
+
+static SDL_AudioDeviceID *g_audio_dev_ids = NULL;
+static int g_audio_dev_count = 0;
+
+static vigil_status_t sdl_fn_get_audio_playback_count(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    vigil_vm_stack_pop_n(vm, arg_count);
+    if (g_audio_dev_ids)
+    {
+        SDL_free(g_audio_dev_ids);
+        g_audio_dev_ids = NULL;
+    }
+    g_audio_dev_ids = SDL_GetAudioPlaybackDevices(&g_audio_dev_count);
+    return sdl_push_i32(vm, (int32_t)g_audio_dev_count, error);
+}
+
+static vigil_status_t sdl_fn_get_audio_device_name(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t idx = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    if (idx >= 0 && idx < g_audio_dev_count && g_audio_dev_ids)
+        return sdl_push_string(vm, SDL_GetAudioDeviceName(g_audio_dev_ids[idx]), error);
+    return sdl_push_string(vm, "", error);
+}
+
+static vigil_status_t sdl_fn_get_current_audio_driver(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_string(vm, SDL_GetCurrentAudioDriver(), error);
+}
+
+/* stream.set_gain(f64) -> (bool, err) */
+static vigil_status_t sdl_audio_stream_set_gain(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, ASTREAM_HANDLE);
+    float gain = (float)sdl_arg_f64(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_AudioStream *s = (SDL_AudioStream *)SDL_HANDLE_GET(audio_streams, h);
+    if (s && SDL_SetAudioStreamGain(s, gain))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+static vigil_status_t sdl_audio_stream_get_gain(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, ASTREAM_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_AudioStream *s = (SDL_AudioStream *)SDL_HANDLE_GET(audio_streams, h);
+    return sdl_push_f64(vm, s ? (double)SDL_GetAudioStreamGain(s) : 1.0, error);
+}
+
+static vigil_status_t sdl_audio_stream_set_freq_ratio(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, ASTREAM_HANDLE);
+    float ratio = (float)sdl_arg_f64(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_AudioStream *s = (SDL_AudioStream *)SDL_HANDLE_GET(audio_streams, h);
+    if (s && SDL_SetAudioStreamFrequencyRatio(s, ratio))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+static vigil_status_t sdl_audio_stream_get_freq_ratio(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, ASTREAM_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_AudioStream *s = (SDL_AudioStream *)SDL_HANDLE_GET(audio_streams, h);
+    return sdl_push_f64(vm, s ? (double)SDL_GetAudioStreamFrequencyRatio(s) : 1.0, error);
+}
+
+static vigil_status_t sdl_audio_stream_get_available(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, ASTREAM_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_AudioStream *s = (SDL_AudioStream *)SDL_HANDLE_GET(audio_streams, h);
+    return sdl_push_i32(vm, s ? SDL_GetAudioStreamAvailable(s) : 0, error);
+}
+
+static vigil_status_t sdl_audio_stream_flush(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, ASTREAM_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_AudioStream *s = (SDL_AudioStream *)SDL_HANDLE_GET(audio_streams, h);
+    if (s && SDL_FlushAudioStream(s))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+static vigil_status_t sdl_audio_stream_clear(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, ASTREAM_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_AudioStream *s = (SDL_AudioStream *)SDL_HANDLE_GET(audio_streams, h);
+    if (s && SDL_ClearAudioStream(s))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+/* ── Slice 15: Cursor Management ──────────────────────────────────── */
+
+SDL_HANDLE_REGISTRY(cursors);
+
+static vigil_status_t sdl_fn_create_system_cursor(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t id = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Cursor *c = SDL_CreateSystemCursor((SDL_SystemCursor)id);
+    if (!c)
+    {
+        vigil_status_t st = sdl_push_i64(vm, -1, error);
+        if (st != VIGIL_STATUS_OK)
+            return st;
+        return sdl_push_sdl_err(vm, SDL_ERR_IO, error);
+    }
+    int64_t handle;
+    if (SDL_HANDLE_STORE(cursors, c, &handle) < 0)
+    {
+        SDL_DestroyCursor(c);
+        vigil_status_t st = sdl_push_i64(vm, -1, error);
+        if (st != VIGIL_STATUS_OK)
+            return st;
+        return sdl_push_err(vm, "too many cursors", SDL_ERR_STATE, error);
+    }
+    vigil_status_t st = sdl_push_i64(vm, handle, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_ok(vm, error);
+}
+
+static vigil_status_t sdl_fn_create_color_cursor(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t sh = sdl_field_i64(vm, base, SURF_HANDLE);
+    int32_t hx = sdl_arg_i32(vm, base, 1);
+    int32_t hy = sdl_arg_i32(vm, base, 2);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Surface *surf = (SDL_Surface *)SDL_HANDLE_GET(surfaces, sh);
+    if (!surf)
+    {
+        vigil_status_t st = sdl_push_i64(vm, -1, error);
+        if (st != VIGIL_STATUS_OK)
+            return st;
+        return sdl_push_err(vm, "invalid surface", SDL_ERR_ARG, error);
+    }
+    SDL_Cursor *c = SDL_CreateColorCursor(surf, hx, hy);
+    if (!c)
+    {
+        vigil_status_t st = sdl_push_i64(vm, -1, error);
+        if (st != VIGIL_STATUS_OK)
+            return st;
+        return sdl_push_sdl_err(vm, SDL_ERR_IO, error);
+    }
+    int64_t handle;
+    if (SDL_HANDLE_STORE(cursors, c, &handle) < 0)
+    {
+        SDL_DestroyCursor(c);
+        vigil_status_t st = sdl_push_i64(vm, -1, error);
+        if (st != VIGIL_STATUS_OK)
+            return st;
+        return sdl_push_err(vm, "too many cursors", SDL_ERR_STATE, error);
+    }
+    vigil_status_t st = sdl_push_i64(vm, handle, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_ok(vm, error);
+}
+
+static vigil_status_t sdl_fn_set_cursor(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_arg_i64(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Cursor *c = (SDL_Cursor *)SDL_HANDLE_GET(cursors, h);
+    if (c && SDL_SetCursor(c))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+static vigil_status_t sdl_fn_destroy_cursor(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_arg_i64(vm, base, 0);
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Cursor *c = (SDL_Cursor *)SDL_HANDLE_GET(cursors, h);
+    if (c)
+    {
+        SDL_DestroyCursor(c);
+        SDL_HANDLE_CLEAR(cursors, h);
+    }
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t sdl_fn_capture_mouse(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t en = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    if (SDL_CaptureMouse(en != 0))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+static vigil_status_t sdl_fn_get_relative_mouse_state(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    vigil_vm_stack_pop_n(vm, arg_count);
+    float x = 0, y = 0;
+    SDL_GetRelativeMouseState(&x, &y);
+    vigil_status_t st = sdl_push_f64(vm, (double)x, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_f64(vm, (double)y, error);
+}
+
+static vigil_status_t sdl_fn_warp_mouse_global(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    float x = (float)sdl_arg_f64(vm, base, 0);
+    float y = (float)sdl_arg_f64(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    if (SDL_WarpMouseGlobal(x, y))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+/* System cursor constants */
+SDL_CONST_FN(CURSOR_DEFAULT, SDL_SYSTEM_CURSOR_DEFAULT)
+SDL_CONST_FN(CURSOR_TEXT, SDL_SYSTEM_CURSOR_TEXT)
+SDL_CONST_FN(CURSOR_WAIT, SDL_SYSTEM_CURSOR_WAIT)
+SDL_CONST_FN(CURSOR_CROSSHAIR, SDL_SYSTEM_CURSOR_CROSSHAIR)
+SDL_CONST_FN(CURSOR_PROGRESS, SDL_SYSTEM_CURSOR_PROGRESS)
+SDL_CONST_FN(CURSOR_NWSE_RESIZE, SDL_SYSTEM_CURSOR_NWSE_RESIZE)
+SDL_CONST_FN(CURSOR_NESW_RESIZE, SDL_SYSTEM_CURSOR_NESW_RESIZE)
+SDL_CONST_FN(CURSOR_EW_RESIZE, SDL_SYSTEM_CURSOR_EW_RESIZE)
+SDL_CONST_FN(CURSOR_NS_RESIZE, SDL_SYSTEM_CURSOR_NS_RESIZE)
+SDL_CONST_FN(CURSOR_MOVE, SDL_SYSTEM_CURSOR_MOVE)
+SDL_CONST_FN(CURSOR_NOT_ALLOWED, SDL_SYSTEM_CURSOR_NOT_ALLOWED)
+SDL_CONST_FN(CURSOR_POINTER, SDL_SYSTEM_CURSOR_POINTER)
+
+/* ── Slice 16: Extended Events ────────────────────────────────────── */
+
+static vigil_status_t sdl_fn_pump_events(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_PumpEvents();
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t sdl_fn_has_event(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t type = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_bool(vm, SDL_HasEvent((Uint32)type), error);
+}
+
+static vigil_status_t sdl_fn_flush_event(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t type = sdl_arg_i32(vm, base, 0);
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_FlushEvent((Uint32)type);
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t sdl_fn_flush_events(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t min_type = sdl_arg_i32(vm, base, 0);
+    int32_t max_type = sdl_arg_i32(vm, base, 1);
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_FlushEvents((Uint32)min_type, (Uint32)max_type);
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t sdl_fn_event_enabled(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t type = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_bool(vm, SDL_EventEnabled((Uint32)type), error);
+}
+
+static vigil_status_t sdl_fn_set_event_enabled(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t type = sdl_arg_i32(vm, base, 0);
+    int32_t enabled = sdl_arg_i32(vm, base, 1);
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_SetEventEnabled((Uint32)type, enabled != 0);
+    return VIGIL_STATUS_OK;
+}
+
 /* Texture access constants */
 SDL_CONST_FN(TEXTUREACCESS_STATIC, SDL_TEXTUREACCESS_STATIC)
 SDL_CONST_FN(TEXTUREACCESS_STREAMING, SDL_TEXTUREACCESS_STREAMING)
@@ -2906,6 +3214,41 @@ static const vigil_native_module_function_t sdl_functions[] = {
     SDL_CONST_ENTRY("FLASH_CANCEL", FLASH_CANCEL),
     SDL_CONST_ENTRY("FLASH_BRIEFLY", FLASH_BRIEFLY),
     SDL_CONST_ENTRY("FLASH_UNTIL_FOCUSED", FLASH_UNTIL_FOCUSED),
+    /* Audio extras (slice 14) */
+    SDL_FN("get_audio_playback_count", 24U, sdl_fn_get_audio_playback_count, 0U, NULL, VIGIL_TYPE_I32),
+    SDL_FN("get_audio_device_name", 21U, sdl_fn_get_audio_device_name, 1U, p_i32, VIGIL_TYPE_STRING),
+    SDL_FN("get_current_audio_driver", 24U, sdl_fn_get_current_audio_driver, 0U, NULL, VIGIL_TYPE_STRING),
+    /* Cursor (slice 15) */
+    {"create_system_cursor", 20U, sdl_fn_create_system_cursor, 1U, p_i32, VIGIL_TYPE_I64, 2U, rt_i64_err, 0, NULL, NULL,
+     0},
+    {"create_color_cursor", 19U, sdl_fn_create_color_cursor, 3U, p_obj_i32_i32, VIGIL_TYPE_I64, 2U, rt_i64_err, 0, NULL,
+     NULL, 0},
+    SDL_FN_BOOL_ERR("set_cursor", 10U, sdl_fn_set_cursor, 1U, p_i64),
+    SDL_FN_VOID("destroy_cursor", 14U, sdl_fn_destroy_cursor, 1U, p_i64),
+    SDL_FN_BOOL_ERR("capture_mouse", 13U, sdl_fn_capture_mouse, 1U, p_i32),
+    {"get_relative_mouse_state", 24U, sdl_fn_get_relative_mouse_state, 0U, NULL, VIGIL_TYPE_F64, 2U, rt_f64_f64, 0,
+     NULL, NULL, 0},
+    SDL_FN_BOOL_ERR("warp_mouse_global", 17U, sdl_fn_warp_mouse_global, 2U, p_f64_f64),
+    /* System cursor constants */
+    SDL_CONST_ENTRY("CURSOR_DEFAULT", CURSOR_DEFAULT),
+    SDL_CONST_ENTRY("CURSOR_TEXT", CURSOR_TEXT),
+    SDL_CONST_ENTRY("CURSOR_WAIT", CURSOR_WAIT),
+    SDL_CONST_ENTRY("CURSOR_CROSSHAIR", CURSOR_CROSSHAIR),
+    SDL_CONST_ENTRY("CURSOR_PROGRESS", CURSOR_PROGRESS),
+    SDL_CONST_ENTRY("CURSOR_NWSE_RESIZE", CURSOR_NWSE_RESIZE),
+    SDL_CONST_ENTRY("CURSOR_NESW_RESIZE", CURSOR_NESW_RESIZE),
+    SDL_CONST_ENTRY("CURSOR_EW_RESIZE", CURSOR_EW_RESIZE),
+    SDL_CONST_ENTRY("CURSOR_NS_RESIZE", CURSOR_NS_RESIZE),
+    SDL_CONST_ENTRY("CURSOR_MOVE", CURSOR_MOVE),
+    SDL_CONST_ENTRY("CURSOR_NOT_ALLOWED", CURSOR_NOT_ALLOWED),
+    SDL_CONST_ENTRY("CURSOR_POINTER", CURSOR_POINTER),
+    /* Events (slice 16) */
+    SDL_FN_VOID("pump_events", 11U, sdl_fn_pump_events, 0U, NULL),
+    SDL_FN("has_event", 9U, sdl_fn_has_event, 1U, p_i32, VIGIL_TYPE_BOOL),
+    SDL_FN_VOID("flush_event", 11U, sdl_fn_flush_event, 1U, p_i32),
+    SDL_FN_VOID("flush_events", 12U, sdl_fn_flush_events, 2U, p_i32_i32),
+    SDL_FN("event_enabled", 13U, sdl_fn_event_enabled, 1U, p_i32, VIGIL_TYPE_BOOL),
+    SDL_FN_VOID("set_event_enabled", 17U, sdl_fn_set_event_enabled, 2U, p_i32_i32),
     /* Display info (slice 11) */
     SDL_FN("get_display_count", 17U, sdl_fn_get_display_count, 0U, NULL, VIGIL_TYPE_I32),
     SDL_FN("get_display_name", 16U, sdl_fn_get_display_name, 1U, p_i32, VIGIL_TYPE_STRING),
@@ -3070,6 +3413,14 @@ static const vigil_native_class_method_t sdl_audio_stream_methods[] = {
     SDL_METHOD("get_queued", 10U, sdl_audio_stream_get_queued, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL),
     SDL_METHOD("resume", 6U, sdl_audio_stream_resume, 0U, NULL, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
     SDL_METHOD("pause", 5U, sdl_audio_stream_pause, 0U, NULL, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
+    /* Slice 14: audio extras */
+    SDL_METHOD("set_gain", 8U, sdl_audio_stream_set_gain, 1U, p_f64, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
+    SDL_METHOD("get_gain", 8U, sdl_audio_stream_get_gain, 0U, NULL, VIGIL_TYPE_F64, 1U, NULL),
+    SDL_METHOD("set_freq_ratio", 14U, sdl_audio_stream_set_freq_ratio, 1U, p_f64, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
+    SDL_METHOD("get_freq_ratio", 14U, sdl_audio_stream_get_freq_ratio, 0U, NULL, VIGIL_TYPE_F64, 1U, NULL),
+    SDL_METHOD("get_available", 13U, sdl_audio_stream_get_available, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL),
+    SDL_METHOD("flush", 5U, sdl_audio_stream_flush, 0U, NULL, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
+    SDL_METHOD("clear", 5U, sdl_audio_stream_clear, 0U, NULL, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
 };
 
 /* ── Gamepad class descriptor ────────────────────────────────────── */
