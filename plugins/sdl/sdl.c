@@ -300,6 +300,7 @@ static vigil_status_t sdl_push_handle_instance(vigil_vm_t *vm, size_t class_inde
         return sdl_push_i32(vm, (int32_t)(value), error);                                                              \
     }
 
+/* clang-format off */
 #define SDL_CONST_ENTRY(vname, cname)                                                                                  \
     {vname, sizeof(vname) - 1U, sdl_const_##cname, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, NULL, 0}
 
@@ -310,6 +311,7 @@ static vigil_status_t sdl_push_handle_instance(vigil_vm_t *vm, size_t class_inde
 #define SDL_METHOD(n, nl, fn, pc, pt, rt, rc, rts) {n, nl, fn, pc, pt, rt, rc, rts, 0, NULL, 0U, 0}
 
 #define SDL_STATIC(n, nl, fn, pc, pt, rt, rc, rts) {n, nl, fn, pc, pt, rt, rc, rts, 1, NULL, 0U, 0}
+/* clang-format on */
 
 /* ── Slice 1: Init, Version, Constants ────────────────────────────── */
 
@@ -415,6 +417,8 @@ static const int rt_bool_err[] = {VIGIL_TYPE_BOOL, VIGIL_TYPE_ERR};
 
 /* ── Function helper macros ──────────────────────────────────────── */
 
+/* clang-format off */
+
 /* Function returning (bool, err). */
 #define SDL_FN_BOOL_ERR(n, nl, fn, pc, pt) {n, nl, fn, pc, pt, VIGIL_TYPE_BOOL, 2U, rt_bool_err, 0, NULL, NULL, 0}
 
@@ -423,6 +427,8 @@ static const int rt_bool_err[] = {VIGIL_TYPE_BOOL, VIGIL_TYPE_ERR};
 
 /* Void function. */
 #define SDL_FN_VOID(n, nl, fn, pc, pt) {n, nl, fn, pc, pt, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, NULL, 0}
+
+/* clang-format on */
 
 /* ── Function table ──────────────────────────────────────────────── */
 

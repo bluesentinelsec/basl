@@ -279,7 +279,7 @@ jobs:
         env:
           CLANG_FORMAT_BIN: /usr/bin/clang-format-18
         run: |
-          mapfile -t files < <(git diff --name-only --diff-filter=ACMR origin/main...HEAD -- '*.c' '*.h')
+          mapfile -t files < <(git diff --name-only --diff-filter=ACMR origin/main...HEAD -- '*.c' '*.h' | grep -v '^deps/')
           if [ "${#files[@]}" -eq 0 ]; then
             echo "No C or header changes to format-check."
             exit 0
