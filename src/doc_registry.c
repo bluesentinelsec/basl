@@ -1643,6 +1643,25 @@ static const vigil_doc_entry_t sdl_docs[] = {
     {"sdl.LOGICAL_LETTERBOX", "sdl.LOGICAL_LETTERBOX() -> i32", "Letterbox to fit.", NULL, NULL},
     {"sdl.LOGICAL_OVERSCAN", "sdl.LOGICAL_OVERSCAN() -> i32", "Overscan to fill.", NULL, NULL},
     {"sdl.LOGICAL_INTEGER_SCALE", "sdl.LOGICAL_INTEGER_SCALE() -> i32", "Integer scaling.", NULL, NULL},
+    /* Renderer drawing extras (slice 12) */
+    {"sdl.Renderer.render_debug_text", "ren.render_debug_text(x: f64, y: f64, text: string) -> (bool, err)",
+     "Draw debug text.", "Uses SDL's built-in 8x8 font. Set color with set_draw_color first.",
+     "ren.render_debug_text(10.0, 10.0, \"FPS: 60\")"},
+    {"sdl.Renderer.set_viewport", "ren.set_viewport(x: i32, y: i32, w: i32, h: i32) -> (bool, err)",
+     "Set the drawing area.", "Pass all zeros to reset to the full target.", NULL},
+    {"sdl.Renderer.set_draw_blend_mode", "ren.set_draw_blend_mode(mode: i32) -> (bool, err)",
+     "Set blend mode for draw operations.", "Use BLENDMODE_* constants.", NULL},
+    {"sdl.Renderer.get_draw_blend_mode", "ren.get_draw_blend_mode() -> i32", "Get current draw blend mode.", NULL,
+     NULL},
+    {"sdl.Renderer.set_color_scale", "ren.set_color_scale(scale: f64) -> (bool, err)",
+     "Set color scale for render operations.", NULL, NULL},
+    {"sdl.Renderer.get_color_scale", "ren.get_color_scale() -> f64", "Get current color scale.", NULL, NULL},
+    {"sdl.Renderer.flush", "ren.flush() -> (bool, err)", "Flush pending render commands.", NULL, NULL},
+    {"sdl.Renderer.get_output_size", "ren.get_output_size() -> (i32, i32)", "Get renderer output size in pixels.", NULL,
+     NULL},
+    {"sdl.Renderer.get_current_output_size", "ren.get_current_output_size() -> (i32, i32)",
+     "Get current output size in pixels.", NULL, NULL},
+    {"sdl.Renderer.get_name", "ren.get_name() -> string", "Get renderer driver name.", NULL, NULL},
 };
 
 #define SDL_DOC_COUNT (sizeof(sdl_docs) / sizeof(sdl_docs[0]))
