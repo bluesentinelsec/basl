@@ -675,6 +675,11 @@ static const int p_obj[] = {VIGIL_TYPE_OBJECT};
 static const int p_obj_i32_i32[] = {VIGIL_TYPE_OBJECT, VIGIL_TYPE_I32, VIGIL_TYPE_I32};
 static const int p_i32_i32_i32_i32_i32[] = {VIGIL_TYPE_I32, VIGIL_TYPE_I32, VIGIL_TYPE_I32, VIGIL_TYPE_I32,
                                             VIGIL_TYPE_I32};
+static const int p_i32_i32_i32_i32_i32_i32[] = {VIGIL_TYPE_I32, VIGIL_TYPE_I32, VIGIL_TYPE_I32,
+                                                VIGIL_TYPE_I32, VIGIL_TYPE_I32, VIGIL_TYPE_I32};
+/* render_texture_tiled: obj tex + 9x f64 */
+static const int p_obj_f64x9[] = {VIGIL_TYPE_OBJECT, VIGIL_TYPE_F64, VIGIL_TYPE_F64, VIGIL_TYPE_F64, VIGIL_TYPE_F64,
+                                  VIGIL_TYPE_F64,    VIGIL_TYPE_F64, VIGIL_TYPE_F64, VIGIL_TYPE_F64, VIGIL_TYPE_F64};
 static const int p_i32_f64[] = {VIGIL_TYPE_I32, VIGIL_TYPE_F64};
 /* blit: obj dst + sx, sy, sw, sh, dx, dy */
 static const int p_obj_i32x6[] = {VIGIL_TYPE_OBJECT, VIGIL_TYPE_I32, VIGIL_TYPE_I32, VIGIL_TYPE_I32,
@@ -3409,6 +3414,274 @@ SDL_CONST_FN(PROGRESS_NORMAL, SDL_PROGRESS_STATE_NORMAL)
 SDL_CONST_FN(PROGRESS_PAUSED, SDL_PROGRESS_STATE_PAUSED)
 SDL_CONST_FN(PROGRESS_ERROR, SDL_PROGRESS_STATE_ERROR)
 
+/* ── Slice 23: Advanced Surface ───────────────────────────────────── */
+
+/* Surface.create(i32 w, i32 h, i32 format) -> (Surface, err) */
+static vigil_status_t sdl_surface_create(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    size_t ci = sdl_static_class_index(vm, base);
+    int32_t w = sdl_arg_i32(vm, base, 1);
+    int32_t h = sdl_arg_i32(vm, base, 2);
+    int32_t fmt = sdl_arg_i32(vm, base, 3);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Surface *s = SDL_CreateSurface(w, h, (SDL_PixelFormat)fmt);
+    if (!s)
+        return sdl_push_nil_and_sdl_err(vm, SDL_ERR_IO, error);
+    int64_t handle;
+    if (SDL_HANDLE_STORE(surfaces, s, &handle) < 0)
+    {
+        SDL_DestroySurface(s);
+        return sdl_push_nil_and_err(vm, "too many surfaces", SDL_ERR_STATE, error);
+    }
+    vigil_status_t st = sdl_push_handle_instance(vm, ci, handle, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_ok(vm, error);
+}
+
+/* surf.duplicate() -> (Surface, err) */
+static vigil_status_t sdl_surface_duplicate(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    size_t ci = sdl_self_class_index(vm, base);
+    int64_t h = sdl_field_i64(vm, base, SURF_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Surface *src = (SDL_Surface *)SDL_HANDLE_GET(surfaces, h);
+    if (!src)
+        return sdl_push_nil_and_err(vm, "invalid surface", SDL_ERR_ARG, error);
+    SDL_Surface *dup = SDL_DuplicateSurface(src);
+    if (!dup)
+        return sdl_push_nil_and_sdl_err(vm, SDL_ERR_IO, error);
+    int64_t nh;
+    if (SDL_HANDLE_STORE(surfaces, dup, &nh) < 0)
+    {
+        SDL_DestroySurface(dup);
+        return sdl_push_nil_and_err(vm, "too many surfaces", SDL_ERR_STATE, error);
+    }
+    vigil_status_t st = sdl_push_handle_instance(vm, ci, nh, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_ok(vm, error);
+}
+
+/* surf.scale(i32 w, i32 h, i32 mode) -> (Surface, err) */
+static vigil_status_t sdl_surface_scale(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    size_t ci = sdl_self_class_index(vm, base);
+    int64_t h = sdl_field_i64(vm, base, SURF_HANDLE);
+    int32_t w = sdl_arg_i32(vm, base, 1);
+    int32_t ht = sdl_arg_i32(vm, base, 2);
+    int32_t mode = sdl_arg_i32(vm, base, 3);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Surface *src = (SDL_Surface *)SDL_HANDLE_GET(surfaces, h);
+    if (!src)
+        return sdl_push_nil_and_err(vm, "invalid surface", SDL_ERR_ARG, error);
+    SDL_Surface *scaled = SDL_ScaleSurface(src, w, ht, (SDL_ScaleMode)mode);
+    if (!scaled)
+        return sdl_push_nil_and_sdl_err(vm, SDL_ERR_IO, error);
+    int64_t nh;
+    if (SDL_HANDLE_STORE(surfaces, scaled, &nh) < 0)
+    {
+        SDL_DestroySurface(scaled);
+        return sdl_push_nil_and_err(vm, "too many surfaces", SDL_ERR_STATE, error);
+    }
+    vigil_status_t st = sdl_push_handle_instance(vm, ci, nh, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_ok(vm, error);
+}
+
+/* surf.rotate(f64 angle) -> (Surface, err) */
+static vigil_status_t sdl_surface_rotate(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    size_t ci = sdl_self_class_index(vm, base);
+    int64_t h = sdl_field_i64(vm, base, SURF_HANDLE);
+    float angle = (float)sdl_arg_f64(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Surface *src = (SDL_Surface *)SDL_HANDLE_GET(surfaces, h);
+    if (!src)
+        return sdl_push_nil_and_err(vm, "invalid surface", SDL_ERR_ARG, error);
+    SDL_Surface *rot = SDL_RotateSurface(src, angle);
+    if (!rot)
+        return sdl_push_nil_and_sdl_err(vm, SDL_ERR_IO, error);
+    int64_t nh;
+    if (SDL_HANDLE_STORE(surfaces, rot, &nh) < 0)
+    {
+        SDL_DestroySurface(rot);
+        return sdl_push_nil_and_err(vm, "too many surfaces", SDL_ERR_STATE, error);
+    }
+    vigil_status_t st = sdl_push_handle_instance(vm, ci, nh, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_ok(vm, error);
+}
+
+/* surf.save_bmp(string path) -> (bool, err) */
+static vigil_status_t sdl_surface_save_bmp(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, SURF_HANDLE);
+    char path[512];
+    sdl_arg_str(vm, base, 1, path, sizeof(path));
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Surface *s = (SDL_Surface *)SDL_HANDLE_GET(surfaces, h);
+    if (s && SDL_SaveBMP(s, path))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+/* surf.save_png(string path) -> (bool, err) */
+static vigil_status_t sdl_surface_save_png(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, SURF_HANDLE);
+    char path[512];
+    sdl_arg_str(vm, base, 1, path, sizeof(path));
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Surface *s = (SDL_Surface *)SDL_HANDLE_GET(surfaces, h);
+    if (s && SDL_SavePNG(s, path))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+/* surf.read_pixel(i32 x, i32 y) -> i32 — packed 0xAARRGGBB */
+static vigil_status_t sdl_surface_read_pixel(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, SURF_HANDLE);
+    int32_t x = sdl_arg_i32(vm, base, 1);
+    int32_t y = sdl_arg_i32(vm, base, 2);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    Uint8 r = 0, g = 0, b = 0, a = 0;
+    SDL_Surface *s = (SDL_Surface *)SDL_HANDLE_GET(surfaces, h);
+    if (s)
+        SDL_ReadSurfacePixel(s, x, y, &r, &g, &b, &a);
+    return sdl_push_i32(vm, ((int32_t)a << 24) | ((int32_t)r << 16) | ((int32_t)g << 8) | (int32_t)b, error);
+}
+
+/* surf.write_pixel(i32 x, i32 y, i32 r, i32 g, i32 b, i32 a) -> (bool, err) */
+static vigil_status_t sdl_surface_write_pixel(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, SURF_HANDLE);
+    int32_t x = sdl_arg_i32(vm, base, 1), y = sdl_arg_i32(vm, base, 2);
+    Uint8 r = (Uint8)sdl_arg_i32(vm, base, 3), g = (Uint8)sdl_arg_i32(vm, base, 4);
+    Uint8 b = (Uint8)sdl_arg_i32(vm, base, 5), a = (Uint8)sdl_arg_i32(vm, base, 6);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Surface *s = (SDL_Surface *)SDL_HANDLE_GET(surfaces, h);
+    if (s && SDL_WriteSurfacePixel(s, x, y, r, g, b, a))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+/* ── Slice 24: Keyboard/Scancode Lookups ──────────────────────────── */
+
+static vigil_status_t sdl_fn_get_key_from_scancode(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t sc = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_i32(vm, (int32_t)SDL_GetKeyFromScancode((SDL_Scancode)sc, SDL_KMOD_NONE, false), error);
+}
+
+static vigil_status_t sdl_fn_get_scancode_from_key(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t key = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_i32(vm, (int32_t)SDL_GetScancodeFromKey((SDL_Keycode)key, NULL), error);
+}
+
+static vigil_status_t sdl_fn_get_key_from_name(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    char name[64];
+    sdl_arg_str(vm, base, 0, name, sizeof(name));
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_i32(vm, (int32_t)SDL_GetKeyFromName(name), error);
+}
+
+static vigil_status_t sdl_fn_get_scancode_from_name(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    char name[64];
+    sdl_arg_str(vm, base, 0, name, sizeof(name));
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_i32(vm, (int32_t)SDL_GetScancodeFromName(name), error);
+}
+
+static vigil_status_t sdl_fn_has_keyboard(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_bool(vm, SDL_HasKeyboard(), error);
+}
+
+static vigil_status_t sdl_fn_has_mouse(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_bool(vm, SDL_HasMouse(), error);
+}
+
+static vigil_status_t sdl_fn_start_text_input(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t wh = sdl_field_i64(vm, base, WIN_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Window *win = (SDL_Window *)SDL_HANDLE_GET(windows, wh);
+    if (win && SDL_StartTextInput(win))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+static vigil_status_t sdl_fn_stop_text_input(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t wh = sdl_field_i64(vm, base, WIN_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Window *win = (SDL_Window *)SDL_HANDLE_GET(windows, wh);
+    if (win && SDL_StopTextInput(win))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+static vigil_status_t sdl_fn_text_input_active(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t wh = sdl_field_i64(vm, base, WIN_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Window *win = (SDL_Window *)SDL_HANDLE_GET(windows, wh);
+    return sdl_push_bool(vm, win && SDL_TextInputActive(win), error);
+}
+
+/* ── Slice 25: Texture Update & Tiled Rendering ───────────────────── */
+
+/* ren.render_texture_tiled(tex, sx, sy, sw, sh, f64 scale, dx, dy, dw, dh) -> (bool, err) */
+static vigil_status_t sdl_renderer_render_texture_tiled(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t rh = sdl_field_i64(vm, base, REN_HANDLE);
+    int64_t th = sdl_field_i64(vm, base + 1, TEX_HANDLE);
+    float sx = (float)sdl_arg_f64(vm, base, 2), sy = (float)sdl_arg_f64(vm, base, 3);
+    float sw = (float)sdl_arg_f64(vm, base, 4), sh = (float)sdl_arg_f64(vm, base, 5);
+    float scale = (float)sdl_arg_f64(vm, base, 6);
+    float dx = (float)sdl_arg_f64(vm, base, 7), dy = (float)sdl_arg_f64(vm, base, 8);
+    float dw = (float)sdl_arg_f64(vm, base, 9), dh = (float)sdl_arg_f64(vm, base, 10);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Renderer *ren = (SDL_Renderer *)SDL_HANDLE_GET(renderers, rh);
+    SDL_Texture *tex = (SDL_Texture *)SDL_HANDLE_GET(textures, th);
+    if (!ren || !tex)
+        return sdl_push_bool_sdl_err(vm, SDL_ERR_ARG, error);
+    SDL_FRect src = {sx, sy, sw, sh};
+    SDL_FRect dst = {dx, dy, dw, dh};
+    int use_src = (sw > 0.0f || sh > 0.0f);
+    int use_dst = (dw > 0.0f || dh > 0.0f);
+    if (SDL_RenderTextureTiled(ren, tex, use_src ? &src : NULL, scale, use_dst ? &dst : NULL))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
 /* Texture access constants */
 SDL_CONST_FN(TEXTUREACCESS_STATIC, SDL_TEXTUREACCESS_STATIC)
 SDL_CONST_FN(TEXTUREACCESS_STREAMING, SDL_TEXTUREACCESS_STREAMING)
@@ -3738,6 +4011,16 @@ static const vigil_native_module_function_t sdl_functions[] = {
     SDL_CONST_ENTRY("PROGRESS_NORMAL", PROGRESS_NORMAL),
     SDL_CONST_ENTRY("PROGRESS_PAUSED", PROGRESS_PAUSED),
     SDL_CONST_ENTRY("PROGRESS_ERROR", PROGRESS_ERROR),
+    /* Keyboard/scancode lookups (slice 24) */
+    SDL_FN("get_key_from_scancode", 21U, sdl_fn_get_key_from_scancode, 1U, p_i32, VIGIL_TYPE_I32),
+    SDL_FN("get_scancode_from_key", 21U, sdl_fn_get_scancode_from_key, 1U, p_i32, VIGIL_TYPE_I32),
+    SDL_FN("get_key_from_name", 17U, sdl_fn_get_key_from_name, 1U, p_str, VIGIL_TYPE_I32),
+    SDL_FN("get_scancode_from_name", 21U, sdl_fn_get_scancode_from_name, 1U, p_str, VIGIL_TYPE_I32),
+    SDL_FN("has_keyboard", 12U, sdl_fn_has_keyboard, 0U, NULL, VIGIL_TYPE_BOOL),
+    SDL_FN("has_mouse", 9U, sdl_fn_has_mouse, 0U, NULL, VIGIL_TYPE_BOOL),
+    SDL_FN_BOOL_ERR("start_text_input", 16U, sdl_fn_start_text_input, 1U, p_obj),
+    SDL_FN_BOOL_ERR("stop_text_input", 15U, sdl_fn_stop_text_input, 1U, p_obj),
+    SDL_FN("text_input_active", 17U, sdl_fn_text_input_active, 1U, p_obj, VIGIL_TYPE_BOOL),
     /* Display info (slice 11) */
     SDL_FN("get_display_count", 17U, sdl_fn_get_display_count, 0U, NULL, VIGIL_TYPE_I32),
     SDL_FN("get_display_name", 16U, sdl_fn_get_display_name, 1U, p_i32, VIGIL_TYPE_STRING),
@@ -3843,6 +4126,8 @@ static const vigil_native_class_method_t sdl_renderer_methods[] = {
     SDL_METHOD("get_vsync", 9U, sdl_renderer_get_vsync, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL),
     SDL_METHOD("clip_enabled", 12U, sdl_renderer_clip_enabled, 0U, NULL, VIGIL_TYPE_BOOL, 1U, NULL),
     SDL_METHOD("get_viewport", 12U, sdl_renderer_get_viewport, 0U, NULL, VIGIL_TYPE_I32, 2U, rt_i32_i32),
+    /* Slice 25: tiled rendering */
+    SDL_METHOD("render_texture_tiled", 21U, sdl_renderer_render_texture_tiled, 10U, p_obj_f64x9, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
 };
 
 /* ── Event class descriptor ──────────────────────────────────────── */
@@ -3891,6 +4176,15 @@ static const vigil_native_class_method_t sdl_surface_methods[] = {
     SDL_METHOD("set_blend_mode", 14U, sdl_surface_set_blend_mode, 1U, p_i32, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
     SDL_METHOD("set_color_key", 13U, sdl_surface_set_color_key, 2U, p_i32_i32, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
     SDL_METHOD("blit", 4U, sdl_surface_blit, 7U, p_obj_i32x6, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
+    /* Slice 23: advanced surface */
+    SDL_STATIC("create", 6U, sdl_surface_create, 3U, p_i32_i32_i32, VIGIL_TYPE_OBJECT, 2U, rt_obj_err),
+    SDL_METHOD("duplicate", 9U, sdl_surface_duplicate, 0U, NULL, VIGIL_TYPE_OBJECT, 2U, rt_obj_err),
+    SDL_METHOD("scale", 5U, sdl_surface_scale, 3U, p_i32_i32_i32, VIGIL_TYPE_OBJECT, 2U, rt_obj_err),
+    SDL_METHOD("rotate", 6U, sdl_surface_rotate, 1U, p_f64, VIGIL_TYPE_OBJECT, 2U, rt_obj_err),
+    SDL_METHOD("save_bmp", 8U, sdl_surface_save_bmp, 1U, p_str, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
+    SDL_METHOD("save_png", 8U, sdl_surface_save_png, 1U, p_str, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
+    SDL_METHOD("read_pixel", 10U, sdl_surface_read_pixel, 2U, p_i32_i32, VIGIL_TYPE_I32, 1U, NULL),
+    SDL_METHOD("write_pixel", 11U, sdl_surface_write_pixel, 6U, p_i32_i32_i32_i32_i32_i32, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
 };
 
 /* ── Texture class descriptor ────────────────────────────────────── */

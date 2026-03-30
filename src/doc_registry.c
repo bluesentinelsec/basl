@@ -1819,6 +1819,38 @@ static const vigil_doc_entry_t sdl_docs[] = {
     {"sdl.Gamepad.has_axis", "gp.has_axis(axis: i32) -> bool", "Check if gamepad has an axis.", NULL, NULL},
     {"sdl.Gamepad.has_button", "gp.has_button(button: i32) -> bool", "Check if gamepad has a button.", NULL, NULL},
     {"sdl.update_gamepads", "sdl.update_gamepads() -> void", "Manually pump gamepad updates.", NULL, NULL},
+    /* Advanced surface (slice 23) */
+    {"sdl.Surface.create", "sdl.Surface.create(w: i32, h: i32, format: i32) -> (sdl.Surface, err)",
+     "Create a blank surface.", NULL, NULL},
+    {"sdl.Surface.duplicate", "surf.duplicate() -> (sdl.Surface, err)", "Copy a surface.", NULL, NULL},
+    {"sdl.Surface.scale", "surf.scale(w: i32, h: i32, mode: i32) -> (sdl.Surface, err)", "Scale to new size.",
+     "Use SCALEMODE_* constants.", NULL},
+    {"sdl.Surface.rotate", "surf.rotate(angle: f64) -> (sdl.Surface, err)", "Rotate (degrees).", NULL, NULL},
+    {"sdl.Surface.save_bmp", "surf.save_bmp(path: string) -> (bool, err)", "Save as BMP.", NULL, NULL},
+    {"sdl.Surface.save_png", "surf.save_png(path: string) -> (bool, err)", "Save as PNG.", NULL, NULL},
+    {"sdl.Surface.read_pixel", "surf.read_pixel(x: i32, y: i32) -> i32", "Read pixel as packed 0xAARRGGBB.", NULL,
+     NULL},
+    {"sdl.Surface.write_pixel", "surf.write_pixel(x: i32, y: i32, r: i32, g: i32, b: i32, a: i32) -> (bool, err)",
+     "Write a single pixel.", NULL, NULL},
+    /* Keyboard/scancode lookups (slice 24) */
+    {"sdl.get_key_from_scancode", "sdl.get_key_from_scancode(scancode: i32) -> i32", "Convert scancode to keycode.",
+     NULL, NULL},
+    {"sdl.get_scancode_from_key", "sdl.get_scancode_from_key(keycode: i32) -> i32", "Convert keycode to scancode.",
+     NULL, NULL},
+    {"sdl.get_key_from_name", "sdl.get_key_from_name(name: string) -> i32", "Get keycode from name.", NULL, NULL},
+    {"sdl.get_scancode_from_name", "sdl.get_scancode_from_name(name: string) -> i32", "Get scancode from name.", NULL,
+     NULL},
+    {"sdl.has_keyboard", "sdl.has_keyboard() -> bool", "Check if a keyboard is connected.", NULL, NULL},
+    {"sdl.has_mouse", "sdl.has_mouse() -> bool", "Check if a mouse is connected.", NULL, NULL},
+    {"sdl.start_text_input", "sdl.start_text_input(win: sdl.Window) -> (bool, err)", "Start text input for a window.",
+     NULL, NULL},
+    {"sdl.stop_text_input", "sdl.stop_text_input(win: sdl.Window) -> (bool, err)", "Stop text input.", NULL, NULL},
+    {"sdl.text_input_active", "sdl.text_input_active(win: sdl.Window) -> bool", "Check if text input is active.", NULL,
+     NULL},
+    /* Tiled rendering (slice 25) */
+    {"sdl.Renderer.render_texture_tiled",
+     "ren.render_texture_tiled(tex, sx, sy, sw, sh, scale, dx, dy, dw, dh) -> (bool, err)",
+     "Tile a texture across a destination rect.", NULL, NULL},
 };
 
 #define SDL_DOC_COUNT (sizeof(sdl_docs) / sizeof(sdl_docs[0]))
