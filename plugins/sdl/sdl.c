@@ -666,6 +666,8 @@ static vigil_status_t sdl_window_get_flags(vigil_vm_t *vm, size_t arg_count, vig
 static const int p_i32[] = {VIGIL_TYPE_I32};
 static const int p_i64[] = {VIGIL_TYPE_I64};
 static const int p_str[] = {VIGIL_TYPE_STRING};
+static const int p_str_str[] = {VIGIL_TYPE_STRING, VIGIL_TYPE_STRING};
+static const int p_i32_str_str[] = {VIGIL_TYPE_I32, VIGIL_TYPE_STRING, VIGIL_TYPE_STRING};
 static const int p_i32_i32[] = {VIGIL_TYPE_I32, VIGIL_TYPE_I32};
 static const int p_i32_i32_i32_i32[] = {VIGIL_TYPE_I32, VIGIL_TYPE_I32, VIGIL_TYPE_I32, VIGIL_TYPE_I32};
 static const int p_str_i32_i32_i32[] = {VIGIL_TYPE_STRING, VIGIL_TYPE_I32, VIGIL_TYPE_I32, VIGIL_TYPE_I32};
@@ -1609,6 +1611,142 @@ SDL_CONST_FN(EVENT_GAMEPAD_BUTTON_UP, SDL_EVENT_GAMEPAD_BUTTON_UP)
 SDL_CONST_FN(EVENT_GAMEPAD_ADDED, SDL_EVENT_GAMEPAD_ADDED)
 SDL_CONST_FN(EVENT_GAMEPAD_REMOVED, SDL_EVENT_GAMEPAD_REMOVED)
 
+/* ── Slice 10: Clipboard, MessageBox, Misc ────────────────────────── */
+
+/* sdl.set_clipboard_text(string text) -> (bool, err) */
+static vigil_status_t sdl_fn_set_clipboard_text(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    char text[4096];
+    sdl_arg_str(vm, base, 0, text, sizeof(text));
+    vigil_vm_stack_pop_n(vm, arg_count);
+    if (SDL_SetClipboardText(text))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+/* sdl.get_clipboard_text() -> string */
+static vigil_status_t sdl_fn_get_clipboard_text(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    vigil_vm_stack_pop_n(vm, arg_count);
+    char *text = SDL_GetClipboardText();
+    vigil_status_t st = sdl_push_string(vm, text ? text : "", error);
+    SDL_free(text);
+    return st;
+}
+
+/* sdl.has_clipboard_text() -> bool */
+static vigil_status_t sdl_fn_has_clipboard_text(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_bool(vm, SDL_HasClipboardText(), error);
+}
+
+/* sdl.show_simple_message_box(i32 flags, string title, string message) -> (bool, err)
+ * Window parameter omitted (passes NULL) — modal to desktop. */
+static vigil_status_t sdl_fn_show_simple_message_box(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t flags = sdl_arg_i32(vm, base, 0);
+    char title[256];
+    sdl_arg_str(vm, base, 1, title, sizeof(title));
+    char message[4096];
+    sdl_arg_str(vm, base, 2, message, sizeof(message));
+    vigil_vm_stack_pop_n(vm, arg_count);
+    if (SDL_ShowSimpleMessageBox((SDL_MessageBoxFlags)flags, title, message, NULL))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+/* sdl.open_url(string url) -> (bool, err) */
+static vigil_status_t sdl_fn_open_url(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    char url[2048];
+    sdl_arg_str(vm, base, 0, url, sizeof(url));
+    vigil_vm_stack_pop_n(vm, arg_count);
+    if (SDL_OpenURL(url))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+/* sdl.get_base_path() -> string */
+static vigil_status_t sdl_fn_get_base_path(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_string(vm, SDL_GetBasePath(), error);
+}
+
+/* sdl.get_pref_path(string org, string app) -> string */
+static vigil_status_t sdl_fn_get_pref_path(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    char org[256];
+    sdl_arg_str(vm, base, 0, org, sizeof(org));
+    char app[256];
+    sdl_arg_str(vm, base, 1, app, sizeof(app));
+    vigil_vm_stack_pop_n(vm, arg_count);
+    char *path = SDL_GetPrefPath(org, app);
+    vigil_status_t st = sdl_push_string(vm, path ? path : "", error);
+    SDL_free(path);
+    return st;
+}
+
+/* sdl.get_num_cpu_cores() -> i32 */
+static vigil_status_t sdl_fn_get_num_cpu_cores(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_i32(vm, SDL_GetNumLogicalCPUCores(), error);
+}
+
+/* sdl.get_system_ram() -> i32 */
+static vigil_status_t sdl_fn_get_system_ram(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_i32(vm, SDL_GetSystemRAM(), error);
+}
+
+/* sdl.log(string msg) */
+static vigil_status_t sdl_fn_log(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    char msg[4096];
+    sdl_arg_str(vm, base, 0, msg, sizeof(msg));
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Log("%s", msg);
+    return VIGIL_STATUS_OK;
+}
+
+/* sdl.log_error(string msg) */
+static vigil_status_t sdl_fn_log_error(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    char msg[4096];
+    sdl_arg_str(vm, base, 0, msg, sizeof(msg));
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "%s", msg);
+    return VIGIL_STATUS_OK;
+}
+
+/* sdl.log_warn(string msg) */
+static vigil_status_t sdl_fn_log_warn(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    char msg[4096];
+    sdl_arg_str(vm, base, 0, msg, sizeof(msg));
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "%s", msg);
+    return VIGIL_STATUS_OK;
+}
+
+/* MessageBox flag constants */
+SDL_CONST_FN(MESSAGEBOX_ERROR, SDL_MESSAGEBOX_ERROR)
+SDL_CONST_FN(MESSAGEBOX_WARNING, SDL_MESSAGEBOX_WARNING)
+SDL_CONST_FN(MESSAGEBOX_INFORMATION, SDL_MESSAGEBOX_INFORMATION)
+
 /* Scancode constants */
 SDL_CONST_FN(SCANCODE_A, SDL_SCANCODE_A)
 SDL_CONST_FN(SCANCODE_B, SDL_SCANCODE_B)
@@ -2227,6 +2365,23 @@ static const vigil_native_module_function_t sdl_functions[] = {
     SDL_CONST_ENTRY("EVENT_GAMEPAD_BUTTON_UP", EVENT_GAMEPAD_BUTTON_UP),
     SDL_CONST_ENTRY("EVENT_GAMEPAD_ADDED", EVENT_GAMEPAD_ADDED),
     SDL_CONST_ENTRY("EVENT_GAMEPAD_REMOVED", EVENT_GAMEPAD_REMOVED),
+    /* Clipboard, MessageBox, Misc (slice 10) */
+    SDL_FN_BOOL_ERR("set_clipboard_text", 18U, sdl_fn_set_clipboard_text, 1U, p_str),
+    SDL_FN("get_clipboard_text", 18U, sdl_fn_get_clipboard_text, 0U, NULL, VIGIL_TYPE_STRING),
+    SDL_FN("has_clipboard_text", 18U, sdl_fn_has_clipboard_text, 0U, NULL, VIGIL_TYPE_BOOL),
+    SDL_FN_BOOL_ERR("show_simple_message_box", 23U, sdl_fn_show_simple_message_box, 3U, p_i32_str_str),
+    SDL_FN_BOOL_ERR("open_url", 8U, sdl_fn_open_url, 1U, p_str),
+    SDL_FN("get_base_path", 13U, sdl_fn_get_base_path, 0U, NULL, VIGIL_TYPE_STRING),
+    {"get_pref_path", 13U, sdl_fn_get_pref_path, 2U, p_str_str, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0},
+    SDL_FN("get_num_cpu_cores", 17U, sdl_fn_get_num_cpu_cores, 0U, NULL, VIGIL_TYPE_I32),
+    SDL_FN("get_system_ram", 14U, sdl_fn_get_system_ram, 0U, NULL, VIGIL_TYPE_I32),
+    SDL_FN_VOID("log", 3U, sdl_fn_log, 1U, p_str),
+    SDL_FN_VOID("log_error", 9U, sdl_fn_log_error, 1U, p_str),
+    SDL_FN_VOID("log_warn", 8U, sdl_fn_log_warn, 1U, p_str),
+    /* MessageBox flag constants */
+    SDL_CONST_ENTRY("MESSAGEBOX_ERROR", MESSAGEBOX_ERROR),
+    SDL_CONST_ENTRY("MESSAGEBOX_WARNING", MESSAGEBOX_WARNING),
+    SDL_CONST_ENTRY("MESSAGEBOX_INFORMATION", MESSAGEBOX_INFORMATION),
 };
 
 #define SDL_FUNCTION_COUNT (sizeof(sdl_functions) / sizeof(sdl_functions[0]))
