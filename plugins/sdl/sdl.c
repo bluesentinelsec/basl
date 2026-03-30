@@ -664,6 +664,7 @@ static vigil_status_t sdl_window_get_flags(vigil_vm_t *vm, size_t arg_count, vig
 /* ── Parameter type arrays ───────────────────────────────────────── */
 
 static const int p_i32[] = {VIGIL_TYPE_I32};
+static const int p_i64[] = {VIGIL_TYPE_I64};
 static const int p_str[] = {VIGIL_TYPE_STRING};
 static const int p_i32_i32[] = {VIGIL_TYPE_I32, VIGIL_TYPE_I32};
 static const int p_i32_i32_i32_i32[] = {VIGIL_TYPE_I32, VIGIL_TYPE_I32, VIGIL_TYPE_I32, VIGIL_TYPE_I32};
@@ -1127,6 +1128,58 @@ static vigil_status_t sdl_fn_delay(vigil_vm_t *vm, size_t arg_count, vigil_error
     (void)error;
     vigil_vm_stack_pop_n(vm, arg_count);
     SDL_Delay((Uint32)ms);
+    return VIGIL_STATUS_OK;
+}
+
+/* ── Slice 7: Timer and Delay ─────────────────────────────────────── */
+
+/* sdl.get_ticks() -> i64 */
+static vigil_status_t sdl_fn_get_ticks(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_i64(vm, (int64_t)SDL_GetTicks(), error);
+}
+
+/* sdl.get_ticks_ns() -> i64 */
+static vigil_status_t sdl_fn_get_ticks_ns(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_i64(vm, (int64_t)SDL_GetTicksNS(), error);
+}
+
+/* sdl.get_performance_counter() -> i64 */
+static vigil_status_t sdl_fn_get_performance_counter(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_i64(vm, (int64_t)SDL_GetPerformanceCounter(), error);
+}
+
+/* sdl.get_performance_frequency() -> i64 */
+static vigil_status_t sdl_fn_get_performance_frequency(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_i64(vm, (int64_t)SDL_GetPerformanceFrequency(), error);
+}
+
+/* sdl.delay_ns(i64 ns) */
+static vigil_status_t sdl_fn_delay_ns(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t ns = sdl_arg_i64(vm, base, 0);
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_DelayNS((Uint64)ns);
+    return VIGIL_STATUS_OK;
+}
+
+/* sdl.delay_precise(i64 ns) */
+static vigil_status_t sdl_fn_delay_precise(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t ns = sdl_arg_i64(vm, base, 0);
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_DelayPrecise((Uint64)ns);
     return VIGIL_STATUS_OK;
 }
 
@@ -1607,6 +1660,13 @@ static const vigil_native_module_function_t sdl_functions[] = {
     SDL_FN("hide_cursor", 11U, sdl_fn_hide_cursor, 0U, NULL, VIGIL_TYPE_BOOL),
     SDL_FN("cursor_visible", 14U, sdl_fn_cursor_visible, 0U, NULL, VIGIL_TYPE_BOOL),
     SDL_FN_VOID("delay", 5U, sdl_fn_delay, 1U, p_i32),
+    /* Timer / timing (slice 7) */
+    SDL_FN("get_ticks", 9U, sdl_fn_get_ticks, 0U, NULL, VIGIL_TYPE_I64),
+    SDL_FN("get_ticks_ns", 12U, sdl_fn_get_ticks_ns, 0U, NULL, VIGIL_TYPE_I64),
+    SDL_FN("get_performance_counter", 23U, sdl_fn_get_performance_counter, 0U, NULL, VIGIL_TYPE_I64),
+    SDL_FN("get_performance_frequency", 25U, sdl_fn_get_performance_frequency, 0U, NULL, VIGIL_TYPE_I64),
+    SDL_FN_VOID("delay_ns", 8U, sdl_fn_delay_ns, 1U, p_i64),
+    SDL_FN_VOID("delay_precise", 13U, sdl_fn_delay_precise, 1U, p_i64),
     /* Scancode constants */
     SDL_CONST_ENTRY("SCANCODE_A", SCANCODE_A),
     SDL_CONST_ENTRY("SCANCODE_B", SCANCODE_B),
