@@ -1604,6 +1604,27 @@ static const vigil_doc_entry_t sdl_docs[] = {
      NULL},
     {"sdl.EVENT_GAMEPAD_BUTTON_UP", "sdl.EVENT_GAMEPAD_BUTTON_UP() -> i32", "Gamepad button release event.", NULL,
      NULL},
+    /* Clipboard, MessageBox, Misc (slice 10) */
+    {"sdl.set_clipboard_text", "sdl.set_clipboard_text(text: string) -> (bool, err)", "Copy text to the clipboard.",
+     NULL, NULL},
+    {"sdl.get_clipboard_text", "sdl.get_clipboard_text() -> string", "Get text from the clipboard.", NULL, NULL},
+    {"sdl.has_clipboard_text", "sdl.has_clipboard_text() -> bool", "Check if clipboard has text.", NULL, NULL},
+    {"sdl.show_simple_message_box",
+     "sdl.show_simple_message_box(flags: i32, title: string, message: string) -> (bool, err)",
+     "Show a modal message box.", "Use MESSAGEBOX_* constants for flags.",
+     "sdl.show_simple_message_box(sdl.MESSAGEBOX_INFORMATION(), \"Hello\", \"World\")"},
+    {"sdl.open_url", "sdl.open_url(url: string) -> (bool, err)", "Open a URL in the default browser.", NULL, NULL},
+    {"sdl.get_base_path", "sdl.get_base_path() -> string", "Get the application base directory.", NULL, NULL},
+    {"sdl.get_pref_path", "sdl.get_pref_path(org: string, app: string) -> string",
+     "Get the user preferences directory.", NULL, NULL},
+    {"sdl.get_num_cpu_cores", "sdl.get_num_cpu_cores() -> i32", "Get the number of logical CPU cores.", NULL, NULL},
+    {"sdl.get_system_ram", "sdl.get_system_ram() -> i32", "Get system RAM in MB.", NULL, NULL},
+    {"sdl.log", "sdl.log(msg: string) -> void", "Log an info message via SDL.", NULL, NULL},
+    {"sdl.log_error", "sdl.log_error(msg: string) -> void", "Log an error message via SDL.", NULL, NULL},
+    {"sdl.log_warn", "sdl.log_warn(msg: string) -> void", "Log a warning message via SDL.", NULL, NULL},
+    {"sdl.MESSAGEBOX_ERROR", "sdl.MESSAGEBOX_ERROR() -> i32", "Error message box flag.", NULL, NULL},
+    {"sdl.MESSAGEBOX_WARNING", "sdl.MESSAGEBOX_WARNING() -> i32", "Warning message box flag.", NULL, NULL},
+    {"sdl.MESSAGEBOX_INFORMATION", "sdl.MESSAGEBOX_INFORMATION() -> i32", "Info message box flag.", NULL, NULL},
 };
 
 #define SDL_DOC_COUNT (sizeof(sdl_docs) / sizeof(sdl_docs[0]))

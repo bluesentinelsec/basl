@@ -1,0 +1,44 @@
+// sdl_misc.vigil — Slice 10 demo: clipboard, system info, logging
+//
+// Demonstrates clipboard round-trip, system queries, and SDL logging.
+
+import "sdl";
+import "fmt";
+
+fn main() -> i32 {
+    bool init_ok, err ie = sdl.init(sdl.INIT_VIDEO());
+    if (ie != ok) {
+        fmt.eprintln(f"SDL init failed: {ie.message()}");
+        return 1;
+    }
+    defer sdl.quit();
+
+    // System info
+    i32 cores = sdl.get_num_cpu_cores();
+    i32 ram = sdl.get_system_ram();
+    string base = sdl.get_base_path();
+    string prefs = sdl.get_pref_path("vigil", "sdl_misc");
+    fmt.println(f"CPU cores: {cores}");
+    fmt.println(f"System RAM: {ram} MB");
+    fmt.println(f"Base path: {base}");
+    fmt.println(f"Pref path: {prefs}");
+
+    // SDL logging
+    sdl.log("This is an info message");
+    sdl.log_warn("This is a warning");
+    sdl.log_error("This is an error");
+
+    // Clipboard round-trip
+    bool set_ok, err se = sdl.set_clipboard_text("Hello from Vigil SDL!");
+    if (se == ok) {
+        bool has = sdl.has_clipboard_text();
+        fmt.println(f"Clipboard has text: {has}");
+        string clip = sdl.get_clipboard_text();
+        fmt.println(f"Clipboard text: {clip}");
+    } else {
+        fmt.println(f"Clipboard set failed: {se.message()}");
+    }
+
+    fmt.println("Done.");
+    return 0;
+}
