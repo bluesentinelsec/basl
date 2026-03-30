@@ -74,7 +74,7 @@ typedef struct vigil_runtime_class_field
 {
     const char *name;
     size_t name_length;
-    vigil_binding_type_t type;
+    vigil_runtime_resolved_type_t type;
     int is_public;
 } vigil_runtime_class_field_t;
 
@@ -88,13 +88,13 @@ typedef struct vigil_runtime_class
 
 typedef struct vigil_runtime_array_type
 {
-    vigil_binding_type_t element_type;
+    vigil_runtime_resolved_type_t element_type;
 } vigil_runtime_array_type_t;
 
 typedef struct vigil_runtime_map_type
 {
-    vigil_binding_type_t key_type;
-    vigil_binding_type_t value_type;
+    vigil_runtime_resolved_type_t key_type;
+    vigil_runtime_resolved_type_t value_type;
 } vigil_runtime_map_type_t;
 
 typedef struct vigil_instance_object
@@ -2208,7 +2208,7 @@ vigil_status_t vigil_function_object_set_global(const vigil_object_t *function, 
 
 int vigil_function_object_get_class_field(const vigil_object_t *function, size_t class_index, size_t field_index,
                                           const char **out_name, size_t *out_name_length,
-                                          vigil_binding_type_t *out_type, int *out_is_public)
+                                          vigil_runtime_resolved_type_t *out_type, int *out_is_public)
 {
     const vigil_function_object_t *function_object;
     const vigil_runtime_class_t *class_metadata;
@@ -2259,7 +2259,7 @@ size_t vigil_function_object_class_field_count(const vigil_object_t *function, s
 }
 
 int vigil_function_object_get_array_type(const vigil_object_t *function, size_t array_index,
-                                         vigil_binding_type_t *out_element_type)
+                                         vigil_runtime_resolved_type_t *out_element_type)
 {
     const vigil_function_object_t *function_object;
 
@@ -2278,7 +2278,8 @@ int vigil_function_object_get_array_type(const vigil_object_t *function, size_t 
 }
 
 int vigil_function_object_get_map_type(const vigil_object_t *function, size_t map_index,
-                                       vigil_binding_type_t *out_key_type, vigil_binding_type_t *out_value_type)
+                                       vigil_runtime_resolved_type_t *out_key_type,
+                                       vigil_runtime_resolved_type_t *out_value_type)
 {
     const vigil_function_object_t *function_object;
 

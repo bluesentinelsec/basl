@@ -46,6 +46,7 @@ static vigil_status_t vigil_parser_emit_integer_cast(vigil_parser_state_t *state
                                                      vigil_source_span_t span);
 static int vigil_opcode_produces_i64(vigil_opcode_t op);
 static int vigil_opcode_i32_to_i64(vigil_opcode_t op, vigil_opcode_t *out);
+static vigil_runtime_resolved_type_t vigil_runtime_type_from_binding(vigil_binding_type_t type);
 // clang-format off
 static int vigil_parser_math_intrinsic_opcode(const vigil_native_module_t *, const char *, size_t);
 static int vigil_parser_parse_intrinsic_opcode(const vigil_native_module_t *, const char *, size_t);
@@ -12942,7 +12943,7 @@ static vigil_status_t alloc_class_inits(vigil_program_state_t *program, vigil_ru
             {
                 field_inits[fi].name = decl->fields[fi].name;
                 field_inits[fi].name_length = decl->fields[fi].name_length;
-                field_inits[fi].type = decl->fields[fi].type;
+                field_inits[fi].type = vigil_runtime_type_from_binding(decl->fields[fi].type);
                 field_inits[fi].is_public = decl->fields[fi].is_public;
             }
         }
@@ -13002,6 +13003,16 @@ static void free_class_inits(vigil_program_state_t *program, vigil_runtime_class
     }
     memory = class_inits;
     vigil_runtime_free(program->registry->runtime, &memory);
+}
+
+static vigil_runtime_resolved_type_t vigil_runtime_type_from_binding(vigil_binding_type_t type)
+{
+    vigil_runtime_resolved_type_t runtime_type;
+
+    runtime_type.kind = type.kind;
+    runtime_type.object_kind = (vigil_runtime_object_kind_t)type.object_kind;
+    runtime_type.object_index = type.object_index;
+    return runtime_type;
 }
 
 static vigil_status_t vigil_compile_attach_entrypoint(vigil_program_state_t *program, vigil_object_t **out_function)
@@ -13065,7 +13076,7 @@ static vigil_status_t vigil_compile_attach_entrypoint(vigil_program_state_t *pro
         array_type_inits = (vigil_runtime_array_type_init_t *)memory;
         for (i = 0U; i < program->array_type_count; ++i)
         {
-            array_type_inits[i].element_type = program->array_types[i].element_type;
+            array_type_inits[i].element_type = vigil_runtime_type_from_binding(program->array_types[i].element_type);
         }
     }
 
@@ -13081,8 +13092,8 @@ static vigil_status_t vigil_compile_attach_entrypoint(vigil_program_state_t *pro
         map_type_inits = (vigil_runtime_map_type_init_t *)memory;
         for (i = 0U; i < program->map_type_count; ++i)
         {
-            map_type_inits[i].key_type = program->map_types[i].key_type;
-            map_type_inits[i].value_type = program->map_types[i].value_type;
+            map_type_inits[i].key_type = vigil_runtime_type_from_binding(program->map_types[i].key_type);
+            map_type_inits[i].value_type = vigil_runtime_type_from_binding(program->map_types[i].value_type);
         }
     }
 

@@ -5,8 +5,8 @@
 
 #include "vigil/runtime.h"
 #include "vigil/status.h"
+#include "vigil/type.h"
 #include "vigil/value.h"
-#include "vigil_binding.h"
 
 /* Forward declarations for opaque platform types used by the runtime struct.
  * The full definitions live in platform/platform.h; callers that need them
@@ -68,11 +68,29 @@ typedef struct vigil_runtime_interface_impl_init
     size_t function_count;
 } vigil_runtime_interface_impl_init_t;
 
+typedef enum vigil_runtime_object_kind
+{
+    VIGIL_RUNTIME_OBJECT_NONE = 0,
+    VIGIL_RUNTIME_OBJECT_CLASS = 1,
+    VIGIL_RUNTIME_OBJECT_INTERFACE = 2,
+    VIGIL_RUNTIME_OBJECT_ENUM = 3,
+    VIGIL_RUNTIME_OBJECT_ARRAY = 4,
+    VIGIL_RUNTIME_OBJECT_MAP = 5,
+    VIGIL_RUNTIME_OBJECT_FUNCTION = 6
+} vigil_runtime_object_kind_t;
+
+typedef struct vigil_runtime_resolved_type
+{
+    vigil_type_kind_t kind;
+    vigil_runtime_object_kind_t object_kind;
+    size_t object_index;
+} vigil_runtime_resolved_type_t;
+
 typedef struct vigil_runtime_class_field_init
 {
     const char *name;
     size_t name_length;
-    vigil_binding_type_t type;
+    vigil_runtime_resolved_type_t type;
     int is_public;
 } vigil_runtime_class_field_init_t;
 
@@ -86,13 +104,13 @@ typedef struct vigil_runtime_class_init
 
 typedef struct vigil_runtime_array_type_init
 {
-    vigil_binding_type_t element_type;
+    vigil_runtime_resolved_type_t element_type;
 } vigil_runtime_array_type_init_t;
 
 typedef struct vigil_runtime_map_type_init
 {
-    vigil_binding_type_t key_type;
-    vigil_binding_type_t value_type;
+    vigil_runtime_resolved_type_t key_type;
+    vigil_runtime_resolved_type_t value_type;
 } vigil_runtime_map_type_init_t;
 
 vigil_allocator_t vigil_default_allocator(void);
@@ -111,12 +129,13 @@ vigil_status_t vigil_function_object_set_global(const vigil_object_t *function, 
                                                 const vigil_value_t *value, vigil_error_t *error);
 int vigil_function_object_get_class_field(const vigil_object_t *function, size_t class_index, size_t field_index,
                                           const char **out_name, size_t *out_name_length,
-                                          vigil_binding_type_t *out_type, int *out_is_public);
+                                          vigil_runtime_resolved_type_t *out_type, int *out_is_public);
 size_t vigil_function_object_class_field_count(const vigil_object_t *function, size_t class_index);
 int vigil_function_object_get_array_type(const vigil_object_t *function, size_t array_index,
-                                         vigil_binding_type_t *out_element_type);
+                                         vigil_runtime_resolved_type_t *out_element_type);
 int vigil_function_object_get_map_type(const vigil_object_t *function, size_t map_index,
-                                       vigil_binding_type_t *out_key_type, vigil_binding_type_t *out_value_type);
+                                       vigil_runtime_resolved_type_t *out_key_type,
+                                       vigil_runtime_resolved_type_t *out_value_type);
 const vigil_object_t *vigil_callable_object_function(const vigil_object_t *callable);
 size_t vigil_callable_object_arity(const vigil_object_t *callable);
 size_t vigil_callable_object_return_count(const vigil_object_t *callable);

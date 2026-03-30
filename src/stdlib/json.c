@@ -343,7 +343,7 @@ static int json_number_to_i64(double number, int64_t min_value, int64_t max_valu
 static vigil_status_t json_encode_value(vigil_vm_t *vm, const vigil_object_t *function, const vigil_value_t *value,
                                         vigil_json_value_t **out_json, vigil_error_t *error);
 static vigil_status_t json_decode_to_type(vigil_vm_t *vm, const vigil_object_t *function,
-                                          const vigil_json_value_t *json, vigil_binding_type_t type,
+                                          const vigil_json_value_t *json, vigil_runtime_resolved_type_t type,
                                           vigil_value_t *out_value, vigil_error_t *error);
 
 static vigil_status_t json_encode_instance(vigil_vm_t *vm, const vigil_object_t *function, const vigil_object_t *object,
@@ -363,7 +363,7 @@ static vigil_status_t json_encode_instance(vigil_vm_t *vm, const vigil_object_t 
     {
         const char *field_name = NULL;
         size_t field_name_length = 0U;
-        vigil_binding_type_t field_type;
+        vigil_runtime_resolved_type_t field_type;
         int is_public = 0;
         vigil_value_t field_value;
         vigil_json_value_t *field_json = NULL;
@@ -596,7 +596,7 @@ static vigil_status_t json_decode_class(vigil_vm_t *vm, const vigil_object_t *fu
     {
         const char *field_name = NULL;
         size_t field_name_length = 0U;
-        vigil_binding_type_t field_type;
+        vigil_runtime_resolved_type_t field_type;
         int is_public = 0;
         const vigil_json_value_t *child = NULL;
 
@@ -652,9 +652,10 @@ cleanup:
 }
 
 static vigil_status_t json_decode_array(vigil_vm_t *vm, const vigil_object_t *function, const vigil_json_value_t *json,
-                                        vigil_binding_type_t type, vigil_value_t *out_value, vigil_error_t *error)
+                                        vigil_runtime_resolved_type_t type, vigil_value_t *out_value,
+                                        vigil_error_t *error)
 {
-    vigil_binding_type_t element_type;
+    vigil_runtime_resolved_type_t element_type;
     vigil_object_t *array = NULL;
     vigil_status_t status;
     size_t index;
@@ -699,10 +700,11 @@ static vigil_status_t json_decode_array(vigil_vm_t *vm, const vigil_object_t *fu
 }
 
 static vigil_status_t json_decode_map(vigil_vm_t *vm, const vigil_object_t *function, const vigil_json_value_t *json,
-                                      vigil_binding_type_t type, vigil_value_t *out_value, vigil_error_t *error)
+                                      vigil_runtime_resolved_type_t type, vigil_value_t *out_value,
+                                      vigil_error_t *error)
 {
-    vigil_binding_type_t key_type;
-    vigil_binding_type_t value_type;
+    vigil_runtime_resolved_type_t key_type;
+    vigil_runtime_resolved_type_t value_type;
     vigil_object_t *map = NULL;
     vigil_status_t status;
     size_t index;
@@ -717,7 +719,7 @@ static vigil_status_t json_decode_map(vigil_vm_t *vm, const vigil_object_t *func
         vigil_error_set_literal(error, VIGIL_STATUS_INVALID_ARGUMENT, "decode: missing map type metadata");
         return VIGIL_STATUS_INVALID_ARGUMENT;
     }
-    if (key_type.kind != VIGIL_TYPE_STRING || key_type.object_kind != VIGIL_BINDING_OBJECT_NONE)
+    if (key_type.kind != VIGIL_TYPE_STRING || key_type.object_kind != VIGIL_RUNTIME_OBJECT_NONE)
     {
         vigil_error_set_literal(error, VIGIL_STATUS_INVALID_ARGUMENT, "decode: only map<string, T> is supported");
         return VIGIL_STATUS_INVALID_ARGUMENT;
@@ -777,20 +779,20 @@ static vigil_status_t json_decode_map(vigil_vm_t *vm, const vigil_object_t *func
 }
 
 static vigil_status_t json_decode_to_type(vigil_vm_t *vm, const vigil_object_t *function,
-                                          const vigil_json_value_t *json, vigil_binding_type_t type,
+                                          const vigil_json_value_t *json, vigil_runtime_resolved_type_t type,
                                           vigil_value_t *out_value, vigil_error_t *error)
 {
     double number;
     int64_t integer;
 
     vigil_value_init_nil(out_value);
-    if (type.object_kind == VIGIL_BINDING_OBJECT_CLASS)
+    if (type.object_kind == VIGIL_RUNTIME_OBJECT_CLASS)
         return json_decode_class(vm, function, json, type.object_index, out_value, error);
-    if (type.object_kind == VIGIL_BINDING_OBJECT_ARRAY)
+    if (type.object_kind == VIGIL_RUNTIME_OBJECT_ARRAY)
         return json_decode_array(vm, function, json, type, out_value, error);
-    if (type.object_kind == VIGIL_BINDING_OBJECT_MAP)
+    if (type.object_kind == VIGIL_RUNTIME_OBJECT_MAP)
         return json_decode_map(vm, function, json, type, out_value, error);
-    if (type.object_kind != VIGIL_BINDING_OBJECT_NONE)
+    if (type.object_kind != VIGIL_RUNTIME_OBJECT_NONE)
     {
         vigil_error_set_literal(error, VIGIL_STATUS_INVALID_ARGUMENT, "decode: unsupported target type");
         return VIGIL_STATUS_INVALID_ARGUMENT;
