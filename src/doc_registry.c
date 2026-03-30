@@ -1545,6 +1545,28 @@ static const vigil_doc_entry_t sdl_docs[] = {
     {"sdl.FLIP_NONE", "sdl.FLIP_NONE() -> i32", "No flip.", NULL, NULL},
     {"sdl.FLIP_HORIZONTAL", "sdl.FLIP_HORIZONTAL() -> i32", "Flip horizontally.", NULL, NULL},
     {"sdl.FLIP_VERTICAL", "sdl.FLIP_VERTICAL() -> i32", "Flip vertically.", NULL, NULL},
+    /* Audio (slice 8) */
+    {"sdl.load_wav", "sdl.load_wav(path: string) -> (i64, err)", "Load a WAV file.",
+     "Returns a wav handle. Query format with wav_format/wav_channels/wav_freq.",
+     "i64 wav, err e = sdl.load_wav(\"sound.wav\")"},
+    {"sdl.wav_free", "sdl.wav_free(handle: i64) -> void", "Free a loaded WAV buffer.", NULL, NULL},
+    {"sdl.wav_format", "sdl.wav_format(handle: i64) -> i32", "Get WAV audio format.", NULL, NULL},
+    {"sdl.wav_channels", "sdl.wav_channels(handle: i64) -> i32", "Get WAV channel count.", NULL, NULL},
+    {"sdl.wav_freq", "sdl.wav_freq(handle: i64) -> i32", "Get WAV sample rate.", NULL, NULL},
+    {"sdl.AudioStream", NULL, "SDL audio stream for playback.",
+     "Open with sdl.AudioStream.open(). Push WAV data with put_wav().", NULL},
+    {"sdl.AudioStream.open", "sdl.AudioStream.open(format: i32, channels: i32, freq: i32) -> (sdl.AudioStream, err)",
+     "Open the default playback device.", "Use AUDIO_* constants for format.",
+     "sdl.AudioStream stream, err e = sdl.AudioStream.open(sdl.AUDIO_S16(), 2, 44100)"},
+    {"sdl.AudioStream.destroy", "stream.destroy() -> void", "Destroy an audio stream.", NULL, NULL},
+    {"sdl.AudioStream.put_wav", "stream.put_wav(wav_handle: i64) -> (bool, err)", "Queue WAV data for playback.", NULL,
+     NULL},
+    {"sdl.AudioStream.get_queued", "stream.get_queued() -> i32", "Get bytes queued for playback.", NULL, NULL},
+    {"sdl.AudioStream.resume", "stream.resume() -> (bool, err)", "Start/resume playback.", NULL, NULL},
+    {"sdl.AudioStream.pause", "stream.pause() -> (bool, err)", "Pause playback.", NULL, NULL},
+    {"sdl.AUDIO_S16", "sdl.AUDIO_S16() -> i32", "Signed 16-bit audio format.", NULL, NULL},
+    {"sdl.AUDIO_S32", "sdl.AUDIO_S32() -> i32", "Signed 32-bit audio format.", NULL, NULL},
+    {"sdl.AUDIO_F32", "sdl.AUDIO_F32() -> i32", "32-bit float audio format.", NULL, NULL},
 };
 
 #define SDL_DOC_COUNT (sizeof(sdl_docs) / sizeof(sdl_docs[0]))

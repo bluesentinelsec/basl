@@ -674,6 +674,7 @@ static const int p_f64_f64[] = {VIGIL_TYPE_F64, VIGIL_TYPE_F64};
 static const int p_f64_f64_f64_f64[] = {VIGIL_TYPE_F64, VIGIL_TYPE_F64, VIGIL_TYPE_F64, VIGIL_TYPE_F64};
 static const int rt_bool_err[] = {VIGIL_TYPE_BOOL, VIGIL_TYPE_ERR};
 static const int rt_obj_err[] = {VIGIL_TYPE_OBJECT, VIGIL_TYPE_ERR};
+static const int rt_i64_err[] = {VIGIL_TYPE_I64, VIGIL_TYPE_ERR};
 static const int rt_i32_i32[] = {VIGIL_TYPE_I32, VIGIL_TYPE_I32};
 static const int rt_i32_i32_i32_i32[] = {VIGIL_TYPE_I32, VIGIL_TYPE_I32, VIGIL_TYPE_I32, VIGIL_TYPE_I32};
 static const int p_obj_f64_f64[] = {VIGIL_TYPE_OBJECT, VIGIL_TYPE_F64, VIGIL_TYPE_F64};
@@ -1183,6 +1184,226 @@ static vigil_status_t sdl_fn_delay_precise(vigil_vm_t *vm, size_t arg_count, vig
     return VIGIL_STATUS_OK;
 }
 
+/* ── Slice 8: Audio ───────────────────────────────────────────────── */
+
+SDL_HANDLE_REGISTRY(audio_streams);
+
+enum
+{
+    ASTREAM_HANDLE = 0,
+    ASTREAM_FIELD_COUNT
+};
+
+/* Internal WAV buffer registry — stores (buf, len) pairs from SDL_LoadWAV.
+ * The Vigil side gets an i64 handle; put_wav_data uses it to push into a stream. */
+#define WAV_BUF_MAX 64
+static struct
+{
+    Uint8 *buf;
+    Uint32 len;
+} g_wav_bufs[WAV_BUF_MAX];
+static int32_t g_wav_buf_count = 0;
+
+/* sdl.load_wav(string path) -> (i64, i32, i32, i32, err)
+ * Returns (wav_handle, format, channels, freq, err).
+ * But we only have 2-return. So: return (i64 wav_handle, err).
+ * Caller queries format info separately or we embed it in the handle. */
+
+/* Actually, with the 2-return limit, let's return (i64 wav_handle, err)
+ * and provide sdl.wav_format/wav_channels/wav_freq accessors. */
+
+static SDL_AudioSpec g_wav_specs[WAV_BUF_MAX];
+
+/* sdl.load_wav(string path) -> (i64, err) */
+static vigil_status_t sdl_fn_load_wav(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    char path[512];
+    sdl_arg_str(vm, base, 0, path, sizeof(path));
+    vigil_vm_stack_pop_n(vm, arg_count);
+
+    if (g_wav_buf_count >= WAV_BUF_MAX)
+    {
+        vigil_status_t st = sdl_push_i64(vm, -1, error);
+        if (st != VIGIL_STATUS_OK)
+            return st;
+        return sdl_push_err(vm, "too many WAV buffers", SDL_ERR_STATE, error);
+    }
+
+    Uint8 *buf = NULL;
+    Uint32 len = 0;
+    SDL_AudioSpec spec;
+    if (!SDL_LoadWAV(path, &spec, &buf, &len))
+    {
+        vigil_status_t st = sdl_push_i64(vm, -1, error);
+        if (st != VIGIL_STATUS_OK)
+            return st;
+        return sdl_push_sdl_err(vm, SDL_ERR_IO, error);
+    }
+
+    int32_t slot = g_wav_buf_count++;
+    g_wav_bufs[slot].buf = buf;
+    g_wav_bufs[slot].len = len;
+    g_wav_specs[slot] = spec;
+
+    vigil_status_t st = sdl_push_i64(vm, (int64_t)slot, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_ok(vm, error);
+}
+
+/* sdl.wav_free(i64 handle) */
+static vigil_status_t sdl_fn_wav_free(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_arg_i64(vm, base, 0);
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    if (h >= 0 && h < g_wav_buf_count && g_wav_bufs[h].buf)
+    {
+        SDL_free(g_wav_bufs[h].buf);
+        g_wav_bufs[h].buf = NULL;
+        g_wav_bufs[h].len = 0;
+    }
+    return VIGIL_STATUS_OK;
+}
+
+/* sdl.wav_format(i64 handle) -> i32 */
+static vigil_status_t sdl_fn_wav_format(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_arg_i64(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    int32_t fmt = (h >= 0 && h < g_wav_buf_count) ? (int32_t)g_wav_specs[h].format : 0;
+    return sdl_push_i32(vm, fmt, error);
+}
+
+/* sdl.wav_channels(i64 handle) -> i32 */
+static vigil_status_t sdl_fn_wav_channels(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_arg_i64(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    int32_t ch = (h >= 0 && h < g_wav_buf_count) ? g_wav_specs[h].channels : 0;
+    return sdl_push_i32(vm, ch, error);
+}
+
+/* sdl.wav_freq(i64 handle) -> i32 */
+static vigil_status_t sdl_fn_wav_freq(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_arg_i64(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    int32_t freq = (h >= 0 && h < g_wav_buf_count) ? g_wav_specs[h].freq : 0;
+    return sdl_push_i32(vm, freq, error);
+}
+
+/* AudioStream.open(i32 format, i32 channels, i32 freq) -> (AudioStream, err)
+ * Opens the default playback device with the given spec. */
+static vigil_status_t sdl_audio_stream_open(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    size_t ci = sdl_static_class_index(vm, base);
+    int32_t format = sdl_arg_i32(vm, base, 1);
+    int32_t channels = sdl_arg_i32(vm, base, 2);
+    int32_t freq = sdl_arg_i32(vm, base, 3);
+    vigil_vm_stack_pop_n(vm, arg_count);
+
+    SDL_AudioSpec spec;
+    spec.format = (SDL_AudioFormat)format;
+    spec.channels = channels;
+    spec.freq = freq;
+
+    SDL_AudioStream *stream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, NULL, NULL);
+    if (!stream)
+        return sdl_push_nil_and_sdl_err(vm, SDL_ERR_IO, error);
+
+    int64_t handle;
+    if (SDL_HANDLE_STORE(audio_streams, stream, &handle) < 0)
+    {
+        SDL_DestroyAudioStream(stream);
+        return sdl_push_nil_and_err(vm, "too many audio streams", SDL_ERR_STATE, error);
+    }
+    vigil_status_t st = sdl_push_handle_instance(vm, ci, handle, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_ok(vm, error);
+}
+
+/* stream.destroy() */
+static vigil_status_t sdl_audio_stream_destroy(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, ASTREAM_HANDLE);
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_AudioStream *s = (SDL_AudioStream *)SDL_HANDLE_GET(audio_streams, h);
+    if (s)
+    {
+        SDL_DestroyAudioStream(s);
+        SDL_HANDLE_CLEAR(audio_streams, h);
+    }
+    return VIGIL_STATUS_OK;
+}
+
+/* stream.put_wav(i64 wav_handle) -> (bool, err) — push WAV data into stream */
+static vigil_status_t sdl_audio_stream_put_wav(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t sh = sdl_field_i64(vm, base, ASTREAM_HANDLE);
+    int64_t wh = sdl_arg_i64(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+
+    SDL_AudioStream *s = (SDL_AudioStream *)SDL_HANDLE_GET(audio_streams, sh);
+    if (!s)
+        return sdl_push_bool_sdl_err(vm, SDL_ERR_ARG, error);
+    if (wh < 0 || wh >= g_wav_buf_count || !g_wav_bufs[wh].buf)
+        return sdl_push_bool_sdl_err(vm, SDL_ERR_ARG, error);
+
+    if (SDL_PutAudioStreamData(s, g_wav_bufs[wh].buf, (int)g_wav_bufs[wh].len))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+/* stream.get_queued() -> i32 */
+static vigil_status_t sdl_audio_stream_get_queued(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, ASTREAM_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_AudioStream *s = (SDL_AudioStream *)SDL_HANDLE_GET(audio_streams, h);
+    return sdl_push_i32(vm, s ? SDL_GetAudioStreamQueued(s) : 0, error);
+}
+
+/* stream.resume() -> (bool, err) */
+static vigil_status_t sdl_audio_stream_resume(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, ASTREAM_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_AudioStream *s = (SDL_AudioStream *)SDL_HANDLE_GET(audio_streams, h);
+    if (s && SDL_ResumeAudioStreamDevice(s))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+/* stream.pause() -> (bool, err) */
+static vigil_status_t sdl_audio_stream_pause(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, ASTREAM_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_AudioStream *s = (SDL_AudioStream *)SDL_HANDLE_GET(audio_streams, h);
+    if (s && SDL_PauseAudioStreamDevice(s))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+/* Audio format constants */
+SDL_CONST_FN(AUDIO_S16, SDL_AUDIO_S16)
+SDL_CONST_FN(AUDIO_S32, SDL_AUDIO_S32)
+SDL_CONST_FN(AUDIO_F32, SDL_AUDIO_F32)
+
 /* Scancode constants */
 SDL_CONST_FN(SCANCODE_A, SDL_SCANCODE_A)
 SDL_CONST_FN(SCANCODE_B, SDL_SCANCODE_B)
@@ -1667,6 +1888,12 @@ static const vigil_native_module_function_t sdl_functions[] = {
     SDL_FN("get_performance_frequency", 25U, sdl_fn_get_performance_frequency, 0U, NULL, VIGIL_TYPE_I64),
     SDL_FN_VOID("delay_ns", 8U, sdl_fn_delay_ns, 1U, p_i64),
     SDL_FN_VOID("delay_precise", 13U, sdl_fn_delay_precise, 1U, p_i64),
+    /* Audio (slice 8) */
+    {"load_wav", 8U, sdl_fn_load_wav, 1U, p_str, VIGIL_TYPE_I64, 2U, rt_i64_err, 0, NULL, NULL, 0},
+    SDL_FN_VOID("wav_free", 8U, sdl_fn_wav_free, 1U, p_i64),
+    SDL_FN("wav_format", 10U, sdl_fn_wav_format, 1U, p_i64, VIGIL_TYPE_I32),
+    SDL_FN("wav_channels", 12U, sdl_fn_wav_channels, 1U, p_i64, VIGIL_TYPE_I32),
+    SDL_FN("wav_freq", 8U, sdl_fn_wav_freq, 1U, p_i64, VIGIL_TYPE_I32),
     /* Scancode constants */
     SDL_CONST_ENTRY("SCANCODE_A", SCANCODE_A),
     SDL_CONST_ENTRY("SCANCODE_B", SCANCODE_B),
@@ -1759,6 +1986,10 @@ static const vigil_native_module_function_t sdl_functions[] = {
     SDL_CONST_ENTRY("FLIP_NONE", FLIP_NONE),
     SDL_CONST_ENTRY("FLIP_HORIZONTAL", FLIP_HORIZONTAL),
     SDL_CONST_ENTRY("FLIP_VERTICAL", FLIP_VERTICAL),
+    /* Audio format constants */
+    SDL_CONST_ENTRY("AUDIO_S16", AUDIO_S16),
+    SDL_CONST_ENTRY("AUDIO_S32", AUDIO_S32),
+    SDL_CONST_ENTRY("AUDIO_F32", AUDIO_F32),
 };
 
 #define SDL_FUNCTION_COUNT (sizeof(sdl_functions) / sizeof(sdl_functions[0]))
@@ -1865,6 +2096,21 @@ static const vigil_native_class_method_t sdl_texture_methods[] = {
     SDL_METHOD("set_blend_mode", 14U, sdl_texture_set_blend_mode, 1U, p_i32, VIGIL_TYPE_VOID, 0U, NULL),
 };
 
+/* ── AudioStream class descriptor ────────────────────────────────── */
+
+static const vigil_native_class_field_t sdl_audio_stream_fields[] = {
+    SDL_PFIELD("handle", 6U, VIGIL_TYPE_I64),
+};
+
+static const vigil_native_class_method_t sdl_audio_stream_methods[] = {
+    SDL_STATIC("open", 4U, sdl_audio_stream_open, 3U, p_i32_i32_i32, VIGIL_TYPE_OBJECT, 2U, rt_obj_err),
+    SDL_METHOD("destroy", 7U, sdl_audio_stream_destroy, 0U, NULL, VIGIL_TYPE_VOID, 0U, NULL),
+    SDL_METHOD("put_wav", 7U, sdl_audio_stream_put_wav, 1U, p_i64, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
+    SDL_METHOD("get_queued", 10U, sdl_audio_stream_get_queued, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL),
+    SDL_METHOD("resume", 6U, sdl_audio_stream_resume, 0U, NULL, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
+    SDL_METHOD("pause", 5U, sdl_audio_stream_pause, 0U, NULL, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
+};
+
 static const vigil_native_class_t sdl_classes[] = {
     {"Window", 6U, sdl_window_fields, WIN_FIELD_COUNT, sdl_window_methods,
      sizeof(sdl_window_methods) / sizeof(sdl_window_methods[0]), NULL},
@@ -1876,6 +2122,8 @@ static const vigil_native_class_t sdl_classes[] = {
      sizeof(sdl_surface_methods) / sizeof(sdl_surface_methods[0]), NULL},
     {"Texture", 7U, sdl_texture_fields, TEX_FIELD_COUNT, sdl_texture_methods,
      sizeof(sdl_texture_methods) / sizeof(sdl_texture_methods[0]), NULL},
+    {"AudioStream", 11U, sdl_audio_stream_fields, ASTREAM_FIELD_COUNT, sdl_audio_stream_methods,
+     sizeof(sdl_audio_stream_methods) / sizeof(sdl_audio_stream_methods[0]), NULL},
 };
 /* clang-format on */
 
