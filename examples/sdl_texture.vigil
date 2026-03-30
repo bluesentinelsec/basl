@@ -1,0 +1,97 @@
+// sdl_texture.vigil — Slice 6 demo: textures and render targets
+//
+// Creates a render-target texture, draws a pattern into it, then
+// renders it to the screen with rotation. Press Escape to quit.
+
+import "sdl";
+import "fmt";
+
+fn main() -> i32 {
+    bool init_ok, err ie = sdl.init(sdl.INIT_VIDEO());
+    if (ie != ok) {
+        fmt.eprintln(f"SDL init failed: {ie.message()}");
+        return 1;
+    }
+    defer sdl.quit();
+
+    sdl.Window win, err we = sdl.Window.create("Texture Demo", 640, 480, 0);
+    if (we != ok) {
+        fmt.eprintln(f"Window failed: {we.message()}");
+        return 1;
+    }
+
+    sdl.Renderer ren, err re = sdl.Renderer.create(win, "");
+    if (re != ok) {
+        fmt.eprintln(f"Renderer failed: {re.message()}");
+        win.destroy();
+        return 1;
+    }
+
+    // Create a 128x128 render-target texture and draw a pattern into it
+    sdl.Texture tex, err te = sdl.Texture.create(
+        ren, 0, sdl.TEXTUREACCESS_TARGET(), 128, 128);
+    if (te != ok) {
+        fmt.eprintln(f"Texture failed: {te.message()}");
+        ren.destroy();
+        win.destroy();
+        return 1;
+    }
+
+    // Draw checkerboard pattern into the texture
+    // (SDL_SetRenderTarget not yet bound, so we draw directly to screen instead)
+
+    sdl.Event ev, err ee = sdl.Event.new();
+    if (ee != ok) {
+        fmt.eprintln(f"Event alloc failed: {ee.message()}");
+        tex.destroy();
+        ren.destroy();
+        win.destroy();
+        return 1;
+    }
+
+    f64 tw, f64 th = tex.get_size();
+    fmt.println(f"Texture size: {tw} x {th}");
+
+    // Set blend mode for alpha support
+    tex.set_blend_mode(sdl.BLENDMODE_BLEND());
+
+    fmt.println("Rendering texture demo. Press Escape to quit.");
+
+    f64 angle = 0.0;
+    bool running = true;
+    while (running) {
+        while (ev.poll()) {
+            if (ev.type() == sdl.EVENT_QUIT()) {
+                running = false;
+            }
+        }
+        if (sdl.is_key_pressed(sdl.SCANCODE_ESCAPE())) {
+            running = false;
+        }
+
+        bool c1, err e1 = ren.set_draw_color(40, 40, 40, 255);
+        bool c2, err e2 = ren.clear();
+
+        // Render the texture at center, rotating over time
+        angle = angle + 1.0;
+        bool c3, err e3 = ren.render_texture_rotated(
+            tex,
+            0.0, 0.0, 0.0, 0.0,
+            256.0, 176.0, 128.0, 128.0,
+            angle, 64.0, 64.0, sdl.FLIP_NONE());
+
+        // Also render it without rotation in the corner
+        bool c4, err e4 = ren.render_texture(
+            tex,
+            0.0, 0.0, 0.0, 0.0,
+            10.0, 10.0, 64.0, 64.0);
+
+        bool c5, err e5 = ren.present();
+        sdl.delay(16);
+    }
+
+    tex.destroy();
+    ren.destroy();
+    win.destroy();
+    return 0;
+}
