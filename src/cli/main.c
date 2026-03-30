@@ -3094,6 +3094,17 @@ static int editor_cmd_uninstall(const char *name, const char *home)
 
 static int early_dispatch_editor(int argc, char **argv)
 {
+    if (argc == 2 || (argc >= 3 && (strcmp(argv[2], "--help") == 0 || strcmp(argv[2], "-h") == 0)))
+    {
+        printf("Usage: vigil editor <list|install|uninstall|status> [editor]\n\n");
+        printf("Manage editor integrations\n\n");
+        printf("Subcommands:\n");
+        printf("  list                 List supported editors and install state\n");
+        printf("  status               Show installed editor integrations\n");
+        printf("  install <editor>     Install integration for an editor\n");
+        printf("  uninstall <editor>   Uninstall integration for an editor\n");
+        return 0;
+    }
     if (argc < 3)
     {
         fprintf(stderr, "Usage: vigil editor <list|install|uninstall|status> [editor]\n");
@@ -3252,10 +3263,16 @@ prof_cleanup:
 
 static int early_dispatch_profile(int argc, char **argv)
 {
+    if (argc >= 3 && (strcmp(argv[2], "--help") == 0 || strcmp(argv[2], "-h") == 0))
+    {
+        printf("Usage: vigil profile <script.vigil>\n\n");
+        printf("Profile a VIGIL script\n");
+        return 0;
+    }
     if (argc < 3)
     {
         fprintf(stderr, "Usage: vigil profile <script.vigil>\n");
-        return 1;
+        return 2;
     }
     return cmd_profile(argv[2]);
 }
@@ -3505,10 +3522,16 @@ static int cmd_complexity(const char *target)
 
 static int early_dispatch_complexity(int argc, char **argv)
 {
+    if (argc >= 3 && (strcmp(argv[2], "--help") == 0 || strcmp(argv[2], "-h") == 0))
+    {
+        printf("Usage: vigil complexity <file.vigil|directory>\n\n");
+        printf("Analyze cyclomatic complexity for VIGIL code\n");
+        return 0;
+    }
     if (argc < 3)
     {
         fprintf(stderr, "Usage: vigil complexity <file.vigil|directory>\n");
-        return 1;
+        return 2;
     }
     return cmd_complexity(argv[2]);
 }
@@ -3677,6 +3700,9 @@ static void register_cli_commands(vigil_cli_t *cli, parsed_args_t *args)
     (void)vigil_cli_add_command(cli, "embed", "Embed files as VIGIL source code");
     (void)vigil_cli_add_command(cli, "test", "Run tests");
     (void)vigil_cli_add_command(cli, "get", "Manage dependencies");
+    (void)vigil_cli_add_command(cli, "editor", "Manage editor integrations");
+    (void)vigil_cli_add_command(cli, "profile", "Profile a VIGIL script");
+    (void)vigil_cli_add_command(cli, "complexity", "Analyze cyclomatic complexity");
 
     cmd = vigil_cli_add_command(cli, "package", "Package a VIGIL program as a standalone binary");
     vigil_cli_add_positional(cmd, "entry", "Entry script or project directory", &args->pkg_entry);

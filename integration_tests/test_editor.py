@@ -26,6 +26,21 @@ def run_editor(args, env_override=None):
 
 
 class EditorListTest(unittest.TestCase):
+    def test_help_shows_editor(self):
+        result = subprocess.run(
+            [VIGIL_BIN, "--help"],
+            capture_output=True, text=True, timeout=10,
+        )
+        output = result.stdout + result.stderr
+        self.assertIn("editor", output)
+
+    def test_editor_help(self):
+        rc, out, _ = run_editor(["--help"])
+        self.assertEqual(rc, 0)
+        self.assertIn("Usage: vigil editor", out)
+        self.assertIn("install", out)
+        self.assertIn("uninstall", out)
+
     def test_list_shows_supported_editors(self):
         rc, out, _ = run_editor(["list"])
         self.assertEqual(rc, 0)

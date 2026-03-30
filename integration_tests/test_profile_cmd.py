@@ -20,6 +20,22 @@ def run_profile(script_content):
 
 
 class ProfileOutputTest(unittest.TestCase):
+    def test_help_shows_profile(self):
+        result = subprocess.run(
+            [VIGIL_BIN, "--help"],
+            capture_output=True, text=True, timeout=10,
+        )
+        output = result.stdout + result.stderr
+        self.assertIn("profile", output)
+
+    def test_profile_help(self):
+        result = subprocess.run(
+            [VIGIL_BIN, "profile", "--help"],
+            capture_output=True, text=True, timeout=10,
+        )
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("Usage: vigil profile", result.stdout)
+
     def test_profile_shows_timing(self):
         rc, out, _ = run_profile("fn main() -> i32 { return 0; }")
         self.assertEqual(rc, 0)

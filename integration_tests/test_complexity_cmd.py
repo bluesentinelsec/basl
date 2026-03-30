@@ -9,6 +9,22 @@ VIGIL_BIN = os.environ.get("VIGIL_BIN", "vigil")
 
 
 class ComplexityTest(unittest.TestCase):
+    def test_help_shows_complexity(self):
+        result = subprocess.run(
+            [VIGIL_BIN, "--help"],
+            capture_output=True, text=True, timeout=10,
+        )
+        output = result.stdout + result.stderr
+        self.assertIn("complexity", output)
+
+    def test_complexity_help(self):
+        result = subprocess.run(
+            [VIGIL_BIN, "complexity", "--help"],
+            capture_output=True, text=True, timeout=10,
+        )
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("Usage: vigil complexity", result.stdout)
+
     def _run(self, args):
         r = subprocess.run(
             [VIGIL_BIN, "complexity"] + args,
