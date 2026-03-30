@@ -890,31 +890,17 @@ static vigil_status_t parser_help(vigil_vm_t *vm, size_t arg_count, vigil_error_
 static const int vigil_args_at_params[] = {VIGIL_TYPE_I32};
 
 static const vigil_native_module_function_t vigil_args_functions[] = {
-    {"count", 5, vigil_args_count, 0, NULL, VIGIL_TYPE_I32, 1, NULL, 0, NULL, NULL},
-    {"at", 2, vigil_args_at, 1, vigil_args_at_params, VIGIL_TYPE_STRING, 1, NULL, 0, NULL, NULL}};
+    {"count", 5, vigil_args_count, 0, NULL, VIGIL_TYPE_I32, 1, NULL, 0, NULL, NULL, 0U},
+    {"at", 2, vigil_args_at, 1, vigil_args_at_params, VIGIL_TYPE_STRING, 1, NULL, 0, NULL, NULL, 0U}};
 
 /* ── Parser class descriptor ─────────────────────────────────────── */
 
-#define VIGIL_PFIELD(n, nl, t)                                                                                         \
-    {                                                                                                                  \
-        n, nl, t, 0, NULL, 0U, 0                                                                                       \
-    }
-#define VIGIL_AFIELD(n, nl, elem)                                                                                      \
-    {                                                                                                                  \
-        n, nl, VIGIL_TYPE_OBJECT, VIGIL_NATIVE_FIELD_ARRAY, NULL, 0U, elem                                             \
-    }
-#define VIGIL_METHOD(n, nl, fn, pc, pt, rt, rc, rts)                                                                   \
-    {                                                                                                                  \
-        n, nl, fn, pc, pt, rt, rc, rts, 0, NULL, 0U, 0                                                                 \
-    }
+#define VIGIL_PFIELD(n, nl, t) {n, nl, t, 0, NULL, 0U, 0}
+#define VIGIL_AFIELD(n, nl, elem) {n, nl, VIGIL_TYPE_OBJECT, VIGIL_NATIVE_FIELD_ARRAY, NULL, 0U, elem}
+#define VIGIL_METHOD(n, nl, fn, pc, pt, rt, rc, rts) {n, nl, fn, pc, pt, rt, rc, rts, 0, NULL, 0U, 0}
 #define VIGIL_METHOD_ARR(n, nl, fn, pc, pt, rc, rts, elem)                                                             \
-    {                                                                                                                  \
-        n, nl, fn, pc, pt, VIGIL_TYPE_OBJECT, rc, rts, 0, NULL, 0U, elem                                               \
-    }
-#define VIGIL_STATIC(n, nl, fn, pc, pt, rt, rc, rts)                                                                   \
-    {                                                                                                                  \
-        n, nl, fn, pc, pt, rt, rc, rts, 1, NULL, 0U, 0                                                                 \
-    }
+    {n, nl, fn, pc, pt, VIGIL_TYPE_OBJECT, rc, rts, 0, NULL, 0U, elem}
+#define VIGIL_STATIC(n, nl, fn, pc, pt, rt, rc, rts) {n, nl, fn, pc, pt, rt, rc, rts, 1, NULL, 0U, 0}
 
 static const vigil_native_class_field_t parser_fields[] = {
     VIGIL_PFIELD("prog", 4U, VIGIL_TYPE_STRING),      VIGIL_PFIELD("desc", 4U, VIGIL_TYPE_STRING),

@@ -65,6 +65,7 @@ extern "C"
         /* Extended type info (optional, NULL = use legacy param_types) */
         const vigil_native_type_t *param_types_ext;
         const vigil_native_type_t *return_type_ext;
+        size_t return_same_as_param_1based; /* 0 = static return type, otherwise same type as this arg (1-based) */
     } vigil_native_module_function_t;
 
     /**

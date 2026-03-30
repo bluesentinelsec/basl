@@ -2638,12 +2638,60 @@ TEST(VigilStdlibJsonTest, InvalidJsonReturnsError)
     EXPECT_EQ(result, 0);
 }
 
+TEST(VigilStdlibJsonTest, EncodeAndDecodeTypedObject)
+{
+    int64_t result = RunWithStdlib(
+        vigil_test_failed_,
+        "import \"json\";\n"
+        "class Meta {\n"
+        "    pub i32 count;\n"
+        "}\n"
+        "class Person {\n"
+        "    pub string name;\n"
+        "    pub array<i32> scores;\n"
+        "    pub map<string, string> tags;\n"
+        "    pub Meta meta;\n"
+        "}\n"
+        "fn main() -> i32 {\n"
+        "    map<string, string> tags = {\"role\": \"tooling\"};\n"
+        "    Person person = Person(\"vigil\", [1, 2, 3], tags, Meta(3));\n"
+        "    string encoded, err encode_err = json.encode(person);\n"
+        "    if (encode_err != ok) { return 1; }\n"
+        "    Person decoded, err decode_err = json.decode(encoded, Person(\"\", [0], {\"\": \"\"}, Meta(0)));\n"
+        "    if (decode_err != ok) { return 2; }\n"
+        "    if (decoded.name != \"vigil\") { return 3; }\n"
+        "    if (decoded.scores.len() != 3 || decoded.scores[0] != 1 || decoded.scores[2] != 3) { return 4; }\n"
+        "    if (!decoded.tags.has(\"role\") || decoded.tags[\"role\"] != \"tooling\") { return 5; }\n"
+        "    if (decoded.meta.count != 3) { return 6; }\n"
+        "    return 0;\n"
+        "}\n");
+    EXPECT_EQ(result, 0);
+}
+
+TEST(VigilStdlibJsonTest, DecodeRejectsExtraFields)
+{
+    int64_t result = RunWithStdlib(vigil_test_failed_,
+                                   "import \"json\";\n"
+                                   "class Person {\n"
+                                   "    pub string name;\n"
+                                   "}\n"
+                                   "fn main() -> i32 {\n"
+                                   "    Person person, err decode_err = "
+                                   "json.decode(\"{\\\"name\\\":\\\"vigil\\\",\\\"extra\\\":1}\", Person(\"\"));\n"
+                                   "    if (decode_err == ok) { return 1; }\n"
+                                   "    return 0;\n"
+                                   "}\n");
+    EXPECT_EQ(result, 0);
+}
+
 void register_stdlib_json_tests(void)
 {
     REGISTER_TEST(VigilStdlibJsonTest, ParseTraverseAndCoerce);
     REGISTER_TEST(VigilStdlibJsonTest, KeysAndStringify);
     REGISTER_TEST(VigilStdlibJsonTest, ParseAndFileRoundTrip);
     REGISTER_TEST(VigilStdlibJsonTest, InvalidJsonReturnsError);
+    REGISTER_TEST(VigilStdlibJsonTest, EncodeAndDecodeTypedObject);
+    REGISTER_TEST(VigilStdlibJsonTest, DecodeRejectsExtraFields);
 }
 
 /* ── CSV stdlib tests ────────────────────────────────────────────── */

@@ -79,9 +79,9 @@ static const int tp_i32i32_params[] = {VIGIL_TYPE_I32, VIGIL_TYPE_I32};
 /* ── function table ──────────────────────────────────────────────── */
 
 static const vigil_native_module_function_t tp_functions[] = {
-    {"add", 3U, tp_add, 2U, tp_i32i32_params, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, NULL},
-    {"greet", 5U, tp_greet, 0U, NULL, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL},
-    {"negate", 6U, tp_negate, 1U, tp_i32_params, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, NULL},
+    {"add", 3U, tp_add, 2U, tp_i32i32_params, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, NULL, 0U},
+    {"greet", 5U, tp_greet, 0U, NULL, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U},
+    {"negate", 6U, tp_negate, 1U, tp_i32_params, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, NULL, 0U},
 };
 
 #define TP_FUNCTION_COUNT (sizeof(tp_functions) / sizeof(tp_functions[0]))

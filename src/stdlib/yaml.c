@@ -216,8 +216,8 @@ static const int str_param[] = {VIGIL_TYPE_STRING};
 static const int str_str_params[] = {VIGIL_TYPE_STRING, VIGIL_TYPE_STRING};
 
 static const vigil_native_module_function_t vigil_yaml_functions[] = {
-    {"parse", 5U, vigil_yaml_parse_fn, 1U, str_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL},
-    {"get", 3U, vigil_yaml_get_fn, 2U, str_str_params, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL},
+    {"parse", 5U, vigil_yaml_parse_fn, 1U, str_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U},
+    {"get", 3U, vigil_yaml_get_fn, 2U, str_str_params, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U},
 };
 
 #define YAML_FUNCTION_COUNT (sizeof(vigil_yaml_functions) / sizeof(vigil_yaml_functions[0]))

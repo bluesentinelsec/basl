@@ -46,13 +46,14 @@ static vigil_status_t vigil_parser_emit_integer_cast(vigil_parser_state_t *state
                                                      vigil_source_span_t span);
 static int vigil_opcode_produces_i64(vigil_opcode_t op);
 static int vigil_opcode_i32_to_i64(vigil_opcode_t op, vigil_opcode_t *out);
+static vigil_runtime_resolved_type_t vigil_runtime_type_from_binding(vigil_binding_type_t type);
 // clang-format off
 static int vigil_parser_math_intrinsic_opcode(const vigil_native_module_t *, const char *, size_t);
 static int vigil_parser_parse_intrinsic_opcode(const vigil_native_module_t *, const char *, size_t);
 static vigil_status_t vigil_parser_set_native_fn_return_type(vigil_parser_state_t *, const vigil_native_module_function_t *, vigil_expression_result_t *);
 static vigil_status_t vigil_parser_try_emit_intrinsic(vigil_parser_state_t *, const vigil_native_module_t *, const vigil_native_module_function_t *, const vigil_token_t *, vigil_expression_result_t *, int *);
 static vigil_status_t vigil_parser_emit_native_call(vigil_parser_state_t *, const vigil_native_module_t *, const vigil_native_module_function_t *, const vigil_token_t *, size_t, vigil_expression_result_t *);
-static vigil_status_t vigil_parser_parse_native_call_args(vigil_parser_state_t *, const vigil_token_t *, const vigil_native_module_function_t *, size_t *);
+static vigil_status_t vigil_parser_parse_native_call_args(vigil_parser_state_t *, const vigil_token_t *, const vigil_native_module_function_t *, size_t *, vigil_binding_type_t *);
 static vigil_status_t vigil_parser_check_native_arg_type(vigil_parser_state_t *, const vigil_token_t *, const vigil_native_module_function_t *, size_t, vigil_binding_type_t);
 // clang-format on
 vigil_status_t vigil_parser_emit_integer_constant(vigil_parser_state_t *state, vigil_parser_type_t target_type,
@@ -6599,12 +6600,17 @@ static vigil_status_t vigil_parser_check_native_arg_type(vigil_parser_state_t *s
 
 static vigil_status_t vigil_parser_parse_native_call_args(vigil_parser_state_t *state,
                                                           const vigil_token_t *member_token,
-                                                          const vigil_native_module_function_t *fn, size_t *out_count)
+                                                          const vigil_native_module_function_t *fn, size_t *out_count,
+                                                          vigil_binding_type_t *out_dynamic_return_type)
 {
     vigil_status_t status;
     vigil_expression_result_t arg_result;
     size_t arg_count = 0U;
 
+    if (out_dynamic_return_type != NULL)
+    {
+        *out_dynamic_return_type = vigil_binding_type_invalid();
+    }
     if (vigil_parser_check(state, VIGIL_TOKEN_RPAREN))
     {
         *out_count = 0U;
@@ -6631,6 +6637,11 @@ static vigil_status_t vigil_parser_parse_native_call_args(vigil_parser_state_t *
             {
                 return status;
             }
+            if (out_dynamic_return_type != NULL && fn->return_same_as_param_1based != 0U &&
+                fn->return_same_as_param_1based - 1U == arg_count)
+            {
+                *out_dynamic_return_type = arg_result.type;
+            }
         }
         arg_count += 1U;
         if (!vigil_parser_match(state, VIGIL_TOKEN_COMMA))
@@ -6652,6 +6663,7 @@ static vigil_status_t vigil_parser_parse_native_call(vigil_parser_state_t *state
     size_t mod_idx;
     size_t i;
     size_t arg_count;
+    vigil_binding_type_t dynamic_return_type = vigil_binding_type_invalid();
 
     mod_idx = VIGIL_NATIVE_SOURCE_INDEX(source_id);
     if (mod_idx >= state->program->natives->module_count)
@@ -6680,7 +6692,7 @@ static vigil_status_t vigil_parser_parse_native_call(vigil_parser_state_t *state
     {
         return status;
     }
-    status = vigil_parser_parse_native_call_args(state, member_token, fn, &arg_count);
+    status = vigil_parser_parse_native_call_args(state, member_token, fn, &arg_count, &dynamic_return_type);
     if (status != VIGIL_STATUS_OK)
     {
         return status;
@@ -6695,7 +6707,32 @@ static vigil_status_t vigil_parser_parse_native_call(vigil_parser_state_t *state
         return vigil_parser_report(state, member_token->span, "call argument count does not match function signature");
     }
 
-    return vigil_parser_emit_native_call(state, mod, fn, member_token, arg_count, out_result);
+    if (fn->return_same_as_param_1based != 0U && !vigil_binding_type_is_valid(dynamic_return_type))
+    {
+        return vigil_parser_report(state, member_token->span, "dynamic native return type could not be resolved");
+    }
+
+    status = vigil_parser_emit_native_call(state, mod, fn, member_token, arg_count, out_result);
+    if (status != VIGIL_STATUS_OK)
+    {
+        return status;
+    }
+
+    if (fn->return_same_as_param_1based != 0U)
+    {
+        if (fn->return_count <= 1U)
+        {
+            vigil_expression_result_set_type(out_result, dynamic_return_type);
+        }
+        else
+        {
+            vigil_expression_result_set_pair(out_result, dynamic_return_type,
+                                             vigil_binding_type_primitive((vigil_type_kind_t)fn->return_types[1]));
+        }
+        return VIGIL_STATUS_OK;
+    }
+
+    return VIGIL_STATUS_OK;
 }
 
 /* Returns a dedicated math intrinsic opcode for (mod, fn), or -1 if none. */
@@ -12877,6 +12914,40 @@ static vigil_status_t alloc_class_inits(vigil_program_state_t *program, vigil_ru
     for (i = 0U; i < program->class_count; ++i)
     {
         const vigil_class_decl_t *decl = &program->classes[i];
+        vigil_runtime_class_field_init_t *field_inits = NULL;
+
+        class_inits[i].field_count = decl->field_count;
+        if (decl->field_count != 0U)
+        {
+            memory = NULL;
+            status = vigil_runtime_alloc(program->registry->runtime, decl->field_count * sizeof(*field_inits), &memory,
+                                         program->error);
+            if (status != VIGIL_STATUS_OK)
+            {
+                size_t ci;
+                for (ci = 0U; ci < i; ++ci)
+                {
+                    memory = (void *)class_inits[ci].fields;
+                    vigil_runtime_free(program->registry->runtime, &memory);
+                    memory = (void *)class_inits[ci].interface_impls;
+                    vigil_runtime_free(program->registry->runtime, &memory);
+                }
+                memory = class_inits;
+                vigil_runtime_free(program->registry->runtime, &memory);
+                return status;
+            }
+
+            field_inits = (vigil_runtime_class_field_init_t *)memory;
+            class_inits[i].fields = field_inits;
+            for (size_t fi = 0U; fi < decl->field_count; ++fi)
+            {
+                field_inits[fi].name = decl->fields[fi].name;
+                field_inits[fi].name_length = decl->fields[fi].name_length;
+                field_inits[fi].type = vigil_runtime_type_from_binding(decl->fields[fi].type);
+                field_inits[fi].is_public = decl->fields[fi].is_public;
+            }
+        }
+
         class_inits[i].interface_impl_count = decl->interface_impl_count;
         if (decl->interface_impl_count == 0U)
             continue;
@@ -12925,11 +12996,23 @@ static void free_class_inits(vigil_program_state_t *program, vigil_runtime_class
         return;
     for (i = 0U; i < program->class_count; ++i)
     {
+        memory = (void *)class_inits[i].fields;
+        vigil_runtime_free(program->registry->runtime, &memory);
         memory = (void *)class_inits[i].interface_impls;
         vigil_runtime_free(program->registry->runtime, &memory);
     }
     memory = class_inits;
     vigil_runtime_free(program->registry->runtime, &memory);
+}
+
+static vigil_runtime_resolved_type_t vigil_runtime_type_from_binding(vigil_binding_type_t type)
+{
+    vigil_runtime_resolved_type_t runtime_type;
+
+    runtime_type.kind = type.kind;
+    runtime_type.object_kind = (vigil_runtime_object_kind_t)type.object_kind;
+    runtime_type.object_index = type.object_index;
+    return runtime_type;
 }
 
 static vigil_status_t vigil_compile_attach_entrypoint(vigil_program_state_t *program, vigil_object_t **out_function)
@@ -12938,8 +13021,11 @@ static vigil_status_t vigil_compile_attach_entrypoint(vigil_program_state_t *pro
     vigil_object_t **function_table;
     vigil_value_t *initial_globals = NULL;
     vigil_runtime_class_init_t *class_inits = NULL;
+    vigil_runtime_array_type_init_t *array_type_inits = NULL;
+    vigil_runtime_map_type_init_t *map_type_inits = NULL;
     size_t i;
     void *memory = NULL;
+    vigil_runtime_function_attach_init_t attach_init;
 
     status = vigil_runtime_alloc(program->registry->runtime, program->functions.count * sizeof(*function_table),
                                  &memory, program->error);
@@ -12979,13 +13065,66 @@ static vigil_status_t vigil_compile_attach_entrypoint(vigil_program_state_t *pro
         return status;
     }
 
-    status = vigil_function_object_attach_siblings(
-        program->functions.functions[program->functions.main_index].object, function_table, program->functions.count,
-        program->functions.main_index, initial_globals, program->global_count, class_inits, program->class_count,
-        program->error);
+    if (program->array_type_count != 0U)
+    {
+        memory = NULL;
+        status = vigil_runtime_alloc(program->registry->runtime, program->array_type_count * sizeof(*array_type_inits),
+                                     &memory, program->error);
+        if (status != VIGIL_STATUS_OK)
+        {
+            goto cleanup;
+        }
+        array_type_inits = (vigil_runtime_array_type_init_t *)memory;
+        for (i = 0U; i < program->array_type_count; ++i)
+        {
+            array_type_inits[i].element_type = vigil_runtime_type_from_binding(program->array_types[i].element_type);
+        }
+    }
+
+    if (program->map_type_count != 0U)
+    {
+        memory = NULL;
+        status = vigil_runtime_alloc(program->registry->runtime, program->map_type_count * sizeof(*map_type_inits),
+                                     &memory, program->error);
+        if (status != VIGIL_STATUS_OK)
+        {
+            goto cleanup;
+        }
+        map_type_inits = (vigil_runtime_map_type_init_t *)memory;
+        for (i = 0U; i < program->map_type_count; ++i)
+        {
+            map_type_inits[i].key_type = vigil_runtime_type_from_binding(program->map_types[i].key_type);
+            map_type_inits[i].value_type = vigil_runtime_type_from_binding(program->map_types[i].value_type);
+        }
+    }
+
+    attach_init.initial_globals = initial_globals;
+    attach_init.global_count = program->global_count;
+    attach_init.classes = class_inits;
+    attach_init.class_count = program->class_count;
+    attach_init.array_types = array_type_inits;
+    attach_init.array_type_count = program->array_type_count;
+    attach_init.map_types = map_type_inits;
+    attach_init.map_type_count = program->map_type_count;
+
+    status = vigil_function_object_attach_siblings(program->functions.functions[program->functions.main_index].object,
+                                                   function_table, program->functions.count,
+                                                   program->functions.main_index, &attach_init, program->error);
+
+cleanup:
     if (initial_globals != NULL)
     {
         memory = initial_globals;
+        vigil_runtime_free(program->registry->runtime, &memory);
+    }
+    if (array_type_inits != NULL)
+    {
+        memory = array_type_inits;
+        vigil_runtime_free(program->registry->runtime, &memory);
+    }
+    if (map_type_inits != NULL)
+    {
+        memory = map_type_inits;
         vigil_runtime_free(program->registry->runtime, &memory);
     }
     free_class_inits(program, class_inits);
