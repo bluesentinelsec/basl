@@ -1,0 +1,106 @@
+// sdl_keyboard_mouse.vigil — Slice 5 demo: real-time keyboard/mouse state
+//
+// Highlights WASD keys and draws a crosshair at the mouse cursor.
+// Press Escape or close the window to quit.
+
+import "sdl";
+import "fmt";
+
+fn main() -> i32 {
+    bool init_ok, err ie = sdl.init(sdl.INIT_VIDEO());
+    if (ie != ok) {
+        fmt.eprintln(f"SDL init failed: {ie.message()}");
+        return 1;
+    }
+    defer sdl.quit();
+
+    sdl.Window win, err we = sdl.Window.create("Keyboard & Mouse Demo", 640, 480, 0);
+    if (we != ok) {
+        fmt.eprintln(f"Window failed: {we.message()}");
+        return 1;
+    }
+
+    sdl.Renderer ren, err re = sdl.Renderer.create(win, "");
+    if (re != ok) {
+        fmt.eprintln(f"Renderer failed: {re.message()}");
+        win.destroy();
+        return 1;
+    }
+
+    sdl.Event ev, err ee = sdl.Event.new();
+    if (ee != ok) {
+        fmt.eprintln(f"Event alloc failed: {ee.message()}");
+        ren.destroy();
+        win.destroy();
+        return 1;
+    }
+
+    fmt.println("WASD to highlight keys, mouse to move crosshair, Escape to quit.");
+
+    bool running = true;
+    while (running) {
+        while (ev.poll()) {
+            if (ev.type() == sdl.EVENT_QUIT()) {
+                running = false;
+            }
+        }
+
+        if (sdl.is_key_pressed(sdl.SCANCODE_ESCAPE())) {
+            running = false;
+        }
+
+        // Clear
+        bool c1, err e1 = ren.set_draw_color(30, 30, 30, 255);
+        bool c2, err e2 = ren.clear();
+
+        // W key
+        if (sdl.is_key_pressed(sdl.SCANCODE_W())) {
+            bool t1, err t2 = ren.set_draw_color(0, 200, 0, 255);
+        } else {
+            bool t3, err t4 = ren.set_draw_color(60, 60, 60, 255);
+        }
+        bool c3, err e3 = ren.fill_rect(270.0, 160.0, 60.0, 60.0);
+
+        // A key
+        if (sdl.is_key_pressed(sdl.SCANCODE_A())) {
+            bool t5, err t6 = ren.set_draw_color(0, 200, 0, 255);
+        } else {
+            bool t7, err t8 = ren.set_draw_color(60, 60, 60, 255);
+        }
+        bool c4, err e4 = ren.fill_rect(200.0, 230.0, 60.0, 60.0);
+
+        // S key
+        if (sdl.is_key_pressed(sdl.SCANCODE_S())) {
+            bool t9, err t10 = ren.set_draw_color(0, 200, 0, 255);
+        } else {
+            bool t11, err t12 = ren.set_draw_color(60, 60, 60, 255);
+        }
+        bool c5, err e5 = ren.fill_rect(270.0, 230.0, 60.0, 60.0);
+
+        // D key
+        if (sdl.is_key_pressed(sdl.SCANCODE_D())) {
+            bool t13, err t14 = ren.set_draw_color(0, 200, 0, 255);
+        } else {
+            bool t15, err t16 = ren.set_draw_color(60, 60, 60, 255);
+        }
+        bool c6, err e6 = ren.fill_rect(340.0, 230.0, 60.0, 60.0);
+
+        // Crosshair at mouse position
+        f64 mx, f64 my = sdl.get_mouse_state();
+        i32 buttons = sdl.get_mouse_buttons();
+        if (buttons > 0) {
+            bool t17, err t18 = ren.set_draw_color(255, 80, 80, 255);
+        } else {
+            bool t19, err t20 = ren.set_draw_color(200, 200, 200, 255);
+        }
+        bool c7, err e7 = ren.draw_line(mx - 10.0, my, mx + 10.0, my);
+        bool c8, err e8 = ren.draw_line(mx, my - 10.0, mx, my + 10.0);
+
+        bool c9, err e9 = ren.present();
+        sdl.delay(16);
+    }
+
+    ren.destroy();
+    win.destroy();
+    return 0;
+}

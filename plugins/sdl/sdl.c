@@ -675,6 +675,8 @@ static const int rt_bool_err[] = {VIGIL_TYPE_BOOL, VIGIL_TYPE_ERR};
 static const int rt_obj_err[] = {VIGIL_TYPE_OBJECT, VIGIL_TYPE_ERR};
 static const int rt_i32_i32[] = {VIGIL_TYPE_I32, VIGIL_TYPE_I32};
 static const int rt_i32_i32_i32_i32[] = {VIGIL_TYPE_I32, VIGIL_TYPE_I32, VIGIL_TYPE_I32, VIGIL_TYPE_I32};
+static const int p_obj_f64_f64[] = {VIGIL_TYPE_OBJECT, VIGIL_TYPE_F64, VIGIL_TYPE_F64};
+static const int rt_f64_f64[] = {VIGIL_TYPE_F64, VIGIL_TYPE_F64};
 
 /* ── Renderer handle registry ────────────────────────────────────── */
 
@@ -1000,6 +1002,204 @@ static vigil_status_t sdl_event_wheel_y(vigil_vm_t *vm, size_t arg_count, vigil_
     return sdl_push_f64(vm, ev ? (double)ev->wheel.y : 0.0, error);
 }
 
+/* ── Slice 5: Keyboard and Mouse Queries ──────────────────────────── */
+
+/* sdl.is_key_pressed(i32 scancode) -> bool */
+static vigil_status_t sdl_fn_is_key_pressed(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t sc = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    int numkeys = 0;
+    const bool *state = SDL_GetKeyboardState(&numkeys);
+    return sdl_push_bool(vm, (state && sc >= 0 && sc < numkeys && state[sc]), error);
+}
+
+/* sdl.get_mod_state() -> i32 */
+static vigil_status_t sdl_fn_get_mod_state(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_i32(vm, (int32_t)SDL_GetModState(), error);
+}
+
+/* sdl.get_key_name(i32 keycode) -> string */
+static vigil_status_t sdl_fn_get_key_name(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t key = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_string(vm, SDL_GetKeyName((SDL_Keycode)key), error);
+}
+
+/* sdl.get_scancode_name(i32 scancode) -> string */
+static vigil_status_t sdl_fn_get_scancode_name(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t sc = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_string(vm, SDL_GetScancodeName((SDL_Scancode)sc), error);
+}
+
+/* sdl.get_mouse_state() -> (f64, f64) — returns x, y */
+static vigil_status_t sdl_fn_get_mouse_state(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    vigil_vm_stack_pop_n(vm, arg_count);
+    float x = 0, y = 0;
+    SDL_GetMouseState(&x, &y);
+    vigil_status_t st = sdl_push_f64(vm, (double)x, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_f64(vm, (double)y, error);
+}
+
+/* sdl.get_mouse_buttons() -> i32 — returns button mask */
+static vigil_status_t sdl_fn_get_mouse_buttons(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_MouseButtonFlags buttons = SDL_GetMouseState(NULL, NULL);
+    return sdl_push_i32(vm, (int32_t)buttons, error);
+}
+
+/* sdl.get_global_mouse_state() -> (f64, f64) — returns x, y */
+static vigil_status_t sdl_fn_get_global_mouse_state(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    vigil_vm_stack_pop_n(vm, arg_count);
+    float x = 0, y = 0;
+    SDL_GetGlobalMouseState(&x, &y);
+    vigil_status_t st = sdl_push_f64(vm, (double)x, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_f64(vm, (double)y, error);
+}
+
+/* sdl.warp_mouse(sdl.Window win, f64 x, f64 y) */
+static vigil_status_t sdl_fn_warp_mouse(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t wh = sdl_field_i64(vm, base, WIN_HANDLE);
+    float x = (float)sdl_arg_f64(vm, base, 1);
+    float y = (float)sdl_arg_f64(vm, base, 2);
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Window *win = (SDL_Window *)SDL_HANDLE_GET(windows, wh);
+    if (win)
+        SDL_WarpMouseInWindow(win, x, y);
+    return VIGIL_STATUS_OK;
+}
+
+/* sdl.show_cursor() -> bool */
+static vigil_status_t sdl_fn_show_cursor(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_bool(vm, SDL_ShowCursor(), error);
+}
+
+/* sdl.hide_cursor() -> bool */
+static vigil_status_t sdl_fn_hide_cursor(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_bool(vm, SDL_HideCursor(), error);
+}
+
+/* sdl.cursor_visible() -> bool */
+static vigil_status_t sdl_fn_cursor_visible(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_bool(vm, SDL_CursorVisible(), error);
+}
+
+/* sdl.delay(i32 ms) — pulled forward from slice 7 for frame timing */
+static vigil_status_t sdl_fn_delay(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t ms = sdl_arg_i32(vm, base, 0);
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Delay((Uint32)ms);
+    return VIGIL_STATUS_OK;
+}
+
+/* Scancode constants */
+SDL_CONST_FN(SCANCODE_A, SDL_SCANCODE_A)
+SDL_CONST_FN(SCANCODE_B, SDL_SCANCODE_B)
+SDL_CONST_FN(SCANCODE_C, SDL_SCANCODE_C)
+SDL_CONST_FN(SCANCODE_D, SDL_SCANCODE_D)
+SDL_CONST_FN(SCANCODE_E, SDL_SCANCODE_E)
+SDL_CONST_FN(SCANCODE_F, SDL_SCANCODE_F)
+SDL_CONST_FN(SCANCODE_G, SDL_SCANCODE_G)
+SDL_CONST_FN(SCANCODE_H, SDL_SCANCODE_H)
+SDL_CONST_FN(SCANCODE_I, SDL_SCANCODE_I)
+SDL_CONST_FN(SCANCODE_J, SDL_SCANCODE_J)
+SDL_CONST_FN(SCANCODE_K, SDL_SCANCODE_K)
+SDL_CONST_FN(SCANCODE_L, SDL_SCANCODE_L)
+SDL_CONST_FN(SCANCODE_M, SDL_SCANCODE_M)
+SDL_CONST_FN(SCANCODE_N, SDL_SCANCODE_N)
+SDL_CONST_FN(SCANCODE_O, SDL_SCANCODE_O)
+SDL_CONST_FN(SCANCODE_P, SDL_SCANCODE_P)
+SDL_CONST_FN(SCANCODE_Q, SDL_SCANCODE_Q)
+SDL_CONST_FN(SCANCODE_R, SDL_SCANCODE_R)
+SDL_CONST_FN(SCANCODE_S, SDL_SCANCODE_S)
+SDL_CONST_FN(SCANCODE_T, SDL_SCANCODE_T)
+SDL_CONST_FN(SCANCODE_U, SDL_SCANCODE_U)
+SDL_CONST_FN(SCANCODE_V, SDL_SCANCODE_V)
+SDL_CONST_FN(SCANCODE_W, SDL_SCANCODE_W)
+SDL_CONST_FN(SCANCODE_X, SDL_SCANCODE_X)
+SDL_CONST_FN(SCANCODE_Y, SDL_SCANCODE_Y)
+SDL_CONST_FN(SCANCODE_Z, SDL_SCANCODE_Z)
+SDL_CONST_FN(SCANCODE_0, SDL_SCANCODE_0)
+SDL_CONST_FN(SCANCODE_1, SDL_SCANCODE_1)
+SDL_CONST_FN(SCANCODE_2, SDL_SCANCODE_2)
+SDL_CONST_FN(SCANCODE_3, SDL_SCANCODE_3)
+SDL_CONST_FN(SCANCODE_4, SDL_SCANCODE_4)
+SDL_CONST_FN(SCANCODE_5, SDL_SCANCODE_5)
+SDL_CONST_FN(SCANCODE_6, SDL_SCANCODE_6)
+SDL_CONST_FN(SCANCODE_7, SDL_SCANCODE_7)
+SDL_CONST_FN(SCANCODE_8, SDL_SCANCODE_8)
+SDL_CONST_FN(SCANCODE_9, SDL_SCANCODE_9)
+SDL_CONST_FN(SCANCODE_RETURN, SDL_SCANCODE_RETURN)
+SDL_CONST_FN(SCANCODE_ESCAPE, SDL_SCANCODE_ESCAPE)
+SDL_CONST_FN(SCANCODE_BACKSPACE, SDL_SCANCODE_BACKSPACE)
+SDL_CONST_FN(SCANCODE_TAB, SDL_SCANCODE_TAB)
+SDL_CONST_FN(SCANCODE_SPACE, SDL_SCANCODE_SPACE)
+SDL_CONST_FN(SCANCODE_RIGHT, SDL_SCANCODE_RIGHT)
+SDL_CONST_FN(SCANCODE_LEFT, SDL_SCANCODE_LEFT)
+SDL_CONST_FN(SCANCODE_DOWN, SDL_SCANCODE_DOWN)
+SDL_CONST_FN(SCANCODE_UP, SDL_SCANCODE_UP)
+SDL_CONST_FN(SCANCODE_DELETE, SDL_SCANCODE_DELETE)
+SDL_CONST_FN(SCANCODE_LCTRL, SDL_SCANCODE_LCTRL)
+SDL_CONST_FN(SCANCODE_LSHIFT, SDL_SCANCODE_LSHIFT)
+SDL_CONST_FN(SCANCODE_LALT, SDL_SCANCODE_LALT)
+SDL_CONST_FN(SCANCODE_RCTRL, SDL_SCANCODE_RCTRL)
+SDL_CONST_FN(SCANCODE_RSHIFT, SDL_SCANCODE_RSHIFT)
+SDL_CONST_FN(SCANCODE_RALT, SDL_SCANCODE_RALT)
+SDL_CONST_FN(SCANCODE_F1, SDL_SCANCODE_F1)
+SDL_CONST_FN(SCANCODE_F2, SDL_SCANCODE_F2)
+SDL_CONST_FN(SCANCODE_F3, SDL_SCANCODE_F3)
+SDL_CONST_FN(SCANCODE_F4, SDL_SCANCODE_F4)
+SDL_CONST_FN(SCANCODE_F5, SDL_SCANCODE_F5)
+SDL_CONST_FN(SCANCODE_F6, SDL_SCANCODE_F6)
+SDL_CONST_FN(SCANCODE_F7, SDL_SCANCODE_F7)
+SDL_CONST_FN(SCANCODE_F8, SDL_SCANCODE_F8)
+SDL_CONST_FN(SCANCODE_F9, SDL_SCANCODE_F9)
+SDL_CONST_FN(SCANCODE_F10, SDL_SCANCODE_F10)
+SDL_CONST_FN(SCANCODE_F11, SDL_SCANCODE_F11)
+SDL_CONST_FN(SCANCODE_F12, SDL_SCANCODE_F12)
+
+/* Keycode constants */
+SDL_CONST_FN(KEY_RETURN, SDLK_RETURN)
+SDL_CONST_FN(KEY_ESCAPE, SDLK_ESCAPE)
+SDL_CONST_FN(KEY_BACKSPACE, SDLK_BACKSPACE)
+SDL_CONST_FN(KEY_TAB, SDLK_TAB)
+SDL_CONST_FN(KEY_SPACE, SDLK_SPACE)
+SDL_CONST_FN(KEY_DELETE, SDLK_DELETE)
+
+/* Mouse button constants */
+SDL_CONST_FN(BUTTON_LEFT, SDL_BUTTON_LEFT)
+SDL_CONST_FN(BUTTON_MIDDLE, SDL_BUTTON_MIDDLE)
+SDL_CONST_FN(BUTTON_RIGHT, SDL_BUTTON_RIGHT)
+SDL_CONST_FN(BUTTON_X1, SDL_BUTTON_X1)
+SDL_CONST_FN(BUTTON_X2, SDL_BUTTON_X2)
+
 /* Event type constants */
 SDL_CONST_FN(EVENT_QUIT, SDL_EVENT_QUIT)
 SDL_CONST_FN(EVENT_KEY_DOWN, SDL_EVENT_KEY_DOWN)
@@ -1070,6 +1270,98 @@ static const vigil_native_module_function_t sdl_functions[] = {
     SDL_CONST_ENTRY("EVENT_MOUSE_WHEEL", EVENT_MOUSE_WHEEL),
     SDL_CONST_ENTRY("EVENT_WINDOW_CLOSE_REQUESTED", EVENT_WINDOW_CLOSE_REQUESTED),
     SDL_CONST_ENTRY("EVENT_WINDOW_RESIZED", EVENT_WINDOW_RESIZED),
+    /* Keyboard / mouse queries (slice 5) */
+    SDL_FN("is_key_pressed", 14U, sdl_fn_is_key_pressed, 1U, p_i32, VIGIL_TYPE_BOOL),
+    SDL_FN("get_mod_state", 13U, sdl_fn_get_mod_state, 0U, NULL, VIGIL_TYPE_I32),
+    SDL_FN("get_key_name", 12U, sdl_fn_get_key_name, 1U, p_i32, VIGIL_TYPE_STRING),
+    SDL_FN("get_scancode_name", 17U, sdl_fn_get_scancode_name, 1U, p_i32, VIGIL_TYPE_STRING),
+    {"get_mouse_state", 15U, sdl_fn_get_mouse_state, 0U, NULL, VIGIL_TYPE_F64, 2U, rt_f64_f64, 0, NULL, NULL, 0},
+    SDL_FN("get_mouse_buttons", 17U, sdl_fn_get_mouse_buttons, 0U, NULL, VIGIL_TYPE_I32),
+    {"get_global_mouse_state", 22U, sdl_fn_get_global_mouse_state, 0U, NULL, VIGIL_TYPE_F64, 2U, rt_f64_f64, 0, NULL,
+     NULL, 0},
+    SDL_FN_VOID("warp_mouse", 10U, sdl_fn_warp_mouse, 3U, p_obj_f64_f64),
+    SDL_FN("show_cursor", 11U, sdl_fn_show_cursor, 0U, NULL, VIGIL_TYPE_BOOL),
+    SDL_FN("hide_cursor", 11U, sdl_fn_hide_cursor, 0U, NULL, VIGIL_TYPE_BOOL),
+    SDL_FN("cursor_visible", 14U, sdl_fn_cursor_visible, 0U, NULL, VIGIL_TYPE_BOOL),
+    SDL_FN_VOID("delay", 5U, sdl_fn_delay, 1U, p_i32),
+    /* Scancode constants */
+    SDL_CONST_ENTRY("SCANCODE_A", SCANCODE_A),
+    SDL_CONST_ENTRY("SCANCODE_B", SCANCODE_B),
+    SDL_CONST_ENTRY("SCANCODE_C", SCANCODE_C),
+    SDL_CONST_ENTRY("SCANCODE_D", SCANCODE_D),
+    SDL_CONST_ENTRY("SCANCODE_E", SCANCODE_E),
+    SDL_CONST_ENTRY("SCANCODE_F", SCANCODE_F),
+    SDL_CONST_ENTRY("SCANCODE_G", SCANCODE_G),
+    SDL_CONST_ENTRY("SCANCODE_H", SCANCODE_H),
+    SDL_CONST_ENTRY("SCANCODE_I", SCANCODE_I),
+    SDL_CONST_ENTRY("SCANCODE_J", SCANCODE_J),
+    SDL_CONST_ENTRY("SCANCODE_K", SCANCODE_K),
+    SDL_CONST_ENTRY("SCANCODE_L", SCANCODE_L),
+    SDL_CONST_ENTRY("SCANCODE_M", SCANCODE_M),
+    SDL_CONST_ENTRY("SCANCODE_N", SCANCODE_N),
+    SDL_CONST_ENTRY("SCANCODE_O", SCANCODE_O),
+    SDL_CONST_ENTRY("SCANCODE_P", SCANCODE_P),
+    SDL_CONST_ENTRY("SCANCODE_Q", SCANCODE_Q),
+    SDL_CONST_ENTRY("SCANCODE_R", SCANCODE_R),
+    SDL_CONST_ENTRY("SCANCODE_S", SCANCODE_S),
+    SDL_CONST_ENTRY("SCANCODE_T", SCANCODE_T),
+    SDL_CONST_ENTRY("SCANCODE_U", SCANCODE_U),
+    SDL_CONST_ENTRY("SCANCODE_V", SCANCODE_V),
+    SDL_CONST_ENTRY("SCANCODE_W", SCANCODE_W),
+    SDL_CONST_ENTRY("SCANCODE_X", SCANCODE_X),
+    SDL_CONST_ENTRY("SCANCODE_Y", SCANCODE_Y),
+    SDL_CONST_ENTRY("SCANCODE_Z", SCANCODE_Z),
+    SDL_CONST_ENTRY("SCANCODE_0", SCANCODE_0),
+    SDL_CONST_ENTRY("SCANCODE_1", SCANCODE_1),
+    SDL_CONST_ENTRY("SCANCODE_2", SCANCODE_2),
+    SDL_CONST_ENTRY("SCANCODE_3", SCANCODE_3),
+    SDL_CONST_ENTRY("SCANCODE_4", SCANCODE_4),
+    SDL_CONST_ENTRY("SCANCODE_5", SCANCODE_5),
+    SDL_CONST_ENTRY("SCANCODE_6", SCANCODE_6),
+    SDL_CONST_ENTRY("SCANCODE_7", SCANCODE_7),
+    SDL_CONST_ENTRY("SCANCODE_8", SCANCODE_8),
+    SDL_CONST_ENTRY("SCANCODE_9", SCANCODE_9),
+    SDL_CONST_ENTRY("SCANCODE_RETURN", SCANCODE_RETURN),
+    SDL_CONST_ENTRY("SCANCODE_ESCAPE", SCANCODE_ESCAPE),
+    SDL_CONST_ENTRY("SCANCODE_BACKSPACE", SCANCODE_BACKSPACE),
+    SDL_CONST_ENTRY("SCANCODE_TAB", SCANCODE_TAB),
+    SDL_CONST_ENTRY("SCANCODE_SPACE", SCANCODE_SPACE),
+    SDL_CONST_ENTRY("SCANCODE_RIGHT", SCANCODE_RIGHT),
+    SDL_CONST_ENTRY("SCANCODE_LEFT", SCANCODE_LEFT),
+    SDL_CONST_ENTRY("SCANCODE_DOWN", SCANCODE_DOWN),
+    SDL_CONST_ENTRY("SCANCODE_UP", SCANCODE_UP),
+    SDL_CONST_ENTRY("SCANCODE_DELETE", SCANCODE_DELETE),
+    SDL_CONST_ENTRY("SCANCODE_LCTRL", SCANCODE_LCTRL),
+    SDL_CONST_ENTRY("SCANCODE_LSHIFT", SCANCODE_LSHIFT),
+    SDL_CONST_ENTRY("SCANCODE_LALT", SCANCODE_LALT),
+    SDL_CONST_ENTRY("SCANCODE_RCTRL", SCANCODE_RCTRL),
+    SDL_CONST_ENTRY("SCANCODE_RSHIFT", SCANCODE_RSHIFT),
+    SDL_CONST_ENTRY("SCANCODE_RALT", SCANCODE_RALT),
+    SDL_CONST_ENTRY("SCANCODE_F1", SCANCODE_F1),
+    SDL_CONST_ENTRY("SCANCODE_F2", SCANCODE_F2),
+    SDL_CONST_ENTRY("SCANCODE_F3", SCANCODE_F3),
+    SDL_CONST_ENTRY("SCANCODE_F4", SCANCODE_F4),
+    SDL_CONST_ENTRY("SCANCODE_F5", SCANCODE_F5),
+    SDL_CONST_ENTRY("SCANCODE_F6", SCANCODE_F6),
+    SDL_CONST_ENTRY("SCANCODE_F7", SCANCODE_F7),
+    SDL_CONST_ENTRY("SCANCODE_F8", SCANCODE_F8),
+    SDL_CONST_ENTRY("SCANCODE_F9", SCANCODE_F9),
+    SDL_CONST_ENTRY("SCANCODE_F10", SCANCODE_F10),
+    SDL_CONST_ENTRY("SCANCODE_F11", SCANCODE_F11),
+    SDL_CONST_ENTRY("SCANCODE_F12", SCANCODE_F12),
+    /* Keycode constants */
+    SDL_CONST_ENTRY("KEY_RETURN", KEY_RETURN),
+    SDL_CONST_ENTRY("KEY_ESCAPE", KEY_ESCAPE),
+    SDL_CONST_ENTRY("KEY_BACKSPACE", KEY_BACKSPACE),
+    SDL_CONST_ENTRY("KEY_TAB", KEY_TAB),
+    SDL_CONST_ENTRY("KEY_SPACE", KEY_SPACE),
+    SDL_CONST_ENTRY("KEY_DELETE", KEY_DELETE),
+    /* Mouse button constants */
+    SDL_CONST_ENTRY("BUTTON_LEFT", BUTTON_LEFT),
+    SDL_CONST_ENTRY("BUTTON_MIDDLE", BUTTON_MIDDLE),
+    SDL_CONST_ENTRY("BUTTON_RIGHT", BUTTON_RIGHT),
+    SDL_CONST_ENTRY("BUTTON_X1", BUTTON_X1),
+    SDL_CONST_ENTRY("BUTTON_X2", BUTTON_X2),
 };
 
 #define SDL_FUNCTION_COUNT (sizeof(sdl_functions) / sizeof(sdl_functions[0]))
