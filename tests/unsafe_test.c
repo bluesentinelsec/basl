@@ -680,7 +680,7 @@ TEST(Unsafe, PeekPokePtr)
     int64_t raw = u_pop_i64(vm);
 
     /* Store a known pointer value and read it back */
-    int64_t fake_ptr = (int64_t)(intptr_t) "hello";
+    int64_t fake_ptr = (int64_t)(intptr_t)"hello";
     u_push_i64(vm, raw, &e);
     u_push_i32(vm, 0, &e);
     u_push_i64(vm, fake_ptr, &e);
