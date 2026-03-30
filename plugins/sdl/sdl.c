@@ -670,6 +670,7 @@ static const int p_str_str[] = {VIGIL_TYPE_STRING, VIGIL_TYPE_STRING};
 static const int p_i32_str_str[] = {VIGIL_TYPE_I32, VIGIL_TYPE_STRING, VIGIL_TYPE_STRING};
 static const int p_f64_f64_str[] = {VIGIL_TYPE_F64, VIGIL_TYPE_F64, VIGIL_TYPE_STRING};
 static const int p_f64[] = {VIGIL_TYPE_F64};
+static const int p_obj[] = {VIGIL_TYPE_OBJECT};
 static const int p_i32_i32[] = {VIGIL_TYPE_I32, VIGIL_TYPE_I32};
 static const int p_i32_i32_i32_i32[] = {VIGIL_TYPE_I32, VIGIL_TYPE_I32, VIGIL_TYPE_I32, VIGIL_TYPE_I32};
 static const int p_str_i32_i32_i32[] = {VIGIL_TYPE_STRING, VIGIL_TYPE_I32, VIGIL_TYPE_I32, VIGIL_TYPE_I32};
@@ -2434,6 +2435,216 @@ static vigil_status_t sdl_renderer_get_name(vigil_vm_t *vm, size_t arg_count, vi
     return sdl_push_string(vm, ren ? SDL_GetRendererName(ren) : "", error);
 }
 
+/* ── Slice 13: Extended Window, Display, Power ────────────────────── */
+
+/* win.flash(i32 op) -> (bool, err) */
+static vigil_status_t sdl_window_flash(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, WIN_HANDLE);
+    int32_t op = sdl_arg_i32(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Window *win = (SDL_Window *)SDL_HANDLE_GET(windows, h);
+    if (win && SDL_FlashWindow(win, (SDL_FlashOperation)op))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+/* win.set_icon(Surface surf) -> (bool, err) */
+static vigil_status_t sdl_window_set_icon(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t wh = sdl_field_i64(vm, base, WIN_HANDLE);
+    int64_t sh = sdl_field_i64(vm, base + 1, SURF_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Window *win = (SDL_Window *)SDL_HANDLE_GET(windows, wh);
+    SDL_Surface *surf = (SDL_Surface *)SDL_HANDLE_GET(surfaces, sh);
+    if (win && surf && SDL_SetWindowIcon(win, surf))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+/* win.set_opacity(f64 opacity) -> (bool, err) */
+static vigil_status_t sdl_window_set_opacity(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, WIN_HANDLE);
+    float op = (float)sdl_arg_f64(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Window *win = (SDL_Window *)SDL_HANDLE_GET(windows, h);
+    if (win && SDL_SetWindowOpacity(win, op))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+/* win.get_opacity() -> f64 */
+static vigil_status_t sdl_window_get_opacity(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, WIN_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Window *win = (SDL_Window *)SDL_HANDLE_GET(windows, h);
+    return sdl_push_f64(vm, win ? (double)SDL_GetWindowOpacity(win) : 1.0, error);
+}
+
+/* win.set_min_size / get_min_size / set_max_size / get_max_size */
+#define WIN_SIZE_LIMIT(name, sdl_set, sdl_get, is_set)                                                                 \
+    static vigil_status_t sdl_window_##name(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)                    \
+    {                                                                                                                  \
+        size_t base = vigil_vm_stack_depth(vm) - arg_count;                                                            \
+        int64_t h = sdl_field_i64(vm, base, WIN_HANDLE);                                                               \
+        if (is_set)                                                                                                    \
+        {                                                                                                              \
+            int32_t w = sdl_arg_i32(vm, base, 1);                                                                      \
+            int32_t ht = sdl_arg_i32(vm, base, 2);                                                                     \
+            vigil_vm_stack_pop_n(vm, arg_count);                                                                       \
+            SDL_Window *win = (SDL_Window *)SDL_HANDLE_GET(windows, h);                                                \
+            if (win && sdl_set(win, w, ht))                                                                            \
+                return sdl_push_bool_ok(vm, error);                                                                    \
+            return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);                                                       \
+        }                                                                                                              \
+        else                                                                                                           \
+        {                                                                                                              \
+            vigil_vm_stack_pop_n(vm, arg_count);                                                                       \
+            int w = 0, ht = 0;                                                                                         \
+            SDL_Window *win = (SDL_Window *)SDL_HANDLE_GET(windows, h);                                                \
+            if (win)                                                                                                   \
+                sdl_get(win, &w, &ht);                                                                                 \
+            vigil_status_t st = sdl_push_i32(vm, (int32_t)w, error);                                                   \
+            if (st != VIGIL_STATUS_OK)                                                                                 \
+                return st;                                                                                             \
+            return sdl_push_i32(vm, (int32_t)ht, error);                                                               \
+        }                                                                                                              \
+    }
+
+WIN_SIZE_LIMIT(set_min_size, SDL_SetWindowMinimumSize, SDL_GetWindowMinimumSize, 1)
+WIN_SIZE_LIMIT(get_min_size, SDL_SetWindowMinimumSize, SDL_GetWindowMinimumSize, 0)
+WIN_SIZE_LIMIT(set_max_size, SDL_SetWindowMaximumSize, SDL_GetWindowMaximumSize, 1)
+WIN_SIZE_LIMIT(get_max_size, SDL_SetWindowMaximumSize, SDL_GetWindowMaximumSize, 0)
+#undef WIN_SIZE_LIMIT
+
+/* Simple bool-arg window methods */
+#define WIN_BOOL_METHOD(name, sdl_fn)                                                                                  \
+    static vigil_status_t sdl_window_##name(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)                    \
+    {                                                                                                                  \
+        size_t base = vigil_vm_stack_depth(vm) - arg_count;                                                            \
+        int64_t h = sdl_field_i64(vm, base, WIN_HANDLE);                                                               \
+        int32_t v = sdl_arg_i32(vm, base, 1);                                                                          \
+        vigil_vm_stack_pop_n(vm, arg_count);                                                                           \
+        SDL_Window *win = (SDL_Window *)SDL_HANDLE_GET(windows, h);                                                    \
+        if (win && sdl_fn(win, v != 0))                                                                                \
+            return sdl_push_bool_ok(vm, error);                                                                        \
+        return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);                                                           \
+    }
+
+WIN_BOOL_METHOD(set_always_on_top, SDL_SetWindowAlwaysOnTop)
+WIN_BOOL_METHOD(set_mouse_grab, SDL_SetWindowMouseGrab)
+WIN_BOOL_METHOD(set_keyboard_grab, SDL_SetWindowKeyboardGrab)
+WIN_BOOL_METHOD(set_relative_mouse, SDL_SetWindowRelativeMouseMode)
+#undef WIN_BOOL_METHOD
+
+/* win.get_size_in_pixels() -> (i32, i32) */
+static vigil_status_t sdl_window_get_size_in_pixels(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, WIN_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    int w = 0, ht = 0;
+    SDL_Window *win = (SDL_Window *)SDL_HANDLE_GET(windows, h);
+    if (win)
+        SDL_GetWindowSizeInPixels(win, &w, &ht);
+    vigil_status_t st = sdl_push_i32(vm, (int32_t)w, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_i32(vm, (int32_t)ht, error);
+}
+
+/* win.get_display_scale() -> f64 */
+static vigil_status_t sdl_window_get_display_scale(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, WIN_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Window *win = (SDL_Window *)SDL_HANDLE_GET(windows, h);
+    return sdl_push_f64(vm, win ? (double)SDL_GetWindowDisplayScale(win) : 1.0, error);
+}
+
+/* Extended display functions */
+
+static vigil_status_t sdl_fn_get_primary_display(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    vigil_vm_stack_pop_n(vm, arg_count);
+    sdl_refresh_display_list();
+    SDL_DisplayID primary = SDL_GetPrimaryDisplay();
+    for (int i = 0; i < g_display_count; i++)
+    {
+        if (g_display_ids && g_display_ids[i] == primary)
+            return sdl_push_i32(vm, (int32_t)i, error);
+    }
+    return sdl_push_i32(vm, 0, error);
+}
+
+static vigil_status_t sdl_fn_get_display_content_scale(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t idx = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    float scale = 1.0f;
+    if (idx >= 0 && idx < g_display_count && g_display_ids)
+        scale = SDL_GetDisplayContentScale(g_display_ids[idx]);
+    return sdl_push_f64(vm, (double)scale, error);
+}
+
+static vigil_status_t sdl_fn_get_display_usable_bounds(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t idx = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Rect rect = {0, 0, 0, 0};
+    if (idx >= 0 && idx < g_display_count && g_display_ids)
+        SDL_GetDisplayUsableBounds(g_display_ids[idx], &rect);
+    vigil_status_t st = sdl_push_i32(vm, rect.w, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_i32(vm, rect.h, error);
+}
+
+/* Power / screensaver */
+
+static vigil_status_t sdl_fn_get_power_info(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    vigil_vm_stack_pop_n(vm, arg_count);
+    int seconds = -1, percent = -1;
+    SDL_GetPowerInfo(&seconds, &percent);
+    vigil_status_t st = sdl_push_i32(vm, (int32_t)percent, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_i32(vm, (int32_t)seconds, error);
+}
+
+static vigil_status_t sdl_fn_screen_saver_enabled(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_bool(vm, SDL_ScreenSaverEnabled(), error);
+}
+
+static vigil_status_t sdl_fn_enable_screen_saver(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_bool(vm, SDL_EnableScreenSaver(), error);
+}
+
+static vigil_status_t sdl_fn_disable_screen_saver(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_bool(vm, SDL_DisableScreenSaver(), error);
+}
+
+/* Flash operation constants */
+SDL_CONST_FN(FLASH_CANCEL, SDL_FLASH_CANCEL)
+SDL_CONST_FN(FLASH_BRIEFLY, SDL_FLASH_BRIEFLY)
+SDL_CONST_FN(FLASH_UNTIL_FOCUSED, SDL_FLASH_UNTIL_FOCUSED)
+
 /* Texture access constants */
 SDL_CONST_FN(TEXTUREACCESS_STATIC, SDL_TEXTUREACCESS_STATIC)
 SDL_CONST_FN(TEXTUREACCESS_STREAMING, SDL_TEXTUREACCESS_STREAMING)
@@ -2682,6 +2893,19 @@ static const vigil_native_module_function_t sdl_functions[] = {
     SDL_CONST_ENTRY("MESSAGEBOX_ERROR", MESSAGEBOX_ERROR),
     SDL_CONST_ENTRY("MESSAGEBOX_WARNING", MESSAGEBOX_WARNING),
     SDL_CONST_ENTRY("MESSAGEBOX_INFORMATION", MESSAGEBOX_INFORMATION),
+    /* Extended display / power / screensaver (slice 13) */
+    SDL_FN("get_primary_display", 19U, sdl_fn_get_primary_display, 0U, NULL, VIGIL_TYPE_I32),
+    SDL_FN("get_display_content_scale", 25U, sdl_fn_get_display_content_scale, 1U, p_i32, VIGIL_TYPE_F64),
+    {"get_display_usable_bounds", 25U, sdl_fn_get_display_usable_bounds, 1U, p_i32, VIGIL_TYPE_I32, 2U, rt_i32_i32, 0,
+     NULL, NULL, 0},
+    {"get_power_info", 14U, sdl_fn_get_power_info, 0U, NULL, VIGIL_TYPE_I32, 2U, rt_i32_i32, 0, NULL, NULL, 0},
+    SDL_FN("screen_saver_enabled", 20U, sdl_fn_screen_saver_enabled, 0U, NULL, VIGIL_TYPE_BOOL),
+    SDL_FN("enable_screen_saver", 19U, sdl_fn_enable_screen_saver, 0U, NULL, VIGIL_TYPE_BOOL),
+    SDL_FN("disable_screen_saver", 20U, sdl_fn_disable_screen_saver, 0U, NULL, VIGIL_TYPE_BOOL),
+    /* Flash operation constants */
+    SDL_CONST_ENTRY("FLASH_CANCEL", FLASH_CANCEL),
+    SDL_CONST_ENTRY("FLASH_BRIEFLY", FLASH_BRIEFLY),
+    SDL_CONST_ENTRY("FLASH_UNTIL_FOCUSED", FLASH_UNTIL_FOCUSED),
     /* Display info (slice 11) */
     SDL_FN("get_display_count", 17U, sdl_fn_get_display_count, 0U, NULL, VIGIL_TYPE_I32),
     SDL_FN("get_display_name", 16U, sdl_fn_get_display_name, 1U, p_i32, VIGIL_TYPE_STRING),
@@ -2723,6 +2947,21 @@ static const vigil_native_class_method_t sdl_window_methods[] = {
     SDL_METHOD("set_resizable", 13U, sdl_window_set_resizable, 1U, p_i32, VIGIL_TYPE_VOID, 0U, NULL),
     SDL_METHOD("set_bordered", 12U, sdl_window_set_bordered, 1U, p_i32, VIGIL_TYPE_VOID, 0U, NULL),
     SDL_METHOD("get_flags", 9U, sdl_window_get_flags, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL),
+    /* Slice 13: window extras */
+    SDL_METHOD("flash", 5U, sdl_window_flash, 1U, p_i32, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
+    SDL_METHOD("set_icon", 8U, sdl_window_set_icon, 1U, p_obj, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
+    SDL_METHOD("set_opacity", 11U, sdl_window_set_opacity, 1U, p_f64, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
+    SDL_METHOD("get_opacity", 11U, sdl_window_get_opacity, 0U, NULL, VIGIL_TYPE_F64, 1U, NULL),
+    SDL_METHOD("set_min_size", 12U, sdl_window_set_min_size, 2U, p_i32_i32, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
+    SDL_METHOD("get_min_size", 12U, sdl_window_get_min_size, 0U, NULL, VIGIL_TYPE_I32, 2U, rt_i32_i32),
+    SDL_METHOD("set_max_size", 12U, sdl_window_set_max_size, 2U, p_i32_i32, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
+    SDL_METHOD("get_max_size", 12U, sdl_window_get_max_size, 0U, NULL, VIGIL_TYPE_I32, 2U, rt_i32_i32),
+    SDL_METHOD("set_always_on_top", 17U, sdl_window_set_always_on_top, 1U, p_i32, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
+    SDL_METHOD("set_mouse_grab", 14U, sdl_window_set_mouse_grab, 1U, p_i32, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
+    SDL_METHOD("set_keyboard_grab", 17U, sdl_window_set_keyboard_grab, 1U, p_i32, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
+    SDL_METHOD("get_size_in_pixels", 18U, sdl_window_get_size_in_pixels, 0U, NULL, VIGIL_TYPE_I32, 2U, rt_i32_i32),
+    SDL_METHOD("get_display_scale", 17U, sdl_window_get_display_scale, 0U, NULL, VIGIL_TYPE_F64, 1U, NULL),
+    SDL_METHOD("set_relative_mouse", 18U, sdl_window_set_relative_mouse, 1U, p_i32, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
 };
 
 /* ── Renderer class descriptor ───────────────────────────────────── */
