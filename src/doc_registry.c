@@ -1625,6 +1625,24 @@ static const vigil_doc_entry_t sdl_docs[] = {
     {"sdl.MESSAGEBOX_ERROR", "sdl.MESSAGEBOX_ERROR() -> i32", "Error message box flag.", NULL, NULL},
     {"sdl.MESSAGEBOX_WARNING", "sdl.MESSAGEBOX_WARNING() -> i32", "Warning message box flag.", NULL, NULL},
     {"sdl.MESSAGEBOX_INFORMATION", "sdl.MESSAGEBOX_INFORMATION() -> i32", "Info message box flag.", NULL, NULL},
+    /* Renderer extras & display info (slice 11) */
+    {"sdl.Renderer.set_target", "ren.set_target(tex_handle: i64) -> (bool, err)", "Set a texture as the render target.",
+     "Pass -1 to reset to the default target (the window).", "ren.set_target(tex_handle)"},
+    {"sdl.Renderer.set_scale", "ren.set_scale(sx: f64, sy: f64) -> (bool, err)", "Set the drawing scale.", NULL, NULL},
+    {"sdl.Renderer.get_scale", "ren.get_scale() -> (f64, f64)", "Get the current drawing scale.", NULL, NULL},
+    {"sdl.Renderer.set_clip_rect", "ren.set_clip_rect(x: i32, y: i32, w: i32, h: i32) -> (bool, err)",
+     "Set the clip rectangle.", "Pass all zeros to clear the clip rect.", NULL},
+    {"sdl.Renderer.set_logical_size", "ren.set_logical_size(w: i32, h: i32, mode: i32) -> (bool, err)",
+     "Set device-independent resolution.", "Use LOGICAL_* constants for mode.", NULL},
+    {"sdl.get_display_count", "sdl.get_display_count() -> i32", "Get the number of connected displays.", NULL, NULL},
+    {"sdl.get_display_name", "sdl.get_display_name(index: i32) -> string", "Get display name.", NULL, NULL},
+    {"sdl.get_display_bounds", "sdl.get_display_bounds(index: i32) -> (i32, i32)", "Get display size (w, h).",
+     "Call get_display_count() first to refresh the list.", NULL},
+    {"sdl.LOGICAL_DISABLED", "sdl.LOGICAL_DISABLED() -> i32", "No logical presentation.", NULL, NULL},
+    {"sdl.LOGICAL_STRETCH", "sdl.LOGICAL_STRETCH() -> i32", "Stretch to fill.", NULL, NULL},
+    {"sdl.LOGICAL_LETTERBOX", "sdl.LOGICAL_LETTERBOX() -> i32", "Letterbox to fit.", NULL, NULL},
+    {"sdl.LOGICAL_OVERSCAN", "sdl.LOGICAL_OVERSCAN() -> i32", "Overscan to fill.", NULL, NULL},
+    {"sdl.LOGICAL_INTEGER_SCALE", "sdl.LOGICAL_INTEGER_SCALE() -> i32", "Integer scaling.", NULL, NULL},
 };
 
 #define SDL_DOC_COUNT (sizeof(sdl_docs) / sizeof(sdl_docs[0]))
