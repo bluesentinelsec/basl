@@ -1410,6 +1410,27 @@ static const vigil_doc_entry_t sdl_docs[] = {
     {"sdl.WINDOW_MINIMIZED", "sdl.WINDOW_MINIMIZED() -> i32", "Minimized window flag.", NULL, NULL},
     {"sdl.WINDOW_MAXIMIZED", "sdl.WINDOW_MAXIMIZED() -> i32", "Maximized window flag.", NULL, NULL},
     {"sdl.WINDOW_ALWAYS_ON_TOP", "sdl.WINDOW_ALWAYS_ON_TOP() -> i32", "Always-on-top window flag.", NULL, NULL},
+    /* Renderer class */
+    {"sdl.Renderer", NULL, "SDL 2D renderer handle.", "Create with sdl.Renderer.create(). Wraps an SDL_Renderer.",
+     NULL},
+    {"sdl.Renderer.create", "sdl.Renderer.create(win: sdl.Window, driver: string) -> (sdl.Renderer, err)",
+     "Create a 2D renderer for a window.", "Pass empty string for driver to use the default.",
+     "sdl.Renderer ren, err e = sdl.Renderer.create(win, \"\")"},
+    {"sdl.Renderer.destroy", "ren.destroy() -> void", "Destroy a renderer.", NULL, NULL},
+    {"sdl.Renderer.clear", "ren.clear() -> (bool, err)", "Clear the rendering target.", NULL, NULL},
+    {"sdl.Renderer.present", "ren.present() -> (bool, err)", "Present the rendered frame.", NULL, NULL},
+    {"sdl.Renderer.set_draw_color", "ren.set_draw_color(r: i32, g: i32, b: i32, a: i32) -> (bool, err)",
+     "Set the draw color (0-255 per channel).", NULL, "ren.set_draw_color(255, 0, 0, 255)"},
+    {"sdl.Renderer.get_draw_color", "ren.get_draw_color() -> (i32, i32, i32, i32)",
+     "Get the current draw color (r, g, b, a).", NULL, NULL},
+    {"sdl.Renderer.draw_point", "ren.draw_point(x: f64, y: f64) -> (bool, err)", "Draw a point.", NULL, NULL},
+    {"sdl.Renderer.draw_line", "ren.draw_line(x1: f64, y1: f64, x2: f64, y2: f64) -> (bool, err)", "Draw a line.", NULL,
+     NULL},
+    {"sdl.Renderer.draw_rect", "ren.draw_rect(x: f64, y: f64, w: f64, h: f64) -> (bool, err)",
+     "Draw a rectangle outline.", NULL, NULL},
+    {"sdl.Renderer.fill_rect", "ren.fill_rect(x: f64, y: f64, w: f64, h: f64) -> (bool, err)",
+     "Draw a filled rectangle.", NULL, NULL},
+    {"sdl.Renderer.set_vsync", "ren.set_vsync(vsync: i32) -> (bool, err)", "Set VSync mode.", NULL, NULL},
 };
 
 #define SDL_DOC_COUNT (sizeof(sdl_docs) / sizeof(sdl_docs[0]))
