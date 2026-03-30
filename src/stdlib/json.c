@@ -342,6 +342,8 @@ static int json_number_to_i64(double number, int64_t min_value, int64_t max_valu
 
 static vigil_status_t json_encode_value(vigil_vm_t *vm, const vigil_object_t *function, const vigil_value_t *value,
                                         vigil_json_value_t **out_json, vigil_error_t *error);
+static vigil_status_t json_decode_primitive_type(vigil_vm_t *vm, const vigil_json_value_t *json, vigil_type_kind_t kind,
+                                                 vigil_value_t *out_value, vigil_error_t *error);
 static vigil_status_t json_decode_to_type(vigil_vm_t *vm, const vigil_object_t *function,
                                           const vigil_json_value_t *json, vigil_runtime_resolved_type_t type,
                                           vigil_value_t *out_value, vigil_error_t *error);
@@ -782,9 +784,6 @@ static vigil_status_t json_decode_to_type(vigil_vm_t *vm, const vigil_object_t *
                                           const vigil_json_value_t *json, vigil_runtime_resolved_type_t type,
                                           vigil_value_t *out_value, vigil_error_t *error)
 {
-    double number;
-    int64_t integer;
-
     vigil_value_init_nil(out_value);
     if (type.object_kind == VIGIL_RUNTIME_OBJECT_CLASS)
         return json_decode_class(vm, function, json, type.object_index, out_value, error);
@@ -798,7 +797,66 @@ static vigil_status_t json_decode_to_type(vigil_vm_t *vm, const vigil_object_t *
         return VIGIL_STATUS_INVALID_ARGUMENT;
     }
 
-    switch (type.kind)
+    return json_decode_primitive_type(vm, json, type.kind, out_value, error);
+}
+
+static vigil_status_t json_decode_unsigned_type(const vigil_json_value_t *json, vigil_type_kind_t kind,
+                                                vigil_value_t *out_value)
+{
+    double number;
+    int64_t integer;
+
+    if (vigil_json_type(json) != VIGIL_JSON_NUMBER)
+        return VIGIL_STATUS_INVALID_ARGUMENT;
+
+    switch (kind)
+    {
+    case VIGIL_TYPE_U8:
+        if (!json_number_to_i64(vigil_json_number_value(json), 0, UINT8_MAX, &integer))
+            return VIGIL_STATUS_INVALID_ARGUMENT;
+        vigil_value_init_uint(out_value, (uint64_t)integer);
+        return VIGIL_STATUS_OK;
+    case VIGIL_TYPE_U32:
+        if (!json_number_to_i64(vigil_json_number_value(json), 0, INT64_C(4294967295), &integer))
+            return VIGIL_STATUS_INVALID_ARGUMENT;
+        vigil_value_init_uint(out_value, (uint64_t)integer);
+        return VIGIL_STATUS_OK;
+    case VIGIL_TYPE_U64:
+        number = vigil_json_number_value(json);
+        if (!isfinite(number) || floor(number) != number || number < 0.0 || number > 18446744073709551615.0)
+            return VIGIL_STATUS_INVALID_ARGUMENT;
+        vigil_value_init_uint(out_value, (uint64_t)number);
+        return VIGIL_STATUS_OK;
+    default:
+        return VIGIL_STATUS_INVALID_ARGUMENT;
+    }
+}
+
+static vigil_status_t json_decode_string_type(vigil_vm_t *vm, const vigil_json_value_t *json, vigil_value_t *out_value,
+                                              vigil_error_t *error)
+{
+    vigil_object_t *string = NULL;
+    vigil_status_t status;
+
+    if (vigil_json_type(json) != VIGIL_JSON_STRING)
+        return VIGIL_STATUS_INVALID_ARGUMENT;
+
+    status = vigil_string_object_new(vigil_vm_runtime(vm), vigil_json_string_value(json),
+                                     vigil_json_string_length(json), &string, error);
+    if (status != VIGIL_STATUS_OK)
+        return status;
+
+    vigil_value_init_object(out_value, &string);
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t json_decode_primitive_type(vigil_vm_t *vm, const vigil_json_value_t *json, vigil_type_kind_t kind,
+                                                 vigil_value_t *out_value, vigil_error_t *error)
+{
+    int64_t integer;
+    vigil_status_t status;
+
+    switch (kind)
     {
     case VIGIL_TYPE_BOOL:
         if (vigil_json_type(json) != VIGIL_JSON_BOOL)
@@ -823,37 +881,14 @@ static vigil_status_t json_decode_to_type(vigil_vm_t *vm, const vigil_object_t *
         vigil_value_init_int(out_value, integer);
         return VIGIL_STATUS_OK;
     case VIGIL_TYPE_U8:
-        if (vigil_json_type(json) != VIGIL_JSON_NUMBER ||
-            !json_number_to_i64(vigil_json_number_value(json), 0, UINT8_MAX, &integer))
-            break;
-        vigil_value_init_uint(out_value, (uint64_t)integer);
-        return VIGIL_STATUS_OK;
     case VIGIL_TYPE_U32:
-        if (vigil_json_type(json) != VIGIL_JSON_NUMBER ||
-            !json_number_to_i64(vigil_json_number_value(json), 0, INT64_C(4294967295), &integer))
-            break;
-        vigil_value_init_uint(out_value, (uint64_t)integer);
-        return VIGIL_STATUS_OK;
     case VIGIL_TYPE_U64:
-        if (vigil_json_type(json) != VIGIL_JSON_NUMBER)
-            break;
-        number = vigil_json_number_value(json);
-        if (!isfinite(number) || floor(number) != number || number < 0.0 || number > 18446744073709551615.0)
-            break;
-        vigil_value_init_uint(out_value, (uint64_t)number);
-        return VIGIL_STATUS_OK;
+        status = json_decode_unsigned_type(json, kind, out_value);
+        if (status == VIGIL_STATUS_OK)
+            return status;
+        break;
     case VIGIL_TYPE_STRING:
-        if (vigil_json_type(json) != VIGIL_JSON_STRING)
-            break;
-        {
-            vigil_object_t *string = NULL;
-            vigil_status_t status = vigil_string_object_new(vigil_vm_runtime(vm), vigil_json_string_value(json),
-                                                            vigil_json_string_length(json), &string, error);
-            if (status != VIGIL_STATUS_OK)
-                return status;
-            vigil_value_init_object(out_value, &string);
-            return VIGIL_STATUS_OK;
-        }
+        return json_decode_string_type(vm, json, out_value, error);
     default:
         break;
     }

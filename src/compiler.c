@@ -13025,6 +13025,7 @@ static vigil_status_t vigil_compile_attach_entrypoint(vigil_program_state_t *pro
     vigil_runtime_map_type_init_t *map_type_inits = NULL;
     size_t i;
     void *memory = NULL;
+    vigil_runtime_function_attach_init_t attach_init;
 
     status = vigil_runtime_alloc(program->registry->runtime, program->functions.count * sizeof(*function_table),
                                  &memory, program->error);
@@ -13097,10 +13098,18 @@ static vigil_status_t vigil_compile_attach_entrypoint(vigil_program_state_t *pro
         }
     }
 
-    status = vigil_function_object_attach_siblings(
-        program->functions.functions[program->functions.main_index].object, function_table, program->functions.count,
-        program->functions.main_index, initial_globals, program->global_count, class_inits, program->class_count,
-        array_type_inits, program->array_type_count, map_type_inits, program->map_type_count, program->error);
+    attach_init.initial_globals = initial_globals;
+    attach_init.global_count = program->global_count;
+    attach_init.classes = class_inits;
+    attach_init.class_count = program->class_count;
+    attach_init.array_types = array_type_inits;
+    attach_init.array_type_count = program->array_type_count;
+    attach_init.map_types = map_type_inits;
+    attach_init.map_type_count = program->map_type_count;
+
+    status = vigil_function_object_attach_siblings(program->functions.functions[program->functions.main_index].object,
+                                                   function_table, program->functions.count,
+                                                   program->functions.main_index, &attach_init, program->error);
 
 cleanup:
     if (initial_globals != NULL)

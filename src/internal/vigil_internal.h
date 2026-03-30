@@ -113,14 +113,25 @@ typedef struct vigil_runtime_map_type_init
     vigil_runtime_resolved_type_t value_type;
 } vigil_runtime_map_type_init_t;
 
+typedef struct vigil_runtime_function_attach_init
+{
+    const vigil_value_t *initial_globals;
+    size_t global_count;
+    const vigil_runtime_class_init_t *classes;
+    size_t class_count;
+    const vigil_runtime_array_type_init_t *array_types;
+    size_t array_type_count;
+    const vigil_runtime_map_type_init_t *map_types;
+    size_t map_type_count;
+} vigil_runtime_function_attach_init_t;
+
 vigil_allocator_t vigil_default_allocator(void);
 int vigil_allocator_is_valid(const vigil_allocator_t *allocator);
 void vigil_error_set_literal(vigil_error_t *error, vigil_status_t type, const char *value);
-vigil_status_t vigil_function_object_attach_siblings(
-    vigil_object_t *owner_function, vigil_object_t **functions, size_t function_count, size_t owner_index,
-    const vigil_value_t *initial_globals, size_t global_count, const vigil_runtime_class_init_t *classes,
-    size_t class_count, const vigil_runtime_array_type_init_t *array_types, size_t array_type_count,
-    const vigil_runtime_map_type_init_t *map_types, size_t map_type_count, vigil_error_t *error);
+vigil_status_t vigil_function_object_attach_siblings(vigil_object_t *owner_function, vigil_object_t **functions,
+                                                     size_t function_count, size_t owner_index,
+                                                     const vigil_runtime_function_attach_init_t *init,
+                                                     vigil_error_t *error);
 const vigil_object_t *vigil_function_object_sibling(const vigil_object_t *function, size_t index);
 const vigil_object_t *vigil_function_object_resolve_interface_method(const vigil_object_t *function, size_t class_index,
                                                                      size_t interface_index, size_t method_index);
