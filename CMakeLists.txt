@@ -26,9 +26,9 @@ option(VIGIL_STDLIB_THREAD "Build thread stdlib module" ${VIGIL_DESKTOP_OPTIONAL
 option(VIGIL_STDLIB_TIME "Build time stdlib module" ${VIGIL_DESKTOP_OPTIONAL_STDLIB_DEFAULT})
 
 if(MSVC)
-    add_compile_options(/W4 /WX)
+    set(VIGIL_WARNING_FLAGS /W4 /WX)
 else()
-    add_compile_options(-Wall -Wextra -Wpedantic -Werror)
+    set(VIGIL_WARNING_FLAGS -Wall -Wextra -Wpedantic -Werror)
 endif()
 
 if(VIGIL_ENABLE_COVERAGE)
@@ -119,6 +119,7 @@ target_include_directories(vigil_core
 )
 
 target_compile_features(vigil_core PUBLIC c_std_11)
+target_compile_options(vigil_core PRIVATE ${VIGIL_WARNING_FLAGS})
 
 # Objects may end up in a shared library, so they need PIC on Linux.
 set_target_properties(vigil_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
@@ -282,6 +283,7 @@ target_include_directories(vigil
 )
 
 target_compile_features(vigil PUBLIC c_std_11)
+target_compile_options(vigil PRIVATE ${VIGIL_WARNING_FLAGS})
 
 # Link plugin libraries (if any plugins declared LIBRARIES).
 if(VIGIL_PLUGIN_LIBRARIES)
@@ -376,6 +378,7 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS" AND NOT CMAKE_SYSTEM_NAME STREQUAL "Andr
         ${CMAKE_BINARY_DIR}/generated
     )
     target_compile_features(vigil_cli PRIVATE c_std_11)
+    target_compile_options(vigil_cli PRIVATE ${VIGIL_WARNING_FLAGS})
 endif()
 
 if(VIGIL_BUILD_TESTS)
@@ -436,6 +439,8 @@ if(VIGIL_BUILD_TESTS)
         tests/plugin_test.c
         src/cli_frontend.c
     )
+
+    target_compile_options(vigil_tests PRIVATE ${VIGIL_WARNING_FLAGS})
 
     if(VIGIL_STDLIB_HTTP)
         target_sources(vigil_tests PRIVATE tests/http_test.c)
@@ -500,6 +505,7 @@ if(VIGIL_BUILD_TESTS)
     # Small shared library for FFI dlopen tests.
     if(NOT EMSCRIPTEN)
         add_library(ffi_testlib SHARED tests/ffi_testlib.c)
+        target_compile_options(ffi_testlib PRIVATE ${VIGIL_WARNING_FLAGS})
         set_target_properties(ffi_testlib PROPERTIES
             PREFIX ""   # no "lib" prefix — predictable name
         )

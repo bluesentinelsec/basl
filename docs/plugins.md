@@ -110,15 +110,34 @@ vigil_add_plugin(
 Example with an external dependency:
 
 ```cmake
+# The SDL plugin uses FetchContent to download and statically link SDL3.
+# It defines VIGIL_PLUGIN_SDL as an opt-out option.
+option(VIGIL_PLUGIN_SDL "Build the SDL3 plugin" ON)
+
+if(NOT VIGIL_PLUGIN_SDL)
+    message(STATUS "Plugin 'sdl': disabled (VIGIL_PLUGIN_SDL=OFF)")
+    return()
+endif()
+
+include(FetchContent)
+set(SDL_SHARED OFF CACHE BOOL "" FORCE)
+set(SDL_STATIC ON CACHE BOOL "" FORCE)
+
+FetchContent_Declare(SDL3
+    GIT_REPOSITORY https://github.com/libsdl-org/SDL.git
+    GIT_TAG        release-3.4.2
+    GIT_SHALLOW    TRUE
+)
+FetchContent_MakeAvailable(SDL3)
+
 vigil_add_plugin(
     NAME sdl
     SOURCES sdl.c
-    LIBRARIES SDL2::SDL2
-    FIND_PACKAGES SDL2
+    LIBRARIES SDL3::SDL3-static
 )
 ```
 
-If SDL2 is not installed, the build prints `Plugin 'sdl': skipped (SDL2 not found)` and continues.
+If the plugin is disabled, the build prints `Plugin 'sdl': disabled (VIGIL_PLUGIN_SDL=OFF)` and continues.
 
 ## Module Export Convention
 
@@ -194,6 +213,20 @@ cmake -S . -B build -DVIGIL_PLUGINS=OFF
 ```
 
 When disabled, no plugins are compiled and `import "plugin_name"` produces a compile error.
+
+Individual plugins can also be disabled if they define an option. For example, the SDL plugin:
+
+```bash
+cmake -S . -B build -DVIGIL_PLUGIN_SDL=OFF
+```
+
+Some plugins are off by default and require opt-in:
+
+```bash
+cmake -S . -B build -DVIGIL_PLUGIN_SDL=ON
+```
+
+Check each plugin's `plugin.cmake` for its option name. The convention is `VIGIL_PLUGIN_<NAME>` in uppercase.
 
 ## File Layout Reference
 

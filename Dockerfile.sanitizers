@@ -3,6 +3,11 @@ FROM --platform=linux/amd64 ubuntu:24.04
 RUN apt-get update && apt-get install -y --no-install-recommends \
     clang libclang-rt-18-dev llvm cmake make python3 \
     libcurl4-openssl-dev libffi-dev git ca-certificates \
+    libasound2-dev libpulse-dev libx11-dev libxext-dev \
+    libxrandr-dev libxcursor-dev libxfixes-dev libxi-dev libxss-dev \
+    libxtst-dev libxkbcommon-dev libdrm-dev libgbm-dev \
+    libgl-dev libgles-dev libegl-dev libdbus-1-dev libudev-dev \
+    libwayland-dev libdecor-0-dev wayland-protocols \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /vigil
