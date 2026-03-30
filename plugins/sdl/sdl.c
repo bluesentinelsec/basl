@@ -668,6 +668,7 @@ static const int p_i64[] = {VIGIL_TYPE_I64};
 static const int p_str[] = {VIGIL_TYPE_STRING};
 static const int p_str_str[] = {VIGIL_TYPE_STRING, VIGIL_TYPE_STRING};
 static const int p_i32_str_str[] = {VIGIL_TYPE_I32, VIGIL_TYPE_STRING, VIGIL_TYPE_STRING};
+static const int p_str_str_str[] = {VIGIL_TYPE_STRING, VIGIL_TYPE_STRING, VIGIL_TYPE_STRING};
 static const int p_f64_f64_str[] = {VIGIL_TYPE_F64, VIGIL_TYPE_F64, VIGIL_TYPE_STRING};
 static const int p_f64[] = {VIGIL_TYPE_F64};
 static const int p_obj[] = {VIGIL_TYPE_OBJECT};
@@ -2953,6 +2954,176 @@ static vigil_status_t sdl_fn_set_event_enabled(vigil_vm_t *vm, size_t arg_count,
     return VIGIL_STATUS_OK;
 }
 
+/* ── Slice 17: Renderer Getters ────────────────────────────────────── */
+
+static vigil_status_t sdl_renderer_get_vsync(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t rh = sdl_field_i64(vm, base, REN_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    int vsync = 0;
+    SDL_Renderer *ren = (SDL_Renderer *)SDL_HANDLE_GET(renderers, rh);
+    if (ren)
+        SDL_GetRenderVSync(ren, &vsync);
+    return sdl_push_i32(vm, (int32_t)vsync, error);
+}
+
+static vigil_status_t sdl_renderer_clip_enabled(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t rh = sdl_field_i64(vm, base, REN_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Renderer *ren = (SDL_Renderer *)SDL_HANDLE_GET(renderers, rh);
+    return sdl_push_bool(vm, ren && SDL_RenderClipEnabled(ren), error);
+}
+
+static vigil_status_t sdl_renderer_get_viewport(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t rh = sdl_field_i64(vm, base, REN_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Rect rect = {0, 0, 0, 0};
+    SDL_Renderer *ren = (SDL_Renderer *)SDL_HANDLE_GET(renderers, rh);
+    if (ren)
+        SDL_GetRenderViewport(ren, &rect);
+    vigil_status_t st = sdl_push_i32(vm, rect.w, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_i32(vm, rect.h, error);
+}
+
+/* ── Slice 18: Texture Extras ─────────────────────────────────────── */
+
+static vigil_status_t sdl_texture_get_color_mod(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, TEX_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    Uint8 r = 255, g = 255, b = 255;
+    SDL_Texture *tex = (SDL_Texture *)SDL_HANDLE_GET(textures, h);
+    if (tex)
+        SDL_GetTextureColorMod(tex, &r, &g, &b);
+    return sdl_push_i32(vm, ((int32_t)r << 16) | ((int32_t)g << 8) | (int32_t)b, error);
+}
+
+static vigil_status_t sdl_texture_get_alpha_mod(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, TEX_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    Uint8 alpha = 255;
+    SDL_Texture *tex = (SDL_Texture *)SDL_HANDLE_GET(textures, h);
+    if (tex)
+        SDL_GetTextureAlphaMod(tex, &alpha);
+    return sdl_push_i32(vm, (int32_t)alpha, error);
+}
+
+static vigil_status_t sdl_texture_get_blend_mode(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, TEX_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_BlendMode mode = SDL_BLENDMODE_NONE;
+    SDL_Texture *tex = (SDL_Texture *)SDL_HANDLE_GET(textures, h);
+    if (tex)
+        SDL_GetTextureBlendMode(tex, &mode);
+    return sdl_push_i32(vm, (int32_t)mode, error);
+}
+
+static vigil_status_t sdl_texture_set_scale_mode(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, TEX_HANDLE);
+    int32_t mode = sdl_arg_i32(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Texture *tex = (SDL_Texture *)SDL_HANDLE_GET(textures, h);
+    if (tex && SDL_SetTextureScaleMode(tex, (SDL_ScaleMode)mode))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+static vigil_status_t sdl_texture_get_scale_mode(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, TEX_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_ScaleMode mode = SDL_SCALEMODE_NEAREST;
+    SDL_Texture *tex = (SDL_Texture *)SDL_HANDLE_GET(textures, h);
+    if (tex)
+        SDL_GetTextureScaleMode(tex, &mode);
+    return sdl_push_i32(vm, (int32_t)mode, error);
+}
+
+SDL_CONST_FN(SCALEMODE_NEAREST, SDL_SCALEMODE_NEAREST)
+SDL_CONST_FN(SCALEMODE_LINEAR, SDL_SCALEMODE_LINEAR)
+
+/* ── Slice 19: System Info ────────────────────────────────────────── */
+
+static vigil_status_t sdl_fn_get_current_time(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Time ticks = 0;
+    SDL_GetCurrentTime(&ticks);
+    return sdl_push_i64(vm, (int64_t)ticks, error);
+}
+
+static vigil_status_t sdl_fn_get_user_folder(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t folder = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_string(vm, SDL_GetUserFolder((SDL_Folder)folder), error);
+}
+
+static vigil_status_t sdl_fn_get_system_theme(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_i32(vm, (int32_t)SDL_GetSystemTheme(), error);
+}
+
+static vigil_status_t sdl_fn_is_tablet(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_bool(vm, SDL_IsTablet(), error);
+}
+
+static vigil_status_t sdl_fn_is_tv(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_bool(vm, SDL_IsTV(), error);
+}
+
+static vigil_status_t sdl_fn_set_app_metadata(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    char name[256], ver[64], ident[256];
+    sdl_arg_str(vm, base, 0, name, sizeof(name));
+    sdl_arg_str(vm, base, 1, ver, sizeof(ver));
+    sdl_arg_str(vm, base, 2, ident, sizeof(ident));
+    vigil_vm_stack_pop_n(vm, arg_count);
+    if (SDL_SetAppMetadata(name, ver, ident))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+static vigil_status_t sdl_fn_get_current_video_driver(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_string(vm, SDL_GetCurrentVideoDriver(), error);
+}
+
+SDL_CONST_FN(SYSTEM_THEME_UNKNOWN, SDL_SYSTEM_THEME_UNKNOWN)
+SDL_CONST_FN(SYSTEM_THEME_LIGHT, SDL_SYSTEM_THEME_LIGHT)
+SDL_CONST_FN(SYSTEM_THEME_DARK, SDL_SYSTEM_THEME_DARK)
+SDL_CONST_FN(FOLDER_HOME, SDL_FOLDER_HOME)
+SDL_CONST_FN(FOLDER_DESKTOP, SDL_FOLDER_DESKTOP)
+SDL_CONST_FN(FOLDER_DOCUMENTS, SDL_FOLDER_DOCUMENTS)
+SDL_CONST_FN(FOLDER_DOWNLOADS, SDL_FOLDER_DOWNLOADS)
+SDL_CONST_FN(FOLDER_MUSIC, SDL_FOLDER_MUSIC)
+SDL_CONST_FN(FOLDER_PICTURES, SDL_FOLDER_PICTURES)
+SDL_CONST_FN(FOLDER_SAVEDGAMES, SDL_FOLDER_SAVEDGAMES)
+SDL_CONST_FN(FOLDER_SCREENSHOTS, SDL_FOLDER_SCREENSHOTS)
+SDL_CONST_FN(FOLDER_VIDEOS, SDL_FOLDER_VIDEOS)
 /* Texture access constants */
 SDL_CONST_FN(TEXTUREACCESS_STATIC, SDL_TEXTUREACCESS_STATIC)
 SDL_CONST_FN(TEXTUREACCESS_STREAMING, SDL_TEXTUREACCESS_STREAMING)
@@ -3249,6 +3420,31 @@ static const vigil_native_module_function_t sdl_functions[] = {
     SDL_FN_VOID("flush_events", 12U, sdl_fn_flush_events, 2U, p_i32_i32),
     SDL_FN("event_enabled", 13U, sdl_fn_event_enabled, 1U, p_i32, VIGIL_TYPE_BOOL),
     SDL_FN_VOID("set_event_enabled", 17U, sdl_fn_set_event_enabled, 2U, p_i32_i32),
+    /* Scale mode constants (slice 18) */
+    SDL_CONST_ENTRY("SCALEMODE_NEAREST", SCALEMODE_NEAREST),
+    SDL_CONST_ENTRY("SCALEMODE_LINEAR", SCALEMODE_LINEAR),
+    /* System info (slice 19) */
+    SDL_FN("get_current_time", 16U, sdl_fn_get_current_time, 0U, NULL, VIGIL_TYPE_I64),
+    SDL_FN("get_user_folder", 15U, sdl_fn_get_user_folder, 1U, p_i32, VIGIL_TYPE_STRING),
+    SDL_FN("get_system_theme", 16U, sdl_fn_get_system_theme, 0U, NULL, VIGIL_TYPE_I32),
+    SDL_FN("is_tablet", 9U, sdl_fn_is_tablet, 0U, NULL, VIGIL_TYPE_BOOL),
+    SDL_FN("is_tv", 5U, sdl_fn_is_tv, 0U, NULL, VIGIL_TYPE_BOOL),
+    SDL_FN_BOOL_ERR("set_app_metadata", 16U, sdl_fn_set_app_metadata, 3U, p_str_str_str),
+    SDL_FN("get_current_video_driver", 24U, sdl_fn_get_current_video_driver, 0U, NULL, VIGIL_TYPE_STRING),
+    /* System theme constants */
+    SDL_CONST_ENTRY("SYSTEM_THEME_UNKNOWN", SYSTEM_THEME_UNKNOWN),
+    SDL_CONST_ENTRY("SYSTEM_THEME_LIGHT", SYSTEM_THEME_LIGHT),
+    SDL_CONST_ENTRY("SYSTEM_THEME_DARK", SYSTEM_THEME_DARK),
+    /* User folder constants */
+    SDL_CONST_ENTRY("FOLDER_HOME", FOLDER_HOME),
+    SDL_CONST_ENTRY("FOLDER_DESKTOP", FOLDER_DESKTOP),
+    SDL_CONST_ENTRY("FOLDER_DOCUMENTS", FOLDER_DOCUMENTS),
+    SDL_CONST_ENTRY("FOLDER_DOWNLOADS", FOLDER_DOWNLOADS),
+    SDL_CONST_ENTRY("FOLDER_MUSIC", FOLDER_MUSIC),
+    SDL_CONST_ENTRY("FOLDER_PICTURES", FOLDER_PICTURES),
+    SDL_CONST_ENTRY("FOLDER_SAVEDGAMES", FOLDER_SAVEDGAMES),
+    SDL_CONST_ENTRY("FOLDER_SCREENSHOTS", FOLDER_SCREENSHOTS),
+    SDL_CONST_ENTRY("FOLDER_VIDEOS", FOLDER_VIDEOS),
     /* Display info (slice 11) */
     SDL_FN("get_display_count", 17U, sdl_fn_get_display_count, 0U, NULL, VIGIL_TYPE_I32),
     SDL_FN("get_display_name", 16U, sdl_fn_get_display_name, 1U, p_i32, VIGIL_TYPE_STRING),
@@ -3343,6 +3539,10 @@ static const vigil_native_class_method_t sdl_renderer_methods[] = {
     SDL_METHOD("get_output_size", 15U, sdl_renderer_get_output_size, 0U, NULL, VIGIL_TYPE_I32, 2U, rt_i32_i32),
     SDL_METHOD("get_current_output_size", 23U, sdl_renderer_get_current_output_size, 0U, NULL, VIGIL_TYPE_I32, 2U, rt_i32_i32),
     SDL_METHOD("get_name", 8U, sdl_renderer_get_name, 0U, NULL, VIGIL_TYPE_STRING, 1U, NULL),
+    /* Slice 17: renderer getters */
+    SDL_METHOD("get_vsync", 9U, sdl_renderer_get_vsync, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL),
+    SDL_METHOD("clip_enabled", 12U, sdl_renderer_clip_enabled, 0U, NULL, VIGIL_TYPE_BOOL, 1U, NULL),
+    SDL_METHOD("get_viewport", 12U, sdl_renderer_get_viewport, 0U, NULL, VIGIL_TYPE_I32, 2U, rt_i32_i32),
 };
 
 /* ── Event class descriptor ──────────────────────────────────────── */
@@ -3398,6 +3598,12 @@ static const vigil_native_class_method_t sdl_texture_methods[] = {
     SDL_METHOD("set_color_mod", 13U, sdl_texture_set_color_mod, 3U, p_i32_i32_i32, VIGIL_TYPE_VOID, 0U, NULL),
     SDL_METHOD("set_alpha_mod", 13U, sdl_texture_set_alpha_mod, 1U, p_i32, VIGIL_TYPE_VOID, 0U, NULL),
     SDL_METHOD("set_blend_mode", 14U, sdl_texture_set_blend_mode, 1U, p_i32, VIGIL_TYPE_VOID, 0U, NULL),
+    /* Slice 18: texture extras */
+    SDL_METHOD("get_color_mod", 13U, sdl_texture_get_color_mod, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL),
+    SDL_METHOD("get_alpha_mod", 13U, sdl_texture_get_alpha_mod, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL),
+    SDL_METHOD("get_blend_mode", 14U, sdl_texture_get_blend_mode, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL),
+    SDL_METHOD("set_scale_mode", 14U, sdl_texture_set_scale_mode, 1U, p_i32, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
+    SDL_METHOD("get_scale_mode", 14U, sdl_texture_get_scale_mode, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL),
 };
 
 /* ── AudioStream class descriptor ────────────────────────────────── */
