@@ -133,6 +133,7 @@ set(VIGIL_STDLIB_ALWAYS_SOURCES
     src/stdlib/crypto.c
     src/stdlib/csv.c
     src/stdlib/fmt.c
+    src/stdlib/json.c
     src/stdlib/log.c
     src/stdlib/math.c
     src/stdlib/parse.c

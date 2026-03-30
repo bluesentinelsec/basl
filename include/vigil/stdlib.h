@@ -43,6 +43,7 @@ extern "C"
 #ifdef VIGIL_HAS_STDLIB_HTTP
     extern VIGIL_API const vigil_native_module_t vigil_stdlib_http;
 #endif
+    extern VIGIL_API const vigil_native_module_t vigil_stdlib_json;
     extern VIGIL_API const vigil_native_module_t vigil_stdlib_log;
     extern VIGIL_API const vigil_native_module_t vigil_stdlib_math;
 #ifdef VIGIL_HAS_STDLIB_NET
@@ -88,6 +89,7 @@ extern "C"
             {"fmt",      3U, &vigil_stdlib_fmt},                                                                       \
             VIGIL_STDLIB_FS_ENTRY                                                                                      \
             VIGIL_STDLIB_HTTP_ENTRY                                                                                    \
+            {"json",     4U, &vigil_stdlib_json},                                                                      \
             {"log",      3U, &vigil_stdlib_log},                                                                       \
             {"math",     4U, &vigil_stdlib_math},                                                                      \
             VIGIL_STDLIB_NET_ENTRY                                                                                     \

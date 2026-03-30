@@ -10,6 +10,7 @@
 #endif
 
 #include <math.h>
+#include <stdio.h>
 #include <string.h>
 
 #include "vigil/stdlib.h"
@@ -106,6 +107,43 @@ static char *RunAndCaptureStderr(int *vigil_test_failed_, const char *source_tex
     fclose(tmp);
     EXPECT_EQ(rc, 0);
     return buf;
+}
+
+static void EscapeVigilStringLiteral(const char *input, char *output, size_t output_size)
+{
+    size_t in_index = 0U;
+    size_t out_index = 0U;
+
+    while (input[in_index] != '\0' && out_index + 2U < output_size)
+    {
+        char ch = input[in_index++];
+        if (ch == '\\' || ch == '"')
+            output[out_index++] = '\\';
+        output[out_index++] = ch;
+    }
+
+    output[out_index] = '\0';
+}
+
+static void BuildJsonRoundTripSource(const char *path, char *source, size_t source_size)
+{
+    char escaped[1024];
+
+    EscapeVigilStringLiteral(path, escaped, sizeof(escaped));
+    snprintf(
+        source, source_size,
+        "import \"json\";\n"
+        "fn main() -> i32 {\n"
+        "    json.Value root, err parse_err = json.Value.parse(\"{\\\"name\\\":\\\"vigil\\\",\\\"count\\\":3}\");\n"
+        "    if (parse_err != ok) { return 1; }\n"
+        "    err write_err = root.write(\"%s\");\n"
+        "    if (write_err != ok) { return 2; }\n"
+        "    json.Value copy, err read_err = json.Value.read(\"%s\");\n"
+        "    if (read_err != ok) { return 3; }\n"
+        "    if (copy.stringify() != root.stringify()) { return 4; }\n"
+        "    return 0;\n"
+        "}\n",
+        escaped, escaped);
 }
 
 /* ── fmt tests ───────────────────────────────────────────────────── */
@@ -2510,6 +2548,100 @@ TEST(VigilStdlibParseTest, AllSuccessPaths)
 void register_stdlib_parse_tests(void)
 {
     REGISTER_TEST(VigilStdlibParseTest, AllSuccessPaths);
+}
+
+/* ── JSON stdlib tests ───────────────────────────────────────────── */
+
+TEST(VigilStdlibJsonTest, ParseTraverseAndCoerce)
+{
+    int64_t result =
+        RunWithStdlib(vigil_test_failed_, "import \"json\";\n"
+                                          "fn main() -> i32 {\n"
+                                          "    json.Value root, err parse_err = "
+                                          "json.Value.parse(\"{\\\"name\\\":\\\"vigil\\\",\\\"flags\\\":[true,false],"
+                                          "\\\"count\\\":3}\");\n"
+                                          "    if (parse_err != ok) { return 1; }\n"
+                                          "    if (!root.is_object()) { return 2; }\n"
+                                          "    if (root.kind() != \"object\") { return 3; }\n"
+                                          "    if (!root.has(\"name\") || !root.has(\"flags\")) { return 4; }\n"
+                                          "    i32 root_len, err len_err = root.len();\n"
+                                          "    if (len_err != ok || root_len != 3) { return 5; }\n"
+                                          "    json.Value flags, err flags_err = root.get(\"flags\");\n"
+                                          "    if (flags_err != ok || !flags.is_array()) { return 6; }\n"
+                                          "    json.Value first, err first_err = flags.at(0);\n"
+                                          "    if (first_err != ok) { return 7; }\n"
+                                          "    bool first_flag, err bool_err = first.as_bool();\n"
+                                          "    if (bool_err != ok || !first_flag) { return 8; }\n"
+                                          "    json.Value count, err count_err = root.get(\"count\");\n"
+                                          "    if (count_err != ok) { return 9; }\n"
+                                          "    f64 count_num, err num_err = count.as_number();\n"
+                                          "    if (num_err != ok || count_num != 3.0) { return 10; }\n"
+                                          "    json.Value name, err name_err = root.get(\"name\");\n"
+                                          "    if (name_err != ok) { return 11; }\n"
+                                          "    string name_text, err string_err = name.as_string();\n"
+                                          "    if (string_err != ok || name_text != \"vigil\") { return 12; }\n"
+                                          "    return 0;\n"
+                                          "}\n");
+    EXPECT_EQ(result, 0);
+}
+
+TEST(VigilStdlibJsonTest, KeysAndStringify)
+{
+    int64_t result = RunWithStdlib(vigil_test_failed_,
+                                   "import \"json\";\n"
+                                   "fn main() -> i32 {\n"
+                                   "    json.Value root, err parse_err = json.Value.parse(\"{\\\"b\\\":2,"
+                                   "\\\"a\\\":\\\"x\\\"}\");\n"
+                                   "    if (parse_err != ok) { return 1; }\n"
+                                   "    array<string> keys = root.keys();\n"
+                                   "    if (keys.len() != 2) { return 2; }\n"
+                                   "    if (keys[0] != \"b\" || keys[1] != \"a\") { return 3; }\n"
+                                   "    if (root.stringify() != \"{\\\"b\\\":2,\\\"a\\\":\\\"x\\\"}\") { return 4; }\n"
+                                   "    return 0;\n"
+                                   "}\n");
+    EXPECT_EQ(result, 0);
+}
+
+TEST(VigilStdlibJsonTest, ParseAndFileRoundTrip)
+{
+    char path[512];
+    char source[4096];
+
+#ifdef _WIN32
+    {
+        const char *tmp = getenv("TEMP");
+        if (tmp == NULL || *tmp == '\0')
+            tmp = ".";
+        snprintf(path, sizeof(path), "%s\\vigil-json-%ld.json", tmp, (long)getpid());
+    }
+#else
+    snprintf(path, sizeof(path), "/tmp/vigil-json-%ld.json", (long)getpid());
+#endif
+
+    remove(path);
+    BuildJsonRoundTripSource(path, source, sizeof(source));
+    EXPECT_EQ(RunWithStdlib(vigil_test_failed_, source), 0);
+    remove(path);
+}
+
+TEST(VigilStdlibJsonTest, InvalidJsonReturnsError)
+{
+    int64_t result =
+        RunWithStdlib(vigil_test_failed_, "import \"json\";\n"
+                                          "fn main() -> i32 {\n"
+                                          "    json.Value value, err parse_err = json.Value.parse(\"{\");\n"
+                                          "    if (parse_err == ok) { return 1; }\n"
+                                          "    return 0;\n"
+                                          "}\n");
+    EXPECT_EQ(result, 0);
+}
+
+void register_stdlib_json_tests(void)
+{
+    REGISTER_TEST(VigilStdlibJsonTest, ParseTraverseAndCoerce);
+    REGISTER_TEST(VigilStdlibJsonTest, KeysAndStringify);
+    REGISTER_TEST(VigilStdlibJsonTest, ParseAndFileRoundTrip);
+    REGISTER_TEST(VigilStdlibJsonTest, InvalidJsonReturnsError);
 }
 
 /* ── CSV stdlib tests ────────────────────────────────────────────── */
