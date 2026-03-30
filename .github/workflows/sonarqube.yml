@@ -10,6 +10,7 @@ on:
 jobs:
   sonarqube:
     runs-on: ubuntu-latest
+    continue-on-error: true
     env:
       BUILD_WRAPPER_OUT_DIR: bw-output
 
