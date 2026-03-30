@@ -1404,6 +1404,211 @@ SDL_CONST_FN(AUDIO_S16, SDL_AUDIO_S16)
 SDL_CONST_FN(AUDIO_S32, SDL_AUDIO_S32)
 SDL_CONST_FN(AUDIO_F32, SDL_AUDIO_F32)
 
+/* ── Slice 9: Gamepad and Joystick ────────────────────────────────── */
+
+SDL_HANDLE_REGISTRY(gamepads);
+
+enum
+{
+    GP_HANDLE = 0,
+    GP_FIELD_COUNT
+};
+
+/* sdl.has_gamepad() -> bool */
+static vigil_status_t sdl_fn_has_gamepad(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_bool(vm, SDL_HasGamepad(), error);
+}
+
+/* sdl.get_gamepads() -> i32 — returns count of connected gamepads.
+ * (Array returns not yet supported for native fns; return count and let
+ *  caller open by index via get_gamepad_id.) */
+
+/* Internal: cache the gamepad ID list for indexed access. */
+static SDL_JoystickID *g_gamepad_ids = NULL;
+static int g_gamepad_count = 0;
+
+static void sdl_refresh_gamepad_list(void)
+{
+    if (g_gamepad_ids)
+    {
+        SDL_free(g_gamepad_ids);
+        g_gamepad_ids = NULL;
+    }
+    g_gamepad_ids = SDL_GetGamepads(&g_gamepad_count);
+}
+
+/* sdl.get_gamepad_count() -> i32 */
+static vigil_status_t sdl_fn_get_gamepad_count(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    vigil_vm_stack_pop_n(vm, arg_count);
+    sdl_refresh_gamepad_list();
+    return sdl_push_i32(vm, (int32_t)g_gamepad_count, error);
+}
+
+/* sdl.get_gamepad_id(i32 index) -> i32 — get instance ID at index */
+static vigil_status_t sdl_fn_get_gamepad_id(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t idx = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    if (idx >= 0 && idx < g_gamepad_count && g_gamepad_ids)
+        return sdl_push_i32(vm, (int32_t)g_gamepad_ids[idx], error);
+    return sdl_push_i32(vm, 0, error);
+}
+
+/* Gamepad.open(i32 instance_id) -> (Gamepad, err) */
+static vigil_status_t sdl_gamepad_open(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    size_t ci = sdl_static_class_index(vm, base);
+    int32_t id = sdl_arg_i32(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+
+    SDL_Gamepad *gp = SDL_OpenGamepad((SDL_JoystickID)id);
+    if (!gp)
+        return sdl_push_nil_and_sdl_err(vm, SDL_ERR_IO, error);
+
+    int64_t handle;
+    if (SDL_HANDLE_STORE(gamepads, gp, &handle) < 0)
+    {
+        SDL_CloseGamepad(gp);
+        return sdl_push_nil_and_err(vm, "too many gamepads", SDL_ERR_STATE, error);
+    }
+    vigil_status_t st = sdl_push_handle_instance(vm, ci, handle, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_ok(vm, error);
+}
+
+/* gp.close() */
+static vigil_status_t sdl_gamepad_close(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, GP_HANDLE);
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Gamepad *gp = (SDL_Gamepad *)SDL_HANDLE_GET(gamepads, h);
+    if (gp)
+    {
+        SDL_CloseGamepad(gp);
+        SDL_HANDLE_CLEAR(gamepads, h);
+    }
+    return VIGIL_STATUS_OK;
+}
+
+/* gp.get_name() -> string */
+static vigil_status_t sdl_gamepad_get_name(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, GP_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Gamepad *gp = (SDL_Gamepad *)SDL_HANDLE_GET(gamepads, h);
+    return sdl_push_string(vm, gp ? SDL_GetGamepadName(gp) : "", error);
+}
+
+/* gp.get_axis(i32 axis) -> i32 */
+static vigil_status_t sdl_gamepad_get_axis(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, GP_HANDLE);
+    int32_t axis = sdl_arg_i32(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Gamepad *gp = (SDL_Gamepad *)SDL_HANDLE_GET(gamepads, h);
+    return sdl_push_i32(vm, gp ? (int32_t)SDL_GetGamepadAxis(gp, (SDL_GamepadAxis)axis) : 0, error);
+}
+
+/* gp.get_button(i32 button) -> bool */
+static vigil_status_t sdl_gamepad_get_button(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, GP_HANDLE);
+    int32_t btn = sdl_arg_i32(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Gamepad *gp = (SDL_Gamepad *)SDL_HANDLE_GET(gamepads, h);
+    return sdl_push_bool(vm, gp && SDL_GetGamepadButton(gp, (SDL_GamepadButton)btn), error);
+}
+
+/* gp.rumble(i32 low, i32 high, i32 duration_ms) -> (bool, err) */
+static vigil_status_t sdl_gamepad_rumble(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, GP_HANDLE);
+    int32_t low = sdl_arg_i32(vm, base, 1);
+    int32_t high = sdl_arg_i32(vm, base, 2);
+    int32_t dur = sdl_arg_i32(vm, base, 3);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Gamepad *gp = (SDL_Gamepad *)SDL_HANDLE_GET(gamepads, h);
+    if (gp && SDL_RumbleGamepad(gp, (Uint16)low, (Uint16)high, (Uint32)dur))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+/* Gamepad event accessors on Event */
+static vigil_status_t sdl_event_gamepad_which(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    SDL_Event *ev = evt_get(vm, base);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_i32(vm, ev ? (int32_t)ev->gaxis.which : 0, error);
+}
+
+static vigil_status_t sdl_event_gamepad_axis(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    SDL_Event *ev = evt_get(vm, base);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_i32(vm, ev ? (int32_t)ev->gaxis.axis : 0, error);
+}
+
+static vigil_status_t sdl_event_gamepad_axis_value(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    SDL_Event *ev = evt_get(vm, base);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_i32(vm, ev ? (int32_t)ev->gaxis.value : 0, error);
+}
+
+static vigil_status_t sdl_event_gamepad_button(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    SDL_Event *ev = evt_get(vm, base);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_i32(vm, ev ? (int32_t)ev->gbutton.button : 0, error);
+}
+
+/* Gamepad axis/button constants */
+SDL_CONST_FN(GAMEPAD_AXIS_LEFTX, SDL_GAMEPAD_AXIS_LEFTX)
+SDL_CONST_FN(GAMEPAD_AXIS_LEFTY, SDL_GAMEPAD_AXIS_LEFTY)
+SDL_CONST_FN(GAMEPAD_AXIS_RIGHTX, SDL_GAMEPAD_AXIS_RIGHTX)
+SDL_CONST_FN(GAMEPAD_AXIS_RIGHTY, SDL_GAMEPAD_AXIS_RIGHTY)
+SDL_CONST_FN(GAMEPAD_AXIS_LEFT_TRIGGER, SDL_GAMEPAD_AXIS_LEFT_TRIGGER)
+SDL_CONST_FN(GAMEPAD_AXIS_RIGHT_TRIGGER, SDL_GAMEPAD_AXIS_RIGHT_TRIGGER)
+
+SDL_CONST_FN(GAMEPAD_BUTTON_SOUTH, SDL_GAMEPAD_BUTTON_SOUTH)
+SDL_CONST_FN(GAMEPAD_BUTTON_EAST, SDL_GAMEPAD_BUTTON_EAST)
+SDL_CONST_FN(GAMEPAD_BUTTON_WEST, SDL_GAMEPAD_BUTTON_WEST)
+SDL_CONST_FN(GAMEPAD_BUTTON_NORTH, SDL_GAMEPAD_BUTTON_NORTH)
+SDL_CONST_FN(GAMEPAD_BUTTON_BACK, SDL_GAMEPAD_BUTTON_BACK)
+SDL_CONST_FN(GAMEPAD_BUTTON_GUIDE, SDL_GAMEPAD_BUTTON_GUIDE)
+SDL_CONST_FN(GAMEPAD_BUTTON_START, SDL_GAMEPAD_BUTTON_START)
+SDL_CONST_FN(GAMEPAD_BUTTON_LEFT_STICK, SDL_GAMEPAD_BUTTON_LEFT_STICK)
+SDL_CONST_FN(GAMEPAD_BUTTON_RIGHT_STICK, SDL_GAMEPAD_BUTTON_RIGHT_STICK)
+SDL_CONST_FN(GAMEPAD_BUTTON_LEFT_SHOULDER, SDL_GAMEPAD_BUTTON_LEFT_SHOULDER)
+SDL_CONST_FN(GAMEPAD_BUTTON_RIGHT_SHOULDER, SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER)
+SDL_CONST_FN(GAMEPAD_BUTTON_DPAD_UP, SDL_GAMEPAD_BUTTON_DPAD_UP)
+SDL_CONST_FN(GAMEPAD_BUTTON_DPAD_DOWN, SDL_GAMEPAD_BUTTON_DPAD_DOWN)
+SDL_CONST_FN(GAMEPAD_BUTTON_DPAD_LEFT, SDL_GAMEPAD_BUTTON_DPAD_LEFT)
+SDL_CONST_FN(GAMEPAD_BUTTON_DPAD_RIGHT, SDL_GAMEPAD_BUTTON_DPAD_RIGHT)
+
+/* Gamepad event type constants */
+SDL_CONST_FN(EVENT_GAMEPAD_AXIS_MOTION, SDL_EVENT_GAMEPAD_AXIS_MOTION)
+SDL_CONST_FN(EVENT_GAMEPAD_BUTTON_DOWN, SDL_EVENT_GAMEPAD_BUTTON_DOWN)
+SDL_CONST_FN(EVENT_GAMEPAD_BUTTON_UP, SDL_EVENT_GAMEPAD_BUTTON_UP)
+SDL_CONST_FN(EVENT_GAMEPAD_ADDED, SDL_EVENT_GAMEPAD_ADDED)
+SDL_CONST_FN(EVENT_GAMEPAD_REMOVED, SDL_EVENT_GAMEPAD_REMOVED)
+
 /* Scancode constants */
 SDL_CONST_FN(SCANCODE_A, SDL_SCANCODE_A)
 SDL_CONST_FN(SCANCODE_B, SDL_SCANCODE_B)
@@ -1990,6 +2195,38 @@ static const vigil_native_module_function_t sdl_functions[] = {
     SDL_CONST_ENTRY("AUDIO_S16", AUDIO_S16),
     SDL_CONST_ENTRY("AUDIO_S32", AUDIO_S32),
     SDL_CONST_ENTRY("AUDIO_F32", AUDIO_F32),
+    /* Gamepad (slice 9) */
+    SDL_FN("has_gamepad", 11U, sdl_fn_has_gamepad, 0U, NULL, VIGIL_TYPE_BOOL),
+    SDL_FN("get_gamepad_count", 17U, sdl_fn_get_gamepad_count, 0U, NULL, VIGIL_TYPE_I32),
+    SDL_FN("get_gamepad_id", 14U, sdl_fn_get_gamepad_id, 1U, p_i32, VIGIL_TYPE_I32),
+    /* Gamepad axis/button constants */
+    SDL_CONST_ENTRY("GAMEPAD_AXIS_LEFTX", GAMEPAD_AXIS_LEFTX),
+    SDL_CONST_ENTRY("GAMEPAD_AXIS_LEFTY", GAMEPAD_AXIS_LEFTY),
+    SDL_CONST_ENTRY("GAMEPAD_AXIS_RIGHTX", GAMEPAD_AXIS_RIGHTX),
+    SDL_CONST_ENTRY("GAMEPAD_AXIS_RIGHTY", GAMEPAD_AXIS_RIGHTY),
+    SDL_CONST_ENTRY("GAMEPAD_AXIS_LEFT_TRIGGER", GAMEPAD_AXIS_LEFT_TRIGGER),
+    SDL_CONST_ENTRY("GAMEPAD_AXIS_RIGHT_TRIGGER", GAMEPAD_AXIS_RIGHT_TRIGGER),
+    SDL_CONST_ENTRY("GAMEPAD_BUTTON_SOUTH", GAMEPAD_BUTTON_SOUTH),
+    SDL_CONST_ENTRY("GAMEPAD_BUTTON_EAST", GAMEPAD_BUTTON_EAST),
+    SDL_CONST_ENTRY("GAMEPAD_BUTTON_WEST", GAMEPAD_BUTTON_WEST),
+    SDL_CONST_ENTRY("GAMEPAD_BUTTON_NORTH", GAMEPAD_BUTTON_NORTH),
+    SDL_CONST_ENTRY("GAMEPAD_BUTTON_BACK", GAMEPAD_BUTTON_BACK),
+    SDL_CONST_ENTRY("GAMEPAD_BUTTON_GUIDE", GAMEPAD_BUTTON_GUIDE),
+    SDL_CONST_ENTRY("GAMEPAD_BUTTON_START", GAMEPAD_BUTTON_START),
+    SDL_CONST_ENTRY("GAMEPAD_BUTTON_LEFT_STICK", GAMEPAD_BUTTON_LEFT_STICK),
+    SDL_CONST_ENTRY("GAMEPAD_BUTTON_RIGHT_STICK", GAMEPAD_BUTTON_RIGHT_STICK),
+    SDL_CONST_ENTRY("GAMEPAD_BUTTON_LEFT_SHOULDER", GAMEPAD_BUTTON_LEFT_SHOULDER),
+    SDL_CONST_ENTRY("GAMEPAD_BUTTON_RIGHT_SHOULDER", GAMEPAD_BUTTON_RIGHT_SHOULDER),
+    SDL_CONST_ENTRY("GAMEPAD_BUTTON_DPAD_UP", GAMEPAD_BUTTON_DPAD_UP),
+    SDL_CONST_ENTRY("GAMEPAD_BUTTON_DPAD_DOWN", GAMEPAD_BUTTON_DPAD_DOWN),
+    SDL_CONST_ENTRY("GAMEPAD_BUTTON_DPAD_LEFT", GAMEPAD_BUTTON_DPAD_LEFT),
+    SDL_CONST_ENTRY("GAMEPAD_BUTTON_DPAD_RIGHT", GAMEPAD_BUTTON_DPAD_RIGHT),
+    /* Gamepad event type constants */
+    SDL_CONST_ENTRY("EVENT_GAMEPAD_AXIS_MOTION", EVENT_GAMEPAD_AXIS_MOTION),
+    SDL_CONST_ENTRY("EVENT_GAMEPAD_BUTTON_DOWN", EVENT_GAMEPAD_BUTTON_DOWN),
+    SDL_CONST_ENTRY("EVENT_GAMEPAD_BUTTON_UP", EVENT_GAMEPAD_BUTTON_UP),
+    SDL_CONST_ENTRY("EVENT_GAMEPAD_ADDED", EVENT_GAMEPAD_ADDED),
+    SDL_CONST_ENTRY("EVENT_GAMEPAD_REMOVED", EVENT_GAMEPAD_REMOVED),
 };
 
 #define SDL_FUNCTION_COUNT (sizeof(sdl_functions) / sizeof(sdl_functions[0]))
@@ -2066,6 +2303,10 @@ static const vigil_native_class_method_t sdl_event_methods[] = {
     SDL_METHOD("mouse_button", 12U, sdl_event_mouse_button, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL),
     SDL_METHOD("wheel_x", 7U, sdl_event_wheel_x, 0U, NULL, VIGIL_TYPE_F64, 1U, NULL),
     SDL_METHOD("wheel_y", 7U, sdl_event_wheel_y, 0U, NULL, VIGIL_TYPE_F64, 1U, NULL),
+    SDL_METHOD("gamepad_which", 13U, sdl_event_gamepad_which, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL),
+    SDL_METHOD("gamepad_axis", 12U, sdl_event_gamepad_axis, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL),
+    SDL_METHOD("gamepad_axis_value", 18U, sdl_event_gamepad_axis_value, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL),
+    SDL_METHOD("gamepad_button", 14U, sdl_event_gamepad_button, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL),
 };
 
 /* ── Surface class descriptor ────────────────────────────────────── */
@@ -2111,6 +2352,21 @@ static const vigil_native_class_method_t sdl_audio_stream_methods[] = {
     SDL_METHOD("pause", 5U, sdl_audio_stream_pause, 0U, NULL, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
 };
 
+/* ── Gamepad class descriptor ────────────────────────────────────── */
+
+static const vigil_native_class_field_t sdl_gamepad_fields[] = {
+    SDL_PFIELD("handle", 6U, VIGIL_TYPE_I64),
+};
+
+static const vigil_native_class_method_t sdl_gamepad_methods[] = {
+    SDL_STATIC("open", 4U, sdl_gamepad_open, 1U, p_i32, VIGIL_TYPE_OBJECT, 2U, rt_obj_err),
+    SDL_METHOD("close", 5U, sdl_gamepad_close, 0U, NULL, VIGIL_TYPE_VOID, 0U, NULL),
+    SDL_METHOD("get_name", 8U, sdl_gamepad_get_name, 0U, NULL, VIGIL_TYPE_STRING, 1U, NULL),
+    SDL_METHOD("get_axis", 8U, sdl_gamepad_get_axis, 1U, p_i32, VIGIL_TYPE_I32, 1U, NULL),
+    SDL_METHOD("get_button", 10U, sdl_gamepad_get_button, 1U, p_i32, VIGIL_TYPE_BOOL, 1U, NULL),
+    SDL_METHOD("rumble", 6U, sdl_gamepad_rumble, 3U, p_i32_i32_i32, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
+};
+
 static const vigil_native_class_t sdl_classes[] = {
     {"Window", 6U, sdl_window_fields, WIN_FIELD_COUNT, sdl_window_methods,
      sizeof(sdl_window_methods) / sizeof(sdl_window_methods[0]), NULL},
@@ -2124,6 +2380,8 @@ static const vigil_native_class_t sdl_classes[] = {
      sizeof(sdl_texture_methods) / sizeof(sdl_texture_methods[0]), NULL},
     {"AudioStream", 11U, sdl_audio_stream_fields, ASTREAM_FIELD_COUNT, sdl_audio_stream_methods,
      sizeof(sdl_audio_stream_methods) / sizeof(sdl_audio_stream_methods[0]), NULL},
+    {"Gamepad", 7U, sdl_gamepad_fields, GP_FIELD_COUNT, sdl_gamepad_methods,
+     sizeof(sdl_gamepad_methods) / sizeof(sdl_gamepad_methods[0]), NULL},
 };
 /* clang-format on */
 
