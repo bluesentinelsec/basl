@@ -668,6 +668,8 @@ static const int p_i64[] = {VIGIL_TYPE_I64};
 static const int p_str[] = {VIGIL_TYPE_STRING};
 static const int p_str_str[] = {VIGIL_TYPE_STRING, VIGIL_TYPE_STRING};
 static const int p_i32_str_str[] = {VIGIL_TYPE_I32, VIGIL_TYPE_STRING, VIGIL_TYPE_STRING};
+static const int p_f64_f64_str[] = {VIGIL_TYPE_F64, VIGIL_TYPE_F64, VIGIL_TYPE_STRING};
+static const int p_f64[] = {VIGIL_TYPE_F64};
 static const int p_i32_i32[] = {VIGIL_TYPE_I32, VIGIL_TYPE_I32};
 static const int p_i32_i32_i32_i32[] = {VIGIL_TYPE_I32, VIGIL_TYPE_I32, VIGIL_TYPE_I32, VIGIL_TYPE_I32};
 static const int p_str_i32_i32_i32[] = {VIGIL_TYPE_STRING, VIGIL_TYPE_I32, VIGIL_TYPE_I32, VIGIL_TYPE_I32};
@@ -2281,6 +2283,157 @@ SDL_CONST_FN(LOGICAL_LETTERBOX, SDL_LOGICAL_PRESENTATION_LETTERBOX)
 SDL_CONST_FN(LOGICAL_OVERSCAN, SDL_LOGICAL_PRESENTATION_OVERSCAN)
 SDL_CONST_FN(LOGICAL_INTEGER_SCALE, SDL_LOGICAL_PRESENTATION_INTEGER_SCALE)
 
+/* ── Slice 12: Renderer Drawing Extras ────────────────────────────── */
+
+/* ren.render_debug_text(f64 x, f64 y, string text) -> (bool, err) */
+static vigil_status_t sdl_renderer_render_debug_text(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t rh = sdl_field_i64(vm, base, REN_HANDLE);
+    float x = (float)sdl_arg_f64(vm, base, 1);
+    float y = (float)sdl_arg_f64(vm, base, 2);
+    char text[4096];
+    sdl_arg_str(vm, base, 3, text, sizeof(text));
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Renderer *ren = (SDL_Renderer *)SDL_HANDLE_GET(renderers, rh);
+    if (ren && SDL_RenderDebugText(ren, x, y, text))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+/* ren.set_viewport(i32 x, i32 y, i32 w, i32 h) -> (bool, err) — zeros to reset */
+static vigil_status_t sdl_renderer_set_viewport(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t rh = sdl_field_i64(vm, base, REN_HANDLE);
+    int32_t x = sdl_arg_i32(vm, base, 1);
+    int32_t y = sdl_arg_i32(vm, base, 2);
+    int32_t w = sdl_arg_i32(vm, base, 3);
+    int32_t h = sdl_arg_i32(vm, base, 4);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Renderer *ren = (SDL_Renderer *)SDL_HANDLE_GET(renderers, rh);
+    if (!ren)
+        return sdl_push_bool_sdl_err(vm, SDL_ERR_ARG, error);
+    if (w == 0 && h == 0)
+    {
+        if (SDL_SetRenderViewport(ren, NULL))
+            return sdl_push_bool_ok(vm, error);
+    }
+    else
+    {
+        SDL_Rect rect = {x, y, w, h};
+        if (SDL_SetRenderViewport(ren, &rect))
+            return sdl_push_bool_ok(vm, error);
+    }
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+/* ren.set_draw_blend_mode(i32 mode) -> (bool, err) */
+static vigil_status_t sdl_renderer_set_draw_blend_mode(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t rh = sdl_field_i64(vm, base, REN_HANDLE);
+    int32_t mode = sdl_arg_i32(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Renderer *ren = (SDL_Renderer *)SDL_HANDLE_GET(renderers, rh);
+    if (ren && SDL_SetRenderDrawBlendMode(ren, (SDL_BlendMode)mode))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+/* ren.get_draw_blend_mode() -> i32 */
+static vigil_status_t sdl_renderer_get_draw_blend_mode(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t rh = sdl_field_i64(vm, base, REN_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_BlendMode mode = SDL_BLENDMODE_NONE;
+    SDL_Renderer *ren = (SDL_Renderer *)SDL_HANDLE_GET(renderers, rh);
+    if (ren)
+        SDL_GetRenderDrawBlendMode(ren, &mode);
+    return sdl_push_i32(vm, (int32_t)mode, error);
+}
+
+/* ren.set_color_scale(f64 scale) -> (bool, err) */
+static vigil_status_t sdl_renderer_set_color_scale(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t rh = sdl_field_i64(vm, base, REN_HANDLE);
+    float scale = (float)sdl_arg_f64(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Renderer *ren = (SDL_Renderer *)SDL_HANDLE_GET(renderers, rh);
+    if (ren && SDL_SetRenderColorScale(ren, scale))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+/* ren.get_color_scale() -> f64 */
+static vigil_status_t sdl_renderer_get_color_scale(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t rh = sdl_field_i64(vm, base, REN_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    float scale = 1.0f;
+    SDL_Renderer *ren = (SDL_Renderer *)SDL_HANDLE_GET(renderers, rh);
+    if (ren)
+        SDL_GetRenderColorScale(ren, &scale);
+    return sdl_push_f64(vm, (double)scale, error);
+}
+
+/* ren.flush() -> (bool, err) */
+static vigil_status_t sdl_renderer_flush(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t rh = sdl_field_i64(vm, base, REN_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Renderer *ren = (SDL_Renderer *)SDL_HANDLE_GET(renderers, rh);
+    if (ren && SDL_FlushRenderer(ren))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+/* ren.get_output_size() -> (i32, i32) */
+static vigil_status_t sdl_renderer_get_output_size(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t rh = sdl_field_i64(vm, base, REN_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    int w = 0, h = 0;
+    SDL_Renderer *ren = (SDL_Renderer *)SDL_HANDLE_GET(renderers, rh);
+    if (ren)
+        SDL_GetRenderOutputSize(ren, &w, &h);
+    vigil_status_t st = sdl_push_i32(vm, (int32_t)w, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_i32(vm, (int32_t)h, error);
+}
+
+/* ren.get_current_output_size() -> (i32, i32) */
+static vigil_status_t sdl_renderer_get_current_output_size(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t rh = sdl_field_i64(vm, base, REN_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    int w = 0, h = 0;
+    SDL_Renderer *ren = (SDL_Renderer *)SDL_HANDLE_GET(renderers, rh);
+    if (ren)
+        SDL_GetCurrentRenderOutputSize(ren, &w, &h);
+    vigil_status_t st = sdl_push_i32(vm, (int32_t)w, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_i32(vm, (int32_t)h, error);
+}
+
+/* ren.get_name() -> string */
+static vigil_status_t sdl_renderer_get_name(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t rh = sdl_field_i64(vm, base, REN_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Renderer *ren = (SDL_Renderer *)SDL_HANDLE_GET(renderers, rh);
+    return sdl_push_string(vm, ren ? SDL_GetRendererName(ren) : "", error);
+}
+
 /* Texture access constants */
 SDL_CONST_FN(TEXTUREACCESS_STATIC, SDL_TEXTUREACCESS_STATIC)
 SDL_CONST_FN(TEXTUREACCESS_STREAMING, SDL_TEXTUREACCESS_STREAMING)
@@ -2597,6 +2750,17 @@ static const vigil_native_class_method_t sdl_renderer_methods[] = {
     SDL_METHOD("get_scale", 9U, sdl_renderer_get_scale, 0U, NULL, VIGIL_TYPE_F64, 2U, rt_f64_f64),
     SDL_METHOD("set_clip_rect", 13U, sdl_renderer_set_clip_rect, 4U, p_i32_i32_i32_i32, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
     SDL_METHOD("set_logical_size", 16U, sdl_renderer_set_logical_size, 3U, p_i32_i32_i32, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
+    /* Slice 12: drawing extras */
+    SDL_METHOD("render_debug_text", 17U, sdl_renderer_render_debug_text, 3U, p_f64_f64_str, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
+    SDL_METHOD("set_viewport", 12U, sdl_renderer_set_viewport, 4U, p_i32_i32_i32_i32, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
+    SDL_METHOD("set_draw_blend_mode", 19U, sdl_renderer_set_draw_blend_mode, 1U, p_i32, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
+    SDL_METHOD("get_draw_blend_mode", 19U, sdl_renderer_get_draw_blend_mode, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL),
+    SDL_METHOD("set_color_scale", 15U, sdl_renderer_set_color_scale, 1U, p_f64, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
+    SDL_METHOD("get_color_scale", 15U, sdl_renderer_get_color_scale, 0U, NULL, VIGIL_TYPE_F64, 1U, NULL),
+    SDL_METHOD("flush", 5U, sdl_renderer_flush, 0U, NULL, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
+    SDL_METHOD("get_output_size", 15U, sdl_renderer_get_output_size, 0U, NULL, VIGIL_TYPE_I32, 2U, rt_i32_i32),
+    SDL_METHOD("get_current_output_size", 23U, sdl_renderer_get_current_output_size, 0U, NULL, VIGIL_TYPE_I32, 2U, rt_i32_i32),
+    SDL_METHOD("get_name", 8U, sdl_renderer_get_name, 0U, NULL, VIGIL_TYPE_STRING, 1U, NULL),
 };
 
 /* ── Event class descriptor ──────────────────────────────────────── */
