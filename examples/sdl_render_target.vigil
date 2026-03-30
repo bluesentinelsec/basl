@@ -1,0 +1,114 @@
+// sdl_render_target.vigil — Slice 11 demo: offscreen render targets
+//
+// Draws a pattern into an offscreen texture, then renders it to the
+// window at different scales and rotations. Press Escape to quit.
+
+import "sdl";
+import "fmt";
+
+fn main() -> i32 {
+    bool init_ok, err ie = sdl.init(sdl.INIT_VIDEO());
+    if (ie != ok) {
+        fmt.eprintln(f"SDL init failed: {ie.message()}");
+        return 1;
+    }
+    defer sdl.quit();
+
+    // Print display info
+    i32 num_displays = sdl.get_display_count();
+    fmt.println(f"Displays: {num_displays}");
+    i32 di = 0;
+    while (di < num_displays) {
+        string dname = sdl.get_display_name(di);
+        i32 dw, i32 dh = sdl.get_display_bounds(di);
+        fmt.println(f"  [{di}] {dname}: {dw}x{dh}");
+        di = di + 1;
+    }
+
+    sdl.Window win, err we = sdl.Window.create("Render Target Demo", 640, 480, 0);
+    if (we != ok) {
+        fmt.eprintln(f"Window failed: {we.message()}");
+        return 1;
+    }
+
+    sdl.Renderer ren, err re = sdl.Renderer.create(win, "");
+    if (re != ok) {
+        fmt.eprintln(f"Renderer failed: {re.message()}");
+        win.destroy();
+        return 1;
+    }
+
+    // Create a 128x128 render-target texture
+    sdl.Texture tex, err te = sdl.Texture.create(
+        ren, 0, sdl.TEXTUREACCESS_TARGET(), 128, 128);
+    if (te != ok) {
+        fmt.eprintln(f"Texture failed: {te.message()}");
+        ren.destroy();
+        win.destroy();
+        return 1;
+    }
+
+    // Draw a checkerboard pattern into the texture
+    // Get the texture's internal handle for set_target
+    bool st1, err ste1 = ren.set_target(i64(0));
+    bool c1, err e1 = ren.set_draw_color(200, 200, 200, 255);
+    bool c2, err e2 = ren.clear();
+    bool c3, err e3 = ren.set_draw_color(80, 80, 200, 255);
+    // Draw some rectangles
+    bool c4, err e4 = ren.fill_rect(0.0, 0.0, 64.0, 64.0);
+    bool c5, err e5 = ren.fill_rect(64.0, 64.0, 64.0, 64.0);
+    bool c6, err e6 = ren.set_draw_color(200, 80, 80, 255);
+    bool c7, err e7 = ren.draw_line(0.0, 0.0, 128.0, 128.0);
+    bool c8, err e8 = ren.draw_line(128.0, 0.0, 0.0, 128.0);
+    // Reset to default render target (the window)
+    bool st2, err ste2 = ren.set_target(i64(-1));
+
+    sdl.Event ev, err ee = sdl.Event.new();
+    if (ee != ok) {
+        tex.destroy();
+        ren.destroy();
+        win.destroy();
+        return 1;
+    }
+
+    fmt.println("Rendering offscreen texture. Press Escape to quit.");
+
+    f64 angle = 0.0;
+    bool running = true;
+    while (running) {
+        while (ev.poll()) {
+            if (ev.type() == sdl.EVENT_QUIT()) {
+                running = false;
+            }
+        }
+        if (sdl.is_key_pressed(sdl.SCANCODE_ESCAPE())) {
+            running = false;
+        }
+
+        bool d1, err de1 = ren.set_draw_color(30, 30, 30, 255);
+        bool d2, err de2 = ren.clear();
+
+        // Render the offscreen texture at original size
+        bool d3, err de3 = ren.render_texture(
+            tex, 0.0, 0.0, 0.0, 0.0, 10.0, 10.0, 128.0, 128.0);
+
+        // Render it scaled up 2x
+        bool d4, err de4 = ren.render_texture(
+            tex, 0.0, 0.0, 0.0, 0.0, 160.0, 10.0, 256.0, 256.0);
+
+        // Render it rotating
+        angle = angle + 1.0;
+        bool d5, err de5 = ren.render_texture_rotated(
+            tex, 0.0, 0.0, 0.0, 0.0,
+            480.0, 150.0, 128.0, 128.0,
+            angle, 64.0, 64.0, sdl.FLIP_NONE());
+
+        bool d6, err de6 = ren.present();
+        sdl.delay(16);
+    }
+
+    tex.destroy();
+    ren.destroy();
+    win.destroy();
+    return 0;
+}
