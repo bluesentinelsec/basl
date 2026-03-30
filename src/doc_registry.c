@@ -540,6 +540,63 @@ static const vigil_doc_entry_t yaml_docs[] = {
 
 #define YAML_COUNT (sizeof(yaml_docs) / sizeof(yaml_docs[0]))
 
+/* ── json module ──────────────────────────────────────────── */
+
+static const vigil_doc_entry_t json_docs[] = {
+    {"json", NULL, "JSON parsing and traversal.",
+     "The json module exposes Vigil's built-in JSON parser through the json.Value class.\n"
+     "Use json.Value.parse() or json.Value.read() to create values, then traverse them\n"
+     "with get(), at(), keys(), len(), kind(), and the typed as_* accessors.",
+     NULL},
+    {"json.Value", "json.Value", "Opaque JSON value wrapper.",
+     "json.Value stores canonical JSON text and provides dynamic traversal helpers for\n"
+     "objects, arrays, strings, numbers, booleans, and null values.",
+     "json.Value v, err parse_err = json.Value.parse(\"{\\\"name\\\":\\\"vigil\\\"}\")"},
+    {"json.Value.parse", "json.Value.parse(text: string) -> (json.Value, error)", "Parse JSON text.",
+     "Parses arbitrary JSON and returns a json.Value on success.",
+     "json.Value v, err parse_err = json.Value.parse(\"[1,2,3]\")"},
+    {"json.Value.read", "json.Value.read(path: string) -> (json.Value, error)", "Read JSON from a file.",
+     "Reads a file from disk, parses it as JSON, and returns a json.Value.",
+     "json.Value cfg, err read_err = json.Value.read(\"config.json\")"},
+    {"json.Value.kind", "json.Value.kind() -> string", "Get the JSON type name.",
+     "Returns one of: null, bool, number, string, array, object, or invalid.", "string k = value.kind()"},
+    {"json.Value.is_null", "json.Value.is_null() -> bool", "Check for null.", "Returns true when the value is null.",
+     "if (value.is_null()) { fmt.println(\"nil\") }"},
+    {"json.Value.is_bool", "json.Value.is_bool() -> bool", "Check for bool.", "Returns true when the value is a bool.",
+     "if (value.is_bool()) { }"},
+    {"json.Value.is_number", "json.Value.is_number() -> bool", "Check for number.",
+     "Returns true when the value is a JSON number.", "if (value.is_number()) { }"},
+    {"json.Value.is_string", "json.Value.is_string() -> bool", "Check for string.",
+     "Returns true when the value is a JSON string.", "if (value.is_string()) { }"},
+    {"json.Value.is_array", "json.Value.is_array() -> bool", "Check for array.",
+     "Returns true when the value is a JSON array.", "if (value.is_array()) { }"},
+    {"json.Value.is_object", "json.Value.is_object() -> bool", "Check for object.",
+     "Returns true when the value is a JSON object.", "if (value.is_object()) { }"},
+    {"json.Value.len", "json.Value.len() -> (i32, error)", "Get array or object length.",
+     "Returns the number of elements in an array or the number of keys in an object.",
+     "i32 n, err len_err = value.len()"},
+    {"json.Value.as_bool", "json.Value.as_bool() -> (bool, error)", "Read a bool value.",
+     "Returns the underlying bool when the JSON value is a boolean.", "bool ok, err bool_err = value.as_bool()"},
+    {"json.Value.as_number", "json.Value.as_number() -> (f64, error)", "Read a number value.",
+     "Returns the underlying number when the JSON value is numeric.", "f64 n, err num_err = value.as_number()"},
+    {"json.Value.as_string", "json.Value.as_string() -> (string, error)", "Read a string value.",
+     "Returns the underlying string when the JSON value is a string.", "string s, err str_err = value.as_string()"},
+    {"json.Value.at", "json.Value.at(index: i32) -> (json.Value, error)", "Get an array element.",
+     "Returns the array element at the given index.", "json.Value item, err item_err = value.at(0)"},
+    {"json.Value.get", "json.Value.get(key: string) -> (json.Value, error)", "Get an object member.",
+     "Returns the object member at the given key.", "json.Value name, err get_err = value.get(\"name\")"},
+    {"json.Value.has", "json.Value.has(key: string) -> bool", "Check if an object has a key.",
+     "Returns true when the key exists on a JSON object.", "if (value.has(\"enabled\")) { }"},
+    {"json.Value.keys", "json.Value.keys() -> array<string>", "List object keys.",
+     "Returns the object's keys in insertion order.", "array<string> ks = value.keys()"},
+    {"json.Value.stringify", "json.Value.stringify() -> string", "Serialize JSON back to text.",
+     "Returns the JSON text stored by the value.", "string text = value.stringify()"},
+    {"json.Value.write", "json.Value.write(path: string) -> error", "Write JSON to a file.",
+     "Writes the value's JSON text to the given path.", "err write_err = value.write(\"out.json\")"},
+};
+
+#define JSON_COUNT (sizeof(json_docs) / sizeof(json_docs[0]))
+
 /* ── fs module ────────────────────────────────────────────── */
 
 static const vigil_doc_entry_t fs_docs[] = {
@@ -1272,8 +1329,9 @@ static const vigil_doc_entry_t readline_docs[] = {
 /* ── Module List ──────────────────────────────────────────── */
 
 static const char *module_names[] = {
-    "builtins", "compress", "crypto", "csv",     "ffi",   "fmt",    "fs",   "http",   "log", "math", "net",    "parse",
-    "args",     "readline", "test",   "strings", "regex", "random", "time", "unsafe", "url", "yaml", "thread", "atomic",
+    "builtins", "compress", "crypto", "csv",  "ffi",  "fmt",      "fs",     "http",    "log",
+    "math",     "net",      "parse",  "args", "json", "readline", "test",   "strings", "regex",
+    "random",   "time",     "unsafe", "url",  "yaml", "thread",   "atomic",
 };
 
 #define MODULE_COUNT (sizeof(module_names) / sizeof(module_names[0]))
@@ -1298,6 +1356,7 @@ static const doc_module_table_entry_t doc_module_table[] = {
     {"random", random_docs, RANDOM_COUNT},
     {"url", url_docs, URL_COUNT},
     {"yaml", yaml_docs, YAML_COUNT},
+    {"json", json_docs, JSON_COUNT},
     {"fs", fs_docs, FS_COUNT},
     {"log", log_docs, LOG_COUNT},
     {"thread", thread_docs, THREAD_COUNT},
