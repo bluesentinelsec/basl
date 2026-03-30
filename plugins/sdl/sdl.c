@@ -666,10 +666,197 @@ static vigil_status_t sdl_window_get_flags(vigil_vm_t *vm, size_t arg_count, vig
 static const int p_i32[] = {VIGIL_TYPE_I32};
 static const int p_str[] = {VIGIL_TYPE_STRING};
 static const int p_i32_i32[] = {VIGIL_TYPE_I32, VIGIL_TYPE_I32};
+static const int p_i32_i32_i32_i32[] = {VIGIL_TYPE_I32, VIGIL_TYPE_I32, VIGIL_TYPE_I32, VIGIL_TYPE_I32};
 static const int p_str_i32_i32_i32[] = {VIGIL_TYPE_STRING, VIGIL_TYPE_I32, VIGIL_TYPE_I32, VIGIL_TYPE_I32};
+static const int p_obj_str[] = {VIGIL_TYPE_OBJECT, VIGIL_TYPE_STRING};
+static const int p_f64_f64[] = {VIGIL_TYPE_F64, VIGIL_TYPE_F64};
+static const int p_f64_f64_f64_f64[] = {VIGIL_TYPE_F64, VIGIL_TYPE_F64, VIGIL_TYPE_F64, VIGIL_TYPE_F64};
 static const int rt_bool_err[] = {VIGIL_TYPE_BOOL, VIGIL_TYPE_ERR};
 static const int rt_obj_err[] = {VIGIL_TYPE_OBJECT, VIGIL_TYPE_ERR};
 static const int rt_i32_i32[] = {VIGIL_TYPE_I32, VIGIL_TYPE_I32};
+static const int rt_i32_i32_i32_i32[] = {VIGIL_TYPE_I32, VIGIL_TYPE_I32, VIGIL_TYPE_I32, VIGIL_TYPE_I32};
+
+/* ── Renderer handle registry ────────────────────────────────────── */
+
+SDL_HANDLE_REGISTRY(renderers);
+
+enum
+{
+    REN_HANDLE = 0,
+    REN_FIELD_COUNT
+};
+
+/* Renderer.create(sdl.Window win, string driver) -> (Renderer, err) */
+
+static vigil_status_t sdl_renderer_create(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    size_t ci = sdl_static_class_index(vm, base);
+    int64_t wh = sdl_field_i64(vm, base + 1, WIN_HANDLE);
+    char driver[64];
+    sdl_arg_str(vm, base, 2, driver, sizeof(driver));
+    vigil_vm_stack_pop_n(vm, arg_count);
+
+    SDL_Window *win = (SDL_Window *)SDL_HANDLE_GET(windows, wh);
+    if (!win)
+        return sdl_push_nil_and_err(vm, "invalid window handle", SDL_ERR_ARG, error);
+
+    const char *drv = driver[0] ? driver : NULL;
+    SDL_Renderer *ren = SDL_CreateRenderer(win, drv);
+    if (!ren)
+        return sdl_push_nil_and_sdl_err(vm, SDL_ERR_IO, error);
+
+    int64_t handle;
+    if (SDL_HANDLE_STORE(renderers, ren, &handle) < 0)
+    {
+        SDL_DestroyRenderer(ren);
+        return sdl_push_nil_and_err(vm, "too many renderers", SDL_ERR_STATE, error);
+    }
+
+    vigil_status_t st = sdl_push_handle_instance(vm, ci, handle, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_ok(vm, error);
+}
+
+static vigil_status_t sdl_renderer_destroy(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, REN_HANDLE);
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Renderer *ren = (SDL_Renderer *)SDL_HANDLE_GET(renderers, h);
+    if (ren)
+    {
+        SDL_DestroyRenderer(ren);
+        SDL_HANDLE_CLEAR(renderers, h);
+    }
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t sdl_renderer_clear(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, REN_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Renderer *ren = (SDL_Renderer *)SDL_HANDLE_GET(renderers, h);
+    if (ren && SDL_RenderClear(ren))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+static vigil_status_t sdl_renderer_present(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, REN_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Renderer *ren = (SDL_Renderer *)SDL_HANDLE_GET(renderers, h);
+    if (ren && SDL_RenderPresent(ren))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+static vigil_status_t sdl_renderer_set_draw_color(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, REN_HANDLE);
+    int32_t r = sdl_arg_i32(vm, base, 1);
+    int32_t g = sdl_arg_i32(vm, base, 2);
+    int32_t b = sdl_arg_i32(vm, base, 3);
+    int32_t a = sdl_arg_i32(vm, base, 4);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Renderer *ren = (SDL_Renderer *)SDL_HANDLE_GET(renderers, h);
+    if (ren && SDL_SetRenderDrawColor(ren, (Uint8)r, (Uint8)g, (Uint8)b, (Uint8)a))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+static vigil_status_t sdl_renderer_get_draw_color(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, REN_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    Uint8 r = 0, g = 0, b = 0, a = 0;
+    SDL_Renderer *ren = (SDL_Renderer *)SDL_HANDLE_GET(renderers, h);
+    if (ren)
+        SDL_GetRenderDrawColor(ren, &r, &g, &b, &a);
+    vigil_status_t st = sdl_push_i32(vm, r, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    st = sdl_push_i32(vm, g, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    st = sdl_push_i32(vm, b, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_i32(vm, a, error);
+}
+
+static vigil_status_t sdl_renderer_draw_point(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, REN_HANDLE);
+    float x = (float)sdl_arg_f64(vm, base, 1);
+    float y = (float)sdl_arg_f64(vm, base, 2);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Renderer *ren = (SDL_Renderer *)SDL_HANDLE_GET(renderers, h);
+    if (ren && SDL_RenderPoint(ren, x, y))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+static vigil_status_t sdl_renderer_draw_line(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, REN_HANDLE);
+    float x1 = (float)sdl_arg_f64(vm, base, 1);
+    float y1 = (float)sdl_arg_f64(vm, base, 2);
+    float x2 = (float)sdl_arg_f64(vm, base, 3);
+    float y2 = (float)sdl_arg_f64(vm, base, 4);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Renderer *ren = (SDL_Renderer *)SDL_HANDLE_GET(renderers, h);
+    if (ren && SDL_RenderLine(ren, x1, y1, x2, y2))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+static vigil_status_t sdl_renderer_draw_rect(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, REN_HANDLE);
+    SDL_FRect rect = {(float)sdl_arg_f64(vm, base, 1), (float)sdl_arg_f64(vm, base, 2), (float)sdl_arg_f64(vm, base, 3),
+                      (float)sdl_arg_f64(vm, base, 4)};
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Renderer *ren = (SDL_Renderer *)SDL_HANDLE_GET(renderers, h);
+    if (ren && SDL_RenderRect(ren, &rect))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+static vigil_status_t sdl_renderer_fill_rect(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, REN_HANDLE);
+    SDL_FRect rect = {(float)sdl_arg_f64(vm, base, 1), (float)sdl_arg_f64(vm, base, 2), (float)sdl_arg_f64(vm, base, 3),
+                      (float)sdl_arg_f64(vm, base, 4)};
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Renderer *ren = (SDL_Renderer *)SDL_HANDLE_GET(renderers, h);
+    if (ren && SDL_RenderFillRect(ren, &rect))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+static vigil_status_t sdl_renderer_set_vsync(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, REN_HANDLE);
+    int32_t vsync = sdl_arg_i32(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Renderer *ren = (SDL_Renderer *)SDL_HANDLE_GET(renderers, h);
+    if (ren && SDL_SetRenderVSync(ren, vsync))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
 
 /* ── Function helper macros ──────────────────────────────────────── */
 
@@ -753,9 +940,31 @@ static const vigil_native_class_method_t sdl_window_methods[] = {
     SDL_METHOD("get_flags", 9U, sdl_window_get_flags, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL),
 };
 
+/* ── Renderer class descriptor ───────────────────────────────────── */
+
+static const vigil_native_class_field_t sdl_renderer_fields[] = {
+    SDL_PFIELD("handle", 6U, VIGIL_TYPE_I64),
+};
+
+static const vigil_native_class_method_t sdl_renderer_methods[] = {
+    SDL_STATIC("create", 6U, sdl_renderer_create, 2U, p_obj_str, VIGIL_TYPE_OBJECT, 2U, rt_obj_err),
+    SDL_METHOD("destroy", 7U, sdl_renderer_destroy, 0U, NULL, VIGIL_TYPE_VOID, 0U, NULL),
+    SDL_METHOD("clear", 5U, sdl_renderer_clear, 0U, NULL, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
+    SDL_METHOD("present", 7U, sdl_renderer_present, 0U, NULL, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
+    SDL_METHOD("set_draw_color", 14U, sdl_renderer_set_draw_color, 4U, p_i32_i32_i32_i32, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
+    SDL_METHOD("get_draw_color", 14U, sdl_renderer_get_draw_color, 0U, NULL, VIGIL_TYPE_I32, 4U, rt_i32_i32_i32_i32),
+    SDL_METHOD("draw_point", 10U, sdl_renderer_draw_point, 2U, p_f64_f64, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
+    SDL_METHOD("draw_line", 9U, sdl_renderer_draw_line, 4U, p_f64_f64_f64_f64, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
+    SDL_METHOD("draw_rect", 9U, sdl_renderer_draw_rect, 4U, p_f64_f64_f64_f64, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
+    SDL_METHOD("fill_rect", 9U, sdl_renderer_fill_rect, 4U, p_f64_f64_f64_f64, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
+    SDL_METHOD("set_vsync", 9U, sdl_renderer_set_vsync, 1U, p_i32, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
+};
+
 static const vigil_native_class_t sdl_classes[] = {
     {"Window", 6U, sdl_window_fields, WIN_FIELD_COUNT, sdl_window_methods,
      sizeof(sdl_window_methods) / sizeof(sdl_window_methods[0]), NULL},
+    {"Renderer", 8U, sdl_renderer_fields, REN_FIELD_COUNT, sdl_renderer_methods,
+     sizeof(sdl_renderer_methods) / sizeof(sdl_renderer_methods[0]), NULL},
 };
 /* clang-format on */
 
