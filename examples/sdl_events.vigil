@@ -1,0 +1,48 @@
+import "fmt";
+import "sdl";
+
+fn main() -> i32 {
+    bool init_ok, err ie = sdl.init(sdl.INIT_VIDEO());
+    if (ie != ok) {
+        fmt.eprintln(f"SDL init failed: {ie.message()}");
+        return 1;
+    }
+    defer sdl.quit();
+
+    sdl.Window win, err we = sdl.Window.create("Vigil SDL Events", 640, 480, 0);
+    if (we != ok) {
+        fmt.eprintln(f"Window failed: {we.message()}");
+        return 1;
+    }
+
+    sdl.Event ev, err ee = sdl.Event.new();
+    if (ee != ok) {
+        fmt.eprintln(f"Event alloc failed: {ee.message()}");
+        win.destroy();
+        return 1;
+    }
+
+    fmt.println("Polling events for 100 iterations...");
+    i32 count = 0;
+    bool running = true;
+    while (running && count < 100) {
+        while (ev.poll()) {
+            i32 t = ev.type();
+            if (t == sdl.EVENT_QUIT()) {
+                fmt.println("Quit event received.");
+                running = false;
+            } else if (t == sdl.EVENT_KEY_DOWN()) {
+                fmt.println(f"Key down: scancode={ev.key_scancode()} keycode={ev.key_keycode()}");
+            } else if (t == sdl.EVENT_MOUSE_MOTION()) {
+                f64 mx = ev.mouse_x();
+                f64 my = ev.mouse_y();
+                fmt.println(f"Mouse: {mx}, {my}");
+            }
+        }
+        count++;
+    }
+
+    fmt.println("Event test complete.");
+    win.destroy();
+    return 0;
+}

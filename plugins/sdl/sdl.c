@@ -858,6 +858,159 @@ static vigil_status_t sdl_renderer_set_vsync(vigil_vm_t *vm, size_t arg_count, v
     return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
 }
 
+/* ── Event system ────────────────────────────────────────────────── */
+
+#define EVT_MAX 64
+static SDL_Event g_events[EVT_MAX];
+static int32_t g_event_count = 0;
+
+enum
+{
+    EVT_HANDLE = 0,
+    EVT_FIELD_COUNT
+};
+
+static vigil_status_t sdl_event_new(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    size_t ci = sdl_static_class_index(vm, base);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    if (g_event_count >= EVT_MAX)
+        return sdl_push_nil_and_err(vm, "too many event objects", SDL_ERR_STATE, error);
+    int64_t slot = g_event_count++;
+    memset(&g_events[slot], 0, sizeof(SDL_Event));
+    vigil_status_t st = sdl_push_handle_instance(vm, ci, slot, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_ok(vm, error);
+}
+
+static SDL_Event *evt_get(vigil_vm_t *vm, size_t base)
+{
+    int64_t h = sdl_field_i64(vm, base, EVT_HANDLE);
+    if (h < 0 || h >= g_event_count)
+        return NULL;
+    return &g_events[h];
+}
+
+static vigil_status_t sdl_event_poll(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    SDL_Event *ev = evt_get(vm, base);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_bool(vm, ev && SDL_PollEvent(ev), error);
+}
+
+static vigil_status_t sdl_event_wait(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    SDL_Event *ev = evt_get(vm, base);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_bool(vm, ev && SDL_WaitEvent(ev), error);
+}
+
+static vigil_status_t sdl_event_wait_timeout(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    SDL_Event *ev = evt_get(vm, base);
+    int32_t ms = sdl_arg_i32(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_bool(vm, ev && SDL_WaitEventTimeout(ev, ms), error);
+}
+
+static vigil_status_t sdl_event_type(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    SDL_Event *ev = evt_get(vm, base);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_i32(vm, ev ? (int32_t)ev->type : 0, error);
+}
+
+/* Keyboard accessors */
+static vigil_status_t sdl_event_key_scancode(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    SDL_Event *ev = evt_get(vm, base);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_i32(vm, ev ? (int32_t)ev->key.scancode : 0, error);
+}
+
+static vigil_status_t sdl_event_key_keycode(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    SDL_Event *ev = evt_get(vm, base);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_i32(vm, ev ? (int32_t)ev->key.key : 0, error);
+}
+
+static vigil_status_t sdl_event_key_mod(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    SDL_Event *ev = evt_get(vm, base);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_i32(vm, ev ? (int32_t)ev->key.mod : 0, error);
+}
+
+static vigil_status_t sdl_event_key_repeat(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    SDL_Event *ev = evt_get(vm, base);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_bool(vm, ev && ev->key.repeat, error);
+}
+
+/* Mouse accessors */
+static vigil_status_t sdl_event_mouse_x(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    SDL_Event *ev = evt_get(vm, base);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_f64(vm, ev ? (double)ev->motion.x : 0.0, error);
+}
+
+static vigil_status_t sdl_event_mouse_y(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    SDL_Event *ev = evt_get(vm, base);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_f64(vm, ev ? (double)ev->motion.y : 0.0, error);
+}
+
+static vigil_status_t sdl_event_mouse_button(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    SDL_Event *ev = evt_get(vm, base);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_i32(vm, ev ? (int32_t)ev->button.button : 0, error);
+}
+
+static vigil_status_t sdl_event_wheel_x(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    SDL_Event *ev = evt_get(vm, base);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_f64(vm, ev ? (double)ev->wheel.x : 0.0, error);
+}
+
+static vigil_status_t sdl_event_wheel_y(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    SDL_Event *ev = evt_get(vm, base);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_f64(vm, ev ? (double)ev->wheel.y : 0.0, error);
+}
+
+/* Event type constants */
+SDL_CONST_FN(EVENT_QUIT, SDL_EVENT_QUIT)
+SDL_CONST_FN(EVENT_KEY_DOWN, SDL_EVENT_KEY_DOWN)
+SDL_CONST_FN(EVENT_KEY_UP, SDL_EVENT_KEY_UP)
+SDL_CONST_FN(EVENT_MOUSE_MOTION, SDL_EVENT_MOUSE_MOTION)
+SDL_CONST_FN(EVENT_MOUSE_BUTTON_DOWN, SDL_EVENT_MOUSE_BUTTON_DOWN)
+SDL_CONST_FN(EVENT_MOUSE_BUTTON_UP, SDL_EVENT_MOUSE_BUTTON_UP)
+SDL_CONST_FN(EVENT_MOUSE_WHEEL, SDL_EVENT_MOUSE_WHEEL)
+SDL_CONST_FN(EVENT_WINDOW_CLOSE_REQUESTED, SDL_EVENT_WINDOW_CLOSE_REQUESTED)
+SDL_CONST_FN(EVENT_WINDOW_RESIZED, SDL_EVENT_WINDOW_RESIZED)
+
 /* ── Function helper macros ──────────────────────────────────────── */
 
 /* clang-format off */
@@ -907,6 +1060,16 @@ static const vigil_native_module_function_t sdl_functions[] = {
     SDL_CONST_ENTRY("WINDOW_VULKAN", WINDOW_VULKAN),
     SDL_CONST_ENTRY("WINDOW_METAL", WINDOW_METAL),
     SDL_CONST_ENTRY("WINDOW_HIGH_PIXEL_DENSITY", WINDOW_HIGH_PIXEL_DENSITY),
+    /* Event type constants */
+    SDL_CONST_ENTRY("EVENT_QUIT", EVENT_QUIT),
+    SDL_CONST_ENTRY("EVENT_KEY_DOWN", EVENT_KEY_DOWN),
+    SDL_CONST_ENTRY("EVENT_KEY_UP", EVENT_KEY_UP),
+    SDL_CONST_ENTRY("EVENT_MOUSE_MOTION", EVENT_MOUSE_MOTION),
+    SDL_CONST_ENTRY("EVENT_MOUSE_BUTTON_DOWN", EVENT_MOUSE_BUTTON_DOWN),
+    SDL_CONST_ENTRY("EVENT_MOUSE_BUTTON_UP", EVENT_MOUSE_BUTTON_UP),
+    SDL_CONST_ENTRY("EVENT_MOUSE_WHEEL", EVENT_MOUSE_WHEEL),
+    SDL_CONST_ENTRY("EVENT_WINDOW_CLOSE_REQUESTED", EVENT_WINDOW_CLOSE_REQUESTED),
+    SDL_CONST_ENTRY("EVENT_WINDOW_RESIZED", EVENT_WINDOW_RESIZED),
 };
 
 #define SDL_FUNCTION_COUNT (sizeof(sdl_functions) / sizeof(sdl_functions[0]))
@@ -960,11 +1123,36 @@ static const vigil_native_class_method_t sdl_renderer_methods[] = {
     SDL_METHOD("set_vsync", 9U, sdl_renderer_set_vsync, 1U, p_i32, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
 };
 
+/* ── Event class descriptor ──────────────────────────────────────── */
+
+static const vigil_native_class_field_t sdl_event_fields[] = {
+    SDL_PFIELD("handle", 6U, VIGIL_TYPE_I64),
+};
+
+static const vigil_native_class_method_t sdl_event_methods[] = {
+    SDL_STATIC("new", 3U, sdl_event_new, 0U, NULL, VIGIL_TYPE_OBJECT, 2U, rt_obj_err),
+    SDL_METHOD("poll", 4U, sdl_event_poll, 0U, NULL, VIGIL_TYPE_BOOL, 1U, NULL),
+    SDL_METHOD("wait", 4U, sdl_event_wait, 0U, NULL, VIGIL_TYPE_BOOL, 1U, NULL),
+    SDL_METHOD("wait_timeout", 12U, sdl_event_wait_timeout, 1U, p_i32, VIGIL_TYPE_BOOL, 1U, NULL),
+    SDL_METHOD("type", 4U, sdl_event_type, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL),
+    SDL_METHOD("key_scancode", 12U, sdl_event_key_scancode, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL),
+    SDL_METHOD("key_keycode", 11U, sdl_event_key_keycode, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL),
+    SDL_METHOD("key_mod", 7U, sdl_event_key_mod, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL),
+    SDL_METHOD("key_repeat", 10U, sdl_event_key_repeat, 0U, NULL, VIGIL_TYPE_BOOL, 1U, NULL),
+    SDL_METHOD("mouse_x", 7U, sdl_event_mouse_x, 0U, NULL, VIGIL_TYPE_F64, 1U, NULL),
+    SDL_METHOD("mouse_y", 7U, sdl_event_mouse_y, 0U, NULL, VIGIL_TYPE_F64, 1U, NULL),
+    SDL_METHOD("mouse_button", 12U, sdl_event_mouse_button, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL),
+    SDL_METHOD("wheel_x", 7U, sdl_event_wheel_x, 0U, NULL, VIGIL_TYPE_F64, 1U, NULL),
+    SDL_METHOD("wheel_y", 7U, sdl_event_wheel_y, 0U, NULL, VIGIL_TYPE_F64, 1U, NULL),
+};
+
 static const vigil_native_class_t sdl_classes[] = {
     {"Window", 6U, sdl_window_fields, WIN_FIELD_COUNT, sdl_window_methods,
      sizeof(sdl_window_methods) / sizeof(sdl_window_methods[0]), NULL},
     {"Renderer", 8U, sdl_renderer_fields, REN_FIELD_COUNT, sdl_renderer_methods,
      sizeof(sdl_renderer_methods) / sizeof(sdl_renderer_methods[0]), NULL},
+    {"Event", 5U, sdl_event_fields, EVT_FIELD_COUNT, sdl_event_methods,
+     sizeof(sdl_event_methods) / sizeof(sdl_event_methods[0]), NULL},
 };
 /* clang-format on */
 
