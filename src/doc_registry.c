@@ -546,8 +546,17 @@ static const vigil_doc_entry_t json_docs[] = {
     {"json", NULL, "JSON parsing and traversal.",
      "The json module exposes Vigil's built-in JSON parser through the json.Value class.\n"
      "Use json.Value.parse() or json.Value.read() to create values, then traverse them\n"
-     "with get(), at(), keys(), len(), kind(), and the typed as_* accessors.",
+     "with get(), at(), keys(), len(), kind(), and the typed as_* accessors.\n"
+     "Phase 2 also adds json.encode() and json.decode() for class-based object marshaling.",
      NULL},
+    {"json.encode", "json.encode(value: object) -> (string, error)", "Encode a Vigil object as JSON.",
+     "Encodes class instances, arrays, maps with string keys, strings, booleans, and numbers.\n"
+     "Class encoding uses public fields only.",
+     "string text, err encode_err = json.encode(person)"},
+    {"json.decode", "json.decode(text: string, prototype: T) -> (T, error)", "Decode JSON into a class instance.",
+     "Decodes a JSON object into the same class as the prototype instance. Missing and extra fields are errors.\n"
+     "Currently supports public fields, nested classes, arrays, and map<string, T> members.",
+     "Person p, err decode_err = json.decode(text, Person(\"\", [0], {\"\": \"\"}, Meta(0)))"},
     {"json.Value", "json.Value", "Opaque JSON value wrapper.",
      "json.Value stores canonical JSON text and provides dynamic traversal helpers for\n"
      "objects, arrays, strings, numbers, booleans, and null values.",

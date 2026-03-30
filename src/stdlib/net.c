@@ -487,17 +487,17 @@ static const int i64_str_param[] = {VIGIL_TYPE_I64, VIGIL_TYPE_STRING};
 static const int udp_send_param[] = {VIGIL_TYPE_I64, VIGIL_TYPE_STRING, VIGIL_TYPE_I32, VIGIL_TYPE_STRING};
 
 static const vigil_native_module_function_t net_functions[] = {
-    {"tcp_listen", 10U, net_tcp_listen, 2U, str_i32_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL},
-    {"tcp_accept", 10U, net_tcp_accept, 1U, i64_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL},
-    {"tcp_connect", 11U, net_tcp_connect, 2U, str_i32_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL},
-    {"read", 4U, net_read, 2U, i64_i32_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL},
-    {"write", 5U, net_write, 2U, i64_str_param, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, NULL},
-    {"close", 5U, net_close, 1U, i64_param, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, NULL},
-    {"udp_bind", 8U, net_udp_bind, 2U, str_i32_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL},
-    {"udp_new", 7U, net_udp_new, 0U, NULL, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL},
-    {"udp_send", 8U, net_udp_send, 4U, udp_send_param, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, NULL},
-    {"udp_recv", 8U, net_udp_recv, 2U, i64_i32_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL},
-    {"set_timeout", 11U, net_set_timeout, 2U, i64_i32_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL},
+    {"tcp_listen", 10U, net_tcp_listen, 2U, str_i32_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U},
+    {"tcp_accept", 10U, net_tcp_accept, 1U, i64_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U},
+    {"tcp_connect", 11U, net_tcp_connect, 2U, str_i32_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U},
+    {"read", 4U, net_read, 2U, i64_i32_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U},
+    {"write", 5U, net_write, 2U, i64_str_param, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, NULL, 0U},
+    {"close", 5U, net_close, 1U, i64_param, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, NULL, 0U},
+    {"udp_bind", 8U, net_udp_bind, 2U, str_i32_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U},
+    {"udp_new", 7U, net_udp_new, 0U, NULL, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U},
+    {"udp_send", 8U, net_udp_send, 4U, udp_send_param, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, NULL, 0U},
+    {"udp_recv", 8U, net_udp_recv, 2U, i64_i32_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U},
+    {"set_timeout", 11U, net_set_timeout, 2U, i64_i32_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U},
 };
 
 #define NET_FUNCTION_COUNT (sizeof(net_functions) / sizeof(net_functions[0]))

@@ -861,14 +861,8 @@ static const int p_str[] = {VIGIL_TYPE_STRING};
 static const int p_str_i32[] = {VIGIL_TYPE_STRING, VIGIL_TYPE_I32};
 static const int p_copy[] = {VIGIL_TYPE_I64, VIGIL_TYPE_I32, VIGIL_TYPE_I64, VIGIL_TYPE_I32, VIGIL_TYPE_I32};
 
-#define F(n, nl, fn, pc, pt, rt)                                                                                       \
-    {                                                                                                                  \
-        n, nl, fn, pc, pt, rt, 1, NULL, 0, NULL, NULL                                                                  \
-    }
-#define FV(n, nl, fn, pc, pt)                                                                                          \
-    {                                                                                                                  \
-        n, nl, fn, pc, pt, VIGIL_TYPE_VOID, 0, NULL, 0, NULL, NULL                                                     \
-    }
+#define F(n, nl, fn, pc, pt, rt) {n, nl, fn, pc, pt, rt, 1, NULL, 0, NULL, NULL, 0U}
+#define FV(n, nl, fn, pc, pt) {n, nl, fn, pc, pt, VIGIL_TYPE_VOID, 0, NULL, 0, NULL, NULL, 0U}
 
 static const vigil_native_module_function_t vigil_unsafe_functions[] = {
     /* Buffer management */

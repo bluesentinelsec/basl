@@ -158,12 +158,12 @@ static const int seed_params[] = {VIGIL_TYPE_I32};
 static const int range_params[] = {VIGIL_TYPE_I32, VIGIL_TYPE_I32};
 
 static const vigil_native_module_function_t vigil_random_functions[] = {
-    {"seed", 4U, vigil_random_seed, 1U, seed_params, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, NULL},
-    {"i64", 3U, vigil_random_i64, 0U, NULL, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL},
-    {"i32", 3U, vigil_random_i32, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, NULL},
-    {"f64", 3U, vigil_random_f64, 0U, NULL, VIGIL_TYPE_F64, 1U, NULL, 0, NULL, NULL},
-    {"gaussian", 8U, vigil_random_gaussian, 0U, NULL, VIGIL_TYPE_F64, 1U, NULL, 0, NULL, NULL},
-    {"range", 5U, vigil_random_range, 2U, range_params, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, NULL},
+    {"seed", 4U, vigil_random_seed, 1U, seed_params, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, NULL, 0U},
+    {"i64", 3U, vigil_random_i64, 0U, NULL, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U},
+    {"i32", 3U, vigil_random_i32, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, NULL, 0U},
+    {"f64", 3U, vigil_random_f64, 0U, NULL, VIGIL_TYPE_F64, 1U, NULL, 0, NULL, NULL, 0U},
+    {"gaussian", 8U, vigil_random_gaussian, 0U, NULL, VIGIL_TYPE_F64, 1U, NULL, 0, NULL, NULL, 0U},
+    {"range", 5U, vigil_random_range, 2U, range_params, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, NULL, 0U},
 };
 
 #define RANDOM_FUNCTION_COUNT (sizeof(vigil_random_functions) / sizeof(vigil_random_functions[0]))

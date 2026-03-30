@@ -121,9 +121,9 @@ static const int vigil_fmt_print_params[] = {VIGIL_TYPE_STRING};
 static const int vigil_fmt_eprintln_params[] = {VIGIL_TYPE_STRING};
 
 static const vigil_native_module_function_t vigil_fmt_functions[] = {
-    {"println", 7U, vigil_fmt_println, 1U, vigil_fmt_println_params, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, NULL},
-    {"print", 5U, vigil_fmt_print, 1U, vigil_fmt_print_params, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, NULL},
-    {"eprintln", 8U, vigil_fmt_eprintln, 1U, vigil_fmt_eprintln_params, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, NULL},
+    {"println", 7U, vigil_fmt_println, 1U, vigil_fmt_println_params, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, NULL, 0U},
+    {"print", 5U, vigil_fmt_print, 1U, vigil_fmt_print_params, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, NULL, 0U},
+    {"eprintln", 8U, vigil_fmt_eprintln, 1U, vigil_fmt_eprintln_params, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, NULL, 0U},
 };
 
 #define VIGIL_FMT_FUNCTION_COUNT (sizeof(vigil_fmt_functions) / sizeof(vigil_fmt_functions[0]))

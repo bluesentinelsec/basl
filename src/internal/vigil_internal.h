@@ -6,6 +6,7 @@
 #include "vigil/runtime.h"
 #include "vigil/status.h"
 #include "vigil/value.h"
+#include "vigil_binding.h"
 
 /* Forward declarations for opaque platform types used by the runtime struct.
  * The full definitions live in platform/platform.h; callers that need them
@@ -67,26 +68,55 @@ typedef struct vigil_runtime_interface_impl_init
     size_t function_count;
 } vigil_runtime_interface_impl_init_t;
 
+typedef struct vigil_runtime_class_field_init
+{
+    const char *name;
+    size_t name_length;
+    vigil_binding_type_t type;
+    int is_public;
+} vigil_runtime_class_field_init_t;
+
 typedef struct vigil_runtime_class_init
 {
+    const vigil_runtime_class_field_init_t *fields;
+    size_t field_count;
     const vigil_runtime_interface_impl_init_t *interface_impls;
     size_t interface_impl_count;
 } vigil_runtime_class_init_t;
 
+typedef struct vigil_runtime_array_type_init
+{
+    vigil_binding_type_t element_type;
+} vigil_runtime_array_type_init_t;
+
+typedef struct vigil_runtime_map_type_init
+{
+    vigil_binding_type_t key_type;
+    vigil_binding_type_t value_type;
+} vigil_runtime_map_type_init_t;
+
 vigil_allocator_t vigil_default_allocator(void);
 int vigil_allocator_is_valid(const vigil_allocator_t *allocator);
 void vigil_error_set_literal(vigil_error_t *error, vigil_status_t type, const char *value);
-vigil_status_t vigil_function_object_attach_siblings(vigil_object_t *owner_function, vigil_object_t **functions,
-                                                     size_t function_count, size_t owner_index,
-                                                     const vigil_value_t *initial_globals, size_t global_count,
-                                                     const vigil_runtime_class_init_t *classes, size_t class_count,
-                                                     vigil_error_t *error);
+vigil_status_t vigil_function_object_attach_siblings(
+    vigil_object_t *owner_function, vigil_object_t **functions, size_t function_count, size_t owner_index,
+    const vigil_value_t *initial_globals, size_t global_count, const vigil_runtime_class_init_t *classes,
+    size_t class_count, const vigil_runtime_array_type_init_t *array_types, size_t array_type_count,
+    const vigil_runtime_map_type_init_t *map_types, size_t map_type_count, vigil_error_t *error);
 const vigil_object_t *vigil_function_object_sibling(const vigil_object_t *function, size_t index);
 const vigil_object_t *vigil_function_object_resolve_interface_method(const vigil_object_t *function, size_t class_index,
                                                                      size_t interface_index, size_t method_index);
 int vigil_function_object_get_global(const vigil_object_t *function, size_t index, vigil_value_t *out_value);
 vigil_status_t vigil_function_object_set_global(const vigil_object_t *function, size_t index,
                                                 const vigil_value_t *value, vigil_error_t *error);
+int vigil_function_object_get_class_field(const vigil_object_t *function, size_t class_index, size_t field_index,
+                                          const char **out_name, size_t *out_name_length,
+                                          vigil_binding_type_t *out_type, int *out_is_public);
+size_t vigil_function_object_class_field_count(const vigil_object_t *function, size_t class_index);
+int vigil_function_object_get_array_type(const vigil_object_t *function, size_t array_index,
+                                         vigil_binding_type_t *out_element_type);
+int vigil_function_object_get_map_type(const vigil_object_t *function, size_t map_index,
+                                       vigil_binding_type_t *out_key_type, vigil_binding_type_t *out_value_type);
 const vigil_object_t *vigil_callable_object_function(const vigil_object_t *callable);
 size_t vigil_callable_object_arity(const vigil_object_t *callable);
 size_t vigil_callable_object_return_count(const vigil_object_t *callable);
