@@ -710,10 +710,20 @@ static const int p_i64_i64_i32_i32_i32_i32_i32[] = {VIGIL_TYPE_I64, VIGIL_TYPE_I
 static const int p_i64_i64_f64_f64_f64_f64_i32_i32[] = {VIGIL_TYPE_I64, VIGIL_TYPE_I64, VIGIL_TYPE_F64, VIGIL_TYPE_F64,
                                                         VIGIL_TYPE_F64, VIGIL_TYPE_F64, VIGIL_TYPE_I32, VIGIL_TYPE_I32};
 static const int p_i64_i64_i32[] = {VIGIL_TYPE_I64, VIGIL_TYPE_I64, VIGIL_TYPE_I32};
+static const int p_i64_i32[] = {VIGIL_TYPE_I64, VIGIL_TYPE_I32};
+static const int p_i64_i64_str[] = {VIGIL_TYPE_I64, VIGIL_TYPE_I64, VIGIL_TYPE_STRING};
+static const int p_i64_f64_f64_f64_f64[] = {VIGIL_TYPE_I64, VIGIL_TYPE_F64, VIGIL_TYPE_F64, VIGIL_TYPE_F64,
+                                            VIGIL_TYPE_F64};
+static const int p_i64_i64_i32_i32[] = {VIGIL_TYPE_I64, VIGIL_TYPE_I64, VIGIL_TYPE_I32, VIGIL_TYPE_I32};
+static const int p_i64_obj_i32[] = {VIGIL_TYPE_I64, VIGIL_TYPE_OBJECT, VIGIL_TYPE_I32};
+static const int p_i64_i64_i32x9[] = {VIGIL_TYPE_I64, VIGIL_TYPE_I64, VIGIL_TYPE_I32, VIGIL_TYPE_I32,
+                                      VIGIL_TYPE_I32, VIGIL_TYPE_I32, VIGIL_TYPE_I32, VIGIL_TYPE_I32,
+                                      VIGIL_TYPE_I32, VIGIL_TYPE_I32, VIGIL_TYPE_I32};
+static const int p_i64_i64_i32_i32_i64_i32[] = {VIGIL_TYPE_I64, VIGIL_TYPE_I64, VIGIL_TYPE_I32,
+                                                VIGIL_TYPE_I32, VIGIL_TYPE_I64, VIGIL_TYPE_I32};
 static const int p_i64_i64_i64[] = {VIGIL_TYPE_I64, VIGIL_TYPE_I64, VIGIL_TYPE_I64};
 static const int p_i64_i32_i64[] = {VIGIL_TYPE_I64, VIGIL_TYPE_I32, VIGIL_TYPE_I64};
 static const int p_i64_str[] = {VIGIL_TYPE_I64, VIGIL_TYPE_STRING};
-static const int p_i64_i64_i32_i32[] = {VIGIL_TYPE_I64, VIGIL_TYPE_I64, VIGIL_TYPE_I32, VIGIL_TYPE_I32};
 static const int p_i64_i32_i32_i32_i32_i32[] = {VIGIL_TYPE_I64, VIGIL_TYPE_I32, VIGIL_TYPE_I32,
                                                 VIGIL_TYPE_I32, VIGIL_TYPE_I32, VIGIL_TYPE_I32};
 static const int p_i64_f64_f64_f64_f64_f64_f64[] = {VIGIL_TYPE_I64, VIGIL_TYPE_F64, VIGIL_TYPE_F64, VIGIL_TYPE_F64,
@@ -5721,7 +5731,585 @@ SDL_CONST_FN(GPU_PRESENTMODE_IMMEDIATE, SDL_GPU_PRESENTMODE_IMMEDIATE)
 SDL_CONST_FN(GPU_PRESENTMODE_MAILBOX, SDL_GPU_PRESENTMODE_MAILBOX)
 SDL_CONST_FN(GPU_SWAPCHAIN_SDR, SDL_GPU_SWAPCHAINCOMPOSITION_SDR)
 
+/* ── GPU Phase 3: Complete ────────────────────────────────────────── */
+
+SDL_HANDLE_REGISTRY(gpu_compute_pipelines);
+SDL_HANDLE_REGISTRY(gpu_compute_passes);
+SDL_HANDLE_REGISTRY(gpu_fences);
+
+/* Simple query functions */
+static vigil_status_t sdl_fn_gpu_num_drivers(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_i32(vm, SDL_GetNumGPUDrivers(), error);
+}
+
+static vigil_status_t sdl_fn_gpu_get_driver_name(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t idx = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_string(vm, SDL_GetGPUDriver(idx), error);
+}
+
+static vigil_status_t sdl_fn_gpu_supports_shader_formats(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t fmt = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_bool(vm, SDL_GPUSupportsShaderFormats((SDL_GPUShaderFormat)fmt, NULL), error);
+}
+
+static vigil_status_t sdl_fn_gpu_texture_supports_format(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t dh = sdl_arg_i64(vm, base, 0);
+    int32_t fmt = sdl_arg_i32(vm, base, 1);
+    int32_t type = sdl_arg_i32(vm, base, 2);
+    int32_t usage = sdl_arg_i32(vm, base, 3);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_GPUDevice *dev = (SDL_GPUDevice *)SDL_HANDLE_GET(gpu_devices, dh);
+    return sdl_push_bool(vm,
+                         dev && SDL_GPUTextureSupportsFormat(dev, (SDL_GPUTextureFormat)fmt, (SDL_GPUTextureType)type,
+                                                             (SDL_GPUTextureUsageFlags)usage),
+                         error);
+}
+
+static vigil_status_t sdl_fn_gpu_texture_supports_sample_count(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t dh = sdl_arg_i64(vm, base, 0);
+    int32_t fmt = sdl_arg_i32(vm, base, 1);
+    int32_t sc = sdl_arg_i32(vm, base, 2);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_GPUDevice *dev = (SDL_GPUDevice *)SDL_HANDLE_GET(gpu_devices, dh);
+    return sdl_push_bool(
+        vm, dev && SDL_GPUTextureSupportsSampleCount(dev, (SDL_GPUTextureFormat)fmt, (SDL_GPUSampleCount)sc), error);
+}
+
+static vigil_status_t sdl_fn_gpu_set_allowed_frames(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t dh = sdl_arg_i64(vm, base, 0);
+    int32_t n = sdl_arg_i32(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_GPUDevice *dev = (SDL_GPUDevice *)SDL_HANDLE_GET(gpu_devices, dh);
+    if (dev && SDL_SetGPUAllowedFramesInFlight(dev, (Uint32)n))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+/* Naming / debug */
+static vigil_status_t sdl_fn_gpu_set_buffer_name(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t dh = sdl_arg_i64(vm, base, 0);
+    int64_t bh = sdl_arg_i64(vm, base, 1);
+    char name[256];
+    sdl_arg_str(vm, base, 2, name, sizeof(name));
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_GPUDevice *dev = (SDL_GPUDevice *)SDL_HANDLE_GET(gpu_devices, dh);
+    SDL_GPUBuffer *buf = (SDL_GPUBuffer *)SDL_HANDLE_GET(gpu_buffers, bh);
+    if (dev && buf)
+        SDL_SetGPUBufferName(dev, buf, name);
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t sdl_fn_gpu_set_texture_name(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t dh = sdl_arg_i64(vm, base, 0);
+    int64_t th = sdl_arg_i64(vm, base, 1);
+    char name[256];
+    sdl_arg_str(vm, base, 2, name, sizeof(name));
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_GPUDevice *dev = (SDL_GPUDevice *)SDL_HANDLE_GET(gpu_devices, dh);
+    SDL_GPUTexture *tex = (SDL_GPUTexture *)SDL_HANDLE_GET(gpu_textures_gpu, th);
+    if (dev && tex)
+        SDL_SetGPUTextureName(dev, tex, name);
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t sdl_fn_gpu_push_debug_group(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t ch = sdl_arg_i64(vm, base, 0);
+    char name[256];
+    sdl_arg_str(vm, base, 1, name, sizeof(name));
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_GPUCommandBuffer *cmd = (SDL_GPUCommandBuffer *)SDL_HANDLE_GET(gpu_cmd_buffers, ch);
+    if (cmd)
+        SDL_PushGPUDebugGroup(cmd, name);
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t sdl_fn_gpu_pop_debug_group(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t ch = sdl_arg_i64(vm, base, 0);
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_GPUCommandBuffer *cmd = (SDL_GPUCommandBuffer *)SDL_HANDLE_GET(gpu_cmd_buffers, ch);
+    if (cmd)
+        SDL_PopGPUDebugGroup(cmd);
+    return VIGIL_STATUS_OK;
+}
+
+/* Render state extras */
+static vigil_status_t sdl_fn_gpu_set_blend_constants(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t ph = sdl_arg_i64(vm, base, 0);
+    float r = (float)sdl_arg_f64(vm, base, 1), g = (float)sdl_arg_f64(vm, base, 2), b = (float)sdl_arg_f64(vm, base, 3),
+          a = (float)sdl_arg_f64(vm, base, 4);
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_GPURenderPass *pass = (SDL_GPURenderPass *)SDL_HANDLE_GET(gpu_render_passes, ph);
+    if (pass)
+    {
+        SDL_FColor c = {r, g, b, a};
+        SDL_SetGPUBlendConstants(pass, c);
+    }
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t sdl_fn_gpu_set_stencil_ref(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t ph = sdl_arg_i64(vm, base, 0);
+    int32_t ref = sdl_arg_i32(vm, base, 1);
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_GPURenderPass *pass = (SDL_GPURenderPass *)SDL_HANDLE_GET(gpu_render_passes, ph);
+    if (pass)
+        SDL_SetGPUStencilReference(pass, (Uint8)ref);
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t sdl_fn_gpu_bind_vertex_samplers(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t ph = sdl_arg_i64(vm, base, 0);
+    int64_t th = sdl_arg_i64(vm, base, 1);
+    int64_t sh = sdl_arg_i64(vm, base, 2);
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_GPURenderPass *pass = (SDL_GPURenderPass *)SDL_HANDLE_GET(gpu_render_passes, ph);
+    SDL_GPUTexture *tex = (SDL_GPUTexture *)SDL_HANDLE_GET(gpu_textures_gpu, th);
+    SDL_GPUSampler *samp = (SDL_GPUSampler *)SDL_HANDLE_GET(gpu_samplers, sh);
+    if (pass && tex && samp)
+    {
+        SDL_GPUTextureSamplerBinding tsb = {tex, samp};
+        SDL_BindGPUVertexSamplers(pass, 0, &tsb, 1);
+    }
+    return VIGIL_STATUS_OK;
+}
+
+/* Indirect draw */
+static vigil_status_t sdl_fn_gpu_draw_indirect(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t ph = sdl_arg_i64(vm, base, 0);
+    int64_t bh = sdl_arg_i64(vm, base, 1);
+    int32_t off = sdl_arg_i32(vm, base, 2);
+    int32_t cnt = sdl_arg_i32(vm, base, 3);
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_GPURenderPass *pass = (SDL_GPURenderPass *)SDL_HANDLE_GET(gpu_render_passes, ph);
+    SDL_GPUBuffer *buf = (SDL_GPUBuffer *)SDL_HANDLE_GET(gpu_buffers, bh);
+    if (pass && buf)
+        SDL_DrawGPUPrimitivesIndirect(pass, buf, (Uint32)off, (Uint32)cnt);
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t sdl_fn_gpu_draw_indexed_indirect(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t ph = sdl_arg_i64(vm, base, 0);
+    int64_t bh = sdl_arg_i64(vm, base, 1);
+    int32_t off = sdl_arg_i32(vm, base, 2);
+    int32_t cnt = sdl_arg_i32(vm, base, 3);
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_GPURenderPass *pass = (SDL_GPURenderPass *)SDL_HANDLE_GET(gpu_render_passes, ph);
+    SDL_GPUBuffer *buf = (SDL_GPUBuffer *)SDL_HANDLE_GET(gpu_buffers, bh);
+    if (pass && buf)
+        SDL_DrawGPUIndexedPrimitivesIndirect(pass, buf, (Uint32)off, (Uint32)cnt);
+    return VIGIL_STATUS_OK;
+}
+
+/* Fences */
+static vigil_status_t sdl_fn_gpu_submit_and_fence(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t ch = sdl_arg_i64(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_GPUCommandBuffer *cmd = (SDL_GPUCommandBuffer *)SDL_HANDLE_GET(gpu_cmd_buffers, ch);
+    if (!cmd)
+        return sdl_push_i64(vm, -1, error);
+    SDL_GPUFence *f = SDL_SubmitGPUCommandBufferAndAcquireFence(cmd);
+    SDL_HANDLE_CLEAR(gpu_cmd_buffers, ch);
+    if (!f)
+        return sdl_push_i64(vm, -1, error);
+    int64_t h;
+    if (SDL_HANDLE_STORE(gpu_fences, f, &h) < 0)
+        return sdl_push_i64(vm, -1, error);
+    return sdl_push_i64(vm, h, error);
+}
+
+static vigil_status_t sdl_fn_gpu_query_fence(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t dh = sdl_arg_i64(vm, base, 0);
+    int64_t fh = sdl_arg_i64(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_GPUDevice *dev = (SDL_GPUDevice *)SDL_HANDLE_GET(gpu_devices, dh);
+    SDL_GPUFence *f = (SDL_GPUFence *)SDL_HANDLE_GET(gpu_fences, fh);
+    return sdl_push_bool(vm, dev && f && SDL_QueryGPUFence(dev, f), error);
+}
+
+static vigil_status_t sdl_fn_gpu_release_fence(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t dh = sdl_arg_i64(vm, base, 0);
+    int64_t fh = sdl_arg_i64(vm, base, 1);
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_GPUDevice *dev = (SDL_GPUDevice *)SDL_HANDLE_GET(gpu_devices, dh);
+    SDL_GPUFence *f = (SDL_GPUFence *)SDL_HANDLE_GET(gpu_fences, fh);
+    if (dev && f)
+    {
+        SDL_ReleaseGPUFence(dev, f);
+        SDL_HANDLE_CLEAR(gpu_fences, fh);
+    }
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t sdl_fn_gpu_wait_fences(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t dh = sdl_arg_i64(vm, base, 0);
+    int64_t fh = sdl_arg_i64(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_GPUDevice *dev = (SDL_GPUDevice *)SDL_HANDLE_GET(gpu_devices, dh);
+    SDL_GPUFence *f = (SDL_GPUFence *)SDL_HANDLE_GET(gpu_fences, fh);
+    if (dev && f && SDL_WaitForGPUFences(dev, true, &f, 1))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+/* Swapchain extras */
+static vigil_status_t sdl_fn_gpu_wait_swapchain(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t dh = sdl_arg_i64(vm, base, 0);
+    int64_t wh = sdl_field_i64(vm, base + 1, WIN_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_GPUDevice *dev = (SDL_GPUDevice *)SDL_HANDLE_GET(gpu_devices, dh);
+    SDL_Window *win = (SDL_Window *)SDL_HANDLE_GET(windows, wh);
+    if (dev && win && SDL_WaitForGPUSwapchain(dev, win))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+static vigil_status_t sdl_fn_gpu_wait_acquire_swapchain(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t ch = sdl_arg_i64(vm, base, 0);
+    int64_t wh = sdl_field_i64(vm, base + 1, WIN_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_GPUCommandBuffer *cmd = (SDL_GPUCommandBuffer *)SDL_HANDLE_GET(gpu_cmd_buffers, ch);
+    SDL_Window *win = (SDL_Window *)SDL_HANDLE_GET(windows, wh);
+    if (!cmd || !win)
+    {
+        vigil_status_t st = sdl_push_i64(vm, -1, error);
+        if (st != VIGIL_STATUS_OK)
+            return st;
+        return sdl_push_err(vm, "invalid cmd/window", SDL_ERR_ARG, error);
+    }
+    SDL_GPUTexture *tex = NULL;
+    Uint32 w = 0, h = 0;
+    if (!SDL_WaitAndAcquireGPUSwapchainTexture(cmd, win, &tex, &w, &h) || !tex)
+    {
+        vigil_status_t st = sdl_push_i64(vm, -1, error);
+        if (st != VIGIL_STATUS_OK)
+            return st;
+        return sdl_push_sdl_err(vm, SDL_ERR_IO, error);
+    }
+    int64_t th;
+    if (SDL_HANDLE_STORE(gpu_textures_gpu, tex, &th) < 0)
+    {
+        vigil_status_t st = sdl_push_i64(vm, -1, error);
+        if (st != VIGIL_STATUS_OK)
+            return st;
+        return sdl_push_err(vm, "too many GPU textures", SDL_ERR_STATE, error);
+    }
+    vigil_status_t st = sdl_push_i64(vm, th, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_ok(vm, error);
+}
+
+static vigil_status_t sdl_fn_gpu_window_supports_present(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t dh = sdl_arg_i64(vm, base, 0);
+    int64_t wh = sdl_field_i64(vm, base + 1, WIN_HANDLE);
+    int32_t mode = sdl_arg_i32(vm, base, 2);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_GPUDevice *dev = (SDL_GPUDevice *)SDL_HANDLE_GET(gpu_devices, dh);
+    SDL_Window *win = (SDL_Window *)SDL_HANDLE_GET(windows, wh);
+    return sdl_push_bool(vm, dev && win && SDL_WindowSupportsGPUPresentMode(dev, win, (SDL_GPUPresentMode)mode), error);
+}
+
+static vigil_status_t sdl_fn_gpu_window_supports_composition(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t dh = sdl_arg_i64(vm, base, 0);
+    int64_t wh = sdl_field_i64(vm, base + 1, WIN_HANDLE);
+    int32_t comp = sdl_arg_i32(vm, base, 2);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_GPUDevice *dev = (SDL_GPUDevice *)SDL_HANDLE_GET(gpu_devices, dh);
+    SDL_Window *win = (SDL_Window *)SDL_HANDLE_GET(windows, wh);
+    return sdl_push_bool(
+        vm, dev && win && SDL_WindowSupportsGPUSwapchainComposition(dev, win, (SDL_GPUSwapchainComposition)comp),
+        error);
+}
+
 /* GPU constants */
+
+/* Compute pipeline */
+static vigil_status_t sdl_fn_gpu_create_compute_pipeline(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t dh = sdl_arg_i64(vm, base, 0);
+    int64_t buf = sdl_arg_i64(vm, base, 1);
+    int32_t n_samp = sdl_arg_i32(vm, base, 2);
+    int32_t n_ro_tex = sdl_arg_i32(vm, base, 3);
+    int32_t n_ro_buf = sdl_arg_i32(vm, base, 4);
+    int32_t n_rw_tex = sdl_arg_i32(vm, base, 5);
+    int32_t n_rw_buf = sdl_arg_i32(vm, base, 6);
+    int32_t n_ubuf = sdl_arg_i32(vm, base, 7);
+    int32_t tx = sdl_arg_i32(vm, base, 8);
+    int32_t ty = sdl_arg_i32(vm, base, 9);
+    int32_t tz = sdl_arg_i32(vm, base, 10);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_GPUDevice *dev = (SDL_GPUDevice *)SDL_HANDLE_GET(gpu_devices, dh);
+    int32_t code_size = 0;
+    void *code = vigil_unsafe_buffer_get(buf, &code_size);
+    if (!dev || !code)
+    {
+        vigil_status_t st = sdl_push_i64(vm, -1, error);
+        if (st != VIGIL_STATUS_OK)
+            return st;
+        return sdl_push_err(vm, "invalid device or buffer", SDL_ERR_ARG, error);
+    }
+    SDL_GPUComputePipelineCreateInfo ci = {0};
+    ci.code = (const Uint8 *)code;
+    ci.code_size = (size_t)code_size;
+    ci.entrypoint = "main";
+    ci.format = SDL_GetGPUShaderFormats(dev);
+    ci.num_samplers = (Uint32)n_samp;
+    ci.num_readonly_storage_textures = (Uint32)n_ro_tex;
+    ci.num_readonly_storage_buffers = (Uint32)n_ro_buf;
+    ci.num_readwrite_storage_textures = (Uint32)n_rw_tex;
+    ci.num_readwrite_storage_buffers = (Uint32)n_rw_buf;
+    ci.num_uniform_buffers = (Uint32)n_ubuf;
+    ci.threadcount_x = (Uint32)tx;
+    ci.threadcount_y = (Uint32)ty;
+    ci.threadcount_z = (Uint32)tz;
+    SDL_GPUComputePipeline *pip = SDL_CreateGPUComputePipeline(dev, &ci);
+    if (!pip)
+    {
+        vigil_status_t st = sdl_push_i64(vm, -1, error);
+        if (st != VIGIL_STATUS_OK)
+            return st;
+        return sdl_push_sdl_err(vm, SDL_ERR_IO, error);
+    }
+    int64_t h;
+    if (SDL_HANDLE_STORE(gpu_compute_pipelines, pip, &h) < 0)
+    {
+        SDL_ReleaseGPUComputePipeline(dev, pip);
+        vigil_status_t st = sdl_push_i64(vm, -1, error);
+        if (st != VIGIL_STATUS_OK)
+            return st;
+        return sdl_push_err(vm, "too many compute pipelines", SDL_ERR_STATE, error);
+    }
+    vigil_status_t st = sdl_push_i64(vm, h, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_ok(vm, error);
+}
+
+static vigil_status_t sdl_fn_gpu_release_compute_pipeline(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t dh = sdl_arg_i64(vm, base, 0);
+    int64_t ph = sdl_arg_i64(vm, base, 1);
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_GPUDevice *dev = (SDL_GPUDevice *)SDL_HANDLE_GET(gpu_devices, dh);
+    SDL_GPUComputePipeline *pip = (SDL_GPUComputePipeline *)SDL_HANDLE_GET(gpu_compute_pipelines, ph);
+    if (dev && pip)
+    {
+        SDL_ReleaseGPUComputePipeline(dev, pip);
+        SDL_HANDLE_CLEAR(gpu_compute_pipelines, ph);
+    }
+    return VIGIL_STATUS_OK;
+}
+
+/* Compute pass */
+static vigil_status_t sdl_fn_gpu_begin_compute_pass(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t ch = sdl_arg_i64(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_GPUCommandBuffer *cmd = (SDL_GPUCommandBuffer *)SDL_HANDLE_GET(gpu_cmd_buffers, ch);
+    if (!cmd)
+        return sdl_push_i64(vm, -1, error);
+    SDL_GPUComputePass *cp = SDL_BeginGPUComputePass(cmd, NULL, 0, NULL, 0);
+    if (!cp)
+        return sdl_push_i64(vm, -1, error);
+    int64_t h;
+    if (SDL_HANDLE_STORE(gpu_compute_passes, cp, &h) < 0)
+        return sdl_push_i64(vm, -1, error);
+    return sdl_push_i64(vm, h, error);
+}
+
+static vigil_status_t sdl_fn_gpu_end_compute_pass(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t cph = sdl_arg_i64(vm, base, 0);
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_GPUComputePass *cp = (SDL_GPUComputePass *)SDL_HANDLE_GET(gpu_compute_passes, cph);
+    if (cp)
+    {
+        SDL_EndGPUComputePass(cp);
+        SDL_HANDLE_CLEAR(gpu_compute_passes, cph);
+    }
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t sdl_fn_gpu_bind_compute_pipeline(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t cph = sdl_arg_i64(vm, base, 0);
+    int64_t pih = sdl_arg_i64(vm, base, 1);
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_GPUComputePass *cp = (SDL_GPUComputePass *)SDL_HANDLE_GET(gpu_compute_passes, cph);
+    SDL_GPUComputePipeline *pip = (SDL_GPUComputePipeline *)SDL_HANDLE_GET(gpu_compute_pipelines, pih);
+    if (cp && pip)
+        SDL_BindGPUComputePipeline(cp, pip);
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t sdl_fn_gpu_dispatch_compute(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t cph = sdl_arg_i64(vm, base, 0);
+    int32_t gx = sdl_arg_i32(vm, base, 1);
+    int32_t gy = sdl_arg_i32(vm, base, 2);
+    int32_t gz = sdl_arg_i32(vm, base, 3);
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_GPUComputePass *cp = (SDL_GPUComputePass *)SDL_HANDLE_GET(gpu_compute_passes, cph);
+    if (cp)
+        SDL_DispatchGPUCompute(cp, (Uint32)gx, (Uint32)gy, (Uint32)gz);
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t sdl_fn_gpu_push_compute_uniforms(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t ch = sdl_arg_i64(vm, base, 0);
+    int32_t slot = sdl_arg_i32(vm, base, 1);
+    int64_t bh = sdl_arg_i64(vm, base, 2);
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_GPUCommandBuffer *cmd = (SDL_GPUCommandBuffer *)SDL_HANDLE_GET(gpu_cmd_buffers, ch);
+    int32_t sz = 0;
+    void *data = vigil_unsafe_buffer_get(bh, &sz);
+    if (cmd && data)
+        SDL_PushGPUComputeUniformData(cmd, (Uint32)slot, data, (Uint32)sz);
+    return VIGIL_STATUS_OK;
+}
+
+/* Copy pass extras */
+static vigil_status_t sdl_fn_gpu_copy_buffer_to_buffer(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t cph = sdl_arg_i64(vm, base, 0);
+    int64_t sh = sdl_arg_i64(vm, base, 1);
+    int32_t soff = sdl_arg_i32(vm, base, 2);
+    int64_t dh = sdl_arg_i64(vm, base, 3);
+    int32_t doff = sdl_arg_i32(vm, base, 4);
+    int32_t sz = sdl_arg_i32(vm, base, 5);
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_GPUCopyPass *cp = (SDL_GPUCopyPass *)SDL_HANDLE_GET(gpu_copy_passes, cph);
+    SDL_GPUBuffer *src = (SDL_GPUBuffer *)SDL_HANDLE_GET(gpu_buffers, sh);
+    SDL_GPUBuffer *dst = (SDL_GPUBuffer *)SDL_HANDLE_GET(gpu_buffers, dh);
+    if (cp && src && dst)
+    {
+        SDL_GPUBufferLocation sl = {src, (Uint32)soff};
+        SDL_GPUBufferLocation dl = {dst, (Uint32)doff};
+        SDL_CopyGPUBufferToBuffer(cp, &sl, &dl, (Uint32)sz, false);
+    }
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t sdl_fn_gpu_download_from_buffer(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t cph = sdl_arg_i64(vm, base, 0);
+    int64_t bh = sdl_arg_i64(vm, base, 1);
+    int32_t boff = sdl_arg_i32(vm, base, 2);
+    int32_t sz = sdl_arg_i32(vm, base, 3);
+    int64_t xh = sdl_arg_i64(vm, base, 4);
+    int32_t xoff = sdl_arg_i32(vm, base, 5);
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_GPUCopyPass *cp = (SDL_GPUCopyPass *)SDL_HANDLE_GET(gpu_copy_passes, cph);
+    SDL_GPUBuffer *buf = (SDL_GPUBuffer *)SDL_HANDLE_GET(gpu_buffers, bh);
+    SDL_GPUTransferBuffer *xb = (SDL_GPUTransferBuffer *)SDL_HANDLE_GET(gpu_xfer_buffers, xh);
+    if (cp && buf && xb)
+    {
+        SDL_GPUBufferRegion src = {buf, (Uint32)boff, (Uint32)sz};
+        SDL_GPUTransferBufferLocation dst = {xb, (Uint32)xoff};
+        SDL_DownloadFromGPUBuffer(cp, &src, &dst);
+    }
+    return VIGIL_STATUS_OK;
+}
+
+/* Upload to GPU texture */
+static vigil_status_t sdl_fn_gpu_upload_to_texture(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t cph = sdl_arg_i64(vm, base, 0);
+    int64_t xh = sdl_arg_i64(vm, base, 1);
+    int32_t xoff = sdl_arg_i32(vm, base, 2);
+    int64_t th = sdl_arg_i64(vm, base, 3);
+    int32_t w = sdl_arg_i32(vm, base, 4);
+    int32_t h = sdl_arg_i32(vm, base, 5);
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_GPUCopyPass *cp = (SDL_GPUCopyPass *)SDL_HANDLE_GET(gpu_copy_passes, cph);
+    SDL_GPUTransferBuffer *xb = (SDL_GPUTransferBuffer *)SDL_HANDLE_GET(gpu_xfer_buffers, xh);
+    SDL_GPUTexture *tex = (SDL_GPUTexture *)SDL_HANDLE_GET(gpu_textures_gpu, th);
+    if (cp && xb && tex)
+    {
+        SDL_GPUTextureTransferInfo src = {xb, (Uint32)xoff, 0, 0};
+        SDL_GPUTextureRegion dst = {tex, 0, 0, 0, 0, 0, (Uint32)w, (Uint32)h, 1};
+        SDL_UploadToGPUTexture(cp, &src, &dst, false);
+    }
+    return VIGIL_STATUS_OK;
+}
+
 SDL_CONST_FN(GPU_SHADERFORMAT_SPIRV, SDL_GPU_SHADERFORMAT_SPIRV)
 SDL_CONST_FN(GPU_SHADERFORMAT_MSL, SDL_GPU_SHADERFORMAT_MSL)
 SDL_CONST_FN(GPU_SHADERFORMAT_METALLIB, SDL_GPU_SHADERFORMAT_METALLIB)
@@ -6216,6 +6804,46 @@ static const vigil_native_module_function_t sdl_functions[] = {
     SDL_CONST_ENTRY("GPU_PRESENTMODE_IMMEDIATE", GPU_PRESENTMODE_IMMEDIATE),
     SDL_CONST_ENTRY("GPU_PRESENTMODE_MAILBOX", GPU_PRESENTMODE_MAILBOX),
     SDL_CONST_ENTRY("GPU_SWAPCHAIN_SDR", GPU_SWAPCHAIN_SDR),
+    /* GPU Phase 3 */
+    SDL_FN("gpu_num_drivers", 15U, sdl_fn_gpu_num_drivers, 0U, NULL, VIGIL_TYPE_I32),
+    SDL_FN("gpu_get_driver_name", 19U, sdl_fn_gpu_get_driver_name, 1U, p_i32, VIGIL_TYPE_STRING),
+    SDL_FN("gpu_supports_shader_formats", 27U, sdl_fn_gpu_supports_shader_formats, 1U, p_i32, VIGIL_TYPE_BOOL),
+    {"gpu_texture_supports_format", 27U, sdl_fn_gpu_texture_supports_format, 4U, p_i64_i32_i32_i32, VIGIL_TYPE_BOOL, 1U,
+     NULL, 0, NULL, NULL, 0},
+    {"gpu_texture_supports_sample_count", 33U, sdl_fn_gpu_texture_supports_sample_count, 3U, p_i64_i32_i32,
+     VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0},
+    SDL_FN_BOOL_ERR("gpu_set_allowed_frames", 22U, sdl_fn_gpu_set_allowed_frames, 2U, p_i64_i32),
+    SDL_FN_VOID("gpu_set_buffer_name", 19U, sdl_fn_gpu_set_buffer_name, 3U, p_i64_i64_str),
+    SDL_FN_VOID("gpu_set_texture_name", 20U, sdl_fn_gpu_set_texture_name, 3U, p_i64_i64_str),
+    SDL_FN_VOID("gpu_push_debug_group", 20U, sdl_fn_gpu_push_debug_group, 2U, p_i64_str),
+    SDL_FN_VOID("gpu_pop_debug_group", 19U, sdl_fn_gpu_pop_debug_group, 1U, p_i64),
+    SDL_FN_VOID("gpu_set_blend_constants", 23U, sdl_fn_gpu_set_blend_constants, 5U, p_i64_f64_f64_f64_f64),
+    SDL_FN_VOID("gpu_set_stencil_ref", 19U, sdl_fn_gpu_set_stencil_ref, 2U, p_i64_i32),
+    SDL_FN_VOID("gpu_bind_vertex_samplers", 24U, sdl_fn_gpu_bind_vertex_samplers, 3U, p_i64_i64_i64),
+    SDL_FN_VOID("gpu_draw_indirect", 17U, sdl_fn_gpu_draw_indirect, 4U, p_i64_i64_i32_i32),
+    SDL_FN_VOID("gpu_draw_indexed_indirect", 24U, sdl_fn_gpu_draw_indexed_indirect, 4U, p_i64_i64_i32_i32),
+    SDL_FN("gpu_submit_and_fence", 20U, sdl_fn_gpu_submit_and_fence, 1U, p_i64, VIGIL_TYPE_I64),
+    SDL_FN("gpu_query_fence", 15U, sdl_fn_gpu_query_fence, 2U, p_i64_i64, VIGIL_TYPE_BOOL),
+    SDL_FN_VOID("gpu_release_fence", 17U, sdl_fn_gpu_release_fence, 2U, p_i64_i64),
+    SDL_FN_BOOL_ERR("gpu_wait_fences", 14U, sdl_fn_gpu_wait_fences, 2U, p_i64_i64),
+    SDL_FN_BOOL_ERR("gpu_wait_swapchain", 18U, sdl_fn_gpu_wait_swapchain, 2U, p_i64_obj),
+    {"gpu_wait_acquire_swapchain", 26U, sdl_fn_gpu_wait_acquire_swapchain, 2U, p_i64_obj, VIGIL_TYPE_I64, 2U,
+     rt_i64_err, 0, NULL, NULL, 0},
+    {"gpu_window_supports_present", 27U, sdl_fn_gpu_window_supports_present, 3U, p_i64_obj_i32, VIGIL_TYPE_BOOL, 1U,
+     NULL, 0, NULL, NULL, 0},
+    {"gpu_window_supports_composition", 31U, sdl_fn_gpu_window_supports_composition, 3U, p_i64_obj_i32, VIGIL_TYPE_BOOL,
+     1U, NULL, 0, NULL, NULL, 0},
+    {"gpu_create_compute_pipeline", 27U, sdl_fn_gpu_create_compute_pipeline, 11U, p_i64_i64_i32x9, VIGIL_TYPE_I64, 2U,
+     rt_i64_err, 0, NULL, NULL, 0},
+    SDL_FN_VOID("gpu_release_compute_pipeline", 27U, sdl_fn_gpu_release_compute_pipeline, 2U, p_i64_i64),
+    SDL_FN("gpu_begin_compute_pass", 22U, sdl_fn_gpu_begin_compute_pass, 1U, p_i64, VIGIL_TYPE_I64),
+    SDL_FN_VOID("gpu_end_compute_pass", 20U, sdl_fn_gpu_end_compute_pass, 1U, p_i64),
+    SDL_FN_VOID("gpu_bind_compute_pipeline", 24U, sdl_fn_gpu_bind_compute_pipeline, 2U, p_i64_i64),
+    SDL_FN_VOID("gpu_dispatch_compute", 20U, sdl_fn_gpu_dispatch_compute, 4U, p_i64_i32_i32_i32),
+    SDL_FN_VOID("gpu_push_compute_uniforms", 25U, sdl_fn_gpu_push_compute_uniforms, 3U, p_i64_i32_i64),
+    SDL_FN_VOID("gpu_copy_buffer_to_buffer", 24U, sdl_fn_gpu_copy_buffer_to_buffer, 6U, p_i64_i64_i32_i64_i32_i32),
+    SDL_FN_VOID("gpu_download_from_buffer", 23U, sdl_fn_gpu_download_from_buffer, 6U, p_i64_i64_i32_i32_i64_i32),
+    SDL_FN_VOID("gpu_upload_to_texture", 21U, sdl_fn_gpu_upload_to_texture, 6U, p_i64_i64_i32_i64_i32_i32),
     /* Display info (slice 11) */
     SDL_FN("get_display_count", 17U, sdl_fn_get_display_count, 0U, NULL, VIGIL_TYPE_I32),
     SDL_FN("get_display_name", 16U, sdl_fn_get_display_name, 1U, p_i32, VIGIL_TYPE_STRING),
