@@ -9505,6 +9505,149 @@ static vigil_status_t sdl_audio_stream_get_data(vigil_vm_t *vm, size_t arg_count
     return sdl_push_i32(vm, SDL_GetAudioStreamData(s, buf, to_read), error);
 }
 
+/* ── Sensor Complete ──────────────────────────────────────────────── */
+
+SDL_HANDLE_REGISTRY(sensors);
+
+static SDL_SensorID *g_sensor_ids = NULL;
+static int g_sensor_count = 0;
+
+static vigil_status_t sdl_fn_get_sensor_count(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    vigil_vm_stack_pop_n(vm, arg_count);
+    if (g_sensor_ids)
+    {
+        SDL_free(g_sensor_ids);
+        g_sensor_ids = NULL;
+    }
+    g_sensor_ids = SDL_GetSensors(&g_sensor_count);
+    return sdl_push_i32(vm, g_sensor_count, error);
+}
+
+static vigil_status_t sdl_fn_get_sensor_name_for_id(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t idx = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    if (idx >= 0 && idx < g_sensor_count && g_sensor_ids)
+        return sdl_push_string(vm, SDL_GetSensorNameForID(g_sensor_ids[idx]), error);
+    return sdl_push_string(vm, "", error);
+}
+
+static vigil_status_t sdl_fn_get_sensor_type_for_id(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t idx = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    if (idx >= 0 && idx < g_sensor_count && g_sensor_ids)
+        return sdl_push_i32(vm, (int32_t)SDL_GetSensorTypeForID(g_sensor_ids[idx]), error);
+    return sdl_push_i32(vm, 0, error);
+}
+
+static vigil_status_t sdl_fn_get_sensor_nonportable_type_for_id(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t idx = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    if (idx >= 0 && idx < g_sensor_count && g_sensor_ids)
+        return sdl_push_i32(vm, SDL_GetSensorNonPortableTypeForID(g_sensor_ids[idx]), error);
+    return sdl_push_i32(vm, 0, error);
+}
+
+static vigil_status_t sdl_fn_update_sensors(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_UpdateSensors();
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t sdl_fn_open_sensor(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t idx = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_SensorID sid = (idx >= 0 && idx < g_sensor_count && g_sensor_ids) ? g_sensor_ids[idx] : 0;
+    if (!sid)
+    {
+        vigil_status_t st = sdl_push_i64(vm, -1, error);
+        if (st != VIGIL_STATUS_OK)
+            return st;
+        return sdl_push_err(vm, "invalid sensor index", SDL_ERR_ARG, error);
+    }
+    SDL_Sensor *s = SDL_OpenSensor(sid);
+    if (!s)
+    {
+        vigil_status_t st = sdl_push_i64(vm, -1, error);
+        if (st != VIGIL_STATUS_OK)
+            return st;
+        return sdl_push_sdl_err(vm, SDL_ERR_IO, error);
+    }
+    int64_t h = -1;
+    if (SDL_HANDLE_STORE(sensors, s, &h) < 0)
+    {
+        SDL_CloseSensor(s);
+        vigil_status_t st = sdl_push_i64(vm, -1, error);
+        if (st != VIGIL_STATUS_OK)
+            return st;
+        return sdl_push_err(vm, "too many sensors", SDL_ERR_STATE, error);
+    }
+    vigil_status_t st = sdl_push_i64(vm, h, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_ok(vm, error);
+}
+
+static vigil_status_t sdl_fn_close_sensor(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_arg_i64(vm, base, 0);
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Sensor *s = (SDL_Sensor *)SDL_HANDLE_GET(sensors, h);
+    if (s)
+    {
+        SDL_CloseSensor(s);
+        SDL_HANDLE_CLEAR(sensors, h);
+    }
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t sdl_fn_get_sensor_name(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_arg_i64(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Sensor *s = (SDL_Sensor *)SDL_HANDLE_GET(sensors, h);
+    return sdl_push_string(vm, s ? SDL_GetSensorName(s) : "", error);
+}
+
+static vigil_status_t sdl_fn_get_sensor_type(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_arg_i64(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Sensor *s = (SDL_Sensor *)SDL_HANDLE_GET(sensors, h);
+    return sdl_push_i32(vm, s ? (int32_t)SDL_GetSensorType(s) : 0, error);
+}
+
+static vigil_status_t sdl_fn_get_sensor_nonportable_type(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_arg_i64(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Sensor *s = (SDL_Sensor *)SDL_HANDLE_GET(sensors, h);
+    return sdl_push_i32(vm, s ? SDL_GetSensorNonPortableType(s) : 0, error);
+}
+
+/* Sensor data constants */
+SDL_CONST_FN(SENSOR_ACCEL, SDL_SENSOR_ACCEL)
+SDL_CONST_FN(SENSOR_GYRO, SDL_SENSOR_GYRO)
+SDL_CONST_FN(SENSOR_ACCEL_L, SDL_SENSOR_ACCEL_L)
+SDL_CONST_FN(SENSOR_GYRO_L, SDL_SENSOR_GYRO_L)
+SDL_CONST_FN(SENSOR_ACCEL_R, SDL_SENSOR_ACCEL_R)
+SDL_CONST_FN(SENSOR_GYRO_R, SDL_SENSOR_GYRO_R)
+
 /* Texture access constants */
 SDL_CONST_FN(TEXTUREACCESS_STATIC, SDL_TEXTUREACCESS_STATIC)
 SDL_CONST_FN(TEXTUREACCESS_STREAMING, SDL_TEXTUREACCESS_STREAMING)
@@ -9961,6 +10104,25 @@ static const vigil_native_module_function_t sdl_functions[] = {
     SDL_FN("is_audio_device_physical", 24U, sdl_fn_is_audio_device_physical, 1U, p_i32, VIGIL_TYPE_BOOL),
     SDL_FN("is_audio_device_playback", 24U, sdl_fn_is_audio_device_playback, 1U, p_i32, VIGIL_TYPE_BOOL),
     SDL_FN("get_audio_recording_device_count", 32U, sdl_fn_get_audio_recording_device_count, 0U, NULL, VIGIL_TYPE_I32),
+    /* Sensor complete */
+    SDL_FN("get_sensor_count", 16U, sdl_fn_get_sensor_count, 0U, NULL, VIGIL_TYPE_I32),
+    SDL_FN("get_sensor_name_for_id", 22U, sdl_fn_get_sensor_name_for_id, 1U, p_i32, VIGIL_TYPE_STRING),
+    SDL_FN("get_sensor_type_for_id", 22U, sdl_fn_get_sensor_type_for_id, 1U, p_i32, VIGIL_TYPE_I32),
+    SDL_FN("get_sensor_nonportable_type_for_id", 34U, sdl_fn_get_sensor_nonportable_type_for_id, 1U, p_i32,
+           VIGIL_TYPE_I32),
+    SDL_FN_VOID("update_sensors", 14U, sdl_fn_update_sensors, 0U, NULL),
+    {"open_sensor", 11U, sdl_fn_open_sensor, 1U, p_i32, VIGIL_TYPE_I64, 2U, rt_i64_err, 0, NULL, NULL, 0},
+    SDL_FN_VOID("close_sensor", 12U, sdl_fn_close_sensor, 1U, p_i64),
+    SDL_FN("get_sensor_name", 15U, sdl_fn_get_sensor_name, 1U, p_i64, VIGIL_TYPE_STRING),
+    SDL_FN("get_sensor_type", 15U, sdl_fn_get_sensor_type, 1U, p_i64, VIGIL_TYPE_I32),
+    SDL_FN("get_sensor_nonportable_type", 27U, sdl_fn_get_sensor_nonportable_type, 1U, p_i64, VIGIL_TYPE_I32),
+    /* Sensor type constants */
+    SDL_CONST_ENTRY("SENSOR_ACCEL", SENSOR_ACCEL),
+    SDL_CONST_ENTRY("SENSOR_GYRO", SENSOR_GYRO),
+    SDL_CONST_ENTRY("SENSOR_ACCEL_L", SENSOR_ACCEL_L),
+    SDL_CONST_ENTRY("SENSOR_GYRO_L", SENSOR_GYRO_L),
+    SDL_CONST_ENTRY("SENSOR_ACCEL_R", SENSOR_ACCEL_R),
+    SDL_CONST_ENTRY("SENSOR_GYRO_R", SENSOR_GYRO_R),
     /* IO constants */
     SDL_CONST_ENTRY("IO_SEEK_SET", IO_SEEK_SET),
     SDL_CONST_ENTRY("IO_SEEK_CUR", IO_SEEK_CUR),
