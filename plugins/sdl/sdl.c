@@ -9967,6 +9967,116 @@ static vigil_status_t sdl_fn_gpu_download_from_texture(vigil_vm_t *vm, size_t ar
     return VIGIL_STATUS_OK;
 }
 
+/* ── Haptic Complete ──────────────────────────────────────────────── */
+
+static vigil_status_t sdl_fn_get_haptic_name_for_id(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t idx = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    if (idx >= 0 && idx < g_haptic_count && g_haptic_ids)
+        return sdl_push_string(vm, SDL_GetHapticNameForID(g_haptic_ids[idx]), error);
+    return sdl_push_string(vm, "", error);
+}
+
+static vigil_status_t sdl_fn_open_haptic_from_mouse(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Haptic *h = SDL_OpenHapticFromMouse();
+    if (!h)
+    {
+        vigil_status_t st = sdl_push_i64(vm, -1, error);
+        if (st != VIGIL_STATUS_OK)
+            return st;
+        return sdl_push_sdl_err(vm, SDL_ERR_IO, error);
+    }
+    int64_t handle = -1;
+    if (SDL_HANDLE_STORE(haptics, h, &handle) < 0)
+    {
+        SDL_CloseHaptic(h);
+        vigil_status_t st = sdl_push_i64(vm, -1, error);
+        if (st != VIGIL_STATUS_OK)
+            return st;
+        return sdl_push_err(vm, "too many haptics", SDL_ERR_STATE, error);
+    }
+    vigil_status_t st = sdl_push_i64(vm, handle, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_ok(vm, error);
+}
+
+/* Haptic instance methods */
+static vigil_status_t sdl_haptic_get_features(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, HAP_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Haptic *hp = (SDL_Haptic *)SDL_HANDLE_GET(haptics, h);
+    return sdl_push_i32(vm, hp ? (int32_t)SDL_GetHapticFeatures(hp) : 0, error);
+}
+
+static vigil_status_t sdl_haptic_get_max_effects(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, HAP_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Haptic *hp = (SDL_Haptic *)SDL_HANDLE_GET(haptics, h);
+    return sdl_push_i32(vm, hp ? SDL_GetMaxHapticEffects(hp) : 0, error);
+}
+
+static vigil_status_t sdl_haptic_get_max_effects_playing(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, HAP_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Haptic *hp = (SDL_Haptic *)SDL_HANDLE_GET(haptics, h);
+    return sdl_push_i32(vm, hp ? SDL_GetMaxHapticEffectsPlaying(hp) : 0, error);
+}
+
+static vigil_status_t sdl_haptic_get_num_axes(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, HAP_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Haptic *hp = (SDL_Haptic *)SDL_HANDLE_GET(haptics, h);
+    return sdl_push_i32(vm, hp ? SDL_GetNumHapticAxes(hp) : 0, error);
+}
+
+static vigil_status_t sdl_haptic_set_gain(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, HAP_HANDLE);
+    int32_t gain = sdl_arg_i32(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Haptic *hp = (SDL_Haptic *)SDL_HANDLE_GET(haptics, h);
+    if (hp && SDL_SetHapticGain(hp, gain))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+static vigil_status_t sdl_haptic_set_autocenter(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, HAP_HANDLE);
+    int32_t ac = sdl_arg_i32(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Haptic *hp = (SDL_Haptic *)SDL_HANDLE_GET(haptics, h);
+    if (hp && SDL_SetHapticAutocenter(hp, ac))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+static vigil_status_t sdl_haptic_stop_effects(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, HAP_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Haptic *hp = (SDL_Haptic *)SDL_HANDLE_GET(haptics, h);
+    if (hp && SDL_StopHapticEffects(hp))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
 /* Texture access constants */
 SDL_CONST_FN(TEXTUREACCESS_STATIC, SDL_TEXTUREACCESS_STATIC)
 SDL_CONST_FN(TEXTUREACCESS_STREAMING, SDL_TEXTUREACCESS_STREAMING)
@@ -10476,6 +10586,10 @@ static const vigil_native_module_function_t sdl_functions[] = {
     SDL_FN_VOID("gpu_copy_texture_to_texture", 27U, sdl_fn_gpu_copy_texture_to_texture, 6U, p_i64_i64_i64_i32_i32_i32),
     {"gpu_download_from_texture", 24U, sdl_fn_gpu_download_from_texture, 6U, p_i64_i64_i32_i32_i64_i32, VIGIL_TYPE_VOID,
      0U, NULL, 0, NULL, NULL, 0},
+    /* Haptic complete - module */
+    SDL_FN("get_haptic_name_for_id", 22U, sdl_fn_get_haptic_name_for_id, 1U, p_i32, VIGIL_TYPE_STRING),
+    {"open_haptic_from_mouse", 22U, sdl_fn_open_haptic_from_mouse, 0U, NULL, VIGIL_TYPE_I64, 2U, rt_i64_err, 0, NULL,
+     NULL, 0},
     /* IO constants */
     SDL_CONST_ENTRY("IO_SEEK_SET", IO_SEEK_SET),
     SDL_CONST_ENTRY("IO_SEEK_CUR", IO_SEEK_CUR),
@@ -11181,6 +11295,14 @@ static const vigil_native_class_method_t sdl_haptic_methods[] = {
     SDL_METHOD("init_rumble", 11U, sdl_haptic_init_rumble, 0U, NULL, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
     SDL_METHOD("play_rumble", 11U, sdl_haptic_play_rumble, 2U, p_f64_i32, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
     SDL_METHOD("stop_rumble", 11U, sdl_haptic_stop_rumble, 0U, NULL, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
+    /* Haptic complete - methods */
+    SDL_METHOD("get_features", 12U, sdl_haptic_get_features, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL),
+    SDL_METHOD("get_max_effects", 15U, sdl_haptic_get_max_effects, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL),
+    SDL_METHOD("get_max_effects_playing", 23U, sdl_haptic_get_max_effects_playing, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL),
+    SDL_METHOD("get_num_axes", 12U, sdl_haptic_get_num_axes, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL),
+    SDL_METHOD("set_gain", 8U, sdl_haptic_set_gain, 1U, p_i32, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
+    SDL_METHOD("set_autocenter", 14U, sdl_haptic_set_autocenter, 1U, p_i32, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
+    SDL_METHOD("stop_effects", 12U, sdl_haptic_stop_effects, 0U, NULL, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
     SDL_METHOD("pause", 5U, sdl_haptic_pause, 0U, NULL, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
     SDL_METHOD("resume", 6U, sdl_haptic_resume, 0U, NULL, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
 };
