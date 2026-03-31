@@ -3887,6 +3887,281 @@ static vigil_status_t sdl_surface_get_color_key(vigil_vm_t *vm, size_t arg_count
     return sdl_push_i32(vm, (int32_t)key, error);
 }
 
+/* ── Slice 29: Joystick (Raw Input) ───────────────────────────────── */
+
+SDL_HANDLE_REGISTRY(joysticks);
+
+enum
+{
+    JOY_HANDLE = 0,
+    JOY_FIELD_COUNT
+};
+
+static SDL_JoystickID *g_joystick_ids = NULL;
+static int g_joystick_count = 0;
+
+static vigil_status_t sdl_fn_has_joystick(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_bool(vm, SDL_HasJoystick(), error);
+}
+
+static vigil_status_t sdl_fn_get_joystick_count(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    vigil_vm_stack_pop_n(vm, arg_count);
+    if (g_joystick_ids)
+    {
+        SDL_free(g_joystick_ids);
+        g_joystick_ids = NULL;
+    }
+    g_joystick_ids = SDL_GetJoysticks(&g_joystick_count);
+    return sdl_push_i32(vm, (int32_t)g_joystick_count, error);
+}
+
+static vigil_status_t sdl_fn_get_joystick_id(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t idx = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    if (idx >= 0 && idx < g_joystick_count && g_joystick_ids)
+        return sdl_push_i32(vm, (int32_t)g_joystick_ids[idx], error);
+    return sdl_push_i32(vm, 0, error);
+}
+
+static vigil_status_t sdl_fn_is_gamepad_id(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t id = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_bool(vm, SDL_IsGamepad((SDL_JoystickID)id), error);
+}
+
+/* Joystick.open(i32 instance_id) -> (Joystick, err) */
+static vigil_status_t sdl_joystick_open(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    size_t ci = sdl_static_class_index(vm, base);
+    int32_t id = sdl_arg_i32(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Joystick *j = SDL_OpenJoystick((SDL_JoystickID)id);
+    if (!j)
+        return sdl_push_nil_and_sdl_err(vm, SDL_ERR_IO, error);
+    int64_t handle;
+    if (SDL_HANDLE_STORE(joysticks, j, &handle) < 0)
+    {
+        SDL_CloseJoystick(j);
+        return sdl_push_nil_and_err(vm, "too many joysticks", SDL_ERR_STATE, error);
+    }
+    vigil_status_t st = sdl_push_handle_instance(vm, ci, handle, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_ok(vm, error);
+}
+
+static vigil_status_t sdl_joystick_close(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, JOY_HANDLE);
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Joystick *j = (SDL_Joystick *)SDL_HANDLE_GET(joysticks, h);
+    if (j)
+    {
+        SDL_CloseJoystick(j);
+        SDL_HANDLE_CLEAR(joysticks, h);
+    }
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t sdl_joystick_get_name(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, JOY_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Joystick *j = (SDL_Joystick *)SDL_HANDLE_GET(joysticks, h);
+    return sdl_push_string(vm, j ? SDL_GetJoystickName(j) : "", error);
+}
+
+static vigil_status_t sdl_joystick_get_type(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, JOY_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Joystick *j = (SDL_Joystick *)SDL_HANDLE_GET(joysticks, h);
+    return sdl_push_i32(vm, j ? (int32_t)SDL_GetJoystickType(j) : 0, error);
+}
+
+static vigil_status_t sdl_joystick_connected(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, JOY_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Joystick *j = (SDL_Joystick *)SDL_HANDLE_GET(joysticks, h);
+    return sdl_push_bool(vm, j && SDL_JoystickConnected(j), error);
+}
+
+static vigil_status_t sdl_joystick_num_axes(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, JOY_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Joystick *j = (SDL_Joystick *)SDL_HANDLE_GET(joysticks, h);
+    return sdl_push_i32(vm, j ? SDL_GetNumJoystickAxes(j) : 0, error);
+}
+
+static vigil_status_t sdl_joystick_num_buttons(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, JOY_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Joystick *j = (SDL_Joystick *)SDL_HANDLE_GET(joysticks, h);
+    return sdl_push_i32(vm, j ? SDL_GetNumJoystickButtons(j) : 0, error);
+}
+
+static vigil_status_t sdl_joystick_num_hats(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, JOY_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Joystick *j = (SDL_Joystick *)SDL_HANDLE_GET(joysticks, h);
+    return sdl_push_i32(vm, j ? SDL_GetNumJoystickHats(j) : 0, error);
+}
+
+static vigil_status_t sdl_joystick_get_axis(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, JOY_HANDLE);
+    int32_t axis = sdl_arg_i32(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Joystick *j = (SDL_Joystick *)SDL_HANDLE_GET(joysticks, h);
+    return sdl_push_i32(vm, j ? (int32_t)SDL_GetJoystickAxis(j, axis) : 0, error);
+}
+
+static vigil_status_t sdl_joystick_get_button(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, JOY_HANDLE);
+    int32_t btn = sdl_arg_i32(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Joystick *j = (SDL_Joystick *)SDL_HANDLE_GET(joysticks, h);
+    return sdl_push_bool(vm, j && SDL_GetJoystickButton(j, btn), error);
+}
+
+static vigil_status_t sdl_joystick_get_hat(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, JOY_HANDLE);
+    int32_t hat = sdl_arg_i32(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Joystick *j = (SDL_Joystick *)SDL_HANDLE_GET(joysticks, h);
+    return sdl_push_i32(vm, j ? (int32_t)SDL_GetJoystickHat(j, hat) : 0, error);
+}
+
+static vigil_status_t sdl_joystick_rumble(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, JOY_HANDLE);
+    int32_t low = sdl_arg_i32(vm, base, 1), high = sdl_arg_i32(vm, base, 2), dur = sdl_arg_i32(vm, base, 3);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Joystick *j = (SDL_Joystick *)SDL_HANDLE_GET(joysticks, h);
+    if (j && SDL_RumbleJoystick(j, (Uint16)low, (Uint16)high, (Uint32)dur))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+/* ── Slice 30: Window Getters Completion ──────────────────────────── */
+
+static vigil_status_t sdl_window_get_aspect_ratio(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, WIN_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    float mn = 0, mx = 0;
+    SDL_Window *win = (SDL_Window *)SDL_HANDLE_GET(windows, h);
+    if (win)
+        SDL_GetWindowAspectRatio(win, &mn, &mx);
+    vigil_status_t st = sdl_push_f64(vm, (double)mn, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_f64(vm, (double)mx, error);
+}
+
+static vigil_status_t sdl_window_get_pixel_format(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, WIN_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Window *win = (SDL_Window *)SDL_HANDLE_GET(windows, h);
+    return sdl_push_i32(vm, win ? (int32_t)SDL_GetWindowPixelFormat(win) : 0, error);
+}
+
+/* ── Slice 31: Renderer/Texture Remaining ─────────────────────────── */
+
+/* ren.read_pixels(i32 x, y, w, h) -> (Surface, err) */
+static vigil_status_t sdl_renderer_read_pixels(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    size_t ci = sdl_self_class_index(vm, base);
+    int64_t rh = sdl_field_i64(vm, base, REN_HANDLE);
+    int32_t x = sdl_arg_i32(vm, base, 1), y = sdl_arg_i32(vm, base, 2);
+    int32_t w = sdl_arg_i32(vm, base, 3), h = sdl_arg_i32(vm, base, 4);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Renderer *ren = (SDL_Renderer *)SDL_HANDLE_GET(renderers, rh);
+    if (!ren)
+        return sdl_push_nil_and_err(vm, "invalid renderer", SDL_ERR_ARG, error);
+    SDL_Rect rect = {x, y, w, h};
+    int use_rect = (w > 0 || h > 0);
+    SDL_Surface *surf = SDL_RenderReadPixels(ren, use_rect ? &rect : NULL);
+    if (!surf)
+        return sdl_push_nil_and_sdl_err(vm, SDL_ERR_IO, error);
+    int64_t sh;
+    if (SDL_HANDLE_STORE(surfaces, surf, &sh) < 0)
+    {
+        SDL_DestroySurface(surf);
+        return sdl_push_nil_and_err(vm, "too many surfaces", SDL_ERR_STATE, error);
+    }
+    /* Need to find the Surface class index — search classes array */
+    (void)ci;
+    /* Use a fixed approach: push handle instance with surface class */
+    vigil_status_t st = sdl_push_handle_instance(vm, 3U, sh, error); /* Surface is class index 3 */
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_ok(vm, error);
+}
+
+/* surf.convert(i32 format) -> (Surface, err) */
+static vigil_status_t sdl_surface_convert(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    size_t ci = sdl_self_class_index(vm, base);
+    int64_t h = sdl_field_i64(vm, base, SURF_HANDLE);
+    int32_t fmt = sdl_arg_i32(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Surface *src = (SDL_Surface *)SDL_HANDLE_GET(surfaces, h);
+    if (!src)
+        return sdl_push_nil_and_err(vm, "invalid surface", SDL_ERR_ARG, error);
+    SDL_Surface *dst = SDL_ConvertSurface(src, (SDL_PixelFormat)fmt);
+    if (!dst)
+        return sdl_push_nil_and_sdl_err(vm, SDL_ERR_IO, error);
+    int64_t nh;
+    if (SDL_HANDLE_STORE(surfaces, dst, &nh) < 0)
+    {
+        SDL_DestroySurface(dst);
+        return sdl_push_nil_and_err(vm, "too many surfaces", SDL_ERR_STATE, error);
+    }
+    vigil_status_t st = sdl_push_handle_instance(vm, ci, nh, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_ok(vm, error);
+}
+
+/* Hat position constants */
+SDL_CONST_FN(HAT_CENTERED, SDL_HAT_CENTERED)
+SDL_CONST_FN(HAT_UP, SDL_HAT_UP)
+SDL_CONST_FN(HAT_RIGHT, SDL_HAT_RIGHT)
+SDL_CONST_FN(HAT_DOWN, SDL_HAT_DOWN)
+SDL_CONST_FN(HAT_LEFT, SDL_HAT_LEFT)
+
 /* Texture access constants */
 SDL_CONST_FN(TEXTUREACCESS_STATIC, SDL_TEXTUREACCESS_STATIC)
 SDL_CONST_FN(TEXTUREACCESS_STREAMING, SDL_TEXTUREACCESS_STREAMING)
@@ -4233,6 +4508,17 @@ static const vigil_native_module_function_t sdl_functions[] = {
      NULL, NULL, 0},
     SDL_FN("get_display_refresh_rate", 24U, sdl_fn_get_display_refresh_rate, 1U, p_i32, VIGIL_TYPE_F64),
     SDL_FN("get_display_for_window", 22U, sdl_fn_get_display_for_window, 1U, p_obj, VIGIL_TYPE_I32),
+    /* Joystick (slice 29) */
+    SDL_FN("has_joystick", 12U, sdl_fn_has_joystick, 0U, NULL, VIGIL_TYPE_BOOL),
+    SDL_FN("get_joystick_count", 18U, sdl_fn_get_joystick_count, 0U, NULL, VIGIL_TYPE_I32),
+    SDL_FN("get_joystick_id", 15U, sdl_fn_get_joystick_id, 1U, p_i32, VIGIL_TYPE_I32),
+    SDL_FN("is_gamepad_id", 13U, sdl_fn_is_gamepad_id, 1U, p_i32, VIGIL_TYPE_BOOL),
+    /* Hat constants */
+    SDL_CONST_ENTRY("HAT_CENTERED", HAT_CENTERED),
+    SDL_CONST_ENTRY("HAT_UP", HAT_UP),
+    SDL_CONST_ENTRY("HAT_RIGHT", HAT_RIGHT),
+    SDL_CONST_ENTRY("HAT_DOWN", HAT_DOWN),
+    SDL_CONST_ENTRY("HAT_LEFT", HAT_LEFT),
     /* Display info (slice 11) */
     SDL_FN("get_display_count", 17U, sdl_fn_get_display_count, 0U, NULL, VIGIL_TYPE_I32),
     SDL_FN("get_display_name", 16U, sdl_fn_get_display_name, 1U, p_i32, VIGIL_TYPE_STRING),
@@ -4298,6 +4584,9 @@ static const vigil_native_class_method_t sdl_window_methods[] = {
     SDL_METHOD("set_aspect_ratio", 16U, sdl_window_set_aspect_ratio, 2U, p_f64_f64, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
     /* Slice 26: display/window */
     SDL_METHOD("sync", 4U, sdl_window_sync, 0U, NULL, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
+    /* Slice 30: window getters completion */
+    SDL_METHOD("get_aspect_ratio", 16U, sdl_window_get_aspect_ratio, 0U, NULL, VIGIL_TYPE_F64, 2U, rt_f64_f64),
+    SDL_METHOD("get_pixel_format", 16U, sdl_window_get_pixel_format, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL),
 };
 
 /* ── Renderer class descriptor ───────────────────────────────────── */
@@ -4346,6 +4635,8 @@ static const vigil_native_class_method_t sdl_renderer_methods[] = {
     SDL_METHOD("get_render_target", 17U, sdl_renderer_get_render_target, 0U, NULL, VIGIL_TYPE_I64, 1U, NULL),
     SDL_METHOD("set_draw_color_float", 20U, sdl_renderer_set_draw_color_float, 4U, p_f64_f64_f64_f64, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
     SDL_METHOD("get_logical_presentation", 24U, sdl_renderer_get_logical_presentation, 0U, NULL, VIGIL_TYPE_I32, 2U, rt_i32_i32),
+    /* Slice 31: read_pixels */
+    SDL_METHOD("read_pixels", 11U, sdl_renderer_read_pixels, 4U, p_i32_i32_i32_i32, VIGIL_TYPE_OBJECT, 2U, rt_obj_err),
 };
 
 /* ── Event class descriptor ──────────────────────────────────────── */
@@ -4407,6 +4698,8 @@ static const vigil_native_class_method_t sdl_surface_methods[] = {
     SDL_STATIC("load_png", 8U, sdl_surface_load_png, 1U, p_str, VIGIL_TYPE_OBJECT, 2U, rt_obj_err),
     SDL_METHOD("blit_scaled", 11U, sdl_surface_blit_scaled, 10U, p_obj_i32x9, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
     SDL_METHOD("get_color_key", 13U, sdl_surface_get_color_key, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL),
+    /* Slice 31: convert */
+    SDL_METHOD("convert", 7U, sdl_surface_convert, 1U, p_i32, VIGIL_TYPE_OBJECT, 2U, rt_obj_err),
 };
 
 /* ── Texture class descriptor ────────────────────────────────────── */
@@ -4477,6 +4770,27 @@ static const vigil_native_class_method_t sdl_gamepad_methods[] = {
     SDL_METHOD("has_button", 10U, sdl_gamepad_has_button, 1U, p_i32, VIGIL_TYPE_BOOL, 1U, NULL),
 };
 
+/* ── Joystick class descriptor ───────────────────────────────────── */
+
+static const vigil_native_class_field_t sdl_joystick_fields[] = {
+    SDL_PFIELD("handle", 6U, VIGIL_TYPE_I64),
+};
+
+static const vigil_native_class_method_t sdl_joystick_methods[] = {
+    SDL_STATIC("open", 4U, sdl_joystick_open, 1U, p_i32, VIGIL_TYPE_OBJECT, 2U, rt_obj_err),
+    SDL_METHOD("close", 5U, sdl_joystick_close, 0U, NULL, VIGIL_TYPE_VOID, 0U, NULL),
+    SDL_METHOD("get_name", 8U, sdl_joystick_get_name, 0U, NULL, VIGIL_TYPE_STRING, 1U, NULL),
+    SDL_METHOD("get_type", 8U, sdl_joystick_get_type, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL),
+    SDL_METHOD("connected", 9U, sdl_joystick_connected, 0U, NULL, VIGIL_TYPE_BOOL, 1U, NULL),
+    SDL_METHOD("num_axes", 8U, sdl_joystick_num_axes, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL),
+    SDL_METHOD("num_buttons", 11U, sdl_joystick_num_buttons, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL),
+    SDL_METHOD("num_hats", 8U, sdl_joystick_num_hats, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL),
+    SDL_METHOD("get_axis", 8U, sdl_joystick_get_axis, 1U, p_i32, VIGIL_TYPE_I32, 1U, NULL),
+    SDL_METHOD("get_button", 10U, sdl_joystick_get_button, 1U, p_i32, VIGIL_TYPE_BOOL, 1U, NULL),
+    SDL_METHOD("get_hat", 7U, sdl_joystick_get_hat, 1U, p_i32, VIGIL_TYPE_I32, 1U, NULL),
+    SDL_METHOD("rumble", 6U, sdl_joystick_rumble, 3U, p_i32_i32_i32, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
+};
+
 static const vigil_native_class_t sdl_classes[] = {
     {"Window", 6U, sdl_window_fields, WIN_FIELD_COUNT, sdl_window_methods,
      sizeof(sdl_window_methods) / sizeof(sdl_window_methods[0]), NULL},
@@ -4492,6 +4806,8 @@ static const vigil_native_class_t sdl_classes[] = {
      sizeof(sdl_audio_stream_methods) / sizeof(sdl_audio_stream_methods[0]), NULL},
     {"Gamepad", 7U, sdl_gamepad_fields, GP_FIELD_COUNT, sdl_gamepad_methods,
      sizeof(sdl_gamepad_methods) / sizeof(sdl_gamepad_methods[0]), NULL},
+    {"Joystick", 8U, sdl_joystick_fields, JOY_FIELD_COUNT, sdl_joystick_methods,
+     sizeof(sdl_joystick_methods) / sizeof(sdl_joystick_methods[0]), NULL},
 };
 /* clang-format on */
 
