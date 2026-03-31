@@ -669,6 +669,7 @@ static const int p_str[] = {VIGIL_TYPE_STRING};
 static const int p_str_str[] = {VIGIL_TYPE_STRING, VIGIL_TYPE_STRING};
 static const int p_str_i32[] = {VIGIL_TYPE_STRING, VIGIL_TYPE_I32};
 static const int p_i32_str[] = {VIGIL_TYPE_I32, VIGIL_TYPE_STRING};
+static const int p_i32_obj[] = {VIGIL_TYPE_I32, VIGIL_TYPE_OBJECT};
 static const int p_i32_str_str[] = {VIGIL_TYPE_I32, VIGIL_TYPE_STRING, VIGIL_TYPE_STRING};
 static const int p_i32_str_i64[] = {VIGIL_TYPE_I32, VIGIL_TYPE_STRING, VIGIL_TYPE_I64};
 static const int p_i32_str_f64[] = {VIGIL_TYPE_I32, VIGIL_TYPE_STRING, VIGIL_TYPE_F64};
@@ -10729,6 +10730,153 @@ static vigil_status_t sdl_fn_io_write_s64be(vigil_vm_t *vm, size_t arg_count, vi
 { size_t base = vigil_vm_stack_depth(vm) - arg_count; int64_t h = sdl_arg_i64(vm, base, 0); int64_t v = sdl_arg_i64(vm, base, 1); vigil_vm_stack_pop_n(vm, arg_count); SDL_IOStream *io = (SDL_IOStream *)SDL_HANDLE_GET(io_streams, h); if (io && SDL_WriteS64BE(io, (Sint64)v)) return sdl_push_bool_ok(vm, error); return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error); }
 /* clang-format on */
 
+/* ── Misc batch: timers, memory, environment, process ─────────────── */
+
+/* Timers (callback-based — store closure like HitTest) */
+static vigil_vm_t *g_timer_vm = NULL;
+static vigil_object_t *g_timer_closures[8] = {0};
+
+static Uint32 sdl_timer_callback(void *userdata, SDL_TimerID timerID, Uint32 interval)
+{
+    (void)timerID;
+    int slot = (int)(intptr_t)userdata;
+    if (!g_timer_vm || slot < 0 || slot >= 8 || !g_timer_closures[slot])
+        return 0;
+    vigil_error_t err = {0};
+    vigil_value_t arg = vigil_nanbox_encode_i32((int32_t)interval);
+    vigil_vm_stack_push(g_timer_vm, &arg, &err);
+    vigil_value_t result = {0};
+    vigil_vm_execute_function(g_timer_vm, g_timer_closures[slot], &result, &err);
+    return vigil_nanbox_is_int(result) ? (Uint32)vigil_nanbox_decode_int(result) : 0;
+}
+
+static vigil_status_t sdl_fn_add_timer(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t interval = sdl_arg_i32(vm, base, 0);
+    vigil_value_t fn_val = vigil_vm_stack_get(vm, base + 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    vigil_object_t *fn = (vigil_object_t *)vigil_nanbox_decode_ptr(fn_val);
+    if (!fn)
+        return sdl_push_i32(vm, 0, error);
+    int slot = -1;
+    for (int i = 0; i < 8; i++)
+    {
+        if (!g_timer_closures[i])
+        {
+            slot = i;
+            break;
+        }
+    }
+    if (slot < 0)
+        return sdl_push_i32(vm, 0, error);
+    vigil_object_retain(fn);
+    g_timer_closures[slot] = fn;
+    g_timer_vm = vm;
+    SDL_TimerID id = SDL_AddTimer((Uint32)interval, sdl_timer_callback, (void *)(intptr_t)slot);
+    if (id == 0)
+    {
+        vigil_object_release(&g_timer_closures[slot]);
+        g_timer_closures[slot] = NULL;
+    }
+    return sdl_push_i32(vm, (int32_t)id, error);
+}
+
+static vigil_status_t sdl_fn_remove_timer(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t id = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_bool(vm, SDL_RemoveTimer((SDL_TimerID)id), error);
+}
+
+/* Memory — operate on unsafe buffers */
+static vigil_status_t sdl_fn_mem_alloc(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t size = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_i64(vm, vigil_unsafe_buffer_alloc(size), error);
+}
+
+static vigil_status_t sdl_fn_mem_free(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_arg_i64(vm, base, 0);
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    vigil_unsafe_buffer_free(h);
+    return VIGIL_STATUS_OK;
+}
+
+/* Environment */
+static vigil_status_t sdl_fn_getenv_unsafe(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    char name[256];
+    sdl_arg_str(vm, base, 0, name, sizeof(name));
+    vigil_vm_stack_pop_n(vm, arg_count);
+    const char *val = SDL_getenv_unsafe(name);
+    return sdl_push_string(vm, val ? val : "", error);
+}
+
+/* Process */
+static vigil_status_t sdl_fn_get_current_thread_id(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_i64(vm, (int64_t)SDL_GetCurrentThreadID(), error);
+}
+
+static vigil_status_t sdl_fn_is_main_thread(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_bool(vm, SDL_IsMainThread(), error);
+}
+
+/* DateTimeToTime */
+static vigil_status_t sdl_fn_datetime_to_time(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t y = sdl_arg_i32(vm, base, 0), m = sdl_arg_i32(vm, base, 1), d = sdl_arg_i32(vm, base, 2);
+    int32_t hr = sdl_arg_i32(vm, base, 3), mn = sdl_arg_i32(vm, base, 4), sec = sdl_arg_i32(vm, base, 5);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_DateTime dt = {0};
+    dt.year = y;
+    dt.month = m;
+    dt.day = d;
+    dt.hour = hr;
+    dt.minute = mn;
+    dt.second = sec;
+    SDL_Time ticks = 0;
+    SDL_DateTimeToTime(&dt, &ticks);
+    return sdl_push_i64(vm, (int64_t)ticks, error);
+}
+
+/* Misc remaining */
+static vigil_status_t sdl_fn_get_preferred_locales_count(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    vigil_vm_stack_pop_n(vm, arg_count);
+    int count = 0;
+    SDL_Locale **locales = SDL_GetPreferredLocales(&count);
+    SDL_free(locales);
+    return sdl_push_i32(vm, count, error);
+}
+
+static vigil_status_t sdl_fn_glob_directory(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    char path[512], pattern[256];
+    sdl_arg_str(vm, base, 0, path, sizeof(path));
+    sdl_arg_str(vm, base, 1, pattern, sizeof(pattern));
+    vigil_vm_stack_pop_n(vm, arg_count);
+    int count = 0;
+    char **results = SDL_GlobDirectory(path, pattern[0] ? pattern : NULL, 0, &count);
+    /* Return count — user can query individual results later */
+    /* For now just return count; full array support would need iteration */
+    SDL_free(results);
+    return sdl_push_i32(vm, count, error);
+}
+
 /* Texture access constants */
 SDL_CONST_FN(TEXTUREACCESS_STATIC, SDL_TEXTUREACCESS_STATIC)
 SDL_CONST_FN(TEXTUREACCESS_STREAMING, SDL_TEXTUREACCESS_STREAMING)
@@ -11326,6 +11474,18 @@ static const vigil_native_module_function_t sdl_functions[] = {
     SDL_FN_BOOL_ERR("io_write_s16be", 14U, sdl_fn_io_write_s16be, 2U, p_i64_i32),
     SDL_FN_BOOL_ERR("io_write_s32be", 14U, sdl_fn_io_write_s32be, 2U, p_i64_i32),
     SDL_FN_BOOL_ERR("io_write_s64be", 14U, sdl_fn_io_write_s64be, 2U, p_i64_i64),
+    /* Misc batch */
+    {"add_timer", 9U, sdl_fn_add_timer, 2U, p_i32_obj, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, NULL, 0},
+    SDL_FN("remove_timer", 12U, sdl_fn_remove_timer, 1U, p_i32, VIGIL_TYPE_BOOL),
+    SDL_FN("mem_alloc", 9U, sdl_fn_mem_alloc, 1U, p_i32, VIGIL_TYPE_I64),
+    SDL_FN_VOID("mem_free", 8U, sdl_fn_mem_free, 1U, p_i64),
+    SDL_FN("getenv_unsafe", 13U, sdl_fn_getenv_unsafe, 1U, p_str, VIGIL_TYPE_STRING),
+    SDL_FN("get_current_thread_id", 21U, sdl_fn_get_current_thread_id, 0U, NULL, VIGIL_TYPE_I64),
+    SDL_FN("is_main_thread", 14U, sdl_fn_is_main_thread, 0U, NULL, VIGIL_TYPE_BOOL),
+    {"datetime_to_time", 16U, sdl_fn_datetime_to_time, 6U, p_i32_i32_i32_i32_i32_i32, VIGIL_TYPE_I64, 1U, NULL, 0, NULL,
+     NULL, 0},
+    SDL_FN("get_preferred_locales_count", 27U, sdl_fn_get_preferred_locales_count, 0U, NULL, VIGIL_TYPE_I32),
+    SDL_FN("glob_directory", 14U, sdl_fn_glob_directory, 2U, p_str_str, VIGIL_TYPE_I32),
     /* IO constants */
     SDL_CONST_ENTRY("IO_SEEK_SET", IO_SEEK_SET),
     SDL_CONST_ENTRY("IO_SEEK_CUR", IO_SEEK_CUR),
