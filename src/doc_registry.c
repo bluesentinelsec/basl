@@ -1874,6 +1874,38 @@ static const vigil_doc_entry_t sdl_docs[] = {
     {"sdl.Surface.blit_scaled", "surf.blit_scaled(dst, sx, sy, sw, sh, dx, dy, dw, dh, mode) -> (bool, err)",
      "Scaled blit to another surface.", "Use SCALEMODE_* constants.", NULL},
     {"sdl.Surface.get_color_key", "surf.get_color_key() -> i32", "Get transparent color key.", NULL, NULL},
+    /* Joystick (slice 29) */
+    {"sdl.has_joystick", "sdl.has_joystick() -> bool", "Check if any joystick is connected.", NULL, NULL},
+    {"sdl.get_joystick_count", "sdl.get_joystick_count() -> i32", "Get number of connected joysticks.", NULL, NULL},
+    {"sdl.get_joystick_id", "sdl.get_joystick_id(index: i32) -> i32", "Get joystick instance ID.", NULL, NULL},
+    {"sdl.is_gamepad_id", "sdl.is_gamepad_id(id: i32) -> bool", "Check if joystick ID is a gamepad.", NULL, NULL},
+    {"sdl.Joystick", NULL, "Raw joystick handle.", "For non-gamepad devices. Use sdl.Gamepad for standard controllers.",
+     NULL},
+    {"sdl.Joystick.open", "sdl.Joystick.open(id: i32) -> (sdl.Joystick, err)", "Open a joystick.", NULL, NULL},
+    {"sdl.Joystick.close", "joy.close() -> void", "Close a joystick.", NULL, NULL},
+    {"sdl.Joystick.get_name", "joy.get_name() -> string", "Get joystick name.", NULL, NULL},
+    {"sdl.Joystick.get_type", "joy.get_type() -> i32", "Get joystick type.", NULL, NULL},
+    {"sdl.Joystick.connected", "joy.connected() -> bool", "Check if connected.", NULL, NULL},
+    {"sdl.Joystick.num_axes", "joy.num_axes() -> i32", "Get number of axes.", NULL, NULL},
+    {"sdl.Joystick.num_buttons", "joy.num_buttons() -> i32", "Get number of buttons.", NULL, NULL},
+    {"sdl.Joystick.num_hats", "joy.num_hats() -> i32", "Get number of POV hats.", NULL, NULL},
+    {"sdl.Joystick.get_axis", "joy.get_axis(axis: i32) -> i32", "Get axis value (-32768..32767).", NULL, NULL},
+    {"sdl.Joystick.get_button", "joy.get_button(btn: i32) -> bool", "Get button state.", NULL, NULL},
+    {"sdl.Joystick.get_hat", "joy.get_hat(hat: i32) -> i32", "Get hat position. Use HAT_* constants.", NULL, NULL},
+    {"sdl.Joystick.rumble", "joy.rumble(low: i32, high: i32, ms: i32) -> (bool, err)", "Rumble effect.", NULL, NULL},
+    {"sdl.HAT_CENTERED", "sdl.HAT_CENTERED() -> i32", "Hat centered.", NULL, NULL},
+    {"sdl.HAT_UP", "sdl.HAT_UP() -> i32", "Hat up.", NULL, NULL},
+    {"sdl.HAT_RIGHT", "sdl.HAT_RIGHT() -> i32", "Hat right.", NULL, NULL},
+    {"sdl.HAT_DOWN", "sdl.HAT_DOWN() -> i32", "Hat down.", NULL, NULL},
+    {"sdl.HAT_LEFT", "sdl.HAT_LEFT() -> i32", "Hat left.", NULL, NULL},
+    /* Window getters (slice 30) */
+    {"sdl.Window.get_aspect_ratio", "win.get_aspect_ratio() -> (f64, f64)", "Get aspect ratio (min, max).", NULL, NULL},
+    {"sdl.Window.get_pixel_format", "win.get_pixel_format() -> i32", "Get window pixel format.", NULL, NULL},
+    /* Renderer/Surface (slice 31) */
+    {"sdl.Renderer.read_pixels", "ren.read_pixels(x: i32, y: i32, w: i32, h: i32) -> (sdl.Surface, err)",
+     "Read pixels from render target.", "Pass all zeros for full target.", NULL},
+    {"sdl.Surface.convert", "surf.convert(format: i32) -> (sdl.Surface, err)",
+     "Convert surface to a different pixel format.", NULL, NULL},
 };
 
 #define SDL_DOC_COUNT (sizeof(sdl_docs) / sizeof(sdl_docs[0]))
