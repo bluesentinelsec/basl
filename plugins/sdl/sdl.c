@@ -775,6 +775,7 @@ static const int p_i64_i32_i64[] = {VIGIL_TYPE_I64, VIGIL_TYPE_I32, VIGIL_TYPE_I
 static const int p_i64_str[] = {VIGIL_TYPE_I64, VIGIL_TYPE_STRING};
 static const int p_i64_str_i64_i32[] = {VIGIL_TYPE_I64, VIGIL_TYPE_STRING, VIGIL_TYPE_I64, VIGIL_TYPE_I32};
 static const int p_i64_str_str[] = {VIGIL_TYPE_I64, VIGIL_TYPE_STRING, VIGIL_TYPE_STRING};
+static const int p_i64_i32_str_i32[] = {VIGIL_TYPE_I64, VIGIL_TYPE_I32, VIGIL_TYPE_STRING, VIGIL_TYPE_I32};
 static const int p_i64_i32_i32_i32_i32_i32[] = {VIGIL_TYPE_I64, VIGIL_TYPE_I32, VIGIL_TYPE_I32,
                                                 VIGIL_TYPE_I32, VIGIL_TYPE_I32, VIGIL_TYPE_I32};
 static const int p_i64_f64_f64_f64_f64_f64_f64[] = {VIGIL_TYPE_I64, VIGIL_TYPE_F64, VIGIL_TYPE_F64, VIGIL_TYPE_F64,
@@ -11777,6 +11778,331 @@ static vigil_status_t sdl_fn_get_storage_space_remaining(vigil_vm_t *vm, size_t 
     return sdl_push_i64(vm, s ? (int64_t)SDL_GetStorageSpaceRemaining(s) : 0, error);
 }
 
+/* ── Process ──────────────────────────────────────────────────────── */
+
+SDL_HANDLE_REGISTRY(processes);
+
+static vigil_status_t sdl_fn_create_process(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    char cmd[512];
+    sdl_arg_str(vm, base, 0, cmd, sizeof(cmd));
+    int32_t pipe_stdio = sdl_arg_i32(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    const char *args[] = {cmd, NULL};
+    SDL_Process *p = SDL_CreateProcess(args, pipe_stdio != 0);
+    if (!p)
+    {
+        vigil_status_t st = sdl_push_i64(vm, -1, error);
+        if (st != VIGIL_STATUS_OK)
+            return st;
+        return sdl_push_sdl_err(vm, SDL_ERR_IO, error);
+    }
+    int64_t h = -1;
+    if (SDL_HANDLE_STORE(processes, p, &h) < 0)
+    {
+        SDL_DestroyProcess(p);
+        vigil_status_t st = sdl_push_i64(vm, -1, error);
+        if (st != VIGIL_STATUS_OK)
+            return st;
+        return sdl_push_err(vm, "too many processes", SDL_ERR_STATE, error);
+    }
+    vigil_status_t st = sdl_push_i64(vm, h, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_ok(vm, error);
+}
+
+static vigil_status_t sdl_fn_destroy_process(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_arg_i64(vm, base, 0);
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Process *p = (SDL_Process *)SDL_HANDLE_GET(processes, h);
+    if (p)
+    {
+        SDL_DestroyProcess(p);
+        SDL_HANDLE_CLEAR(processes, h);
+    }
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t sdl_fn_kill_process(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_arg_i64(vm, base, 0);
+    int32_t force = sdl_arg_i32(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Process *p = (SDL_Process *)SDL_HANDLE_GET(processes, h);
+    if (p && SDL_KillProcess(p, force != 0))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+static vigil_status_t sdl_fn_wait_process(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_arg_i64(vm, base, 0);
+    int32_t block = sdl_arg_i32(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    int exitcode = -1;
+    SDL_Process *p = (SDL_Process *)SDL_HANDLE_GET(processes, h);
+    if (p)
+        SDL_WaitProcess(p, block != 0, &exitcode);
+    return sdl_push_i32(vm, exitcode, error);
+}
+
+static vigil_status_t sdl_fn_read_process(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_arg_i64(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Process *p = (SDL_Process *)SDL_HANDLE_GET(processes, h);
+    if (!p)
+        return sdl_push_string(vm, "", error);
+    size_t datasize = 0;
+    int exitcode = 0;
+    void *data = SDL_ReadProcess(p, &datasize, &exitcode);
+    if (!data)
+        return sdl_push_string(vm, "", error);
+    /* Register as unsafe buffer */
+    int64_t bh = vigil_unsafe_buffer_register(data, (int32_t)datasize);
+    return sdl_push_i64(vm, bh, error);
+}
+
+/* ── Palette ──────────────────────────────────────────────────────── */
+
+SDL_HANDLE_REGISTRY(palettes);
+
+static vigil_status_t sdl_fn_create_palette(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t ncolors = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Palette *p = SDL_CreatePalette(ncolors);
+    if (!p)
+        return sdl_push_i64(vm, -1, error);
+    int64_t h = -1;
+    SDL_HANDLE_STORE(palettes, p, &h);
+    return sdl_push_i64(vm, h, error);
+}
+
+static vigil_status_t sdl_fn_destroy_palette(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_arg_i64(vm, base, 0);
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Palette *p = (SDL_Palette *)SDL_HANDLE_GET(palettes, h);
+    if (p)
+    {
+        SDL_DestroyPalette(p);
+        SDL_HANDLE_CLEAR(palettes, h);
+    }
+    return VIGIL_STATUS_OK;
+}
+
+/* set_palette_colors(palette, buf_handle, first, count) -> bool */
+static vigil_status_t sdl_fn_set_palette_colors(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t ph = sdl_arg_i64(vm, base, 0);
+    int64_t bh = sdl_arg_i64(vm, base, 1);
+    int32_t first = sdl_arg_i32(vm, base, 2);
+    int32_t count = sdl_arg_i32(vm, base, 3);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Palette *p = (SDL_Palette *)SDL_HANDLE_GET(palettes, ph);
+    int32_t bsz = 0;
+    void *colors = vigil_unsafe_buffer_get(bh, &bsz);
+    if (p && colors && SDL_SetPaletteColors(p, (const SDL_Color *)colors, first, count))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+/* ── Tray ─────────────────────────────────────────────────────────── */
+
+SDL_HANDLE_REGISTRY(trays);
+SDL_HANDLE_REGISTRY(tray_menus);
+SDL_HANDLE_REGISTRY(tray_entries);
+
+static vigil_status_t sdl_fn_create_tray(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    char tooltip[256];
+    sdl_arg_str(vm, base, 0, tooltip, sizeof(tooltip));
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Tray *t = SDL_CreateTray(NULL, tooltip[0] ? tooltip : NULL);
+    if (!t)
+    {
+        vigil_status_t st = sdl_push_i64(vm, -1, error);
+        if (st != VIGIL_STATUS_OK)
+            return st;
+        return sdl_push_sdl_err(vm, SDL_ERR_IO, error);
+    }
+    int64_t h = -1;
+    SDL_HANDLE_STORE(trays, t, &h);
+    vigil_status_t st = sdl_push_i64(vm, h, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_ok(vm, error);
+}
+
+static vigil_status_t sdl_fn_destroy_tray(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_arg_i64(vm, base, 0);
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Tray *t = (SDL_Tray *)SDL_HANDLE_GET(trays, h);
+    if (t)
+    {
+        SDL_DestroyTray(t);
+        SDL_HANDLE_CLEAR(trays, h);
+    }
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t sdl_fn_set_tray_tooltip(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_arg_i64(vm, base, 0);
+    char tip[256];
+    sdl_arg_str(vm, base, 1, tip, sizeof(tip));
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Tray *t = (SDL_Tray *)SDL_HANDLE_GET(trays, h);
+    if (t)
+        SDL_SetTrayTooltip(t, tip);
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t sdl_fn_create_tray_menu(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t th = sdl_arg_i64(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Tray *t = (SDL_Tray *)SDL_HANDLE_GET(trays, th);
+    if (!t)
+        return sdl_push_i64(vm, -1, error);
+    SDL_TrayMenu *m = SDL_CreateTrayMenu(t);
+    if (!m)
+        return sdl_push_i64(vm, -1, error);
+    int64_t h = -1;
+    SDL_HANDLE_STORE(tray_menus, m, &h);
+    return sdl_push_i64(vm, h, error);
+}
+
+static vigil_status_t sdl_fn_insert_tray_entry(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t mh = sdl_arg_i64(vm, base, 0);
+    int32_t pos = sdl_arg_i32(vm, base, 1);
+    char label[256];
+    sdl_arg_str(vm, base, 2, label, sizeof(label));
+    int32_t flags = sdl_arg_i32(vm, base, 3);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_TrayMenu *m = (SDL_TrayMenu *)SDL_HANDLE_GET(tray_menus, mh);
+    if (!m)
+        return sdl_push_i64(vm, -1, error);
+    SDL_TrayEntry *e = SDL_InsertTrayEntryAt(m, pos, label[0] ? label : NULL, (SDL_TrayEntryFlags)flags);
+    if (!e)
+        return sdl_push_i64(vm, -1, error);
+    int64_t h = -1;
+    SDL_HANDLE_STORE(tray_entries, e, &h);
+    return sdl_push_i64(vm, h, error);
+}
+
+static vigil_status_t sdl_fn_remove_tray_entry(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_arg_i64(vm, base, 0);
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_TrayEntry *e = (SDL_TrayEntry *)SDL_HANDLE_GET(tray_entries, h);
+    if (e)
+    {
+        SDL_RemoveTrayEntry(e);
+        SDL_HANDLE_CLEAR(tray_entries, h);
+    }
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t sdl_fn_set_tray_entry_label(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_arg_i64(vm, base, 0);
+    char label[256];
+    sdl_arg_str(vm, base, 1, label, sizeof(label));
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_TrayEntry *e = (SDL_TrayEntry *)SDL_HANDLE_GET(tray_entries, h);
+    if (e)
+        SDL_SetTrayEntryLabel(e, label);
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t sdl_fn_get_tray_entry_label(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_arg_i64(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_TrayEntry *e = (SDL_TrayEntry *)SDL_HANDLE_GET(tray_entries, h);
+    return sdl_push_string(vm, e ? SDL_GetTrayEntryLabel(e) : "", error);
+}
+
+static vigil_status_t sdl_fn_set_tray_entry_checked(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_arg_i64(vm, base, 0);
+    int32_t checked = sdl_arg_i32(vm, base, 1);
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_TrayEntry *e = (SDL_TrayEntry *)SDL_HANDLE_GET(tray_entries, h);
+    if (e)
+        SDL_SetTrayEntryChecked(e, checked != 0);
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t sdl_fn_get_tray_entry_checked(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_arg_i64(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_TrayEntry *e = (SDL_TrayEntry *)SDL_HANDLE_GET(tray_entries, h);
+    return sdl_push_bool(vm, e && SDL_GetTrayEntryChecked(e), error);
+}
+
+static vigil_status_t sdl_fn_set_tray_entry_enabled(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_arg_i64(vm, base, 0);
+    int32_t en = sdl_arg_i32(vm, base, 1);
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_TrayEntry *e = (SDL_TrayEntry *)SDL_HANDLE_GET(tray_entries, h);
+    if (e)
+        SDL_SetTrayEntryEnabled(e, en != 0);
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t sdl_fn_get_tray_entry_enabled(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_arg_i64(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_TrayEntry *e = (SDL_TrayEntry *)SDL_HANDLE_GET(tray_entries, h);
+    return sdl_push_bool(vm, e && SDL_GetTrayEntryEnabled(e), error);
+}
+
+static vigil_status_t sdl_fn_update_trays(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_UpdateTrays();
+    return VIGIL_STATUS_OK;
+}
+
 /* Texture access constants */
 SDL_CONST_FN(TEXTUREACCESS_STATIC, SDL_TEXTUREACCESS_STATIC)
 SDL_CONST_FN(TEXTUREACCESS_STREAMING, SDL_TEXTUREACCESS_STREAMING)
@@ -12467,6 +12793,32 @@ static const vigil_native_module_function_t sdl_functions[] = {
      NULL, 0},
     SDL_FN("get_storage_path_type", 21U, sdl_fn_get_storage_path_type, 2U, p_i64_str, VIGIL_TYPE_I32),
     SDL_FN("get_storage_space_remaining", 27U, sdl_fn_get_storage_space_remaining, 1U, p_i64, VIGIL_TYPE_I64),
+    /* Process */
+    {"create_process", 14U, sdl_fn_create_process, 2U, p_str_i32, VIGIL_TYPE_I64, 2U, rt_i64_err, 0, NULL, NULL, 0},
+    SDL_FN_VOID("destroy_process", 15U, sdl_fn_destroy_process, 1U, p_i64),
+    SDL_FN_BOOL_ERR("kill_process", 12U, sdl_fn_kill_process, 2U, p_i64_i32),
+    SDL_FN("wait_process", 12U, sdl_fn_wait_process, 2U, p_i64_i32, VIGIL_TYPE_I32),
+    SDL_FN("read_process", 12U, sdl_fn_read_process, 1U, p_i64, VIGIL_TYPE_I64),
+    /* Palette */
+    SDL_FN("create_palette", 14U, sdl_fn_create_palette, 1U, p_i32, VIGIL_TYPE_I64),
+    SDL_FN_VOID("destroy_palette", 15U, sdl_fn_destroy_palette, 1U, p_i64),
+    {"set_palette_colors", 18U, sdl_fn_set_palette_colors, 4U, p_i64_i64_i32_i32, VIGIL_TYPE_BOOL, 2U, rt_bool_err, 0,
+     NULL, NULL, 0},
+    /* Tray */
+    {"create_tray", 11U, sdl_fn_create_tray, 1U, p_str, VIGIL_TYPE_I64, 2U, rt_i64_err, 0, NULL, NULL, 0},
+    SDL_FN_VOID("destroy_tray", 12U, sdl_fn_destroy_tray, 1U, p_i64),
+    SDL_FN_VOID("set_tray_tooltip", 16U, sdl_fn_set_tray_tooltip, 2U, p_i64_str),
+    SDL_FN("create_tray_menu", 16U, sdl_fn_create_tray_menu, 1U, p_i64, VIGIL_TYPE_I64),
+    {"insert_tray_entry", 17U, sdl_fn_insert_tray_entry, 4U, p_i64_i32_str_i32, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL,
+     0},
+    SDL_FN_VOID("remove_tray_entry", 17U, sdl_fn_remove_tray_entry, 1U, p_i64),
+    SDL_FN_VOID("set_tray_entry_label", 20U, sdl_fn_set_tray_entry_label, 2U, p_i64_str),
+    SDL_FN("get_tray_entry_label", 20U, sdl_fn_get_tray_entry_label, 1U, p_i64, VIGIL_TYPE_STRING),
+    SDL_FN_VOID("set_tray_entry_checked", 22U, sdl_fn_set_tray_entry_checked, 2U, p_i64_i32),
+    SDL_FN("get_tray_entry_checked", 22U, sdl_fn_get_tray_entry_checked, 1U, p_i64, VIGIL_TYPE_BOOL),
+    SDL_FN_VOID("set_tray_entry_enabled", 22U, sdl_fn_set_tray_entry_enabled, 2U, p_i64_i32),
+    SDL_FN("get_tray_entry_enabled", 22U, sdl_fn_get_tray_entry_enabled, 1U, p_i64, VIGIL_TYPE_BOOL),
+    SDL_FN_VOID("update_trays", 12U, sdl_fn_update_trays, 0U, NULL),
     /* IO constants */
     SDL_CONST_ENTRY("IO_SEEK_SET", IO_SEEK_SET),
     SDL_CONST_ENTRY("IO_SEEK_CUR", IO_SEEK_CUR),
