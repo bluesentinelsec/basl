@@ -10,6 +10,7 @@
 #include "vigil/native_module.h"
 #include "vigil/runtime.h"
 #include "vigil/stdlib.h"
+#include "vigil/unsafe_buffer.h"
 #include "vigil/vm.h"
 
 /* ── Helpers ─────────────────────────────────────────────────────── */
@@ -894,6 +895,64 @@ TEST(Unsafe, Errno)
     unsafe_vm_teardown(&rt, &vm);
 }
 
+/* ── Public buffer API tests ─────────────────────────────────────── */
+
+TEST(Unsafe, BufferPublicAPI)
+{
+    /* Alloc via public API */
+    int64_t slot = vigil_unsafe_buffer_alloc(64);
+    EXPECT_TRUE(slot >= 0);
+
+    /* Get pointer and size */
+    int32_t size = 0;
+    void *ptr = vigil_unsafe_buffer_get(slot, &size);
+    EXPECT_TRUE(ptr != NULL);
+    EXPECT_EQ(64, size);
+
+    /* Write through pointer, read back */
+    ((uint8_t *)ptr)[0] = 0xAB;
+    ((uint8_t *)ptr)[63] = 0xCD;
+
+    void *ptr2 = vigil_unsafe_buffer_get(slot, NULL);
+    EXPECT_EQ(0xAB, ((uint8_t *)ptr2)[0]);
+    EXPECT_EQ(0xCD, ((uint8_t *)ptr2)[63]);
+
+    /* Invalid slot returns NULL */
+    EXPECT_TRUE(vigil_unsafe_buffer_get(-1, NULL) == NULL);
+    EXPECT_TRUE(vigil_unsafe_buffer_get(9999, NULL) == NULL);
+
+    /* Free */
+    vigil_unsafe_buffer_free(slot);
+    EXPECT_TRUE(vigil_unsafe_buffer_get(slot, NULL) == NULL);
+}
+
+TEST(Unsafe, BufferRegister)
+{
+    /* Register externally-allocated buffer */
+    void *data = calloc(32, 1);
+    EXPECT_TRUE(data != NULL);
+    ((uint8_t *)data)[0] = 0x42;
+
+    int64_t slot = vigil_unsafe_buffer_register(data, 32);
+    EXPECT_TRUE(slot >= 0);
+
+    int32_t size = 0;
+    void *ptr = vigil_unsafe_buffer_get(slot, &size);
+    EXPECT_EQ(data, ptr);
+    EXPECT_EQ(32, size);
+    EXPECT_EQ(0x42, ((uint8_t *)ptr)[0]);
+
+    /* Free releases the registered buffer */
+    vigil_unsafe_buffer_free(slot);
+    EXPECT_TRUE(vigil_unsafe_buffer_get(slot, NULL) == NULL);
+
+    /* NULL/zero rejects */
+    EXPECT_EQ(-1, vigil_unsafe_buffer_register(NULL, 10));
+    EXPECT_EQ(-1, vigil_unsafe_buffer_register((void *)1, 0));
+    EXPECT_EQ(-1, vigil_unsafe_buffer_alloc(0));
+    EXPECT_EQ(-1, vigil_unsafe_buffer_alloc(-1));
+}
+
 /* ── Registration ────────────────────────────────────────────────── */
 
 void register_unsafe_tests(void)
@@ -925,4 +984,6 @@ void register_unsafe_tests(void)
     REGISTER_TEST(Unsafe, OffsetofOutOfRange);
     REGISTER_TEST(Unsafe, StructSize);
     REGISTER_TEST(Unsafe, Errno);
+    REGISTER_TEST(Unsafe, BufferPublicAPI);
+    REGISTER_TEST(Unsafe, BufferRegister);
 }
