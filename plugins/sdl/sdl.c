@@ -668,6 +668,7 @@ static const int p_i64[] = {VIGIL_TYPE_I64};
 static const int p_str[] = {VIGIL_TYPE_STRING};
 static const int p_str_str[] = {VIGIL_TYPE_STRING, VIGIL_TYPE_STRING};
 static const int p_str_i32[] = {VIGIL_TYPE_STRING, VIGIL_TYPE_I32};
+static const int p_i32_str[] = {VIGIL_TYPE_I32, VIGIL_TYPE_STRING};
 static const int p_str_str_i32[] = {VIGIL_TYPE_STRING, VIGIL_TYPE_STRING, VIGIL_TYPE_I32};
 static const int p_i32_str_str[] = {VIGIL_TYPE_I32, VIGIL_TYPE_STRING, VIGIL_TYPE_STRING};
 static const int p_str_str_str[] = {VIGIL_TYPE_STRING, VIGIL_TYPE_STRING, VIGIL_TYPE_STRING};
@@ -10077,6 +10078,339 @@ static vigil_status_t sdl_haptic_stop_effects(vigil_vm_t *vm, size_t arg_count, 
     return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
 }
 
+/* ── stdinc batch 2: remaining portable functions ─────────────────── */
+
+/* Math extras */
+static vigil_status_t sdl_fn_m_isinff(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    double v = sdl_arg_f64(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_bool(vm, SDL_isinff((float)v), error);
+}
+
+static vigil_status_t sdl_fn_m_isnanf(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    double v = sdl_arg_f64(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_bool(vm, SDL_isnanf((float)v), error);
+}
+
+static vigil_status_t sdl_fn_m_scalbnf(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    double x = sdl_arg_f64(vm, base, 0);
+    int n = (int)sdl_arg_f64(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_f64(vm, (double)SDL_scalbnf((float)x, n), error);
+}
+
+/* String extras */
+static vigil_status_t sdl_fn_s_strnlen(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    char a[4096];
+    sdl_arg_str(vm, base, 0, a, sizeof(a));
+    int32_t n = sdl_arg_i32(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_i32(vm, (int32_t)SDL_strnlen(a, (size_t)n), error);
+}
+
+static vigil_status_t sdl_fn_s_strlcpy(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    char src[4096];
+    sdl_arg_str(vm, base, 0, src, sizeof(src));
+    int32_t maxlen = sdl_arg_i32(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    char dst[4096] = {0};
+    SDL_strlcpy(dst, src, (size_t)(maxlen > 0 && maxlen < 4096 ? maxlen : 4095));
+    return sdl_push_string(vm, dst, error);
+}
+
+static vigil_status_t sdl_fn_s_strlcat(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    char dst[4096];
+    sdl_arg_str(vm, base, 0, dst, sizeof(dst));
+    char src[4096];
+    sdl_arg_str(vm, base, 1, src, sizeof(src));
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_strlcat(dst, src, sizeof(dst));
+    return sdl_push_string(vm, dst, error);
+}
+
+static vigil_status_t sdl_fn_s_strpbrk(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    char a[4096], b[256];
+    sdl_arg_str(vm, base, 0, a, sizeof(a));
+    sdl_arg_str(vm, base, 1, b, sizeof(b));
+    vigil_vm_stack_pop_n(vm, arg_count);
+    const char *p = SDL_strpbrk(a, b);
+    return sdl_push_i32(vm, p ? (int32_t)(p - a) : -1, error);
+}
+
+static vigil_status_t sdl_fn_s_strcasestr(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    char a[4096], b[256];
+    sdl_arg_str(vm, base, 0, a, sizeof(a));
+    sdl_arg_str(vm, base, 1, b, sizeof(b));
+    vigil_vm_stack_pop_n(vm, arg_count);
+    const char *p = SDL_strcasestr(a, b);
+    return sdl_push_i32(vm, p ? (int32_t)(p - a) : -1, error);
+}
+
+static vigil_status_t sdl_fn_s_strtoll(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    char a[256];
+    sdl_arg_str(vm, base, 0, a, sizeof(a));
+    int32_t radix = sdl_arg_i32(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_i64(vm, (int64_t)SDL_strtoll(a, NULL, radix), error);
+}
+
+static vigil_status_t sdl_fn_s_strtoull(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    char a[256];
+    sdl_arg_str(vm, base, 0, a, sizeof(a));
+    int32_t radix = sdl_arg_i32(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_i64(vm, (int64_t)SDL_strtoull(a, NULL, radix), error);
+}
+
+static vigil_status_t sdl_fn_s_uitoa(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t v = sdl_arg_i32(vm, base, 0);
+    int32_t radix = sdl_arg_i32(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    char buf[68];
+    SDL_uitoa((unsigned int)v, buf, radix);
+    return sdl_push_string(vm, buf, error);
+}
+
+static vigil_status_t sdl_fn_s_ltoa(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t v = sdl_arg_i64(vm, base, 0);
+    int32_t radix = sdl_arg_i32(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    char buf[68];
+    SDL_ltoa((long)v, buf, radix);
+    return sdl_push_string(vm, buf, error);
+}
+
+static vigil_status_t sdl_fn_s_ulltoa(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t v = sdl_arg_i64(vm, base, 0);
+    int32_t radix = sdl_arg_i32(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    char buf[68];
+    SDL_ulltoa((unsigned long long)v, buf, radix);
+    return sdl_push_string(vm, buf, error);
+}
+
+/* Pixel format */
+static vigil_status_t sdl_fn_get_pixel_format_name(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t fmt = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_string(vm, SDL_GetPixelFormatName((SDL_PixelFormat)fmt), error);
+}
+
+/* Memory info */
+static vigil_status_t sdl_fn_get_num_allocations(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_i32(vm, SDL_GetNumAllocations(), error);
+}
+
+static vigil_status_t sdl_fn_get_simd_alignment(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_i32(vm, (int32_t)SDL_GetSIMDAlignment(), error);
+}
+
+static vigil_status_t sdl_fn_get_system_page_size(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_i32(vm, (int32_t)SDL_GetSystemPageSize(), error);
+}
+
+/* Error */
+static vigil_status_t sdl_fn_clear_error(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_ClearError();
+    return VIGIL_STATUS_OK;
+}
+
+/* Byte swap */
+static vigil_status_t sdl_fn_swap16(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t v = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_i32(vm, (int32_t)SDL_Swap16((Uint16)v), error);
+}
+
+static vigil_status_t sdl_fn_swap32(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t v = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_i32(vm, (int32_t)SDL_Swap32((Uint32)v), error);
+}
+
+static vigil_status_t sdl_fn_swap64(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t v = sdl_arg_i64(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_i64(vm, (int64_t)SDL_Swap64((Uint64)v), error);
+}
+
+/* Hints */
+static vigil_status_t sdl_fn_set_hint(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    char name[256], val[256];
+    sdl_arg_str(vm, base, 0, name, sizeof(name));
+    sdl_arg_str(vm, base, 1, val, sizeof(val));
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_bool(vm, SDL_SetHint(name, val), error);
+}
+
+static vigil_status_t sdl_fn_get_hint(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    char name[256];
+    sdl_arg_str(vm, base, 0, name, sizeof(name));
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_string(vm, SDL_GetHint(name), error);
+}
+
+static vigil_status_t sdl_fn_get_hint_boolean(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    char name[256];
+    sdl_arg_str(vm, base, 0, name, sizeof(name));
+    int32_t def = sdl_arg_i32(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_bool(vm, SDL_GetHintBoolean(name, def != 0), error);
+}
+
+static vigil_status_t sdl_fn_reset_hint(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    char name[256];
+    sdl_arg_str(vm, base, 0, name, sizeof(name));
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_bool(vm, SDL_ResetHint(name), error);
+}
+
+static vigil_status_t sdl_fn_reset_hints(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_ResetHints();
+    return VIGIL_STATUS_OK;
+}
+
+/* Logging */
+static vigil_status_t sdl_fn_log_info(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t cat = sdl_arg_i32(vm, base, 0);
+    char msg[4096];
+    sdl_arg_str(vm, base, 1, msg, sizeof(msg));
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_LogInfo(cat, "%s", msg);
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t sdl_fn_log_debug(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t cat = sdl_arg_i32(vm, base, 0);
+    char msg[4096];
+    sdl_arg_str(vm, base, 1, msg, sizeof(msg));
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_LogDebug(cat, "%s", msg);
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t sdl_fn_log_verbose(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t cat = sdl_arg_i32(vm, base, 0);
+    char msg[4096];
+    sdl_arg_str(vm, base, 1, msg, sizeof(msg));
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_LogVerbose(cat, "%s", msg);
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t sdl_fn_log_critical(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t cat = sdl_arg_i32(vm, base, 0);
+    char msg[4096];
+    sdl_arg_str(vm, base, 1, msg, sizeof(msg));
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_LogCritical(cat, "%s", msg);
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t sdl_fn_set_log_priority(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t cat = sdl_arg_i32(vm, base, 0);
+    int32_t pri = sdl_arg_i32(vm, base, 1);
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_SetLogPriority(cat, (SDL_LogPriority)pri);
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t sdl_fn_get_log_priority(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t cat = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_i32(vm, (int32_t)SDL_GetLogPriority(cat), error);
+}
+
+static vigil_status_t sdl_fn_reset_log_priorities(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_ResetLogPriorities();
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t sdl_fn_set_log_priorities(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t pri = sdl_arg_i32(vm, base, 0);
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_SetLogPriorities((SDL_LogPriority)pri);
+    return VIGIL_STATUS_OK;
+}
+
 /* Texture access constants */
 SDL_CONST_FN(TEXTUREACCESS_STATIC, SDL_TEXTUREACCESS_STATIC)
 SDL_CONST_FN(TEXTUREACCESS_STREAMING, SDL_TEXTUREACCESS_STREAMING)
@@ -10590,6 +10924,43 @@ static const vigil_native_module_function_t sdl_functions[] = {
     SDL_FN("get_haptic_name_for_id", 22U, sdl_fn_get_haptic_name_for_id, 1U, p_i32, VIGIL_TYPE_STRING),
     {"open_haptic_from_mouse", 22U, sdl_fn_open_haptic_from_mouse, 0U, NULL, VIGIL_TYPE_I64, 2U, rt_i64_err, 0, NULL,
      NULL, 0},
+    /* stdinc batch 2 */
+    SDL_FN("m_isinff", 8U, sdl_fn_m_isinff, 1U, p_f64, VIGIL_TYPE_BOOL),
+    SDL_FN("m_isnanf", 8U, sdl_fn_m_isnanf, 1U, p_f64, VIGIL_TYPE_BOOL),
+    SDL_FN("m_scalbnf", 9U, sdl_fn_m_scalbnf, 2U, p_f64_f64, VIGIL_TYPE_F64),
+    SDL_FN("s_strnlen", 9U, sdl_fn_s_strnlen, 2U, p_str_i32, VIGIL_TYPE_I32),
+    SDL_FN("s_strlcpy", 9U, sdl_fn_s_strlcpy, 2U, p_str_i32, VIGIL_TYPE_STRING),
+    SDL_FN("s_strlcat", 9U, sdl_fn_s_strlcat, 2U, p_str_str, VIGIL_TYPE_STRING),
+    SDL_FN("s_strpbrk", 9U, sdl_fn_s_strpbrk, 2U, p_str_str, VIGIL_TYPE_I32),
+    SDL_FN("s_strcasestr", 12U, sdl_fn_s_strcasestr, 2U, p_str_str, VIGIL_TYPE_I32),
+    SDL_FN("s_strtoll", 9U, sdl_fn_s_strtoll, 2U, p_str_i32, VIGIL_TYPE_I64),
+    SDL_FN("s_strtoull", 10U, sdl_fn_s_strtoull, 2U, p_str_i32, VIGIL_TYPE_I64),
+    SDL_FN("s_uitoa", 7U, sdl_fn_s_uitoa, 2U, p_i32_i32, VIGIL_TYPE_STRING),
+    SDL_FN("s_ltoa", 6U, sdl_fn_s_ltoa, 2U, p_i64_i32, VIGIL_TYPE_STRING),
+    SDL_FN("s_ulltoa", 8U, sdl_fn_s_ulltoa, 2U, p_i64_i32, VIGIL_TYPE_STRING),
+    SDL_FN("get_pixel_format_name", 21U, sdl_fn_get_pixel_format_name, 1U, p_i32, VIGIL_TYPE_STRING),
+    SDL_FN("get_num_allocations", 19U, sdl_fn_get_num_allocations, 0U, NULL, VIGIL_TYPE_I32),
+    SDL_FN("get_simd_alignment", 19U, sdl_fn_get_simd_alignment, 0U, NULL, VIGIL_TYPE_I32),
+    SDL_FN("get_system_page_size", 20U, sdl_fn_get_system_page_size, 0U, NULL, VIGIL_TYPE_I32),
+    SDL_FN_VOID("clear_error", 11U, sdl_fn_clear_error, 0U, NULL),
+    SDL_FN("swap16", 6U, sdl_fn_swap16, 1U, p_i32, VIGIL_TYPE_I32),
+    SDL_FN("swap32", 6U, sdl_fn_swap32, 1U, p_i32, VIGIL_TYPE_I32),
+    SDL_FN("swap64", 6U, sdl_fn_swap64, 1U, p_i64, VIGIL_TYPE_I64),
+    /* Hints */
+    SDL_FN("set_hint", 8U, sdl_fn_set_hint, 2U, p_str_str, VIGIL_TYPE_BOOL),
+    SDL_FN("get_hint", 8U, sdl_fn_get_hint, 1U, p_str, VIGIL_TYPE_STRING),
+    SDL_FN("get_hint_boolean", 16U, sdl_fn_get_hint_boolean, 2U, p_str_i32, VIGIL_TYPE_BOOL),
+    SDL_FN("reset_hint", 10U, sdl_fn_reset_hint, 1U, p_str, VIGIL_TYPE_BOOL),
+    SDL_FN_VOID("reset_hints", 11U, sdl_fn_reset_hints, 0U, NULL),
+    /* Logging */
+    SDL_FN_VOID("log_info", 8U, sdl_fn_log_info, 2U, p_i32_str),
+    SDL_FN_VOID("log_debug", 9U, sdl_fn_log_debug, 2U, p_i32_str),
+    SDL_FN_VOID("log_verbose", 11U, sdl_fn_log_verbose, 2U, p_i32_str),
+    SDL_FN_VOID("log_critical", 12U, sdl_fn_log_critical, 2U, p_i32_str),
+    SDL_FN_VOID("set_log_priority", 16U, sdl_fn_set_log_priority, 2U, p_i32_i32),
+    SDL_FN("get_log_priority", 16U, sdl_fn_get_log_priority, 1U, p_i32, VIGIL_TYPE_I32),
+    SDL_FN_VOID("reset_log_priorities", 20U, sdl_fn_reset_log_priorities, 0U, NULL),
+    SDL_FN_VOID("set_log_priorities", 18U, sdl_fn_set_log_priorities, 1U, p_i32),
     /* IO constants */
     SDL_CONST_ENTRY("IO_SEEK_SET", IO_SEEK_SET),
     SDL_CONST_ENTRY("IO_SEEK_CUR", IO_SEEK_CUR),
