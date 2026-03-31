@@ -682,6 +682,19 @@ static const int p_i32_i32_i32_i32_i32_i32[] = {VIGIL_TYPE_I32, VIGIL_TYPE_I32, 
 /* render_texture_tiled: obj tex + 9x f64 */
 static const int p_obj_f64x9[] = {VIGIL_TYPE_OBJECT, VIGIL_TYPE_F64, VIGIL_TYPE_F64, VIGIL_TYPE_F64, VIGIL_TYPE_F64,
                                   VIGIL_TYPE_F64,    VIGIL_TYPE_F64, VIGIL_TYPE_F64, VIGIL_TYPE_F64, VIGIL_TYPE_F64};
+/* clang-format off */
+static const int p_obj_f64x11[] = {VIGIL_TYPE_OBJECT, VIGIL_TYPE_F64, VIGIL_TYPE_F64, VIGIL_TYPE_F64, VIGIL_TYPE_F64,
+                                    VIGIL_TYPE_F64, VIGIL_TYPE_F64, VIGIL_TYPE_F64, VIGIL_TYPE_F64, VIGIL_TYPE_F64,
+                                    VIGIL_TYPE_F64, VIGIL_TYPE_F64};
+static const int p_obj_f64x13[] = {VIGIL_TYPE_OBJECT, VIGIL_TYPE_F64, VIGIL_TYPE_F64, VIGIL_TYPE_F64, VIGIL_TYPE_F64,
+                                    VIGIL_TYPE_F64, VIGIL_TYPE_F64, VIGIL_TYPE_F64, VIGIL_TYPE_F64, VIGIL_TYPE_F64,
+                                    VIGIL_TYPE_F64, VIGIL_TYPE_F64, VIGIL_TYPE_F64, VIGIL_TYPE_F64};
+static const int p_f64_f64_f64[] = {VIGIL_TYPE_F64, VIGIL_TYPE_F64, VIGIL_TYPE_F64};
+static const int p_i32_i32_i32_i32_i64_i32[] = {VIGIL_TYPE_I32, VIGIL_TYPE_I32, VIGIL_TYPE_I32, VIGIL_TYPE_I32,
+                                                  VIGIL_TYPE_I64, VIGIL_TYPE_I32};
+static const int p_i64_i64_i32_i64_i32[] = {VIGIL_TYPE_I64, VIGIL_TYPE_I64, VIGIL_TYPE_I32, VIGIL_TYPE_I64,
+                                              VIGIL_TYPE_I32};
+/* clang-format on */
 static const int p_i32_f64[] = {VIGIL_TYPE_I32, VIGIL_TYPE_F64};
 static const int p_f64_i32[] = {VIGIL_TYPE_F64, VIGIL_TYPE_I32};
 /* blit: obj dst + sx, sy, sw, sh, dx, dy */
@@ -7173,6 +7186,389 @@ SDL_CONST_FN(HITTEST_RESIZE_BOTTOM, SDL_HITTEST_RESIZE_BOTTOM)
 SDL_CONST_FN(HITTEST_RESIZE_BOTTOMLEFT, SDL_HITTEST_RESIZE_BOTTOMLEFT)
 SDL_CONST_FN(HITTEST_RESIZE_LEFT, SDL_HITTEST_RESIZE_LEFT)
 
+/* ── Renderer Complete ────────────────────────────────────────────── */
+
+static vigil_status_t sdl_fn_get_num_render_drivers(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_i32(vm, SDL_GetNumRenderDrivers(), error);
+}
+
+static vigil_status_t sdl_fn_get_render_driver(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t idx = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_string(vm, SDL_GetRenderDriver(idx), error);
+}
+
+/* ren.get_draw_color_float() -> (f64, f64) — r,g packed as doubles (b,a in second) */
+static vigil_status_t sdl_renderer_get_draw_color_float(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t rh = sdl_field_i64(vm, base, REN_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    float r = 0, g = 0, b = 0, a = 0;
+    SDL_Renderer *ren = (SDL_Renderer *)SDL_HANDLE_GET(renderers, rh);
+    if (ren)
+        SDL_GetRenderDrawColorFloat(ren, &r, &g, &b, &a);
+    /* Pack as two f64: first = r (high 32) | g (low 32), but that's lossy.
+       Better: return r as f64, caller gets one channel at a time. Or pack RGBA into i64.
+       Simplest: return packed i64 with 16-bit-per-channel fixed point. */
+    int64_t packed = ((int64_t)(int32_t)(r * 65535.0f) << 48) | ((int64_t)(int32_t)(g * 65535.0f) << 32) |
+                     ((int64_t)(int32_t)(b * 65535.0f) << 16) | (int64_t)(int32_t)(a * 65535.0f);
+    return sdl_push_i64(vm, packed, error);
+}
+
+static vigil_status_t sdl_renderer_get_safe_area(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t rh = sdl_field_i64(vm, base, REN_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Rect rect = {0, 0, 0, 0};
+    SDL_Renderer *ren = (SDL_Renderer *)SDL_HANDLE_GET(renderers, rh);
+    if (ren)
+        SDL_GetRenderSafeArea(ren, &rect);
+    vigil_status_t st = sdl_push_i32(vm, rect.w, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_i32(vm, rect.h, error);
+}
+
+static vigil_status_t sdl_renderer_viewport_set(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t rh = sdl_field_i64(vm, base, REN_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Renderer *ren = (SDL_Renderer *)SDL_HANDLE_GET(renderers, rh);
+    return sdl_push_bool(vm, ren && SDL_RenderViewportSet(ren), error);
+}
+
+static vigil_status_t sdl_renderer_set_texture_address_mode(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t rh = sdl_field_i64(vm, base, REN_HANDLE);
+    int32_t u = sdl_arg_i32(vm, base, 1), v = sdl_arg_i32(vm, base, 2);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Renderer *ren = (SDL_Renderer *)SDL_HANDLE_GET(renderers, rh);
+    if (ren && SDL_SetRenderTextureAddressMode(ren, (SDL_TextureAddressMode)u, (SDL_TextureAddressMode)v))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+static vigil_status_t sdl_renderer_get_texture_address_mode(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t rh = sdl_field_i64(vm, base, REN_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_TextureAddressMode u = SDL_TEXTURE_ADDRESS_AUTO, v = SDL_TEXTURE_ADDRESS_AUTO;
+    SDL_Renderer *ren = (SDL_Renderer *)SDL_HANDLE_GET(renderers, rh);
+    if (ren)
+        SDL_GetRenderTextureAddressMode(ren, &u, &v);
+    vigil_status_t st = sdl_push_i32(vm, (int32_t)u, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_i32(vm, (int32_t)v, error);
+}
+
+static vigil_status_t sdl_renderer_set_default_scale_mode(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t rh = sdl_field_i64(vm, base, REN_HANDLE);
+    int32_t mode = sdl_arg_i32(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Renderer *ren = (SDL_Renderer *)SDL_HANDLE_GET(renderers, rh);
+    if (ren && SDL_SetDefaultTextureScaleMode(ren, (SDL_ScaleMode)mode))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+static vigil_status_t sdl_renderer_get_default_scale_mode(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t rh = sdl_field_i64(vm, base, REN_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_ScaleMode mode = SDL_SCALEMODE_NEAREST;
+    SDL_Renderer *ren = (SDL_Renderer *)SDL_HANDLE_GET(renderers, rh);
+    if (ren)
+        SDL_GetDefaultTextureScaleMode(ren, &mode);
+    return sdl_push_i32(vm, (int32_t)mode, error);
+}
+
+static vigil_status_t sdl_renderer_coords_from_window(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t rh = sdl_field_i64(vm, base, REN_HANDLE);
+    float wx = (float)sdl_arg_f64(vm, base, 1), wy = (float)sdl_arg_f64(vm, base, 2);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    float rx = 0, ry = 0;
+    SDL_Renderer *ren = (SDL_Renderer *)SDL_HANDLE_GET(renderers, rh);
+    if (ren)
+        SDL_RenderCoordinatesFromWindow(ren, wx, wy, &rx, &ry);
+    vigil_status_t st = sdl_push_f64(vm, (double)rx, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_f64(vm, (double)ry, error);
+}
+
+static vigil_status_t sdl_renderer_coords_to_window(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t rh = sdl_field_i64(vm, base, REN_HANDLE);
+    float rx = (float)sdl_arg_f64(vm, base, 1), ry = (float)sdl_arg_f64(vm, base, 2);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    float wx = 0, wy = 0;
+    SDL_Renderer *ren = (SDL_Renderer *)SDL_HANDLE_GET(renderers, rh);
+    if (ren)
+        SDL_RenderCoordinatesToWindow(ren, rx, ry, &wx, &wy);
+    vigil_status_t st = sdl_push_f64(vm, (double)wx, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_f64(vm, (double)wy, error);
+}
+
+static vigil_status_t sdl_renderer_convert_event_coords(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t rh = sdl_field_i64(vm, base, REN_HANDLE);
+    SDL_Event *ev = evt_get(vm, base + 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Renderer *ren = (SDL_Renderer *)SDL_HANDLE_GET(renderers, rh);
+    if (ren && ev && SDL_ConvertEventToRenderCoordinates(ren, ev))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+/* Texture float mods */
+static vigil_status_t sdl_texture_set_color_mod_float(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, TEX_HANDLE);
+    float r = (float)sdl_arg_f64(vm, base, 1), g = (float)sdl_arg_f64(vm, base, 2), b = (float)sdl_arg_f64(vm, base, 3);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Texture *tex = (SDL_Texture *)SDL_HANDLE_GET(textures, h);
+    if (tex && SDL_SetTextureColorModFloat(tex, r, g, b))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+static vigil_status_t sdl_texture_set_alpha_mod_float(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, TEX_HANDLE);
+    float a = (float)sdl_arg_f64(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Texture *tex = (SDL_Texture *)SDL_HANDLE_GET(textures, h);
+    if (tex && SDL_SetTextureAlphaModFloat(tex, a))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+static vigil_status_t sdl_texture_get_alpha_mod_float(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, TEX_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    float a = 1.0f;
+    SDL_Texture *tex = (SDL_Texture *)SDL_HANDLE_GET(textures, h);
+    if (tex)
+        SDL_GetTextureAlphaModFloat(tex, &a);
+    return sdl_push_f64(vm, (double)a, error);
+}
+
+/* UpdateTexture — uses unsafe buffer for pixel data */
+static vigil_status_t sdl_texture_update(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t th = sdl_field_i64(vm, base, TEX_HANDLE);
+    int32_t x = sdl_arg_i32(vm, base, 1), y = sdl_arg_i32(vm, base, 2);
+    int32_t w = sdl_arg_i32(vm, base, 3), h = sdl_arg_i32(vm, base, 4);
+    int64_t buf = sdl_arg_i64(vm, base, 5);
+    int32_t pitch = sdl_arg_i32(vm, base, 6);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Texture *tex = (SDL_Texture *)SDL_HANDLE_GET(textures, th);
+    int32_t sz = 0;
+    void *pixels = vigil_unsafe_buffer_get(buf, &sz);
+    if (!tex || !pixels)
+        return sdl_push_bool_sdl_err(vm, SDL_ERR_ARG, error);
+    SDL_Rect rect = {x, y, w, h};
+    if (SDL_UpdateTexture(tex, (w > 0 && h > 0) ? &rect : NULL, pixels, pitch))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+/* LockTexture — returns unsafe buffer handle for pixel data */
+static vigil_status_t sdl_texture_lock(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t th = sdl_field_i64(vm, base, TEX_HANDLE);
+    int32_t x = sdl_arg_i32(vm, base, 1), y = sdl_arg_i32(vm, base, 2);
+    int32_t w = sdl_arg_i32(vm, base, 3), h = sdl_arg_i32(vm, base, 4);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Texture *tex = (SDL_Texture *)SDL_HANDLE_GET(textures, th);
+    if (!tex)
+        return sdl_push_i64(vm, -1, error);
+    void *pixels = NULL;
+    int pitch = 0;
+    SDL_Rect rect = {x, y, w, h};
+    if (!SDL_LockTexture(tex, (w > 0 && h > 0) ? &rect : NULL, &pixels, &pitch))
+        return sdl_push_i64(vm, -1, error);
+    /* Return raw pointer as i64 — user writes via unsafe.poke_* */
+    return sdl_push_i64(vm, (int64_t)(intptr_t)pixels, error);
+}
+
+static vigil_status_t sdl_texture_unlock(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t th = sdl_field_i64(vm, base, TEX_HANDLE);
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Texture *tex = (SDL_Texture *)SDL_HANDLE_GET(textures, th);
+    if (tex)
+        SDL_UnlockTexture(tex);
+    return VIGIL_STATUS_OK;
+}
+
+/* RenderPoints — takes unsafe buffer of packed float pairs (x,y) */
+static vigil_status_t sdl_renderer_render_points(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t rh = sdl_field_i64(vm, base, REN_HANDLE);
+    int64_t buf = sdl_arg_i64(vm, base, 1);
+    int32_t count = sdl_arg_i32(vm, base, 2);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Renderer *ren = (SDL_Renderer *)SDL_HANDLE_GET(renderers, rh);
+    int32_t sz = 0;
+    void *data = vigil_unsafe_buffer_get(buf, &sz);
+    if (ren && data && SDL_RenderPoints(ren, (const SDL_FPoint *)data, count))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+/* RenderLines — takes unsafe buffer of packed float pairs */
+static vigil_status_t sdl_renderer_render_lines(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t rh = sdl_field_i64(vm, base, REN_HANDLE);
+    int64_t buf = sdl_arg_i64(vm, base, 1);
+    int32_t count = sdl_arg_i32(vm, base, 2);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Renderer *ren = (SDL_Renderer *)SDL_HANDLE_GET(renderers, rh);
+    int32_t sz = 0;
+    void *data = vigil_unsafe_buffer_get(buf, &sz);
+    if (ren && data && SDL_RenderLines(ren, (const SDL_FPoint *)data, count))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+/* RenderRects — takes unsafe buffer of packed float quads (x,y,w,h) */
+static vigil_status_t sdl_renderer_render_rects(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t rh = sdl_field_i64(vm, base, REN_HANDLE);
+    int64_t buf = sdl_arg_i64(vm, base, 1);
+    int32_t count = sdl_arg_i32(vm, base, 2);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Renderer *ren = (SDL_Renderer *)SDL_HANDLE_GET(renderers, rh);
+    int32_t sz = 0;
+    void *data = vigil_unsafe_buffer_get(buf, &sz);
+    if (ren && data && SDL_RenderRects(ren, (const SDL_FRect *)data, count))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+static vigil_status_t sdl_renderer_render_fill_rects(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t rh = sdl_field_i64(vm, base, REN_HANDLE);
+    int64_t buf = sdl_arg_i64(vm, base, 1);
+    int32_t count = sdl_arg_i32(vm, base, 2);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Renderer *ren = (SDL_Renderer *)SDL_HANDLE_GET(renderers, rh);
+    int32_t sz = 0;
+    void *data = vigil_unsafe_buffer_get(buf, &sz);
+    if (ren && data && SDL_RenderFillRects(ren, (const SDL_FRect *)data, count))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+/* RenderGeometry — vertices in unsafe buffer, optional indices in unsafe buffer */
+static vigil_status_t sdl_renderer_render_geometry(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t rh = sdl_field_i64(vm, base, REN_HANDLE);
+    int64_t th = sdl_arg_i64(vm, base, 1); /* texture handle or -1 */
+    int64_t vbuf = sdl_arg_i64(vm, base, 2);
+    int32_t num_verts = sdl_arg_i32(vm, base, 3);
+    int64_t ibuf = sdl_arg_i64(vm, base, 4); /* index buffer handle or -1 */
+    int32_t num_indices = sdl_arg_i32(vm, base, 5);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Renderer *ren = (SDL_Renderer *)SDL_HANDLE_GET(renderers, rh);
+    SDL_Texture *tex = (th >= 0) ? (SDL_Texture *)SDL_HANDLE_GET(textures, th) : NULL;
+    int32_t vsz = 0;
+    void *verts = vigil_unsafe_buffer_get(vbuf, &vsz);
+    int32_t isz = 0;
+    const int *indices = NULL;
+    if (ibuf >= 0)
+        indices = (const int *)vigil_unsafe_buffer_get(ibuf, &isz);
+    if (ren && verts && SDL_RenderGeometry(ren, tex, (const SDL_Vertex *)verts, num_verts, indices, num_indices))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+/* RenderTextureAffine */
+static vigil_status_t sdl_renderer_render_texture_affine(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t rh = sdl_field_i64(vm, base, REN_HANDLE);
+    int64_t th = sdl_field_i64(vm, base + 1, TEX_HANDLE);
+    float sx = (float)sdl_arg_f64(vm, base, 2), sy = (float)sdl_arg_f64(vm, base, 3);
+    float sw = (float)sdl_arg_f64(vm, base, 4), sh = (float)sdl_arg_f64(vm, base, 5);
+    float ox = (float)sdl_arg_f64(vm, base, 6), oy = (float)sdl_arg_f64(vm, base, 7);
+    float rx = (float)sdl_arg_f64(vm, base, 8), ry = (float)sdl_arg_f64(vm, base, 9);
+    float dx = (float)sdl_arg_f64(vm, base, 10), dy = (float)sdl_arg_f64(vm, base, 11);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Renderer *ren = (SDL_Renderer *)SDL_HANDLE_GET(renderers, rh);
+    SDL_Texture *tex = (SDL_Texture *)SDL_HANDLE_GET(textures, th);
+    if (!ren || !tex)
+        return sdl_push_bool_sdl_err(vm, SDL_ERR_ARG, error);
+    SDL_FRect src = {sx, sy, sw, sh};
+    SDL_FPoint origin = {ox, oy}, right = {rx, ry}, down = {dx, dy};
+    int use_src = (sw > 0.0f || sh > 0.0f);
+    if (SDL_RenderTextureAffine(ren, tex, use_src ? &src : NULL, &origin, &right, &down))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+/* RenderTexture9Grid */
+static vigil_status_t sdl_renderer_render_texture_9grid(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t rh = sdl_field_i64(vm, base, REN_HANDLE);
+    int64_t th = sdl_field_i64(vm, base + 1, TEX_HANDLE);
+    float sx = (float)sdl_arg_f64(vm, base, 2), sy = (float)sdl_arg_f64(vm, base, 3);
+    float sw = (float)sdl_arg_f64(vm, base, 4), sh = (float)sdl_arg_f64(vm, base, 5);
+    float lw = (float)sdl_arg_f64(vm, base, 6), rw = (float)sdl_arg_f64(vm, base, 7);
+    float th2 = (float)sdl_arg_f64(vm, base, 8), bh = (float)sdl_arg_f64(vm, base, 9);
+    float scale = (float)sdl_arg_f64(vm, base, 10);
+    float dx = (float)sdl_arg_f64(vm, base, 11), dy = (float)sdl_arg_f64(vm, base, 12);
+    float dw = (float)sdl_arg_f64(vm, base, 13), dh = (float)sdl_arg_f64(vm, base, 14);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Renderer *ren = (SDL_Renderer *)SDL_HANDLE_GET(renderers, rh);
+    SDL_Texture *tex = (SDL_Texture *)SDL_HANDLE_GET(textures, th);
+    if (!ren || !tex)
+        return sdl_push_bool_sdl_err(vm, SDL_ERR_ARG, error);
+    SDL_FRect src = {sx, sy, sw, sh}, dst = {dx, dy, dw, dh};
+    if (SDL_RenderTexture9Grid(ren, tex, &src, lw, rw, th2, bh, scale, &dst))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+/* Address mode constants */
+SDL_CONST_FN(TEXTURE_ADDRESS_AUTO, SDL_TEXTURE_ADDRESS_AUTO)
+SDL_CONST_FN(TEXTURE_ADDRESS_CLAMP, SDL_TEXTURE_ADDRESS_CLAMP)
+SDL_CONST_FN(TEXTURE_ADDRESS_WRAP, SDL_TEXTURE_ADDRESS_WRAP)
+
 /* Texture access constants */
 SDL_CONST_FN(TEXTUREACCESS_STATIC, SDL_TEXTUREACCESS_STATIC)
 SDL_CONST_FN(TEXTUREACCESS_STREAMING, SDL_TEXTUREACCESS_STREAMING)
@@ -7552,6 +7948,13 @@ static const vigil_native_module_function_t sdl_functions[] = {
     {"create_window_and_renderer", 26U, sdl_fn_create_window_and_renderer, 4U, p_str_i32_i32_i32, VIGIL_TYPE_I64, 2U,
      rt_i64_err, 0, NULL, NULL, 0},
     SDL_FN("get_grabbed_window", 18U, sdl_fn_get_grabbed_window, 0U, NULL, VIGIL_TYPE_I32),
+    /* Renderer complete - module functions */
+    SDL_FN("get_num_render_drivers", 21U, sdl_fn_get_num_render_drivers, 0U, NULL, VIGIL_TYPE_I32),
+    SDL_FN("get_render_driver", 17U, sdl_fn_get_render_driver, 1U, p_i32, VIGIL_TYPE_STRING),
+    /* Address mode constants */
+    SDL_CONST_ENTRY("TEXTURE_ADDRESS_AUTO", TEXTURE_ADDRESS_AUTO),
+    SDL_CONST_ENTRY("TEXTURE_ADDRESS_CLAMP", TEXTURE_ADDRESS_CLAMP),
+    SDL_CONST_ENTRY("TEXTURE_ADDRESS_WRAP", TEXTURE_ADDRESS_WRAP),
     /* Window remaining - module functions */
     {"time_from_windows", 18U, sdl_fn_time_from_windows, 2U, p_i32_i32, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0},
     {"time_to_windows", 16U, sdl_fn_time_to_windows, 1U, p_i64, VIGIL_TYPE_I32, 2U, rt_i32_i32, 0, NULL, NULL, 0},
@@ -7929,6 +8332,24 @@ static const vigil_native_class_method_t sdl_renderer_methods[] = {
     SDL_METHOD("get_vsync", 9U, sdl_renderer_get_vsync, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL),
     SDL_METHOD("clip_enabled", 12U, sdl_renderer_clip_enabled, 0U, NULL, VIGIL_TYPE_BOOL, 1U, NULL),
     SDL_METHOD("get_viewport", 12U, sdl_renderer_get_viewport, 0U, NULL, VIGIL_TYPE_I32, 2U, rt_i32_i32),
+    /* Renderer complete - methods */
+    SDL_METHOD("get_draw_color_float", 20U, sdl_renderer_get_draw_color_float, 0U, NULL, VIGIL_TYPE_I64, 1U, NULL),
+    SDL_METHOD("get_safe_area", 13U, sdl_renderer_get_safe_area, 0U, NULL, VIGIL_TYPE_I32, 2U, rt_i32_i32),
+    SDL_METHOD("viewport_set", 12U, sdl_renderer_viewport_set, 0U, NULL, VIGIL_TYPE_BOOL, 1U, NULL),
+    SDL_METHOD("set_texture_address_mode", 24U, sdl_renderer_set_texture_address_mode, 2U, p_i32_i32, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
+    SDL_METHOD("get_texture_address_mode", 24U, sdl_renderer_get_texture_address_mode, 0U, NULL, VIGIL_TYPE_I32, 2U, rt_i32_i32),
+    SDL_METHOD("set_default_scale_mode", 22U, sdl_renderer_set_default_scale_mode, 1U, p_i32, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
+    SDL_METHOD("get_default_scale_mode", 22U, sdl_renderer_get_default_scale_mode, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL),
+    SDL_METHOD("coords_from_window", 18U, sdl_renderer_coords_from_window, 2U, p_f64_f64, VIGIL_TYPE_F64, 2U, rt_f64_f64),
+    SDL_METHOD("coords_to_window", 16U, sdl_renderer_coords_to_window, 2U, p_f64_f64, VIGIL_TYPE_F64, 2U, rt_f64_f64),
+    SDL_METHOD("convert_event_coords", 20U, sdl_renderer_convert_event_coords, 1U, p_obj, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
+    SDL_METHOD("render_points", 13U, sdl_renderer_render_points, 2U, p_i64_i32, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
+    SDL_METHOD("render_lines", 12U, sdl_renderer_render_lines, 2U, p_i64_i32, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
+    SDL_METHOD("render_rects", 12U, sdl_renderer_render_rects, 2U, p_i64_i32, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
+    SDL_METHOD("render_fill_rects", 17U, sdl_renderer_render_fill_rects, 2U, p_i64_i32, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
+    {"render_geometry", 15U, sdl_renderer_render_geometry, 5U, p_i64_i64_i32_i64_i32, VIGIL_TYPE_BOOL, 2U, rt_bool_err, 0, NULL, 0U, 0},
+    {"render_texture_affine", 22U, sdl_renderer_render_texture_affine, 11U, p_obj_f64x11, VIGIL_TYPE_BOOL, 2U, rt_bool_err, 0, NULL, 0U, 0},
+    {"render_texture_9grid", 21U, sdl_renderer_render_texture_9grid, 14U, p_obj_f64x13, VIGIL_TYPE_BOOL, 2U, rt_bool_err, 0, NULL, 0U, 0},
     /* Slice 25: tiled rendering */
     SDL_METHOD("render_texture_tiled", 21U, sdl_renderer_render_texture_tiled, 10U, p_obj_f64x9, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
     /* Slice 27: renderer completions */
@@ -8029,6 +8450,13 @@ static const vigil_native_class_method_t sdl_texture_methods[] = {
     SDL_METHOD("get_blend_mode", 14U, sdl_texture_get_blend_mode, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL),
     SDL_METHOD("set_scale_mode", 14U, sdl_texture_set_scale_mode, 1U, p_i32, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
     SDL_METHOD("get_scale_mode", 14U, sdl_texture_get_scale_mode, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL),
+    /* Texture complete - methods */
+    SDL_METHOD("set_color_mod_float", 19U, sdl_texture_set_color_mod_float, 3U, p_f64_f64_f64, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
+    SDL_METHOD("set_alpha_mod_float", 19U, sdl_texture_set_alpha_mod_float, 1U, p_f64, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
+    SDL_METHOD("get_alpha_mod_float", 19U, sdl_texture_get_alpha_mod_float, 0U, NULL, VIGIL_TYPE_F64, 1U, NULL),
+    {"update", 6U, sdl_texture_update, 6U, p_i32_i32_i32_i32_i64_i32, VIGIL_TYPE_BOOL, 2U, rt_bool_err, 0, NULL, 0U, 0},
+    SDL_METHOD("lock", 4U, sdl_texture_lock, 4U, p_i32_i32_i32_i32, VIGIL_TYPE_I64, 1U, NULL),
+    SDL_METHOD("unlock", 6U, sdl_texture_unlock, 0U, NULL, VIGIL_TYPE_VOID, 0U, NULL),
 };
 
 /* ── AudioStream class descriptor ────────────────────────────────── */
