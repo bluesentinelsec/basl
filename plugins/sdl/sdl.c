@@ -773,6 +773,8 @@ static const int p_i64_i64_i64_i32_i32_i32[] = {VIGIL_TYPE_I64, VIGIL_TYPE_I64, 
                                                 VIGIL_TYPE_I32, VIGIL_TYPE_I32, VIGIL_TYPE_I32};
 static const int p_i64_i32_i64[] = {VIGIL_TYPE_I64, VIGIL_TYPE_I32, VIGIL_TYPE_I64};
 static const int p_i64_str[] = {VIGIL_TYPE_I64, VIGIL_TYPE_STRING};
+static const int p_i64_str_i64_i32[] = {VIGIL_TYPE_I64, VIGIL_TYPE_STRING, VIGIL_TYPE_I64, VIGIL_TYPE_I32};
+static const int p_i64_str_str[] = {VIGIL_TYPE_I64, VIGIL_TYPE_STRING, VIGIL_TYPE_STRING};
 static const int p_i64_i32_i32_i32_i32_i32[] = {VIGIL_TYPE_I64, VIGIL_TYPE_I32, VIGIL_TYPE_I32,
                                                 VIGIL_TYPE_I32, VIGIL_TYPE_I32, VIGIL_TYPE_I32};
 static const int p_i64_f64_f64_f64_f64_f64_f64[] = {VIGIL_TYPE_I64, VIGIL_TYPE_F64, VIGIL_TYPE_F64, VIGIL_TYPE_F64,
@@ -11533,6 +11535,248 @@ static vigil_status_t sdl_fn_set_current_thread_priority(vigil_vm_t *vm, size_t 
     return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
 }
 
+/* ── Storage ──────────────────────────────────────────────────────── */
+
+SDL_HANDLE_REGISTRY(storages);
+
+static vigil_status_t sdl_fn_open_title_storage(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    char override[512];
+    sdl_arg_str(vm, base, 0, override, sizeof(override));
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Storage *s = SDL_OpenTitleStorage(override[0] ? override : NULL, 0);
+    if (!s)
+    {
+        vigil_status_t st = sdl_push_i64(vm, -1, error);
+        if (st != VIGIL_STATUS_OK)
+            return st;
+        return sdl_push_sdl_err(vm, SDL_ERR_IO, error);
+    }
+    int64_t h = -1;
+    if (SDL_HANDLE_STORE(storages, s, &h) < 0)
+    {
+        SDL_CloseStorage(s);
+        vigil_status_t st = sdl_push_i64(vm, -1, error);
+        if (st != VIGIL_STATUS_OK)
+            return st;
+        return sdl_push_err(vm, "too many storages", SDL_ERR_STATE, error);
+    }
+    vigil_status_t st = sdl_push_i64(vm, h, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_ok(vm, error);
+}
+
+static vigil_status_t sdl_fn_open_user_storage(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    char org[256], app[256];
+    sdl_arg_str(vm, base, 0, org, sizeof(org));
+    sdl_arg_str(vm, base, 1, app, sizeof(app));
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Storage *s = SDL_OpenUserStorage(org, app, 0);
+    if (!s)
+    {
+        vigil_status_t st = sdl_push_i64(vm, -1, error);
+        if (st != VIGIL_STATUS_OK)
+            return st;
+        return sdl_push_sdl_err(vm, SDL_ERR_IO, error);
+    }
+    int64_t h = -1;
+    if (SDL_HANDLE_STORE(storages, s, &h) < 0)
+    {
+        SDL_CloseStorage(s);
+        vigil_status_t st = sdl_push_i64(vm, -1, error);
+        if (st != VIGIL_STATUS_OK)
+            return st;
+        return sdl_push_err(vm, "too many storages", SDL_ERR_STATE, error);
+    }
+    vigil_status_t st = sdl_push_i64(vm, h, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_ok(vm, error);
+}
+
+static vigil_status_t sdl_fn_open_file_storage(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    char path[512];
+    sdl_arg_str(vm, base, 0, path, sizeof(path));
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Storage *s = SDL_OpenFileStorage(path);
+    if (!s)
+    {
+        vigil_status_t st = sdl_push_i64(vm, -1, error);
+        if (st != VIGIL_STATUS_OK)
+            return st;
+        return sdl_push_sdl_err(vm, SDL_ERR_IO, error);
+    }
+    int64_t h = -1;
+    if (SDL_HANDLE_STORE(storages, s, &h) < 0)
+    {
+        SDL_CloseStorage(s);
+        vigil_status_t st = sdl_push_i64(vm, -1, error);
+        if (st != VIGIL_STATUS_OK)
+            return st;
+        return sdl_push_err(vm, "too many storages", SDL_ERR_STATE, error);
+    }
+    vigil_status_t st = sdl_push_i64(vm, h, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_ok(vm, error);
+}
+
+static vigil_status_t sdl_fn_close_storage(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_arg_i64(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Storage *s = (SDL_Storage *)SDL_HANDLE_GET(storages, h);
+    if (s && SDL_CloseStorage(s))
+    {
+        SDL_HANDLE_CLEAR(storages, h);
+        return sdl_push_bool_ok(vm, error);
+    }
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+static vigil_status_t sdl_fn_storage_ready(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_arg_i64(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Storage *s = (SDL_Storage *)SDL_HANDLE_GET(storages, h);
+    return sdl_push_bool(vm, s && SDL_StorageReady(s), error);
+}
+
+static vigil_status_t sdl_fn_get_storage_file_size(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_arg_i64(vm, base, 0);
+    char path[512];
+    sdl_arg_str(vm, base, 1, path, sizeof(path));
+    vigil_vm_stack_pop_n(vm, arg_count);
+    Uint64 len = 0;
+    SDL_Storage *s = (SDL_Storage *)SDL_HANDLE_GET(storages, h);
+    if (s)
+        SDL_GetStorageFileSize(s, path, &len);
+    return sdl_push_i64(vm, (int64_t)len, error);
+}
+
+static vigil_status_t sdl_fn_read_storage_file(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_arg_i64(vm, base, 0);
+    char path[512];
+    sdl_arg_str(vm, base, 1, path, sizeof(path));
+    int64_t bh = sdl_arg_i64(vm, base, 2);
+    int32_t len = sdl_arg_i32(vm, base, 3);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Storage *s = (SDL_Storage *)SDL_HANDLE_GET(storages, h);
+    int32_t bsz = 0;
+    void *buf = vigil_unsafe_buffer_get(bh, &bsz);
+    if (s && buf && SDL_ReadStorageFile(s, path, buf, (Uint64)(len > 0 ? len : bsz)))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+static vigil_status_t sdl_fn_write_storage_file(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_arg_i64(vm, base, 0);
+    char path[512];
+    sdl_arg_str(vm, base, 1, path, sizeof(path));
+    int64_t bh = sdl_arg_i64(vm, base, 2);
+    int32_t len = sdl_arg_i32(vm, base, 3);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Storage *s = (SDL_Storage *)SDL_HANDLE_GET(storages, h);
+    int32_t bsz = 0;
+    void *buf = vigil_unsafe_buffer_get(bh, &bsz);
+    if (s && buf && SDL_WriteStorageFile(s, path, buf, (Uint64)(len > 0 ? len : bsz)))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+static vigil_status_t sdl_fn_create_storage_directory(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_arg_i64(vm, base, 0);
+    char path[512];
+    sdl_arg_str(vm, base, 1, path, sizeof(path));
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Storage *s = (SDL_Storage *)SDL_HANDLE_GET(storages, h);
+    if (s && SDL_CreateStorageDirectory(s, path))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+static vigil_status_t sdl_fn_remove_storage_path(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_arg_i64(vm, base, 0);
+    char path[512];
+    sdl_arg_str(vm, base, 1, path, sizeof(path));
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Storage *s = (SDL_Storage *)SDL_HANDLE_GET(storages, h);
+    if (s && SDL_RemoveStoragePath(s, path))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+static vigil_status_t sdl_fn_rename_storage_path(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_arg_i64(vm, base, 0);
+    char old[512];
+    sdl_arg_str(vm, base, 1, old, sizeof(old));
+    char new_path[512];
+    sdl_arg_str(vm, base, 2, new_path, sizeof(new_path));
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Storage *s = (SDL_Storage *)SDL_HANDLE_GET(storages, h);
+    if (s && SDL_RenameStoragePath(s, old, new_path))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+static vigil_status_t sdl_fn_copy_storage_file(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_arg_i64(vm, base, 0);
+    char old[512];
+    sdl_arg_str(vm, base, 1, old, sizeof(old));
+    char new_path[512];
+    sdl_arg_str(vm, base, 2, new_path, sizeof(new_path));
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Storage *s = (SDL_Storage *)SDL_HANDLE_GET(storages, h);
+    if (s && SDL_CopyStorageFile(s, old, new_path))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+static vigil_status_t sdl_fn_get_storage_path_type(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_arg_i64(vm, base, 0);
+    char path[512];
+    sdl_arg_str(vm, base, 1, path, sizeof(path));
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_PathInfo info = {0};
+    SDL_Storage *s = (SDL_Storage *)SDL_HANDLE_GET(storages, h);
+    if (s)
+        SDL_GetStoragePathInfo(s, path, &info);
+    return sdl_push_i32(vm, (int32_t)info.type, error);
+}
+
+static vigil_status_t sdl_fn_get_storage_space_remaining(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_arg_i64(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Storage *s = (SDL_Storage *)SDL_HANDLE_GET(storages, h);
+    return sdl_push_i64(vm, s ? (int64_t)SDL_GetStorageSpaceRemaining(s) : 0, error);
+}
+
 /* Texture access constants */
 SDL_CONST_FN(TEXTUREACCESS_STATIC, SDL_TEXTUREACCESS_STATIC)
 SDL_CONST_FN(TEXTUREACCESS_STREAMING, SDL_TEXTUREACCESS_STREAMING)
@@ -12203,6 +12447,26 @@ static const vigil_native_module_function_t sdl_functions[] = {
     SDL_FN("get_atomic_int", 14U, sdl_fn_get_atomic_int, 1U, p_i64, VIGIL_TYPE_I32),
     SDL_FN("add_atomic_int", 14U, sdl_fn_add_atomic_int, 2U, p_i64_i32, VIGIL_TYPE_I32),
     SDL_FN_BOOL_ERR("set_current_thread_priority", 27U, sdl_fn_set_current_thread_priority, 1U, p_i32),
+    /* Storage */
+    {"open_title_storage", 18U, sdl_fn_open_title_storage, 1U, p_str, VIGIL_TYPE_I64, 2U, rt_i64_err, 0, NULL, NULL, 0},
+    {"open_user_storage", 17U, sdl_fn_open_user_storage, 2U, p_str_str, VIGIL_TYPE_I64, 2U, rt_i64_err, 0, NULL, NULL,
+     0},
+    {"open_file_storage", 17U, sdl_fn_open_file_storage, 1U, p_str, VIGIL_TYPE_I64, 2U, rt_i64_err, 0, NULL, NULL, 0},
+    SDL_FN_BOOL_ERR("close_storage", 13U, sdl_fn_close_storage, 1U, p_i64),
+    SDL_FN("storage_ready", 13U, sdl_fn_storage_ready, 1U, p_i64, VIGIL_TYPE_BOOL),
+    SDL_FN("get_storage_file_size", 21U, sdl_fn_get_storage_file_size, 2U, p_i64_str, VIGIL_TYPE_I64),
+    {"read_storage_file", 17U, sdl_fn_read_storage_file, 4U, p_i64_str_i64_i32, VIGIL_TYPE_BOOL, 2U, rt_bool_err, 0,
+     NULL, NULL, 0},
+    {"write_storage_file", 18U, sdl_fn_write_storage_file, 4U, p_i64_str_i64_i32, VIGIL_TYPE_BOOL, 2U, rt_bool_err, 0,
+     NULL, NULL, 0},
+    SDL_FN_BOOL_ERR("create_storage_directory", 23U, sdl_fn_create_storage_directory, 2U, p_i64_str),
+    SDL_FN_BOOL_ERR("remove_storage_path", 19U, sdl_fn_remove_storage_path, 2U, p_i64_str),
+    {"rename_storage_path", 19U, sdl_fn_rename_storage_path, 3U, p_i64_str_str, VIGIL_TYPE_BOOL, 2U, rt_bool_err, 0,
+     NULL, NULL, 0},
+    {"copy_storage_file", 17U, sdl_fn_copy_storage_file, 3U, p_i64_str_str, VIGIL_TYPE_BOOL, 2U, rt_bool_err, 0, NULL,
+     NULL, 0},
+    SDL_FN("get_storage_path_type", 21U, sdl_fn_get_storage_path_type, 2U, p_i64_str, VIGIL_TYPE_I32),
+    SDL_FN("get_storage_space_remaining", 27U, sdl_fn_get_storage_space_remaining, 1U, p_i64, VIGIL_TYPE_I64),
     /* IO constants */
     SDL_CONST_ENTRY("IO_SEEK_SET", IO_SEEK_SET),
     SDL_CONST_ENTRY("IO_SEEK_CUR", IO_SEEK_CUR),
