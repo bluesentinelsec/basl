@@ -728,6 +728,7 @@ static const int p_f64_f64_f64_f64[] = {VIGIL_TYPE_F64, VIGIL_TYPE_F64, VIGIL_TY
 static const int rt_bool_err[] = {VIGIL_TYPE_BOOL, VIGIL_TYPE_ERR};
 static const int rt_obj_err[] = {VIGIL_TYPE_OBJECT, VIGIL_TYPE_ERR};
 static const int rt_i64_err[] = {VIGIL_TYPE_I64, VIGIL_TYPE_ERR};
+static const int rt_i32_err[] = {VIGIL_TYPE_I32, VIGIL_TYPE_ERR};
 static const int rt_i32_i32[] = {VIGIL_TYPE_I32, VIGIL_TYPE_I32};
 static const int rt_i32_i32_i32_i32[] = {VIGIL_TYPE_I32, VIGIL_TYPE_I32, VIGIL_TYPE_I32, VIGIL_TYPE_I32};
 static const int p_obj_f64_f64[] = {VIGIL_TYPE_OBJECT, VIGIL_TYPE_F64, VIGIL_TYPE_F64};
@@ -9289,6 +9290,221 @@ static vigil_status_t sdl_fn_set_joystick_virtual_hat(vigil_vm_t *vm, size_t arg
     return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
 }
 
+/* ── Audio Complete ───────────────────────────────────────────────── */
+
+static vigil_status_t sdl_fn_get_num_audio_drivers(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_i32(vm, SDL_GetNumAudioDrivers(), error);
+}
+
+static vigil_status_t sdl_fn_get_audio_driver(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t idx = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_string(vm, SDL_GetAudioDriver(idx), error);
+}
+
+static vigil_status_t sdl_fn_get_audio_format_name(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t fmt = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_string(vm, SDL_GetAudioFormatName((SDL_AudioFormat)fmt), error);
+}
+
+/* sdl.open_audio_device(i32 device_id, i32 format, i32 channels, i32 freq) -> (i32, err) */
+static vigil_status_t sdl_fn_open_audio_device(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t devid = sdl_arg_i32(vm, base, 0);
+    int32_t fmt = sdl_arg_i32(vm, base, 1), ch = sdl_arg_i32(vm, base, 2), freq = sdl_arg_i32(vm, base, 3);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_AudioSpec spec = {0};
+    spec.format = (SDL_AudioFormat)fmt;
+    spec.channels = ch;
+    spec.freq = freq;
+    SDL_AudioDeviceID id = SDL_OpenAudioDevice((SDL_AudioDeviceID)devid, (fmt > 0) ? &spec : NULL);
+    if (id == 0)
+    {
+        vigil_status_t st = sdl_push_i32(vm, 0, error);
+        if (st != VIGIL_STATUS_OK)
+            return st;
+        return sdl_push_sdl_err(vm, SDL_ERR_IO, error);
+    }
+    vigil_status_t st = sdl_push_i32(vm, (int32_t)id, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_ok(vm, error);
+}
+
+static vigil_status_t sdl_fn_close_audio_device(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t id = sdl_arg_i32(vm, base, 0);
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_CloseAudioDevice((SDL_AudioDeviceID)id);
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t sdl_fn_pause_audio_device(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t id = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    if (SDL_PauseAudioDevice((SDL_AudioDeviceID)id))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+static vigil_status_t sdl_fn_resume_audio_device(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t id = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    if (SDL_ResumeAudioDevice((SDL_AudioDeviceID)id))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+static vigil_status_t sdl_fn_audio_device_paused(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t id = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_bool(vm, SDL_AudioDevicePaused((SDL_AudioDeviceID)id), error);
+}
+
+static vigil_status_t sdl_fn_get_audio_device_gain(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t id = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_f64(vm, (double)SDL_GetAudioDeviceGain((SDL_AudioDeviceID)id), error);
+}
+
+static vigil_status_t sdl_fn_set_audio_device_gain(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t id = sdl_arg_i32(vm, base, 0);
+    float gain = (float)sdl_arg_f64(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    if (SDL_SetAudioDeviceGain((SDL_AudioDeviceID)id, gain))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+static vigil_status_t sdl_fn_is_audio_device_physical(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t id = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_bool(vm, SDL_IsAudioDevicePhysical((SDL_AudioDeviceID)id), error);
+}
+
+static vigil_status_t sdl_fn_is_audio_device_playback(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t id = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_bool(vm, SDL_IsAudioDevicePlayback((SDL_AudioDeviceID)id), error);
+}
+
+static vigil_status_t sdl_fn_get_audio_recording_device_count(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    vigil_vm_stack_pop_n(vm, arg_count);
+    int count = 0;
+    SDL_AudioDeviceID *devs = SDL_GetAudioRecordingDevices(&count);
+    SDL_free(devs);
+    return sdl_push_i32(vm, count, error);
+}
+
+/* AudioStream methods */
+static vigil_status_t sdl_audio_stream_get_device(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, ASTREAM_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_AudioStream *s = (SDL_AudioStream *)SDL_HANDLE_GET(audio_streams, h);
+    return sdl_push_i32(vm, s ? (int32_t)SDL_GetAudioStreamDevice(s) : 0, error);
+}
+
+static vigil_status_t sdl_audio_stream_paused(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, ASTREAM_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_AudioStream *s = (SDL_AudioStream *)SDL_HANDLE_GET(audio_streams, h);
+    return sdl_push_bool(vm, s && SDL_AudioStreamDevicePaused(s), error);
+}
+
+static vigil_status_t sdl_audio_stream_lock(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, ASTREAM_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_AudioStream *s = (SDL_AudioStream *)SDL_HANDLE_GET(audio_streams, h);
+    if (s && SDL_LockAudioStream(s))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+static vigil_status_t sdl_audio_stream_unlock(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, ASTREAM_HANDLE);
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_AudioStream *s = (SDL_AudioStream *)SDL_HANDLE_GET(audio_streams, h);
+    if (s)
+        SDL_UnlockAudioStream(s);
+    return VIGIL_STATUS_OK;
+}
+
+/* stream.bind(device_id) / stream.unbind() */
+static vigil_status_t sdl_audio_stream_bind(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, ASTREAM_HANDLE);
+    int32_t devid = sdl_arg_i32(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_AudioStream *s = (SDL_AudioStream *)SDL_HANDLE_GET(audio_streams, h);
+    if (s && SDL_BindAudioStream((SDL_AudioDeviceID)devid, s))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+static vigil_status_t sdl_audio_stream_unbind(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, ASTREAM_HANDLE);
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_AudioStream *s = (SDL_AudioStream *)SDL_HANDLE_GET(audio_streams, h);
+    if (s)
+        SDL_UnbindAudioStream(s);
+    return VIGIL_STATUS_OK;
+}
+
+/* stream.get_data(buf, size) -> i32 bytes read */
+static vigil_status_t sdl_audio_stream_get_data(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, ASTREAM_HANDLE);
+    int64_t bh = sdl_arg_i64(vm, base, 1);
+    int32_t size = sdl_arg_i32(vm, base, 2);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_AudioStream *s = (SDL_AudioStream *)SDL_HANDLE_GET(audio_streams, h);
+    int32_t bsz = 0;
+    void *buf = vigil_unsafe_buffer_get(bh, &bsz);
+    if (!s || !buf)
+        return sdl_push_i32(vm, 0, error);
+    int32_t to_read = (size > 0 && size <= bsz) ? size : bsz;
+    return sdl_push_i32(vm, SDL_GetAudioStreamData(s, buf, to_read), error);
+}
+
 /* Texture access constants */
 SDL_CONST_FN(TEXTUREACCESS_STATIC, SDL_TEXTUREACCESS_STATIC)
 SDL_CONST_FN(TEXTUREACCESS_STREAMING, SDL_TEXTUREACCESS_STREAMING)
@@ -9729,6 +9945,22 @@ static const vigil_native_module_function_t sdl_functions[] = {
      rt_bool_err, 0, NULL, NULL, 0},
     {"set_joystick_virtual_hat", 24U, sdl_fn_set_joystick_virtual_hat, 3U, p_i64_i32_i32, VIGIL_TYPE_BOOL, 2U,
      rt_bool_err, 0, NULL, NULL, 0},
+    /* Audio complete - module */
+    SDL_FN("get_num_audio_drivers", 21U, sdl_fn_get_num_audio_drivers, 0U, NULL, VIGIL_TYPE_I32),
+    SDL_FN("get_audio_driver", 16U, sdl_fn_get_audio_driver, 1U, p_i32, VIGIL_TYPE_STRING),
+    SDL_FN("get_audio_format_name", 21U, sdl_fn_get_audio_format_name, 1U, p_i32, VIGIL_TYPE_STRING),
+    {"open_audio_device", 17U, sdl_fn_open_audio_device, 4U, p_i32_i32_i32_i32, VIGIL_TYPE_I32, 2U, rt_i32_err, 0, NULL,
+     NULL, 0},
+    SDL_FN_VOID("close_audio_device", 18U, sdl_fn_close_audio_device, 1U, p_i32),
+    SDL_FN_BOOL_ERR("pause_audio_device", 18U, sdl_fn_pause_audio_device, 1U, p_i32),
+    SDL_FN_BOOL_ERR("resume_audio_device", 19U, sdl_fn_resume_audio_device, 1U, p_i32),
+    SDL_FN("audio_device_paused", 19U, sdl_fn_audio_device_paused, 1U, p_i32, VIGIL_TYPE_BOOL),
+    SDL_FN("get_audio_device_gain", 21U, sdl_fn_get_audio_device_gain, 1U, p_i32, VIGIL_TYPE_F64),
+    {"set_audio_device_gain", 21U, sdl_fn_set_audio_device_gain, 2U, p_i32_f64, VIGIL_TYPE_BOOL, 2U, rt_bool_err, 0,
+     NULL, NULL, 0},
+    SDL_FN("is_audio_device_physical", 24U, sdl_fn_is_audio_device_physical, 1U, p_i32, VIGIL_TYPE_BOOL),
+    SDL_FN("is_audio_device_playback", 24U, sdl_fn_is_audio_device_playback, 1U, p_i32, VIGIL_TYPE_BOOL),
+    SDL_FN("get_audio_recording_device_count", 32U, sdl_fn_get_audio_recording_device_count, 0U, NULL, VIGIL_TYPE_I32),
     /* IO constants */
     SDL_CONST_ENTRY("IO_SEEK_SET", IO_SEEK_SET),
     SDL_CONST_ENTRY("IO_SEEK_CUR", IO_SEEK_CUR),
@@ -10331,6 +10563,14 @@ static const vigil_native_class_method_t sdl_audio_stream_methods[] = {
     SDL_METHOD("get_available", 13U, sdl_audio_stream_get_available, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL),
     SDL_METHOD("flush", 5U, sdl_audio_stream_flush, 0U, NULL, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
     SDL_METHOD("clear", 5U, sdl_audio_stream_clear, 0U, NULL, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
+    /* Audio complete - stream methods */
+    SDL_METHOD("get_device", 10U, sdl_audio_stream_get_device, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL),
+    SDL_METHOD("paused", 6U, sdl_audio_stream_paused, 0U, NULL, VIGIL_TYPE_BOOL, 1U, NULL),
+    SDL_METHOD("lock", 4U, sdl_audio_stream_lock, 0U, NULL, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
+    SDL_METHOD("unlock", 6U, sdl_audio_stream_unlock, 0U, NULL, VIGIL_TYPE_VOID, 0U, NULL),
+    SDL_METHOD("bind", 4U, sdl_audio_stream_bind, 1U, p_i32, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
+    SDL_METHOD("unbind", 6U, sdl_audio_stream_unbind, 0U, NULL, VIGIL_TYPE_VOID, 0U, NULL),
+    {"get_data", 8U, sdl_audio_stream_get_data, 2U, p_i64_i32, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, 0U, 0},
 };
 
 /* ── Gamepad class descriptor ────────────────────────────────────── */
