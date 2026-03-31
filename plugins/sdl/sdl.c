@@ -686,6 +686,15 @@ static const int p_i32_i32_i32_i32_i32[] = {VIGIL_TYPE_I32, VIGIL_TYPE_I32, VIGI
 static const int p_i32_i32_i32_i32_i32_i32[] = {VIGIL_TYPE_I32, VIGIL_TYPE_I32, VIGIL_TYPE_I32,
                                                 VIGIL_TYPE_I32, VIGIL_TYPE_I32, VIGIL_TYPE_I32};
 /* render_texture_tiled: obj tex + 9x f64 */
+/* clang-format off */
+static const int p_i32x8[] = {VIGIL_TYPE_I32, VIGIL_TYPE_I32, VIGIL_TYPE_I32, VIGIL_TYPE_I32,
+                               VIGIL_TYPE_I32, VIGIL_TYPE_I32, VIGIL_TYPE_I32, VIGIL_TYPE_I32};
+static const int p_f64x6[] = {VIGIL_TYPE_F64, VIGIL_TYPE_F64, VIGIL_TYPE_F64, VIGIL_TYPE_F64,
+                               VIGIL_TYPE_F64, VIGIL_TYPE_F64};
+static const int p_f64x8[] = {VIGIL_TYPE_F64, VIGIL_TYPE_F64, VIGIL_TYPE_F64, VIGIL_TYPE_F64,
+                               VIGIL_TYPE_F64, VIGIL_TYPE_F64, VIGIL_TYPE_F64, VIGIL_TYPE_F64};
+static const int p_i64_i64_i64_i32_i64[] = {VIGIL_TYPE_I64, VIGIL_TYPE_I64, VIGIL_TYPE_I64, VIGIL_TYPE_I32, VIGIL_TYPE_I64};
+/* clang-format on */
 static const int p_obj_f64x9[] = {VIGIL_TYPE_OBJECT, VIGIL_TYPE_F64, VIGIL_TYPE_F64, VIGIL_TYPE_F64, VIGIL_TYPE_F64,
                                   VIGIL_TYPE_F64,    VIGIL_TYPE_F64, VIGIL_TYPE_F64, VIGIL_TYPE_F64, VIGIL_TYPE_F64};
 /* clang-format off */
@@ -10877,6 +10886,297 @@ static vigil_status_t sdl_fn_glob_directory(vigil_vm_t *vm, size_t arg_count, vi
     return sdl_push_i32(vm, count, error);
 }
 
+/* ── Rect Math ────────────────────────────────────────────────────── */
+
+static vigil_status_t sdl_fn_point_in_rect(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t px = sdl_arg_i32(vm, base, 0), py = sdl_arg_i32(vm, base, 1);
+    int32_t rx = sdl_arg_i32(vm, base, 2), ry = sdl_arg_i32(vm, base, 3), rw = sdl_arg_i32(vm, base, 4),
+            rh = sdl_arg_i32(vm, base, 5);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Point p = {px, py};
+    SDL_Rect r = {rx, ry, rw, rh};
+    return sdl_push_bool(vm, SDL_PointInRect(&p, &r), error);
+}
+
+static vigil_status_t sdl_fn_rect_empty(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t x = sdl_arg_i32(vm, base, 0), y = sdl_arg_i32(vm, base, 1), w = sdl_arg_i32(vm, base, 2),
+            h = sdl_arg_i32(vm, base, 3);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Rect r = {x, y, w, h};
+    return sdl_push_bool(vm, SDL_RectEmpty(&r), error);
+}
+
+static vigil_status_t sdl_fn_rects_equal(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    SDL_Rect a = {sdl_arg_i32(vm, base, 0), sdl_arg_i32(vm, base, 1), sdl_arg_i32(vm, base, 2),
+                  sdl_arg_i32(vm, base, 3)};
+    SDL_Rect b = {sdl_arg_i32(vm, base, 4), sdl_arg_i32(vm, base, 5), sdl_arg_i32(vm, base, 6),
+                  sdl_arg_i32(vm, base, 7)};
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_bool(vm, SDL_RectsEqual(&a, &b), error);
+}
+
+static vigil_status_t sdl_fn_has_rect_intersection(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    SDL_Rect a = {sdl_arg_i32(vm, base, 0), sdl_arg_i32(vm, base, 1), sdl_arg_i32(vm, base, 2),
+                  sdl_arg_i32(vm, base, 3)};
+    SDL_Rect b = {sdl_arg_i32(vm, base, 4), sdl_arg_i32(vm, base, 5), sdl_arg_i32(vm, base, 6),
+                  sdl_arg_i32(vm, base, 7)};
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_bool(vm, SDL_HasRectIntersection(&a, &b), error);
+}
+
+/* get_rect_intersection(ax,ay,aw,ah, bx,by,bw,bh) -> (i32 w, i32 h) of intersection */
+static vigil_status_t sdl_fn_get_rect_intersection(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    SDL_Rect a = {sdl_arg_i32(vm, base, 0), sdl_arg_i32(vm, base, 1), sdl_arg_i32(vm, base, 2),
+                  sdl_arg_i32(vm, base, 3)};
+    SDL_Rect b = {sdl_arg_i32(vm, base, 4), sdl_arg_i32(vm, base, 5), sdl_arg_i32(vm, base, 6),
+                  sdl_arg_i32(vm, base, 7)};
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Rect result = {0};
+    SDL_GetRectIntersection(&a, &b, &result);
+    vigil_status_t st = sdl_push_i32(vm, result.w, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_i32(vm, result.h, error);
+}
+
+/* get_rect_union(ax,ay,aw,ah, bx,by,bw,bh) -> (i32 w, i32 h) of union */
+static vigil_status_t sdl_fn_get_rect_union(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    SDL_Rect a = {sdl_arg_i32(vm, base, 0), sdl_arg_i32(vm, base, 1), sdl_arg_i32(vm, base, 2),
+                  sdl_arg_i32(vm, base, 3)};
+    SDL_Rect b = {sdl_arg_i32(vm, base, 4), sdl_arg_i32(vm, base, 5), sdl_arg_i32(vm, base, 6),
+                  sdl_arg_i32(vm, base, 7)};
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Rect result = {0};
+    SDL_GetRectUnion(&a, &b, &result);
+    vigil_status_t st = sdl_push_i32(vm, result.w, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_i32(vm, result.h, error);
+}
+
+/* Float variants */
+static vigil_status_t sdl_fn_point_in_rect_float(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    float px = (float)sdl_arg_f64(vm, base, 0), py = (float)sdl_arg_f64(vm, base, 1);
+    float rx = (float)sdl_arg_f64(vm, base, 2), ry = (float)sdl_arg_f64(vm, base, 3),
+          rw = (float)sdl_arg_f64(vm, base, 4), rh = (float)sdl_arg_f64(vm, base, 5);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_FPoint p = {px, py};
+    SDL_FRect r = {rx, ry, rw, rh};
+    return sdl_push_bool(vm, SDL_PointInRectFloat(&p, &r), error);
+}
+
+static vigil_status_t sdl_fn_rect_empty_float(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    SDL_FRect r = {(float)sdl_arg_f64(vm, base, 0), (float)sdl_arg_f64(vm, base, 1), (float)sdl_arg_f64(vm, base, 2),
+                   (float)sdl_arg_f64(vm, base, 3)};
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_bool(vm, SDL_RectEmptyFloat(&r), error);
+}
+
+static vigil_status_t sdl_fn_has_rect_intersection_float(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    SDL_FRect a = {(float)sdl_arg_f64(vm, base, 0), (float)sdl_arg_f64(vm, base, 1), (float)sdl_arg_f64(vm, base, 2),
+                   (float)sdl_arg_f64(vm, base, 3)};
+    SDL_FRect b = {(float)sdl_arg_f64(vm, base, 4), (float)sdl_arg_f64(vm, base, 5), (float)sdl_arg_f64(vm, base, 6),
+                   (float)sdl_arg_f64(vm, base, 7)};
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_bool(vm, SDL_HasRectIntersectionFloat(&a, &b), error);
+}
+
+/* ── Async IO ─────────────────────────────────────────────────────── */
+
+SDL_HANDLE_REGISTRY(async_ios);
+SDL_HANDLE_REGISTRY(async_io_queues);
+
+static vigil_status_t sdl_fn_async_io_from_file(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    char path[512], mode[8];
+    sdl_arg_str(vm, base, 0, path, sizeof(path));
+    sdl_arg_str(vm, base, 1, mode, sizeof(mode));
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_AsyncIO *aio = SDL_AsyncIOFromFile(path, mode);
+    if (!aio)
+    {
+        vigil_status_t st = sdl_push_i64(vm, -1, error);
+        if (st != VIGIL_STATUS_OK)
+            return st;
+        return sdl_push_sdl_err(vm, SDL_ERR_IO, error);
+    }
+    int64_t h = -1;
+    if (SDL_HANDLE_STORE(async_ios, aio, &h) < 0)
+    {
+        vigil_status_t st = sdl_push_i64(vm, -1, error);
+        if (st != VIGIL_STATUS_OK)
+            return st;
+        return sdl_push_err(vm, "too many async IOs", SDL_ERR_STATE, error);
+    }
+    vigil_status_t st = sdl_push_i64(vm, h, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_ok(vm, error);
+}
+
+static vigil_status_t sdl_fn_async_io_size(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_arg_i64(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_AsyncIO *aio = (SDL_AsyncIO *)SDL_HANDLE_GET(async_ios, h);
+    return sdl_push_i64(vm, aio ? SDL_GetAsyncIOSize(aio) : -1, error);
+}
+
+static vigil_status_t sdl_fn_create_async_io_queue(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_AsyncIOQueue *q = SDL_CreateAsyncIOQueue();
+    if (!q)
+    {
+        vigil_status_t st = sdl_push_i64(vm, -1, error);
+        if (st != VIGIL_STATUS_OK)
+            return st;
+        return sdl_push_sdl_err(vm, SDL_ERR_IO, error);
+    }
+    int64_t h = -1;
+    if (SDL_HANDLE_STORE(async_io_queues, q, &h) < 0)
+    {
+        SDL_DestroyAsyncIOQueue(q);
+        vigil_status_t st = sdl_push_i64(vm, -1, error);
+        if (st != VIGIL_STATUS_OK)
+            return st;
+        return sdl_push_err(vm, "too many queues", SDL_ERR_STATE, error);
+    }
+    vigil_status_t st = sdl_push_i64(vm, h, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_ok(vm, error);
+}
+
+static vigil_status_t sdl_fn_destroy_async_io_queue(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_arg_i64(vm, base, 0);
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_AsyncIOQueue *q = (SDL_AsyncIOQueue *)SDL_HANDLE_GET(async_io_queues, h);
+    if (q)
+    {
+        SDL_DestroyAsyncIOQueue(q);
+        SDL_HANDLE_CLEAR(async_io_queues, h);
+    }
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t sdl_fn_signal_async_io_queue(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_arg_i64(vm, base, 0);
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_AsyncIOQueue *q = (SDL_AsyncIOQueue *)SDL_HANDLE_GET(async_io_queues, h);
+    if (q)
+        SDL_SignalAsyncIOQueue(q);
+    return VIGIL_STATUS_OK;
+}
+
+/* async_io_read(aio, buf, offset, size, queue) -> (bool, err) */
+static vigil_status_t sdl_fn_async_io_read(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t ah = sdl_arg_i64(vm, base, 0), bh = sdl_arg_i64(vm, base, 1);
+    int64_t offset = sdl_arg_i64(vm, base, 2);
+    int32_t size = sdl_arg_i32(vm, base, 3);
+    int64_t qh = sdl_arg_i64(vm, base, 4);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_AsyncIO *aio = (SDL_AsyncIO *)SDL_HANDLE_GET(async_ios, ah);
+    int32_t bsz = 0;
+    void *buf = vigil_unsafe_buffer_get(bh, &bsz);
+    SDL_AsyncIOQueue *q = (SDL_AsyncIOQueue *)SDL_HANDLE_GET(async_io_queues, qh);
+    if (aio && buf && q && SDL_ReadAsyncIO(aio, buf, (Uint64)offset, (Uint64)size, q, NULL))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+static vigil_status_t sdl_fn_async_io_write(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t ah = sdl_arg_i64(vm, base, 0), bh = sdl_arg_i64(vm, base, 1);
+    int64_t offset = sdl_arg_i64(vm, base, 2);
+    int32_t size = sdl_arg_i32(vm, base, 3);
+    int64_t qh = sdl_arg_i64(vm, base, 4);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_AsyncIO *aio = (SDL_AsyncIO *)SDL_HANDLE_GET(async_ios, ah);
+    int32_t bsz = 0;
+    void *buf = vigil_unsafe_buffer_get(bh, &bsz);
+    SDL_AsyncIOQueue *q = (SDL_AsyncIOQueue *)SDL_HANDLE_GET(async_io_queues, qh);
+    if (aio && buf && q && SDL_WriteAsyncIO(aio, buf, (Uint64)offset, (Uint64)size, q, NULL))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+static vigil_status_t sdl_fn_close_async_io(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t ah = sdl_arg_i64(vm, base, 0);
+    int32_t flush = sdl_arg_i32(vm, base, 1);
+    int64_t qh = sdl_arg_i64(vm, base, 2);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_AsyncIO *aio = (SDL_AsyncIO *)SDL_HANDLE_GET(async_ios, ah);
+    SDL_AsyncIOQueue *q = (SDL_AsyncIOQueue *)SDL_HANDLE_GET(async_io_queues, qh);
+    if (aio && SDL_CloseAsyncIO(aio, flush != 0, q, NULL))
+    {
+        SDL_HANDLE_CLEAR(async_ios, ah);
+        return sdl_push_bool_ok(vm, error);
+    }
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+/* get_async_io_result(queue) -> i32 (result code, 0=nothing, 1=complete, -1=error) */
+static vigil_status_t sdl_fn_get_async_io_result(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t qh = sdl_arg_i64(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_AsyncIOQueue *q = (SDL_AsyncIOQueue *)SDL_HANDLE_GET(async_io_queues, qh);
+    if (!q)
+        return sdl_push_i32(vm, 0, error);
+    SDL_AsyncIOOutcome outcome = {0};
+    if (SDL_GetAsyncIOResult(q, &outcome))
+        return sdl_push_i32(vm, (int32_t)outcome.result, error);
+    return sdl_push_i32(vm, 0, error);
+}
+
+static vigil_status_t sdl_fn_wait_async_io_result(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t qh = sdl_arg_i64(vm, base, 0);
+    int32_t timeout = sdl_arg_i32(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_AsyncIOQueue *q = (SDL_AsyncIOQueue *)SDL_HANDLE_GET(async_io_queues, qh);
+    if (!q)
+        return sdl_push_i32(vm, 0, error);
+    SDL_AsyncIOOutcome outcome = {0};
+    if (SDL_WaitAsyncIOResult(q, &outcome, timeout))
+        return sdl_push_i32(vm, (int32_t)outcome.result, error);
+    return sdl_push_i32(vm, 0, error);
+}
+
 /* Texture access constants */
 SDL_CONST_FN(TEXTUREACCESS_STATIC, SDL_TEXTUREACCESS_STATIC)
 SDL_CONST_FN(TEXTUREACCESS_STREAMING, SDL_TEXTUREACCESS_STREAMING)
@@ -11486,6 +11786,36 @@ static const vigil_native_module_function_t sdl_functions[] = {
      NULL, 0},
     SDL_FN("get_preferred_locales_count", 27U, sdl_fn_get_preferred_locales_count, 0U, NULL, VIGIL_TYPE_I32),
     SDL_FN("glob_directory", 14U, sdl_fn_glob_directory, 2U, p_str_str, VIGIL_TYPE_I32),
+    /* Rect math */
+    {"point_in_rect", 13U, sdl_fn_point_in_rect, 6U, p_i32_i32_i32_i32_i32_i32, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL,
+     NULL, 0},
+    SDL_FN("rect_empty", 10U, sdl_fn_rect_empty, 4U, p_i32_i32_i32_i32, VIGIL_TYPE_BOOL),
+    {"rects_equal", 11U, sdl_fn_rects_equal, 8U, p_i32x8, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0},
+    {"has_rect_intersection", 21U, sdl_fn_has_rect_intersection, 8U, p_i32x8, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL,
+     0},
+    {"get_rect_intersection", 21U, sdl_fn_get_rect_intersection, 8U, p_i32x8, VIGIL_TYPE_I32, 2U, rt_i32_i32, 0, NULL,
+     NULL, 0},
+    {"get_rect_union", 14U, sdl_fn_get_rect_union, 8U, p_i32x8, VIGIL_TYPE_I32, 2U, rt_i32_i32, 0, NULL, NULL, 0},
+    {"point_in_rect_float", 19U, sdl_fn_point_in_rect_float, 6U, p_f64x6, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0},
+    SDL_FN("rect_empty_float", 16U, sdl_fn_rect_empty_float, 4U, p_f64_f64_f64_f64, VIGIL_TYPE_BOOL),
+    {"has_rect_intersection_float", 27U, sdl_fn_has_rect_intersection_float, 8U, p_f64x8, VIGIL_TYPE_BOOL, 1U, NULL, 0,
+     NULL, NULL, 0},
+    /* Async IO */
+    {"async_io_from_file", 18U, sdl_fn_async_io_from_file, 2U, p_str_str, VIGIL_TYPE_I64, 2U, rt_i64_err, 0, NULL, NULL,
+     0},
+    SDL_FN("async_io_size", 13U, sdl_fn_async_io_size, 1U, p_i64, VIGIL_TYPE_I64),
+    {"create_async_io_queue", 21U, sdl_fn_create_async_io_queue, 0U, NULL, VIGIL_TYPE_I64, 2U, rt_i64_err, 0, NULL,
+     NULL, 0},
+    SDL_FN_VOID("destroy_async_io_queue", 22U, sdl_fn_destroy_async_io_queue, 1U, p_i64),
+    SDL_FN_VOID("signal_async_io_queue", 21U, sdl_fn_signal_async_io_queue, 1U, p_i64),
+    {"async_io_read", 13U, sdl_fn_async_io_read, 5U, p_i64_i64_i64_i32_i64, VIGIL_TYPE_BOOL, 2U, rt_bool_err, 0, NULL,
+     NULL, 0},
+    {"async_io_write", 14U, sdl_fn_async_io_write, 5U, p_i64_i64_i64_i32_i64, VIGIL_TYPE_BOOL, 2U, rt_bool_err, 0, NULL,
+     NULL, 0},
+    {"close_async_io", 14U, sdl_fn_close_async_io, 3U, p_i64_i32_i64, VIGIL_TYPE_BOOL, 2U, rt_bool_err, 0, NULL, NULL,
+     0},
+    SDL_FN("get_async_io_result", 19U, sdl_fn_get_async_io_result, 1U, p_i64, VIGIL_TYPE_I32),
+    SDL_FN("wait_async_io_result", 20U, sdl_fn_wait_async_io_result, 2U, p_i64_i32, VIGIL_TYPE_I32),
     /* IO constants */
     SDL_CONST_ENTRY("IO_SEEK_SET", IO_SEEK_SET),
     SDL_CONST_ENTRY("IO_SEEK_CUR", IO_SEEK_CUR),
