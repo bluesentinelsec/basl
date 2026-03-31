@@ -667,6 +667,8 @@ static const int p_i32[] = {VIGIL_TYPE_I32};
 static const int p_i64[] = {VIGIL_TYPE_I64};
 static const int p_str[] = {VIGIL_TYPE_STRING};
 static const int p_str_str[] = {VIGIL_TYPE_STRING, VIGIL_TYPE_STRING};
+static const int p_str_i32[] = {VIGIL_TYPE_STRING, VIGIL_TYPE_I32};
+static const int p_str_str_i32[] = {VIGIL_TYPE_STRING, VIGIL_TYPE_STRING, VIGIL_TYPE_I32};
 static const int p_i32_str_str[] = {VIGIL_TYPE_I32, VIGIL_TYPE_STRING, VIGIL_TYPE_STRING};
 static const int p_str_str_str[] = {VIGIL_TYPE_STRING, VIGIL_TYPE_STRING, VIGIL_TYPE_STRING};
 static const int p_f64_f64_str[] = {VIGIL_TYPE_F64, VIGIL_TYPE_F64, VIGIL_TYPE_STRING};
@@ -701,6 +703,7 @@ static const int rt_i32_i32_i32_i32[] = {VIGIL_TYPE_I32, VIGIL_TYPE_I32, VIGIL_T
 static const int p_obj_f64_f64[] = {VIGIL_TYPE_OBJECT, VIGIL_TYPE_F64, VIGIL_TYPE_F64};
 static const int rt_f64_f64[] = {VIGIL_TYPE_F64, VIGIL_TYPE_F64};
 static const int p_i32_i32_i32[] = {VIGIL_TYPE_I32, VIGIL_TYPE_I32, VIGIL_TYPE_I32};
+static const int p_i64_i32[] = {VIGIL_TYPE_I64, VIGIL_TYPE_I32};
 static const int p_i64_i32_i32[] = {VIGIL_TYPE_I64, VIGIL_TYPE_I32, VIGIL_TYPE_I32};
 static const int p_i64_i32_i32_i32[] = {VIGIL_TYPE_I64, VIGIL_TYPE_I32, VIGIL_TYPE_I32, VIGIL_TYPE_I32};
 static const int p_i64_i64[] = {VIGIL_TYPE_I64, VIGIL_TYPE_I64};
@@ -710,7 +713,6 @@ static const int p_i64_i64_i32_i32_i32_i32_i32[] = {VIGIL_TYPE_I64, VIGIL_TYPE_I
 static const int p_i64_i64_f64_f64_f64_f64_i32_i32[] = {VIGIL_TYPE_I64, VIGIL_TYPE_I64, VIGIL_TYPE_F64, VIGIL_TYPE_F64,
                                                         VIGIL_TYPE_F64, VIGIL_TYPE_F64, VIGIL_TYPE_I32, VIGIL_TYPE_I32};
 static const int p_i64_i64_i32[] = {VIGIL_TYPE_I64, VIGIL_TYPE_I64, VIGIL_TYPE_I32};
-static const int p_i64_i32[] = {VIGIL_TYPE_I64, VIGIL_TYPE_I32};
 static const int p_i64_i64_str[] = {VIGIL_TYPE_I64, VIGIL_TYPE_I64, VIGIL_TYPE_STRING};
 static const int p_i64_f64_f64_f64_f64[] = {VIGIL_TYPE_I64, VIGIL_TYPE_F64, VIGIL_TYPE_F64, VIGIL_TYPE_F64,
                                             VIGIL_TYPE_F64};
@@ -6310,6 +6312,507 @@ static vigil_status_t sdl_fn_gpu_upload_to_texture(vigil_vm_t *vm, size_t arg_co
     return VIGIL_STATUS_OK;
 }
 
+/* ── SDL stdinc: Math ─────────────────────────────────────────────── */
+
+#define SDL_MATH_F64(name, fn)                                                                                         \
+    static vigil_status_t sdl_fn_##name(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)                        \
+    {                                                                                                                  \
+        size_t base = vigil_vm_stack_depth(vm) - arg_count;                                                            \
+        double v = sdl_arg_f64(vm, base, 0);                                                                           \
+        vigil_vm_stack_pop_n(vm, arg_count);                                                                           \
+        return sdl_push_f64(vm, (double)fn((double)v), error);                                                         \
+    }
+
+#define SDL_MATH_F64_F(name, fn)                                                                                       \
+    static vigil_status_t sdl_fn_##name(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)                        \
+    {                                                                                                                  \
+        size_t base = vigil_vm_stack_depth(vm) - arg_count;                                                            \
+        double v = sdl_arg_f64(vm, base, 0);                                                                           \
+        vigil_vm_stack_pop_n(vm, arg_count);                                                                           \
+        return sdl_push_f64(vm, (double)fn((float)v), error);                                                          \
+    }
+
+#define SDL_MATH_F64_2(name, fn)                                                                                       \
+    static vigil_status_t sdl_fn_##name(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)                        \
+    {                                                                                                                  \
+        size_t base = vigil_vm_stack_depth(vm) - arg_count;                                                            \
+        double a = sdl_arg_f64(vm, base, 0);                                                                           \
+        double b = sdl_arg_f64(vm, base, 1);                                                                           \
+        vigil_vm_stack_pop_n(vm, arg_count);                                                                           \
+        return sdl_push_f64(vm, (double)fn((double)a, (double)b), error);                                              \
+    }
+
+#define SDL_MATH_F64_2F(name, fn)                                                                                      \
+    static vigil_status_t sdl_fn_##name(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)                        \
+    {                                                                                                                  \
+        size_t base = vigil_vm_stack_depth(vm) - arg_count;                                                            \
+        double a = sdl_arg_f64(vm, base, 0);                                                                           \
+        double b = sdl_arg_f64(vm, base, 1);                                                                           \
+        vigil_vm_stack_pop_n(vm, arg_count);                                                                           \
+        return sdl_push_f64(vm, (double)fn((float)a, (float)b), error);                                                \
+    }
+
+/* clang-format off */
+SDL_MATH_F64(m_acos, SDL_acos)
+SDL_MATH_F64_F(m_acosf, SDL_acosf)
+SDL_MATH_F64(m_asin, SDL_asin)
+SDL_MATH_F64_F(m_asinf, SDL_asinf)
+SDL_MATH_F64(m_atan, SDL_atan)
+SDL_MATH_F64_F(m_atanf, SDL_atanf)
+SDL_MATH_F64_2(m_atan2, SDL_atan2)
+SDL_MATH_F64_2F(m_atan2f, SDL_atan2f)
+SDL_MATH_F64(m_ceil, SDL_ceil)
+SDL_MATH_F64_F(m_ceilf, SDL_ceilf)
+SDL_MATH_F64(m_cos, SDL_cos)
+SDL_MATH_F64_F(m_cosf, SDL_cosf)
+SDL_MATH_F64(m_exp, SDL_exp)
+SDL_MATH_F64_F(m_expf, SDL_expf)
+SDL_MATH_F64(m_fabs, SDL_fabs)
+SDL_MATH_F64_F(m_fabsf, SDL_fabsf)
+SDL_MATH_F64(m_floor, SDL_floor)
+SDL_MATH_F64_F(m_floorf, SDL_floorf)
+SDL_MATH_F64_2(m_fmod, SDL_fmod)
+SDL_MATH_F64_2F(m_fmodf, SDL_fmodf)
+SDL_MATH_F64(m_log, SDL_log)
+SDL_MATH_F64_F(m_logf, SDL_logf)
+SDL_MATH_F64(m_log10, SDL_log10)
+SDL_MATH_F64_F(m_log10f, SDL_log10f)
+SDL_MATH_F64_2(m_pow, SDL_pow)
+SDL_MATH_F64_2F(m_powf, SDL_powf)
+SDL_MATH_F64(m_round, SDL_round)
+SDL_MATH_F64_F(m_roundf, SDL_roundf)
+SDL_MATH_F64(m_sin, SDL_sin)
+SDL_MATH_F64_F(m_sinf, SDL_sinf)
+SDL_MATH_F64(m_sqrt, SDL_sqrt)
+SDL_MATH_F64_F(m_sqrtf, SDL_sqrtf)
+SDL_MATH_F64(m_tan, SDL_tan)
+SDL_MATH_F64_F(m_tanf, SDL_tanf)
+SDL_MATH_F64(m_trunc, SDL_trunc)
+SDL_MATH_F64_F(m_truncf, SDL_truncf)
+SDL_MATH_F64_2(m_copysign, SDL_copysign)
+SDL_MATH_F64_2F(m_copysignf, SDL_copysignf)
+
+#define SDL_CHAR_FN(name, fn)                                                                                          \
+    static vigil_status_t sdl_fn_##name(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)                        \
+    {                                                                                                                  \
+        size_t base = vigil_vm_stack_depth(vm) - arg_count;                                                            \
+        int32_t c = sdl_arg_i32(vm, base, 0);                                                                          \
+        vigil_vm_stack_pop_n(vm, arg_count);                                                                           \
+        return sdl_push_bool(vm, fn(c), error);                                                                        \
+    }
+
+SDL_CHAR_FN(c_isalnum, SDL_isalnum)
+SDL_CHAR_FN(c_isalpha, SDL_isalpha)
+SDL_CHAR_FN(c_isblank, SDL_isblank)
+SDL_CHAR_FN(c_iscntrl, SDL_iscntrl)
+SDL_CHAR_FN(c_isdigit, SDL_isdigit)
+SDL_CHAR_FN(c_isgraph, SDL_isgraph)
+SDL_CHAR_FN(c_islower, SDL_islower)
+SDL_CHAR_FN(c_isprint, SDL_isprint)
+SDL_CHAR_FN(c_ispunct, SDL_ispunct)
+SDL_CHAR_FN(c_isspace, SDL_isspace)
+SDL_CHAR_FN(c_isupper, SDL_isupper)
+SDL_CHAR_FN(c_isxdigit, SDL_isxdigit)
+/* clang-format on */
+
+static vigil_status_t sdl_fn_m_scalbn(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    double x = sdl_arg_f64(vm, base, 0);
+    int n = (int)sdl_arg_f64(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_f64(vm, SDL_scalbn(x, n), error);
+}
+
+static vigil_status_t sdl_fn_m_lround(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    double v = sdl_arg_f64(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_i64(vm, (int64_t)SDL_lround(v), error);
+}
+
+static vigil_status_t sdl_fn_m_lroundf(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    double v = sdl_arg_f64(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_i64(vm, (int64_t)SDL_lroundf((float)v), error);
+}
+
+static vigil_status_t sdl_fn_m_isinf(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    double v = sdl_arg_f64(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_bool(vm, SDL_isinf(v), error);
+}
+
+static vigil_status_t sdl_fn_m_isnan(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    double v = sdl_arg_f64(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_bool(vm, SDL_isnan(v), error);
+}
+
+static vigil_status_t sdl_fn_m_abs(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t v = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_i32(vm, SDL_abs(v), error);
+}
+
+static vigil_status_t sdl_fn_c_toupper(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t c = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_i32(vm, SDL_toupper(c), error);
+}
+
+static vigil_status_t sdl_fn_c_tolower(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t c = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_i32(vm, SDL_tolower(c), error);
+}
+
+/* ── SDL stdinc: String functions ─────────────────────────────────── */
+
+static vigil_status_t sdl_fn_s_strlen(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    char buf[4096];
+    sdl_arg_str(vm, base, 0, buf, sizeof(buf));
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_i32(vm, (int32_t)SDL_strlen(buf), error);
+}
+
+static vigil_status_t sdl_fn_s_strcmp(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    char a[4096], b[4096];
+    sdl_arg_str(vm, base, 0, a, sizeof(a));
+    sdl_arg_str(vm, base, 1, b, sizeof(b));
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_i32(vm, SDL_strcmp(a, b), error);
+}
+
+static vigil_status_t sdl_fn_s_strncmp(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    char a[4096], b[4096];
+    sdl_arg_str(vm, base, 0, a, sizeof(a));
+    sdl_arg_str(vm, base, 1, b, sizeof(b));
+    int32_t n = sdl_arg_i32(vm, base, 2);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_i32(vm, SDL_strncmp(a, b, (size_t)n), error);
+}
+
+static vigil_status_t sdl_fn_s_strcasecmp(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    char a[4096], b[4096];
+    sdl_arg_str(vm, base, 0, a, sizeof(a));
+    sdl_arg_str(vm, base, 1, b, sizeof(b));
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_i32(vm, SDL_strcasecmp(a, b), error);
+}
+
+static vigil_status_t sdl_fn_s_strncasecmp(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    char a[4096], b[4096];
+    sdl_arg_str(vm, base, 0, a, sizeof(a));
+    sdl_arg_str(vm, base, 1, b, sizeof(b));
+    int32_t n = sdl_arg_i32(vm, base, 2);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_i32(vm, SDL_strncasecmp(a, b, (size_t)n), error);
+}
+
+static vigil_status_t sdl_fn_s_strstr(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    char a[4096], b[256];
+    sdl_arg_str(vm, base, 0, a, sizeof(a));
+    sdl_arg_str(vm, base, 1, b, sizeof(b));
+    vigil_vm_stack_pop_n(vm, arg_count);
+    const char *p = SDL_strstr(a, b);
+    return sdl_push_i32(vm, p ? (int32_t)(p - a) : -1, error);
+}
+
+static vigil_status_t sdl_fn_s_strchr(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    char a[4096];
+    sdl_arg_str(vm, base, 0, a, sizeof(a));
+    int32_t c = sdl_arg_i32(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    const char *p = SDL_strchr(a, c);
+    return sdl_push_i32(vm, p ? (int32_t)(p - a) : -1, error);
+}
+
+static vigil_status_t sdl_fn_s_strrchr(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    char a[4096];
+    sdl_arg_str(vm, base, 0, a, sizeof(a));
+    int32_t c = sdl_arg_i32(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    const char *p = SDL_strrchr(a, c);
+    return sdl_push_i32(vm, p ? (int32_t)(p - a) : -1, error);
+}
+
+static vigil_status_t sdl_fn_s_strupr(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    char a[4096];
+    sdl_arg_str(vm, base, 0, a, sizeof(a));
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_strupr(a);
+    return sdl_push_string(vm, a, error);
+}
+
+static vigil_status_t sdl_fn_s_strlwr(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    char a[4096];
+    sdl_arg_str(vm, base, 0, a, sizeof(a));
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_strlwr(a);
+    return sdl_push_string(vm, a, error);
+}
+
+static vigil_status_t sdl_fn_s_strrev(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    char a[4096];
+    sdl_arg_str(vm, base, 0, a, sizeof(a));
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_strrev(a);
+    return sdl_push_string(vm, a, error);
+}
+
+/* Conversion: string -> number */
+static vigil_status_t sdl_fn_s_atoi(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    char a[256];
+    sdl_arg_str(vm, base, 0, a, sizeof(a));
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_i32(vm, SDL_atoi(a), error);
+}
+
+static vigil_status_t sdl_fn_s_atof(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    char a[256];
+    sdl_arg_str(vm, base, 0, a, sizeof(a));
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_f64(vm, SDL_atof(a), error);
+}
+
+static vigil_status_t sdl_fn_s_strtol(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    char a[256];
+    sdl_arg_str(vm, base, 0, a, sizeof(a));
+    int32_t radix = sdl_arg_i32(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_i64(vm, (int64_t)SDL_strtol(a, NULL, radix), error);
+}
+
+static vigil_status_t sdl_fn_s_strtoul(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    char a[256];
+    sdl_arg_str(vm, base, 0, a, sizeof(a));
+    int32_t radix = sdl_arg_i32(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_i64(vm, (int64_t)SDL_strtoul(a, NULL, radix), error);
+}
+
+static vigil_status_t sdl_fn_s_strtod(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    char a[256];
+    sdl_arg_str(vm, base, 0, a, sizeof(a));
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_f64(vm, SDL_strtod(a, NULL), error);
+}
+
+/* Conversion: number -> string */
+static vigil_status_t sdl_fn_s_itoa(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t v = sdl_arg_i32(vm, base, 0);
+    int32_t radix = sdl_arg_i32(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    char buf[68];
+    SDL_itoa(v, buf, radix);
+    return sdl_push_string(vm, buf, error);
+}
+
+static vigil_status_t sdl_fn_s_lltoa(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t v = sdl_arg_i64(vm, base, 0);
+    int32_t radix = sdl_arg_i32(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    char buf[68];
+    SDL_lltoa(v, buf, radix);
+    return sdl_push_string(vm, buf, error);
+}
+
+/* UTF-8 */
+static vigil_status_t sdl_fn_s_utf8strlen(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    char a[4096];
+    sdl_arg_str(vm, base, 0, a, sizeof(a));
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_i32(vm, (int32_t)SDL_utf8strlen(a), error);
+}
+
+static vigil_status_t sdl_fn_s_utf8strnlen(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    char a[4096];
+    sdl_arg_str(vm, base, 0, a, sizeof(a));
+    int32_t n = sdl_arg_i32(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_i32(vm, (int32_t)SDL_utf8strnlen(a, (size_t)n), error);
+}
+
+/* ── SDL stdinc: Random, Hash, Bit, Env ───────────────────────────── */
+
+static vigil_status_t sdl_fn_r_srand(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t seed = sdl_arg_i64(vm, base, 0);
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_srand((Uint64)seed);
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t sdl_fn_r_rand(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t n = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_i32(vm, (int32_t)SDL_rand(n), error);
+}
+
+static vigil_status_t sdl_fn_r_randf(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_f64(vm, (double)SDL_randf(), error);
+}
+
+static vigil_status_t sdl_fn_r_rand_bits(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_i32(vm, (int32_t)SDL_rand_bits(), error);
+}
+
+static vigil_status_t sdl_fn_r_crc16(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t bh = sdl_arg_i64(vm, base, 0);
+    int32_t crc_init = sdl_arg_i32(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    int32_t sz = 0;
+    void *data = vigil_unsafe_buffer_get(bh, &sz);
+    if (!data)
+        return sdl_push_i32(vm, 0, error);
+    return sdl_push_i32(vm, (int32_t)SDL_crc16((Uint16)crc_init, (const Uint8 *)data, (size_t)sz), error);
+}
+
+static vigil_status_t sdl_fn_r_crc32(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t bh = sdl_arg_i64(vm, base, 0);
+    int32_t crc_init = sdl_arg_i32(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    int32_t sz = 0;
+    void *data = vigil_unsafe_buffer_get(bh, &sz);
+    if (!data)
+        return sdl_push_i32(vm, 0, error);
+    return sdl_push_i32(vm, (int32_t)SDL_crc32((Uint32)crc_init, (const Uint8 *)data, (size_t)sz), error);
+}
+
+static vigil_status_t sdl_fn_r_murmur3_32(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t bh = sdl_arg_i64(vm, base, 0);
+    int32_t seed = sdl_arg_i32(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    int32_t sz = 0;
+    void *data = vigil_unsafe_buffer_get(bh, &sz);
+    if (!data)
+        return sdl_push_i32(vm, 0, error);
+    return sdl_push_i32(vm, (int32_t)SDL_murmur3_32(data, (size_t)sz, (Uint32)seed), error);
+}
+
+static vigil_status_t sdl_fn_r_msb32(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t v = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_i32(vm, SDL_MostSignificantBitIndex32((Uint32)v), error);
+}
+
+static vigil_status_t sdl_fn_r_has_one_bit32(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t v = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_bool(vm, SDL_HasExactlyOneBitSet32((Uint32)v), error);
+}
+
+static vigil_status_t sdl_fn_e_getenv(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    char name[256];
+    sdl_arg_str(vm, base, 0, name, sizeof(name));
+    vigil_vm_stack_pop_n(vm, arg_count);
+    const char *val = SDL_getenv(name);
+    return sdl_push_string(vm, val ? val : "", error);
+}
+
+static vigil_status_t sdl_fn_e_setenv(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    char name[256], val[4096];
+    sdl_arg_str(vm, base, 0, name, sizeof(name));
+    sdl_arg_str(vm, base, 1, val, sizeof(val));
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_i32(vm, SDL_setenv_unsafe(name, val, 1), error);
+}
+
+static vigil_status_t sdl_fn_e_unsetenv(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    char name[256];
+    sdl_arg_str(vm, base, 0, name, sizeof(name));
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_i32(vm, SDL_unsetenv_unsafe(name), error);
+}
+
+/* Wide string basics */
+static vigil_status_t sdl_fn_s_wcslen(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    char a[4096];
+    sdl_arg_str(vm, base, 0, a, sizeof(a));
+    vigil_vm_stack_pop_n(vm, arg_count); /* Convert to wchar for length count — approximate with utf8strlen */
+    return sdl_push_i32(vm, (int32_t)SDL_utf8strlen(a), error);
+}
+
 SDL_CONST_FN(GPU_SHADERFORMAT_SPIRV, SDL_GPU_SHADERFORMAT_SPIRV)
 SDL_CONST_FN(GPU_SHADERFORMAT_MSL, SDL_GPU_SHADERFORMAT_MSL)
 SDL_CONST_FN(GPU_SHADERFORMAT_METALLIB, SDL_GPU_SHADERFORMAT_METALLIB)
@@ -6788,6 +7291,101 @@ static const vigil_native_module_function_t sdl_functions[] = {
     SDL_FN_VOID("gpu_debug_label", 15U, sdl_fn_gpu_debug_label, 2U, p_i64_str),
     SDL_FN_VOID("gpu_generate_mipmaps", 20U, sdl_fn_gpu_generate_mipmaps, 2U, p_i64_i64),
     SDL_FN_BOOL_ERR("gpu_set_swapchain_params", 23U, sdl_fn_gpu_set_swapchain_params, 4U, p_i64_obj_i32_i32),
+    /* stdinc: math */
+    SDL_FN("m_acos", 6U, sdl_fn_m_acos, 1U, p_f64, VIGIL_TYPE_F64),
+    SDL_FN("m_acosf", 7U, sdl_fn_m_acosf, 1U, p_f64, VIGIL_TYPE_F64),
+    SDL_FN("m_asin", 6U, sdl_fn_m_asin, 1U, p_f64, VIGIL_TYPE_F64),
+    SDL_FN("m_asinf", 7U, sdl_fn_m_asinf, 1U, p_f64, VIGIL_TYPE_F64),
+    SDL_FN("m_atan", 6U, sdl_fn_m_atan, 1U, p_f64, VIGIL_TYPE_F64),
+    SDL_FN("m_atanf", 7U, sdl_fn_m_atanf, 1U, p_f64, VIGIL_TYPE_F64),
+    SDL_FN("m_atan2", 7U, sdl_fn_m_atan2, 2U, p_f64_f64, VIGIL_TYPE_F64),
+    SDL_FN("m_atan2f", 8U, sdl_fn_m_atan2f, 2U, p_f64_f64, VIGIL_TYPE_F64),
+    SDL_FN("m_ceil", 6U, sdl_fn_m_ceil, 1U, p_f64, VIGIL_TYPE_F64),
+    SDL_FN("m_ceilf", 7U, sdl_fn_m_ceilf, 1U, p_f64, VIGIL_TYPE_F64),
+    SDL_FN("m_cos", 5U, sdl_fn_m_cos, 1U, p_f64, VIGIL_TYPE_F64),
+    SDL_FN("m_cosf", 6U, sdl_fn_m_cosf, 1U, p_f64, VIGIL_TYPE_F64),
+    SDL_FN("m_exp", 5U, sdl_fn_m_exp, 1U, p_f64, VIGIL_TYPE_F64),
+    SDL_FN("m_expf", 6U, sdl_fn_m_expf, 1U, p_f64, VIGIL_TYPE_F64),
+    SDL_FN("m_fabs", 6U, sdl_fn_m_fabs, 1U, p_f64, VIGIL_TYPE_F64),
+    SDL_FN("m_fabsf", 7U, sdl_fn_m_fabsf, 1U, p_f64, VIGIL_TYPE_F64),
+    SDL_FN("m_floor", 7U, sdl_fn_m_floor, 1U, p_f64, VIGIL_TYPE_F64),
+    SDL_FN("m_floorf", 8U, sdl_fn_m_floorf, 1U, p_f64, VIGIL_TYPE_F64),
+    SDL_FN("m_fmod", 6U, sdl_fn_m_fmod, 2U, p_f64_f64, VIGIL_TYPE_F64),
+    SDL_FN("m_fmodf", 7U, sdl_fn_m_fmodf, 2U, p_f64_f64, VIGIL_TYPE_F64),
+    SDL_FN("m_log", 5U, sdl_fn_m_log, 1U, p_f64, VIGIL_TYPE_F64),
+    SDL_FN("m_logf", 6U, sdl_fn_m_logf, 1U, p_f64, VIGIL_TYPE_F64),
+    SDL_FN("m_log10", 7U, sdl_fn_m_log10, 1U, p_f64, VIGIL_TYPE_F64),
+    SDL_FN("m_log10f", 8U, sdl_fn_m_log10f, 1U, p_f64, VIGIL_TYPE_F64),
+    SDL_FN("m_pow", 5U, sdl_fn_m_pow, 2U, p_f64_f64, VIGIL_TYPE_F64),
+    SDL_FN("m_powf", 6U, sdl_fn_m_powf, 2U, p_f64_f64, VIGIL_TYPE_F64),
+    SDL_FN("m_round", 7U, sdl_fn_m_round, 1U, p_f64, VIGIL_TYPE_F64),
+    SDL_FN("m_roundf", 8U, sdl_fn_m_roundf, 1U, p_f64, VIGIL_TYPE_F64),
+    SDL_FN("m_sin", 5U, sdl_fn_m_sin, 1U, p_f64, VIGIL_TYPE_F64),
+    SDL_FN("m_sinf", 6U, sdl_fn_m_sinf, 1U, p_f64, VIGIL_TYPE_F64),
+    SDL_FN("m_sqrt", 6U, sdl_fn_m_sqrt, 1U, p_f64, VIGIL_TYPE_F64),
+    SDL_FN("m_sqrtf", 7U, sdl_fn_m_sqrtf, 1U, p_f64, VIGIL_TYPE_F64),
+    SDL_FN("m_tan", 5U, sdl_fn_m_tan, 1U, p_f64, VIGIL_TYPE_F64),
+    SDL_FN("m_tanf", 6U, sdl_fn_m_tanf, 1U, p_f64, VIGIL_TYPE_F64),
+    SDL_FN("m_trunc", 7U, sdl_fn_m_trunc, 1U, p_f64, VIGIL_TYPE_F64),
+    SDL_FN("m_truncf", 8U, sdl_fn_m_truncf, 1U, p_f64, VIGIL_TYPE_F64),
+    SDL_FN("m_copysign", 10U, sdl_fn_m_copysign, 2U, p_f64_f64, VIGIL_TYPE_F64),
+    SDL_FN("m_copysignf", 11U, sdl_fn_m_copysignf, 2U, p_f64_f64, VIGIL_TYPE_F64),
+    SDL_FN("m_scalbn", 8U, sdl_fn_m_scalbn, 2U, p_f64_f64, VIGIL_TYPE_F64),
+    SDL_FN("m_lround", 8U, sdl_fn_m_lround, 1U, p_f64, VIGIL_TYPE_I64),
+    SDL_FN("m_lroundf", 9U, sdl_fn_m_lroundf, 1U, p_f64, VIGIL_TYPE_I64),
+    SDL_FN("m_isinf", 7U, sdl_fn_m_isinf, 1U, p_f64, VIGIL_TYPE_BOOL),
+    SDL_FN("m_isnan", 7U, sdl_fn_m_isnan, 1U, p_f64, VIGIL_TYPE_BOOL),
+    SDL_FN("m_abs", 5U, sdl_fn_m_abs, 1U, p_i32, VIGIL_TYPE_I32),
+    /* stdinc: char */
+    SDL_FN("c_isalnum", 9U, sdl_fn_c_isalnum, 1U, p_i32, VIGIL_TYPE_BOOL),
+    SDL_FN("c_isalpha", 9U, sdl_fn_c_isalpha, 1U, p_i32, VIGIL_TYPE_BOOL),
+    SDL_FN("c_isblank", 9U, sdl_fn_c_isblank, 1U, p_i32, VIGIL_TYPE_BOOL),
+    SDL_FN("c_iscntrl", 9U, sdl_fn_c_iscntrl, 1U, p_i32, VIGIL_TYPE_BOOL),
+    SDL_FN("c_isdigit", 9U, sdl_fn_c_isdigit, 1U, p_i32, VIGIL_TYPE_BOOL),
+    SDL_FN("c_isgraph", 9U, sdl_fn_c_isgraph, 1U, p_i32, VIGIL_TYPE_BOOL),
+    SDL_FN("c_islower", 9U, sdl_fn_c_islower, 1U, p_i32, VIGIL_TYPE_BOOL),
+    SDL_FN("c_isprint", 9U, sdl_fn_c_isprint, 1U, p_i32, VIGIL_TYPE_BOOL),
+    SDL_FN("c_ispunct", 9U, sdl_fn_c_ispunct, 1U, p_i32, VIGIL_TYPE_BOOL),
+    SDL_FN("c_isspace", 9U, sdl_fn_c_isspace, 1U, p_i32, VIGIL_TYPE_BOOL),
+    SDL_FN("c_isupper", 9U, sdl_fn_c_isupper, 1U, p_i32, VIGIL_TYPE_BOOL),
+    SDL_FN("c_isxdigit", 10U, sdl_fn_c_isxdigit, 1U, p_i32, VIGIL_TYPE_BOOL),
+    SDL_FN("c_toupper", 9U, sdl_fn_c_toupper, 1U, p_i32, VIGIL_TYPE_I32),
+    SDL_FN("c_tolower", 9U, sdl_fn_c_tolower, 1U, p_i32, VIGIL_TYPE_I32),
+    /* stdinc: string */
+    SDL_FN("s_strlen", 8U, sdl_fn_s_strlen, 1U, p_str, VIGIL_TYPE_I32),
+    SDL_FN("s_strcmp", 8U, sdl_fn_s_strcmp, 2U, p_str_str, VIGIL_TYPE_I32),
+    {"s_strncmp", 9U, sdl_fn_s_strncmp, 3U, p_str_str_i32, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, NULL, 0},
+    SDL_FN("s_strcasecmp", 12U, sdl_fn_s_strcasecmp, 2U, p_str_str, VIGIL_TYPE_I32),
+    {"s_strncasecmp", 13U, sdl_fn_s_strncasecmp, 3U, p_str_str_i32, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, NULL, 0},
+    SDL_FN("s_strstr", 8U, sdl_fn_s_strstr, 2U, p_str_str, VIGIL_TYPE_I32),
+    SDL_FN("s_strchr", 8U, sdl_fn_s_strchr, 2U, p_str_i32, VIGIL_TYPE_I32),
+    SDL_FN("s_strrchr", 9U, sdl_fn_s_strrchr, 2U, p_str_i32, VIGIL_TYPE_I32),
+    SDL_FN("s_strupr", 8U, sdl_fn_s_strupr, 1U, p_str, VIGIL_TYPE_STRING),
+    SDL_FN("s_strlwr", 8U, sdl_fn_s_strlwr, 1U, p_str, VIGIL_TYPE_STRING),
+    SDL_FN("s_strrev", 8U, sdl_fn_s_strrev, 1U, p_str, VIGIL_TYPE_STRING),
+    SDL_FN("s_atoi", 6U, sdl_fn_s_atoi, 1U, p_str, VIGIL_TYPE_I32),
+    SDL_FN("s_atof", 6U, sdl_fn_s_atof, 1U, p_str, VIGIL_TYPE_F64),
+    SDL_FN("s_strtol", 8U, sdl_fn_s_strtol, 2U, p_str_i32, VIGIL_TYPE_I64),
+    SDL_FN("s_strtoul", 9U, sdl_fn_s_strtoul, 2U, p_str_i32, VIGIL_TYPE_I64),
+    SDL_FN("s_strtod", 8U, sdl_fn_s_strtod, 1U, p_str, VIGIL_TYPE_F64),
+    SDL_FN("s_itoa", 6U, sdl_fn_s_itoa, 2U, p_i32_i32, VIGIL_TYPE_STRING),
+    SDL_FN("s_lltoa", 7U, sdl_fn_s_lltoa, 2U, p_i64_i32, VIGIL_TYPE_STRING),
+    SDL_FN("s_utf8strlen", 12U, sdl_fn_s_utf8strlen, 1U, p_str, VIGIL_TYPE_I32),
+    SDL_FN("s_utf8strnlen", 13U, sdl_fn_s_utf8strnlen, 2U, p_str_i32, VIGIL_TYPE_I32),
+    /* stdinc: random/hash/bit/env */
+    SDL_FN_VOID("r_srand", 7U, sdl_fn_r_srand, 1U, p_i64),
+    SDL_FN("r_rand", 6U, sdl_fn_r_rand, 1U, p_i32, VIGIL_TYPE_I32),
+    SDL_FN("r_randf", 7U, sdl_fn_r_randf, 0U, NULL, VIGIL_TYPE_F64),
+    SDL_FN("r_rand_bits", 11U, sdl_fn_r_rand_bits, 0U, NULL, VIGIL_TYPE_I32),
+    SDL_FN("r_crc16", 7U, sdl_fn_r_crc16, 2U, p_i64_i32, VIGIL_TYPE_I32),
+    SDL_FN("r_crc32", 7U, sdl_fn_r_crc32, 2U, p_i64_i32, VIGIL_TYPE_I32),
+    SDL_FN("r_murmur3_32", 12U, sdl_fn_r_murmur3_32, 2U, p_i64_i32, VIGIL_TYPE_I32),
+    SDL_FN("r_msb32", 7U, sdl_fn_r_msb32, 1U, p_i32, VIGIL_TYPE_I32),
+    SDL_FN("r_has_one_bit32", 15U, sdl_fn_r_has_one_bit32, 1U, p_i32, VIGIL_TYPE_BOOL),
+    SDL_FN("e_getenv", 8U, sdl_fn_e_getenv, 1U, p_str, VIGIL_TYPE_STRING),
+    SDL_FN("e_setenv", 8U, sdl_fn_e_setenv, 2U, p_str_str, VIGIL_TYPE_I32),
+    SDL_FN("e_unsetenv", 10U, sdl_fn_e_unsetenv, 1U, p_str, VIGIL_TYPE_I32),
+    SDL_FN("s_wcslen", 8U, sdl_fn_s_wcslen, 1U, p_str, VIGIL_TYPE_I32),
     /* GPU Phase 2 constants */
     SDL_CONST_ENTRY("GPU_TEXTUREUSAGE_SAMPLER", GPU_TEXTUREUSAGE_SAMPLER),
     SDL_CONST_ENTRY("GPU_TEXTUREUSAGE_COLOR_TARGET", GPU_TEXTUREUSAGE_COLOR_TARGET),
