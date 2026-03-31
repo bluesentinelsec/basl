@@ -10659,6 +10659,76 @@ static vigil_status_t sdl_fn_set_app_metadata_property(vigil_vm_t *vm, size_t ar
     return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
 }
 
+/* ── IO Read/Write helpers (endian-aware) ─────────────────────────── */
+
+#define SDL_IO_READ_FN(name, sdl_fn, type, push_fn)                                                                    \
+    static vigil_status_t sdl_fn_##name(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)                        \
+    {                                                                                                                  \
+        size_t base = vigil_vm_stack_depth(vm) - arg_count;                                                            \
+        int64_t h = sdl_arg_i64(vm, base, 0);                                                                          \
+        vigil_vm_stack_pop_n(vm, arg_count);                                                                           \
+        SDL_IOStream *io = (SDL_IOStream *)SDL_HANDLE_GET(io_streams, h);                                              \
+        type val = 0;                                                                                                  \
+        if (io)                                                                                                        \
+            sdl_fn(io, &val);                                                                                          \
+        return push_fn(vm, val, error);                                                                                \
+    }
+
+#define SDL_IO_WRITE_FN(name, sdl_fn, arg_fn)                                                                          \
+    static vigil_status_t sdl_fn_##name(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)                        \
+    {                                                                                                                  \
+        size_t base = vigil_vm_stack_depth(vm) - arg_count;                                                            \
+        int64_t h = sdl_arg_i64(vm, base, 0);                                                                          \
+        vigil_vm_stack_pop_n(vm, arg_count);                                                                           \
+        SDL_IOStream *io = (SDL_IOStream *)SDL_HANDLE_GET(io_streams, h);                                              \
+        (void)error;                                                                                                   \
+        return VIGIL_STATUS_OK;                                                                                        \
+    }
+
+/* clang-format off */
+static vigil_status_t sdl_fn_io_read_u8(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{ size_t base = vigil_vm_stack_depth(vm) - arg_count; int64_t h = sdl_arg_i64(vm, base, 0); vigil_vm_stack_pop_n(vm, arg_count); SDL_IOStream *io = (SDL_IOStream *)SDL_HANDLE_GET(io_streams, h); Uint8 val = 0; if (io) SDL_ReadU8(io, &val); return sdl_push_i32(vm, (int32_t)val, error); }
+
+static vigil_status_t sdl_fn_io_read_s16le(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{ size_t base = vigil_vm_stack_depth(vm) - arg_count; int64_t h = sdl_arg_i64(vm, base, 0); vigil_vm_stack_pop_n(vm, arg_count); SDL_IOStream *io = (SDL_IOStream *)SDL_HANDLE_GET(io_streams, h); Sint16 val = 0; if (io) SDL_ReadS16LE(io, &val); return sdl_push_i32(vm, (int32_t)val, error); }
+
+static vigil_status_t sdl_fn_io_read_s16be(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{ size_t base = vigil_vm_stack_depth(vm) - arg_count; int64_t h = sdl_arg_i64(vm, base, 0); vigil_vm_stack_pop_n(vm, arg_count); SDL_IOStream *io = (SDL_IOStream *)SDL_HANDLE_GET(io_streams, h); Sint16 val = 0; if (io) SDL_ReadS16BE(io, &val); return sdl_push_i32(vm, (int32_t)val, error); }
+
+static vigil_status_t sdl_fn_io_read_s32le(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{ size_t base = vigil_vm_stack_depth(vm) - arg_count; int64_t h = sdl_arg_i64(vm, base, 0); vigil_vm_stack_pop_n(vm, arg_count); SDL_IOStream *io = (SDL_IOStream *)SDL_HANDLE_GET(io_streams, h); Sint32 val = 0; if (io) SDL_ReadS32LE(io, &val); return sdl_push_i32(vm, (int32_t)val, error); }
+
+static vigil_status_t sdl_fn_io_read_s32be(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{ size_t base = vigil_vm_stack_depth(vm) - arg_count; int64_t h = sdl_arg_i64(vm, base, 0); vigil_vm_stack_pop_n(vm, arg_count); SDL_IOStream *io = (SDL_IOStream *)SDL_HANDLE_GET(io_streams, h); Sint32 val = 0; if (io) SDL_ReadS32BE(io, &val); return sdl_push_i32(vm, (int32_t)val, error); }
+
+static vigil_status_t sdl_fn_io_read_s64le(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{ size_t base = vigil_vm_stack_depth(vm) - arg_count; int64_t h = sdl_arg_i64(vm, base, 0); vigil_vm_stack_pop_n(vm, arg_count); SDL_IOStream *io = (SDL_IOStream *)SDL_HANDLE_GET(io_streams, h); Sint64 val = 0; if (io) SDL_ReadS64LE(io, &val); return sdl_push_i64(vm, (int64_t)val, error); }
+
+static vigil_status_t sdl_fn_io_read_s64be(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{ size_t base = vigil_vm_stack_depth(vm) - arg_count; int64_t h = sdl_arg_i64(vm, base, 0); vigil_vm_stack_pop_n(vm, arg_count); SDL_IOStream *io = (SDL_IOStream *)SDL_HANDLE_GET(io_streams, h); Sint64 val = 0; if (io) SDL_ReadS64BE(io, &val); return sdl_push_i64(vm, (int64_t)val, error); }
+
+static vigil_status_t sdl_fn_io_write_u8(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{ size_t base = vigil_vm_stack_depth(vm) - arg_count; int64_t h = sdl_arg_i64(vm, base, 0); int32_t v = sdl_arg_i32(vm, base, 1); vigil_vm_stack_pop_n(vm, arg_count); SDL_IOStream *io = (SDL_IOStream *)SDL_HANDLE_GET(io_streams, h); if (io && SDL_WriteU8(io, (Uint8)v)) return sdl_push_bool_ok(vm, error); return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error); }
+
+static vigil_status_t sdl_fn_io_write_s16le(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{ size_t base = vigil_vm_stack_depth(vm) - arg_count; int64_t h = sdl_arg_i64(vm, base, 0); int32_t v = sdl_arg_i32(vm, base, 1); vigil_vm_stack_pop_n(vm, arg_count); SDL_IOStream *io = (SDL_IOStream *)SDL_HANDLE_GET(io_streams, h); if (io && SDL_WriteS16LE(io, (Sint16)v)) return sdl_push_bool_ok(vm, error); return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error); }
+
+static vigil_status_t sdl_fn_io_write_s32le(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{ size_t base = vigil_vm_stack_depth(vm) - arg_count; int64_t h = sdl_arg_i64(vm, base, 0); int32_t v = sdl_arg_i32(vm, base, 1); vigil_vm_stack_pop_n(vm, arg_count); SDL_IOStream *io = (SDL_IOStream *)SDL_HANDLE_GET(io_streams, h); if (io && SDL_WriteS32LE(io, (Sint32)v)) return sdl_push_bool_ok(vm, error); return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error); }
+
+static vigil_status_t sdl_fn_io_write_s64le(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{ size_t base = vigil_vm_stack_depth(vm) - arg_count; int64_t h = sdl_arg_i64(vm, base, 0); int64_t v = sdl_arg_i64(vm, base, 1); vigil_vm_stack_pop_n(vm, arg_count); SDL_IOStream *io = (SDL_IOStream *)SDL_HANDLE_GET(io_streams, h); if (io && SDL_WriteS64LE(io, (Sint64)v)) return sdl_push_bool_ok(vm, error); return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error); }
+
+static vigil_status_t sdl_fn_io_write_s16be(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{ size_t base = vigil_vm_stack_depth(vm) - arg_count; int64_t h = sdl_arg_i64(vm, base, 0); int32_t v = sdl_arg_i32(vm, base, 1); vigil_vm_stack_pop_n(vm, arg_count); SDL_IOStream *io = (SDL_IOStream *)SDL_HANDLE_GET(io_streams, h); if (io && SDL_WriteS16BE(io, (Sint16)v)) return sdl_push_bool_ok(vm, error); return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error); }
+
+static vigil_status_t sdl_fn_io_write_s32be(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{ size_t base = vigil_vm_stack_depth(vm) - arg_count; int64_t h = sdl_arg_i64(vm, base, 0); int32_t v = sdl_arg_i32(vm, base, 1); vigil_vm_stack_pop_n(vm, arg_count); SDL_IOStream *io = (SDL_IOStream *)SDL_HANDLE_GET(io_streams, h); if (io && SDL_WriteS32BE(io, (Sint32)v)) return sdl_push_bool_ok(vm, error); return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error); }
+
+static vigil_status_t sdl_fn_io_write_s64be(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{ size_t base = vigil_vm_stack_depth(vm) - arg_count; int64_t h = sdl_arg_i64(vm, base, 0); int64_t v = sdl_arg_i64(vm, base, 1); vigil_vm_stack_pop_n(vm, arg_count); SDL_IOStream *io = (SDL_IOStream *)SDL_HANDLE_GET(io_streams, h); if (io && SDL_WriteS64BE(io, (Sint64)v)) return sdl_push_bool_ok(vm, error); return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error); }
+/* clang-format on */
+
 /* Texture access constants */
 SDL_CONST_FN(TEXTUREACCESS_STATIC, SDL_TEXTUREACCESS_STATIC)
 SDL_CONST_FN(TEXTUREACCESS_STREAMING, SDL_TEXTUREACCESS_STREAMING)
@@ -11241,6 +11311,21 @@ static const vigil_native_module_function_t sdl_functions[] = {
     SDL_FN("get_surface_properties", 22U, sdl_fn_get_surface_properties, 1U, p_obj, VIGIL_TYPE_I32),
     SDL_FN("get_app_metadata_property", 25U, sdl_fn_get_app_metadata_property, 1U, p_str, VIGIL_TYPE_STRING),
     SDL_FN_BOOL_ERR("set_app_metadata_property", 25U, sdl_fn_set_app_metadata_property, 2U, p_str_str),
+    /* IO read/write helpers */
+    SDL_FN("io_read_u8", 10U, sdl_fn_io_read_u8, 1U, p_i64, VIGIL_TYPE_I32),
+    SDL_FN("io_read_s16le", 13U, sdl_fn_io_read_s16le, 1U, p_i64, VIGIL_TYPE_I32),
+    SDL_FN("io_read_s16be", 13U, sdl_fn_io_read_s16be, 1U, p_i64, VIGIL_TYPE_I32),
+    SDL_FN("io_read_s32le", 13U, sdl_fn_io_read_s32le, 1U, p_i64, VIGIL_TYPE_I32),
+    SDL_FN("io_read_s32be", 13U, sdl_fn_io_read_s32be, 1U, p_i64, VIGIL_TYPE_I32),
+    SDL_FN("io_read_s64le", 13U, sdl_fn_io_read_s64le, 1U, p_i64, VIGIL_TYPE_I64),
+    SDL_FN("io_read_s64be", 13U, sdl_fn_io_read_s64be, 1U, p_i64, VIGIL_TYPE_I64),
+    SDL_FN_BOOL_ERR("io_write_u8", 11U, sdl_fn_io_write_u8, 2U, p_i64_i32),
+    SDL_FN_BOOL_ERR("io_write_s16le", 14U, sdl_fn_io_write_s16le, 2U, p_i64_i32),
+    SDL_FN_BOOL_ERR("io_write_s32le", 14U, sdl_fn_io_write_s32le, 2U, p_i64_i32),
+    SDL_FN_BOOL_ERR("io_write_s64le", 14U, sdl_fn_io_write_s64le, 2U, p_i64_i64),
+    SDL_FN_BOOL_ERR("io_write_s16be", 14U, sdl_fn_io_write_s16be, 2U, p_i64_i32),
+    SDL_FN_BOOL_ERR("io_write_s32be", 14U, sdl_fn_io_write_s32be, 2U, p_i64_i32),
+    SDL_FN_BOOL_ERR("io_write_s64be", 14U, sdl_fn_io_write_s64be, 2U, p_i64_i64),
     /* IO constants */
     SDL_CONST_ENTRY("IO_SEEK_SET", IO_SEEK_SET),
     SDL_CONST_ENTRY("IO_SEEK_CUR", IO_SEEK_CUR),
