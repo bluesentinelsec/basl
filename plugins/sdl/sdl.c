@@ -7,6 +7,8 @@
 #include <string.h>
 
 #include <SDL3/SDL.h>
+#include <SDL3/SDL_vulkan.h>
+#include <SDL3/SDL_metal.h>
 
 #include "vigil/native_module.h"
 #include "vigil/type.h"
@@ -12103,6 +12105,221 @@ static vigil_status_t sdl_fn_update_trays(vigil_vm_t *vm, size_t arg_count, vigi
     return VIGIL_STATUS_OK;
 }
 
+/* ── OpenGL ───────────────────────────────────────────────────────── */
+
+SDL_HANDLE_REGISTRY(gl_contexts);
+
+static vigil_status_t sdl_fn_gl_load_library(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    char path[512];
+    sdl_arg_str(vm, base, 0, path, sizeof(path));
+    vigil_vm_stack_pop_n(vm, arg_count);
+    if (SDL_GL_LoadLibrary(path[0] ? path : NULL))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+static vigil_status_t sdl_fn_gl_unload_library(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_GL_UnloadLibrary();
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t sdl_fn_gl_extension_supported(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    char ext[256];
+    sdl_arg_str(vm, base, 0, ext, sizeof(ext));
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_bool(vm, SDL_GL_ExtensionSupported(ext), error);
+}
+
+static vigil_status_t sdl_fn_gl_reset_attributes(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_GL_ResetAttributes();
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t sdl_fn_gl_set_attribute(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t attr = sdl_arg_i32(vm, base, 0);
+    int32_t val = sdl_arg_i32(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    if (SDL_GL_SetAttribute((SDL_GLAttr)attr, val))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+static vigil_status_t sdl_fn_gl_get_attribute(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t attr = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    int val = 0;
+    SDL_GL_GetAttribute((SDL_GLAttr)attr, &val);
+    return sdl_push_i32(vm, val, error);
+}
+
+static vigil_status_t sdl_fn_gl_create_context(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t wh = sdl_arg_i64(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Window *w = (SDL_Window *)SDL_HANDLE_GET(windows, wh);
+    if (!w)
+    {
+        vigil_status_t st = sdl_push_i64(vm, -1, error);
+        if (st != VIGIL_STATUS_OK)
+            return st;
+        return sdl_push_err(vm, "invalid window", SDL_ERR_STATE, error);
+    }
+    SDL_GLContext ctx = SDL_GL_CreateContext(w);
+    if (!ctx)
+    {
+        vigil_status_t st = sdl_push_i64(vm, -1, error);
+        if (st != VIGIL_STATUS_OK)
+            return st;
+        return sdl_push_sdl_err(vm, SDL_ERR_IO, error);
+    }
+    int64_t h = -1;
+    SDL_HANDLE_STORE(gl_contexts, ctx, &h);
+    vigil_status_t st = sdl_push_i64(vm, h, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_ok(vm, error);
+}
+
+static vigil_status_t sdl_fn_gl_destroy_context(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_arg_i64(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_GLContext ctx = (SDL_GLContext)SDL_HANDLE_GET(gl_contexts, h);
+    if (ctx && SDL_GL_DestroyContext(ctx))
+    {
+        SDL_HANDLE_CLEAR(gl_contexts, h);
+        return sdl_push_bool_ok(vm, error);
+    }
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+static vigil_status_t sdl_fn_gl_make_current(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t wh = sdl_arg_i64(vm, base, 0);
+    int64_t ch = sdl_arg_i64(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Window *w = (SDL_Window *)SDL_HANDLE_GET(windows, wh);
+    SDL_GLContext ctx = (SDL_GLContext)SDL_HANDLE_GET(gl_contexts, ch);
+    if (w && SDL_GL_MakeCurrent(w, ctx))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+static vigil_status_t sdl_fn_gl_set_swap_interval(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t interval = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    if (SDL_GL_SetSwapInterval(interval))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+static vigil_status_t sdl_fn_gl_get_swap_interval(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    vigil_vm_stack_pop_n(vm, arg_count);
+    int interval = 0;
+    SDL_GL_GetSwapInterval(&interval);
+    return sdl_push_i32(vm, interval, error);
+}
+
+static vigil_status_t sdl_fn_gl_swap_window(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t wh = sdl_arg_i64(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Window *w = (SDL_Window *)SDL_HANDLE_GET(windows, wh);
+    if (w && SDL_GL_SwapWindow(w))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+/* ── Vulkan ───────────────────────────────────────────────────────── */
+
+static vigil_status_t sdl_fn_vulkan_load_library(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    char path[512];
+    sdl_arg_str(vm, base, 0, path, sizeof(path));
+    vigil_vm_stack_pop_n(vm, arg_count);
+    if (SDL_Vulkan_LoadLibrary(path[0] ? path : NULL))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+static vigil_status_t sdl_fn_vulkan_unload_library(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Vulkan_UnloadLibrary();
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t sdl_fn_vulkan_get_instance_extensions(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    vigil_vm_stack_pop_n(vm, arg_count);
+    Uint32 count = 0;
+    const char *const *exts = SDL_Vulkan_GetInstanceExtensions(&count);
+    if (!exts || count == 0)
+        return sdl_push_string(vm, "", error);
+    /* Join with comma */
+    char buf[2048] = {0};
+    size_t off = 0;
+    for (Uint32 i = 0; i < count && off < sizeof(buf) - 1; i++)
+    {
+        if (i > 0 && off < sizeof(buf) - 1)
+            buf[off++] = ',';
+        size_t len = strlen(exts[i]);
+        if (off + len >= sizeof(buf))
+            break;
+        memcpy(buf + off, exts[i], len);
+        off += len;
+    }
+    return sdl_push_string(vm, buf, error);
+}
+
+/* ── Metal ────────────────────────────────────────────────────────── */
+
+static vigil_status_t sdl_fn_metal_create_view(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t wh = sdl_arg_i64(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Window *w = (SDL_Window *)SDL_HANDLE_GET(windows, wh);
+    if (!w)
+        return sdl_push_i64(vm, 0, error);
+    SDL_MetalView v = SDL_Metal_CreateView(w);
+    return sdl_push_i64(vm, (int64_t)(uintptr_t)v, error);
+}
+
+static vigil_status_t sdl_fn_metal_destroy_view(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t v = sdl_arg_i64(vm, base, 0);
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    if (v)
+        SDL_Metal_DestroyView((SDL_MetalView)(uintptr_t)v);
+    return VIGIL_STATUS_OK;
+}
+
 /* Texture access constants */
 SDL_CONST_FN(TEXTUREACCESS_STATIC, SDL_TEXTUREACCESS_STATIC)
 SDL_CONST_FN(TEXTUREACCESS_STREAMING, SDL_TEXTUREACCESS_STREAMING)
@@ -12819,6 +13036,26 @@ static const vigil_native_module_function_t sdl_functions[] = {
     SDL_FN_VOID("set_tray_entry_enabled", 22U, sdl_fn_set_tray_entry_enabled, 2U, p_i64_i32),
     SDL_FN("get_tray_entry_enabled", 22U, sdl_fn_get_tray_entry_enabled, 1U, p_i64, VIGIL_TYPE_BOOL),
     SDL_FN_VOID("update_trays", 12U, sdl_fn_update_trays, 0U, NULL),
+    /* OpenGL */
+    SDL_FN_BOOL_ERR("gl_load_library", 15U, sdl_fn_gl_load_library, 1U, p_str),
+    SDL_FN_VOID("gl_unload_library", 17U, sdl_fn_gl_unload_library, 0U, NULL),
+    SDL_FN("gl_extension_supported", 22U, sdl_fn_gl_extension_supported, 1U, p_str, VIGIL_TYPE_BOOL),
+    SDL_FN_VOID("gl_reset_attributes", 19U, sdl_fn_gl_reset_attributes, 0U, NULL),
+    SDL_FN_BOOL_ERR("gl_set_attribute", 16U, sdl_fn_gl_set_attribute, 2U, p_i32_i32),
+    SDL_FN("gl_get_attribute", 16U, sdl_fn_gl_get_attribute, 1U, p_i32, VIGIL_TYPE_I32),
+    {"gl_create_context", 17U, sdl_fn_gl_create_context, 1U, p_i64, VIGIL_TYPE_I64, 2U, rt_i64_err, 0, NULL, NULL, 0},
+    SDL_FN_BOOL_ERR("gl_destroy_context", 18U, sdl_fn_gl_destroy_context, 1U, p_i64),
+    SDL_FN_BOOL_ERR("gl_make_current", 15U, sdl_fn_gl_make_current, 2U, p_i64_i64),
+    SDL_FN_BOOL_ERR("gl_set_swap_interval", 20U, sdl_fn_gl_set_swap_interval, 1U, p_i32),
+    SDL_FN("gl_get_swap_interval", 20U, sdl_fn_gl_get_swap_interval, 0U, NULL, VIGIL_TYPE_I32),
+    SDL_FN_BOOL_ERR("gl_swap_window", 14U, sdl_fn_gl_swap_window, 1U, p_i64),
+    /* Vulkan */
+    SDL_FN_BOOL_ERR("vulkan_load_library", 19U, sdl_fn_vulkan_load_library, 1U, p_str),
+    SDL_FN_VOID("vulkan_unload_library", 21U, sdl_fn_vulkan_unload_library, 0U, NULL),
+    SDL_FN("vulkan_get_instance_extensions", 30U, sdl_fn_vulkan_get_instance_extensions, 0U, NULL, VIGIL_TYPE_STRING),
+    /* Metal */
+    SDL_FN("metal_create_view", 17U, sdl_fn_metal_create_view, 1U, p_i64, VIGIL_TYPE_I64),
+    SDL_FN_VOID("metal_destroy_view", 18U, sdl_fn_metal_destroy_view, 1U, p_i64),
     /* IO constants */
     SDL_CONST_ENTRY("IO_SEEK_SET", IO_SEEK_SET),
     SDL_CONST_ENTRY("IO_SEEK_CUR", IO_SEEK_CUR),
