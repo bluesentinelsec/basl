@@ -4449,6 +4449,259 @@ static vigil_status_t sdl_surface_set_clip_rect(vigil_vm_t *vm, size_t arg_count
     return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
 }
 
+/* ── Slice 35: Camera ─────────────────────────────────────────────── */
+
+SDL_HANDLE_REGISTRY(cameras);
+
+enum
+{
+    CAM_HANDLE = 0,
+    CAM_FIELD_COUNT
+};
+
+static SDL_CameraID *g_camera_ids = NULL;
+static int g_camera_count = 0;
+
+static vigil_status_t sdl_fn_get_camera_count(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    vigil_vm_stack_pop_n(vm, arg_count);
+    if (g_camera_ids)
+    {
+        SDL_free(g_camera_ids);
+        g_camera_ids = NULL;
+    }
+    g_camera_ids = SDL_GetCameras(&g_camera_count);
+    return sdl_push_i32(vm, (int32_t)g_camera_count, error);
+}
+
+static vigil_status_t sdl_fn_get_camera_name(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t idx = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    if (idx >= 0 && idx < g_camera_count && g_camera_ids)
+        return sdl_push_string(vm, SDL_GetCameraName(g_camera_ids[idx]), error);
+    return sdl_push_string(vm, "", error);
+}
+
+static vigil_status_t sdl_fn_get_current_camera_driver(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_string(vm, SDL_GetCurrentCameraDriver(), error);
+}
+
+/* Camera.open(i32 index, i32 w, i32 h, i32 fps) -> (Camera, err) */
+static vigil_status_t sdl_camera_open(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    size_t ci = sdl_static_class_index(vm, base);
+    int32_t idx = sdl_arg_i32(vm, base, 1);
+    int32_t w = sdl_arg_i32(vm, base, 2);
+    int32_t h = sdl_arg_i32(vm, base, 3);
+    int32_t fps = sdl_arg_i32(vm, base, 4);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_CameraID cid = (idx >= 0 && idx < g_camera_count && g_camera_ids) ? g_camera_ids[idx] : 0;
+    if (!cid)
+        return sdl_push_nil_and_err(vm, "invalid camera index", SDL_ERR_ARG, error);
+    SDL_CameraSpec spec = {0};
+    SDL_CameraSpec *sp = NULL;
+    if (w > 0 && h > 0)
+    {
+        spec.width = w;
+        spec.height = h;
+        spec.framerate_numerator = fps > 0 ? fps : 30;
+        spec.framerate_denominator = 1;
+        sp = &spec;
+    }
+    SDL_Camera *cam = SDL_OpenCamera(cid, sp);
+    if (!cam)
+        return sdl_push_nil_and_sdl_err(vm, SDL_ERR_IO, error);
+    int64_t handle;
+    if (SDL_HANDLE_STORE(cameras, cam, &handle) < 0)
+    {
+        SDL_CloseCamera(cam);
+        return sdl_push_nil_and_err(vm, "too many cameras", SDL_ERR_STATE, error);
+    }
+    vigil_status_t st = sdl_push_handle_instance(vm, ci, handle, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_ok(vm, error);
+}
+
+static vigil_status_t sdl_camera_close(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, CAM_HANDLE);
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Camera *cam = (SDL_Camera *)SDL_HANDLE_GET(cameras, h);
+    if (cam)
+    {
+        SDL_CloseCamera(cam);
+        SDL_HANDLE_CLEAR(cameras, h);
+    }
+    return VIGIL_STATUS_OK;
+}
+
+/* cam.get_permission() -> i32 — -1 denied, 0 pending, 1 approved */
+static vigil_status_t sdl_camera_get_permission(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, CAM_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Camera *cam = (SDL_Camera *)SDL_HANDLE_GET(cameras, h);
+    return sdl_push_i32(vm, cam ? (int32_t)SDL_GetCameraPermissionState(cam) : -1, error);
+}
+
+/* cam.get_format() -> (i32, i32) — w, h of the camera */
+static vigil_status_t sdl_camera_get_format(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, CAM_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_CameraSpec spec = {0};
+    SDL_Camera *cam = (SDL_Camera *)SDL_HANDLE_GET(cameras, h);
+    if (cam)
+        SDL_GetCameraFormat(cam, &spec);
+    vigil_status_t st = sdl_push_i32(vm, spec.width, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_i32(vm, spec.height, error);
+}
+
+/* cam.acquire_frame() -> (i64, err) — returns surface handle or -1
+ * The surface must be released with cam.release_frame(handle). */
+static vigil_status_t sdl_camera_acquire_frame(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, CAM_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Camera *cam = (SDL_Camera *)SDL_HANDLE_GET(cameras, h);
+    if (!cam)
+    {
+        vigil_status_t st = sdl_push_i64(vm, -1, error);
+        if (st != VIGIL_STATUS_OK)
+            return st;
+        return sdl_push_err(vm, "invalid camera", SDL_ERR_ARG, error);
+    }
+    Uint64 ts = 0;
+    SDL_Surface *frame = SDL_AcquireCameraFrame(cam, &ts);
+    if (!frame)
+    {
+        vigil_status_t st = sdl_push_i64(vm, -1, error);
+        if (st != VIGIL_STATUS_OK)
+            return st;
+        return sdl_push_ok(vm, error); /* no frame yet, not an error */
+    }
+    int64_t sh;
+    if (SDL_HANDLE_STORE(surfaces, frame, &sh) < 0)
+    {
+        SDL_ReleaseCameraFrame(cam, frame);
+        vigil_status_t st = sdl_push_i64(vm, -1, error);
+        if (st != VIGIL_STATUS_OK)
+            return st;
+        return sdl_push_err(vm, "too many surfaces", SDL_ERR_STATE, error);
+    }
+    vigil_status_t st = sdl_push_i64(vm, sh, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_ok(vm, error);
+}
+
+/* cam.release_frame(i64 surface_handle) */
+static vigil_status_t sdl_camera_release_frame(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t ch = sdl_field_i64(vm, base, CAM_HANDLE);
+    int64_t sh = sdl_arg_i64(vm, base, 1);
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Camera *cam = (SDL_Camera *)SDL_HANDLE_GET(cameras, ch);
+    SDL_Surface *frame = (sh >= 0) ? (SDL_Surface *)SDL_HANDLE_GET(surfaces, sh) : NULL;
+    if (cam && frame)
+    {
+        SDL_ReleaseCameraFrame(cam, frame);
+        SDL_HANDLE_CLEAR(surfaces, sh);
+    }
+    return VIGIL_STATUS_OK;
+}
+
+/* ── Slice 36: Remaining Window/Renderer ──────────────────────────── */
+
+/* win.set_mouse_rect(i32 x, y, w, h) -> (bool, err) — zeros to clear */
+static vigil_status_t sdl_window_set_mouse_rect(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, WIN_HANDLE);
+    int32_t x = sdl_arg_i32(vm, base, 1), y = sdl_arg_i32(vm, base, 2);
+    int32_t w = sdl_arg_i32(vm, base, 3), ht = sdl_arg_i32(vm, base, 4);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Window *win = (SDL_Window *)SDL_HANDLE_GET(windows, h);
+    if (!win)
+        return sdl_push_bool_sdl_err(vm, SDL_ERR_ARG, error);
+    if (w == 0 && ht == 0)
+    {
+        SDL_SetWindowMouseRect(win, NULL);
+        return sdl_push_bool_ok(vm, error);
+    }
+    SDL_Rect rect = {x, y, w, ht};
+    if (SDL_SetWindowMouseRect(win, &rect))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+/* ev.get_description() -> string */
+static vigil_status_t sdl_event_get_description(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    SDL_Event *ev = evt_get(vm, base);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    char buf[256] = {0};
+    if (ev)
+        SDL_GetEventDescription(ev, buf, sizeof(buf));
+    return sdl_push_string(vm, buf, error);
+}
+
+/* ── Slice 37: Surface get_clip_rect + stretch ────────────────────── */
+
+static vigil_status_t sdl_surface_get_clip_rect(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, SURF_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Rect rect = {0, 0, 0, 0};
+    SDL_Surface *s = (SDL_Surface *)SDL_HANDLE_GET(surfaces, h);
+    if (s)
+        SDL_GetSurfaceClipRect(s, &rect);
+    vigil_status_t st = sdl_push_i32(vm, rect.w, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_i32(vm, rect.h, error);
+}
+
+/* surf.stretch(dst, sx, sy, sw, sh, dx, dy, dw, dh, mode) -> (bool, err) */
+static vigil_status_t sdl_surface_stretch(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t sh = sdl_field_i64(vm, base, SURF_HANDLE);
+    int64_t dh = sdl_field_i64(vm, base + 1, SURF_HANDLE);
+    int32_t sx = sdl_arg_i32(vm, base, 2), sy = sdl_arg_i32(vm, base, 3);
+    int32_t sw = sdl_arg_i32(vm, base, 4), sht = sdl_arg_i32(vm, base, 5);
+    int32_t dx = sdl_arg_i32(vm, base, 6), dy = sdl_arg_i32(vm, base, 7);
+    int32_t dw = sdl_arg_i32(vm, base, 8), dht = sdl_arg_i32(vm, base, 9);
+    int32_t mode = sdl_arg_i32(vm, base, 10);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Surface *src = (SDL_Surface *)SDL_HANDLE_GET(surfaces, sh);
+    SDL_Surface *dst = (SDL_Surface *)SDL_HANDLE_GET(surfaces, dh);
+    if (!src || !dst)
+        return sdl_push_bool_sdl_err(vm, SDL_ERR_ARG, error);
+    SDL_Rect srect = {sx, sy, sw, sht}, drect = {dx, dy, dw, dht};
+    int use_src = (sw > 0 || sht > 0), use_dst = (dw > 0 || dht > 0);
+    if (SDL_StretchSurface(src, use_src ? &srect : NULL, dst, use_dst ? &drect : NULL, (SDL_ScaleMode)mode))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
 /* Texture access constants */
 SDL_CONST_FN(TEXTUREACCESS_STATIC, SDL_TEXTUREACCESS_STATIC)
 SDL_CONST_FN(TEXTUREACCESS_STREAMING, SDL_TEXTUREACCESS_STREAMING)
@@ -4820,6 +5073,10 @@ static const vigil_native_module_function_t sdl_functions[] = {
     SDL_CONST_ENTRY("PATHTYPE_NONE", PATHTYPE_NONE),
     SDL_CONST_ENTRY("PATHTYPE_FILE", PATHTYPE_FILE),
     SDL_CONST_ENTRY("PATHTYPE_DIRECTORY", PATHTYPE_DIRECTORY),
+    /* Camera (slice 35) */
+    SDL_FN("get_camera_count", 16U, sdl_fn_get_camera_count, 0U, NULL, VIGIL_TYPE_I32),
+    SDL_FN("get_camera_name", 15U, sdl_fn_get_camera_name, 1U, p_i32, VIGIL_TYPE_STRING),
+    SDL_FN("get_current_camera_driver", 25U, sdl_fn_get_current_camera_driver, 0U, NULL, VIGIL_TYPE_STRING),
     /* Display info (slice 11) */
     SDL_FN("get_display_count", 17U, sdl_fn_get_display_count, 0U, NULL, VIGIL_TYPE_I32),
     SDL_FN("get_display_name", 16U, sdl_fn_get_display_name, 1U, p_i32, VIGIL_TYPE_STRING),
@@ -4891,6 +5148,8 @@ static const vigil_native_class_method_t sdl_window_methods[] = {
     /* Slice 34: window extras */
     SDL_METHOD("get_borders_size", 16U, sdl_window_get_borders_size, 0U, NULL, VIGIL_TYPE_I32, 2U, rt_i32_i32),
     SDL_METHOD("get_safe_area", 13U, sdl_window_get_safe_area, 0U, NULL, VIGIL_TYPE_I32, 2U, rt_i32_i32),
+    /* Slice 36: window mouse rect */
+    SDL_METHOD("set_mouse_rect", 14U, sdl_window_set_mouse_rect, 4U, p_i32_i32_i32_i32, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
 };
 
 /* ── Renderer class descriptor ───────────────────────────────────── */
@@ -4968,6 +5227,8 @@ static const vigil_native_class_method_t sdl_event_methods[] = {
     SDL_METHOD("gamepad_axis", 12U, sdl_event_gamepad_axis, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL),
     SDL_METHOD("gamepad_axis_value", 18U, sdl_event_gamepad_axis_value, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL),
     SDL_METHOD("gamepad_button", 14U, sdl_event_gamepad_button, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL),
+    /* Slice 36: event description */
+    SDL_METHOD("get_description", 15U, sdl_event_get_description, 0U, NULL, VIGIL_TYPE_STRING, 1U, NULL),
 };
 
 /* ── Surface class descriptor ────────────────────────────────────── */
@@ -5006,6 +5267,9 @@ static const vigil_native_class_method_t sdl_surface_methods[] = {
     SDL_METHOD("convert", 7U, sdl_surface_convert, 1U, p_i32, VIGIL_TYPE_OBJECT, 2U, rt_obj_err),
     /* Slice 34: surface clip rect */
     SDL_METHOD("set_clip_rect", 13U, sdl_surface_set_clip_rect, 4U, p_i32_i32_i32_i32, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
+    /* Slice 37: surface extras */
+    SDL_METHOD("get_clip_rect", 13U, sdl_surface_get_clip_rect, 0U, NULL, VIGIL_TYPE_I32, 2U, rt_i32_i32),
+    SDL_METHOD("stretch", 7U, sdl_surface_stretch, 10U, p_obj_i32x9, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
 };
 
 /* ── Texture class descriptor ────────────────────────────────────── */
@@ -5115,6 +5379,21 @@ static const vigil_native_class_method_t sdl_haptic_methods[] = {
     SDL_METHOD("resume", 6U, sdl_haptic_resume, 0U, NULL, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
 };
 
+/* ── Camera class descriptor ─────────────────────────────────────── */
+
+static const vigil_native_class_field_t sdl_camera_fields[] = {
+    SDL_PFIELD("handle", 6U, VIGIL_TYPE_I64),
+};
+
+static const vigil_native_class_method_t sdl_camera_methods[] = {
+    SDL_STATIC("open", 4U, sdl_camera_open, 4U, p_i32_i32_i32_i32, VIGIL_TYPE_OBJECT, 2U, rt_obj_err),
+    SDL_METHOD("close", 5U, sdl_camera_close, 0U, NULL, VIGIL_TYPE_VOID, 0U, NULL),
+    SDL_METHOD("get_permission", 14U, sdl_camera_get_permission, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL),
+    SDL_METHOD("get_format", 10U, sdl_camera_get_format, 0U, NULL, VIGIL_TYPE_I32, 2U, rt_i32_i32),
+    {"acquire_frame", 13U, sdl_camera_acquire_frame, 0U, NULL, VIGIL_TYPE_I64, 2U, rt_i64_err, 0, NULL, 0U, 0},
+    SDL_METHOD("release_frame", 13U, sdl_camera_release_frame, 1U, p_i64, VIGIL_TYPE_VOID, 0U, NULL),
+};
+
 static const vigil_native_class_t sdl_classes[] = {
     {"Window", 6U, sdl_window_fields, WIN_FIELD_COUNT, sdl_window_methods,
      sizeof(sdl_window_methods) / sizeof(sdl_window_methods[0]), NULL},
@@ -5134,6 +5413,8 @@ static const vigil_native_class_t sdl_classes[] = {
      sizeof(sdl_joystick_methods) / sizeof(sdl_joystick_methods[0]), NULL},
     {"Haptic", 6U, sdl_haptic_fields, HAP_FIELD_COUNT, sdl_haptic_methods,
      sizeof(sdl_haptic_methods) / sizeof(sdl_haptic_methods[0]), NULL},
+    {"Camera", 6U, sdl_camera_fields, CAM_FIELD_COUNT, sdl_camera_methods,
+     sizeof(sdl_camera_methods) / sizeof(sdl_camera_methods[0]), NULL},
 };
 /* clang-format on */
 
