@@ -7569,6 +7569,295 @@ SDL_CONST_FN(TEXTURE_ADDRESS_AUTO, SDL_TEXTURE_ADDRESS_AUTO)
 SDL_CONST_FN(TEXTURE_ADDRESS_CLAMP, SDL_TEXTURE_ADDRESS_CLAMP)
 SDL_CONST_FN(TEXTURE_ADDRESS_WRAP, SDL_TEXTURE_ADDRESS_WRAP)
 
+/* ── Misc Complete ────────────────────────────────────────────────── */
+
+/* CPU features */
+#define SDL_CPU_FN(name, fn)                                                                                           \
+    static vigil_status_t sdl_fn_##name(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)                        \
+    {                                                                                                                  \
+        vigil_vm_stack_pop_n(vm, arg_count);                                                                           \
+        return sdl_push_bool(vm, fn(), error);                                                                         \
+    }
+
+/* clang-format off */
+SDL_CPU_FN(has_sse, SDL_HasSSE)
+SDL_CPU_FN(has_sse2, SDL_HasSSE2)
+SDL_CPU_FN(has_sse3, SDL_HasSSE3)
+SDL_CPU_FN(has_sse41, SDL_HasSSE41)
+SDL_CPU_FN(has_sse42, SDL_HasSSE42)
+SDL_CPU_FN(has_avx, SDL_HasAVX)
+SDL_CPU_FN(has_avx2, SDL_HasAVX2)
+SDL_CPU_FN(has_avx512f, SDL_HasAVX512F)
+SDL_CPU_FN(has_neon, SDL_HasNEON)
+SDL_CPU_FN(has_mmx, SDL_HasMMX)
+SDL_CPU_FN(has_altivec, SDL_HasAltiVec)
+SDL_CPU_FN(has_armsimd, SDL_HasARMSIMD)
+SDL_CPU_FN(has_lsx, SDL_HasLSX)
+SDL_CPU_FN(has_lasx, SDL_HasLASX)
+/* clang-format on */
+
+static vigil_status_t sdl_fn_get_cpu_cache_line_size(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_i32(vm, SDL_GetCPUCacheLineSize(), error);
+}
+
+static vigil_status_t sdl_fn_get_num_video_drivers(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_i32(vm, SDL_GetNumVideoDrivers(), error);
+}
+
+static vigil_status_t sdl_fn_get_video_driver(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t idx = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_string(vm, SDL_GetVideoDriver(idx), error);
+}
+
+static vigil_status_t sdl_fn_get_sandbox(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_i32(vm, (int32_t)SDL_GetSandbox(), error);
+}
+
+/* Date/time */
+static vigil_status_t sdl_fn_time_to_datetime(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t ticks = sdl_arg_i64(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_DateTime dt = {0};
+    SDL_TimeToDateTime((SDL_Time)ticks, &dt, false);
+    /* Pack as string: YYYY-MM-DD HH:MM:SS */
+    char buf[32];
+    SDL_snprintf(buf, sizeof(buf), "%04d-%02d-%02d %02d:%02d:%02d", dt.year, dt.month, dt.day, dt.hour, dt.minute,
+                 dt.second);
+    return sdl_push_string(vm, buf, error);
+}
+
+static vigil_status_t sdl_fn_get_day_of_week(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t y = sdl_arg_i32(vm, base, 0);
+    int32_t m = sdl_arg_i32(vm, base, 1);
+    int32_t d = sdl_arg_i32(vm, base, 2);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_i32(vm, SDL_GetDayOfWeek(y, m, d), error);
+}
+
+static vigil_status_t sdl_fn_get_day_of_year(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t y = sdl_arg_i32(vm, base, 0);
+    int32_t m = sdl_arg_i32(vm, base, 1);
+    int32_t d = sdl_arg_i32(vm, base, 2);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_i32(vm, SDL_GetDayOfYear(y, m, d), error);
+}
+
+static vigil_status_t sdl_fn_get_days_in_month(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t y = sdl_arg_i32(vm, base, 0);
+    int32_t m = sdl_arg_i32(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_i32(vm, SDL_GetDaysInMonth(y, m), error);
+}
+
+/* Primary selection (X11 middle-click paste) */
+static vigil_status_t sdl_fn_set_primary_selection_text(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    char text[4096];
+    sdl_arg_str(vm, base, 0, text, sizeof(text));
+    vigil_vm_stack_pop_n(vm, arg_count);
+    if (SDL_SetPrimarySelectionText(text))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+static vigil_status_t sdl_fn_get_primary_selection_text(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    vigil_vm_stack_pop_n(vm, arg_count);
+    char *t = SDL_GetPrimarySelectionText();
+    vigil_status_t st = sdl_push_string(vm, t ? t : "", error);
+    SDL_free(t);
+    return st;
+}
+
+static vigil_status_t sdl_fn_has_primary_selection_text(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_bool(vm, SDL_HasPrimarySelectionText(), error);
+}
+
+/* Custom blend mode */
+static vigil_status_t sdl_fn_compose_custom_blend_mode(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t sf = sdl_arg_i32(vm, base, 0), df = sdl_arg_i32(vm, base, 1), co = sdl_arg_i32(vm, base, 2);
+    int32_t sa = sdl_arg_i32(vm, base, 3), da = sdl_arg_i32(vm, base, 4), ao = sdl_arg_i32(vm, base, 5);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_BlendMode mode = SDL_ComposeCustomBlendMode((SDL_BlendFactor)sf, (SDL_BlendFactor)df, (SDL_BlendOperation)co,
+                                                    (SDL_BlendFactor)sa, (SDL_BlendFactor)da, (SDL_BlendOperation)ao);
+    return sdl_push_i32(vm, (int32_t)mode, error);
+}
+
+/* ── Surface Complete ─────────────────────────────────────────────── */
+
+static vigil_status_t sdl_surface_get_alpha_mod(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, SURF_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    Uint8 a = 255;
+    SDL_Surface *s = (SDL_Surface *)SDL_HANDLE_GET(surfaces, h);
+    if (s)
+        SDL_GetSurfaceAlphaMod(s, &a);
+    return sdl_push_i32(vm, (int32_t)a, error);
+}
+
+static vigil_status_t sdl_surface_get_blend_mode(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, SURF_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_BlendMode m = SDL_BLENDMODE_NONE;
+    SDL_Surface *s = (SDL_Surface *)SDL_HANDLE_GET(surfaces, h);
+    if (s)
+        SDL_GetSurfaceBlendMode(s, &m);
+    return sdl_push_i32(vm, (int32_t)m, error);
+}
+
+static vigil_status_t sdl_surface_get_color_mod(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, SURF_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    Uint8 r = 255, g = 255, b = 255;
+    SDL_Surface *s = (SDL_Surface *)SDL_HANDLE_GET(surfaces, h);
+    if (s)
+        SDL_GetSurfaceColorMod(s, &r, &g, &b);
+    return sdl_push_i32(vm, ((int32_t)r << 16) | ((int32_t)g << 8) | (int32_t)b, error);
+}
+
+static vigil_status_t sdl_surface_set_rle(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, SURF_HANDLE);
+    int32_t en = sdl_arg_i32(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Surface *s = (SDL_Surface *)SDL_HANDLE_GET(surfaces, h);
+    if (s && SDL_SetSurfaceRLE(s, en != 0))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+static vigil_status_t sdl_surface_has_rle(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, SURF_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Surface *s = (SDL_Surface *)SDL_HANDLE_GET(surfaces, h);
+    return sdl_push_bool(vm, s && SDL_SurfaceHasRLE(s), error);
+}
+
+static vigil_status_t sdl_surface_has_color_key(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, SURF_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Surface *s = (SDL_Surface *)SDL_HANDLE_GET(surfaces, h);
+    return sdl_push_bool(vm, s && SDL_SurfaceHasColorKey(s), error);
+}
+
+static vigil_status_t sdl_surface_lock(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, SURF_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Surface *s = (SDL_Surface *)SDL_HANDLE_GET(surfaces, h);
+    if (s && SDL_LockSurface(s))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+static vigil_status_t sdl_surface_unlock(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, SURF_HANDLE);
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Surface *s = (SDL_Surface *)SDL_HANDLE_GET(surfaces, h);
+    if (s)
+        SDL_UnlockSurface(s);
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t sdl_surface_premultiply_alpha(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, SURF_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Surface *s = (SDL_Surface *)SDL_HANDLE_GET(surfaces, h);
+    if (s && SDL_PremultiplySurfaceAlpha(s, true))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+/* ── Event Complete ───────────────────────────────────────────────── */
+
+static vigil_status_t sdl_fn_has_events(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t min_t = sdl_arg_i32(vm, base, 0);
+    int32_t max_t = sdl_arg_i32(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_bool(vm, SDL_HasEvents((Uint32)min_t, (Uint32)max_t), error);
+}
+
+static vigil_status_t sdl_fn_register_events(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t n = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_i32(vm, (int32_t)SDL_RegisterEvents(n), error);
+}
+
+static vigil_status_t sdl_fn_gamepad_events_enabled(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_bool(vm, SDL_GamepadEventsEnabled(), error);
+}
+
+static vigil_status_t sdl_fn_set_gamepad_events_enabled(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t en = sdl_arg_i32(vm, base, 0);
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_SetGamepadEventsEnabled(en != 0);
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t sdl_fn_joystick_events_enabled(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_bool(vm, SDL_JoystickEventsEnabled(), error);
+}
+
+static vigil_status_t sdl_fn_set_joystick_events_enabled(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t en = sdl_arg_i32(vm, base, 0);
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_SetJoystickEventsEnabled(en != 0);
+    return VIGIL_STATUS_OK;
+}
+
 /* Texture access constants */
 SDL_CONST_FN(TEXTUREACCESS_STATIC, SDL_TEXTUREACCESS_STATIC)
 SDL_CONST_FN(TEXTUREACCESS_STREAMING, SDL_TEXTUREACCESS_STREAMING)
@@ -7951,6 +8240,41 @@ static const vigil_native_module_function_t sdl_functions[] = {
     /* Renderer complete - module functions */
     SDL_FN("get_num_render_drivers", 21U, sdl_fn_get_num_render_drivers, 0U, NULL, VIGIL_TYPE_I32),
     SDL_FN("get_render_driver", 17U, sdl_fn_get_render_driver, 1U, p_i32, VIGIL_TYPE_STRING),
+    /* Misc complete */
+    SDL_FN("has_sse", 7U, sdl_fn_has_sse, 0U, NULL, VIGIL_TYPE_BOOL),
+    SDL_FN("has_sse2", 8U, sdl_fn_has_sse2, 0U, NULL, VIGIL_TYPE_BOOL),
+    SDL_FN("has_sse3", 8U, sdl_fn_has_sse3, 0U, NULL, VIGIL_TYPE_BOOL),
+    SDL_FN("has_sse41", 9U, sdl_fn_has_sse41, 0U, NULL, VIGIL_TYPE_BOOL),
+    SDL_FN("has_sse42", 9U, sdl_fn_has_sse42, 0U, NULL, VIGIL_TYPE_BOOL),
+    SDL_FN("has_avx", 7U, sdl_fn_has_avx, 0U, NULL, VIGIL_TYPE_BOOL),
+    SDL_FN("has_avx2", 8U, sdl_fn_has_avx2, 0U, NULL, VIGIL_TYPE_BOOL),
+    SDL_FN("has_avx512f", 11U, sdl_fn_has_avx512f, 0U, NULL, VIGIL_TYPE_BOOL),
+    SDL_FN("has_neon", 8U, sdl_fn_has_neon, 0U, NULL, VIGIL_TYPE_BOOL),
+    SDL_FN("has_mmx", 7U, sdl_fn_has_mmx, 0U, NULL, VIGIL_TYPE_BOOL),
+    SDL_FN("has_altivec", 11U, sdl_fn_has_altivec, 0U, NULL, VIGIL_TYPE_BOOL),
+    SDL_FN("has_armsimd", 11U, sdl_fn_has_armsimd, 0U, NULL, VIGIL_TYPE_BOOL),
+    SDL_FN("has_lsx", 7U, sdl_fn_has_lsx, 0U, NULL, VIGIL_TYPE_BOOL),
+    SDL_FN("has_lasx", 8U, sdl_fn_has_lasx, 0U, NULL, VIGIL_TYPE_BOOL),
+    SDL_FN("get_cpu_cache_line_size", 23U, sdl_fn_get_cpu_cache_line_size, 0U, NULL, VIGIL_TYPE_I32),
+    SDL_FN("get_num_video_drivers", 21U, sdl_fn_get_num_video_drivers, 0U, NULL, VIGIL_TYPE_I32),
+    SDL_FN("get_video_driver", 16U, sdl_fn_get_video_driver, 1U, p_i32, VIGIL_TYPE_STRING),
+    SDL_FN("get_sandbox", 11U, sdl_fn_get_sandbox, 0U, NULL, VIGIL_TYPE_I32),
+    SDL_FN("time_to_datetime", 16U, sdl_fn_time_to_datetime, 1U, p_i64, VIGIL_TYPE_STRING),
+    {"get_day_of_week", 15U, sdl_fn_get_day_of_week, 3U, p_i32_i32_i32, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, NULL, 0},
+    {"get_day_of_year", 15U, sdl_fn_get_day_of_year, 3U, p_i32_i32_i32, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, NULL, 0},
+    SDL_FN("get_days_in_month", 17U, sdl_fn_get_days_in_month, 2U, p_i32_i32, VIGIL_TYPE_I32),
+    SDL_FN_BOOL_ERR("set_primary_selection_text", 25U, sdl_fn_set_primary_selection_text, 1U, p_str),
+    SDL_FN("get_primary_selection_text", 25U, sdl_fn_get_primary_selection_text, 0U, NULL, VIGIL_TYPE_STRING),
+    SDL_FN("has_primary_selection_text", 25U, sdl_fn_has_primary_selection_text, 0U, NULL, VIGIL_TYPE_BOOL),
+    {"compose_custom_blend_mode", 25U, sdl_fn_compose_custom_blend_mode, 6U, p_i32_i32_i32_i32_i32_i32, VIGIL_TYPE_I32,
+     1U, NULL, 0, NULL, NULL, 0},
+    /* Event complete */
+    SDL_FN("has_events", 10U, sdl_fn_has_events, 2U, p_i32_i32, VIGIL_TYPE_BOOL),
+    SDL_FN("register_events", 15U, sdl_fn_register_events, 1U, p_i32, VIGIL_TYPE_I32),
+    SDL_FN("gamepad_events_enabled", 22U, sdl_fn_gamepad_events_enabled, 0U, NULL, VIGIL_TYPE_BOOL),
+    SDL_FN_VOID("set_gamepad_events_enabled", 26U, sdl_fn_set_gamepad_events_enabled, 1U, p_i32),
+    SDL_FN("joystick_events_enabled", 23U, sdl_fn_joystick_events_enabled, 0U, NULL, VIGIL_TYPE_BOOL),
+    SDL_FN_VOID("set_joystick_events_enabled", 27U, sdl_fn_set_joystick_events_enabled, 1U, p_i32),
     /* Address mode constants */
     SDL_CONST_ENTRY("TEXTURE_ADDRESS_AUTO", TEXTURE_ADDRESS_AUTO),
     SDL_CONST_ENTRY("TEXTURE_ADDRESS_CLAMP", TEXTURE_ADDRESS_CLAMP),
@@ -8425,6 +8749,16 @@ static const vigil_native_class_method_t sdl_surface_methods[] = {
     SDL_METHOD("convert", 7U, sdl_surface_convert, 1U, p_i32, VIGIL_TYPE_OBJECT, 2U, rt_obj_err),
     /* Slice 34: surface clip rect */
     SDL_METHOD("set_clip_rect", 13U, sdl_surface_set_clip_rect, 4U, p_i32_i32_i32_i32, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
+    /* Surface complete */
+    SDL_METHOD("get_alpha_mod", 13U, sdl_surface_get_alpha_mod, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL),
+    SDL_METHOD("get_blend_mode", 14U, sdl_surface_get_blend_mode, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL),
+    SDL_METHOD("get_color_mod", 13U, sdl_surface_get_color_mod, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL),
+    SDL_METHOD("set_rle", 7U, sdl_surface_set_rle, 1U, p_i32, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
+    SDL_METHOD("has_rle", 7U, sdl_surface_has_rle, 0U, NULL, VIGIL_TYPE_BOOL, 1U, NULL),
+    SDL_METHOD("has_color_key", 13U, sdl_surface_has_color_key, 0U, NULL, VIGIL_TYPE_BOOL, 1U, NULL),
+    SDL_METHOD("lock", 4U, sdl_surface_lock, 0U, NULL, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
+    SDL_METHOD("unlock", 6U, sdl_surface_unlock, 0U, NULL, VIGIL_TYPE_VOID, 0U, NULL),
+    SDL_METHOD("premultiply_alpha", 17U, sdl_surface_premultiply_alpha, 0U, NULL, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
     /* Slice 37: surface extras */
     SDL_METHOD("get_clip_rect", 13U, sdl_surface_get_clip_rect, 0U, NULL, VIGIL_TYPE_I32, 2U, rt_i32_i32),
     SDL_METHOD("stretch", 7U, sdl_surface_stretch, 10U, p_obj_i32x9, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
