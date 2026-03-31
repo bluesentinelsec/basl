@@ -681,6 +681,7 @@ static const int p_i32_i32_i32_i32_i32_i32[] = {VIGIL_TYPE_I32, VIGIL_TYPE_I32, 
 static const int p_obj_f64x9[] = {VIGIL_TYPE_OBJECT, VIGIL_TYPE_F64, VIGIL_TYPE_F64, VIGIL_TYPE_F64, VIGIL_TYPE_F64,
                                   VIGIL_TYPE_F64,    VIGIL_TYPE_F64, VIGIL_TYPE_F64, VIGIL_TYPE_F64, VIGIL_TYPE_F64};
 static const int p_i32_f64[] = {VIGIL_TYPE_I32, VIGIL_TYPE_F64};
+static const int p_f64_i32[] = {VIGIL_TYPE_F64, VIGIL_TYPE_I32};
 /* blit: obj dst + sx, sy, sw, sh, dx, dy */
 static const int p_obj_i32x6[] = {VIGIL_TYPE_OBJECT, VIGIL_TYPE_I32, VIGIL_TYPE_I32, VIGIL_TYPE_I32,
                                   VIGIL_TYPE_I32,    VIGIL_TYPE_I32, VIGIL_TYPE_I32};
@@ -4162,6 +4163,292 @@ SDL_CONST_FN(HAT_RIGHT, SDL_HAT_RIGHT)
 SDL_CONST_FN(HAT_DOWN, SDL_HAT_DOWN)
 SDL_CONST_FN(HAT_LEFT, SDL_HAT_LEFT)
 
+/* ── Slice 32: Haptic (Simple Rumble) ─────────────────────────────── */
+
+SDL_HANDLE_REGISTRY(haptics);
+
+enum
+{
+    HAP_HANDLE = 0,
+    HAP_FIELD_COUNT
+};
+
+static SDL_HapticID *g_haptic_ids = NULL;
+static int g_haptic_count = 0;
+
+static vigil_status_t sdl_fn_get_haptic_count(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    vigil_vm_stack_pop_n(vm, arg_count);
+    if (g_haptic_ids)
+    {
+        SDL_free(g_haptic_ids);
+        g_haptic_ids = NULL;
+    }
+    g_haptic_ids = SDL_GetHaptics(&g_haptic_count);
+    return sdl_push_i32(vm, (int32_t)g_haptic_count, error);
+}
+
+static vigil_status_t sdl_fn_is_mouse_haptic(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_bool(vm, SDL_IsMouseHaptic(), error);
+}
+
+static vigil_status_t sdl_haptic_open(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    size_t ci = sdl_static_class_index(vm, base);
+    int32_t idx = sdl_arg_i32(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_HapticID hid = (idx >= 0 && idx < g_haptic_count && g_haptic_ids) ? g_haptic_ids[idx] : 0;
+    SDL_Haptic *h = hid ? SDL_OpenHaptic(hid) : NULL;
+    if (!h)
+        return sdl_push_nil_and_sdl_err(vm, SDL_ERR_IO, error);
+    int64_t handle;
+    if (SDL_HANDLE_STORE(haptics, h, &handle) < 0)
+    {
+        SDL_CloseHaptic(h);
+        return sdl_push_nil_and_err(vm, "too many haptics", SDL_ERR_STATE, error);
+    }
+    vigil_status_t st = sdl_push_handle_instance(vm, ci, handle, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_ok(vm, error);
+}
+
+static vigil_status_t sdl_haptic_close(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, HAP_HANDLE);
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Haptic *hp = (SDL_Haptic *)SDL_HANDLE_GET(haptics, h);
+    if (hp)
+    {
+        SDL_CloseHaptic(hp);
+        SDL_HANDLE_CLEAR(haptics, h);
+    }
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t sdl_haptic_get_name(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, HAP_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Haptic *hp = (SDL_Haptic *)SDL_HANDLE_GET(haptics, h);
+    return sdl_push_string(vm, hp ? SDL_GetHapticName(hp) : "", error);
+}
+
+static vigil_status_t sdl_haptic_rumble_supported(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, HAP_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Haptic *hp = (SDL_Haptic *)SDL_HANDLE_GET(haptics, h);
+    return sdl_push_bool(vm, hp && SDL_HapticRumbleSupported(hp), error);
+}
+
+static vigil_status_t sdl_haptic_init_rumble(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, HAP_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Haptic *hp = (SDL_Haptic *)SDL_HANDLE_GET(haptics, h);
+    if (hp && SDL_InitHapticRumble(hp))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+static vigil_status_t sdl_haptic_play_rumble(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, HAP_HANDLE);
+    float strength = (float)sdl_arg_f64(vm, base, 1);
+    int32_t length = sdl_arg_i32(vm, base, 2);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Haptic *hp = (SDL_Haptic *)SDL_HANDLE_GET(haptics, h);
+    if (hp && SDL_PlayHapticRumble(hp, strength, (Uint32)length))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+static vigil_status_t sdl_haptic_stop_rumble(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, HAP_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Haptic *hp = (SDL_Haptic *)SDL_HANDLE_GET(haptics, h);
+    if (hp && SDL_StopHapticRumble(hp))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+static vigil_status_t sdl_haptic_pause(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, HAP_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Haptic *hp = (SDL_Haptic *)SDL_HANDLE_GET(haptics, h);
+    if (hp && SDL_PauseHaptic(hp))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+static vigil_status_t sdl_haptic_resume(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, HAP_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Haptic *hp = (SDL_Haptic *)SDL_HANDLE_GET(haptics, h);
+    if (hp && SDL_ResumeHaptic(hp))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+/* ── Slice 33: Filesystem ─────────────────────────────────────────── */
+
+static vigil_status_t sdl_fn_get_current_directory(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    vigil_vm_stack_pop_n(vm, arg_count);
+    char *dir = SDL_GetCurrentDirectory();
+    vigil_status_t st = sdl_push_string(vm, dir ? dir : "", error);
+    SDL_free(dir);
+    return st;
+}
+
+static vigil_status_t sdl_fn_create_directory(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    char path[512];
+    sdl_arg_str(vm, base, 0, path, sizeof(path));
+    vigil_vm_stack_pop_n(vm, arg_count);
+    if (SDL_CreateDirectory(path))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+static vigil_status_t sdl_fn_remove_path(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    char path[512];
+    sdl_arg_str(vm, base, 0, path, sizeof(path));
+    vigil_vm_stack_pop_n(vm, arg_count);
+    if (SDL_RemovePath(path))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+static vigil_status_t sdl_fn_rename_path(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    char old[512];
+    sdl_arg_str(vm, base, 0, old, sizeof(old));
+    char new_path[512];
+    sdl_arg_str(vm, base, 1, new_path, sizeof(new_path));
+    vigil_vm_stack_pop_n(vm, arg_count);
+    if (SDL_RenamePath(old, new_path))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+static vigil_status_t sdl_fn_copy_file(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    char old[512];
+    sdl_arg_str(vm, base, 0, old, sizeof(old));
+    char new_path[512];
+    sdl_arg_str(vm, base, 1, new_path, sizeof(new_path));
+    vigil_vm_stack_pop_n(vm, arg_count);
+    if (SDL_CopyFile(old, new_path))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+/* sdl.get_path_type(string path) -> i32 — returns PATHTYPE_* */
+static vigil_status_t sdl_fn_get_path_type(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    char path[512];
+    sdl_arg_str(vm, base, 0, path, sizeof(path));
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_PathInfo info;
+    if (SDL_GetPathInfo(path, &info))
+        return sdl_push_i32(vm, (int32_t)info.type, error);
+    return sdl_push_i32(vm, (int32_t)SDL_PATHTYPE_NONE, error);
+}
+
+/* sdl.get_path_size(string path) -> i64 */
+static vigil_status_t sdl_fn_get_path_size(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    char path[512];
+    sdl_arg_str(vm, base, 0, path, sizeof(path));
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_PathInfo info;
+    if (SDL_GetPathInfo(path, &info))
+        return sdl_push_i64(vm, (int64_t)info.size, error);
+    return sdl_push_i64(vm, 0, error);
+}
+
+SDL_CONST_FN(PATHTYPE_NONE, SDL_PATHTYPE_NONE)
+SDL_CONST_FN(PATHTYPE_FILE, SDL_PATHTYPE_FILE)
+SDL_CONST_FN(PATHTYPE_DIRECTORY, SDL_PATHTYPE_DIRECTORY)
+
+/* ── Slice 34: Remaining Window/Surface ───────────────────────────── */
+
+static vigil_status_t sdl_window_get_borders_size(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, WIN_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    int top = 0, left = 0, bottom = 0, right = 0;
+    SDL_Window *win = (SDL_Window *)SDL_HANDLE_GET(windows, h);
+    if (win)
+        SDL_GetWindowBordersSize(win, &top, &left, &bottom, &right);
+    /* Pack as (i32 top_bottom, i32 left_right) due to 2-return limit */
+    vigil_status_t st = sdl_push_i32(vm, (top << 16) | (bottom & 0xFFFF), error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_i32(vm, (left << 16) | (right & 0xFFFF), error);
+}
+
+static vigil_status_t sdl_window_get_safe_area(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, WIN_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Rect rect = {0, 0, 0, 0};
+    SDL_Window *win = (SDL_Window *)SDL_HANDLE_GET(windows, h);
+    if (win)
+        SDL_GetWindowSafeArea(win, &rect);
+    vigil_status_t st = sdl_push_i32(vm, rect.w, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_i32(vm, rect.h, error);
+}
+
+static vigil_status_t sdl_surface_set_clip_rect(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, SURF_HANDLE);
+    int32_t x = sdl_arg_i32(vm, base, 1), y = sdl_arg_i32(vm, base, 2);
+    int32_t w = sdl_arg_i32(vm, base, 3), ht = sdl_arg_i32(vm, base, 4);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Surface *s = (SDL_Surface *)SDL_HANDLE_GET(surfaces, h);
+    if (!s)
+        return sdl_push_bool_sdl_err(vm, SDL_ERR_ARG, error);
+    if (w == 0 && ht == 0)
+    {
+        SDL_SetSurfaceClipRect(s, NULL);
+        return sdl_push_bool_ok(vm, error);
+    }
+    SDL_Rect rect = {x, y, w, ht};
+    if (SDL_SetSurfaceClipRect(s, &rect))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
 /* Texture access constants */
 SDL_CONST_FN(TEXTUREACCESS_STATIC, SDL_TEXTUREACCESS_STATIC)
 SDL_CONST_FN(TEXTUREACCESS_STREAMING, SDL_TEXTUREACCESS_STREAMING)
@@ -4519,6 +4806,20 @@ static const vigil_native_module_function_t sdl_functions[] = {
     SDL_CONST_ENTRY("HAT_RIGHT", HAT_RIGHT),
     SDL_CONST_ENTRY("HAT_DOWN", HAT_DOWN),
     SDL_CONST_ENTRY("HAT_LEFT", HAT_LEFT),
+    /* Haptic (slice 32) */
+    SDL_FN("get_haptic_count", 15U, sdl_fn_get_haptic_count, 0U, NULL, VIGIL_TYPE_I32),
+    SDL_FN("is_mouse_haptic", 15U, sdl_fn_is_mouse_haptic, 0U, NULL, VIGIL_TYPE_BOOL),
+    /* Filesystem (slice 33) */
+    SDL_FN("get_current_directory", 21U, sdl_fn_get_current_directory, 0U, NULL, VIGIL_TYPE_STRING),
+    SDL_FN_BOOL_ERR("create_directory", 16U, sdl_fn_create_directory, 1U, p_str),
+    SDL_FN_BOOL_ERR("remove_path", 11U, sdl_fn_remove_path, 1U, p_str),
+    SDL_FN_BOOL_ERR("rename_path", 11U, sdl_fn_rename_path, 2U, p_str_str),
+    SDL_FN_BOOL_ERR("copy_file", 9U, sdl_fn_copy_file, 2U, p_str_str),
+    SDL_FN("get_path_type", 13U, sdl_fn_get_path_type, 1U, p_str, VIGIL_TYPE_I32),
+    SDL_FN("get_path_size", 13U, sdl_fn_get_path_size, 1U, p_str, VIGIL_TYPE_I64),
+    SDL_CONST_ENTRY("PATHTYPE_NONE", PATHTYPE_NONE),
+    SDL_CONST_ENTRY("PATHTYPE_FILE", PATHTYPE_FILE),
+    SDL_CONST_ENTRY("PATHTYPE_DIRECTORY", PATHTYPE_DIRECTORY),
     /* Display info (slice 11) */
     SDL_FN("get_display_count", 17U, sdl_fn_get_display_count, 0U, NULL, VIGIL_TYPE_I32),
     SDL_FN("get_display_name", 16U, sdl_fn_get_display_name, 1U, p_i32, VIGIL_TYPE_STRING),
@@ -4587,6 +4888,9 @@ static const vigil_native_class_method_t sdl_window_methods[] = {
     /* Slice 30: window getters completion */
     SDL_METHOD("get_aspect_ratio", 16U, sdl_window_get_aspect_ratio, 0U, NULL, VIGIL_TYPE_F64, 2U, rt_f64_f64),
     SDL_METHOD("get_pixel_format", 16U, sdl_window_get_pixel_format, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL),
+    /* Slice 34: window extras */
+    SDL_METHOD("get_borders_size", 16U, sdl_window_get_borders_size, 0U, NULL, VIGIL_TYPE_I32, 2U, rt_i32_i32),
+    SDL_METHOD("get_safe_area", 13U, sdl_window_get_safe_area, 0U, NULL, VIGIL_TYPE_I32, 2U, rt_i32_i32),
 };
 
 /* ── Renderer class descriptor ───────────────────────────────────── */
@@ -4700,6 +5004,8 @@ static const vigil_native_class_method_t sdl_surface_methods[] = {
     SDL_METHOD("get_color_key", 13U, sdl_surface_get_color_key, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL),
     /* Slice 31: convert */
     SDL_METHOD("convert", 7U, sdl_surface_convert, 1U, p_i32, VIGIL_TYPE_OBJECT, 2U, rt_obj_err),
+    /* Slice 34: surface clip rect */
+    SDL_METHOD("set_clip_rect", 13U, sdl_surface_set_clip_rect, 4U, p_i32_i32_i32_i32, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
 };
 
 /* ── Texture class descriptor ────────────────────────────────────── */
@@ -4791,6 +5097,24 @@ static const vigil_native_class_method_t sdl_joystick_methods[] = {
     SDL_METHOD("rumble", 6U, sdl_joystick_rumble, 3U, p_i32_i32_i32, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
 };
 
+/* ── Haptic class descriptor ─────────────────────────────────────── */
+
+static const vigil_native_class_field_t sdl_haptic_fields[] = {
+    SDL_PFIELD("handle", 6U, VIGIL_TYPE_I64),
+};
+
+static const vigil_native_class_method_t sdl_haptic_methods[] = {
+    SDL_STATIC("open", 4U, sdl_haptic_open, 1U, p_i32, VIGIL_TYPE_OBJECT, 2U, rt_obj_err),
+    SDL_METHOD("close", 5U, sdl_haptic_close, 0U, NULL, VIGIL_TYPE_VOID, 0U, NULL),
+    SDL_METHOD("get_name", 8U, sdl_haptic_get_name, 0U, NULL, VIGIL_TYPE_STRING, 1U, NULL),
+    SDL_METHOD("rumble_supported", 16U, sdl_haptic_rumble_supported, 0U, NULL, VIGIL_TYPE_BOOL, 1U, NULL),
+    SDL_METHOD("init_rumble", 11U, sdl_haptic_init_rumble, 0U, NULL, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
+    SDL_METHOD("play_rumble", 11U, sdl_haptic_play_rumble, 2U, p_f64_i32, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
+    SDL_METHOD("stop_rumble", 11U, sdl_haptic_stop_rumble, 0U, NULL, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
+    SDL_METHOD("pause", 5U, sdl_haptic_pause, 0U, NULL, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
+    SDL_METHOD("resume", 6U, sdl_haptic_resume, 0U, NULL, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
+};
+
 static const vigil_native_class_t sdl_classes[] = {
     {"Window", 6U, sdl_window_fields, WIN_FIELD_COUNT, sdl_window_methods,
      sizeof(sdl_window_methods) / sizeof(sdl_window_methods[0]), NULL},
@@ -4808,6 +5132,8 @@ static const vigil_native_class_t sdl_classes[] = {
      sizeof(sdl_gamepad_methods) / sizeof(sdl_gamepad_methods[0]), NULL},
     {"Joystick", 8U, sdl_joystick_fields, JOY_FIELD_COUNT, sdl_joystick_methods,
      sizeof(sdl_joystick_methods) / sizeof(sdl_joystick_methods[0]), NULL},
+    {"Haptic", 6U, sdl_haptic_fields, HAP_FIELD_COUNT, sdl_haptic_methods,
+     sizeof(sdl_haptic_methods) / sizeof(sdl_haptic_methods[0]), NULL},
 };
 /* clang-format on */
 
