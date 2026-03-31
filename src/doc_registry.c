@@ -1851,6 +1851,29 @@ static const vigil_doc_entry_t sdl_docs[] = {
     {"sdl.Renderer.render_texture_tiled",
      "ren.render_texture_tiled(tex, sx, sy, sw, sh, scale, dx, dy, dw, dh) -> (bool, err)",
      "Tile a texture across a destination rect.", NULL, NULL},
+    /* Display modes (slice 26) */
+    {"sdl.get_desktop_display_mode", "sdl.get_desktop_display_mode(index: i32) -> (i32, i32)",
+     "Get desktop display mode (w, h).", NULL, NULL},
+    {"sdl.get_current_display_mode", "sdl.get_current_display_mode(index: i32) -> (i32, i32)",
+     "Get current display mode (w, h).", NULL, NULL},
+    {"sdl.get_display_refresh_rate", "sdl.get_display_refresh_rate(index: i32) -> f64",
+     "Get display refresh rate in Hz.", NULL, NULL},
+    {"sdl.get_display_for_window", "sdl.get_display_for_window(win: sdl.Window) -> i32",
+     "Get display index for a window.", NULL, NULL},
+    {"sdl.Window.sync", "win.sync() -> (bool, err)", "Block until pending window state is finalized.", NULL, NULL},
+    /* Renderer completions (slice 27) */
+    {"sdl.Renderer.get_render_target", "ren.get_render_target() -> i64",
+     "Get current render target handle (-1 for default).", NULL, NULL},
+    {"sdl.Renderer.set_draw_color_float", "ren.set_draw_color_float(r: f64, g: f64, b: f64, a: f64) -> (bool, err)",
+     "Set draw color with float precision (0.0-1.0).", NULL, NULL},
+    {"sdl.Renderer.get_logical_presentation", "ren.get_logical_presentation() -> (i32, i32)",
+     "Get logical presentation size (w, h).", NULL, NULL},
+    /* Surface extras (slice 28) */
+    {"sdl.Surface.load_png", "sdl.Surface.load_png(path: string) -> (sdl.Surface, err)", "Load a PNG image.", NULL,
+     NULL},
+    {"sdl.Surface.blit_scaled", "surf.blit_scaled(dst, sx, sy, sw, sh, dx, dy, dw, dh, mode) -> (bool, err)",
+     "Scaled blit to another surface.", "Use SCALEMODE_* constants.", NULL},
+    {"sdl.Surface.get_color_key", "surf.get_color_key() -> i32", "Get transparent color key.", NULL, NULL},
 };
 
 #define SDL_DOC_COUNT (sizeof(sdl_docs) / sizeof(sdl_docs[0]))
