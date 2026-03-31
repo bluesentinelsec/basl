@@ -675,6 +675,7 @@ static const int p_f64_f64_str[] = {VIGIL_TYPE_F64, VIGIL_TYPE_F64, VIGIL_TYPE_S
 static const int p_f64[] = {VIGIL_TYPE_F64};
 static const int p_obj[] = {VIGIL_TYPE_OBJECT};
 static const int p_obj_i32_i32[] = {VIGIL_TYPE_OBJECT, VIGIL_TYPE_I32, VIGIL_TYPE_I32};
+static const int p_obj_i64[] = {VIGIL_TYPE_OBJECT, VIGIL_TYPE_I64};
 static const int p_i32_i32_i32_i32_i32[] = {VIGIL_TYPE_I32, VIGIL_TYPE_I32, VIGIL_TYPE_I32, VIGIL_TYPE_I32,
                                             VIGIL_TYPE_I32};
 static const int p_i32_i32_i32_i32_i32_i32[] = {VIGIL_TYPE_I32, VIGIL_TYPE_I32, VIGIL_TYPE_I32,
@@ -8298,6 +8299,413 @@ static vigil_status_t sdl_surface_convert_colorspace(vigil_vm_t *vm, size_t arg_
     return sdl_push_ok(vm, error);
 }
 
+/* ── SDL IO Stream ────────────────────────────────────────────────── */
+
+SDL_HANDLE_REGISTRY(io_streams);
+
+/* sdl.io_from_file(path, mode) -> (i64, err) */
+static vigil_status_t sdl_fn_io_from_file(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    char path[512], mode[8];
+    sdl_arg_str(vm, base, 0, path, sizeof(path));
+    sdl_arg_str(vm, base, 1, mode, sizeof(mode));
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_IOStream *io = SDL_IOFromFile(path, mode);
+    if (!io)
+    {
+        vigil_status_t st = sdl_push_i64(vm, -1, error);
+        if (st != VIGIL_STATUS_OK)
+            return st;
+        return sdl_push_sdl_err(vm, SDL_ERR_IO, error);
+    }
+    int64_t h = -1;
+    if (SDL_HANDLE_STORE(io_streams, io, &h) < 0)
+    {
+        SDL_CloseIO(io);
+        vigil_status_t st = sdl_push_i64(vm, -1, error);
+        if (st != VIGIL_STATUS_OK)
+            return st;
+        return sdl_push_err(vm, "too many IO streams", SDL_ERR_STATE, error);
+    }
+    vigil_status_t st = sdl_push_i64(vm, h, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_ok(vm, error);
+}
+
+/* sdl.io_from_mem(buf_handle) -> (i64, err) */
+static vigil_status_t sdl_fn_io_from_mem(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t bh = sdl_arg_i64(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    int32_t sz = 0;
+    void *mem = vigil_unsafe_buffer_get(bh, &sz);
+    if (!mem)
+    {
+        vigil_status_t st = sdl_push_i64(vm, -1, error);
+        if (st != VIGIL_STATUS_OK)
+            return st;
+        return sdl_push_err(vm, "invalid buffer", SDL_ERR_ARG, error);
+    }
+    SDL_IOStream *io = SDL_IOFromMem(mem, (size_t)sz);
+    if (!io)
+    {
+        vigil_status_t st = sdl_push_i64(vm, -1, error);
+        if (st != VIGIL_STATUS_OK)
+            return st;
+        return sdl_push_sdl_err(vm, SDL_ERR_IO, error);
+    }
+    int64_t h = -1;
+    if (SDL_HANDLE_STORE(io_streams, io, &h) < 0)
+    {
+        SDL_CloseIO(io);
+        vigil_status_t st = sdl_push_i64(vm, -1, error);
+        if (st != VIGIL_STATUS_OK)
+            return st;
+        return sdl_push_err(vm, "too many IO streams", SDL_ERR_STATE, error);
+    }
+    vigil_status_t st = sdl_push_i64(vm, h, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_ok(vm, error);
+}
+
+/* sdl.io_from_const_mem(buf_handle) -> (i64, err) */
+static vigil_status_t sdl_fn_io_from_const_mem(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t bh = sdl_arg_i64(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    int32_t sz = 0;
+    void *mem = vigil_unsafe_buffer_get(bh, &sz);
+    if (!mem)
+    {
+        vigil_status_t st = sdl_push_i64(vm, -1, error);
+        if (st != VIGIL_STATUS_OK)
+            return st;
+        return sdl_push_err(vm, "invalid buffer", SDL_ERR_ARG, error);
+    }
+    SDL_IOStream *io = SDL_IOFromConstMem(mem, (size_t)sz);
+    if (!io)
+    {
+        vigil_status_t st = sdl_push_i64(vm, -1, error);
+        if (st != VIGIL_STATUS_OK)
+            return st;
+        return sdl_push_sdl_err(vm, SDL_ERR_IO, error);
+    }
+    int64_t h = -1;
+    if (SDL_HANDLE_STORE(io_streams, io, &h) < 0)
+    {
+        SDL_CloseIO(io);
+        vigil_status_t st = sdl_push_i64(vm, -1, error);
+        if (st != VIGIL_STATUS_OK)
+            return st;
+        return sdl_push_err(vm, "too many IO streams", SDL_ERR_STATE, error);
+    }
+    vigil_status_t st = sdl_push_i64(vm, h, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_ok(vm, error);
+}
+
+/* sdl.io_from_dynamic_mem() -> (i64, err) */
+static vigil_status_t sdl_fn_io_from_dynamic_mem(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_IOStream *io = SDL_IOFromDynamicMem();
+    if (!io)
+    {
+        vigil_status_t st = sdl_push_i64(vm, -1, error);
+        if (st != VIGIL_STATUS_OK)
+            return st;
+        return sdl_push_sdl_err(vm, SDL_ERR_IO, error);
+    }
+    int64_t h = -1;
+    if (SDL_HANDLE_STORE(io_streams, io, &h) < 0)
+    {
+        SDL_CloseIO(io);
+        vigil_status_t st = sdl_push_i64(vm, -1, error);
+        if (st != VIGIL_STATUS_OK)
+            return st;
+        return sdl_push_err(vm, "too many IO streams", SDL_ERR_STATE, error);
+    }
+    vigil_status_t st = sdl_push_i64(vm, h, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_ok(vm, error);
+}
+
+/* sdl.io_close(handle) -> (bool, err) */
+static vigil_status_t sdl_fn_io_close(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_arg_i64(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_IOStream *io = (SDL_IOStream *)SDL_HANDLE_GET(io_streams, h);
+    if (io && SDL_CloseIO(io))
+    {
+        SDL_HANDLE_CLEAR(io_streams, h);
+        return sdl_push_bool_ok(vm, error);
+    }
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+/* sdl.io_size(handle) -> i64 */
+static vigil_status_t sdl_fn_io_size(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_arg_i64(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_IOStream *io = (SDL_IOStream *)SDL_HANDLE_GET(io_streams, h);
+    return sdl_push_i64(vm, io ? SDL_GetIOSize(io) : -1, error);
+}
+
+/* sdl.io_seek(handle, offset, whence) -> i64 */
+static vigil_status_t sdl_fn_io_seek(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_arg_i64(vm, base, 0);
+    int64_t offset = sdl_arg_i64(vm, base, 1);
+    int32_t whence = sdl_arg_i32(vm, base, 2);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_IOStream *io = (SDL_IOStream *)SDL_HANDLE_GET(io_streams, h);
+    return sdl_push_i64(vm, io ? SDL_SeekIO(io, offset, (SDL_IOWhence)whence) : -1, error);
+}
+
+/* sdl.io_tell(handle) -> i64 */
+static vigil_status_t sdl_fn_io_tell(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_arg_i64(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_IOStream *io = (SDL_IOStream *)SDL_HANDLE_GET(io_streams, h);
+    return sdl_push_i64(vm, io ? SDL_TellIO(io) : -1, error);
+}
+
+/* sdl.io_read(handle, buf_handle, size) -> i32 bytes read */
+static vigil_status_t sdl_fn_io_read(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_arg_i64(vm, base, 0);
+    int64_t bh = sdl_arg_i64(vm, base, 1);
+    int32_t size = sdl_arg_i32(vm, base, 2);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_IOStream *io = (SDL_IOStream *)SDL_HANDLE_GET(io_streams, h);
+    int32_t bsz = 0;
+    void *buf = vigil_unsafe_buffer_get(bh, &bsz);
+    if (!io || !buf)
+        return sdl_push_i32(vm, 0, error);
+    int32_t to_read = (size > 0 && size <= bsz) ? size : bsz;
+    return sdl_push_i32(vm, (int32_t)SDL_ReadIO(io, buf, (size_t)to_read), error);
+}
+
+/* sdl.io_write(handle, buf_handle, size) -> i32 bytes written */
+static vigil_status_t sdl_fn_io_write(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_arg_i64(vm, base, 0);
+    int64_t bh = sdl_arg_i64(vm, base, 1);
+    int32_t size = sdl_arg_i32(vm, base, 2);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_IOStream *io = (SDL_IOStream *)SDL_HANDLE_GET(io_streams, h);
+    int32_t bsz = 0;
+    void *buf = vigil_unsafe_buffer_get(bh, &bsz);
+    if (!io || !buf)
+        return sdl_push_i32(vm, 0, error);
+    int32_t to_write = (size > 0 && size <= bsz) ? size : bsz;
+    return sdl_push_i32(vm, (int32_t)SDL_WriteIO(io, buf, (size_t)to_write), error);
+}
+
+/* sdl.io_flush(handle) -> (bool, err) */
+static vigil_status_t sdl_fn_io_flush(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_arg_i64(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_IOStream *io = (SDL_IOStream *)SDL_HANDLE_GET(io_streams, h);
+    if (io && SDL_FlushIO(io))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+/* sdl.io_status(handle) -> i32 */
+static vigil_status_t sdl_fn_io_status(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_arg_i64(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_IOStream *io = (SDL_IOStream *)SDL_HANDLE_GET(io_streams, h);
+    return sdl_push_i32(vm, io ? (int32_t)SDL_GetIOStatus(io) : (int32_t)SDL_IO_STATUS_ERROR, error);
+}
+
+/* sdl.io_load_file(handle) -> (i64 buf_handle, err) — reads entire stream */
+static vigil_status_t sdl_fn_io_load_file(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_arg_i64(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_IOStream *io = (SDL_IOStream *)SDL_HANDLE_GET(io_streams, h);
+    if (!io)
+    {
+        vigil_status_t st = sdl_push_i64(vm, -1, error);
+        if (st != VIGIL_STATUS_OK)
+            return st;
+        return sdl_push_err(vm, "invalid IO stream", SDL_ERR_ARG, error);
+    }
+    size_t datasize = 0;
+    void *data = SDL_LoadFile_IO(io, &datasize, false);
+    if (!data)
+    {
+        vigil_status_t st = sdl_push_i64(vm, -1, error);
+        if (st != VIGIL_STATUS_OK)
+            return st;
+        return sdl_push_sdl_err(vm, SDL_ERR_IO, error);
+    }
+    int64_t bh = vigil_unsafe_buffer_register(data, (int32_t)datasize);
+    if (bh < 0)
+    {
+        SDL_free(data);
+        vigil_status_t st = sdl_push_i64(vm, -1, error);
+        if (st != VIGIL_STATUS_OK)
+            return st;
+        return sdl_push_err(vm, "too many buffers", SDL_ERR_STATE, error);
+    }
+    vigil_status_t st = sdl_push_i64(vm, bh, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_ok(vm, error);
+}
+
+/* sdl.io_save_file(handle, buf_handle) -> (bool, err) */
+static vigil_status_t sdl_fn_io_save_file(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_arg_i64(vm, base, 0);
+    int64_t bh = sdl_arg_i64(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_IOStream *io = (SDL_IOStream *)SDL_HANDLE_GET(io_streams, h);
+    int32_t sz = 0;
+    void *data = vigil_unsafe_buffer_get(bh, &sz);
+    if (io && data && SDL_SaveFile_IO(io, data, (size_t)sz, false))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+/* IO stream constants */
+SDL_CONST_FN(IO_SEEK_SET, SDL_IO_SEEK_SET)
+SDL_CONST_FN(IO_SEEK_CUR, SDL_IO_SEEK_CUR)
+SDL_CONST_FN(IO_SEEK_END, SDL_IO_SEEK_END)
+SDL_CONST_FN(IO_STATUS_READY, SDL_IO_STATUS_READY)
+SDL_CONST_FN(IO_STATUS_ERROR, SDL_IO_STATUS_ERROR)
+SDL_CONST_FN(IO_STATUS_EOF, SDL_IO_STATUS_EOF)
+
+/* Now bind the _IO variants of load functions */
+
+/* sdl.load_bmp_io(io_handle) -> (Surface, err) */
+static vigil_status_t sdl_fn_load_bmp_io(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_arg_i64(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_IOStream *io = (SDL_IOStream *)SDL_HANDLE_GET(io_streams, h);
+    if (!io)
+        return sdl_push_nil_and_err(vm, "invalid IO stream", SDL_ERR_ARG, error);
+    SDL_Surface *surf = SDL_LoadBMP_IO(io, false);
+    if (!surf)
+        return sdl_push_nil_and_sdl_err(vm, SDL_ERR_IO, error);
+    int64_t sh = -1;
+    if (SDL_HANDLE_STORE(surfaces, surf, &sh) < 0)
+    {
+        SDL_DestroySurface(surf);
+        return sdl_push_nil_and_err(vm, "too many surfaces", SDL_ERR_STATE, error);
+    }
+    vigil_status_t st = sdl_push_handle_instance(vm, 3U, sh, error); /* Surface class index */
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_ok(vm, error);
+}
+
+/* sdl.load_surface_io(io_handle) -> (Surface, err) */
+static vigil_status_t sdl_fn_load_surface_io(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_arg_i64(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_IOStream *io = (SDL_IOStream *)SDL_HANDLE_GET(io_streams, h);
+    if (!io)
+        return sdl_push_nil_and_err(vm, "invalid IO stream", SDL_ERR_ARG, error);
+    SDL_Surface *surf = SDL_LoadSurface_IO(io, false);
+    if (!surf)
+        return sdl_push_nil_and_sdl_err(vm, SDL_ERR_IO, error);
+    int64_t sh = -1;
+    if (SDL_HANDLE_STORE(surfaces, surf, &sh) < 0)
+    {
+        SDL_DestroySurface(surf);
+        return sdl_push_nil_and_err(vm, "too many surfaces", SDL_ERR_STATE, error);
+    }
+    vigil_status_t st = sdl_push_handle_instance(vm, 3U, sh, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_ok(vm, error);
+}
+
+/* sdl.save_bmp_io(surface, io_handle) -> (bool, err) */
+static vigil_status_t sdl_fn_save_bmp_io(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t sh = sdl_field_i64(vm, base, SURF_HANDLE);
+    int64_t ih = sdl_arg_i64(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Surface *surf = (SDL_Surface *)SDL_HANDLE_GET(surfaces, sh);
+    SDL_IOStream *io = (SDL_IOStream *)SDL_HANDLE_GET(io_streams, ih);
+    if (surf && io && SDL_SaveBMP_IO(surf, io, false))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+/* sdl.load_wav_io(io_handle) -> (i64 wav_handle, err) */
+static vigil_status_t sdl_fn_load_wav_io(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_arg_i64(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_IOStream *io = (SDL_IOStream *)SDL_HANDLE_GET(io_streams, h);
+    if (!io)
+    {
+        vigil_status_t st = sdl_push_i64(vm, -1, error);
+        if (st != VIGIL_STATUS_OK)
+            return st;
+        return sdl_push_err(vm, "invalid IO stream", SDL_ERR_ARG, error);
+    }
+    if (g_wav_buf_count >= WAV_BUF_MAX)
+    {
+        vigil_status_t st = sdl_push_i64(vm, -1, error);
+        if (st != VIGIL_STATUS_OK)
+            return st;
+        return sdl_push_err(vm, "too many WAV buffers", SDL_ERR_STATE, error);
+    }
+    Uint8 *buf = NULL;
+    Uint32 len = 0;
+    SDL_AudioSpec spec;
+    if (!SDL_LoadWAV_IO(io, false, &spec, &buf, &len))
+    {
+        vigil_status_t st = sdl_push_i64(vm, -1, error);
+        if (st != VIGIL_STATUS_OK)
+            return st;
+        return sdl_push_sdl_err(vm, SDL_ERR_IO, error);
+    }
+    int32_t slot = g_wav_buf_count++;
+    g_wav_bufs[slot].buf = buf;
+    g_wav_bufs[slot].len = len;
+    g_wav_specs[slot] = spec;
+    vigil_status_t st = sdl_push_i64(vm, (int64_t)slot, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_ok(vm, error);
+}
+
 /* Texture access constants */
 SDL_CONST_FN(TEXTUREACCESS_STATIC, SDL_TEXTUREACCESS_STATIC)
 SDL_CONST_FN(TEXTUREACCESS_STREAMING, SDL_TEXTUREACCESS_STREAMING)
@@ -8685,6 +9093,33 @@ static const vigil_native_module_function_t sdl_functions[] = {
      NULL, NULL, 0},
     {"lock_texture_to_surface", 23U, sdl_renderer_lock_texture_to_surface, 5U, p_i64_i32_i32_i32_i32, VIGIL_TYPE_I64,
      2U, rt_i64_err, 0, NULL, NULL, 0},
+    /* IO Stream */
+    {"io_from_file", 12U, sdl_fn_io_from_file, 2U, p_str_str, VIGIL_TYPE_I64, 2U, rt_i64_err, 0, NULL, NULL, 0},
+    {"io_from_mem", 11U, sdl_fn_io_from_mem, 1U, p_i64, VIGIL_TYPE_I64, 2U, rt_i64_err, 0, NULL, NULL, 0},
+    {"io_from_const_mem", 16U, sdl_fn_io_from_const_mem, 1U, p_i64, VIGIL_TYPE_I64, 2U, rt_i64_err, 0, NULL, NULL, 0},
+    {"io_from_dynamic_mem", 18U, sdl_fn_io_from_dynamic_mem, 0U, NULL, VIGIL_TYPE_I64, 2U, rt_i64_err, 0, NULL, NULL,
+     0},
+    SDL_FN_BOOL_ERR("io_close", 8U, sdl_fn_io_close, 1U, p_i64),
+    SDL_FN("io_size", 7U, sdl_fn_io_size, 1U, p_i64, VIGIL_TYPE_I64),
+    {"io_seek", 7U, sdl_fn_io_seek, 3U, p_i64_i64_i32, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0},
+    SDL_FN("io_tell", 7U, sdl_fn_io_tell, 1U, p_i64, VIGIL_TYPE_I64),
+    {"io_read", 7U, sdl_fn_io_read, 3U, p_i64_i64_i32, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, NULL, 0},
+    {"io_write", 8U, sdl_fn_io_write, 3U, p_i64_i64_i32, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, NULL, 0},
+    SDL_FN_BOOL_ERR("io_flush", 8U, sdl_fn_io_flush, 1U, p_i64),
+    SDL_FN("io_status", 9U, sdl_fn_io_status, 1U, p_i64, VIGIL_TYPE_I32),
+    {"io_load_file", 12U, sdl_fn_io_load_file, 1U, p_i64, VIGIL_TYPE_I64, 2U, rt_i64_err, 0, NULL, NULL, 0},
+    SDL_FN_BOOL_ERR("io_save_file", 12U, sdl_fn_io_save_file, 2U, p_i64_i64),
+    {"load_bmp_io", 11U, sdl_fn_load_bmp_io, 1U, p_i64, VIGIL_TYPE_OBJECT, 2U, rt_obj_err, 0, NULL, NULL, 0},
+    {"load_surface_io", 15U, sdl_fn_load_surface_io, 1U, p_i64, VIGIL_TYPE_OBJECT, 2U, rt_obj_err, 0, NULL, NULL, 0},
+    {"save_bmp_io", 11U, sdl_fn_save_bmp_io, 2U, p_obj_i64, VIGIL_TYPE_BOOL, 2U, rt_bool_err, 0, NULL, NULL, 0},
+    {"load_wav_io", 11U, sdl_fn_load_wav_io, 1U, p_i64, VIGIL_TYPE_I64, 2U, rt_i64_err, 0, NULL, NULL, 0},
+    /* IO constants */
+    SDL_CONST_ENTRY("IO_SEEK_SET", IO_SEEK_SET),
+    SDL_CONST_ENTRY("IO_SEEK_CUR", IO_SEEK_CUR),
+    SDL_CONST_ENTRY("IO_SEEK_END", IO_SEEK_END),
+    SDL_CONST_ENTRY("IO_STATUS_READY", IO_STATUS_READY),
+    SDL_CONST_ENTRY("IO_STATUS_ERROR", IO_STATUS_ERROR),
+    SDL_CONST_ENTRY("IO_STATUS_EOF", IO_STATUS_EOF),
     /* Misc complete */
     SDL_FN("has_sse", 7U, sdl_fn_has_sse, 0U, NULL, VIGIL_TYPE_BOOL),
     SDL_FN("has_sse2", 8U, sdl_fn_has_sse2, 0U, NULL, VIGIL_TYPE_BOOL),
