@@ -241,3 +241,64 @@ cmake/
 ```
 
 The build system scans `plugins/*/plugin.cmake` automatically. No manual registration is needed.
+
+## Accessing Unsafe Buffers from Plugins
+
+Plugins that need to pass raw memory to C APIs (e.g. vertex data, shader bytecode, pixel buffers) can use the public unsafe buffer API declared in `vigil/unsafe_buffer.h`.
+
+### C API
+
+```c
+#include "vigil/unsafe_buffer.h"
+
+// Resolve a Vigil buffer handle to a raw pointer
+void *vigil_unsafe_buffer_get(int64_t slot, int32_t *out_size);
+
+// Allocate a buffer and return a handle for Vigil
+int64_t vigil_unsafe_buffer_alloc(int32_t size);
+
+// Free a buffer
+void vigil_unsafe_buffer_free(int64_t slot);
+
+// Register an externally-allocated buffer (takes ownership)
+int64_t vigil_unsafe_buffer_register(void *data, int32_t size);
+```
+
+### Usage Pattern
+
+Vigil scripts build data in unsafe buffers, then pass the handle (i64) to a plugin function:
+
+```vigil
+import "unsafe";
+import "my_plugin";
+
+// Allocate a buffer and fill it with vertex data
+i64 buf = unsafe.alloc(24);  // 2 vertices × 12 bytes each
+unsafe.set_f32(buf, 0, 100.0);   // x1
+unsafe.set_f32(buf, 4, 200.0);   // y1
+unsafe.set_f32(buf, 8, 1.0);     // z1
+unsafe.set_f32(buf, 12, 300.0);  // x2
+unsafe.set_f32(buf, 16, 400.0);  // y2
+unsafe.set_f32(buf, 20, 1.0);    // z2
+
+my_plugin.upload_vertices(buf, 2);
+unsafe.free(buf);
+```
+
+The plugin resolves the handle in C:
+
+```c
+static vigil_status_t my_upload_vertices(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    int64_t buf_handle = sdl_arg_i64(vm, base, 0);
+    int32_t size = 0;
+    void *data = vigil_unsafe_buffer_get(buf_handle, &size);
+    if (!data) return push_err(vm, "invalid buffer", ...);
+
+    // Pass raw pointer to C API
+    SomeAPI_UploadData(data, size);
+    return push_ok(vm, error);
+}
+```
+
+This keeps the safety model intact: buffer access is gated through `import "unsafe"` on the Vigil side, and plugins get validated pointer access through the public C API.

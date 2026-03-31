@@ -45,6 +45,7 @@
 
 #include "vigil/native_module.h"
 #include "vigil/type.h"
+#include "vigil/unsafe_buffer.h"
 #include "vigil/value.h"
 #include "vigil/vm.h"
 
@@ -142,6 +143,53 @@ static int buf_find_slot(void)
         if (!g_bufs[i].data)
             return i;
     return -1;
+}
+
+/* ── Public buffer API (see vigil/unsafe_buffer.h) ───────────────── */
+
+void *vigil_unsafe_buffer_get(int64_t slot, int32_t *out_size)
+{
+    if (slot < 0 || slot >= MAX_BUFS || !g_bufs[slot].data)
+        return NULL;
+    if (out_size)
+        *out_size = g_bufs[slot].size;
+    return g_bufs[slot].data;
+}
+
+int64_t vigil_unsafe_buffer_alloc(int32_t size)
+{
+    if (size <= 0)
+        return -1;
+    int slot = buf_find_slot();
+    if (slot < 0)
+        return -1;
+    g_bufs[slot].data = (uint8_t *)calloc((size_t)size, 1);
+    if (!g_bufs[slot].data)
+        return -1;
+    g_bufs[slot].size = size;
+    return (int64_t)slot;
+}
+
+void vigil_unsafe_buffer_free(int64_t slot)
+{
+    if (slot >= 0 && slot < MAX_BUFS && g_bufs[slot].data)
+    {
+        free(g_bufs[slot].data);
+        g_bufs[slot].data = NULL;
+        g_bufs[slot].size = 0;
+    }
+}
+
+int64_t vigil_unsafe_buffer_register(void *data, int32_t size)
+{
+    if (!data || size <= 0)
+        return -1;
+    int slot = buf_find_slot();
+    if (slot < 0)
+        return -1;
+    g_bufs[slot].data = (uint8_t *)data;
+    g_bufs[slot].size = size;
+    return (int64_t)slot;
 }
 
 /* ── unsafe.alloc(i32 size) -> i64 ───────────────────────────────── */
