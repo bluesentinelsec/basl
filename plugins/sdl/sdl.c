@@ -669,8 +669,11 @@ static const int p_str[] = {VIGIL_TYPE_STRING};
 static const int p_str_str[] = {VIGIL_TYPE_STRING, VIGIL_TYPE_STRING};
 static const int p_str_i32[] = {VIGIL_TYPE_STRING, VIGIL_TYPE_I32};
 static const int p_i32_str[] = {VIGIL_TYPE_I32, VIGIL_TYPE_STRING};
-static const int p_str_str_i32[] = {VIGIL_TYPE_STRING, VIGIL_TYPE_STRING, VIGIL_TYPE_I32};
 static const int p_i32_str_str[] = {VIGIL_TYPE_I32, VIGIL_TYPE_STRING, VIGIL_TYPE_STRING};
+static const int p_i32_str_i64[] = {VIGIL_TYPE_I32, VIGIL_TYPE_STRING, VIGIL_TYPE_I64};
+static const int p_i32_str_f64[] = {VIGIL_TYPE_I32, VIGIL_TYPE_STRING, VIGIL_TYPE_F64};
+static const int p_i32_str_i32[] = {VIGIL_TYPE_I32, VIGIL_TYPE_STRING, VIGIL_TYPE_I32};
+static const int p_str_str_i32[] = {VIGIL_TYPE_STRING, VIGIL_TYPE_STRING, VIGIL_TYPE_I32};
 static const int p_str_str_str[] = {VIGIL_TYPE_STRING, VIGIL_TYPE_STRING, VIGIL_TYPE_STRING};
 static const int p_f64_f64_str[] = {VIGIL_TYPE_F64, VIGIL_TYPE_F64, VIGIL_TYPE_STRING};
 static const int p_f64[] = {VIGIL_TYPE_F64};
@@ -10411,6 +10414,251 @@ static vigil_status_t sdl_fn_set_log_priorities(vigil_vm_t *vm, size_t arg_count
     return VIGIL_STATUS_OK;
 }
 
+/* ── Properties ───────────────────────────────────────────────────── */
+
+static vigil_status_t sdl_fn_create_properties(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_PropertiesID id = SDL_CreateProperties();
+    return sdl_push_i32(vm, (int32_t)id, error);
+}
+
+static vigil_status_t sdl_fn_destroy_properties(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t id = sdl_arg_i32(vm, base, 0);
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_DestroyProperties((SDL_PropertiesID)id);
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t sdl_fn_get_global_properties(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_i32(vm, (int32_t)SDL_GetGlobalProperties(), error);
+}
+
+static vigil_status_t sdl_fn_lock_properties(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t id = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    if (SDL_LockProperties((SDL_PropertiesID)id))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+static vigil_status_t sdl_fn_unlock_properties(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t id = sdl_arg_i32(vm, base, 0);
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_UnlockProperties((SDL_PropertiesID)id);
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t sdl_fn_copy_properties(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t src = sdl_arg_i32(vm, base, 0);
+    int32_t dst = sdl_arg_i32(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    if (SDL_CopyProperties((SDL_PropertiesID)src, (SDL_PropertiesID)dst))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+static vigil_status_t sdl_fn_has_property(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t id = sdl_arg_i32(vm, base, 0);
+    char name[256];
+    sdl_arg_str(vm, base, 1, name, sizeof(name));
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_bool(vm, SDL_HasProperty((SDL_PropertiesID)id, name), error);
+}
+
+static vigil_status_t sdl_fn_get_property_type(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t id = sdl_arg_i32(vm, base, 0);
+    char name[256];
+    sdl_arg_str(vm, base, 1, name, sizeof(name));
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_i32(vm, (int32_t)SDL_GetPropertyType((SDL_PropertiesID)id, name), error);
+}
+
+static vigil_status_t sdl_fn_clear_property(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t id = sdl_arg_i32(vm, base, 0);
+    char name[256];
+    sdl_arg_str(vm, base, 1, name, sizeof(name));
+    vigil_vm_stack_pop_n(vm, arg_count);
+    if (SDL_ClearProperty((SDL_PropertiesID)id, name))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+static vigil_status_t sdl_fn_set_string_property(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t id = sdl_arg_i32(vm, base, 0);
+    char name[256];
+    sdl_arg_str(vm, base, 1, name, sizeof(name));
+    char val[4096];
+    sdl_arg_str(vm, base, 2, val, sizeof(val));
+    vigil_vm_stack_pop_n(vm, arg_count);
+    if (SDL_SetStringProperty((SDL_PropertiesID)id, name, val))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+static vigil_status_t sdl_fn_get_string_property(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t id = sdl_arg_i32(vm, base, 0);
+    char name[256];
+    sdl_arg_str(vm, base, 1, name, sizeof(name));
+    char def[256];
+    sdl_arg_str(vm, base, 2, def, sizeof(def));
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_string(vm, SDL_GetStringProperty((SDL_PropertiesID)id, name, def), error);
+}
+
+static vigil_status_t sdl_fn_set_number_property(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t id = sdl_arg_i32(vm, base, 0);
+    char name[256];
+    sdl_arg_str(vm, base, 1, name, sizeof(name));
+    int64_t val = sdl_arg_i64(vm, base, 2);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    if (SDL_SetNumberProperty((SDL_PropertiesID)id, name, val))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+static vigil_status_t sdl_fn_get_number_property(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t id = sdl_arg_i32(vm, base, 0);
+    char name[256];
+    sdl_arg_str(vm, base, 1, name, sizeof(name));
+    int64_t def = sdl_arg_i64(vm, base, 2);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_i64(vm, SDL_GetNumberProperty((SDL_PropertiesID)id, name, def), error);
+}
+
+static vigil_status_t sdl_fn_set_float_property(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t id = sdl_arg_i32(vm, base, 0);
+    char name[256];
+    sdl_arg_str(vm, base, 1, name, sizeof(name));
+    float val = (float)sdl_arg_f64(vm, base, 2);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    if (SDL_SetFloatProperty((SDL_PropertiesID)id, name, val))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+static vigil_status_t sdl_fn_get_float_property(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t id = sdl_arg_i32(vm, base, 0);
+    char name[256];
+    sdl_arg_str(vm, base, 1, name, sizeof(name));
+    float def = (float)sdl_arg_f64(vm, base, 2);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_f64(vm, (double)SDL_GetFloatProperty((SDL_PropertiesID)id, name, def), error);
+}
+
+static vigil_status_t sdl_fn_set_boolean_property(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t id = sdl_arg_i32(vm, base, 0);
+    char name[256];
+    sdl_arg_str(vm, base, 1, name, sizeof(name));
+    int32_t val = sdl_arg_i32(vm, base, 2);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    if (SDL_SetBooleanProperty((SDL_PropertiesID)id, name, val != 0))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+static vigil_status_t sdl_fn_get_boolean_property(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t id = sdl_arg_i32(vm, base, 0);
+    char name[256];
+    sdl_arg_str(vm, base, 1, name, sizeof(name));
+    int32_t def = sdl_arg_i32(vm, base, 2);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_bool(vm, SDL_GetBooleanProperty((SDL_PropertiesID)id, name, def != 0), error);
+}
+
+/* Get*Properties for each subsystem */
+static vigil_status_t sdl_fn_get_window_properties(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, WIN_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Window *win = (SDL_Window *)SDL_HANDLE_GET(windows, h);
+    return sdl_push_i32(vm, win ? (int32_t)SDL_GetWindowProperties(win) : 0, error);
+}
+
+static vigil_status_t sdl_fn_get_renderer_properties(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, REN_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Renderer *ren = (SDL_Renderer *)SDL_HANDLE_GET(renderers, h);
+    return sdl_push_i32(vm, ren ? (int32_t)SDL_GetRendererProperties(ren) : 0, error);
+}
+
+static vigil_status_t sdl_fn_get_texture_properties(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, TEX_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Texture *tex = (SDL_Texture *)SDL_HANDLE_GET(textures, h);
+    return sdl_push_i32(vm, tex ? (int32_t)SDL_GetTextureProperties(tex) : 0, error);
+}
+
+static vigil_status_t sdl_fn_get_surface_properties(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, SURF_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Surface *s = (SDL_Surface *)SDL_HANDLE_GET(surfaces, h);
+    return sdl_push_i32(vm, s ? (int32_t)SDL_GetSurfaceProperties(s) : 0, error);
+}
+
+static vigil_status_t sdl_fn_get_app_metadata_property(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    char name[256];
+    sdl_arg_str(vm, base, 0, name, sizeof(name));
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_string(vm, SDL_GetAppMetadataProperty(name), error);
+}
+
+static vigil_status_t sdl_fn_set_app_metadata_property(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    char name[256];
+    sdl_arg_str(vm, base, 0, name, sizeof(name));
+    char val[4096];
+    sdl_arg_str(vm, base, 1, val, sizeof(val));
+    vigil_vm_stack_pop_n(vm, arg_count);
+    if (SDL_SetAppMetadataProperty(name, val))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
 /* Texture access constants */
 SDL_CONST_FN(TEXTUREACCESS_STATIC, SDL_TEXTUREACCESS_STATIC)
 SDL_CONST_FN(TEXTUREACCESS_STREAMING, SDL_TEXTUREACCESS_STREAMING)
@@ -10961,6 +11209,38 @@ static const vigil_native_module_function_t sdl_functions[] = {
     SDL_FN("get_log_priority", 16U, sdl_fn_get_log_priority, 1U, p_i32, VIGIL_TYPE_I32),
     SDL_FN_VOID("reset_log_priorities", 20U, sdl_fn_reset_log_priorities, 0U, NULL),
     SDL_FN_VOID("set_log_priorities", 18U, sdl_fn_set_log_priorities, 1U, p_i32),
+    /* Properties */
+    SDL_FN("create_properties", 17U, sdl_fn_create_properties, 0U, NULL, VIGIL_TYPE_I32),
+    SDL_FN_VOID("destroy_properties", 18U, sdl_fn_destroy_properties, 1U, p_i32),
+    SDL_FN("get_global_properties", 21U, sdl_fn_get_global_properties, 0U, NULL, VIGIL_TYPE_I32),
+    SDL_FN_BOOL_ERR("lock_properties", 15U, sdl_fn_lock_properties, 1U, p_i32),
+    SDL_FN_VOID("unlock_properties", 17U, sdl_fn_unlock_properties, 1U, p_i32),
+    SDL_FN_BOOL_ERR("copy_properties", 15U, sdl_fn_copy_properties, 2U, p_i32_i32),
+    SDL_FN("has_property", 12U, sdl_fn_has_property, 2U, p_i32_str, VIGIL_TYPE_BOOL),
+    SDL_FN("get_property_type", 17U, sdl_fn_get_property_type, 2U, p_i32_str, VIGIL_TYPE_I32),
+    SDL_FN_BOOL_ERR("clear_property", 14U, sdl_fn_clear_property, 2U, p_i32_str),
+    {"set_string_property", 19U, sdl_fn_set_string_property, 3U, p_i32_str_str, VIGIL_TYPE_BOOL, 2U, rt_bool_err, 0,
+     NULL, NULL, 0},
+    {"get_string_property", 19U, sdl_fn_get_string_property, 3U, p_i32_str_str, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL,
+     NULL, 0},
+    {"set_number_property", 19U, sdl_fn_set_number_property, 3U, p_i32_str_i64, VIGIL_TYPE_BOOL, 2U, rt_bool_err, 0,
+     NULL, NULL, 0},
+    {"get_number_property", 19U, sdl_fn_get_number_property, 3U, p_i32_str_i64, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL,
+     0},
+    {"set_float_property", 18U, sdl_fn_set_float_property, 3U, p_i32_str_f64, VIGIL_TYPE_BOOL, 2U, rt_bool_err, 0, NULL,
+     NULL, 0},
+    {"get_float_property", 18U, sdl_fn_get_float_property, 3U, p_i32_str_f64, VIGIL_TYPE_F64, 1U, NULL, 0, NULL, NULL,
+     0},
+    {"set_boolean_property", 20U, sdl_fn_set_boolean_property, 3U, p_i32_str_i32, VIGIL_TYPE_BOOL, 2U, rt_bool_err, 0,
+     NULL, NULL, 0},
+    {"get_boolean_property", 20U, sdl_fn_get_boolean_property, 3U, p_i32_str_i32, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL,
+     NULL, 0},
+    SDL_FN("get_window_properties", 21U, sdl_fn_get_window_properties, 1U, p_obj, VIGIL_TYPE_I32),
+    SDL_FN("get_renderer_properties", 23U, sdl_fn_get_renderer_properties, 1U, p_obj, VIGIL_TYPE_I32),
+    SDL_FN("get_texture_properties", 22U, sdl_fn_get_texture_properties, 1U, p_obj, VIGIL_TYPE_I32),
+    SDL_FN("get_surface_properties", 22U, sdl_fn_get_surface_properties, 1U, p_obj, VIGIL_TYPE_I32),
+    SDL_FN("get_app_metadata_property", 25U, sdl_fn_get_app_metadata_property, 1U, p_str, VIGIL_TYPE_STRING),
+    SDL_FN_BOOL_ERR("set_app_metadata_property", 25U, sdl_fn_set_app_metadata_property, 2U, p_str_str),
     /* IO constants */
     SDL_CONST_ENTRY("IO_SEEK_SET", IO_SEEK_SET),
     SDL_CONST_ENTRY("IO_SEEK_CUR", IO_SEEK_CUR),
