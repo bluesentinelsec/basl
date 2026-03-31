@@ -705,6 +705,16 @@ static const int rt_f64x4[] = {VIGIL_TYPE_F64, VIGIL_TYPE_F64, VIGIL_TYPE_F64, V
 static const int rt_bool_i32x4[] = {VIGIL_TYPE_BOOL, VIGIL_TYPE_I32, VIGIL_TYPE_I32, VIGIL_TYPE_I32, VIGIL_TYPE_I32};
 static const int rt_bool_f64x4[] = {VIGIL_TYPE_BOOL, VIGIL_TYPE_F64, VIGIL_TYPE_F64, VIGIL_TYPE_F64, VIGIL_TYPE_F64};
 static const int rt_i64_i64_err[] = {VIGIL_TYPE_I64, VIGIL_TYPE_I64, VIGIL_TYPE_ERR};
+/* clang-format off */
+static const int rt_bool_f64x3[] = {VIGIL_TYPE_BOOL, VIGIL_TYPE_F64, VIGIL_TYPE_F64, VIGIL_TYPE_F64};
+static const int rt_bool_i32[] = {VIGIL_TYPE_BOOL, VIGIL_TYPE_I32};
+static const int rt_i32x4[] = {VIGIL_TYPE_I32, VIGIL_TYPE_I32, VIGIL_TYPE_I32, VIGIL_TYPE_I32};
+static const int rt_i32x5[] = {VIGIL_TYPE_I32, VIGIL_TYPE_I32, VIGIL_TYPE_I32, VIGIL_TYPE_I32, VIGIL_TYPE_I32};
+static const int rt_i32x6[] = {VIGIL_TYPE_I32, VIGIL_TYPE_I32, VIGIL_TYPE_I32, VIGIL_TYPE_I32, VIGIL_TYPE_I32, VIGIL_TYPE_I32};
+static const int rt_i64_i64[] = {VIGIL_TYPE_I64, VIGIL_TYPE_I64};
+static const int p_i64_i32x6[] = {VIGIL_TYPE_I64, VIGIL_TYPE_I32, VIGIL_TYPE_I32, VIGIL_TYPE_I32,
+                                   VIGIL_TYPE_I32, VIGIL_TYPE_I32, VIGIL_TYPE_I32};
+/* clang-format on */
 /* clang-format on */
 static const int p_i64_i64_i64_i32_i64[] = {VIGIL_TYPE_I64, VIGIL_TYPE_I64, VIGIL_TYPE_I64, VIGIL_TYPE_I32,
                                             VIGIL_TYPE_I64};
@@ -12662,7 +12672,6 @@ static vigil_status_t sdl_fn_save_file(vigil_vm_t *vm, size_t arg_count, vigil_e
     return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
 }
 
-
 static vigil_status_t sdl_fn_clear_clipboard_data(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
 {
     vigil_vm_stack_pop_n(vm, arg_count);
@@ -12874,6 +12883,901 @@ static vigil_status_t sdl_fn_convert_pixels(vigil_vm_t *vm, size_t arg_count, vi
         SDL_ConvertPixels(w, h, (SDL_PixelFormat)src_fmt, src, src_pitch, (SDL_PixelFormat)dst_fmt, dst, dst_pitch))
         return sdl_push_bool_ok(vm, error);
     return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+/* ── Gamepad ID queries ───────────────────────────────────────────── */
+
+static vigil_status_t sdl_fn_get_gamepad_from_id(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t id = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Gamepad *g = SDL_GetGamepadFromID((SDL_JoystickID)id);
+    if (!g)
+        return sdl_push_i64(vm, -1, error);
+    int64_t h = -1;
+    SDL_HANDLE_STORE(gamepads, g, &h);
+    return sdl_push_i64(vm, h, error);
+}
+
+static vigil_status_t sdl_fn_get_gamepad_from_player_index(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t idx = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Gamepad *g = SDL_GetGamepadFromPlayerIndex(idx);
+    if (!g)
+        return sdl_push_i64(vm, -1, error);
+    int64_t h = -1;
+    SDL_HANDLE_STORE(gamepads, g, &h);
+    return sdl_push_i64(vm, h, error);
+}
+
+static vigil_status_t sdl_fn_get_gamepad_properties(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t gh = sdl_arg_i64(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Gamepad *g = (SDL_Gamepad *)SDL_HANDLE_GET(gamepads, gh);
+    return sdl_push_i32(vm, g ? (int32_t)SDL_GetGamepadProperties(g) : 0, error);
+}
+
+static vigil_status_t sdl_fn_get_gamepad_path_for_id(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t id = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    const char *p = SDL_GetGamepadPathForID((SDL_JoystickID)id);
+    return sdl_push_string(vm, p ? p : "", error);
+}
+
+static vigil_status_t sdl_fn_get_gamepad_player_index_for_id(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t id = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_i32(vm, SDL_GetGamepadPlayerIndexForID((SDL_JoystickID)id), error);
+}
+
+static vigil_status_t sdl_fn_get_gamepad_vendor_for_id(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t id = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_i32(vm, (int32_t)SDL_GetGamepadVendorForID((SDL_JoystickID)id), error);
+}
+
+static vigil_status_t sdl_fn_get_gamepad_product_for_id(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t id = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_i32(vm, (int32_t)SDL_GetGamepadProductForID((SDL_JoystickID)id), error);
+}
+
+static vigil_status_t sdl_fn_get_gamepad_product_version_for_id(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t id = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_i32(vm, (int32_t)SDL_GetGamepadProductVersionForID((SDL_JoystickID)id), error);
+}
+
+static vigil_status_t sdl_fn_get_real_gamepad_type_for_id(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t id = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_i32(vm, (int32_t)SDL_GetRealGamepadTypeForID((SDL_JoystickID)id), error);
+}
+
+static vigil_status_t sdl_fn_get_gamepad_mapping_for_id(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t id = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    char *m = SDL_GetGamepadMappingForID((SDL_JoystickID)id);
+    vigil_status_t st = sdl_push_string(vm, m ? m : "", error);
+    SDL_free(m);
+    return st;
+}
+
+static vigil_status_t sdl_fn_set_gamepad_mapping(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t id = sdl_arg_i32(vm, base, 0);
+    char mapping[1024];
+    sdl_arg_str(vm, base, 1, mapping, sizeof(mapping));
+    vigil_vm_stack_pop_n(vm, arg_count);
+    if (SDL_SetGamepadMapping((SDL_JoystickID)id, mapping))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+static vigil_status_t sdl_fn_get_gamepad_button_label_for_type(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t type = sdl_arg_i32(vm, base, 0);
+    int32_t btn = sdl_arg_i32(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_i32(vm, (int32_t)SDL_GetGamepadButtonLabelForType((SDL_GamepadType)type, (SDL_GamepadButton)btn),
+                        error);
+}
+
+static vigil_status_t sdl_fn_get_gamepad_sensor_data_rate(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t gh = sdl_arg_i64(vm, base, 0);
+    int32_t type = sdl_arg_i32(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Gamepad *g = (SDL_Gamepad *)SDL_HANDLE_GET(gamepads, gh);
+    return sdl_push_f64(vm, g ? SDL_GetGamepadSensorDataRate(g, (SDL_SensorType)type) : 0.0f, error);
+}
+
+static vigil_status_t sdl_fn_get_num_gamepad_touchpad_fingers(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t gh = sdl_arg_i64(vm, base, 0);
+    int32_t tp = sdl_arg_i32(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Gamepad *g = (SDL_Gamepad *)SDL_HANDLE_GET(gamepads, gh);
+    return sdl_push_i32(vm, g ? SDL_GetNumGamepadTouchpadFingers(g, tp) : 0, error);
+}
+
+static vigil_status_t sdl_fn_get_gamepad_touchpad_finger(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t gh = sdl_arg_i64(vm, base, 0);
+    int32_t tp = sdl_arg_i32(vm, base, 1);
+    int32_t finger = sdl_arg_i32(vm, base, 2);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Gamepad *g = (SDL_Gamepad *)SDL_HANDLE_GET(gamepads, gh);
+    bool down = false;
+    float x = 0, y = 0, pressure = 0;
+    if (g)
+        SDL_GetGamepadTouchpadFinger(g, tp, finger, &down, &x, &y, &pressure);
+    vigil_status_t st = sdl_push_bool(vm, down, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    st = sdl_push_f64(vm, x, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    st = sdl_push_f64(vm, y, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_f64(vm, pressure, error);
+}
+
+static vigil_status_t sdl_fn_get_gamepad_apple_sf_symbols_name_for_button(vigil_vm_t *vm, size_t arg_count,
+                                                                          vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t gh = sdl_arg_i64(vm, base, 0);
+    int32_t btn = sdl_arg_i32(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Gamepad *g = (SDL_Gamepad *)SDL_HANDLE_GET(gamepads, gh);
+    const char *n = g ? SDL_GetGamepadAppleSFSymbolsNameForButton(g, (SDL_GamepadButton)btn) : NULL;
+    return sdl_push_string(vm, n ? n : "", error);
+}
+
+static vigil_status_t sdl_fn_get_gamepad_apple_sf_symbols_name_for_axis(vigil_vm_t *vm, size_t arg_count,
+                                                                        vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t gh = sdl_arg_i64(vm, base, 0);
+    int32_t axis = sdl_arg_i32(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Gamepad *g = (SDL_Gamepad *)SDL_HANDLE_GET(gamepads, gh);
+    const char *n = g ? SDL_GetGamepadAppleSFSymbolsNameForAxis(g, (SDL_GamepadAxis)axis) : NULL;
+    return sdl_push_string(vm, n ? n : "", error);
+}
+
+/* ── Joystick ID queries ──────────────────────────────────────────── */
+
+static vigil_status_t sdl_fn_get_joystick_from_id(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t id = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Joystick *j = SDL_GetJoystickFromID((SDL_JoystickID)id);
+    if (!j)
+        return sdl_push_i64(vm, -1, error);
+    int64_t h = -1;
+    SDL_HANDLE_STORE(joysticks, j, &h);
+    return sdl_push_i64(vm, h, error);
+}
+
+static vigil_status_t sdl_fn_get_joystick_from_player_index(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t idx = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Joystick *j = SDL_GetJoystickFromPlayerIndex(idx);
+    if (!j)
+        return sdl_push_i64(vm, -1, error);
+    int64_t h = -1;
+    SDL_HANDLE_STORE(joysticks, j, &h);
+    return sdl_push_i64(vm, h, error);
+}
+
+static vigil_status_t sdl_fn_get_joystick_properties(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t jh = sdl_arg_i64(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Joystick *j = (SDL_Joystick *)SDL_HANDLE_GET(joysticks, jh);
+    return sdl_push_i32(vm, j ? (int32_t)SDL_GetJoystickProperties(j) : 0, error);
+}
+
+static vigil_status_t sdl_fn_get_joystick_guid(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t jh = sdl_arg_i64(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Joystick *j = (SDL_Joystick *)SDL_HANDLE_GET(joysticks, jh);
+    char buf[64] = {0};
+    if (j)
+    {
+        SDL_GUID g = SDL_GetJoystickGUID(j);
+        SDL_GUIDToString(g, buf, sizeof(buf));
+    }
+    return sdl_push_string(vm, buf, error);
+}
+
+static vigil_status_t sdl_fn_get_joystick_guid_for_id(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t id = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    char buf[64] = {0};
+    SDL_GUID g = SDL_GetJoystickGUIDForID((SDL_JoystickID)id);
+    SDL_GUIDToString(g, buf, sizeof(buf));
+    return sdl_push_string(vm, buf, error);
+}
+
+static vigil_status_t sdl_fn_get_joystick_axis_initial_state(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t jh = sdl_arg_i64(vm, base, 0);
+    int32_t axis = sdl_arg_i32(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Joystick *j = (SDL_Joystick *)SDL_HANDLE_GET(joysticks, jh);
+    Sint16 state = 0;
+    bool has = j && SDL_GetJoystickAxisInitialState(j, axis, &state);
+    vigil_status_t st = sdl_push_bool(vm, has, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_i32(vm, state, error);
+}
+
+
+/* ── Haptic ID queries ────────────────────────────────────────────── */
+
+static vigil_status_t sdl_fn_get_haptic_id(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t hh = sdl_arg_i64(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Haptic *h = (SDL_Haptic *)SDL_HANDLE_GET(haptics, hh);
+    return sdl_push_i32(vm, h ? (int32_t)SDL_GetHapticID(h) : 0, error);
+}
+
+static vigil_status_t sdl_fn_get_haptic_from_id(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t id = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Haptic *h = SDL_GetHapticFromID((SDL_HapticID)id);
+    if (!h)
+        return sdl_push_i64(vm, -1, error);
+    int64_t hh = -1;
+    SDL_HANDLE_STORE(haptics, h, &hh);
+    return sdl_push_i64(vm, hh, error);
+}
+
+static vigil_status_t sdl_fn_open_haptic_from_joystick(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t jh = sdl_arg_i64(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Joystick *j = (SDL_Joystick *)SDL_HANDLE_GET(joysticks, jh);
+    if (!j)
+    {
+        vigil_status_t st = sdl_push_i64(vm, -1, error);
+        if (st != VIGIL_STATUS_OK)
+            return st;
+        return sdl_push_sdl_err(vm, SDL_ERR_IO, error);
+    }
+    SDL_Haptic *h = SDL_OpenHapticFromJoystick(j);
+    if (!h)
+    {
+        vigil_status_t st = sdl_push_i64(vm, -1, error);
+        if (st != VIGIL_STATUS_OK)
+            return st;
+        return sdl_push_sdl_err(vm, SDL_ERR_IO, error);
+    }
+    int64_t hh = -1;
+    SDL_HANDLE_STORE(haptics, h, &hh);
+    vigil_status_t st = sdl_push_i64(vm, hh, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_ok(vm, error);
+}
+
+/* ── Sensor queries ───────────────────────────────────────────────── */
+
+static vigil_status_t sdl_fn_get_sensor_id(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t sh = sdl_arg_i64(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Sensor *s = (SDL_Sensor *)SDL_HANDLE_GET(sensors, sh);
+    return sdl_push_i32(vm, s ? (int32_t)SDL_GetSensorID(s) : 0, error);
+}
+
+static vigil_status_t sdl_fn_get_sensor_properties(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t sh = sdl_arg_i64(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Sensor *s = (SDL_Sensor *)SDL_HANDLE_GET(sensors, sh);
+    return sdl_push_i32(vm, s ? (int32_t)SDL_GetSensorProperties(s) : 0, error);
+}
+
+static vigil_status_t sdl_fn_get_sensor_from_id(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t id = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Sensor *s = SDL_GetSensorFromID((SDL_SensorID)id);
+    if (!s)
+        return sdl_push_i64(vm, -1, error);
+    int64_t h = -1;
+    SDL_HANDLE_STORE(sensors, s, &h);
+    return sdl_push_i64(vm, h, error);
+}
+
+/* ── Camera queries ───────────────────────────────────────────────── */
+
+static vigil_status_t sdl_fn_get_camera_id(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t ch = sdl_arg_i64(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Camera *c = (SDL_Camera *)SDL_HANDLE_GET(cameras, ch);
+    return sdl_push_i32(vm, c ? (int32_t)SDL_GetCameraID(c) : 0, error);
+}
+
+static vigil_status_t sdl_fn_get_camera_properties(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t ch = sdl_arg_i64(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Camera *c = (SDL_Camera *)SDL_HANDLE_GET(cameras, ch);
+    return sdl_push_i32(vm, c ? (int32_t)SDL_GetCameraProperties(c) : 0, error);
+}
+
+static vigil_status_t sdl_fn_get_camera_position(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t id = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_i32(vm, (int32_t)SDL_GetCameraPosition((SDL_CameraID)id), error);
+}
+
+/* ── Window/Renderer queries ──────────────────────────────────────── */
+
+static vigil_status_t sdl_fn_get_window_from_id(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t id = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Window *w = SDL_GetWindowFromID((SDL_WindowID)id);
+    if (!w)
+        return sdl_push_i64(vm, -1, error);
+    int64_t h = -1;
+    SDL_HANDLE_STORE(windows, w, &h);
+    return sdl_push_i64(vm, h, error);
+}
+
+static vigil_status_t sdl_fn_get_window_parent(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t wh = sdl_arg_i64(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Window *w = (SDL_Window *)SDL_HANDLE_GET(windows, wh);
+    SDL_Window *p = w ? SDL_GetWindowParent(w) : NULL;
+    if (!p)
+        return sdl_push_i64(vm, -1, error);
+    int64_t h = -1;
+    SDL_HANDLE_STORE(windows, p, &h);
+    return sdl_push_i64(vm, h, error);
+}
+
+static vigil_status_t sdl_fn_get_window_icc_profile(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t wh = sdl_arg_i64(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Window *w = (SDL_Window *)SDL_HANDLE_GET(windows, wh);
+    size_t sz = 0;
+    void *data = w ? SDL_GetWindowICCProfile(w, &sz) : NULL;
+    if (!data)
+    {
+        vigil_status_t st = sdl_push_i64(vm, -1, error);
+        if (st != VIGIL_STATUS_OK)
+            return st;
+        return sdl_push_i64(vm, 0, error);
+    }
+    int64_t bh = vigil_unsafe_buffer_register(data, (int32_t)sz);
+    vigil_status_t st = sdl_push_i64(vm, bh, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_i64(vm, (int64_t)sz, error);
+}
+
+static vigil_status_t sdl_fn_get_display_properties(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t id = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_i32(vm, (int32_t)SDL_GetDisplayProperties((SDL_DisplayID)id), error);
+}
+
+static vigil_status_t sdl_fn_get_keyboard_focus(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Window *w = SDL_GetKeyboardFocus();
+    if (!w)
+        return sdl_push_i64(vm, -1, error);
+    int64_t h = -1;
+    SDL_HANDLE_STORE(windows, w, &h);
+    return sdl_push_i64(vm, h, error);
+}
+
+static vigil_status_t sdl_fn_get_keyboard_name_for_id(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t id = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    const char *n = SDL_GetKeyboardNameForID((SDL_KeyboardID)id);
+    return sdl_push_string(vm, n ? n : "", error);
+}
+
+static vigil_status_t sdl_fn_get_mouse_name_for_id(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t id = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    const char *n = SDL_GetMouseNameForID((SDL_MouseID)id);
+    return sdl_push_string(vm, n ? n : "", error);
+}
+
+static vigil_status_t sdl_fn_get_io_properties(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t ih = sdl_arg_i64(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_IOStream *io = (SDL_IOStream *)SDL_HANDLE_GET(io_streams, ih);
+    return sdl_push_i32(vm, io ? (int32_t)SDL_GetIOProperties(io) : 0, error);
+}
+
+static vigil_status_t sdl_fn_get_gpu_device_properties(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t gh = sdl_arg_i64(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_GPUDevice *d = (SDL_GPUDevice *)SDL_HANDLE_GET(gpu_devices, gh);
+    return sdl_push_i32(vm, d ? (int32_t)SDL_GetGPUDeviceProperties(d) : 0, error);
+}
+
+static vigil_status_t sdl_fn_get_audio_stream_properties(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t ah = sdl_arg_i64(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_AudioStream *s = (SDL_AudioStream *)SDL_HANDLE_GET(audio_streams, ah);
+    return sdl_push_i32(vm, s ? (int32_t)SDL_GetAudioStreamProperties(s) : 0, error);
+}
+
+/* ── Audio format queries ─────────────────────────────────────────── */
+
+static vigil_status_t sdl_fn_get_audio_device_format(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t devid = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_AudioSpec spec = {0};
+    int sample_frames = 0;
+    SDL_GetAudioDeviceFormat((SDL_AudioDeviceID)devid, &spec, &sample_frames);
+    vigil_status_t st = sdl_push_i32(vm, (int32_t)spec.format, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    st = sdl_push_i32(vm, spec.channels, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    st = sdl_push_i32(vm, spec.freq, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_i32(vm, sample_frames, error);
+}
+
+static vigil_status_t sdl_fn_get_audio_stream_format(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t ah = sdl_arg_i64(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_AudioStream *s = (SDL_AudioStream *)SDL_HANDLE_GET(audio_streams, ah);
+    SDL_AudioSpec src = {0}, dst = {0};
+    if (s)
+        SDL_GetAudioStreamFormat(s, &src, &dst);
+    vigil_status_t st = sdl_push_i32(vm, (int32_t)src.format, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    st = sdl_push_i32(vm, src.channels, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    st = sdl_push_i32(vm, src.freq, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    st = sdl_push_i32(vm, (int32_t)dst.format, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    st = sdl_push_i32(vm, dst.channels, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_i32(vm, dst.freq, error);
+}
+
+static vigil_status_t sdl_fn_set_audio_stream_format(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t ah = sdl_arg_i64(vm, base, 0);
+    int32_t sf = sdl_arg_i32(vm, base, 1);
+    int32_t sc = sdl_arg_i32(vm, base, 2);
+    int32_t sr = sdl_arg_i32(vm, base, 3);
+    int32_t df = sdl_arg_i32(vm, base, 4);
+    int32_t dc = sdl_arg_i32(vm, base, 5);
+    int32_t dr = sdl_arg_i32(vm, base, 6);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_AudioStream *s = (SDL_AudioStream *)SDL_HANDLE_GET(audio_streams, ah);
+    SDL_AudioSpec src = {(SDL_AudioFormat)sf, sc, sr};
+    SDL_AudioSpec dst = {(SDL_AudioFormat)df, dc, dr};
+    if (s && SDL_SetAudioStreamFormat(s, &src, &dst))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+/* ── Misc remaining ───────────────────────────────────────────────── */
+
+static vigil_status_t sdl_fn_guid_to_string(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    char in[64];
+    sdl_arg_str(vm, base, 0, in, sizeof(in));
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_GUID g = SDL_StringToGUID(in);
+    char out[64] = {0};
+    SDL_GUIDToString(g, out, sizeof(out));
+    return sdl_push_string(vm, out, error);
+}
+
+static vigil_status_t sdl_fn_string_to_guid(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    char in[64];
+    sdl_arg_str(vm, base, 0, in, sizeof(in));
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_GUID g = SDL_StringToGUID(in);
+    char out[64] = {0};
+    SDL_GUIDToString(g, out, sizeof(out));
+    return sdl_push_string(vm, out, error);
+}
+
+static vigil_status_t sdl_fn_modff(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    float x = (float)sdl_arg_f64(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    float intpart = 0;
+    float frac = SDL_modff(x, &intpart);
+    vigil_status_t st = sdl_push_f64(vm, frac, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_f64(vm, intpart, error);
+}
+
+static vigil_status_t sdl_fn_get_masks_for_pixel_format(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t fmt = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    int bpp = 0;
+    Uint32 rm = 0, gm = 0, bm = 0, am = 0;
+    SDL_GetMasksForPixelFormat((SDL_PixelFormat)fmt, &bpp, &rm, &gm, &bm, &am);
+    vigil_status_t st = sdl_push_i32(vm, bpp, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    st = sdl_push_i32(vm, (int32_t)rm, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    st = sdl_push_i32(vm, (int32_t)gm, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    st = sdl_push_i32(vm, (int32_t)bm, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_i32(vm, (int32_t)am, error);
+}
+
+static vigil_status_t sdl_fn_surface_has_alternate_images(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t sh = sdl_arg_i64(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Surface *s = (SDL_Surface *)SDL_HANDLE_GET(surfaces, sh);
+    return sdl_push_bool(vm, s && SDL_SurfaceHasAlternateImages(s), error);
+}
+
+static vigil_status_t sdl_fn_remove_surface_alternate_images(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t sh = sdl_arg_i64(vm, base, 0);
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Surface *s = (SDL_Surface *)SDL_HANDLE_GET(surfaces, sh);
+    if (s)
+        SDL_RemoveSurfaceAlternateImages(s);
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t sdl_fn_cleanup_tls(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_CleanupTLS();
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t sdl_fn_set_environment_variable(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    char name[256];
+    sdl_arg_str(vm, base, 0, name, sizeof(name));
+    char val[512];
+    sdl_arg_str(vm, base, 1, val, sizeof(val));
+    int32_t overwrite = sdl_arg_i32(vm, base, 2);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Environment *env = SDL_GetEnvironment();
+    if (env && SDL_SetEnvironmentVariable(env, name, val, overwrite != 0))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+static vigil_status_t sdl_fn_unset_environment_variable(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    char name[256];
+    sdl_arg_str(vm, base, 0, name, sizeof(name));
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Environment *env = SDL_GetEnvironment();
+    if (env && SDL_UnsetEnvironmentVariable(env, name))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+static vigil_status_t sdl_fn_get_environment_variable(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    char name[256];
+    sdl_arg_str(vm, base, 0, name, sizeof(name));
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Environment *env = SDL_GetEnvironment();
+    const char *v = env ? SDL_GetEnvironmentVariable(env, name) : NULL;
+    return sdl_push_string(vm, v ? v : "", error);
+}
+
+static vigil_status_t sdl_fn_gl_get_current_window(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Window *w = SDL_GL_GetCurrentWindow();
+    if (!w)
+        return sdl_push_i64(vm, -1, error);
+    int64_t h = -1;
+    SDL_HANDLE_STORE(windows, w, &h);
+    return sdl_push_i64(vm, h, error);
+}
+
+static vigil_status_t sdl_fn_gl_get_current_context(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_GLContext ctx = SDL_GL_GetCurrentContext();
+    if (!ctx)
+        return sdl_push_i64(vm, -1, error);
+    int64_t h = -1;
+    SDL_HANDLE_STORE(gl_contexts, ctx, &h);
+    return sdl_push_i64(vm, h, error);
+}
+
+static vigil_status_t sdl_fn_metal_get_layer(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t v = sdl_arg_i64(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    void *layer = v ? SDL_Metal_GetLayer((SDL_MetalView)(uintptr_t)v) : NULL;
+    return sdl_push_i64(vm, (int64_t)(uintptr_t)layer, error);
+}
+
+static vigil_status_t sdl_fn_get_process_properties(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t ph = sdl_arg_i64(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Process *p = (SDL_Process *)SDL_HANDLE_GET(processes, ph);
+    return sdl_push_i32(vm, p ? (int32_t)SDL_GetProcessProperties(p) : 0, error);
+}
+
+static vigil_status_t sdl_fn_get_clipboard_mime_types(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    vigil_vm_stack_pop_n(vm, arg_count);
+    size_t count = 0;
+    char **types = SDL_GetClipboardMimeTypes(&count);
+    if (!types || count == 0)
+        return sdl_push_string(vm, "", error);
+    char buf[2048] = {0};
+    size_t off = 0;
+    for (size_t i = 0; i < count && off < sizeof(buf) - 1; i++)
+    {
+        if (i > 0 && off < sizeof(buf) - 1)
+            buf[off++] = ',';
+        size_t len = strlen(types[i]);
+        if (off + len >= sizeof(buf))
+            break;
+        memcpy(buf + off, types[i], len);
+        off += len;
+    }
+    SDL_free(types);
+    return sdl_push_string(vm, buf, error);
+}
+
+static vigil_status_t sdl_fn_set_tray_icon(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t th = sdl_arg_i64(vm, base, 0);
+    int64_t sh = sdl_arg_i64(vm, base, 1);
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Tray *t = (SDL_Tray *)SDL_HANDLE_GET(trays, th);
+    SDL_Surface *s = (SDL_Surface *)SDL_HANDLE_GET(surfaces, sh);
+    if (t)
+        SDL_SetTrayIcon(t, s);
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t sdl_fn_get_tray_entry_parent(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t eh = sdl_arg_i64(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_TrayEntry *e = (SDL_TrayEntry *)SDL_HANDLE_GET(tray_entries, eh);
+    if (!e)
+        return sdl_push_i64(vm, -1, error);
+    SDL_TrayMenu *m = SDL_GetTrayEntryParent(e);
+    if (!m)
+        return sdl_push_i64(vm, -1, error);
+    int64_t h = -1;
+    SDL_HANDLE_STORE(tray_menus, m, &h);
+    return sdl_push_i64(vm, h, error);
+}
+
+static vigil_status_t sdl_fn_get_tray_menu_parent_entry(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t mh = sdl_arg_i64(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_TrayMenu *m = (SDL_TrayMenu *)SDL_HANDLE_GET(tray_menus, mh);
+    if (!m)
+        return sdl_push_i64(vm, -1, error);
+    SDL_TrayEntry *e = SDL_GetTrayMenuParentEntry(m);
+    if (!e)
+        return sdl_push_i64(vm, -1, error);
+    int64_t h = -1;
+    SDL_HANDLE_STORE(tray_entries, e, &h);
+    return sdl_push_i64(vm, h, error);
+}
+
+static vigil_status_t sdl_fn_get_tray_menu_parent_tray(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t mh = sdl_arg_i64(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_TrayMenu *m = (SDL_TrayMenu *)SDL_HANDLE_GET(tray_menus, mh);
+    if (!m)
+        return sdl_push_i64(vm, -1, error);
+    SDL_Tray *t = SDL_GetTrayMenuParentTray(m);
+    if (!t)
+        return sdl_push_i64(vm, -1, error);
+    int64_t h = -1;
+    SDL_HANDLE_STORE(trays, t, &h);
+    return sdl_push_i64(vm, h, error);
+}
+
+static vigil_status_t sdl_fn_set_surface_palette(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t sh = sdl_arg_i64(vm, base, 0);
+    int64_t ph = sdl_arg_i64(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Surface *s = (SDL_Surface *)SDL_HANDLE_GET(surfaces, sh);
+    SDL_Palette *p = (SDL_Palette *)SDL_HANDLE_GET(palettes, ph);
+    if (s && p && SDL_SetSurfacePalette(s, p))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+static vigil_status_t sdl_fn_set_texture_palette(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t th = sdl_arg_i64(vm, base, 0);
+    int64_t ph = sdl_arg_i64(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Texture *t = (SDL_Texture *)SDL_HANDLE_GET(textures, th);
+    SDL_Palette *p = (SDL_Palette *)SDL_HANDLE_GET(palettes, ph);
+    if (t && p && SDL_SetTexturePalette(t, p))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+static vigil_status_t sdl_fn_create_surface_palette(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t sh = sdl_arg_i64(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Surface *s = (SDL_Surface *)SDL_HANDLE_GET(surfaces, sh);
+    SDL_Palette *p = s ? SDL_CreateSurfacePalette(s) : NULL;
+    if (!p)
+        return sdl_push_i64(vm, -1, error);
+    int64_t h = -1;
+    SDL_HANDLE_STORE(palettes, p, &h);
+    return sdl_push_i64(vm, h, error);
+}
+
+static vigil_status_t sdl_fn_get_gamepad_joystick(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t gh = sdl_arg_i64(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Gamepad *g = (SDL_Gamepad *)SDL_HANDLE_GET(gamepads, gh);
+    SDL_Joystick *j = g ? SDL_GetGamepadJoystick(g) : NULL;
+    if (!j)
+        return sdl_push_i64(vm, -1, error);
+    int64_t h = -1;
+    SDL_HANDLE_STORE(joysticks, j, &h);
+    return sdl_push_i64(vm, h, error);
+}
+
+static vigil_status_t sdl_fn_get_gamepad_guid_for_id(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t id = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    char buf[64] = {0};
+    SDL_GUID g = SDL_GetGamepadGUIDForID((SDL_JoystickID)id);
+    SDL_GUIDToString(g, buf, sizeof(buf));
+    return sdl_push_string(vm, buf, error);
+}
+
+static vigil_status_t sdl_fn_calculate_gpu_texture_format_size(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t fmt = sdl_arg_i32(vm, base, 0);
+    int32_t w = sdl_arg_i32(vm, base, 1);
+    int32_t h = sdl_arg_i32(vm, base, 2);
+    int32_t d = sdl_arg_i32(vm, base, 3);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_i32(
+        vm, (int32_t)SDL_CalculateGPUTextureFormatSize((SDL_GPUTextureFormat)fmt, (Uint32)w, (Uint32)h, (Uint32)d),
+        error);
 }
 /* Texture access constants */
 SDL_CONST_FN(TEXTUREACCESS_STATIC, SDL_TEXTUREACCESS_STATIC)
@@ -13664,8 +14568,111 @@ static const vigil_native_module_function_t sdl_functions[] = {
     SDL_FN_VOID("destroy_haptic_effect", 21U, sdl_fn_destroy_haptic_effect, 2U, p_i64_i32),
     SDL_FN("get_haptic_effect_status", 24U, sdl_fn_get_haptic_effect_status, 2U, p_i64_i32, VIGIL_TYPE_BOOL),
     /* Convert pixels */
-    {"convert_pixels", 14U, sdl_fn_convert_pixels, 8U, p_convert_pixels, VIGIL_TYPE_BOOL, 2U, rt_bool_err, 0, NULL,
+    {"convert_pixels",
+     14U,
+     sdl_fn_convert_pixels,
+     8U,
+     p_convert_pixels,
+     VIGIL_TYPE_BOOL,
+     2U,
+     rt_bool_err,
+     0,
+     NULL,
      NULL, 0},
+     /* Gamepad ID queries */
+     SDL_FN("get_gamepad_from_id", 19U, sdl_fn_get_gamepad_from_id, 1U, p_i32, VIGIL_TYPE_I64),
+     SDL_FN("get_gamepad_from_player_index", 29U, sdl_fn_get_gamepad_from_player_index, 1U, p_i32, VIGIL_TYPE_I64),
+     SDL_FN("get_gamepad_id", 14U, sdl_fn_get_gamepad_id, 1U, p_i64, VIGIL_TYPE_I32),
+     SDL_FN("get_gamepad_properties", 22U, sdl_fn_get_gamepad_properties, 1U, p_i64, VIGIL_TYPE_I32),
+     SDL_FN("get_gamepad_path_for_id", 23U, sdl_fn_get_gamepad_path_for_id, 1U, p_i32, VIGIL_TYPE_STRING),
+     SDL_FN("get_gamepad_player_index_for_id", 30U, sdl_fn_get_gamepad_player_index_for_id, 1U, p_i32, VIGIL_TYPE_I32),
+     SDL_FN("get_gamepad_vendor_for_id", 25U, sdl_fn_get_gamepad_vendor_for_id, 1U, p_i32, VIGIL_TYPE_I32),
+     SDL_FN("get_gamepad_product_for_id", 26U, sdl_fn_get_gamepad_product_for_id, 1U, p_i32, VIGIL_TYPE_I32),
+     SDL_FN("get_gamepad_product_version_for_id", 34U, sdl_fn_get_gamepad_product_version_for_id, 1U, p_i32,
+            VIGIL_TYPE_I32),
+     SDL_FN("get_real_gamepad_type_for_id", 28U, sdl_fn_get_real_gamepad_type_for_id, 1U, p_i32, VIGIL_TYPE_I32),
+     SDL_FN("get_gamepad_mapping_for_id", 26U, sdl_fn_get_gamepad_mapping_for_id, 1U, p_i32, VIGIL_TYPE_STRING),
+     SDL_FN_BOOL_ERR("set_gamepad_mapping", 19U, sdl_fn_set_gamepad_mapping, 2U, p_i32_str),
+     SDL_FN("get_gamepad_button_label_for_type", 33U, sdl_fn_get_gamepad_button_label_for_type, 2U, p_i32_i32,
+            VIGIL_TYPE_I32),
+     SDL_FN("get_gamepad_sensor_data_rate", 28U, sdl_fn_get_gamepad_sensor_data_rate, 2U, p_i64_i32, VIGIL_TYPE_F64),
+     SDL_FN("get_num_gamepad_touchpad_fingers", 31U, sdl_fn_get_num_gamepad_touchpad_fingers, 2U, p_i64_i32,
+            VIGIL_TYPE_I32),
+     {"get_gamepad_touchpad_finger", 27U, sdl_fn_get_gamepad_touchpad_finger, 3U, p_i64_i32_i32, VIGIL_TYPE_BOOL, 4U,
+      rt_bool_f64x3, 0, NULL, NULL, 0},
+     SDL_FN("get_gamepad_apple_sf_symbols_name_for_button", 45U, sdl_fn_get_gamepad_apple_sf_symbols_name_for_button,
+            2U, p_i64_i32, VIGIL_TYPE_STRING),
+     SDL_FN("get_gamepad_apple_sf_symbols_name_for_axis", 43U, sdl_fn_get_gamepad_apple_sf_symbols_name_for_axis, 2U,
+            p_i64_i32, VIGIL_TYPE_STRING),
+     SDL_FN("get_gamepad_joystick", 20U, sdl_fn_get_gamepad_joystick, 1U, p_i64, VIGIL_TYPE_I64),
+     SDL_FN("get_gamepad_guid_for_id", 23U, sdl_fn_get_gamepad_guid_for_id, 1U, p_i32, VIGIL_TYPE_STRING),
+     /* Joystick ID queries */
+     SDL_FN("get_joystick_from_id", 20U, sdl_fn_get_joystick_from_id, 1U, p_i32, VIGIL_TYPE_I64),
+     SDL_FN("get_joystick_from_player_index", 30U, sdl_fn_get_joystick_from_player_index, 1U, p_i32, VIGIL_TYPE_I64),
+     SDL_FN("get_joystick_properties", 23U, sdl_fn_get_joystick_properties, 1U, p_i64, VIGIL_TYPE_I32),
+     SDL_FN("get_joystick_guid", 18U, sdl_fn_get_joystick_guid, 1U, p_i64, VIGIL_TYPE_STRING),
+     SDL_FN("get_joystick_guid_for_id", 23U, sdl_fn_get_joystick_guid_for_id, 1U, p_i32, VIGIL_TYPE_STRING),
+     {"get_joystick_axis_initial_state", 30U, sdl_fn_get_joystick_axis_initial_state, 2U, p_i64_i32, VIGIL_TYPE_BOOL,
+      2U, rt_bool_i32, 0, NULL, NULL, 0},
+     /* Haptic */
+     SDL_FN("get_haptic_id", 13U, sdl_fn_get_haptic_id, 1U, p_i64, VIGIL_TYPE_I32),
+     SDL_FN("get_haptic_from_id", 18U, sdl_fn_get_haptic_from_id, 1U, p_i32, VIGIL_TYPE_I64),
+     {"open_haptic_from_joystick", 25U, sdl_fn_open_haptic_from_joystick, 1U, p_i64, VIGIL_TYPE_I64, 2U, rt_i64_err, 0,
+      NULL, NULL, 0},
+     /* Sensor */
+     SDL_FN("get_sensor_id", 13U, sdl_fn_get_sensor_id, 1U, p_i64, VIGIL_TYPE_I32),
+     SDL_FN("get_sensor_properties", 21U, sdl_fn_get_sensor_properties, 1U, p_i64, VIGIL_TYPE_I32),
+     SDL_FN("get_sensor_from_id", 18U, sdl_fn_get_sensor_from_id, 1U, p_i32, VIGIL_TYPE_I64),
+     /* Camera */
+     SDL_FN("get_camera_id", 13U, sdl_fn_get_camera_id, 1U, p_i64, VIGIL_TYPE_I32),
+     SDL_FN("get_camera_properties", 21U, sdl_fn_get_camera_properties, 1U, p_i64, VIGIL_TYPE_I32),
+     SDL_FN("get_camera_position", 19U, sdl_fn_get_camera_position, 1U, p_i32, VIGIL_TYPE_I32),
+     /* Window/Renderer */
+     SDL_FN("get_window_from_id", 18U, sdl_fn_get_window_from_id, 1U, p_i32, VIGIL_TYPE_I64),
+     SDL_FN("get_window_parent", 17U, sdl_fn_get_window_parent, 1U, p_i64, VIGIL_TYPE_I64),
+     {"get_window_icc_profile", 22U, sdl_fn_get_window_icc_profile, 1U, p_i64, VIGIL_TYPE_I64, 2U, rt_i64_i64, 0, NULL,
+      NULL, 0},
+     SDL_FN("get_display_properties", 22U, sdl_fn_get_display_properties, 1U, p_i32, VIGIL_TYPE_I32),
+     SDL_FN("get_keyboard_focus", 18U, sdl_fn_get_keyboard_focus, 0U, NULL, VIGIL_TYPE_I64),
+     SDL_FN("get_keyboard_name_for_id", 24U, sdl_fn_get_keyboard_name_for_id, 1U, p_i32, VIGIL_TYPE_STRING),
+     SDL_FN("get_mouse_name_for_id", 21U, sdl_fn_get_mouse_name_for_id, 1U, p_i32, VIGIL_TYPE_STRING),
+     SDL_FN("get_io_properties", 17U, sdl_fn_get_io_properties, 1U, p_i64, VIGIL_TYPE_I32),
+     SDL_FN("get_gpu_device_properties", 25U, sdl_fn_get_gpu_device_properties, 1U, p_i64, VIGIL_TYPE_I32),
+     SDL_FN("get_audio_stream_properties", 27U, sdl_fn_get_audio_stream_properties, 1U, p_i64, VIGIL_TYPE_I32),
+     /* Audio format */
+     {"get_audio_device_format", 23U, sdl_fn_get_audio_device_format, 1U, p_i32, VIGIL_TYPE_I32, 4U, rt_i32x4, 0, NULL,
+      NULL, 0},
+     {"get_audio_stream_format", 23U, sdl_fn_get_audio_stream_format, 1U, p_i64, VIGIL_TYPE_I32, 6U, rt_i32x6, 0, NULL,
+      NULL, 0},
+     {"set_audio_stream_format", 23U, sdl_fn_set_audio_stream_format, 7U, p_i64_i32x6, VIGIL_TYPE_BOOL, 2U, rt_bool_err,
+      0, NULL, NULL, 0},
+     /* Misc */
+     SDL_FN("guid_to_string", 14U, sdl_fn_guid_to_string, 1U, p_str, VIGIL_TYPE_STRING),
+     SDL_FN("string_to_guid", 14U, sdl_fn_string_to_guid, 1U, p_str, VIGIL_TYPE_STRING),
+     {"modff", 5U, sdl_fn_modff, 1U, p_f64, VIGIL_TYPE_F64, 2U, rt_f64_f64, 0, NULL, NULL, 0},
+     {"get_masks_for_pixel_format", 26U, sdl_fn_get_masks_for_pixel_format, 1U, p_i32, VIGIL_TYPE_I32, 5U, rt_i32x5, 0,
+      NULL, NULL, 0},
+     SDL_FN("surface_has_alternate_images", 28U, sdl_fn_surface_has_alternate_images, 1U, p_i64, VIGIL_TYPE_BOOL),
+     SDL_FN_VOID("remove_surface_alternate_images", 31U, sdl_fn_remove_surface_alternate_images, 1U, p_i64),
+     SDL_FN_VOID("cleanup_tls", 11U, sdl_fn_cleanup_tls, 0U, NULL),
+     {"set_environment_variable", 24U, sdl_fn_set_environment_variable, 3U, p_str_str_i32, VIGIL_TYPE_BOOL, 2U,
+      rt_bool_err, 0, NULL, NULL, 0},
+     SDL_FN_BOOL_ERR("unset_environment_variable", 25U, sdl_fn_unset_environment_variable, 1U, p_str),
+     SDL_FN("get_environment_variable", 24U, sdl_fn_get_environment_variable, 1U, p_str, VIGIL_TYPE_STRING),
+     SDL_FN("gl_get_current_window", 21U, sdl_fn_gl_get_current_window, 0U, NULL, VIGIL_TYPE_I64),
+     SDL_FN("gl_get_current_context", 22U, sdl_fn_gl_get_current_context, 0U, NULL, VIGIL_TYPE_I64),
+     SDL_FN("metal_get_layer", 15U, sdl_fn_metal_get_layer, 1U, p_i64, VIGIL_TYPE_I64),
+     SDL_FN("get_process_properties", 22U, sdl_fn_get_process_properties, 1U, p_i64, VIGIL_TYPE_I32),
+     SDL_FN("get_clipboard_mime_types", 24U, sdl_fn_get_clipboard_mime_types, 0U, NULL, VIGIL_TYPE_STRING),
+     SDL_FN_VOID("set_tray_icon", 13U, sdl_fn_set_tray_icon, 2U, p_i64_i64),
+     SDL_FN("get_tray_entry_parent", 21U, sdl_fn_get_tray_entry_parent, 1U, p_i64, VIGIL_TYPE_I64),
+     SDL_FN("get_tray_menu_parent_entry", 25U, sdl_fn_get_tray_menu_parent_entry, 1U, p_i64, VIGIL_TYPE_I64),
+     SDL_FN("get_tray_menu_parent_tray", 25U, sdl_fn_get_tray_menu_parent_tray, 1U, p_i64, VIGIL_TYPE_I64),
+     SDL_FN_BOOL_ERR("set_surface_palette", 19U, sdl_fn_set_surface_palette, 2U, p_i64_i64),
+     SDL_FN_BOOL_ERR("set_texture_palette", 19U, sdl_fn_set_texture_palette, 2U, p_i64_i64),
+     SDL_FN("create_surface_palette", 22U, sdl_fn_create_surface_palette, 1U, p_i64, VIGIL_TYPE_I64),
+     {"calculate_gpu_texture_format_size", 33U, sdl_fn_calculate_gpu_texture_format_size, 4U, p_i32_i32_i32_i32,
+      VIGIL_TYPE_I32, 1U, NULL, 0, NULL, NULL, 0},
     /* IO constants */
     SDL_CONST_ENTRY("IO_SEEK_SET", IO_SEEK_SET),
     SDL_CONST_ENTRY("IO_SEEK_CUR", IO_SEEK_CUR),
