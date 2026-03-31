@@ -1939,6 +1939,31 @@ static const vigil_doc_entry_t sdl_docs[] = {
     {"sdl.Window.get_safe_area", "win.get_safe_area() -> (i32, i32)", "Get safe area (w, h).", NULL, NULL},
     {"sdl.Surface.set_clip_rect", "surf.set_clip_rect(x: i32, y: i32, w: i32, h: i32) -> (bool, err)",
      "Set clipping rectangle. Zeros to clear.", NULL, NULL},
+    /* Camera (slice 35) */
+    {"sdl.get_camera_count", "sdl.get_camera_count() -> i32", "Get number of cameras.", NULL, NULL},
+    {"sdl.get_camera_name", "sdl.get_camera_name(index: i32) -> string", "Get camera name.", NULL, NULL},
+    {"sdl.get_current_camera_driver", "sdl.get_current_camera_driver() -> string", "Get camera driver.", NULL, NULL},
+    {"sdl.Camera", NULL, "Camera (webcam) device.", "Open with sdl.Camera.open(). Acquire frames in a loop.", NULL},
+    {"sdl.Camera.open", "sdl.Camera.open(index: i32, w: i32, h: i32, fps: i32) -> (sdl.Camera, err)", "Open a camera.",
+     "Pass 0 for w/h/fps to use defaults.", NULL},
+    {"sdl.Camera.close", "cam.close() -> void", "Close camera.", NULL, NULL},
+    {"sdl.Camera.get_permission", "cam.get_permission() -> i32",
+     "Get permission state (-1 denied, 0 pending, 1 approved).", NULL, NULL},
+    {"sdl.Camera.get_format", "cam.get_format() -> (i32, i32)", "Get camera resolution (w, h).", NULL, NULL},
+    {"sdl.Camera.acquire_frame", "cam.acquire_frame() -> (i64, err)", "Acquire a frame as surface handle.",
+     "Returns -1 with ok err if no frame ready yet. Must release_frame after use.", NULL},
+    {"sdl.Camera.release_frame", "cam.release_frame(surface_handle: i64) -> void", "Release an acquired camera frame.",
+     NULL, NULL},
+    /* Window mouse rect (slice 36) */
+    {"sdl.Window.set_mouse_rect", "win.set_mouse_rect(x: i32, y: i32, w: i32, h: i32) -> (bool, err)",
+     "Confine cursor to area. Zeros to clear.", NULL, NULL},
+    /* Event description (slice 36) */
+    {"sdl.Event.get_description", "ev.get_description() -> string", "Get English description of the event.", NULL,
+     NULL},
+    /* Surface extras (slice 37) */
+    {"sdl.Surface.get_clip_rect", "surf.get_clip_rect() -> (i32, i32)", "Get clip rect size (w, h).", NULL, NULL},
+    {"sdl.Surface.stretch", "surf.stretch(dst, sx, sy, sw, sh, dx, dy, dw, dh, mode) -> (bool, err)",
+     "Stretched pixel copy to another surface.", NULL, NULL},
 };
 
 #define SDL_DOC_COUNT (sizeof(sdl_docs) / sizeof(sdl_docs[0]))
