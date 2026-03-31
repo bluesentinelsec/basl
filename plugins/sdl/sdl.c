@@ -728,6 +728,7 @@ static const int p_f64_f64_f64_f64[] = {VIGIL_TYPE_F64, VIGIL_TYPE_F64, VIGIL_TY
 static const int rt_bool_err[] = {VIGIL_TYPE_BOOL, VIGIL_TYPE_ERR};
 static const int rt_obj_err[] = {VIGIL_TYPE_OBJECT, VIGIL_TYPE_ERR};
 static const int rt_i64_err[] = {VIGIL_TYPE_I64, VIGIL_TYPE_ERR};
+static const int rt_i32_err[] = {VIGIL_TYPE_I32, VIGIL_TYPE_ERR};
 static const int rt_i32_i32[] = {VIGIL_TYPE_I32, VIGIL_TYPE_I32};
 static const int rt_i32_i32_i32_i32[] = {VIGIL_TYPE_I32, VIGIL_TYPE_I32, VIGIL_TYPE_I32, VIGIL_TYPE_I32};
 static const int p_obj_f64_f64[] = {VIGIL_TYPE_OBJECT, VIGIL_TYPE_F64, VIGIL_TYPE_F64};
@@ -754,6 +755,8 @@ static const int p_i64_i64_i32x9[] = {VIGIL_TYPE_I64, VIGIL_TYPE_I64, VIGIL_TYPE
 static const int p_i64_i64_i32_i32_i64_i32[] = {VIGIL_TYPE_I64, VIGIL_TYPE_I64, VIGIL_TYPE_I32,
                                                 VIGIL_TYPE_I32, VIGIL_TYPE_I64, VIGIL_TYPE_I32};
 static const int p_i64_i64_i64[] = {VIGIL_TYPE_I64, VIGIL_TYPE_I64, VIGIL_TYPE_I64};
+static const int p_i64_i64_i64_i32_i32_i32[] = {VIGIL_TYPE_I64, VIGIL_TYPE_I64, VIGIL_TYPE_I64,
+                                                VIGIL_TYPE_I32, VIGIL_TYPE_I32, VIGIL_TYPE_I32};
 static const int p_i64_i32_i64[] = {VIGIL_TYPE_I64, VIGIL_TYPE_I32, VIGIL_TYPE_I64};
 static const int p_i64_str[] = {VIGIL_TYPE_I64, VIGIL_TYPE_STRING};
 static const int p_i64_i32_i32_i32_i32_i32[] = {VIGIL_TYPE_I64, VIGIL_TYPE_I32, VIGIL_TYPE_I32,
@@ -8968,6 +8971,1112 @@ static vigil_status_t sdl_gamepad_get_button_label(vigil_vm_t *vm, size_t arg_co
     return sdl_push_i32(vm, gp ? (int32_t)SDL_GetGamepadButtonLabel(gp, (SDL_GamepadButton)btn) : 0, error);
 }
 
+/* ── Joystick Complete ────────────────────────────────────────────── */
+
+/* Module-level joystick functions */
+static vigil_status_t sdl_fn_update_joysticks(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_UpdateJoysticks();
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t sdl_fn_lock_joysticks(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_LockJoysticks();
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t sdl_fn_unlock_joysticks(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_UnlockJoysticks();
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t sdl_fn_get_joystick_name_for_id(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t id = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_string(vm, SDL_GetJoystickNameForID((SDL_JoystickID)id), error);
+}
+
+static vigil_status_t sdl_fn_get_joystick_path_for_id(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t id = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_string(vm, SDL_GetJoystickPathForID((SDL_JoystickID)id), error);
+}
+
+static vigil_status_t sdl_fn_get_joystick_type_for_id(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t id = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_i32(vm, (int32_t)SDL_GetJoystickTypeForID((SDL_JoystickID)id), error);
+}
+
+static vigil_status_t sdl_fn_get_joystick_vendor_for_id(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t id = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_i32(vm, (int32_t)SDL_GetJoystickVendorForID((SDL_JoystickID)id), error);
+}
+
+static vigil_status_t sdl_fn_get_joystick_product_for_id(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t id = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_i32(vm, (int32_t)SDL_GetJoystickProductForID((SDL_JoystickID)id), error);
+}
+
+static vigil_status_t sdl_fn_get_joystick_product_version_for_id(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t id = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_i32(vm, (int32_t)SDL_GetJoystickProductVersionForID((SDL_JoystickID)id), error);
+}
+
+static vigil_status_t sdl_fn_get_joystick_player_index_for_id(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t id = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_i32(vm, SDL_GetJoystickPlayerIndexForID((SDL_JoystickID)id), error);
+}
+
+static vigil_status_t sdl_fn_is_joystick_virtual(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t id = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_bool(vm, SDL_IsJoystickVirtual((SDL_JoystickID)id), error);
+}
+
+/* Joystick instance methods */
+static vigil_status_t sdl_joystick_get_id(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, JOY_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Joystick *j = (SDL_Joystick *)SDL_HANDLE_GET(joysticks, h);
+    return sdl_push_i32(vm, j ? (int32_t)SDL_GetJoystickID(j) : 0, error);
+}
+
+static vigil_status_t sdl_joystick_get_path(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, JOY_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Joystick *j = (SDL_Joystick *)SDL_HANDLE_GET(joysticks, h);
+    return sdl_push_string(vm, j ? SDL_GetJoystickPath(j) : "", error);
+}
+
+static vigil_status_t sdl_joystick_get_serial(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, JOY_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Joystick *j = (SDL_Joystick *)SDL_HANDLE_GET(joysticks, h);
+    return sdl_push_string(vm, j ? SDL_GetJoystickSerial(j) : "", error);
+}
+
+static vigil_status_t sdl_joystick_get_vendor(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, JOY_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Joystick *j = (SDL_Joystick *)SDL_HANDLE_GET(joysticks, h);
+    return sdl_push_i32(vm, j ? (int32_t)SDL_GetJoystickVendor(j) : 0, error);
+}
+
+static vigil_status_t sdl_joystick_get_product(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, JOY_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Joystick *j = (SDL_Joystick *)SDL_HANDLE_GET(joysticks, h);
+    return sdl_push_i32(vm, j ? (int32_t)SDL_GetJoystickProduct(j) : 0, error);
+}
+
+static vigil_status_t sdl_joystick_get_product_version(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, JOY_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Joystick *j = (SDL_Joystick *)SDL_HANDLE_GET(joysticks, h);
+    return sdl_push_i32(vm, j ? (int32_t)SDL_GetJoystickProductVersion(j) : 0, error);
+}
+
+static vigil_status_t sdl_joystick_get_firmware_version(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, JOY_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Joystick *j = (SDL_Joystick *)SDL_HANDLE_GET(joysticks, h);
+    return sdl_push_i32(vm, j ? (int32_t)SDL_GetJoystickFirmwareVersion(j) : 0, error);
+}
+
+static vigil_status_t sdl_joystick_get_player_index(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, JOY_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Joystick *j = (SDL_Joystick *)SDL_HANDLE_GET(joysticks, h);
+    return sdl_push_i32(vm, j ? SDL_GetJoystickPlayerIndex(j) : -1, error);
+}
+
+static vigil_status_t sdl_joystick_set_player_index(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, JOY_HANDLE);
+    int32_t idx = sdl_arg_i32(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Joystick *j = (SDL_Joystick *)SDL_HANDLE_GET(joysticks, h);
+    if (j && SDL_SetJoystickPlayerIndex(j, idx))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+static vigil_status_t sdl_joystick_get_power_info(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, JOY_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    int percent = -1;
+    SDL_Joystick *j = (SDL_Joystick *)SDL_HANDLE_GET(joysticks, h);
+    if (j)
+        SDL_GetJoystickPowerInfo(j, &percent);
+    return sdl_push_i32(vm, percent, error);
+}
+
+static vigil_status_t sdl_joystick_get_connection_state(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, JOY_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Joystick *j = (SDL_Joystick *)SDL_HANDLE_GET(joysticks, h);
+    return sdl_push_i32(vm, j ? (int32_t)SDL_GetJoystickConnectionState(j) : 0, error);
+}
+
+static vigil_status_t sdl_joystick_num_balls(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, JOY_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Joystick *j = (SDL_Joystick *)SDL_HANDLE_GET(joysticks, h);
+    return sdl_push_i32(vm, j ? SDL_GetNumJoystickBalls(j) : 0, error);
+}
+
+static vigil_status_t sdl_joystick_get_ball(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, JOY_HANDLE);
+    int32_t ball = sdl_arg_i32(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    int dx = 0, dy = 0;
+    SDL_Joystick *j = (SDL_Joystick *)SDL_HANDLE_GET(joysticks, h);
+    if (j)
+        SDL_GetJoystickBall(j, ball, &dx, &dy);
+    vigil_status_t st = sdl_push_i32(vm, dx, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_i32(vm, dy, error);
+}
+
+static vigil_status_t sdl_joystick_set_led(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, JOY_HANDLE);
+    int32_t r = sdl_arg_i32(vm, base, 1), g = sdl_arg_i32(vm, base, 2), b = sdl_arg_i32(vm, base, 3);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Joystick *j = (SDL_Joystick *)SDL_HANDLE_GET(joysticks, h);
+    if (j && SDL_SetJoystickLED(j, (Uint8)r, (Uint8)g, (Uint8)b))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+static vigil_status_t sdl_joystick_rumble_triggers(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, JOY_HANDLE);
+    int32_t left = sdl_arg_i32(vm, base, 1), right = sdl_arg_i32(vm, base, 2), dur = sdl_arg_i32(vm, base, 3);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Joystick *j = (SDL_Joystick *)SDL_HANDLE_GET(joysticks, h);
+    if (j && SDL_RumbleJoystickTriggers(j, (Uint16)left, (Uint16)right, (Uint32)dur))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+static vigil_status_t sdl_joystick_is_haptic(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, JOY_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Joystick *j = (SDL_Joystick *)SDL_HANDLE_GET(joysticks, h);
+    return sdl_push_bool(vm, j && SDL_IsJoystickHaptic(j), error);
+}
+
+/* Virtual joystick */
+static vigil_status_t sdl_fn_attach_virtual_joystick(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t type = sdl_arg_i32(vm, base, 0), naxes = sdl_arg_i32(vm, base, 1);
+    int32_t nbuttons = sdl_arg_i32(vm, base, 2), nhats = sdl_arg_i32(vm, base, 3);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_VirtualJoystickDesc desc;
+    SDL_zero(desc);
+    desc.type = (Uint16)type;
+    desc.naxes = (Uint16)naxes;
+    desc.nbuttons = (Uint16)nbuttons;
+    desc.nhats = (Uint16)nhats;
+    SDL_JoystickID id = SDL_AttachVirtualJoystick(&desc);
+    return sdl_push_i32(vm, (int32_t)id, error);
+}
+
+static vigil_status_t sdl_fn_detach_virtual_joystick(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t id = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    if (SDL_DetachVirtualJoystick((SDL_JoystickID)id))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+static vigil_status_t sdl_fn_set_joystick_virtual_axis(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_arg_i64(vm, base, 0);
+    int32_t axis = sdl_arg_i32(vm, base, 1);
+    int32_t val = sdl_arg_i32(vm, base, 2);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Joystick *j = (SDL_Joystick *)SDL_HANDLE_GET(joysticks, h);
+    if (j && SDL_SetJoystickVirtualAxis(j, axis, (Sint16)val))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+static vigil_status_t sdl_fn_set_joystick_virtual_button(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_arg_i64(vm, base, 0);
+    int32_t btn = sdl_arg_i32(vm, base, 1);
+    int32_t val = sdl_arg_i32(vm, base, 2);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Joystick *j = (SDL_Joystick *)SDL_HANDLE_GET(joysticks, h);
+    if (j && SDL_SetJoystickVirtualButton(j, btn, val != 0))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+static vigil_status_t sdl_fn_set_joystick_virtual_hat(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_arg_i64(vm, base, 0);
+    int32_t hat = sdl_arg_i32(vm, base, 1);
+    int32_t val = sdl_arg_i32(vm, base, 2);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Joystick *j = (SDL_Joystick *)SDL_HANDLE_GET(joysticks, h);
+    if (j && SDL_SetJoystickVirtualHat(j, hat, (Uint8)val))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+/* ── Audio Complete ───────────────────────────────────────────────── */
+
+static vigil_status_t sdl_fn_get_num_audio_drivers(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_i32(vm, SDL_GetNumAudioDrivers(), error);
+}
+
+static vigil_status_t sdl_fn_get_audio_driver(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t idx = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_string(vm, SDL_GetAudioDriver(idx), error);
+}
+
+static vigil_status_t sdl_fn_get_audio_format_name(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t fmt = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_string(vm, SDL_GetAudioFormatName((SDL_AudioFormat)fmt), error);
+}
+
+/* sdl.open_audio_device(i32 device_id, i32 format, i32 channels, i32 freq) -> (i32, err) */
+static vigil_status_t sdl_fn_open_audio_device(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t devid = sdl_arg_i32(vm, base, 0);
+    int32_t fmt = sdl_arg_i32(vm, base, 1), ch = sdl_arg_i32(vm, base, 2), freq = sdl_arg_i32(vm, base, 3);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_AudioSpec spec = {0};
+    spec.format = (SDL_AudioFormat)fmt;
+    spec.channels = ch;
+    spec.freq = freq;
+    SDL_AudioDeviceID id = SDL_OpenAudioDevice((SDL_AudioDeviceID)devid, (fmt > 0) ? &spec : NULL);
+    if (id == 0)
+    {
+        vigil_status_t st = sdl_push_i32(vm, 0, error);
+        if (st != VIGIL_STATUS_OK)
+            return st;
+        return sdl_push_sdl_err(vm, SDL_ERR_IO, error);
+    }
+    vigil_status_t st = sdl_push_i32(vm, (int32_t)id, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_ok(vm, error);
+}
+
+static vigil_status_t sdl_fn_close_audio_device(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t id = sdl_arg_i32(vm, base, 0);
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_CloseAudioDevice((SDL_AudioDeviceID)id);
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t sdl_fn_pause_audio_device(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t id = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    if (SDL_PauseAudioDevice((SDL_AudioDeviceID)id))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+static vigil_status_t sdl_fn_resume_audio_device(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t id = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    if (SDL_ResumeAudioDevice((SDL_AudioDeviceID)id))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+static vigil_status_t sdl_fn_audio_device_paused(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t id = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_bool(vm, SDL_AudioDevicePaused((SDL_AudioDeviceID)id), error);
+}
+
+static vigil_status_t sdl_fn_get_audio_device_gain(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t id = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_f64(vm, (double)SDL_GetAudioDeviceGain((SDL_AudioDeviceID)id), error);
+}
+
+static vigil_status_t sdl_fn_set_audio_device_gain(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t id = sdl_arg_i32(vm, base, 0);
+    float gain = (float)sdl_arg_f64(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    if (SDL_SetAudioDeviceGain((SDL_AudioDeviceID)id, gain))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+static vigil_status_t sdl_fn_is_audio_device_physical(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t id = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_bool(vm, SDL_IsAudioDevicePhysical((SDL_AudioDeviceID)id), error);
+}
+
+static vigil_status_t sdl_fn_is_audio_device_playback(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t id = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_bool(vm, SDL_IsAudioDevicePlayback((SDL_AudioDeviceID)id), error);
+}
+
+static vigil_status_t sdl_fn_get_audio_recording_device_count(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    vigil_vm_stack_pop_n(vm, arg_count);
+    int count = 0;
+    SDL_AudioDeviceID *devs = SDL_GetAudioRecordingDevices(&count);
+    SDL_free(devs);
+    return sdl_push_i32(vm, count, error);
+}
+
+/* AudioStream methods */
+static vigil_status_t sdl_audio_stream_get_device(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, ASTREAM_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_AudioStream *s = (SDL_AudioStream *)SDL_HANDLE_GET(audio_streams, h);
+    return sdl_push_i32(vm, s ? (int32_t)SDL_GetAudioStreamDevice(s) : 0, error);
+}
+
+static vigil_status_t sdl_audio_stream_paused(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, ASTREAM_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_AudioStream *s = (SDL_AudioStream *)SDL_HANDLE_GET(audio_streams, h);
+    return sdl_push_bool(vm, s && SDL_AudioStreamDevicePaused(s), error);
+}
+
+static vigil_status_t sdl_audio_stream_lock(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, ASTREAM_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_AudioStream *s = (SDL_AudioStream *)SDL_HANDLE_GET(audio_streams, h);
+    if (s && SDL_LockAudioStream(s))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+static vigil_status_t sdl_audio_stream_unlock(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, ASTREAM_HANDLE);
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_AudioStream *s = (SDL_AudioStream *)SDL_HANDLE_GET(audio_streams, h);
+    if (s)
+        SDL_UnlockAudioStream(s);
+    return VIGIL_STATUS_OK;
+}
+
+/* stream.bind(device_id) / stream.unbind() */
+static vigil_status_t sdl_audio_stream_bind(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, ASTREAM_HANDLE);
+    int32_t devid = sdl_arg_i32(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_AudioStream *s = (SDL_AudioStream *)SDL_HANDLE_GET(audio_streams, h);
+    if (s && SDL_BindAudioStream((SDL_AudioDeviceID)devid, s))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+static vigil_status_t sdl_audio_stream_unbind(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, ASTREAM_HANDLE);
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_AudioStream *s = (SDL_AudioStream *)SDL_HANDLE_GET(audio_streams, h);
+    if (s)
+        SDL_UnbindAudioStream(s);
+    return VIGIL_STATUS_OK;
+}
+
+/* stream.get_data(buf, size) -> i32 bytes read */
+static vigil_status_t sdl_audio_stream_get_data(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, ASTREAM_HANDLE);
+    int64_t bh = sdl_arg_i64(vm, base, 1);
+    int32_t size = sdl_arg_i32(vm, base, 2);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_AudioStream *s = (SDL_AudioStream *)SDL_HANDLE_GET(audio_streams, h);
+    int32_t bsz = 0;
+    void *buf = vigil_unsafe_buffer_get(bh, &bsz);
+    if (!s || !buf)
+        return sdl_push_i32(vm, 0, error);
+    int32_t to_read = (size > 0 && size <= bsz) ? size : bsz;
+    return sdl_push_i32(vm, SDL_GetAudioStreamData(s, buf, to_read), error);
+}
+
+/* ── Sensor Complete ──────────────────────────────────────────────── */
+
+SDL_HANDLE_REGISTRY(sensors);
+
+static SDL_SensorID *g_sensor_ids = NULL;
+static int g_sensor_count = 0;
+
+static vigil_status_t sdl_fn_get_sensor_count(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    vigil_vm_stack_pop_n(vm, arg_count);
+    if (g_sensor_ids)
+    {
+        SDL_free(g_sensor_ids);
+        g_sensor_ids = NULL;
+    }
+    g_sensor_ids = SDL_GetSensors(&g_sensor_count);
+    return sdl_push_i32(vm, g_sensor_count, error);
+}
+
+static vigil_status_t sdl_fn_get_sensor_name_for_id(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t idx = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    if (idx >= 0 && idx < g_sensor_count && g_sensor_ids)
+        return sdl_push_string(vm, SDL_GetSensorNameForID(g_sensor_ids[idx]), error);
+    return sdl_push_string(vm, "", error);
+}
+
+static vigil_status_t sdl_fn_get_sensor_type_for_id(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t idx = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    if (idx >= 0 && idx < g_sensor_count && g_sensor_ids)
+        return sdl_push_i32(vm, (int32_t)SDL_GetSensorTypeForID(g_sensor_ids[idx]), error);
+    return sdl_push_i32(vm, 0, error);
+}
+
+static vigil_status_t sdl_fn_get_sensor_nonportable_type_for_id(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t idx = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    if (idx >= 0 && idx < g_sensor_count && g_sensor_ids)
+        return sdl_push_i32(vm, SDL_GetSensorNonPortableTypeForID(g_sensor_ids[idx]), error);
+    return sdl_push_i32(vm, 0, error);
+}
+
+static vigil_status_t sdl_fn_update_sensors(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_UpdateSensors();
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t sdl_fn_open_sensor(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t idx = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_SensorID sid = (idx >= 0 && idx < g_sensor_count && g_sensor_ids) ? g_sensor_ids[idx] : 0;
+    if (!sid)
+    {
+        vigil_status_t st = sdl_push_i64(vm, -1, error);
+        if (st != VIGIL_STATUS_OK)
+            return st;
+        return sdl_push_err(vm, "invalid sensor index", SDL_ERR_ARG, error);
+    }
+    SDL_Sensor *s = SDL_OpenSensor(sid);
+    if (!s)
+    {
+        vigil_status_t st = sdl_push_i64(vm, -1, error);
+        if (st != VIGIL_STATUS_OK)
+            return st;
+        return sdl_push_sdl_err(vm, SDL_ERR_IO, error);
+    }
+    int64_t h = -1;
+    if (SDL_HANDLE_STORE(sensors, s, &h) < 0)
+    {
+        SDL_CloseSensor(s);
+        vigil_status_t st = sdl_push_i64(vm, -1, error);
+        if (st != VIGIL_STATUS_OK)
+            return st;
+        return sdl_push_err(vm, "too many sensors", SDL_ERR_STATE, error);
+    }
+    vigil_status_t st = sdl_push_i64(vm, h, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_ok(vm, error);
+}
+
+static vigil_status_t sdl_fn_close_sensor(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_arg_i64(vm, base, 0);
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Sensor *s = (SDL_Sensor *)SDL_HANDLE_GET(sensors, h);
+    if (s)
+    {
+        SDL_CloseSensor(s);
+        SDL_HANDLE_CLEAR(sensors, h);
+    }
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t sdl_fn_get_sensor_name(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_arg_i64(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Sensor *s = (SDL_Sensor *)SDL_HANDLE_GET(sensors, h);
+    return sdl_push_string(vm, s ? SDL_GetSensorName(s) : "", error);
+}
+
+static vigil_status_t sdl_fn_get_sensor_type(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_arg_i64(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Sensor *s = (SDL_Sensor *)SDL_HANDLE_GET(sensors, h);
+    return sdl_push_i32(vm, s ? (int32_t)SDL_GetSensorType(s) : 0, error);
+}
+
+static vigil_status_t sdl_fn_get_sensor_nonportable_type(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_arg_i64(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Sensor *s = (SDL_Sensor *)SDL_HANDLE_GET(sensors, h);
+    return sdl_push_i32(vm, s ? SDL_GetSensorNonPortableType(s) : 0, error);
+}
+
+/* Sensor data constants */
+SDL_CONST_FN(SENSOR_ACCEL, SDL_SENSOR_ACCEL)
+SDL_CONST_FN(SENSOR_GYRO, SDL_SENSOR_GYRO)
+SDL_CONST_FN(SENSOR_ACCEL_L, SDL_SENSOR_ACCEL_L)
+SDL_CONST_FN(SENSOR_GYRO_L, SDL_SENSOR_GYRO_L)
+SDL_CONST_FN(SENSOR_ACCEL_R, SDL_SENSOR_ACCEL_R)
+SDL_CONST_FN(SENSOR_GYRO_R, SDL_SENSOR_GYRO_R)
+
+/* ── Keyboard Complete ────────────────────────────────────────────── */
+
+static vigil_status_t sdl_fn_clear_composition(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t wh = sdl_field_i64(vm, base, WIN_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Window *win = (SDL_Window *)SDL_HANDLE_GET(windows, wh);
+    if (win)
+        SDL_ClearComposition(win);
+    return sdl_push_bool_ok(vm, error);
+}
+
+static vigil_status_t sdl_fn_has_screen_keyboard_support(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_bool(vm, SDL_HasScreenKeyboardSupport(), error);
+}
+
+static vigil_status_t sdl_fn_screen_keyboard_shown(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t wh = sdl_field_i64(vm, base, WIN_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Window *win = (SDL_Window *)SDL_HANDLE_GET(windows, wh);
+    return sdl_push_bool(vm, win && SDL_ScreenKeyboardShown(win), error);
+}
+
+static vigil_status_t sdl_fn_reset_keyboard(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_ResetKeyboard();
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t sdl_fn_set_mod_state(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t mod = sdl_arg_i32(vm, base, 0);
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_SetModState((SDL_Keymod)mod);
+    return VIGIL_STATUS_OK;
+}
+
+/* ── Touch Complete ───────────────────────────────────────────────── */
+
+static SDL_TouchID *g_touch_ids = NULL;
+static int g_touch_count = 0;
+
+static vigil_status_t sdl_fn_get_touch_device_count(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    vigil_vm_stack_pop_n(vm, arg_count);
+    if (g_touch_ids)
+    {
+        SDL_free(g_touch_ids);
+        g_touch_ids = NULL;
+    }
+    g_touch_ids = SDL_GetTouchDevices(&g_touch_count);
+    return sdl_push_i32(vm, g_touch_count, error);
+}
+
+static vigil_status_t sdl_fn_get_touch_device_name(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t idx = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    if (idx >= 0 && idx < g_touch_count && g_touch_ids)
+        return sdl_push_string(vm, SDL_GetTouchDeviceName(g_touch_ids[idx]), error);
+    return sdl_push_string(vm, "", error);
+}
+
+static vigil_status_t sdl_fn_get_touch_device_type(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t idx = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    if (idx >= 0 && idx < g_touch_count && g_touch_ids)
+        return sdl_push_i32(vm, (int32_t)SDL_GetTouchDeviceType(g_touch_ids[idx]), error);
+    return sdl_push_i32(vm, 0, error);
+}
+
+/* ── Cursor Complete ──────────────────────────────────────────────── */
+
+static vigil_status_t sdl_fn_get_mouse_focus(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Window *win = SDL_GetMouseFocus();
+    if (!win)
+        return sdl_push_i32(vm, -1, error);
+    for (int64_t i = 0; i < (int64_t)g_windows.count; i++)
+        if (g_windows.items[i] == win)
+            return sdl_push_i32(vm, (int32_t)i, error);
+    return sdl_push_i32(vm, -1, error);
+}
+
+/* ── Display Complete ─────────────────────────────────────────────── */
+
+static vigil_status_t sdl_fn_get_current_display_orientation(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t idx = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    if (idx >= 0 && idx < g_display_count && g_display_ids)
+        return sdl_push_i32(vm, (int32_t)SDL_GetCurrentDisplayOrientation(g_display_ids[idx]), error);
+    return sdl_push_i32(vm, 0, error);
+}
+
+static vigil_status_t sdl_fn_get_natural_display_orientation(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t idx = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    if (idx >= 0 && idx < g_display_count && g_display_ids)
+        return sdl_push_i32(vm, (int32_t)SDL_GetNaturalDisplayOrientation(g_display_ids[idx]), error);
+    return sdl_push_i32(vm, 0, error);
+}
+
+/* ── Camera Complete ──────────────────────────────────────────────── */
+
+static vigil_status_t sdl_fn_get_num_camera_drivers(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_i32(vm, SDL_GetNumCameraDrivers(), error);
+}
+
+static vigil_status_t sdl_fn_get_camera_driver(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t idx = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_string(vm, SDL_GetCameraDriver(idx), error);
+}
+
+/* ── GPU Final ────────────────────────────────────────────────────── */
+
+/* Compute storage bindings */
+static vigil_status_t sdl_fn_gpu_bind_compute_storage_buffers(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t cph = sdl_arg_i64(vm, base, 0), bh = sdl_arg_i64(vm, base, 1);
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_GPUComputePass *cp = (SDL_GPUComputePass *)SDL_HANDLE_GET(gpu_compute_passes, cph);
+    SDL_GPUBuffer *buf = (SDL_GPUBuffer *)SDL_HANDLE_GET(gpu_buffers, bh);
+    if (cp && buf)
+        SDL_BindGPUComputeStorageBuffers(cp, 0, &buf, 1);
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t sdl_fn_gpu_bind_compute_storage_textures(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t cph = sdl_arg_i64(vm, base, 0), th = sdl_arg_i64(vm, base, 1);
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_GPUComputePass *cp = (SDL_GPUComputePass *)SDL_HANDLE_GET(gpu_compute_passes, cph);
+    SDL_GPUTexture *tex = (SDL_GPUTexture *)SDL_HANDLE_GET(gpu_textures_gpu, th);
+    if (cp && tex)
+        SDL_BindGPUComputeStorageTextures(cp, 0, &tex, 1);
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t sdl_fn_gpu_bind_compute_samplers(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t cph = sdl_arg_i64(vm, base, 0), th = sdl_arg_i64(vm, base, 1), sh = sdl_arg_i64(vm, base, 2);
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_GPUComputePass *cp = (SDL_GPUComputePass *)SDL_HANDLE_GET(gpu_compute_passes, cph);
+    SDL_GPUTexture *tex = (SDL_GPUTexture *)SDL_HANDLE_GET(gpu_textures_gpu, th);
+    SDL_GPUSampler *samp = (SDL_GPUSampler *)SDL_HANDLE_GET(gpu_samplers, sh);
+    if (cp && tex && samp)
+    {
+        SDL_GPUTextureSamplerBinding tsb = {tex, samp};
+        SDL_BindGPUComputeSamplers(cp, 0, &tsb, 1);
+    }
+    return VIGIL_STATUS_OK;
+}
+
+/* Fragment/vertex storage bindings */
+static vigil_status_t sdl_fn_gpu_bind_fragment_storage_buffers(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t ph = sdl_arg_i64(vm, base, 0), bh = sdl_arg_i64(vm, base, 1);
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_GPURenderPass *pass = (SDL_GPURenderPass *)SDL_HANDLE_GET(gpu_render_passes, ph);
+    SDL_GPUBuffer *buf = (SDL_GPUBuffer *)SDL_HANDLE_GET(gpu_buffers, bh);
+    if (pass && buf)
+        SDL_BindGPUFragmentStorageBuffers(pass, 0, &buf, 1);
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t sdl_fn_gpu_bind_fragment_storage_textures(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t ph = sdl_arg_i64(vm, base, 0), th = sdl_arg_i64(vm, base, 1);
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_GPURenderPass *pass = (SDL_GPURenderPass *)SDL_HANDLE_GET(gpu_render_passes, ph);
+    SDL_GPUTexture *tex = (SDL_GPUTexture *)SDL_HANDLE_GET(gpu_textures_gpu, th);
+    if (pass && tex)
+        SDL_BindGPUFragmentStorageTextures(pass, 0, &tex, 1);
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t sdl_fn_gpu_bind_vertex_storage_buffers(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t ph = sdl_arg_i64(vm, base, 0), bh = sdl_arg_i64(vm, base, 1);
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_GPURenderPass *pass = (SDL_GPURenderPass *)SDL_HANDLE_GET(gpu_render_passes, ph);
+    SDL_GPUBuffer *buf = (SDL_GPUBuffer *)SDL_HANDLE_GET(gpu_buffers, bh);
+    if (pass && buf)
+        SDL_BindGPUVertexStorageBuffers(pass, 0, &buf, 1);
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t sdl_fn_gpu_bind_vertex_storage_textures(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t ph = sdl_arg_i64(vm, base, 0), th = sdl_arg_i64(vm, base, 1);
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_GPURenderPass *pass = (SDL_GPURenderPass *)SDL_HANDLE_GET(gpu_render_passes, ph);
+    SDL_GPUTexture *tex = (SDL_GPUTexture *)SDL_HANDLE_GET(gpu_textures_gpu, th);
+    if (pass && tex)
+        SDL_BindGPUVertexStorageTextures(pass, 0, &tex, 1);
+    return VIGIL_STATUS_OK;
+}
+
+/* Indirect compute dispatch */
+static vigil_status_t sdl_fn_gpu_dispatch_compute_indirect(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t cph = sdl_arg_i64(vm, base, 0), bh = sdl_arg_i64(vm, base, 1);
+    int32_t offset = sdl_arg_i32(vm, base, 2);
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_GPUComputePass *cp = (SDL_GPUComputePass *)SDL_HANDLE_GET(gpu_compute_passes, cph);
+    SDL_GPUBuffer *buf = (SDL_GPUBuffer *)SDL_HANDLE_GET(gpu_buffers, bh);
+    if (cp && buf)
+        SDL_DispatchGPUComputeIndirect(cp, buf, (Uint32)offset);
+    return VIGIL_STATUS_OK;
+}
+
+/* Texture format queries */
+static vigil_status_t sdl_fn_gpu_texture_format_texel_block_size(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t fmt = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_i32(vm, (int32_t)SDL_GPUTextureFormatTexelBlockSize((SDL_GPUTextureFormat)fmt), error);
+}
+
+static vigil_status_t sdl_fn_gpu_texture_format_from_pixel(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t fmt = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_i32(vm, (int32_t)SDL_GetGPUTextureFormatFromPixelFormat((SDL_PixelFormat)fmt), error);
+}
+
+static vigil_status_t sdl_fn_gpu_pixel_format_from_texture(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t fmt = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_i32(vm, (int32_t)SDL_GetPixelFormatFromGPUTextureFormat((SDL_GPUTextureFormat)fmt), error);
+}
+
+/* GPU texture copy */
+static vigil_status_t sdl_fn_gpu_copy_texture_to_texture(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t cph = sdl_arg_i64(vm, base, 0);
+    int64_t src_th = sdl_arg_i64(vm, base, 1), dst_th = sdl_arg_i64(vm, base, 2);
+    int32_t w = sdl_arg_i32(vm, base, 3), h = sdl_arg_i32(vm, base, 4), d = sdl_arg_i32(vm, base, 5);
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_GPUCopyPass *cp = (SDL_GPUCopyPass *)SDL_HANDLE_GET(gpu_copy_passes, cph);
+    SDL_GPUTexture *src = (SDL_GPUTexture *)SDL_HANDLE_GET(gpu_textures_gpu, src_th);
+    SDL_GPUTexture *dst = (SDL_GPUTexture *)SDL_HANDLE_GET(gpu_textures_gpu, dst_th);
+    if (cp && src && dst)
+    {
+        SDL_GPUTextureLocation sl = {src, 0, 0, 0, 0, 0};
+        SDL_GPUTextureLocation dl = {dst, 0, 0, 0, 0, 0};
+        SDL_CopyGPUTextureToTexture(cp, &sl, &dl, (Uint32)w, (Uint32)h, (Uint32)(d > 0 ? d : 1), false);
+    }
+    return VIGIL_STATUS_OK;
+}
+
+/* GPU texture download */
+static vigil_status_t sdl_fn_gpu_download_from_texture(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t cph = sdl_arg_i64(vm, base, 0), th = sdl_arg_i64(vm, base, 1);
+    int32_t w = sdl_arg_i32(vm, base, 2), h = sdl_arg_i32(vm, base, 3);
+    int64_t xh = sdl_arg_i64(vm, base, 4);
+    int32_t xoff = sdl_arg_i32(vm, base, 5);
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_GPUCopyPass *cp = (SDL_GPUCopyPass *)SDL_HANDLE_GET(gpu_copy_passes, cph);
+    SDL_GPUTexture *tex = (SDL_GPUTexture *)SDL_HANDLE_GET(gpu_textures_gpu, th);
+    SDL_GPUTransferBuffer *xb = (SDL_GPUTransferBuffer *)SDL_HANDLE_GET(gpu_xfer_buffers, xh);
+    if (cp && tex && xb)
+    {
+        SDL_GPUTextureRegion src = {tex, 0, 0, 0, 0, 0, (Uint32)w, (Uint32)h, 1};
+        SDL_GPUTextureTransferInfo dst = {xb, (Uint32)xoff, 0, 0};
+        SDL_DownloadFromGPUTexture(cp, &src, &dst);
+    }
+    return VIGIL_STATUS_OK;
+}
+
+/* ── Haptic Complete ──────────────────────────────────────────────── */
+
+static vigil_status_t sdl_fn_get_haptic_name_for_id(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t idx = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    if (idx >= 0 && idx < g_haptic_count && g_haptic_ids)
+        return sdl_push_string(vm, SDL_GetHapticNameForID(g_haptic_ids[idx]), error);
+    return sdl_push_string(vm, "", error);
+}
+
+static vigil_status_t sdl_fn_open_haptic_from_mouse(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Haptic *h = SDL_OpenHapticFromMouse();
+    if (!h)
+    {
+        vigil_status_t st = sdl_push_i64(vm, -1, error);
+        if (st != VIGIL_STATUS_OK)
+            return st;
+        return sdl_push_sdl_err(vm, SDL_ERR_IO, error);
+    }
+    int64_t handle = -1;
+    if (SDL_HANDLE_STORE(haptics, h, &handle) < 0)
+    {
+        SDL_CloseHaptic(h);
+        vigil_status_t st = sdl_push_i64(vm, -1, error);
+        if (st != VIGIL_STATUS_OK)
+            return st;
+        return sdl_push_err(vm, "too many haptics", SDL_ERR_STATE, error);
+    }
+    vigil_status_t st = sdl_push_i64(vm, handle, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_ok(vm, error);
+}
+
+/* Haptic instance methods */
+static vigil_status_t sdl_haptic_get_features(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, HAP_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Haptic *hp = (SDL_Haptic *)SDL_HANDLE_GET(haptics, h);
+    return sdl_push_i32(vm, hp ? (int32_t)SDL_GetHapticFeatures(hp) : 0, error);
+}
+
+static vigil_status_t sdl_haptic_get_max_effects(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, HAP_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Haptic *hp = (SDL_Haptic *)SDL_HANDLE_GET(haptics, h);
+    return sdl_push_i32(vm, hp ? SDL_GetMaxHapticEffects(hp) : 0, error);
+}
+
+static vigil_status_t sdl_haptic_get_max_effects_playing(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, HAP_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Haptic *hp = (SDL_Haptic *)SDL_HANDLE_GET(haptics, h);
+    return sdl_push_i32(vm, hp ? SDL_GetMaxHapticEffectsPlaying(hp) : 0, error);
+}
+
+static vigil_status_t sdl_haptic_get_num_axes(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, HAP_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Haptic *hp = (SDL_Haptic *)SDL_HANDLE_GET(haptics, h);
+    return sdl_push_i32(vm, hp ? SDL_GetNumHapticAxes(hp) : 0, error);
+}
+
+static vigil_status_t sdl_haptic_set_gain(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, HAP_HANDLE);
+    int32_t gain = sdl_arg_i32(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Haptic *hp = (SDL_Haptic *)SDL_HANDLE_GET(haptics, h);
+    if (hp && SDL_SetHapticGain(hp, gain))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+static vigil_status_t sdl_haptic_set_autocenter(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, HAP_HANDLE);
+    int32_t ac = sdl_arg_i32(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Haptic *hp = (SDL_Haptic *)SDL_HANDLE_GET(haptics, h);
+    if (hp && SDL_SetHapticAutocenter(hp, ac))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+static vigil_status_t sdl_haptic_stop_effects(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, HAP_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Haptic *hp = (SDL_Haptic *)SDL_HANDLE_GET(haptics, h);
+    if (hp && SDL_StopHapticEffects(hp))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
 /* Texture access constants */
 SDL_CONST_FN(TEXTUREACCESS_STATIC, SDL_TEXTUREACCESS_STATIC)
 SDL_CONST_FN(TEXTUREACCESS_STREAMING, SDL_TEXTUREACCESS_STREAMING)
@@ -9387,6 +10496,100 @@ static const vigil_native_module_function_t sdl_functions[] = {
     SDL_FN("get_gamepad_type_from_string", 28U, sdl_fn_get_gamepad_type_from_string, 1U, p_str, VIGIL_TYPE_I32),
     SDL_FN("get_gamepad_name_for_id", 22U, sdl_fn_get_gamepad_name_for_id, 1U, p_i32, VIGIL_TYPE_STRING),
     SDL_FN("get_gamepad_type_for_id", 22U, sdl_fn_get_gamepad_type_for_id, 1U, p_i32, VIGIL_TYPE_I32),
+    /* Joystick complete - module */
+    SDL_FN_VOID("update_joysticks", 17U, sdl_fn_update_joysticks, 0U, NULL),
+    SDL_FN_VOID("lock_joysticks", 15U, sdl_fn_lock_joysticks, 0U, NULL),
+    SDL_FN_VOID("unlock_joysticks", 17U, sdl_fn_unlock_joysticks, 0U, NULL),
+    SDL_FN("get_joystick_name_for_id", 23U, sdl_fn_get_joystick_name_for_id, 1U, p_i32, VIGIL_TYPE_STRING),
+    SDL_FN("get_joystick_path_for_id", 23U, sdl_fn_get_joystick_path_for_id, 1U, p_i32, VIGIL_TYPE_STRING),
+    SDL_FN("get_joystick_type_for_id", 23U, sdl_fn_get_joystick_type_for_id, 1U, p_i32, VIGIL_TYPE_I32),
+    SDL_FN("get_joystick_vendor_for_id", 25U, sdl_fn_get_joystick_vendor_for_id, 1U, p_i32, VIGIL_TYPE_I32),
+    SDL_FN("get_joystick_product_for_id", 26U, sdl_fn_get_joystick_product_for_id, 1U, p_i32, VIGIL_TYPE_I32),
+    SDL_FN("get_joystick_product_version_for_id", 34U, sdl_fn_get_joystick_product_version_for_id, 1U, p_i32,
+           VIGIL_TYPE_I32),
+    SDL_FN("get_joystick_player_index_for_id", 31U, sdl_fn_get_joystick_player_index_for_id, 1U, p_i32, VIGIL_TYPE_I32),
+    SDL_FN("is_joystick_virtual", 19U, sdl_fn_is_joystick_virtual, 1U, p_i32, VIGIL_TYPE_BOOL),
+    SDL_FN("attach_virtual_joystick", 23U, sdl_fn_attach_virtual_joystick, 4U, p_i32_i32_i32_i32, VIGIL_TYPE_I32),
+    SDL_FN_BOOL_ERR("detach_virtual_joystick", 22U, sdl_fn_detach_virtual_joystick, 1U, p_i32),
+    {"set_joystick_virtual_axis", 25U, sdl_fn_set_joystick_virtual_axis, 3U, p_i64_i32_i32, VIGIL_TYPE_BOOL, 2U,
+     rt_bool_err, 0, NULL, NULL, 0},
+    {"set_joystick_virtual_button", 27U, sdl_fn_set_joystick_virtual_button, 3U, p_i64_i32_i32, VIGIL_TYPE_BOOL, 2U,
+     rt_bool_err, 0, NULL, NULL, 0},
+    {"set_joystick_virtual_hat", 24U, sdl_fn_set_joystick_virtual_hat, 3U, p_i64_i32_i32, VIGIL_TYPE_BOOL, 2U,
+     rt_bool_err, 0, NULL, NULL, 0},
+    /* Audio complete - module */
+    SDL_FN("get_num_audio_drivers", 21U, sdl_fn_get_num_audio_drivers, 0U, NULL, VIGIL_TYPE_I32),
+    SDL_FN("get_audio_driver", 16U, sdl_fn_get_audio_driver, 1U, p_i32, VIGIL_TYPE_STRING),
+    SDL_FN("get_audio_format_name", 21U, sdl_fn_get_audio_format_name, 1U, p_i32, VIGIL_TYPE_STRING),
+    {"open_audio_device", 17U, sdl_fn_open_audio_device, 4U, p_i32_i32_i32_i32, VIGIL_TYPE_I32, 2U, rt_i32_err, 0, NULL,
+     NULL, 0},
+    SDL_FN_VOID("close_audio_device", 18U, sdl_fn_close_audio_device, 1U, p_i32),
+    SDL_FN_BOOL_ERR("pause_audio_device", 18U, sdl_fn_pause_audio_device, 1U, p_i32),
+    SDL_FN_BOOL_ERR("resume_audio_device", 19U, sdl_fn_resume_audio_device, 1U, p_i32),
+    SDL_FN("audio_device_paused", 19U, sdl_fn_audio_device_paused, 1U, p_i32, VIGIL_TYPE_BOOL),
+    SDL_FN("get_audio_device_gain", 21U, sdl_fn_get_audio_device_gain, 1U, p_i32, VIGIL_TYPE_F64),
+    {"set_audio_device_gain", 21U, sdl_fn_set_audio_device_gain, 2U, p_i32_f64, VIGIL_TYPE_BOOL, 2U, rt_bool_err, 0,
+     NULL, NULL, 0},
+    SDL_FN("is_audio_device_physical", 24U, sdl_fn_is_audio_device_physical, 1U, p_i32, VIGIL_TYPE_BOOL),
+    SDL_FN("is_audio_device_playback", 24U, sdl_fn_is_audio_device_playback, 1U, p_i32, VIGIL_TYPE_BOOL),
+    SDL_FN("get_audio_recording_device_count", 32U, sdl_fn_get_audio_recording_device_count, 0U, NULL, VIGIL_TYPE_I32),
+    /* Sensor complete */
+    SDL_FN("get_sensor_count", 16U, sdl_fn_get_sensor_count, 0U, NULL, VIGIL_TYPE_I32),
+    SDL_FN("get_sensor_name_for_id", 22U, sdl_fn_get_sensor_name_for_id, 1U, p_i32, VIGIL_TYPE_STRING),
+    SDL_FN("get_sensor_type_for_id", 22U, sdl_fn_get_sensor_type_for_id, 1U, p_i32, VIGIL_TYPE_I32),
+    SDL_FN("get_sensor_nonportable_type_for_id", 34U, sdl_fn_get_sensor_nonportable_type_for_id, 1U, p_i32,
+           VIGIL_TYPE_I32),
+    SDL_FN_VOID("update_sensors", 14U, sdl_fn_update_sensors, 0U, NULL),
+    {"open_sensor", 11U, sdl_fn_open_sensor, 1U, p_i32, VIGIL_TYPE_I64, 2U, rt_i64_err, 0, NULL, NULL, 0},
+    SDL_FN_VOID("close_sensor", 12U, sdl_fn_close_sensor, 1U, p_i64),
+    SDL_FN("get_sensor_name", 15U, sdl_fn_get_sensor_name, 1U, p_i64, VIGIL_TYPE_STRING),
+    SDL_FN("get_sensor_type", 15U, sdl_fn_get_sensor_type, 1U, p_i64, VIGIL_TYPE_I32),
+    SDL_FN("get_sensor_nonportable_type", 27U, sdl_fn_get_sensor_nonportable_type, 1U, p_i64, VIGIL_TYPE_I32),
+    /* Sensor type constants */
+    SDL_CONST_ENTRY("SENSOR_ACCEL", SENSOR_ACCEL),
+    SDL_CONST_ENTRY("SENSOR_GYRO", SENSOR_GYRO),
+    SDL_CONST_ENTRY("SENSOR_ACCEL_L", SENSOR_ACCEL_L),
+    SDL_CONST_ENTRY("SENSOR_GYRO_L", SENSOR_GYRO_L),
+    SDL_CONST_ENTRY("SENSOR_ACCEL_R", SENSOR_ACCEL_R),
+    SDL_CONST_ENTRY("SENSOR_GYRO_R", SENSOR_GYRO_R),
+    /* Keyboard complete */
+    SDL_FN_BOOL_ERR("clear_composition", 17U, sdl_fn_clear_composition, 1U, p_obj),
+    SDL_FN("has_screen_keyboard_support", 27U, sdl_fn_has_screen_keyboard_support, 0U, NULL, VIGIL_TYPE_BOOL),
+    SDL_FN("screen_keyboard_shown", 21U, sdl_fn_screen_keyboard_shown, 1U, p_obj, VIGIL_TYPE_BOOL),
+    SDL_FN_VOID("reset_keyboard", 14U, sdl_fn_reset_keyboard, 0U, NULL),
+    SDL_FN_VOID("set_mod_state", 13U, sdl_fn_set_mod_state, 1U, p_i32),
+    /* Touch complete */
+    SDL_FN("get_touch_device_count", 22U, sdl_fn_get_touch_device_count, 0U, NULL, VIGIL_TYPE_I32),
+    SDL_FN("get_touch_device_name", 21U, sdl_fn_get_touch_device_name, 1U, p_i32, VIGIL_TYPE_STRING),
+    SDL_FN("get_touch_device_type", 21U, sdl_fn_get_touch_device_type, 1U, p_i32, VIGIL_TYPE_I32),
+    /* Cursor complete */
+    SDL_FN("get_mouse_focus", 15U, sdl_fn_get_mouse_focus, 0U, NULL, VIGIL_TYPE_I32),
+    /* Display complete */
+    SDL_FN("get_current_display_orientation", 31U, sdl_fn_get_current_display_orientation, 1U, p_i32, VIGIL_TYPE_I32),
+    SDL_FN("get_natural_display_orientation", 31U, sdl_fn_get_natural_display_orientation, 1U, p_i32, VIGIL_TYPE_I32),
+    /* Camera complete */
+    SDL_FN("get_num_camera_drivers", 21U, sdl_fn_get_num_camera_drivers, 0U, NULL, VIGIL_TYPE_I32),
+    SDL_FN("get_camera_driver", 16U, sdl_fn_get_camera_driver, 1U, p_i32, VIGIL_TYPE_STRING),
+    /* GPU final */
+    SDL_FN_VOID("gpu_bind_compute_storage_buffers", 32U, sdl_fn_gpu_bind_compute_storage_buffers, 2U, p_i64_i64),
+    SDL_FN_VOID("gpu_bind_compute_storage_textures", 33U, sdl_fn_gpu_bind_compute_storage_textures, 2U, p_i64_i64),
+    SDL_FN_VOID("gpu_bind_compute_samplers", 25U, sdl_fn_gpu_bind_compute_samplers, 3U, p_i64_i64_i64),
+    SDL_FN_VOID("gpu_bind_fragment_storage_buffers", 33U, sdl_fn_gpu_bind_fragment_storage_buffers, 2U, p_i64_i64),
+    SDL_FN_VOID("gpu_bind_fragment_storage_textures", 34U, sdl_fn_gpu_bind_fragment_storage_textures, 2U, p_i64_i64),
+    SDL_FN_VOID("gpu_bind_vertex_storage_buffers", 31U, sdl_fn_gpu_bind_vertex_storage_buffers, 2U, p_i64_i64),
+    SDL_FN_VOID("gpu_bind_vertex_storage_textures", 32U, sdl_fn_gpu_bind_vertex_storage_textures, 2U, p_i64_i64),
+    SDL_FN_VOID("gpu_dispatch_compute_indirect", 29U, sdl_fn_gpu_dispatch_compute_indirect, 3U, p_i64_i64_i32),
+    SDL_FN("gpu_texture_format_texel_block_size", 36U, sdl_fn_gpu_texture_format_texel_block_size, 1U, p_i32,
+           VIGIL_TYPE_I32),
+    SDL_FN("gpu_texture_format_from_pixel", 30U, sdl_fn_gpu_texture_format_from_pixel, 1U, p_i32, VIGIL_TYPE_I32),
+    SDL_FN("gpu_pixel_format_from_texture", 30U, sdl_fn_gpu_pixel_format_from_texture, 1U, p_i32, VIGIL_TYPE_I32),
+    SDL_FN_VOID("gpu_copy_texture_to_texture", 27U, sdl_fn_gpu_copy_texture_to_texture, 6U, p_i64_i64_i64_i32_i32_i32),
+    {"gpu_download_from_texture", 24U, sdl_fn_gpu_download_from_texture, 6U, p_i64_i64_i32_i32_i64_i32, VIGIL_TYPE_VOID,
+     0U, NULL, 0, NULL, NULL, 0},
+    /* Haptic complete - module */
+    SDL_FN("get_haptic_name_for_id", 22U, sdl_fn_get_haptic_name_for_id, 1U, p_i32, VIGIL_TYPE_STRING),
+    {"open_haptic_from_mouse", 22U, sdl_fn_open_haptic_from_mouse, 0U, NULL, VIGIL_TYPE_I64, 2U, rt_i64_err, 0, NULL,
+     NULL, 0},
     /* IO constants */
     SDL_CONST_ENTRY("IO_SEEK_SET", IO_SEEK_SET),
     SDL_CONST_ENTRY("IO_SEEK_CUR", IO_SEEK_CUR),
@@ -9989,6 +11192,14 @@ static const vigil_native_class_method_t sdl_audio_stream_methods[] = {
     SDL_METHOD("get_available", 13U, sdl_audio_stream_get_available, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL),
     SDL_METHOD("flush", 5U, sdl_audio_stream_flush, 0U, NULL, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
     SDL_METHOD("clear", 5U, sdl_audio_stream_clear, 0U, NULL, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
+    /* Audio complete - stream methods */
+    SDL_METHOD("get_device", 10U, sdl_audio_stream_get_device, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL),
+    SDL_METHOD("paused", 6U, sdl_audio_stream_paused, 0U, NULL, VIGIL_TYPE_BOOL, 1U, NULL),
+    SDL_METHOD("lock", 4U, sdl_audio_stream_lock, 0U, NULL, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
+    SDL_METHOD("unlock", 6U, sdl_audio_stream_unlock, 0U, NULL, VIGIL_TYPE_VOID, 0U, NULL),
+    SDL_METHOD("bind", 4U, sdl_audio_stream_bind, 1U, p_i32, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
+    SDL_METHOD("unbind", 6U, sdl_audio_stream_unbind, 0U, NULL, VIGIL_TYPE_VOID, 0U, NULL),
+    {"get_data", 8U, sdl_audio_stream_get_data, 2U, p_i64_i32, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, 0U, 0},
 };
 
 /* ── Gamepad class descriptor ────────────────────────────────────── */
@@ -10051,6 +11262,23 @@ static const vigil_native_class_method_t sdl_joystick_methods[] = {
     SDL_METHOD("get_button", 10U, sdl_joystick_get_button, 1U, p_i32, VIGIL_TYPE_BOOL, 1U, NULL),
     SDL_METHOD("get_hat", 7U, sdl_joystick_get_hat, 1U, p_i32, VIGIL_TYPE_I32, 1U, NULL),
     SDL_METHOD("rumble", 6U, sdl_joystick_rumble, 3U, p_i32_i32_i32, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
+    /* Joystick complete - methods */
+    SDL_METHOD("get_id", 6U, sdl_joystick_get_id, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL),
+    SDL_METHOD("get_path", 8U, sdl_joystick_get_path, 0U, NULL, VIGIL_TYPE_STRING, 1U, NULL),
+    SDL_METHOD("get_serial", 10U, sdl_joystick_get_serial, 0U, NULL, VIGIL_TYPE_STRING, 1U, NULL),
+    SDL_METHOD("get_vendor", 10U, sdl_joystick_get_vendor, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL),
+    SDL_METHOD("get_product", 11U, sdl_joystick_get_product, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL),
+    SDL_METHOD("get_product_version", 19U, sdl_joystick_get_product_version, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL),
+    SDL_METHOD("get_firmware_version", 20U, sdl_joystick_get_firmware_version, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL),
+    SDL_METHOD("get_player_index", 16U, sdl_joystick_get_player_index, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL),
+    SDL_METHOD("set_player_index", 16U, sdl_joystick_set_player_index, 1U, p_i32, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
+    SDL_METHOD("get_power_info", 14U, sdl_joystick_get_power_info, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL),
+    SDL_METHOD("get_connection_state", 20U, sdl_joystick_get_connection_state, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL),
+    SDL_METHOD("num_balls", 9U, sdl_joystick_num_balls, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL),
+    SDL_METHOD("get_ball", 8U, sdl_joystick_get_ball, 1U, p_i32, VIGIL_TYPE_I32, 2U, rt_i32_i32),
+    SDL_METHOD("set_led", 7U, sdl_joystick_set_led, 3U, p_i32_i32_i32, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
+    SDL_METHOD("rumble_triggers", 15U, sdl_joystick_rumble_triggers, 3U, p_i32_i32_i32, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
+    SDL_METHOD("is_haptic", 9U, sdl_joystick_is_haptic, 0U, NULL, VIGIL_TYPE_BOOL, 1U, NULL),
 };
 
 /* ── Haptic class descriptor ─────────────────────────────────────── */
@@ -10067,6 +11295,14 @@ static const vigil_native_class_method_t sdl_haptic_methods[] = {
     SDL_METHOD("init_rumble", 11U, sdl_haptic_init_rumble, 0U, NULL, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
     SDL_METHOD("play_rumble", 11U, sdl_haptic_play_rumble, 2U, p_f64_i32, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
     SDL_METHOD("stop_rumble", 11U, sdl_haptic_stop_rumble, 0U, NULL, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
+    /* Haptic complete - methods */
+    SDL_METHOD("get_features", 12U, sdl_haptic_get_features, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL),
+    SDL_METHOD("get_max_effects", 15U, sdl_haptic_get_max_effects, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL),
+    SDL_METHOD("get_max_effects_playing", 23U, sdl_haptic_get_max_effects_playing, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL),
+    SDL_METHOD("get_num_axes", 12U, sdl_haptic_get_num_axes, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL),
+    SDL_METHOD("set_gain", 8U, sdl_haptic_set_gain, 1U, p_i32, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
+    SDL_METHOD("set_autocenter", 14U, sdl_haptic_set_autocenter, 1U, p_i32, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
+    SDL_METHOD("stop_effects", 12U, sdl_haptic_stop_effects, 0U, NULL, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
     SDL_METHOD("pause", 5U, sdl_haptic_pause, 0U, NULL, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
     SDL_METHOD("resume", 6U, sdl_haptic_resume, 0U, NULL, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
 };
