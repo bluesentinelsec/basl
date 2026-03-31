@@ -9648,6 +9648,141 @@ SDL_CONST_FN(SENSOR_GYRO_L, SDL_SENSOR_GYRO_L)
 SDL_CONST_FN(SENSOR_ACCEL_R, SDL_SENSOR_ACCEL_R)
 SDL_CONST_FN(SENSOR_GYRO_R, SDL_SENSOR_GYRO_R)
 
+/* ── Keyboard Complete ────────────────────────────────────────────── */
+
+static vigil_status_t sdl_fn_clear_composition(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t wh = sdl_field_i64(vm, base, WIN_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Window *win = (SDL_Window *)SDL_HANDLE_GET(windows, wh);
+    if (win)
+        SDL_ClearComposition(win);
+    return sdl_push_bool_ok(vm, error);
+}
+
+static vigil_status_t sdl_fn_has_screen_keyboard_support(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_bool(vm, SDL_HasScreenKeyboardSupport(), error);
+}
+
+static vigil_status_t sdl_fn_screen_keyboard_shown(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t wh = sdl_field_i64(vm, base, WIN_HANDLE);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Window *win = (SDL_Window *)SDL_HANDLE_GET(windows, wh);
+    return sdl_push_bool(vm, win && SDL_ScreenKeyboardShown(win), error);
+}
+
+static vigil_status_t sdl_fn_reset_keyboard(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_ResetKeyboard();
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t sdl_fn_set_mod_state(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t mod = sdl_arg_i32(vm, base, 0);
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_SetModState((SDL_Keymod)mod);
+    return VIGIL_STATUS_OK;
+}
+
+/* ── Touch Complete ───────────────────────────────────────────────── */
+
+static SDL_TouchID *g_touch_ids = NULL;
+static int g_touch_count = 0;
+
+static vigil_status_t sdl_fn_get_touch_device_count(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    vigil_vm_stack_pop_n(vm, arg_count);
+    if (g_touch_ids)
+    {
+        SDL_free(g_touch_ids);
+        g_touch_ids = NULL;
+    }
+    g_touch_ids = SDL_GetTouchDevices(&g_touch_count);
+    return sdl_push_i32(vm, g_touch_count, error);
+}
+
+static vigil_status_t sdl_fn_get_touch_device_name(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t idx = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    if (idx >= 0 && idx < g_touch_count && g_touch_ids)
+        return sdl_push_string(vm, SDL_GetTouchDeviceName(g_touch_ids[idx]), error);
+    return sdl_push_string(vm, "", error);
+}
+
+static vigil_status_t sdl_fn_get_touch_device_type(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t idx = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    if (idx >= 0 && idx < g_touch_count && g_touch_ids)
+        return sdl_push_i32(vm, (int32_t)SDL_GetTouchDeviceType(g_touch_ids[idx]), error);
+    return sdl_push_i32(vm, 0, error);
+}
+
+/* ── Cursor Complete ──────────────────────────────────────────────── */
+
+static vigil_status_t sdl_fn_get_mouse_focus(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Window *win = SDL_GetMouseFocus();
+    if (!win)
+        return sdl_push_i32(vm, -1, error);
+    for (int64_t i = 0; i < (int64_t)g_windows.count; i++)
+        if (g_windows.items[i] == win)
+            return sdl_push_i32(vm, (int32_t)i, error);
+    return sdl_push_i32(vm, -1, error);
+}
+
+/* ── Display Complete ─────────────────────────────────────────────── */
+
+static vigil_status_t sdl_fn_get_current_display_orientation(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t idx = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    if (idx >= 0 && idx < g_display_count && g_display_ids)
+        return sdl_push_i32(vm, (int32_t)SDL_GetCurrentDisplayOrientation(g_display_ids[idx]), error);
+    return sdl_push_i32(vm, 0, error);
+}
+
+static vigil_status_t sdl_fn_get_natural_display_orientation(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t idx = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    if (idx >= 0 && idx < g_display_count && g_display_ids)
+        return sdl_push_i32(vm, (int32_t)SDL_GetNaturalDisplayOrientation(g_display_ids[idx]), error);
+    return sdl_push_i32(vm, 0, error);
+}
+
+/* ── Camera Complete ──────────────────────────────────────────────── */
+
+static vigil_status_t sdl_fn_get_num_camera_drivers(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_i32(vm, SDL_GetNumCameraDrivers(), error);
+}
+
+static vigil_status_t sdl_fn_get_camera_driver(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t idx = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_push_string(vm, SDL_GetCameraDriver(idx), error);
+}
+
 /* Texture access constants */
 SDL_CONST_FN(TEXTUREACCESS_STATIC, SDL_TEXTUREACCESS_STATIC)
 SDL_CONST_FN(TEXTUREACCESS_STREAMING, SDL_TEXTUREACCESS_STREAMING)
@@ -10123,6 +10258,24 @@ static const vigil_native_module_function_t sdl_functions[] = {
     SDL_CONST_ENTRY("SENSOR_GYRO_L", SENSOR_GYRO_L),
     SDL_CONST_ENTRY("SENSOR_ACCEL_R", SENSOR_ACCEL_R),
     SDL_CONST_ENTRY("SENSOR_GYRO_R", SENSOR_GYRO_R),
+    /* Keyboard complete */
+    SDL_FN_BOOL_ERR("clear_composition", 17U, sdl_fn_clear_composition, 1U, p_obj),
+    SDL_FN("has_screen_keyboard_support", 27U, sdl_fn_has_screen_keyboard_support, 0U, NULL, VIGIL_TYPE_BOOL),
+    SDL_FN("screen_keyboard_shown", 21U, sdl_fn_screen_keyboard_shown, 1U, p_obj, VIGIL_TYPE_BOOL),
+    SDL_FN_VOID("reset_keyboard", 14U, sdl_fn_reset_keyboard, 0U, NULL),
+    SDL_FN_VOID("set_mod_state", 13U, sdl_fn_set_mod_state, 1U, p_i32),
+    /* Touch complete */
+    SDL_FN("get_touch_device_count", 22U, sdl_fn_get_touch_device_count, 0U, NULL, VIGIL_TYPE_I32),
+    SDL_FN("get_touch_device_name", 21U, sdl_fn_get_touch_device_name, 1U, p_i32, VIGIL_TYPE_STRING),
+    SDL_FN("get_touch_device_type", 21U, sdl_fn_get_touch_device_type, 1U, p_i32, VIGIL_TYPE_I32),
+    /* Cursor complete */
+    SDL_FN("get_mouse_focus", 15U, sdl_fn_get_mouse_focus, 0U, NULL, VIGIL_TYPE_I32),
+    /* Display complete */
+    SDL_FN("get_current_display_orientation", 31U, sdl_fn_get_current_display_orientation, 1U, p_i32, VIGIL_TYPE_I32),
+    SDL_FN("get_natural_display_orientation", 31U, sdl_fn_get_natural_display_orientation, 1U, p_i32, VIGIL_TYPE_I32),
+    /* Camera complete */
+    SDL_FN("get_num_camera_drivers", 21U, sdl_fn_get_num_camera_drivers, 0U, NULL, VIGIL_TYPE_I32),
+    SDL_FN("get_camera_driver", 16U, sdl_fn_get_camera_driver, 1U, p_i32, VIGIL_TYPE_STRING),
     /* IO constants */
     SDL_CONST_ENTRY("IO_SEEK_SET", IO_SEEK_SET),
     SDL_CONST_ENTRY("IO_SEEK_CUR", IO_SEEK_CUR),
