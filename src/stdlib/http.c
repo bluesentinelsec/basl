@@ -2280,46 +2280,230 @@ static const int http_i64_str_str[] = {VIGIL_TYPE_I64, VIGIL_TYPE_STRING, VIGIL_
 static const int http_i64_i64[] = {VIGIL_TYPE_I64, VIGIL_TYPE_I64};
 static const int http_handle_p[] = {VIGIL_TYPE_I64, VIGIL_TYPE_STRING, VIGIL_TYPE_OBJECT};
 static const int http_ret_get[] = {VIGIL_TYPE_I32, VIGIL_TYPE_STRING, VIGIL_TYPE_STRING};
+static const char *const http_url_param_names[] = {"url"};
+static const char *const http_url_body_param_names[] = {"url", "body"};
+static const char *const http_request_param_names[] = {"method", "url"};
+static const char *const http_listen_param_names[] = {"host", "port"};
+static const char *const http_server_param_names[] = {"server"};
+static const char *const http_server_pattern_handler_param_names[] = {"server", "pattern", "handler"};
+static const char *const http_conn_status_headers_body_param_names[] = {"conn", "status", "headers", "body"};
+static const char *const http_conn_status_param_names[] = {"conn", "status"};
+static const char *const http_conn_data_param_names[] = {"conn", "data"};
+static const char *const http_conn_param_names[] = {"conn"};
+static const char *const http_conn_name_param_names[] = {"conn", "name"};
+static const char *const http_conn_url_param_names[] = {"conn", "url"};
+static const char *const http_conn_name_value_param_names[] = {"conn", "name", "value"};
+static const char *const http_server_timeout_param_names[] = {"server", "ms"};
+static const char *const http_handler_param_types[] = {"i64", "string", "function"};
+
+static const vigil_native_symbol_doc_t vigil_http_module_doc = {
+    "HTTP client and server support.",
+    "Issue HTTP requests and build simple HTTP/1.1 servers with route handlers and streaming responses.",
+    NULL,
+};
+
+static const vigil_native_symbol_doc_t vigil_http_get_doc = {
+    "Issue an HTTP GET request.",
+    "Returns the status code, response body, and raw response headers.",
+    NULL,
+};
+
+static const vigil_native_symbol_doc_t vigil_http_post_doc = {
+    "Issue an HTTP POST request.",
+    "Returns the status code, response body, and raw response headers.",
+    NULL,
+};
+
+static const vigil_native_symbol_doc_t vigil_http_request_doc = {
+    "Issue a generic HTTP request.",
+    "Supports arbitrary methods. Additional header and body arguments are accepted dynamically by the implementation.",
+    NULL,
+};
+
+static const vigil_native_symbol_doc_t vigil_http_listen_doc = {
+    "Start an HTTP server.",
+    "Binds a listener and returns a server handle, or -1 on failure.",
+    NULL,
+};
+
+static const vigil_native_symbol_doc_t vigil_http_accept_doc = {
+    "Accept the next connection.",
+    "Blocks until a request arrives and returns a connection handle.",
+    NULL,
+};
+
+static const vigil_native_symbol_doc_t vigil_http_handle_doc = {
+    "Register a route handler.",
+    "Associates a path prefix with a handler function that can inspect the active request via http.current_conn().",
+    NULL,
+};
+
+static const vigil_native_symbol_doc_t vigil_http_serve_doc = {
+    "Serve requests in a loop.",
+    "Accepts incoming connections and dispatches to registered handlers until the server is closed.",
+    NULL,
+};
+
+static const vigil_native_symbol_doc_t vigil_http_current_conn_doc = {
+    "Get the active connection.",
+    "Returns the connection handle for the request currently executing inside a registered handler.",
+    NULL,
+};
+
+static const vigil_native_symbol_doc_t vigil_http_write_header_doc = {
+    "Begin a streaming response.",
+    "Writes the status line and headers for a chunked response. Follow with http.write() and finish with http.flush().",
+    NULL,
+};
+
+static const vigil_native_symbol_doc_t vigil_http_write_doc = {
+    "Write a response chunk.",
+    "Appends a chunk to the active streaming response.",
+    NULL,
+};
+
+static const vigil_native_symbol_doc_t vigil_http_flush_doc = {
+    "Finish a streaming response.",
+    "Flushes the final chunk terminator and closes the connection.",
+    NULL,
+};
+
+static const vigil_native_symbol_doc_t vigil_http_req_method_doc = {
+    "Read the request method.",
+    "Returns the HTTP method from an accepted connection.",
+    NULL,
+};
+
+static const vigil_native_symbol_doc_t vigil_http_req_path_doc = {
+    "Read the request path.",
+    "Returns the path portion of the current request target.",
+    NULL,
+};
+
+static const vigil_native_symbol_doc_t vigil_http_req_body_doc = {
+    "Read the request body.",
+    "Returns the full request body collected for the connection.",
+    NULL,
+};
+
+static const vigil_native_symbol_doc_t vigil_http_req_headers_doc = {
+    "Read raw request headers.",
+    "Returns the request headers as a CRLF-separated string.",
+    NULL,
+};
+
+static const vigil_native_symbol_doc_t vigil_http_req_header_doc = {
+    "Look up a request header.",
+    "Performs a case-insensitive header lookup and returns an empty string when the header is absent.",
+    NULL,
+};
+
+static const vigil_native_symbol_doc_t vigil_http_req_query_doc = {
+    "Read the query string.",
+    "Returns the query portion of the request target without the leading '?'.",
+    NULL,
+};
+
+static const vigil_native_symbol_doc_t vigil_http_respond_doc = {
+    "Send a complete response.",
+    "Writes the status, headers, and body, then closes the connection.",
+    NULL,
+};
+
+static const vigil_native_symbol_doc_t vigil_http_redirect_doc = {
+    "Send a redirect response.",
+    "Writes a redirect with a Location header. The implementation accepts an optional status override.",
+    NULL,
+};
+
+static const vigil_native_symbol_doc_t vigil_http_set_cookie_doc = {
+    "Queue a Set-Cookie header.",
+    "Adds a response cookie for the next response written on the connection.",
+    NULL,
+};
+
+static const vigil_native_symbol_doc_t vigil_http_req_cookies_doc = {
+    "Read request cookies.",
+    "Returns the raw Cookie header string from the request.",
+    NULL,
+};
+
+static const vigil_native_symbol_doc_t vigil_http_close_doc = {
+    "Close a server handle.",
+    "Stops accepting new connections and releases the listener.",
+    NULL,
+};
+
+static const vigil_native_symbol_doc_t vigil_http_set_read_timeout_doc = {
+    "Set the read timeout.",
+    "Configures the read timeout in milliseconds for accepted connections.",
+    NULL,
+};
+
+static const vigil_native_symbol_doc_t vigil_http_set_write_timeout_doc = {
+    "Set the write timeout.",
+    "Configures the write timeout in milliseconds for accepted connections.",
+    NULL,
+};
+
+static const vigil_native_symbol_doc_t vigil_http_set_idle_timeout_doc = {
+    "Set the idle timeout.",
+    "Configures how long an idle connection may remain open before it is closed.",
+    NULL,
+};
 
 static const vigil_native_module_function_t http_functions[] = {
-    {"get", 3, http_get, 1, http_1str, VIGIL_TYPE_I32, 3, http_ret_get, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
-    {"post", 4, http_post, 2, http_2str, VIGIL_TYPE_I32, 3, http_ret_get, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
-    {"request", 7, http_request, 2, http_2str, VIGIL_TYPE_I32, 3, http_ret_get, 0, NULL, NULL, 0U, NULL, NULL, NULL,
-     NULL},
-    {"listen", 6, http_listen, 2, http_str_i32, VIGIL_TYPE_I64, 1, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
-    {"accept", 6, http_accept, 1, http_i64, VIGIL_TYPE_I64, 1, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
-    {"handle", 6, http_handle, 3, http_handle_p, VIGIL_TYPE_I32, 1, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
-    {"serve", 5, http_serve, 1, http_i64, VIGIL_TYPE_I32, 1, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
+    {"get", 3, http_get, 1, http_1str, VIGIL_TYPE_I32, 3, http_ret_get, 0, NULL, NULL, 0U, http_url_param_names, NULL,
+     NULL, &vigil_http_get_doc},
+    {"post", 4, http_post, 2, http_2str, VIGIL_TYPE_I32, 3, http_ret_get, 0, NULL, NULL, 0U,
+     http_url_body_param_names, NULL, NULL, &vigil_http_post_doc},
+    {"request", 7, http_request, 2, http_2str, VIGIL_TYPE_I32, 3, http_ret_get, 0, NULL, NULL, 0U,
+     http_request_param_names, NULL, NULL, &vigil_http_request_doc},
+    {"listen", 6, http_listen, 2, http_str_i32, VIGIL_TYPE_I64, 1, NULL, 0, NULL, NULL, 0U, http_listen_param_names,
+     NULL, NULL, &vigil_http_listen_doc},
+    {"accept", 6, http_accept, 1, http_i64, VIGIL_TYPE_I64, 1, NULL, 0, NULL, NULL, 0U, http_server_param_names, NULL,
+     NULL, &vigil_http_accept_doc},
+    {"handle", 6, http_handle, 3, http_handle_p, VIGIL_TYPE_I32, 1, NULL, 0, NULL, NULL, 0U,
+     http_server_pattern_handler_param_names, http_handler_param_types, NULL, &vigil_http_handle_doc},
+    {"serve", 5, http_serve, 1, http_i64, VIGIL_TYPE_I32, 1, NULL, 0, NULL, NULL, 0U, http_server_param_names, NULL,
+     NULL, &vigil_http_serve_doc},
     {"current_conn", 12, http_current_conn, 0, NULL, VIGIL_TYPE_I64, 1, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL,
-     NULL},
-    {"write_header", 12, http_write_header, 2, http_i64_i64, VIGIL_TYPE_I32, 1, NULL, 0, NULL, NULL, 0U, NULL, NULL,
-     NULL, NULL},
-    {"write", 5, http_write, 2, http_i64_str, VIGIL_TYPE_I32, 1, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
-    {"flush", 5, http_flush, 1, http_i64, VIGIL_TYPE_I32, 1, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
-    {"req_method", 10, http_req_method, 1, http_i64, VIGIL_TYPE_STRING, 1, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL,
-     NULL},
-    {"req_path", 8, http_req_path, 1, http_i64, VIGIL_TYPE_STRING, 1, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
-    {"req_body", 8, http_req_body, 1, http_i64, VIGIL_TYPE_STRING, 1, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
-    {"req_headers", 11, http_req_headers, 1, http_i64, VIGIL_TYPE_STRING, 1, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL,
-     NULL},
-    {"req_header", 10, http_req_header, 2, http_i64_str, VIGIL_TYPE_STRING, 1, NULL, 0, NULL, NULL, 0U, NULL, NULL,
-     NULL, NULL},
-    {"req_query", 9, http_req_query, 1, http_i64, VIGIL_TYPE_STRING, 1, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL,
-     NULL},
-    {"respond", 7, http_respond, 4, http_respond_p, VIGIL_TYPE_I32, 1, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
-    {"redirect", 8, http_redirect, 2, http_i64_str, VIGIL_TYPE_I32, 1, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
-    {"set_cookie", 10, http_set_cookie, 3, http_i64_str_str, VIGIL_TYPE_I32, 1, NULL, 0, NULL, NULL, 0U, NULL, NULL,
-     NULL, NULL},
-    {"req_cookies", 11, http_req_cookies, 1, http_i64, VIGIL_TYPE_STRING, 1, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL,
-     NULL},
-    {"close", 5, http_server_close, 1, http_i64, VIGIL_TYPE_VOID, 0, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
-    {"set_read_timeout", 16, http_set_read_timeout, 2, http_i64_i64, VIGIL_TYPE_I32, 1, NULL, 0, NULL, NULL, 0U, NULL,
-     NULL, NULL, NULL},
-    {"set_write_timeout", 17, http_set_write_timeout, 2, http_i64_i64, VIGIL_TYPE_I32, 1, NULL, 0, NULL, NULL, 0U, NULL,
-     NULL, NULL, NULL},
-    {"set_idle_timeout", 16, http_set_idle_timeout, 2, http_i64_i64, VIGIL_TYPE_I32, 1, NULL, 0, NULL, NULL, 0U, NULL,
-     NULL, NULL, NULL},
+     &vigil_http_current_conn_doc},
+    {"write_header", 12, http_write_header, 2, http_i64_i64, VIGIL_TYPE_I32, 1, NULL, 0, NULL, NULL, 0U,
+     http_conn_status_param_names, NULL, NULL, &vigil_http_write_header_doc},
+    {"write", 5, http_write, 2, http_i64_str, VIGIL_TYPE_I32, 1, NULL, 0, NULL, NULL, 0U, http_conn_data_param_names,
+     NULL, NULL, &vigil_http_write_doc},
+    {"flush", 5, http_flush, 1, http_i64, VIGIL_TYPE_I32, 1, NULL, 0, NULL, NULL, 0U, http_conn_param_names, NULL,
+     NULL, &vigil_http_flush_doc},
+    {"req_method", 10, http_req_method, 1, http_i64, VIGIL_TYPE_STRING, 1, NULL, 0, NULL, NULL, 0U,
+     http_conn_param_names, NULL, NULL, &vigil_http_req_method_doc},
+    {"req_path", 8, http_req_path, 1, http_i64, VIGIL_TYPE_STRING, 1, NULL, 0, NULL, NULL, 0U, http_conn_param_names,
+     NULL, NULL, &vigil_http_req_path_doc},
+    {"req_body", 8, http_req_body, 1, http_i64, VIGIL_TYPE_STRING, 1, NULL, 0, NULL, NULL, 0U, http_conn_param_names,
+     NULL, NULL, &vigil_http_req_body_doc},
+    {"req_headers", 11, http_req_headers, 1, http_i64, VIGIL_TYPE_STRING, 1, NULL, 0, NULL, NULL, 0U,
+     http_conn_param_names, NULL, NULL, &vigil_http_req_headers_doc},
+    {"req_header", 10, http_req_header, 2, http_i64_str, VIGIL_TYPE_STRING, 1, NULL, 0, NULL, NULL, 0U,
+     http_conn_name_param_names, NULL, NULL, &vigil_http_req_header_doc},
+    {"req_query", 9, http_req_query, 1, http_i64, VIGIL_TYPE_STRING, 1, NULL, 0, NULL, NULL, 0U, http_conn_param_names,
+     NULL, NULL, &vigil_http_req_query_doc},
+    {"respond", 7, http_respond, 4, http_respond_p, VIGIL_TYPE_I32, 1, NULL, 0, NULL, NULL, 0U,
+     http_conn_status_headers_body_param_names, NULL, NULL, &vigil_http_respond_doc},
+    {"redirect", 8, http_redirect, 2, http_i64_str, VIGIL_TYPE_I32, 1, NULL, 0, NULL, NULL, 0U,
+     http_conn_url_param_names, NULL, NULL, &vigil_http_redirect_doc},
+    {"set_cookie", 10, http_set_cookie, 3, http_i64_str_str, VIGIL_TYPE_I32, 1, NULL, 0, NULL, NULL, 0U,
+     http_conn_name_value_param_names, NULL, NULL, &vigil_http_set_cookie_doc},
+    {"req_cookies", 11, http_req_cookies, 1, http_i64, VIGIL_TYPE_STRING, 1, NULL, 0, NULL, NULL, 0U,
+     http_conn_param_names, NULL, NULL, &vigil_http_req_cookies_doc},
+    {"close", 5, http_server_close, 1, http_i64, VIGIL_TYPE_VOID, 0, NULL, 0, NULL, NULL, 0U, http_server_param_names,
+     NULL, NULL, &vigil_http_close_doc},
+    {"set_read_timeout", 16, http_set_read_timeout, 2, http_i64_i64, VIGIL_TYPE_I32, 1, NULL, 0, NULL, NULL, 0U,
+     http_server_timeout_param_names, NULL, NULL, &vigil_http_set_read_timeout_doc},
+    {"set_write_timeout", 17, http_set_write_timeout, 2, http_i64_i64, VIGIL_TYPE_I32, 1, NULL, 0, NULL, NULL, 0U,
+     http_server_timeout_param_names, NULL, NULL, &vigil_http_set_write_timeout_doc},
+    {"set_idle_timeout", 16, http_set_idle_timeout, 2, http_i64_i64, VIGIL_TYPE_I32, 1, NULL, 0, NULL, NULL, 0U,
+     http_server_timeout_param_names, NULL, NULL, &vigil_http_set_idle_timeout_doc},
 };
 
 VIGIL_API const vigil_native_module_t vigil_stdlib_http = {
-    "http", 4, http_functions, sizeof(http_functions) / sizeof(http_functions[0]), NULL, 0, NULL};
+    "http", 4, http_functions, sizeof(http_functions) / sizeof(http_functions[0]), NULL, 0, &vigil_http_module_doc};

@@ -1698,10 +1698,6 @@ static vigil_status_t json_decode_fn(vigil_vm_t *vm, size_t arg_count, vigil_err
     return vigil_runtime_push_ok_error(vigil_vm_runtime(vm), vm, error);
 }
 
-static const vigil_native_class_field_t json_value_fields[] = {
-    {"raw", 3U, VIGIL_TYPE_STRING, VIGIL_NATIVE_FIELD_PRIMITIVE, NULL, 0U, 0, NULL, NULL},
-};
-
 static const int str_param[] = {VIGIL_TYPE_STRING};
 static const int i32_param[] = {VIGIL_TYPE_I32};
 static const int obj_param[] = {VIGIL_TYPE_OBJECT};
@@ -1711,49 +1707,183 @@ static const int bool_err_returns[] = {VIGIL_TYPE_BOOL, VIGIL_TYPE_ERR};
 static const int f64_err_returns[] = {VIGIL_TYPE_F64, VIGIL_TYPE_ERR};
 static const int str_err_returns[] = {VIGIL_TYPE_STRING, VIGIL_TYPE_ERR};
 static const int i32_err_returns[] = {VIGIL_TYPE_I32, VIGIL_TYPE_ERR};
+static const char *const json_value_param_names[] = {"value"};
+static const char *const json_decode_param_names[] = {"text", "prototype"};
+static const char *const json_decode_param_types[] = {"string", "T"};
+static const char *const json_text_param_names[] = {"text"};
+static const char *const json_path_param_names[] = {"path"};
+static const char *const json_index_param_names[] = {"index"};
+static const char *const json_key_param_names[] = {"key"};
+
+static const vigil_native_symbol_doc_t vigil_json_module_doc = {
+    "JSON parsing and traversal.",
+    "Parse arbitrary JSON, inspect it dynamically through json.Value, and encode or decode structured values.",
+    NULL,
+};
+
+static const vigil_native_symbol_doc_t vigil_json_encode_doc = {
+    "Encode a value as JSON.",
+    "Serializes supported Vigil values into a JSON string.",
+    NULL,
+};
+
+static const vigil_native_symbol_doc_t vigil_json_decode_doc = {
+    "Decode JSON into a prototype shape.",
+    "Decodes JSON text using the supplied prototype value to determine the target shape.",
+    NULL,
+};
+
+static const vigil_native_symbol_doc_t vigil_json_value_doc = {
+    "Dynamic JSON value wrapper.",
+    "Stores canonical JSON text and exposes traversal helpers for objects, arrays, scalars, and null.",
+    NULL,
+};
+
+static const vigil_native_symbol_doc_t vigil_json_value_raw_doc = {
+    "Canonical JSON text.",
+    "Stores the underlying JSON representation used by the wrapper.",
+    NULL,
+};
+
+static const vigil_native_class_field_t json_value_fields[] = {
+    {"raw", 3U, VIGIL_TYPE_STRING, VIGIL_NATIVE_FIELD_PRIMITIVE, NULL, 0U, 0, NULL, &vigil_json_value_raw_doc},
+};
+
+static const vigil_native_symbol_doc_t vigil_json_value_parse_doc = {
+    "Parse JSON text.",
+    "Parses arbitrary JSON text and returns a json.Value wrapper.",
+    NULL,
+};
+
+static const vigil_native_symbol_doc_t vigil_json_value_read_doc = {
+    "Read and parse JSON from a file.",
+    "Loads a file from disk, parses it as JSON, and returns a json.Value wrapper.",
+    NULL,
+};
+
+static const vigil_native_symbol_doc_t vigil_json_value_kind_doc = {
+    "Get the JSON kind name.",
+    "Returns one of null, bool, number, string, array, object, or invalid.",
+    NULL,
+};
+
+static const vigil_native_symbol_doc_t vigil_json_value_is_null_doc = {"Check for null.", "Returns true when the value is null.", NULL};
+static const vigil_native_symbol_doc_t vigil_json_value_is_bool_doc = {"Check for bool.", "Returns true when the value is a JSON boolean.", NULL};
+static const vigil_native_symbol_doc_t vigil_json_value_is_number_doc = {"Check for number.", "Returns true when the value is a JSON number.", NULL};
+static const vigil_native_symbol_doc_t vigil_json_value_is_string_doc = {"Check for string.", "Returns true when the value is a JSON string.", NULL};
+static const vigil_native_symbol_doc_t vigil_json_value_is_array_doc = {"Check for array.", "Returns true when the value is a JSON array.", NULL};
+static const vigil_native_symbol_doc_t vigil_json_value_is_object_doc = {"Check for object.", "Returns true when the value is a JSON object.", NULL};
+
+static const vigil_native_symbol_doc_t vigil_json_value_len_doc = {
+    "Get object or array length.",
+    "Returns the number of entries in an array or object value.",
+    NULL,
+};
+
+static const vigil_native_symbol_doc_t vigil_json_value_as_bool_doc = {
+    "Read a boolean value.",
+    "Returns the underlying boolean when the value is a JSON boolean.",
+    NULL,
+};
+
+static const vigil_native_symbol_doc_t vigil_json_value_as_number_doc = {
+    "Read a numeric value.",
+    "Returns the underlying number when the value is a JSON number.",
+    NULL,
+};
+
+static const vigil_native_symbol_doc_t vigil_json_value_as_string_doc = {
+    "Read a string value.",
+    "Returns the underlying string when the value is a JSON string.",
+    NULL,
+};
+
+static const vigil_native_symbol_doc_t vigil_json_value_at_doc = {
+    "Read an array element.",
+    "Returns the value at the given array index.",
+    NULL,
+};
+
+static const vigil_native_symbol_doc_t vigil_json_value_get_doc = {
+    "Read an object member.",
+    "Returns the value stored at the given object key.",
+    NULL,
+};
+
+static const vigil_native_symbol_doc_t vigil_json_value_has_doc = {
+    "Check for an object member.",
+    "Returns true when the key exists on the value and the value is an object.",
+    NULL,
+};
+
+static const vigil_native_symbol_doc_t vigil_json_value_keys_doc = {
+    "List object keys.",
+    "Returns the object's keys in their stored order.",
+    NULL,
+};
+
+static const vigil_native_symbol_doc_t vigil_json_value_stringify_doc = {
+    "Serialize the value to text.",
+    "Returns the canonical JSON text currently stored by the wrapper.",
+    NULL,
+};
+
+static const vigil_native_symbol_doc_t vigil_json_value_write_doc = {
+    "Write JSON to a file.",
+    "Writes the stored JSON text to the target path.",
+    NULL,
+};
+
 static const vigil_native_module_function_t json_functions[] = {
-    {"encode", 6U, json_encode_fn, 1U, obj_param, VIGIL_TYPE_STRING, 2U, str_err_returns, 0, NULL, NULL, 0U, NULL, NULL,
-     NULL, NULL},
-    {"decode", 6U, json_decode_fn, 2U, str_obj_param, VIGIL_TYPE_OBJECT, 2U, obj_err_returns, 0, NULL, NULL, 2U, NULL,
-     NULL, NULL, NULL},
+    {"encode", 6U, json_encode_fn, 1U, obj_param, VIGIL_TYPE_STRING, 2U, str_err_returns, 0, NULL, NULL, 0U,
+     json_value_param_names, NULL, NULL, &vigil_json_encode_doc},
+    {"decode", 6U, json_decode_fn, 2U, str_obj_param, VIGIL_TYPE_OBJECT, 2U, obj_err_returns, 0, NULL, NULL, 2U,
+     json_decode_param_names, json_decode_param_types, "T", &vigil_json_decode_doc},
 };
 static const vigil_native_class_method_t json_value_methods[] = {
-    {"parse", 5U, json_value_parse, 1U, str_param, VIGIL_TYPE_OBJECT, 2U, obj_err_returns, 1, "Value", 5U, 0, NULL,
-     NULL, NULL, NULL},
-    {"read", 4U, json_value_read, 1U, str_param, VIGIL_TYPE_OBJECT, 2U, obj_err_returns, 1, "Value", 5U, 0, NULL, NULL,
-     NULL, NULL},
-    {"kind", 4U, json_value_kind, 0U, NULL, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, 0U, 0, NULL, NULL, NULL, NULL},
-    {"is_null", 7U, json_value_is_null, 0U, NULL, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, 0U, 0, NULL, NULL, NULL, NULL},
-    {"is_bool", 7U, json_value_is_bool, 0U, NULL, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, 0U, 0, NULL, NULL, NULL, NULL},
+    {"parse", 5U, json_value_parse, 1U, str_param, VIGIL_TYPE_OBJECT, 2U, obj_err_returns, 1, "Value", 5U, 0,
+     json_text_param_names, NULL, "json.Value", &vigil_json_value_parse_doc},
+    {"read", 4U, json_value_read, 1U, str_param, VIGIL_TYPE_OBJECT, 2U, obj_err_returns, 1, "Value", 5U, 0,
+     json_path_param_names, NULL, "json.Value", &vigil_json_value_read_doc},
+    {"kind", 4U, json_value_kind, 0U, NULL, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, 0U, 0, NULL, NULL, NULL,
+     &vigil_json_value_kind_doc},
+    {"is_null", 7U, json_value_is_null, 0U, NULL, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, 0U, 0, NULL, NULL, NULL,
+     &vigil_json_value_is_null_doc},
+    {"is_bool", 7U, json_value_is_bool, 0U, NULL, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, 0U, 0, NULL, NULL, NULL,
+     &vigil_json_value_is_bool_doc},
     {"is_number", 9U, json_value_is_number, 0U, NULL, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, 0U, 0, NULL, NULL, NULL,
-     NULL},
+     &vigil_json_value_is_number_doc},
     {"is_string", 9U, json_value_is_string, 0U, NULL, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, 0U, 0, NULL, NULL, NULL,
-     NULL},
-    {"is_array", 8U, json_value_is_array, 0U, NULL, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, 0U, 0, NULL, NULL, NULL, NULL},
+     &vigil_json_value_is_string_doc},
+    {"is_array", 8U, json_value_is_array, 0U, NULL, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, 0U, 0, NULL, NULL, NULL,
+     &vigil_json_value_is_array_doc},
     {"is_object", 9U, json_value_is_object, 0U, NULL, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, 0U, 0, NULL, NULL, NULL,
-     NULL},
-    {"len", 3U, json_value_len, 0U, NULL, VIGIL_TYPE_I32, 2U, i32_err_returns, 0, NULL, 0U, 0, NULL, NULL, NULL, NULL},
+     &vigil_json_value_is_object_doc},
+    {"len", 3U, json_value_len, 0U, NULL, VIGIL_TYPE_I32, 2U, i32_err_returns, 0, NULL, 0U, 0, NULL, NULL, NULL,
+     &vigil_json_value_len_doc},
     {"as_bool", 7U, json_value_as_bool, 0U, NULL, VIGIL_TYPE_BOOL, 2U, bool_err_returns, 0, NULL, 0U, 0, NULL, NULL,
-     NULL, NULL},
-    {"as_number", 9U, json_value_as_number, 0U, NULL, VIGIL_TYPE_F64, 2U, f64_err_returns, 0, NULL, 0U, 0, NULL, NULL,
-     NULL, NULL},
+     NULL, &vigil_json_value_as_bool_doc},
+    {"as_number", 9U, json_value_as_number, 0U, NULL, VIGIL_TYPE_F64, 2U, f64_err_returns, 0, NULL, 0U, 0, NULL,
+     NULL, NULL, &vigil_json_value_as_number_doc},
     {"as_string", 9U, json_value_as_string, 0U, NULL, VIGIL_TYPE_STRING, 2U, str_err_returns, 0, NULL, 0U, 0, NULL,
-     NULL, NULL, NULL},
-    {"at", 2U, json_value_at, 1U, i32_param, VIGIL_TYPE_OBJECT, 2U, obj_err_returns, 0, NULL, 0U, 0, NULL, NULL, NULL,
-     NULL},
-    {"get", 3U, json_value_get, 1U, str_param, VIGIL_TYPE_OBJECT, 2U, obj_err_returns, 0, NULL, 0U, 0, NULL, NULL, NULL,
-     NULL},
-    {"has", 3U, json_value_has, 1U, str_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, 0U, 0, NULL, NULL, NULL, NULL},
+     NULL, NULL, &vigil_json_value_as_string_doc},
+    {"at", 2U, json_value_at, 1U, i32_param, VIGIL_TYPE_OBJECT, 2U, obj_err_returns, 0, NULL, 0U, 0,
+     json_index_param_names, NULL, "json.Value", &vigil_json_value_at_doc},
+    {"get", 3U, json_value_get, 1U, str_param, VIGIL_TYPE_OBJECT, 2U, obj_err_returns, 0, NULL, 0U, 0,
+     json_key_param_names, NULL, "json.Value", &vigil_json_value_get_doc},
+    {"has", 3U, json_value_has, 1U, str_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, 0U, 0, json_key_param_names, NULL,
+     NULL, &vigil_json_value_has_doc},
     {"keys", 4U, json_value_keys, 0U, NULL, VIGIL_TYPE_OBJECT, 1U, NULL, 0, NULL, 0U, VIGIL_TYPE_STRING, NULL, NULL,
-     NULL, NULL},
+     NULL, &vigil_json_value_keys_doc},
     {"stringify", 9U, json_value_stringify, 0U, NULL, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, 0U, 0, NULL, NULL, NULL,
-     NULL},
-    {"write", 5U, json_value_write, 1U, str_param, VIGIL_TYPE_ERR, 1U, NULL, 0, NULL, 0U, 0, NULL, NULL, NULL, NULL},
+     &vigil_json_value_stringify_doc},
+    {"write", 5U, json_value_write, 1U, str_param, VIGIL_TYPE_ERR, 1U, NULL, 0, NULL, 0U, 0, json_path_param_names,
+     NULL, NULL, &vigil_json_value_write_doc},
 };
 
 static const vigil_native_class_t json_classes[] = {
     {"Value", 5U, json_value_fields, JSON_VALUE_FIELD_COUNT, json_value_methods,
-     sizeof(json_value_methods) / sizeof(json_value_methods[0]), NULL, NULL},
+     sizeof(json_value_methods) / sizeof(json_value_methods[0]), NULL, &vigil_json_value_doc},
 };
 
 VIGIL_API const vigil_native_module_t vigil_stdlib_json = {"json",
@@ -1762,4 +1892,4 @@ VIGIL_API const vigil_native_module_t vigil_stdlib_json = {"json",
                                                            sizeof(json_functions) / sizeof(json_functions[0]),
                                                            json_classes,
                                                            sizeof(json_classes) / sizeof(json_classes[0]),
-                                                           NULL};
+                                                           &vigil_json_module_doc};

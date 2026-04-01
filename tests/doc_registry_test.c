@@ -331,6 +331,27 @@ TEST(DocRegistryTest, DescriptorBackedDocsRenderDerivedSignaturesForFfiAndUnsafe
     EXPECT_STREQ(unsafe_copy->summary, "Copy bytes between buffers.");
 }
 
+TEST(DocRegistryTest, DescriptorBackedDocsRenderDerivedSignaturesForHttpJsonFsAndMath)
+{
+    const vigil_doc_entry_t *http_get = vigil_doc_lookup("http.get");
+    const vigil_doc_entry_t *json_parse = vigil_doc_lookup("json.Value.parse");
+    const vigil_doc_entry_t *fs_reader_open = vigil_doc_lookup("fs.Reader.open");
+    const vigil_doc_entry_t *math_rotate = vigil_doc_lookup("math.Vec3.rotateByQuaternion");
+
+    ASSERT_NE(http_get, NULL);
+    ASSERT_NE(json_parse, NULL);
+    ASSERT_NE(fs_reader_open, NULL);
+    ASSERT_NE(math_rotate, NULL);
+    EXPECT_STREQ(http_get->signature, "http.get(url: string) -> (i32, string, string)");
+    EXPECT_STREQ(http_get->summary, "Issue an HTTP GET request.");
+    EXPECT_STREQ(json_parse->signature, "json.Value.parse(text: string) -> (json.Value, err)");
+    EXPECT_STREQ(json_parse->summary, "Parse JSON text.");
+    EXPECT_STREQ(fs_reader_open->signature, "fs.Reader.open(path: string) -> (fs.Reader, err)");
+    EXPECT_STREQ(fs_reader_open->summary, "Open a file for reading.");
+    EXPECT_STREQ(math_rotate->signature, "math.Vec3.rotateByQuaternion(rotation: math.Quaternion) -> math.Vec3");
+    EXPECT_STREQ(math_rotate->summary, "Rotate the vector by a quaternion.");
+}
+
 TEST(DocRegistryTest, ModuleListUsesCanonicalStdlibSet)
 {
     size_t count = 0U;
@@ -363,5 +384,6 @@ void register_doc_registry_tests(void)
     REGISTER_TEST(DocRegistryTest, DescriptorBackedDocsRenderDerivedSignaturesForCrypto);
     REGISTER_TEST(DocRegistryTest, DescriptorBackedDocsRenderDerivedSignaturesForThreadAndCompress);
     REGISTER_TEST(DocRegistryTest, DescriptorBackedDocsRenderDerivedSignaturesForFfiAndUnsafe);
+    REGISTER_TEST(DocRegistryTest, DescriptorBackedDocsRenderDerivedSignaturesForHttpJsonFsAndMath);
     REGISTER_TEST(DocRegistryTest, ModuleListUsesCanonicalStdlibSet);
 }

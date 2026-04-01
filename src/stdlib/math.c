@@ -296,19 +296,75 @@ static vigil_status_t vigil_math_step(vigil_vm_t *vm, size_t arg_count, vigil_er
 static const int vigil_math_f64_params[] = {VIGIL_TYPE_F64};
 static const int vigil_math_f64f64_params[] = {VIGIL_TYPE_F64, VIGIL_TYPE_F64};
 static const int vigil_math_f64f64f64_params[] = {VIGIL_TYPE_F64, VIGIL_TYPE_F64, VIGIL_TYPE_F64};
+static const char *const math_x_param_names[] = {"x"};
+static const char *const math_base_exp_param_names[] = {"base", "exp"};
+static const char *const math_a_b_param_names[] = {"a", "b"};
+static const char *const math_y_x_param_names[] = {"y", "x"};
+static const char *const math_edge_x_param_names[] = {"edge", "x"};
+static const char *const math_x_lo_hi_param_names[] = {"x", "lo", "hi"};
+static const char *const math_a_b_t_param_names[] = {"a", "b", "t"};
+static const char *const math_a_b_x_param_names[] = {"a", "b", "x"};
+static const char *const math_edge0_edge1_x_param_names[] = {"edge0", "edge1", "x"};
+static const char *const math_x_start_end_param_names[] = {"x", "start", "end"};
+static const char *const math_remap_param_names[] = {"x", "in_lo", "in_hi", "out_lo", "out_hi"};
 
-#define MATH_FN0(id, n, nl)                                                                                            \
-    {n, nl, vigil_math_##id, 0U, NULL, VIGIL_TYPE_F64, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL}
+#define MATH_DOC(id, text) static const vigil_native_symbol_doc_t id = {text, NULL, NULL}
 
-#define MATH_FN1(id, n, nl)                                                                                            \
-    {n,    nl,  vigil_math_##id, 1U, vigil_math_f64_params, VIGIL_TYPE_F64, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL,   \
-     NULL, NULL}
+MATH_DOC(vigil_math_module_doc, "Mathematical functions and geometry types.");
+MATH_DOC(vigil_math_pi_doc, "Return pi.");
+MATH_DOC(vigil_math_e_doc, "Return Euler's number.");
+MATH_DOC(vigil_math_tau_doc, "Return tau (2*pi).");
+MATH_DOC(vigil_math_epsilon_doc, "Return machine epsilon.");
+MATH_DOC(vigil_math_floor_doc, "Return the floor of x.");
+MATH_DOC(vigil_math_ceil_doc, "Return the ceil of x.");
+MATH_DOC(vigil_math_round_doc, "Round x to the nearest integer value.");
+MATH_DOC(vigil_math_trunc_doc, "Truncate the fractional part of x.");
+MATH_DOC(vigil_math_abs_doc, "Return the absolute value of x.");
+MATH_DOC(vigil_math_sign_doc, "Return the sign of x.");
+MATH_DOC(vigil_math_sqrt_doc, "Return the square root of x.");
+MATH_DOC(vigil_math_cbrt_doc, "Return the cube root of x.");
+MATH_DOC(vigil_math_sin_doc, "Return the sine of x.");
+MATH_DOC(vigil_math_cos_doc, "Return the cosine of x.");
+MATH_DOC(vigil_math_tan_doc, "Return the tangent of x.");
+MATH_DOC(vigil_math_asin_doc, "Return the arc sine of x.");
+MATH_DOC(vigil_math_acos_doc, "Return the arc cosine of x.");
+MATH_DOC(vigil_math_atan_doc, "Return the arc tangent of x.");
+MATH_DOC(vigil_math_log_doc, "Return the natural logarithm of x.");
+MATH_DOC(vigil_math_log2_doc, "Return the base-2 logarithm of x.");
+MATH_DOC(vigil_math_log10_doc, "Return the base-10 logarithm of x.");
+MATH_DOC(vigil_math_exp_doc, "Return e raised to x.");
+MATH_DOC(vigil_math_deg2rad_doc, "Convert degrees to radians.");
+MATH_DOC(vigil_math_rad2deg_doc, "Convert radians to degrees.");
+MATH_DOC(vigil_math_pow_doc, "Raise base to exp.");
+MATH_DOC(vigil_math_min_doc, "Return the smaller of two values.");
+MATH_DOC(vigil_math_max_doc, "Return the larger of two values.");
+MATH_DOC(vigil_math_atan2_doc, "Return the angle of the vector (x, y).");
+MATH_DOC(vigil_math_hypot_doc, "Return sqrt(a*a + b*b).");
+MATH_DOC(vigil_math_fmod_doc, "Return the floating-point remainder of a / b.");
+MATH_DOC(vigil_math_step_doc, "Return 0.0 when x is below edge, otherwise 1.0.");
+MATH_DOC(vigil_math_is_nan_doc, "Return true when x is NaN.");
+MATH_DOC(vigil_math_is_inf_doc, "Return true when x is infinite.");
+MATH_DOC(vigil_math_is_finite_doc, "Return true when x is finite.");
+MATH_DOC(vigil_math_clamp_doc, "Clamp x into the inclusive range [lo, hi].");
+MATH_DOC(vigil_math_lerp_doc, "Linearly interpolate between a and b.");
+MATH_DOC(vigil_math_inverse_lerp_doc, "Return the interpolation factor for x within [a, b].");
+MATH_DOC(vigil_math_smoothstep_doc, "Smoothly interpolate from 0.0 to 1.0 across a range.");
+MATH_DOC(vigil_math_normalize_doc, "Normalize x from [start, end] into [0.0, 1.0].");
+MATH_DOC(vigil_math_wrap_doc, "Wrap x into the half-open interval [lo, hi).");
+MATH_DOC(vigil_math_remap_doc, "Remap x from one range into another.");
 
-#define MATH_FN1_BOOL(id, n, nl)                                                                                       \
-    {n,    nl,  vigil_math_##id, 1U, vigil_math_f64_params, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL,  \
-     NULL, NULL}
+#define MATH_FN0(id, n, nl, doc)                                                                                       \
+    {n, nl, vigil_math_##id, 0U, NULL, VIGIL_TYPE_F64, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, &doc}
 
-#define MATH_FN2(id, n, nl)                                                                                            \
+#define MATH_FN1(id, n, nl, names, doc)                                                                                \
+    {n, nl, vigil_math_##id, 1U, vigil_math_f64_params, VIGIL_TYPE_F64, 1U, NULL, 0, NULL, NULL, 0U, names, NULL, NULL, \
+     &doc}
+
+#define MATH_FN1_BOOL(id, n, nl, names, doc)                                                                           \
+    {n, nl, vigil_math_##id, 1U, vigil_math_f64_params, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U, names, NULL,      \
+     NULL, &doc}
+
+#define MATH_FN2(id, n, nl, names, doc)                                                                                \
     {                                                                                                                  \
         n,                                                                                                             \
         nl,                                                                                                            \
@@ -322,12 +378,12 @@ static const int vigil_math_f64f64f64_params[] = {VIGIL_TYPE_F64, VIGIL_TYPE_F64
         NULL,                                                                                                          \
         NULL,                                                                                                          \
         0U,                                                                                                            \
+        names,                                                                                                         \
         NULL,                                                                                                          \
         NULL,                                                                                                          \
-        NULL,                                                                                                          \
-        NULL}
+        &doc}
 
-#define MATH_FN3(id, n, nl)                                                                                            \
+#define MATH_FN3(id, n, nl, names, doc)                                                                                \
     {n,                                                                                                                \
      nl,                                                                                                               \
      vigil_math_##id,                                                                                                  \
@@ -340,57 +396,57 @@ static const int vigil_math_f64f64f64_params[] = {VIGIL_TYPE_F64, VIGIL_TYPE_F64
      NULL,                                                                                                             \
      NULL,                                                                                                             \
      0U,                                                                                                               \
+     names,                                                                                                            \
      NULL,                                                                                                             \
      NULL,                                                                                                             \
-     NULL,                                                                                                             \
-     NULL}
+     &doc}
 
-#define MATH_FN5(id, n, nl)                                                                                            \
-    {n,    nl,  vigil_math_##id, 5U, vigil_math_f64x5_params, VIGIL_TYPE_F64, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, \
-     NULL, NULL}
+#define MATH_FN5(id, n, nl, names, doc)                                                                                \
+    {n, nl, vigil_math_##id, 5U, vigil_math_f64x5_params, VIGIL_TYPE_F64, 1U, NULL, 0, NULL, NULL, 0U, names, NULL,    \
+     NULL, &doc}
 
 static const vigil_native_module_function_t vigil_math_functions[] = {
-    MATH_FN0(pi, "pi", 2U),
-    MATH_FN0(e, "e", 1U),
-    MATH_FN0(tau, "tau", 3U),
-    MATH_FN0(epsilon, "epsilon", 7U),
-    MATH_FN1(floor, "floor", 5U),
-    MATH_FN1(ceil, "ceil", 4U),
-    MATH_FN1(round, "round", 5U),
-    MATH_FN1(trunc, "trunc", 5U),
-    MATH_FN1(abs, "abs", 3U),
-    MATH_FN1(sign, "sign", 4U),
-    MATH_FN1(sqrt, "sqrt", 4U),
-    MATH_FN1(cbrt, "cbrt", 4U),
-    MATH_FN1(sin, "sin", 3U),
-    MATH_FN1(cos, "cos", 3U),
-    MATH_FN1(tan, "tan", 3U),
-    MATH_FN1(asin, "asin", 4U),
-    MATH_FN1(acos, "acos", 4U),
-    MATH_FN1(atan, "atan", 4U),
-    MATH_FN1(log, "log", 3U),
-    MATH_FN1(log2, "log2", 4U),
-    MATH_FN1(log10, "log10", 5U),
-    MATH_FN1(exp, "exp", 3U),
-    MATH_FN1(deg2rad, "deg2rad", 7U),
-    MATH_FN1(rad2deg, "rad2deg", 7U),
-    MATH_FN2(pow, "pow", 3U),
-    MATH_FN2(min, "min", 3U),
-    MATH_FN2(max, "max", 3U),
-    MATH_FN2(atan2, "atan2", 5U),
-    MATH_FN2(hypot, "hypot", 5U),
-    MATH_FN2(fmod, "fmod", 4U),
-    MATH_FN2(step, "step", 4U),
-    MATH_FN1_BOOL(is_nan, "isNaN", 5U),
-    MATH_FN1_BOOL(is_inf, "isInf", 5U),
-    MATH_FN1_BOOL(is_finite, "isFinite", 8U),
-    MATH_FN3(clamp, "clamp", 5U),
-    MATH_FN3(lerp, "lerp", 4U),
-    MATH_FN3(inverselerp, "inverseLerp", 11U),
-    MATH_FN3(smoothstep, "smoothstep", 10U),
-    MATH_FN3(normalize, "normalize", 9U),
-    MATH_FN3(wrap, "wrap", 4U),
-    MATH_FN5(remap, "remap", 5U),
+    MATH_FN0(pi, "pi", 2U, vigil_math_pi_doc),
+    MATH_FN0(e, "e", 1U, vigil_math_e_doc),
+    MATH_FN0(tau, "tau", 3U, vigil_math_tau_doc),
+    MATH_FN0(epsilon, "epsilon", 7U, vigil_math_epsilon_doc),
+    MATH_FN1(floor, "floor", 5U, math_x_param_names, vigil_math_floor_doc),
+    MATH_FN1(ceil, "ceil", 4U, math_x_param_names, vigil_math_ceil_doc),
+    MATH_FN1(round, "round", 5U, math_x_param_names, vigil_math_round_doc),
+    MATH_FN1(trunc, "trunc", 5U, math_x_param_names, vigil_math_trunc_doc),
+    MATH_FN1(abs, "abs", 3U, math_x_param_names, vigil_math_abs_doc),
+    MATH_FN1(sign, "sign", 4U, math_x_param_names, vigil_math_sign_doc),
+    MATH_FN1(sqrt, "sqrt", 4U, math_x_param_names, vigil_math_sqrt_doc),
+    MATH_FN1(cbrt, "cbrt", 4U, math_x_param_names, vigil_math_cbrt_doc),
+    MATH_FN1(sin, "sin", 3U, math_x_param_names, vigil_math_sin_doc),
+    MATH_FN1(cos, "cos", 3U, math_x_param_names, vigil_math_cos_doc),
+    MATH_FN1(tan, "tan", 3U, math_x_param_names, vigil_math_tan_doc),
+    MATH_FN1(asin, "asin", 4U, math_x_param_names, vigil_math_asin_doc),
+    MATH_FN1(acos, "acos", 4U, math_x_param_names, vigil_math_acos_doc),
+    MATH_FN1(atan, "atan", 4U, math_x_param_names, vigil_math_atan_doc),
+    MATH_FN1(log, "log", 3U, math_x_param_names, vigil_math_log_doc),
+    MATH_FN1(log2, "log2", 4U, math_x_param_names, vigil_math_log2_doc),
+    MATH_FN1(log10, "log10", 5U, math_x_param_names, vigil_math_log10_doc),
+    MATH_FN1(exp, "exp", 3U, math_x_param_names, vigil_math_exp_doc),
+    MATH_FN1(deg2rad, "deg2rad", 7U, math_x_param_names, vigil_math_deg2rad_doc),
+    MATH_FN1(rad2deg, "rad2deg", 7U, math_x_param_names, vigil_math_rad2deg_doc),
+    MATH_FN2(pow, "pow", 3U, math_base_exp_param_names, vigil_math_pow_doc),
+    MATH_FN2(min, "min", 3U, math_a_b_param_names, vigil_math_min_doc),
+    MATH_FN2(max, "max", 3U, math_a_b_param_names, vigil_math_max_doc),
+    MATH_FN2(atan2, "atan2", 5U, math_y_x_param_names, vigil_math_atan2_doc),
+    MATH_FN2(hypot, "hypot", 5U, math_a_b_param_names, vigil_math_hypot_doc),
+    MATH_FN2(fmod, "fmod", 4U, math_a_b_param_names, vigil_math_fmod_doc),
+    MATH_FN2(step, "step", 4U, math_edge_x_param_names, vigil_math_step_doc),
+    MATH_FN1_BOOL(is_nan, "isNaN", 5U, math_x_param_names, vigil_math_is_nan_doc),
+    MATH_FN1_BOOL(is_inf, "isInf", 5U, math_x_param_names, vigil_math_is_inf_doc),
+    MATH_FN1_BOOL(is_finite, "isFinite", 8U, math_x_param_names, vigil_math_is_finite_doc),
+    MATH_FN3(clamp, "clamp", 5U, math_x_lo_hi_param_names, vigil_math_clamp_doc),
+    MATH_FN3(lerp, "lerp", 4U, math_a_b_t_param_names, vigil_math_lerp_doc),
+    MATH_FN3(inverselerp, "inverseLerp", 11U, math_a_b_x_param_names, vigil_math_inverse_lerp_doc),
+    MATH_FN3(smoothstep, "smoothstep", 10U, math_edge0_edge1_x_param_names, vigil_math_smoothstep_doc),
+    MATH_FN3(normalize, "normalize", 9U, math_x_start_end_param_names, vigil_math_normalize_doc),
+    MATH_FN3(wrap, "wrap", 4U, math_x_lo_hi_param_names, vigil_math_wrap_doc),
+    MATH_FN5(remap, "remap", 5U, math_remap_param_names, vigil_math_remap_doc),
 };
 
 #define VIGIL_MATH_FUNCTION_COUNT (sizeof(vigil_math_functions) / sizeof(vigil_math_functions[0]))
@@ -571,23 +627,158 @@ static vigil_status_t vigil_vec2_reflect(vigil_vm_t *vm, size_t arg_count, vigil
 }
 
 /* Helper: primitive field descriptor (object_kind=0, no class/element). */
-#define VIGIL_PFIELD(n, nl, t) {n, nl, t, 0, NULL, 0U, 0, NULL, NULL}
+#define VIGIL_PFIELD_DOC(n, nl, t, doc) {n, nl, t, 0, NULL, 0U, 0, NULL, &doc}
 
 /* Helper: instance method descriptor (is_static=0). */
-#define VIGIL_METHOD(n, nl, fn, pc, pt, rt, rc, rts)                                                                   \
-    {n, nl, fn, pc, pt, rt, rc, rts, 0, NULL, 0U, 0, NULL, NULL, NULL, NULL}
+#define VIGIL_METHOD_DOC(n, nl, fn, pc, pt, rt, rc, rts, names, types, ret_name, doc)                                 \
+    {n, nl, fn, pc, pt, rt, rc, rts, 0, NULL, 0U, 0, names, types, ret_name, &doc}
 
 /* Helper: static method descriptor (is_static=1). */
-#define VIGIL_STATIC(n, nl, fn, pc, pt, rt, rc, rts)                                                                   \
-    {n, nl, fn, pc, pt, rt, rc, rts, 1, NULL, 0U, 0, NULL, NULL, NULL, NULL}
+#define VIGIL_STATIC_DOC(n, nl, fn, pc, pt, rt, rc, rts, names, types, ret_name, doc)                                 \
+    {n, nl, fn, pc, pt, rt, rc, rts, 1, NULL, 0U, 0, names, types, ret_name, &doc}
 
 /* Helper: instance method returning a different class. */
-#define VIGIL_METHOD_RET(n, nl, fn, pc, pt, rt, rc, rts, cn, cnl)                                                      \
-    {n, nl, fn, pc, pt, rt, rc, rts, 0, cn, cnl, 0, NULL, NULL, NULL, NULL}
+#define VIGIL_METHOD_RET_DOC(n, nl, fn, pc, pt, rt, rc, rts, cn, cnl, names, types, ret_name, doc)                    \
+    {n, nl, fn, pc, pt, rt, rc, rts, 0, cn, cnl, 0, names, types, ret_name, &doc}
 
 /* Helper: static method returning a different class. */
-#define VIGIL_STATIC_RET(n, nl, fn, pc, pt, rt, rc, rts, cn, cnl)                                                      \
-    {n, nl, fn, pc, pt, rt, rc, rts, 1, cn, cnl, 0, NULL, NULL, NULL, NULL}
+#define VIGIL_STATIC_RET_DOC(n, nl, fn, pc, pt, rt, rc, rts, cn, cnl, names, types, ret_name, doc)                    \
+    {n, nl, fn, pc, pt, rt, rc, rts, 1, cn, cnl, 0, names, types, ret_name, &doc}
+
+MATH_DOC(vigil_vec2_doc, "Two-dimensional floating-point vector.");
+MATH_DOC(vigil_vec2_x_doc, "X component.");
+MATH_DOC(vigil_vec2_y_doc, "Y component.");
+MATH_DOC(vigil_vec2_zero_doc, "Return the zero vector.");
+MATH_DOC(vigil_vec2_one_doc, "Return the all-ones vector.");
+MATH_DOC(vigil_vec2_length_doc, "Return the vector length.");
+MATH_DOC(vigil_vec2_lengthsqr_doc, "Return the squared vector length.");
+MATH_DOC(vigil_vec2_dot_doc, "Return the dot product with another vector.");
+MATH_DOC(vigil_vec2_distance_doc, "Return the distance to another vector.");
+MATH_DOC(vigil_vec2_normalize_doc, "Return a normalized copy of the vector.");
+MATH_DOC(vigil_vec2_negate_doc, "Return the negated vector.");
+MATH_DOC(vigil_vec2_add_doc, "Return the sum with another vector.");
+MATH_DOC(vigil_vec2_sub_doc, "Return the difference with another vector.");
+MATH_DOC(vigil_vec2_scale_doc, "Scale the vector by a scalar.");
+MATH_DOC(vigil_vec2_lerp_doc, "Linearly interpolate toward another vector.");
+MATH_DOC(vigil_vec2_reflect_doc, "Reflect the vector across a normal.");
+MATH_DOC(vigil_vec2_angle_doc, "Return the vector angle in radians.");
+MATH_DOC(vigil_vec2_rotate_doc, "Rotate the vector by an angle in radians.");
+MATH_DOC(vigil_vec3_doc, "Three-dimensional floating-point vector.");
+MATH_DOC(vigil_vec3_x_doc, "X component.");
+MATH_DOC(vigil_vec3_y_doc, "Y component.");
+MATH_DOC(vigil_vec3_z_doc, "Z component.");
+MATH_DOC(vigil_vec3_zero_doc, "Return the zero vector.");
+MATH_DOC(vigil_vec3_one_doc, "Return the all-ones vector.");
+MATH_DOC(vigil_vec3_length_doc, "Return the vector length.");
+MATH_DOC(vigil_vec3_lengthsqr_doc, "Return the squared vector length.");
+MATH_DOC(vigil_vec3_dot_doc, "Return the dot product with another vector.");
+MATH_DOC(vigil_vec3_distance_doc, "Return the distance to another vector.");
+MATH_DOC(vigil_vec3_angle_doc, "Return the angle to another vector.");
+MATH_DOC(vigil_vec3_cross_doc, "Return the cross product with another vector.");
+MATH_DOC(vigil_vec3_normalize_doc, "Return a normalized copy of the vector.");
+MATH_DOC(vigil_vec3_negate_doc, "Return the negated vector.");
+MATH_DOC(vigil_vec3_add_doc, "Return the sum with another vector.");
+MATH_DOC(vigil_vec3_sub_doc, "Return the difference with another vector.");
+MATH_DOC(vigil_vec3_scale_doc, "Scale the vector by a scalar.");
+MATH_DOC(vigil_vec3_lerp_doc, "Linearly interpolate toward another vector.");
+MATH_DOC(vigil_vec3_reflect_doc, "Reflect the vector across a normal.");
+MATH_DOC(vigil_vec3_transform_doc, "Transform the vector by a matrix.");
+MATH_DOC(vigil_vec3_rotate_quat_doc, "Rotate the vector by a quaternion.");
+MATH_DOC(vigil_vec3_unproject_doc, "Unproject normalized coordinates into world space.");
+MATH_DOC(vigil_vec4_doc, "Four-dimensional floating-point vector.");
+MATH_DOC(vigil_vec4_x_doc, "X component.");
+MATH_DOC(vigil_vec4_y_doc, "Y component.");
+MATH_DOC(vigil_vec4_z_doc, "Z component.");
+MATH_DOC(vigil_vec4_w_doc, "W component.");
+MATH_DOC(vigil_vec4_zero_doc, "Return the zero vector.");
+MATH_DOC(vigil_vec4_one_doc, "Return the all-ones vector.");
+MATH_DOC(vigil_vec4_length_doc, "Return the vector length.");
+MATH_DOC(vigil_vec4_lengthsqr_doc, "Return the squared vector length.");
+MATH_DOC(vigil_vec4_dot_doc, "Return the dot product with another vector.");
+MATH_DOC(vigil_vec4_distance_doc, "Return the distance to another vector.");
+MATH_DOC(vigil_vec4_normalize_doc, "Return a normalized copy of the vector.");
+MATH_DOC(vigil_vec4_negate_doc, "Return the negated vector.");
+MATH_DOC(vigil_vec4_add_doc, "Return the sum with another vector.");
+MATH_DOC(vigil_vec4_sub_doc, "Return the difference with another vector.");
+MATH_DOC(vigil_vec4_scale_doc, "Scale the vector by a scalar.");
+MATH_DOC(vigil_vec4_lerp_doc, "Linearly interpolate toward another vector.");
+MATH_DOC(vigil_quat_doc, "Quaternion rotation value.");
+MATH_DOC(vigil_quat_x_doc, "X component.");
+MATH_DOC(vigil_quat_y_doc, "Y component.");
+MATH_DOC(vigil_quat_z_doc, "Z component.");
+MATH_DOC(vigil_quat_w_doc, "W component.");
+MATH_DOC(vigil_quat_length_doc, "Return the quaternion magnitude.");
+MATH_DOC(vigil_quat_dot_doc, "Return the dot product with another quaternion.");
+MATH_DOC(vigil_quat_normalize_doc, "Return a normalized copy of the quaternion.");
+MATH_DOC(vigil_quat_conjugate_doc, "Return the quaternion conjugate.");
+MATH_DOC(vigil_quat_inverse_doc, "Return the quaternion inverse.");
+MATH_DOC(vigil_quat_multiply_doc, "Return the Hamilton product with another quaternion.");
+MATH_DOC(vigil_quat_slerp_doc, "Spherically interpolate toward another quaternion.");
+MATH_DOC(vigil_quat_from_axis_angle_doc, "Build a quaternion from an axis-angle rotation.");
+MATH_DOC(vigil_quat_from_euler_doc, "Build a quaternion from Euler angles.");
+MATH_DOC(vigil_quat_to_euler_doc, "Convert the quaternion to Euler angles.");
+MATH_DOC(vigil_quat_to_mat4_doc, "Convert the quaternion to a rotation matrix.");
+MATH_DOC(vigil_mat4_doc, "4x4 floating-point matrix.");
+MATH_DOC(vigil_mat4_data_doc, "Raw matrix elements.");
+MATH_DOC(vigil_mat4_identity_doc, "Return the identity matrix.");
+MATH_DOC(vigil_mat4_look_at_doc, "Build a view matrix from eye, target, and up vectors.");
+MATH_DOC(vigil_mat4_perspective_doc, "Build a perspective projection matrix.");
+MATH_DOC(vigil_mat4_ortho_doc, "Build an orthographic projection matrix.");
+MATH_DOC(vigil_mat4_frustum_doc, "Build a frustum projection matrix.");
+MATH_DOC(vigil_mat4_get_doc, "Read a matrix element by row and column.");
+MATH_DOC(vigil_mat4_set_doc, "Return a copy with one matrix element replaced.");
+MATH_DOC(vigil_mat4_multiply_doc, "Multiply the matrix by another matrix.");
+MATH_DOC(vigil_mat4_transpose_doc, "Return the transposed matrix.");
+MATH_DOC(vigil_mat4_determinant_doc, "Return the matrix determinant.");
+MATH_DOC(vigil_mat4_trace_doc, "Return the matrix trace.");
+MATH_DOC(vigil_mat4_invert_doc, "Return the matrix inverse.");
+MATH_DOC(vigil_mat4_add_doc, "Add another matrix element-wise.");
+MATH_DOC(vigil_mat4_scale_doc, "Scale the matrix by a scalar.");
+MATH_DOC(vigil_mat4_scale_v_doc, "Apply a non-uniform scale.");
+MATH_DOC(vigil_mat4_translate_doc, "Apply a translation.");
+MATH_DOC(vigil_mat4_rotate_x_doc, "Apply a rotation about the X axis.");
+MATH_DOC(vigil_mat4_rotate_y_doc, "Apply a rotation about the Y axis.");
+MATH_DOC(vigil_mat4_rotate_z_doc, "Apply a rotation about the Z axis.");
+
+static const char *const math_other_vec2_param_names[] = {"other"};
+static const char *const math_vec2_type_names[] = {"math.Vec2"};
+static const char *const math_normal_vec2_param_names[] = {"normal"};
+static const char *const math_angle_param_names[] = {"angle"};
+static const char *const math_other_t_vec2_param_names[] = {"other", "t"};
+static const char *const math_vec2_f64_param_types[] = {"math.Vec2", "f64"};
+static const char *const math_other_vec3_param_names[] = {"other"};
+static const char *const math_vec3_type_names[] = {"math.Vec3"};
+static const char *const math_other_t_vec3_param_names[] = {"other", "t"};
+static const char *const math_vec3_f64_param_types[] = {"math.Vec3", "f64"};
+static const char *const math_matrix_param_names[] = {"matrix"};
+static const char *const math_mat4_param_types[] = {"math.Mat4"};
+static const char *const math_rotation_param_names[] = {"rotation"};
+static const char *const math_quat_param_types[] = {"math.Quaternion"};
+static const char *const math_projection_view_param_names[] = {"projection", "view"};
+static const char *const math_mat4_mat4_param_types[] = {"math.Mat4", "math.Mat4"};
+static const char *const math_other_vec4_param_names[] = {"other"};
+static const char *const math_vec4_type_names[] = {"math.Vec4"};
+static const char *const math_other_t_vec4_param_names[] = {"other", "t"};
+static const char *const math_vec4_f64_param_types[] = {"math.Vec4", "f64"};
+static const char *const math_other_quat_param_names[] = {"other"};
+static const char *const math_quat_type_names[] = {"math.Quaternion"};
+static const char *const math_other_t_quat_param_names[] = {"other", "t"};
+static const char *const math_quat_f64_param_types[] = {"math.Quaternion", "f64"};
+static const char *const math_axis_angle_param_names[] = {"axis", "angle"};
+static const char *const math_vec3_f64_param_types2[] = {"math.Vec3", "f64"};
+static const char *const math_pitch_yaw_roll_param_names[] = {"pitch", "yaw", "roll"};
+static const char *const math_eye_target_up_param_names[] = {"eye", "target", "up"};
+static const char *const math_three_vec3_param_types[] = {"math.Vec3", "math.Vec3", "math.Vec3"};
+static const char *const math_fov_aspect_near_far_param_names[] = {"fov_y", "aspect", "near", "far"};
+static const char *const math_left_right_bottom_top_near_far_param_names[] = {"left", "right", "bottom", "top", "near", "far"};
+static const char *const math_row_col_param_names[] = {"row", "col"};
+static const char *const math_row_col_value_param_names[] = {"row", "col", "value"};
+static const char *const math_other_mat4_param_names[] = {"other"};
+static const char *const math_other_mat4_param_types[] = {"math.Mat4"};
+static const char *const math_scale_v_param_names[] = {"scale"};
+static const char *const math_scale_vec3_param_types[] = {"math.Vec3"};
+static const char *const math_offset_param_names[] = {"offset"};
+static const char *const math_offset_vec3_param_types[] = {"math.Vec3"};
 
 /* Helper: read class_index from hidden first arg (static methods). */
 static size_t vigil_static_class_index(vigil_vm_t *vm, size_t base)
@@ -639,8 +830,8 @@ static vigil_status_t vigil_vec2_one(vigil_vm_t *vm, size_t arg_count, vigil_err
 }
 
 static const vigil_native_class_field_t vigil_vec2_fields[] = {
-    VIGIL_PFIELD("x", 1U, VIGIL_TYPE_F64),
-    VIGIL_PFIELD("y", 1U, VIGIL_TYPE_F64),
+    VIGIL_PFIELD_DOC("x", 1U, VIGIL_TYPE_F64, vigil_vec2_x_doc),
+    VIGIL_PFIELD_DOC("y", 1U, VIGIL_TYPE_F64, vigil_vec2_y_doc),
 };
 
 static const int vigil_vec_obj_params[] = {VIGIL_TYPE_OBJECT};
@@ -648,21 +839,36 @@ static const int vigil_vec_f64_params[] = {VIGIL_TYPE_F64};
 static const int vigil_vec_obj_f64_params[] = {VIGIL_TYPE_OBJECT, VIGIL_TYPE_F64};
 
 static const vigil_native_class_method_t vigil_vec2_methods[] = {
-    VIGIL_STATIC("zero", 4U, vigil_vec2_zero, 0U, NULL, VIGIL_TYPE_OBJECT, 1U, NULL),
-    VIGIL_STATIC("one", 3U, vigil_vec2_one, 0U, NULL, VIGIL_TYPE_OBJECT, 1U, NULL),
-    VIGIL_METHOD("length", 6U, vigil_vec2_length, 0U, NULL, VIGIL_TYPE_F64, 1U, NULL),
-    VIGIL_METHOD("lengthSqr", 9U, vigil_vec2_lengthsqr, 0U, NULL, VIGIL_TYPE_F64, 1U, NULL),
-    VIGIL_METHOD("dot", 3U, vigil_vec2_dot, 1U, vigil_vec_obj_params, VIGIL_TYPE_F64, 1U, NULL),
-    VIGIL_METHOD("distance", 8U, vigil_vec2_distance, 1U, vigil_vec_obj_params, VIGIL_TYPE_F64, 1U, NULL),
-    VIGIL_METHOD("normalize", 9U, vigil_vec2_vnormalize, 0U, NULL, VIGIL_TYPE_OBJECT, 1U, NULL),
-    VIGIL_METHOD("negate", 6U, vigil_vec2_negate, 0U, NULL, VIGIL_TYPE_OBJECT, 1U, NULL),
-    VIGIL_METHOD("add", 3U, vigil_vec2_add, 1U, vigil_vec_obj_params, VIGIL_TYPE_OBJECT, 1U, NULL),
-    VIGIL_METHOD("sub", 3U, vigil_vec2_sub, 1U, vigil_vec_obj_params, VIGIL_TYPE_OBJECT, 1U, NULL),
-    VIGIL_METHOD("scale", 5U, vigil_vec2_scale, 1U, vigil_vec_f64_params, VIGIL_TYPE_OBJECT, 1U, NULL),
-    VIGIL_METHOD("lerp", 4U, vigil_vec2_vlerp, 2U, vigil_vec_obj_f64_params, VIGIL_TYPE_OBJECT, 1U, NULL),
-    VIGIL_METHOD("reflect", 7U, vigil_vec2_reflect, 1U, vigil_vec_obj_params, VIGIL_TYPE_OBJECT, 1U, NULL),
-    VIGIL_METHOD("angle", 5U, vigil_vec2_angle, 0U, NULL, VIGIL_TYPE_F64, 1U, NULL),
-    VIGIL_METHOD("rotate", 6U, vigil_vec2_rotate, 1U, vigil_vec_f64_params, VIGIL_TYPE_OBJECT, 1U, NULL),
+    VIGIL_STATIC_DOC("zero", 4U, vigil_vec2_zero, 0U, NULL, VIGIL_TYPE_OBJECT, 1U, NULL, NULL, NULL, "math.Vec2",
+                     vigil_vec2_zero_doc),
+    VIGIL_STATIC_DOC("one", 3U, vigil_vec2_one, 0U, NULL, VIGIL_TYPE_OBJECT, 1U, NULL, NULL, NULL, "math.Vec2",
+                     vigil_vec2_one_doc),
+    VIGIL_METHOD_DOC("length", 6U, vigil_vec2_length, 0U, NULL, VIGIL_TYPE_F64, 1U, NULL, NULL, NULL, NULL,
+                     vigil_vec2_length_doc),
+    VIGIL_METHOD_DOC("lengthSqr", 9U, vigil_vec2_lengthsqr, 0U, NULL, VIGIL_TYPE_F64, 1U, NULL, NULL, NULL, NULL,
+                     vigil_vec2_lengthsqr_doc),
+    VIGIL_METHOD_DOC("dot", 3U, vigil_vec2_dot, 1U, vigil_vec_obj_params, VIGIL_TYPE_F64, 1U, NULL,
+                     math_other_vec2_param_names, math_vec2_type_names, NULL, vigil_vec2_dot_doc),
+    VIGIL_METHOD_DOC("distance", 8U, vigil_vec2_distance, 1U, vigil_vec_obj_params, VIGIL_TYPE_F64, 1U, NULL,
+                     math_other_vec2_param_names, math_vec2_type_names, NULL, vigil_vec2_distance_doc),
+    VIGIL_METHOD_DOC("normalize", 9U, vigil_vec2_vnormalize, 0U, NULL, VIGIL_TYPE_OBJECT, 1U, NULL, NULL, NULL,
+                     "math.Vec2", vigil_vec2_normalize_doc),
+    VIGIL_METHOD_DOC("negate", 6U, vigil_vec2_negate, 0U, NULL, VIGIL_TYPE_OBJECT, 1U, NULL, NULL, NULL, "math.Vec2",
+                     vigil_vec2_negate_doc),
+    VIGIL_METHOD_DOC("add", 3U, vigil_vec2_add, 1U, vigil_vec_obj_params, VIGIL_TYPE_OBJECT, 1U, NULL,
+                     math_other_vec2_param_names, math_vec2_type_names, "math.Vec2", vigil_vec2_add_doc),
+    VIGIL_METHOD_DOC("sub", 3U, vigil_vec2_sub, 1U, vigil_vec_obj_params, VIGIL_TYPE_OBJECT, 1U, NULL,
+                     math_other_vec2_param_names, math_vec2_type_names, "math.Vec2", vigil_vec2_sub_doc),
+    VIGIL_METHOD_DOC("scale", 5U, vigil_vec2_scale, 1U, vigil_vec_f64_params, VIGIL_TYPE_OBJECT, 1U, NULL,
+                     math_scale_v_param_names, NULL, "math.Vec2", vigil_vec2_scale_doc),
+    VIGIL_METHOD_DOC("lerp", 4U, vigil_vec2_vlerp, 2U, vigil_vec_obj_f64_params, VIGIL_TYPE_OBJECT, 1U, NULL,
+                     math_other_t_vec2_param_names, math_vec2_f64_param_types, "math.Vec2", vigil_vec2_lerp_doc),
+    VIGIL_METHOD_DOC("reflect", 7U, vigil_vec2_reflect, 1U, vigil_vec_obj_params, VIGIL_TYPE_OBJECT, 1U, NULL,
+                     math_normal_vec2_param_names, math_vec2_type_names, "math.Vec2", vigil_vec2_reflect_doc),
+    VIGIL_METHOD_DOC("angle", 5U, vigil_vec2_angle, 0U, NULL, VIGIL_TYPE_F64, 1U, NULL, NULL, NULL, NULL,
+                     vigil_vec2_angle_doc),
+    VIGIL_METHOD_DOC("rotate", 6U, vigil_vec2_rotate, 1U, vigil_vec_f64_params, VIGIL_TYPE_OBJECT, 1U, NULL,
+                     math_angle_param_names, NULL, "math.Vec2", vigil_vec2_rotate_doc),
 };
 
 /* ── Vec3 class ──────────────────────────────────────────────────── */
@@ -867,9 +1073,9 @@ static vigil_status_t vigil_vec3_angle(vigil_vm_t *vm, size_t arg_count, vigil_e
 }
 
 static const vigil_native_class_field_t vigil_vec3_fields[] = {
-    VIGIL_PFIELD("x", 1U, VIGIL_TYPE_F64),
-    VIGIL_PFIELD("y", 1U, VIGIL_TYPE_F64),
-    VIGIL_PFIELD("z", 1U, VIGIL_TYPE_F64),
+    VIGIL_PFIELD_DOC("x", 1U, VIGIL_TYPE_F64, vigil_vec3_x_doc),
+    VIGIL_PFIELD_DOC("y", 1U, VIGIL_TYPE_F64, vigil_vec3_y_doc),
+    VIGIL_PFIELD_DOC("z", 1U, VIGIL_TYPE_F64, vigil_vec3_z_doc),
 };
 
 /* Vec3 transform by Mat4: result = M * [x,y,z,1], perspective divide */
@@ -1028,25 +1234,44 @@ static vigil_status_t vigil_vec3_one(vigil_vm_t *vm, size_t arg_count, vigil_err
 }
 
 static const vigil_native_class_method_t vigil_vec3_methods[] = {
-    VIGIL_STATIC("zero", 4U, vigil_vec3_zero, 0U, NULL, VIGIL_TYPE_OBJECT, 1U, NULL),
-    VIGIL_STATIC("one", 3U, vigil_vec3_one, 0U, NULL, VIGIL_TYPE_OBJECT, 1U, NULL),
-    VIGIL_METHOD("length", 6U, vigil_vec3_length, 0U, NULL, VIGIL_TYPE_F64, 1U, NULL),
-    VIGIL_METHOD("lengthSqr", 9U, vigil_vec3_lengthsqr, 0U, NULL, VIGIL_TYPE_F64, 1U, NULL),
-    VIGIL_METHOD("dot", 3U, vigil_vec3_dot, 1U, vigil_vec_obj_params, VIGIL_TYPE_F64, 1U, NULL),
-    VIGIL_METHOD("distance", 8U, vigil_vec3_distance, 1U, vigil_vec_obj_params, VIGIL_TYPE_F64, 1U, NULL),
-    VIGIL_METHOD("angle", 5U, vigil_vec3_angle, 1U, vigil_vec_obj_params, VIGIL_TYPE_F64, 1U, NULL),
-    VIGIL_METHOD("cross", 5U, vigil_vec3_cross, 1U, vigil_vec_obj_params, VIGIL_TYPE_OBJECT, 1U, NULL),
-    VIGIL_METHOD("normalize", 9U, vigil_vec3_vnormalize, 0U, NULL, VIGIL_TYPE_OBJECT, 1U, NULL),
-    VIGIL_METHOD("negate", 6U, vigil_vec3_negate, 0U, NULL, VIGIL_TYPE_OBJECT, 1U, NULL),
-    VIGIL_METHOD("add", 3U, vigil_vec3_add, 1U, vigil_vec_obj_params, VIGIL_TYPE_OBJECT, 1U, NULL),
-    VIGIL_METHOD("sub", 3U, vigil_vec3_sub, 1U, vigil_vec_obj_params, VIGIL_TYPE_OBJECT, 1U, NULL),
-    VIGIL_METHOD("scale", 5U, vigil_vec3_scale, 1U, vigil_vec_f64_params, VIGIL_TYPE_OBJECT, 1U, NULL),
-    VIGIL_METHOD("lerp", 4U, vigil_vec3_vlerp, 2U, vigil_vec_obj_f64_params, VIGIL_TYPE_OBJECT, 1U, NULL),
-    VIGIL_METHOD("reflect", 7U, vigil_vec3_reflect, 1U, vigil_vec_obj_params, VIGIL_TYPE_OBJECT, 1U, NULL),
-    VIGIL_METHOD("transform", 9U, vigil_vec3_transform, 1U, vigil_vec_obj_params, VIGIL_TYPE_OBJECT, 1U, NULL),
-    VIGIL_METHOD("rotateByQuaternion", 18U, vigil_vec3_rotate_by_quat, 1U, vigil_vec_obj_params, VIGIL_TYPE_OBJECT, 1U,
-                 NULL),
-    VIGIL_METHOD("unproject", 9U, vigil_vec3_unproject, 2U, vigil_vec_obj_obj_params, VIGIL_TYPE_OBJECT, 1U, NULL),
+    VIGIL_STATIC_DOC("zero", 4U, vigil_vec3_zero, 0U, NULL, VIGIL_TYPE_OBJECT, 1U, NULL, NULL, NULL, "math.Vec3",
+                     vigil_vec3_zero_doc),
+    VIGIL_STATIC_DOC("one", 3U, vigil_vec3_one, 0U, NULL, VIGIL_TYPE_OBJECT, 1U, NULL, NULL, NULL, "math.Vec3",
+                     vigil_vec3_one_doc),
+    VIGIL_METHOD_DOC("length", 6U, vigil_vec3_length, 0U, NULL, VIGIL_TYPE_F64, 1U, NULL, NULL, NULL, NULL,
+                     vigil_vec3_length_doc),
+    VIGIL_METHOD_DOC("lengthSqr", 9U, vigil_vec3_lengthsqr, 0U, NULL, VIGIL_TYPE_F64, 1U, NULL, NULL, NULL, NULL,
+                     vigil_vec3_lengthsqr_doc),
+    VIGIL_METHOD_DOC("dot", 3U, vigil_vec3_dot, 1U, vigil_vec_obj_params, VIGIL_TYPE_F64, 1U, NULL,
+                     math_other_vec3_param_names, math_vec3_type_names, NULL, vigil_vec3_dot_doc),
+    VIGIL_METHOD_DOC("distance", 8U, vigil_vec3_distance, 1U, vigil_vec_obj_params, VIGIL_TYPE_F64, 1U, NULL,
+                     math_other_vec3_param_names, math_vec3_type_names, NULL, vigil_vec3_distance_doc),
+    VIGIL_METHOD_DOC("angle", 5U, vigil_vec3_angle, 1U, vigil_vec_obj_params, VIGIL_TYPE_F64, 1U, NULL,
+                     math_other_vec3_param_names, math_vec3_type_names, NULL, vigil_vec3_angle_doc),
+    VIGIL_METHOD_DOC("cross", 5U, vigil_vec3_cross, 1U, vigil_vec_obj_params, VIGIL_TYPE_OBJECT, 1U, NULL,
+                     math_other_vec3_param_names, math_vec3_type_names, "math.Vec3", vigil_vec3_cross_doc),
+    VIGIL_METHOD_DOC("normalize", 9U, vigil_vec3_vnormalize, 0U, NULL, VIGIL_TYPE_OBJECT, 1U, NULL, NULL, NULL,
+                     "math.Vec3", vigil_vec3_normalize_doc),
+    VIGIL_METHOD_DOC("negate", 6U, vigil_vec3_negate, 0U, NULL, VIGIL_TYPE_OBJECT, 1U, NULL, NULL, NULL, "math.Vec3",
+                     vigil_vec3_negate_doc),
+    VIGIL_METHOD_DOC("add", 3U, vigil_vec3_add, 1U, vigil_vec_obj_params, VIGIL_TYPE_OBJECT, 1U, NULL,
+                     math_other_vec3_param_names, math_vec3_type_names, "math.Vec3", vigil_vec3_add_doc),
+    VIGIL_METHOD_DOC("sub", 3U, vigil_vec3_sub, 1U, vigil_vec_obj_params, VIGIL_TYPE_OBJECT, 1U, NULL,
+                     math_other_vec3_param_names, math_vec3_type_names, "math.Vec3", vigil_vec3_sub_doc),
+    VIGIL_METHOD_DOC("scale", 5U, vigil_vec3_scale, 1U, vigil_vec_f64_params, VIGIL_TYPE_OBJECT, 1U, NULL,
+                     math_scale_v_param_names, NULL, "math.Vec3", vigil_vec3_scale_doc),
+    VIGIL_METHOD_DOC("lerp", 4U, vigil_vec3_vlerp, 2U, vigil_vec_obj_f64_params, VIGIL_TYPE_OBJECT, 1U, NULL,
+                     math_other_t_vec3_param_names, math_vec3_f64_param_types, "math.Vec3", vigil_vec3_lerp_doc),
+    VIGIL_METHOD_DOC("reflect", 7U, vigil_vec3_reflect, 1U, vigil_vec_obj_params, VIGIL_TYPE_OBJECT, 1U, NULL,
+                     math_normal_vec2_param_names, math_vec3_type_names, "math.Vec3", vigil_vec3_reflect_doc),
+    VIGIL_METHOD_DOC("transform", 9U, vigil_vec3_transform, 1U, vigil_vec_obj_params, VIGIL_TYPE_OBJECT, 1U, NULL,
+                     math_matrix_param_names, math_mat4_param_types, "math.Vec3", vigil_vec3_transform_doc),
+    VIGIL_METHOD_DOC("rotateByQuaternion", 18U, vigil_vec3_rotate_by_quat, 1U, vigil_vec_obj_params, VIGIL_TYPE_OBJECT,
+                     1U, NULL, math_rotation_param_names, math_quat_param_types, "math.Vec3",
+                     vigil_vec3_rotate_quat_doc),
+    VIGIL_METHOD_DOC("unproject", 9U, vigil_vec3_unproject, 2U, vigil_vec_obj_obj_params, VIGIL_TYPE_OBJECT, 1U, NULL,
+                     math_projection_view_param_names, math_mat4_mat4_param_types, "math.Vec3",
+                     vigil_vec3_unproject_doc),
 };
 
 /* ── Vec4 class ──────────────────────────────────────────────────── */
@@ -1201,10 +1426,10 @@ static vigil_status_t vigil_vec4_vlerp(vigil_vm_t *vm, size_t arg_count, vigil_e
 }
 
 static const vigil_native_class_field_t vigil_vec4_fields[] = {
-    VIGIL_PFIELD("x", 1U, VIGIL_TYPE_F64),
-    VIGIL_PFIELD("y", 1U, VIGIL_TYPE_F64),
-    VIGIL_PFIELD("z", 1U, VIGIL_TYPE_F64),
-    VIGIL_PFIELD("w", 1U, VIGIL_TYPE_F64),
+    VIGIL_PFIELD_DOC("x", 1U, VIGIL_TYPE_F64, vigil_vec4_x_doc),
+    VIGIL_PFIELD_DOC("y", 1U, VIGIL_TYPE_F64, vigil_vec4_y_doc),
+    VIGIL_PFIELD_DOC("z", 1U, VIGIL_TYPE_F64, vigil_vec4_z_doc),
+    VIGIL_PFIELD_DOC("w", 1U, VIGIL_TYPE_F64, vigil_vec4_w_doc),
 };
 
 /* Vec4.zero() */
@@ -1226,18 +1451,30 @@ static vigil_status_t vigil_vec4_one(vigil_vm_t *vm, size_t arg_count, vigil_err
 }
 
 static const vigil_native_class_method_t vigil_vec4_methods[] = {
-    VIGIL_STATIC("zero", 4U, vigil_vec4_zero, 0U, NULL, VIGIL_TYPE_OBJECT, 1U, NULL),
-    VIGIL_STATIC("one", 3U, vigil_vec4_one, 0U, NULL, VIGIL_TYPE_OBJECT, 1U, NULL),
-    VIGIL_METHOD("length", 6U, vigil_vec4_length, 0U, NULL, VIGIL_TYPE_F64, 1U, NULL),
-    VIGIL_METHOD("lengthSqr", 9U, vigil_vec4_lengthsqr, 0U, NULL, VIGIL_TYPE_F64, 1U, NULL),
-    VIGIL_METHOD("dot", 3U, vigil_vec4_dot, 1U, vigil_vec_obj_params, VIGIL_TYPE_F64, 1U, NULL),
-    VIGIL_METHOD("distance", 8U, vigil_vec4_distance, 1U, vigil_vec_obj_params, VIGIL_TYPE_F64, 1U, NULL),
-    VIGIL_METHOD("normalize", 9U, vigil_vec4_vnormalize, 0U, NULL, VIGIL_TYPE_OBJECT, 1U, NULL),
-    VIGIL_METHOD("negate", 6U, vigil_vec4_negate, 0U, NULL, VIGIL_TYPE_OBJECT, 1U, NULL),
-    VIGIL_METHOD("add", 3U, vigil_vec4_add, 1U, vigil_vec_obj_params, VIGIL_TYPE_OBJECT, 1U, NULL),
-    VIGIL_METHOD("sub", 3U, vigil_vec4_sub, 1U, vigil_vec_obj_params, VIGIL_TYPE_OBJECT, 1U, NULL),
-    VIGIL_METHOD("scale", 5U, vigil_vec4_scale, 1U, vigil_vec_f64_params, VIGIL_TYPE_OBJECT, 1U, NULL),
-    VIGIL_METHOD("lerp", 4U, vigil_vec4_vlerp, 2U, vigil_vec_obj_f64_params, VIGIL_TYPE_OBJECT, 1U, NULL),
+    VIGIL_STATIC_DOC("zero", 4U, vigil_vec4_zero, 0U, NULL, VIGIL_TYPE_OBJECT, 1U, NULL, NULL, NULL, "math.Vec4",
+                     vigil_vec4_zero_doc),
+    VIGIL_STATIC_DOC("one", 3U, vigil_vec4_one, 0U, NULL, VIGIL_TYPE_OBJECT, 1U, NULL, NULL, NULL, "math.Vec4",
+                     vigil_vec4_one_doc),
+    VIGIL_METHOD_DOC("length", 6U, vigil_vec4_length, 0U, NULL, VIGIL_TYPE_F64, 1U, NULL, NULL, NULL, NULL,
+                     vigil_vec4_length_doc),
+    VIGIL_METHOD_DOC("lengthSqr", 9U, vigil_vec4_lengthsqr, 0U, NULL, VIGIL_TYPE_F64, 1U, NULL, NULL, NULL, NULL,
+                     vigil_vec4_lengthsqr_doc),
+    VIGIL_METHOD_DOC("dot", 3U, vigil_vec4_dot, 1U, vigil_vec_obj_params, VIGIL_TYPE_F64, 1U, NULL,
+                     math_other_vec4_param_names, math_vec4_type_names, NULL, vigil_vec4_dot_doc),
+    VIGIL_METHOD_DOC("distance", 8U, vigil_vec4_distance, 1U, vigil_vec_obj_params, VIGIL_TYPE_F64, 1U, NULL,
+                     math_other_vec4_param_names, math_vec4_type_names, NULL, vigil_vec4_distance_doc),
+    VIGIL_METHOD_DOC("normalize", 9U, vigil_vec4_vnormalize, 0U, NULL, VIGIL_TYPE_OBJECT, 1U, NULL, NULL, NULL,
+                     "math.Vec4", vigil_vec4_normalize_doc),
+    VIGIL_METHOD_DOC("negate", 6U, vigil_vec4_negate, 0U, NULL, VIGIL_TYPE_OBJECT, 1U, NULL, NULL, NULL, "math.Vec4",
+                     vigil_vec4_negate_doc),
+    VIGIL_METHOD_DOC("add", 3U, vigil_vec4_add, 1U, vigil_vec_obj_params, VIGIL_TYPE_OBJECT, 1U, NULL,
+                     math_other_vec4_param_names, math_vec4_type_names, "math.Vec4", vigil_vec4_add_doc),
+    VIGIL_METHOD_DOC("sub", 3U, vigil_vec4_sub, 1U, vigil_vec_obj_params, VIGIL_TYPE_OBJECT, 1U, NULL,
+                     math_other_vec4_param_names, math_vec4_type_names, "math.Vec4", vigil_vec4_sub_doc),
+    VIGIL_METHOD_DOC("scale", 5U, vigil_vec4_scale, 1U, vigil_vec_f64_params, VIGIL_TYPE_OBJECT, 1U, NULL,
+                     math_scale_v_param_names, NULL, "math.Vec4", vigil_vec4_scale_doc),
+    VIGIL_METHOD_DOC("lerp", 4U, vigil_vec4_vlerp, 2U, vigil_vec_obj_f64_params, VIGIL_TYPE_OBJECT, 1U, NULL,
+                     math_other_t_vec4_param_names, math_vec4_f64_param_types, "math.Vec4", vigil_vec4_lerp_doc),
 };
 
 /* ── Quaternion class ─────────────────────────────────────────────── */
@@ -1431,10 +1668,10 @@ static vigil_status_t vigil_quat_to_euler(vigil_vm_t *vm, size_t arg_count, vigi
 }
 
 static const vigil_native_class_field_t vigil_quat_fields[] = {
-    VIGIL_PFIELD("x", 1U, VIGIL_TYPE_F64),
-    VIGIL_PFIELD("y", 1U, VIGIL_TYPE_F64),
-    VIGIL_PFIELD("z", 1U, VIGIL_TYPE_F64),
-    VIGIL_PFIELD("w", 1U, VIGIL_TYPE_F64),
+    VIGIL_PFIELD_DOC("x", 1U, VIGIL_TYPE_F64, vigil_quat_x_doc),
+    VIGIL_PFIELD_DOC("y", 1U, VIGIL_TYPE_F64, vigil_quat_y_doc),
+    VIGIL_PFIELD_DOC("z", 1U, VIGIL_TYPE_F64, vigil_quat_z_doc),
+    VIGIL_PFIELD_DOC("w", 1U, VIGIL_TYPE_F64, vigil_quat_w_doc),
 };
 
 /* Quaternion.fromEuler(pitch, yaw, roll) — static factory */
@@ -1495,18 +1732,29 @@ static vigil_status_t vigil_quat_to_mat4(vigil_vm_t *vm, size_t arg_count, vigil
 }
 
 static const vigil_native_class_method_t vigil_quat_methods[] = {
-    VIGIL_METHOD("length", 6U, vigil_quat_length, 0U, NULL, VIGIL_TYPE_F64, 1U, NULL),
-    VIGIL_METHOD("dot", 3U, vigil_quat_dot, 1U, vigil_vec_obj_params, VIGIL_TYPE_F64, 1U, NULL),
-    VIGIL_METHOD("normalize", 9U, vigil_quat_vnormalize, 0U, NULL, VIGIL_TYPE_OBJECT, 1U, NULL),
-    VIGIL_METHOD("conjugate", 9U, vigil_quat_conjugate, 0U, NULL, VIGIL_TYPE_OBJECT, 1U, NULL),
-    VIGIL_METHOD("inverse", 7U, vigil_quat_inverse, 0U, NULL, VIGIL_TYPE_OBJECT, 1U, NULL),
-    VIGIL_METHOD("multiply", 8U, vigil_quat_multiply, 1U, vigil_vec_obj_params, VIGIL_TYPE_OBJECT, 1U, NULL),
-    VIGIL_METHOD("slerp", 5U, vigil_quat_slerp, 2U, vigil_vec_obj_f64_params, VIGIL_TYPE_OBJECT, 1U, NULL),
-    VIGIL_STATIC("fromAxisAngle", 13U, vigil_quat_from_axis_angle, 2U, vigil_vec_obj_f64_params, VIGIL_TYPE_OBJECT, 1U,
-                 NULL),
-    VIGIL_STATIC("fromEuler", 9U, vigil_quat_from_euler, 3U, vigil_quat_f64x3_params, VIGIL_TYPE_OBJECT, 1U, NULL),
-    VIGIL_METHOD("toEuler", 7U, vigil_quat_to_euler, 0U, NULL, VIGIL_TYPE_OBJECT, 1U, NULL),
-    VIGIL_METHOD_RET("toMat4", 6U, vigil_quat_to_mat4, 0U, NULL, VIGIL_TYPE_OBJECT, 1U, NULL, "Mat4", 4U),
+    VIGIL_METHOD_DOC("length", 6U, vigil_quat_length, 0U, NULL, VIGIL_TYPE_F64, 1U, NULL, NULL, NULL, NULL,
+                     vigil_quat_length_doc),
+    VIGIL_METHOD_DOC("dot", 3U, vigil_quat_dot, 1U, vigil_vec_obj_params, VIGIL_TYPE_F64, 1U, NULL,
+                     math_other_quat_param_names, math_quat_type_names, NULL, vigil_quat_dot_doc),
+    VIGIL_METHOD_DOC("normalize", 9U, vigil_quat_vnormalize, 0U, NULL, VIGIL_TYPE_OBJECT, 1U, NULL, NULL, NULL,
+                     "math.Quaternion", vigil_quat_normalize_doc),
+    VIGIL_METHOD_DOC("conjugate", 9U, vigil_quat_conjugate, 0U, NULL, VIGIL_TYPE_OBJECT, 1U, NULL, NULL, NULL,
+                     "math.Quaternion", vigil_quat_conjugate_doc),
+    VIGIL_METHOD_DOC("inverse", 7U, vigil_quat_inverse, 0U, NULL, VIGIL_TYPE_OBJECT, 1U, NULL, NULL, NULL,
+                     "math.Quaternion", vigil_quat_inverse_doc),
+    VIGIL_METHOD_DOC("multiply", 8U, vigil_quat_multiply, 1U, vigil_vec_obj_params, VIGIL_TYPE_OBJECT, 1U, NULL,
+                     math_other_quat_param_names, math_quat_type_names, "math.Quaternion", vigil_quat_multiply_doc),
+    VIGIL_METHOD_DOC("slerp", 5U, vigil_quat_slerp, 2U, vigil_vec_obj_f64_params, VIGIL_TYPE_OBJECT, 1U, NULL,
+                     math_other_t_quat_param_names, math_quat_f64_param_types, "math.Quaternion", vigil_quat_slerp_doc),
+    VIGIL_STATIC_DOC("fromAxisAngle", 13U, vigil_quat_from_axis_angle, 2U, vigil_vec_obj_f64_params, VIGIL_TYPE_OBJECT,
+                     1U, NULL, math_axis_angle_param_names, math_vec3_f64_param_types2, "math.Quaternion",
+                     vigil_quat_from_axis_angle_doc),
+    VIGIL_STATIC_DOC("fromEuler", 9U, vigil_quat_from_euler, 3U, vigil_quat_f64x3_params, VIGIL_TYPE_OBJECT, 1U, NULL,
+                     math_pitch_yaw_roll_param_names, NULL, "math.Quaternion", vigil_quat_from_euler_doc),
+    VIGIL_METHOD_DOC("toEuler", 7U, vigil_quat_to_euler, 0U, NULL, VIGIL_TYPE_OBJECT, 1U, NULL, NULL, NULL,
+                     "math.Quaternion", vigil_quat_to_euler_doc),
+    VIGIL_METHOD_RET_DOC("toMat4", 6U, vigil_quat_to_mat4, 0U, NULL, VIGIL_TYPE_OBJECT, 1U, NULL, "Mat4", 4U, NULL,
+                         NULL, NULL, vigil_quat_to_mat4_doc),
 };
 
 /* ── Mat4 class ──────────────────────────────────────────────────── */
@@ -2026,40 +2274,60 @@ static const int vigil_mat4_i32i32_params[] = {VIGIL_TYPE_I32, VIGIL_TYPE_I32};
 static const int vigil_mat4_i32i32f64_params[] = {VIGIL_TYPE_I32, VIGIL_TYPE_I32, VIGIL_TYPE_F64};
 
 static const vigil_native_class_field_t vigil_mat4_fields[] = {
-    {"data", 4U, VIGIL_TYPE_OBJECT, VIGIL_NATIVE_FIELD_ARRAY, NULL, 0U, VIGIL_TYPE_F64, NULL, NULL},
+    {"data", 4U, VIGIL_TYPE_OBJECT, VIGIL_NATIVE_FIELD_ARRAY, NULL, 0U, VIGIL_TYPE_F64, NULL, &vigil_mat4_data_doc},
 };
 
 static const vigil_native_class_method_t vigil_mat4_methods[] = {
-    VIGIL_STATIC("identity", 8U, vigil_mat4_identity, 0U, NULL, VIGIL_TYPE_OBJECT, 1U, NULL),
-    VIGIL_STATIC("lookAt", 6U, vigil_mat4_look_at, 3U, vigil_mat4_obj3_params, VIGIL_TYPE_OBJECT, 1U, NULL),
-    VIGIL_STATIC("perspective", 11U, vigil_mat4_perspective, 4U, vigil_mat4_f64x4_params, VIGIL_TYPE_OBJECT, 1U, NULL),
-    VIGIL_STATIC("ortho", 5U, vigil_mat4_ortho, 6U, vigil_mat4_f64x6_params, VIGIL_TYPE_OBJECT, 1U, NULL),
-    VIGIL_STATIC("frustum", 7U, vigil_mat4_frustum, 6U, vigil_mat4_f64x6_params, VIGIL_TYPE_OBJECT, 1U, NULL),
-    VIGIL_METHOD("get", 3U, vigil_mat4_get, 2U, vigil_mat4_i32i32_params, VIGIL_TYPE_F64, 1U, NULL),
-    VIGIL_METHOD("set", 3U, vigil_mat4_set, 3U, vigil_mat4_i32i32f64_params, VIGIL_TYPE_OBJECT, 1U, NULL),
-    VIGIL_METHOD("multiply", 8U, vigil_mat4_multiply, 1U, vigil_vec_obj_params, VIGIL_TYPE_OBJECT, 1U, NULL),
-    VIGIL_METHOD("transpose", 9U, vigil_mat4_transpose, 0U, NULL, VIGIL_TYPE_OBJECT, 1U, NULL),
-    VIGIL_METHOD("determinant", 11U, vigil_mat4_determinant, 0U, NULL, VIGIL_TYPE_F64, 1U, NULL),
-    VIGIL_METHOD("trace", 5U, vigil_mat4_trace, 0U, NULL, VIGIL_TYPE_F64, 1U, NULL),
-    VIGIL_METHOD("invert", 6U, vigil_mat4_invert, 0U, NULL, VIGIL_TYPE_OBJECT, 1U, NULL),
-    VIGIL_METHOD("add", 3U, vigil_mat4_add, 1U, vigil_vec_obj_params, VIGIL_TYPE_OBJECT, 1U, NULL),
-    VIGIL_METHOD("scale", 5U, vigil_mat4_scale, 1U, vigil_vec_f64_params, VIGIL_TYPE_OBJECT, 1U, NULL),
-    VIGIL_METHOD("scaleV", 6U, vigil_mat4_scale_vec, 1U, vigil_vec_obj_params, VIGIL_TYPE_OBJECT, 1U, NULL),
-    VIGIL_METHOD("translate", 9U, vigil_mat4_translate, 1U, vigil_vec_obj_params, VIGIL_TYPE_OBJECT, 1U, NULL),
-    VIGIL_METHOD("rotateX", 7U, vigil_mat4_rotate_x, 1U, vigil_vec_f64_params, VIGIL_TYPE_OBJECT, 1U, NULL),
-    VIGIL_METHOD("rotateY", 7U, vigil_mat4_rotate_y, 1U, vigil_vec_f64_params, VIGIL_TYPE_OBJECT, 1U, NULL),
-    VIGIL_METHOD("rotateZ", 7U, vigil_mat4_rotate_z, 1U, vigil_vec_f64_params, VIGIL_TYPE_OBJECT, 1U, NULL),
+    VIGIL_STATIC_DOC("identity", 8U, vigil_mat4_identity, 0U, NULL, VIGIL_TYPE_OBJECT, 1U, NULL, NULL, NULL,
+                     "math.Mat4", vigil_mat4_identity_doc),
+    VIGIL_STATIC_DOC("lookAt", 6U, vigil_mat4_look_at, 3U, vigil_mat4_obj3_params, VIGIL_TYPE_OBJECT, 1U, NULL,
+                     math_eye_target_up_param_names, math_three_vec3_param_types, "math.Mat4", vigil_mat4_look_at_doc),
+    VIGIL_STATIC_DOC("perspective", 11U, vigil_mat4_perspective, 4U, vigil_mat4_f64x4_params, VIGIL_TYPE_OBJECT, 1U,
+                     NULL, math_fov_aspect_near_far_param_names, NULL, "math.Mat4", vigil_mat4_perspective_doc),
+    VIGIL_STATIC_DOC("ortho", 5U, vigil_mat4_ortho, 6U, vigil_mat4_f64x6_params, VIGIL_TYPE_OBJECT, 1U, NULL,
+                     math_left_right_bottom_top_near_far_param_names, NULL, "math.Mat4", vigil_mat4_ortho_doc),
+    VIGIL_STATIC_DOC("frustum", 7U, vigil_mat4_frustum, 6U, vigil_mat4_f64x6_params, VIGIL_TYPE_OBJECT, 1U, NULL,
+                     math_left_right_bottom_top_near_far_param_names, NULL, "math.Mat4", vigil_mat4_frustum_doc),
+    VIGIL_METHOD_DOC("get", 3U, vigil_mat4_get, 2U, vigil_mat4_i32i32_params, VIGIL_TYPE_F64, 1U, NULL,
+                     math_row_col_param_names, NULL, NULL, vigil_mat4_get_doc),
+    VIGIL_METHOD_DOC("set", 3U, vigil_mat4_set, 3U, vigil_mat4_i32i32f64_params, VIGIL_TYPE_OBJECT, 1U, NULL,
+                     math_row_col_value_param_names, NULL, "math.Mat4", vigil_mat4_set_doc),
+    VIGIL_METHOD_DOC("multiply", 8U, vigil_mat4_multiply, 1U, vigil_vec_obj_params, VIGIL_TYPE_OBJECT, 1U, NULL,
+                     math_other_mat4_param_names, math_other_mat4_param_types, "math.Mat4", vigil_mat4_multiply_doc),
+    VIGIL_METHOD_DOC("transpose", 9U, vigil_mat4_transpose, 0U, NULL, VIGIL_TYPE_OBJECT, 1U, NULL, NULL, NULL,
+                     "math.Mat4", vigil_mat4_transpose_doc),
+    VIGIL_METHOD_DOC("determinant", 11U, vigil_mat4_determinant, 0U, NULL, VIGIL_TYPE_F64, 1U, NULL, NULL, NULL, NULL,
+                     vigil_mat4_determinant_doc),
+    VIGIL_METHOD_DOC("trace", 5U, vigil_mat4_trace, 0U, NULL, VIGIL_TYPE_F64, 1U, NULL, NULL, NULL, NULL,
+                     vigil_mat4_trace_doc),
+    VIGIL_METHOD_DOC("invert", 6U, vigil_mat4_invert, 0U, NULL, VIGIL_TYPE_OBJECT, 1U, NULL, NULL, NULL, "math.Mat4",
+                     vigil_mat4_invert_doc),
+    VIGIL_METHOD_DOC("add", 3U, vigil_mat4_add, 1U, vigil_vec_obj_params, VIGIL_TYPE_OBJECT, 1U, NULL,
+                     math_other_mat4_param_names, math_other_mat4_param_types, "math.Mat4", vigil_mat4_add_doc),
+    VIGIL_METHOD_DOC("scale", 5U, vigil_mat4_scale, 1U, vigil_vec_f64_params, VIGIL_TYPE_OBJECT, 1U, NULL,
+                     math_scale_v_param_names, NULL, "math.Mat4", vigil_mat4_scale_doc),
+    VIGIL_METHOD_DOC("scaleV", 6U, vigil_mat4_scale_vec, 1U, vigil_vec_obj_params, VIGIL_TYPE_OBJECT, 1U, NULL,
+                     math_scale_v_param_names, math_scale_vec3_param_types, "math.Mat4", vigil_mat4_scale_v_doc),
+    VIGIL_METHOD_DOC("translate", 9U, vigil_mat4_translate, 1U, vigil_vec_obj_params, VIGIL_TYPE_OBJECT, 1U, NULL,
+                     math_offset_param_names, math_offset_vec3_param_types, "math.Mat4", vigil_mat4_translate_doc),
+    VIGIL_METHOD_DOC("rotateX", 7U, vigil_mat4_rotate_x, 1U, vigil_vec_f64_params, VIGIL_TYPE_OBJECT, 1U, NULL,
+                     math_angle_param_names, NULL, "math.Mat4", vigil_mat4_rotate_x_doc),
+    VIGIL_METHOD_DOC("rotateY", 7U, vigil_mat4_rotate_y, 1U, vigil_vec_f64_params, VIGIL_TYPE_OBJECT, 1U, NULL,
+                     math_angle_param_names, NULL, "math.Mat4", vigil_mat4_rotate_y_doc),
+    VIGIL_METHOD_DOC("rotateZ", 7U, vigil_mat4_rotate_z, 1U, vigil_vec_f64_params, VIGIL_TYPE_OBJECT, 1U, NULL,
+                     math_angle_param_names, NULL, "math.Mat4", vigil_mat4_rotate_z_doc),
 };
 
 static const vigil_native_class_t vigil_math_classes[] = {
-    {"Vec2", 4U, vigil_vec2_fields, 2U, vigil_vec2_methods, 15U, NULL, NULL},
-    {"Vec3", 4U, vigil_vec3_fields, 3U, vigil_vec3_methods, 18U, NULL, NULL},
-    {"Vec4", 4U, vigil_vec4_fields, 4U, vigil_vec4_methods, 12U, NULL, NULL},
-    {"Quaternion", 10U, vigil_quat_fields, 4U, vigil_quat_methods, 11U, NULL, NULL},
-    {"Mat4", 4U, vigil_mat4_fields, 1U, vigil_mat4_methods, 19U, NULL, NULL},
+    {"Vec2", 4U, vigil_vec2_fields, 2U, vigil_vec2_methods, 15U, NULL, &vigil_vec2_doc},
+    {"Vec3", 4U, vigil_vec3_fields, 3U, vigil_vec3_methods, 18U, NULL, &vigil_vec3_doc},
+    {"Vec4", 4U, vigil_vec4_fields, 4U, vigil_vec4_methods, 12U, NULL, &vigil_vec4_doc},
+    {"Quaternion", 10U, vigil_quat_fields, 4U, vigil_quat_methods, 11U, NULL, &vigil_quat_doc},
+    {"Mat4", 4U, vigil_mat4_fields, 1U, vigil_mat4_methods, 19U, NULL, &vigil_mat4_doc},
 };
 
 #define VIGIL_MATH_CLASS_COUNT (sizeof(vigil_math_classes) / sizeof(vigil_math_classes[0]))
 
 VIGIL_API const vigil_native_module_t vigil_stdlib_math = {
-    "math", 4U, vigil_math_functions, VIGIL_MATH_FUNCTION_COUNT, vigil_math_classes, VIGIL_MATH_CLASS_COUNT, NULL};
+    "math", 4U, vigil_math_functions, VIGIL_MATH_FUNCTION_COUNT, vigil_math_classes, VIGIL_MATH_CLASS_COUNT,
+    &vigil_math_module_doc};
