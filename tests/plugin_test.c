@@ -280,6 +280,42 @@ TEST(PluginRegistry, SdlExportsWindowAndMessageBoxBatchFunctions)
     vigil_native_registry_free(&natives);
 }
 
+TEST(PluginRegistry, SdlExportsCameraClipboardAndBindingsBatchFunctions)
+{
+    vigil_native_registry_t natives;
+    vigil_error_t error = {0};
+    const vigil_native_module_t *mod;
+    const vigil_native_class_t *window_class;
+    const vigil_native_class_t *gamepad_class;
+    const vigil_native_class_t *camera_class;
+
+    if (!vigil_plugin_is_known_module("sdl", 3U))
+        return;
+
+    vigil_native_registry_init(&natives);
+    EXPECT_EQ(vigil_plugin_register_all(&natives, &error), VIGIL_STATUS_OK);
+
+    mod = vigil_native_registry_find(&natives, "sdl", 3U);
+    EXPECT_NE(mod, NULL);
+    EXPECT_NE(FindModuleFunction(mod, "get_camera_supported_formats"), NULL);
+    EXPECT_NE(FindModuleFunction(mod, "get_clipboard_data"), NULL);
+    EXPECT_NE(FindModuleFunction(mod, "set_clipboard_data"), NULL);
+
+    window_class = FindModuleClass(mod, "Window");
+    EXPECT_NE(window_class, NULL);
+    EXPECT_NE(FindClassMethod(window_class, "update_surface_rects"), NULL);
+
+    gamepad_class = FindModuleClass(mod, "Gamepad");
+    EXPECT_NE(gamepad_class, NULL);
+    EXPECT_NE(FindClassMethod(gamepad_class, "get_bindings"), NULL);
+
+    camera_class = FindModuleClass(mod, "Camera");
+    EXPECT_NE(camera_class, NULL);
+    EXPECT_NE(FindClassMethod(camera_class, "get_spec"), NULL);
+
+    vigil_native_registry_free(&natives);
+}
+
 TEST(PluginRegistry, SdlGuidHelpersViaVM)
 {
     int64_t result;
@@ -348,6 +384,24 @@ TEST(PluginRegistry, SdlEnvironmentHelpersViaVM)
     EXPECT_EQ(result, 0);
 }
 
+TEST(PluginRegistry, SdlCameraFormatHelpersViaVM)
+{
+    int64_t result;
+
+    if (!vigil_plugin_is_known_module("sdl", 3U))
+        return;
+
+    result = RunWithPlugins(vigil_test_failed_, "import \"sdl\";\n"
+                                                "fn main() -> i32 {\n"
+                                                "    string specs = sdl.get_camera_supported_formats(0);\n"
+                                                "    if (specs.len() < 0) {\n"
+                                                "        return 1;\n"
+                                                "    }\n"
+                                                "    return 0;\n"
+                                                "}\n");
+    EXPECT_EQ(result, 0);
+}
+
 #endif /* VIGIL_PLUGIN_COUNT > 0 */
 
 /* ── registration ────────────────────────────────────────────────── */
@@ -365,7 +419,9 @@ void register_plugin_tests(void)
     REGISTER_TEST(PluginRegistry, SdlExportsParityBatchOneFunctions);
     REGISTER_TEST(PluginRegistry, SdlExportsEnvironmentBatchFunctions);
     REGISTER_TEST(PluginRegistry, SdlExportsWindowAndMessageBoxBatchFunctions);
+    REGISTER_TEST(PluginRegistry, SdlExportsCameraClipboardAndBindingsBatchFunctions);
     REGISTER_TEST(PluginRegistry, SdlGuidHelpersViaVM);
     REGISTER_TEST(PluginRegistry, SdlEnvironmentHelpersViaVM);
+    REGISTER_TEST(PluginRegistry, SdlCameraFormatHelpersViaVM);
 #endif
 }

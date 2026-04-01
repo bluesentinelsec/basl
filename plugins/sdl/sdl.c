@@ -3,6 +3,7 @@
  * SDL3 bindings for Vigil.
  * See: https://github.com/bluesentinelsec/vigil/issues/307
  */
+#include <stdarg.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -200,6 +201,101 @@ static vigil_status_t sdl_push_joined_lines(vigil_vm_t *vm, char **items, int co
     st = sdl_push_string(vm, joined, error);
     free(joined);
     return st;
+}
+
+static int sdl_append_bytes(char **buffer, size_t *length, size_t *capacity, const char *text, size_t text_len)
+{
+    size_t needed = *length + text_len + 1U;
+    if (needed > *capacity)
+    {
+        size_t new_capacity = *capacity == 0 ? 256U : *capacity;
+        while (new_capacity < needed)
+            new_capacity *= 2U;
+        char *next = (char *)realloc(*buffer, new_capacity);
+        if (!next)
+            return -1;
+        *buffer = next;
+        *capacity = new_capacity;
+    }
+
+    memcpy(*buffer + *length, text, text_len);
+    *length += text_len;
+    (*buffer)[*length] = '\0';
+    return 0;
+}
+
+static int sdl_append_cstr(char **buffer, size_t *length, size_t *capacity, const char *text)
+{
+    return sdl_append_bytes(buffer, length, capacity, text, strlen(text));
+}
+
+static int sdl_append_format(char **buffer, size_t *length, size_t *capacity, const char *fmt, ...)
+{
+    va_list args;
+    va_list copy;
+    int required = 0;
+
+    va_start(args, fmt);
+    va_copy(copy, args);
+    required = vsnprintf(NULL, 0, fmt, copy);
+    va_end(copy);
+    if (required < 0)
+    {
+        va_end(args);
+        return -1;
+    }
+
+    size_t needed = *length + (size_t)required + 1U;
+    if (needed > *capacity)
+    {
+        size_t new_capacity = *capacity == 0 ? 256U : *capacity;
+        while (new_capacity < needed)
+            new_capacity *= 2U;
+        char *next = (char *)realloc(*buffer, new_capacity);
+        if (!next)
+        {
+            va_end(args);
+            return -1;
+        }
+        *buffer = next;
+        *capacity = new_capacity;
+    }
+
+    vsnprintf(*buffer + *length, *capacity - *length, fmt, args);
+    *length += (size_t)required;
+    va_end(args);
+    return 0;
+}
+
+typedef struct
+{
+    char *mime_type;
+    uint8_t *data;
+    size_t size;
+} sdl_clipboard_payload_t;
+
+static const void *SDLCALL sdl_clipboard_data_callback(void *userdata, const char *mime_type, size_t *size)
+{
+    sdl_clipboard_payload_t *payload = (sdl_clipboard_payload_t *)userdata;
+    if (!payload || !mime_type || strcmp(payload->mime_type, mime_type) != 0)
+    {
+        if (size)
+            *size = 0;
+        return NULL;
+    }
+    if (size)
+        *size = payload->size;
+    return payload->data;
+}
+
+static void SDLCALL sdl_clipboard_cleanup(void *userdata)
+{
+    sdl_clipboard_payload_t *payload = (sdl_clipboard_payload_t *)userdata;
+    if (!payload)
+        return;
+    free(payload->mime_type);
+    free(payload->data);
+    free(payload);
 }
 
 /* ── Error helpers ───────────────────────────────────────────────── */
@@ -4795,6 +4891,53 @@ static vigil_status_t sdl_fn_get_current_camera_driver(vigil_vm_t *vm, size_t ar
     return sdl_push_string(vm, SDL_GetCurrentCameraDriver(), error);
 }
 
+static vigil_status_t sdl_fn_get_camera_supported_formats(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t idx = sdl_arg_i32(vm, base, 0);
+    SDL_CameraID camera_id = 0;
+    SDL_CameraSpec **specs = NULL;
+    char *joined = NULL;
+    size_t joined_len = 0;
+    size_t joined_cap = 0;
+    vigil_status_t st = VIGIL_STATUS_OK;
+    int count = 0;
+
+    vigil_vm_stack_pop_n(vm, arg_count);
+    if (idx >= 0 && idx < g_camera_count && g_camera_ids)
+        camera_id = g_camera_ids[idx];
+    if (!camera_id)
+        return sdl_push_string(vm, "", error);
+
+    specs = SDL_GetCameraSupportedFormats(camera_id, &count);
+    if (!specs || count <= 0)
+        return sdl_push_string(vm, "", error);
+
+    for (int i = 0; i < count; i++)
+    {
+        const SDL_CameraSpec *spec = specs[i];
+        if (!spec)
+            continue;
+        if (joined_len > 0 && sdl_append_bytes(&joined, &joined_len, &joined_cap, "\n", 1U) != 0)
+            goto oom;
+        if (sdl_append_format(&joined, &joined_len, &joined_cap, "%d,%d,%d,%d,%d,%d", (int)spec->format,
+                              (int)spec->colorspace, spec->width, spec->height, spec->framerate_numerator,
+                              spec->framerate_denominator) != 0)
+            goto oom;
+    }
+
+    st = sdl_push_string(vm, joined ? joined : "", error);
+    SDL_free(specs);
+    free(joined);
+    return st;
+
+oom:
+    SDL_free(specs);
+    free(joined);
+    vigil_error_set_literal(error, VIGIL_STATUS_OUT_OF_MEMORY, "out of memory");
+    return VIGIL_STATUS_OUT_OF_MEMORY;
+}
+
 /* Camera.open(i32 index, i32 w, i32 h, i32 fps) -> (Camera, err) */
 static vigil_status_t sdl_camera_open(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
 {
@@ -4872,6 +5015,37 @@ static vigil_status_t sdl_camera_get_format(vigil_vm_t *vm, size_t arg_count, vi
     if (st != VIGIL_STATUS_OK)
         return st;
     return sdl_push_i32(vm, spec.height, error);
+}
+
+static vigil_status_t sdl_camera_get_spec(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, CAM_HANDLE);
+    SDL_CameraSpec spec = {0};
+    SDL_Camera *cam = NULL;
+    vigil_status_t st = VIGIL_STATUS_OK;
+
+    vigil_vm_stack_pop_n(vm, arg_count);
+    cam = (SDL_Camera *)SDL_HANDLE_GET(cameras, h);
+    if (cam)
+        SDL_GetCameraFormat(cam, &spec);
+
+    st = sdl_push_i32(vm, (int32_t)spec.format, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    st = sdl_push_i32(vm, (int32_t)spec.colorspace, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    st = sdl_push_i32(vm, spec.width, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    st = sdl_push_i32(vm, spec.height, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    st = sdl_push_i32(vm, spec.framerate_numerator, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_i32(vm, spec.framerate_denominator, error);
 }
 
 /* cam.acquire_frame() -> (i64, err) — returns surface handle or -1
@@ -7316,6 +7490,51 @@ static vigil_status_t sdl_window_update_surface_rect(vigil_vm_t *vm, size_t arg_
     if (win && SDL_UpdateWindowSurfaceRects(win, &rect, 1))
         return sdl_push_bool_ok(vm, error);
     return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+static vigil_status_t sdl_window_update_surface_rects(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, WIN_HANDLE);
+    int64_t rect_buffer = sdl_arg_i64(vm, base, 1);
+    int32_t rect_count = sdl_arg_i32(vm, base, 2);
+    SDL_Window *win = NULL;
+    SDL_Rect *rects = NULL;
+    int32_t buffer_size = 0;
+    int32_t *raw = NULL;
+    vigil_status_t st = VIGIL_STATUS_OK;
+
+    vigil_vm_stack_pop_n(vm, arg_count);
+    if (rect_count <= 0)
+        return sdl_push_bool_sdl_err(vm, SDL_ERR_ARG, error);
+
+    raw = (int32_t *)vigil_unsafe_buffer_get(rect_buffer, &buffer_size);
+    if (!raw || buffer_size < rect_count * (int32_t)(4 * sizeof(int32_t)))
+        return sdl_push_bool_sdl_err(vm, SDL_ERR_ARG, error);
+
+    rects = (SDL_Rect *)malloc((size_t)rect_count * sizeof(SDL_Rect));
+    if (!rects)
+    {
+        vigil_error_set_literal(error, VIGIL_STATUS_OUT_OF_MEMORY, "out of memory");
+        return VIGIL_STATUS_OUT_OF_MEMORY;
+    }
+
+    for (int32_t i = 0; i < rect_count; i++)
+    {
+        rects[i].x = raw[i * 4];
+        rects[i].y = raw[i * 4 + 1];
+        rects[i].w = raw[i * 4 + 2];
+        rects[i].h = raw[i * 4 + 3];
+    }
+
+    win = (SDL_Window *)SDL_HANDLE_GET(windows, h);
+    if (win && SDL_UpdateWindowSurfaceRects(win, rects, rect_count))
+        st = sdl_push_bool_ok(vm, error);
+    else
+        st = sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+
+    free(rects);
+    return st;
 }
 
 static vigil_status_t sdl_window_destroy_surface(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
@@ -12992,6 +13211,129 @@ static vigil_status_t sdl_fn_has_clipboard_data(vigil_vm_t *vm, size_t arg_count
     return sdl_push_bool(vm, SDL_HasClipboardData(mime), error);
 }
 
+static vigil_status_t sdl_fn_get_clipboard_data(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    char mime[256];
+    size_t size = 0;
+    void *data = NULL;
+    uint8_t *copy = NULL;
+    int64_t buffer_handle = -1;
+    vigil_status_t st = VIGIL_STATUS_OK;
+
+    sdl_arg_str(vm, base, 0, mime, sizeof(mime));
+    vigil_vm_stack_pop_n(vm, arg_count);
+
+    data = SDL_GetClipboardData(mime, &size);
+    if (!data)
+    {
+        st = sdl_push_i64(vm, -1, error);
+        if (st != VIGIL_STATUS_OK)
+            return st;
+        st = sdl_push_i64(vm, 0, error);
+        if (st != VIGIL_STATUS_OK)
+            return st;
+        return sdl_push_sdl_err(vm, SDL_ERR_IO, error);
+    }
+
+    if (size > 0)
+    {
+        copy = (uint8_t *)malloc(size);
+        if (!copy)
+        {
+            SDL_free(data);
+            vigil_error_set_literal(error, VIGIL_STATUS_OUT_OF_MEMORY, "out of memory");
+            return VIGIL_STATUS_OUT_OF_MEMORY;
+        }
+        memcpy(copy, data, size);
+    }
+    SDL_free(data);
+
+    if (size == 0)
+    {
+        st = sdl_push_i64(vm, -1, error);
+        if (st != VIGIL_STATUS_OK)
+            return st;
+        st = sdl_push_i64(vm, 0, error);
+        if (st != VIGIL_STATUS_OK)
+            return st;
+        return sdl_push_ok(vm, error);
+    }
+
+    buffer_handle = vigil_unsafe_buffer_register(copy, (int32_t)size);
+    if (buffer_handle < 0)
+    {
+        free(copy);
+        st = sdl_push_i64(vm, -1, error);
+        if (st != VIGIL_STATUS_OK)
+            return st;
+        st = sdl_push_i64(vm, 0, error);
+        if (st != VIGIL_STATUS_OK)
+            return st;
+        return sdl_push_err(vm, "too many buffers", SDL_ERR_STATE, error);
+    }
+
+    st = sdl_push_i64(vm, buffer_handle, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    st = sdl_push_i64(vm, (int64_t)size, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_ok(vm, error);
+}
+
+static vigil_status_t sdl_fn_set_clipboard_data(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    char mime[256];
+    int64_t buffer_handle = sdl_arg_i64(vm, base, 1);
+    int32_t length = sdl_arg_i32(vm, base, 2);
+    int32_t buffer_size = 0;
+    void *source = NULL;
+    sdl_clipboard_payload_t *payload = NULL;
+    const char *mime_types[1];
+
+    sdl_arg_str(vm, base, 0, mime, sizeof(mime));
+    vigil_vm_stack_pop_n(vm, arg_count);
+
+    source = vigil_unsafe_buffer_get(buffer_handle, &buffer_size);
+    if (!source)
+        return sdl_push_bool_sdl_err(vm, SDL_ERR_ARG, error);
+
+    if (length <= 0)
+        length = buffer_size;
+    if (length < 0 || length > buffer_size)
+        return sdl_push_bool_sdl_err(vm, SDL_ERR_ARG, error);
+
+    payload = (sdl_clipboard_payload_t *)calloc(1U, sizeof(*payload));
+    if (!payload)
+    {
+        vigil_error_set_literal(error, VIGIL_STATUS_OUT_OF_MEMORY, "out of memory");
+        return VIGIL_STATUS_OUT_OF_MEMORY;
+    }
+
+    payload->mime_type = (char *)malloc(strlen(mime) + 1U);
+    payload->data = (uint8_t *)malloc((size_t)length);
+    if (!payload->mime_type || (!payload->data && length > 0))
+    {
+        sdl_clipboard_cleanup(payload);
+        vigil_error_set_literal(error, VIGIL_STATUS_OUT_OF_MEMORY, "out of memory");
+        return VIGIL_STATUS_OUT_OF_MEMORY;
+    }
+
+    memcpy(payload->mime_type, mime, strlen(mime) + 1U);
+    if (length > 0)
+        memcpy(payload->data, source, (size_t)length);
+    payload->size = (size_t)length;
+
+    mime_types[0] = payload->mime_type;
+    if (SDL_SetClipboardData(sdl_clipboard_data_callback, sdl_clipboard_cleanup, payload, mime_types, 1U))
+        return sdl_push_bool_ok(vm, error);
+
+    sdl_clipboard_cleanup(payload);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
 static vigil_status_t sdl_fn_set_hint_with_priority(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
 {
     size_t base = vigil_vm_stack_depth(vm) - arg_count;
@@ -14235,6 +14577,94 @@ static vigil_status_t sdl_fn_get_gamepad_mappings(vigil_vm_t *vm, size_t arg_cou
     return st;
 }
 
+static vigil_status_t sdl_gamepad_get_bindings(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t handle = sdl_field_i64(vm, base, GP_HANDLE);
+    SDL_Gamepad *gamepad = NULL;
+    SDL_GamepadBinding **bindings = NULL;
+    char *joined = NULL;
+    size_t joined_len = 0;
+    size_t joined_cap = 0;
+    vigil_status_t st = VIGIL_STATUS_OK;
+    int count = 0;
+
+    vigil_vm_stack_pop_n(vm, arg_count);
+    gamepad = (SDL_Gamepad *)SDL_HANDLE_GET(gamepads, handle);
+    if (!gamepad)
+        return sdl_push_string(vm, "", error);
+
+    bindings = SDL_GetGamepadBindings(gamepad, &count);
+    if (!bindings || count <= 0)
+        return sdl_push_string(vm, "", error);
+
+    for (int i = 0; i < count; i++)
+    {
+        const SDL_GamepadBinding *binding = bindings[i];
+        if (!binding)
+            continue;
+
+        if (joined_len > 0 && sdl_append_bytes(&joined, &joined_len, &joined_cap, "\n", 1U) != 0)
+            goto oom;
+
+        switch (binding->input_type)
+        {
+        case SDL_GAMEPAD_BINDTYPE_BUTTON:
+            if (sdl_append_format(&joined, &joined_len, &joined_cap, "input=button:%d ", binding->input.button) != 0)
+                goto oom;
+            break;
+        case SDL_GAMEPAD_BINDTYPE_AXIS:
+            if (sdl_append_format(&joined, &joined_len, &joined_cap, "input=axis:%d[%d:%d] ", binding->input.axis.axis,
+                                  binding->input.axis.axis_min, binding->input.axis.axis_max) != 0)
+                goto oom;
+            break;
+        case SDL_GAMEPAD_BINDTYPE_HAT:
+            if (sdl_append_format(&joined, &joined_len, &joined_cap, "input=hat:%d:%d ", binding->input.hat.hat,
+                                  binding->input.hat.hat_mask) != 0)
+                goto oom;
+            break;
+        default:
+            if (sdl_append_cstr(&joined, &joined_len, &joined_cap, "input=none ") != 0)
+                goto oom;
+            break;
+        }
+
+        switch (binding->output_type)
+        {
+        case SDL_GAMEPAD_BINDTYPE_BUTTON: {
+            const char *button_name = SDL_GetGamepadStringForButton(binding->output.button);
+            if (sdl_append_format(&joined, &joined_len, &joined_cap, "output=button:%s",
+                                  button_name ? button_name : "unknown") != 0)
+                goto oom;
+            break;
+        }
+        case SDL_GAMEPAD_BINDTYPE_AXIS: {
+            const char *axis_name = SDL_GetGamepadStringForAxis(binding->output.axis.axis);
+            if (sdl_append_format(&joined, &joined_len, &joined_cap, "output=axis:%s[%d:%d]",
+                                  axis_name ? axis_name : "unknown", binding->output.axis.axis_min,
+                                  binding->output.axis.axis_max) != 0)
+                goto oom;
+            break;
+        }
+        default:
+            if (sdl_append_cstr(&joined, &joined_len, &joined_cap, "output=none") != 0)
+                goto oom;
+            break;
+        }
+    }
+
+    st = sdl_push_string(vm, joined ? joined : "", error);
+    SDL_free(bindings);
+    free(joined);
+    return st;
+
+oom:
+    SDL_free(bindings);
+    free(joined);
+    vigil_error_set_literal(error, VIGIL_STATUS_OUT_OF_MEMORY, "out of memory");
+    return VIGIL_STATUS_OUT_OF_MEMORY;
+}
+
 static vigil_status_t sdl_fn_calculate_gpu_texture_format_size(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
 {
     size_t base = vigil_vm_stack_depth(vm) - arg_count;
@@ -14855,6 +15285,10 @@ static const char *const sdl_environment_set_param_names[] = {"environment", "na
 static const char *const sdl_environment_create_param_names[] = {"populated"};
 static const char *const sdl_message_box_param_names[] = {"flags", "title", "message", "buttons"};
 static const char *const sdl_window_rect_param_names[] = {"x", "y", "w", "h"};
+static const char *const sdl_window_rects_param_names[] = {"rects", "count"};
+static const char *const sdl_clipboard_mime_param_names[] = {"mime_type"};
+static const char *const sdl_clipboard_set_param_names[] = {"mime_type", "buffer", "size"};
+static const char *const sdl_camera_index_param_names[] = {"camera_index"};
 
 static const vigil_native_symbol_doc_t sdl_doc_create_window_with_properties = {
     "Create a window from an SDL property bag.",
@@ -14928,6 +15362,43 @@ static const vigil_native_symbol_doc_t sdl_doc_window_update_surface_rect = {
     "Update one rectangle of the window surface.",
     "Use this after drawing to a window surface when only one region needs to be presented.",
     "bool ok, err e = win.update_surface_rect(0, 0, 64, 64)",
+};
+
+static const vigil_native_symbol_doc_t sdl_doc_get_camera_supported_formats = {
+    "List camera formats supported by one enumerated camera device.",
+    "Each line is format,colorspace,width,height,fps_num,fps_den using SDL numeric constants. "
+    "Pass the same camera index used by Camera.open.",
+    "string specs = sdl.get_camera_supported_formats(0)",
+};
+
+static const vigil_native_symbol_doc_t sdl_doc_camera_get_spec = {
+    "Return the active camera format specification.",
+    "Returns six i32 values in order: pixel format, colorspace, width, height, fps numerator, fps denominator.",
+    "i32 fmt, i32 cs, i32 w, i32 h, i32 fps_num, i32 fps_den = cam.get_spec()",
+};
+
+static const vigil_native_symbol_doc_t sdl_doc_gamepad_get_bindings = {
+    "Describe the current SDL gamepad bindings for one opened controller.",
+    "Each line summarizes one SDL_GamepadBinding using a practical textual form for debugging and tooling.",
+    "string bindings = pad.get_bindings()",
+};
+
+static const vigil_native_symbol_doc_t sdl_doc_window_update_surface_rects = {
+    "Update multiple rectangles of the window surface from an unsafe buffer.",
+    "The buffer must contain count rectangles packed as repeating i32 x, y, w, h quads.",
+    "bool ok, err e = win.update_surface_rects(rects, 2)",
+};
+
+static const vigil_native_symbol_doc_t sdl_doc_get_clipboard_data = {
+    "Read clipboard data for one MIME type into an unsafe buffer.",
+    "Returns a buffer handle, the byte size, and err. Free the buffer with unsafe.free when done.",
+    "i64 buf, i64 size, err e = sdl.get_clipboard_data(\"text/plain\")",
+};
+
+static const vigil_native_symbol_doc_t sdl_doc_set_clipboard_data = {
+    "Publish one clipboard payload from an unsafe buffer under a MIME type.",
+    "Pass size <= 0 to publish the whole buffer. The data is copied before SDL takes ownership.",
+    "bool ok, err e = sdl.set_clipboard_data(\"text/plain\", buf, size)",
 };
 
 /* ── Function table ──────────────────────────────────────────────── */
@@ -15283,6 +15754,8 @@ static const vigil_native_module_function_t sdl_functions[] = {
     SDL_FN("get_camera_count", 16U, sdl_fn_get_camera_count, 0U, NULL, VIGIL_TYPE_I32),
     SDL_FN("get_camera_name", 15U, sdl_fn_get_camera_name, 1U, p_i32, VIGIL_TYPE_STRING),
     SDL_FN("get_current_camera_driver", 25U, sdl_fn_get_current_camera_driver, 0U, NULL, VIGIL_TYPE_STRING),
+    {"get_camera_supported_formats", 28U, sdl_fn_get_camera_supported_formats, 1U, p_i32, VIGIL_TYPE_STRING, 1U, NULL,
+     0, NULL, NULL, 0U, sdl_camera_index_param_names, NULL, NULL, &sdl_doc_get_camera_supported_formats},
     /* Window complete */
     {"create_window_with_properties", 29U, sdl_fn_create_window_with_properties, 1U, p_i32, VIGIL_TYPE_OBJECT, 2U,
      rt_obj_err, 0, NULL, NULL, 0U, sdl_properties_param_names, NULL, "Window", &sdl_doc_create_window_with_properties},
@@ -15723,6 +16196,10 @@ static const vigil_native_module_function_t sdl_functions[] = {
      rt_bool_err, 0, NULL, NULL, 0U, sdl_environment_name_param_names, NULL, NULL, NULL},
     SDL_FN_BOOL_ERR("clear_clipboard_data", 20U, sdl_fn_clear_clipboard_data, 0U, NULL),
     SDL_FN("has_clipboard_data", 18U, sdl_fn_has_clipboard_data, 1U, p_str, VIGIL_TYPE_BOOL),
+    {"get_clipboard_data", 18U, sdl_fn_get_clipboard_data, 1U, p_str, VIGIL_TYPE_I64, 3U, rt_i64_i64_err, 0, NULL, NULL,
+     0U, sdl_clipboard_mime_param_names, NULL, NULL, &sdl_doc_get_clipboard_data},
+    {"set_clipboard_data", 18U, sdl_fn_set_clipboard_data, 3U, p_str_i64_i32, VIGIL_TYPE_BOOL, 2U, rt_bool_err, 0, NULL,
+     NULL, 0U, sdl_clipboard_set_param_names, NULL, NULL, &sdl_doc_set_clipboard_data},
     {"set_hint_with_priority", 22U, sdl_fn_set_hint_with_priority, 3U, p_str_str_i32, VIGIL_TYPE_BOOL, 1U, NULL, 0,
      NULL, NULL, 0U, NULL, NULL, NULL, NULL},
     SDL_FN_BOOL_ERR("set_log_priority_prefix", 23U, sdl_fn_set_log_priority_prefix, 2U, p_i32_str),
@@ -16288,6 +16765,8 @@ static const vigil_native_class_method_t sdl_window_methods[] = {
     SDL_METHOD("update_surface", 14U, sdl_window_update_surface, 0U, NULL, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
     {"update_surface_rect", 19U, sdl_window_update_surface_rect, 4U, p_i32_i32_i32_i32, VIGIL_TYPE_BOOL, 2U, rt_bool_err,
      0, NULL, 0U, 0, sdl_window_rect_param_names, NULL, NULL, &sdl_doc_window_update_surface_rect},
+    {"update_surface_rects", 20U, sdl_window_update_surface_rects, 2U, p_i64_i32, VIGIL_TYPE_BOOL, 2U, rt_bool_err, 0,
+     NULL, 0U, 0, sdl_window_rects_param_names, NULL, NULL, &sdl_doc_window_update_surface_rects},
     SDL_METHOD("destroy_surface", 15U, sdl_window_destroy_surface, 0U, NULL, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
     {"show_message_box", 16U, sdl_window_show_message_box, 4U, p_i32_str_str_str, VIGIL_TYPE_I32, 2U, rt_i32_err, 0,
      NULL, 0U, 0, sdl_message_box_param_names, NULL, NULL, &sdl_doc_show_message_box},
@@ -16573,6 +17052,8 @@ static const vigil_native_class_method_t sdl_gamepad_methods[] = {
     SDL_METHOD("set_sensor_enabled", 18U, sdl_gamepad_set_sensor_enabled, 2U, p_i32_i32, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
     SDL_METHOD("sensor_enabled", 14U, sdl_gamepad_sensor_enabled, 1U, p_i32, VIGIL_TYPE_BOOL, 1U, NULL),
     SDL_METHOD("get_button_label", 16U, sdl_gamepad_get_button_label, 1U, p_i32, VIGIL_TYPE_I32, 1U, NULL),
+    {"get_bindings", 12U, sdl_gamepad_get_bindings, 0U, NULL, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, 0U, 0, NULL, NULL,
+     NULL, &sdl_doc_gamepad_get_bindings},
 };
 
 /* ── Joystick class descriptor ───────────────────────────────────── */
@@ -16650,6 +17131,8 @@ static const vigil_native_class_method_t sdl_camera_methods[] = {
     SDL_METHOD("close", 5U, sdl_camera_close, 0U, NULL, VIGIL_TYPE_VOID, 0U, NULL),
     SDL_METHOD("get_permission", 14U, sdl_camera_get_permission, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL),
     SDL_METHOD("get_format", 10U, sdl_camera_get_format, 0U, NULL, VIGIL_TYPE_I32, 2U, rt_i32_i32),
+    {"get_spec", 8U, sdl_camera_get_spec, 0U, NULL, VIGIL_TYPE_I32, 6U, rt_i32x6, 0, NULL, 0U, 0, NULL, NULL, NULL,
+     &sdl_doc_camera_get_spec},
     {"acquire_frame", 13U, sdl_camera_acquire_frame, 0U, NULL, VIGIL_TYPE_I64, 2U, rt_i64_err, 0, NULL, 0U, 0, NULL,
      NULL, NULL, NULL},
     SDL_METHOD("release_frame", 13U, sdl_camera_release_frame, 1U, p_i64, VIGIL_TYPE_VOID, 0U, NULL),
