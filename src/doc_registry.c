@@ -1040,6 +1040,29 @@ static const vigil_doc_entry_t http_docs[] = {
 
 #define HTTP_COUNT (sizeof(http_docs) / sizeof(http_docs[0]))
 
+/* ── readline module ─────────────────────────────────────────────── */
+
+static const vigil_doc_entry_t readline_docs[] = {
+    {"readline", NULL, "Interactive line input.", "Read user input with prompt and history support.", NULL},
+    {"readline.input", "readline.input(prompt: string) -> string", "Read a line of input.",
+     "Displays the prompt and reads a line from the terminal.", "string line = readline.input(\"> \")"},
+    {"readline.history_add", "readline.history_add(line: string) -> void", "Add a line to history.",
+     "Stores the line for recall with history_get.", "readline.history_add(line)"},
+    {"readline.history_get", "readline.history_get(index: i32) -> string", "Get a history entry.",
+     "Returns the history entry at the given index.", "string h = readline.history_get(0)"},
+    {"readline.history_length", "readline.history_length() -> i32", "Get history length.",
+     "Returns the number of entries in the history.", "i32 n = readline.history_length()"},
+    {"readline.history_clear", "readline.history_clear() -> void", "Clear line history.",
+     "Removes all entries from the in-memory history list.", "readline.history_clear()"},
+    {"readline.history_load", "readline.history_load(path: string) -> void", "Load history from a file.",
+     "Loads previously saved history entries from the given file path.", "readline.history_load(\".vigil_history\")"},
+    {"readline.history_save", "readline.history_save(path: string) -> void", "Save history to a file.",
+     "Writes the current in-memory history entries to the given file path.",
+     "readline.history_save(\".vigil_history\")"},
+};
+
+#define READLINE_COUNT (sizeof(readline_docs) / sizeof(readline_docs[0]))
+
 /* ── ffi module ──────────────────────────────────────────────────── */
 
 static const vigil_doc_entry_t ffi_docs[] = {
@@ -2409,6 +2432,7 @@ static const doc_module_table_entry_t doc_module_table[] = {
     {"compress", compress_docs, COMPRESS_COUNT},
     {"crypto", crypto_docs, CRYPTO_COUNT},
     {"http", http_docs, HTTP_COUNT},
+    {"readline", readline_docs, READLINE_COUNT},
     {"csv", csv_docs, CSV_COUNT},
     {"net", net_docs, NET_COUNT},
     {"time", time_docs, TIME_COUNT},
