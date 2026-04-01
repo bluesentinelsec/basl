@@ -262,6 +262,85 @@ TEST(DocRegistryTest, CoversAllStdlibModulesAndFunctions)
     }
 }
 
+TEST(DocRegistryTest, NativeDescriptorDocsAreCompleteForCompiledModules)
+{
+    const vigil_native_module_t *modules[] = {
+        &vigil_stdlib_args,     &vigil_stdlib_atomic, &vigil_stdlib_compress, &vigil_stdlib_crypto, &vigil_stdlib_csv,
+#ifdef VIGIL_HAS_STDLIB_FFI
+        &vigil_stdlib_ffi,
+#endif
+        &vigil_stdlib_fmt,
+#ifdef VIGIL_HAS_STDLIB_FS
+        &vigil_stdlib_fs,
+#endif
+#ifdef VIGIL_HAS_STDLIB_HTTP
+        &vigil_stdlib_http,
+#endif
+        &vigil_stdlib_json,     &vigil_stdlib_log,    &vigil_stdlib_math,
+#ifdef VIGIL_HAS_STDLIB_NET
+        &vigil_stdlib_net,
+#endif
+        &vigil_stdlib_parse,    &vigil_stdlib_random,
+#ifdef VIGIL_HAS_STDLIB_READLINE
+        &vigil_stdlib_readline,
+#endif
+        &vigil_stdlib_regex,    &vigil_stdlib_test,
+#ifdef VIGIL_HAS_STDLIB_THREAD
+        &vigil_stdlib_thread,
+#endif
+#ifdef VIGIL_HAS_STDLIB_TIME
+        &vigil_stdlib_time,
+#endif
+        &vigil_stdlib_unsafe,   &vigil_stdlib_url,    &vigil_stdlib_yaml,
+    };
+    size_t module_index;
+
+    for (module_index = 0U; module_index < sizeof(modules) / sizeof(modules[0]); module_index += 1U)
+    {
+        const vigil_native_module_t *module = modules[module_index];
+        size_t function_index;
+        size_t class_index;
+
+        ASSERT_NE(module, NULL);
+        ASSERT_NE(module->doc, NULL);
+        ASSERT_NE(module->doc->summary, NULL);
+
+        for (function_index = 0U; function_index < module->function_count; function_index += 1U)
+        {
+            const vigil_native_module_function_t *function = &module->functions[function_index];
+
+            ASSERT_NE(function->doc, NULL);
+            ASSERT_NE(function->doc->summary, NULL);
+        }
+
+        for (class_index = 0U; class_index < module->class_count; class_index += 1U)
+        {
+            const vigil_native_class_t *klass = &module->classes[class_index];
+            size_t field_index;
+            size_t method_index;
+
+            ASSERT_NE(klass->doc, NULL);
+            ASSERT_NE(klass->doc->summary, NULL);
+
+            for (field_index = 0U; field_index < klass->field_count; field_index += 1U)
+            {
+                const vigil_native_class_field_t *field = &klass->fields[field_index];
+
+                ASSERT_NE(field->doc, NULL);
+                ASSERT_NE(field->doc->summary, NULL);
+            }
+
+            for (method_index = 0U; method_index < klass->method_count; method_index += 1U)
+            {
+                const vigil_native_class_method_t *method = &klass->methods[method_index];
+
+                ASSERT_NE(method->doc, NULL);
+                ASSERT_NE(method->doc->summary, NULL);
+            }
+        }
+    }
+}
+
 TEST(DocRegistryTest, DescriptorBackedDocsRenderDerivedSignaturesForFmtArgsAndTest)
 {
     const vigil_doc_entry_t *fmt_print = vigil_doc_lookup("fmt.print");
@@ -290,12 +369,14 @@ TEST(DocRegistryTest, DescriptorBackedDocsRenderDerivedSignaturesForRandomAndPar
     EXPECT_STREQ(parse_i32->signature, "parse.i32(s: string) -> (i32, err)");
 }
 
-TEST(DocRegistryTest, ReadlineDocsRemainAvailableForDescriptorAndFallbackPaths)
+TEST(DocRegistryTest, ReadlineDocsRenderWhenModuleIsCompiledIn)
 {
+#ifdef VIGIL_HAS_STDLIB_READLINE
     const vigil_doc_entry_t *readline_input = vigil_doc_lookup("readline.input");
 
     ASSERT_NE(readline_input, NULL);
     EXPECT_STREQ(readline_input->signature, "readline.input(prompt: string) -> string");
+#endif
 }
 
 TEST(DocRegistryTest, DescriptorBackedDocsRenderDerivedSignaturesForUrlYamlCsvAndLog)
@@ -424,9 +505,10 @@ void register_doc_registry_tests(void)
     REGISTER_TEST(DocRegistryTest, ListModuleContents);
     REGISTER_TEST(DocRegistryTest, RenderEntry);
     REGISTER_TEST(DocRegistryTest, CoversAllStdlibModulesAndFunctions);
+    REGISTER_TEST(DocRegistryTest, NativeDescriptorDocsAreCompleteForCompiledModules);
     REGISTER_TEST(DocRegistryTest, DescriptorBackedDocsRenderDerivedSignaturesForFmtArgsAndTest);
     REGISTER_TEST(DocRegistryTest, DescriptorBackedDocsRenderDerivedSignaturesForRandomAndParse);
-    REGISTER_TEST(DocRegistryTest, ReadlineDocsRemainAvailableForDescriptorAndFallbackPaths);
+    REGISTER_TEST(DocRegistryTest, ReadlineDocsRenderWhenModuleIsCompiledIn);
     REGISTER_TEST(DocRegistryTest, DescriptorBackedDocsRenderDerivedSignaturesForUrlYamlCsvAndLog);
     REGISTER_TEST(DocRegistryTest, DescriptorBackedDocsRenderDerivedSignaturesForRegexAndAtomic);
     REGISTER_TEST(DocRegistryTest, DescriptorBackedDocsRenderDerivedSignaturesForNetAndTime);
