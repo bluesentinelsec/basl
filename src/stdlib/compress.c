@@ -1486,6 +1486,12 @@ static const int two_arrays_param[] = {VIGIL_TYPE_OBJECT, VIGIL_TYPE_OBJECT};
 static const int bytes_int_param[] = {VIGIL_TYPE_STRING, VIGIL_TYPE_I32};
 
 static const int two_arrays_int_param[] = {VIGIL_TYPE_OBJECT, VIGIL_TYPE_OBJECT, VIGIL_TYPE_I32};
+static const char *const compress_data_param_names[] = {"data"};
+static const char *const compress_data_level_param_names[] = {"data", "level"};
+static const char *const compress_data_filename_param_names[] = {"data", "filename"};
+static const char *const compress_names_contents_param_names[] = {"names", "contents"};
+static const char *const compress_names_contents_level_param_names[] = {"names", "contents", "level"};
+static const char *const compress_data_max_bytes_param_names[] = {"data", "max_bytes"};
 
 /* Extended type info for functions that take array<string> parameters */
 static const vigil_native_type_t create_params_ext[] = {VIGIL_NATIVE_TYPE_ARRAY(VIGIL_TYPE_STRING),
@@ -1504,54 +1510,202 @@ static const vigil_native_type_t array_string_return = VIGIL_NATIVE_TYPE_ARRAY(V
  * issue with map type interning, not a compress module bug. */
 static const vigil_native_type_t map_ss_return = VIGIL_NATIVE_TYPE_MAP(VIGIL_TYPE_STRING, VIGIL_TYPE_STRING);
 
+static const vigil_native_symbol_doc_t vigil_compress_module_doc = {
+    "Data compression and decompression.",
+    "The compress module provides deflate, zlib, gzip, lz4, zip, and tar support.\n"
+    "Uses miniz (MIT) and lz4 (BSD-2) libraries.",
+    NULL,
+};
+
+static const vigil_native_symbol_doc_t vigil_compress_deflate_compress_doc = {
+    "Compress with raw deflate.",
+    "Returns deflate-compressed data.",
+    "compress.deflate_compress(data)",
+};
+
+static const vigil_native_symbol_doc_t vigil_compress_deflate_compress_level_doc = {
+    "Compress with raw deflate at level.",
+    "Level 0=store, 1=fast, 9=best, 10=uber.",
+    "compress.deflate_compress_level(data, 9)",
+};
+
+static const vigil_native_symbol_doc_t vigil_compress_deflate_decompress_doc = {
+    "Decompress raw deflate.",
+    "Returns decompressed data.",
+    "compress.deflate_decompress(compressed)",
+};
+
+static const vigil_native_symbol_doc_t vigil_compress_zlib_compress_doc = {
+    "Compress with zlib format.",
+    "Returns zlib-compressed data (deflate + header/checksum).",
+    "compress.zlib_compress(data)",
+};
+
+static const vigil_native_symbol_doc_t vigil_compress_zlib_compress_level_doc = {
+    "Compress with zlib at level.",
+    "Level 0=store, 1=fast, 9=best, 10=uber.",
+    "compress.zlib_compress_level(data, 9)",
+};
+
+static const vigil_native_symbol_doc_t vigil_compress_zlib_decompress_doc = {
+    "Decompress zlib format.",
+    "Returns decompressed data.",
+    "compress.zlib_decompress(compressed)",
+};
+
+static const vigil_native_symbol_doc_t vigil_compress_gzip_compress_doc = {
+    "Compress with gzip format.",
+    "Returns gzip-compressed data.",
+    "compress.gzip_compress(data)",
+};
+
+static const vigil_native_symbol_doc_t vigil_compress_gzip_compress_level_doc = {
+    "Compress with gzip at level.",
+    "Level 0=store, 1=fast, 9=best. Sets XFL header byte.",
+    "compress.gzip_compress_level(data, 9)",
+};
+
+static const vigil_native_symbol_doc_t vigil_compress_gzip_decompress_doc = {
+    "Decompress gzip format.",
+    "Returns decompressed data.",
+    "compress.gzip_decompress(compressed)",
+};
+
+static const vigil_native_symbol_doc_t vigil_compress_lz4_compress_doc = {
+    "Compress with LZ4.",
+    "Returns LZ4-compressed data. Very fast.",
+    "compress.lz4_compress(data)",
+};
+
+static const vigil_native_symbol_doc_t vigil_compress_lz4_decompress_doc = {
+    "Decompress LZ4.",
+    "Returns decompressed data.",
+    "compress.lz4_decompress(compressed)",
+};
+
+static const vigil_native_symbol_doc_t vigil_compress_crc32_doc = {
+    "Compute CRC-32 checksum.",
+    "Returns CRC-32 of the input data.",
+    "compress.crc32(\"hello\")",
+};
+
+static const vigil_native_symbol_doc_t vigil_compress_adler32_doc = {
+    "Compute Adler-32 checksum.",
+    "Returns Adler-32 of the input data.",
+    "compress.adler32(\"hello\")",
+};
+
+static const vigil_native_symbol_doc_t vigil_compress_zip_list_doc = {
+    "List files in ZIP archive.",
+    "Returns array of filenames in the archive.",
+    "compress.zip_list(zip_data)",
+};
+
+static const vigil_native_symbol_doc_t vigil_compress_zip_read_doc = {
+    "Read file from ZIP archive.",
+    "Extracts and returns contents of named file.",
+    "compress.zip_read(zip_data, \"file.txt\")",
+};
+
+static const vigil_native_symbol_doc_t vigil_compress_zip_create_doc = {
+    "Create ZIP archive.",
+    "Creates archive from parallel arrays of names and contents.",
+    "compress.zip_create([\"a.txt\"], [\"data\"])",
+};
+
+static const vigil_native_symbol_doc_t vigil_compress_zip_create_level_doc = {
+    "Create ZIP archive at level.",
+    "Level 0=store, 1=fast, 9=best, 10=uber.",
+    "compress.zip_create_level([\"a.txt\"], [\"data\"], 9)",
+};
+
+static const vigil_native_symbol_doc_t vigil_compress_tar_list_doc = {
+    "List files in TAR archive.",
+    "Returns array of filenames in the archive.",
+    "compress.tar_list(tar_data)",
+};
+
+static const vigil_native_symbol_doc_t vigil_compress_tar_read_doc = {
+    "Read file from TAR archive.",
+    "Extracts and returns contents of named file.",
+    "compress.tar_read(tar_data, \"file.txt\")",
+};
+
+static const vigil_native_symbol_doc_t vigil_compress_tar_create_doc = {
+    "Create TAR archive.",
+    "Creates archive from parallel arrays of names and contents.",
+    "compress.tar_create([\"a.txt\"], [\"data\"])",
+};
+
+static const vigil_native_symbol_doc_t vigil_compress_tar_gz_create_doc = {
+    "Create TAR.GZ archive.",
+    "Creates tar archive and gzip-compresses it.",
+    "compress.tar_gz_create([\"a.txt\"], [\"data\"])",
+};
+
+static const vigil_native_symbol_doc_t vigil_compress_gzip_decompress_max_doc = {
+    "Decompress gzip with size limit.",
+    "Stops decompression at max_bytes. Protects against zip bombs.",
+    "compress.gzip_decompress_max(data, 1048576)",
+};
+
+static const vigil_native_symbol_doc_t vigil_compress_gzip_info_doc = {
+    "Read gzip header metadata.",
+    "Returns map with method, xfl, os, flags, size, and optional filename/comment.",
+    "compress.gzip_info(gz_data)",
+};
+
 static const vigil_native_module_function_t compress_functions[] = {
     {"deflate_compress", 16U, deflate_compress_fn, 1U, bytes_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U,
-     NULL, NULL, NULL, NULL},
+     compress_data_param_names, NULL, NULL, &vigil_compress_deflate_compress_doc},
     {"deflate_compress_level", 22U, deflate_compress_level_fn, 2U, bytes_int_param, VIGIL_TYPE_STRING, 1U, NULL, 0,
-     NULL, NULL, 0U, NULL, NULL, NULL, NULL},
+     NULL, NULL, 0U, compress_data_level_param_names, NULL, NULL, &vigil_compress_deflate_compress_level_doc},
     {"deflate_decompress", 18U, deflate_decompress_fn, 1U, bytes_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U,
-     NULL, NULL, NULL, NULL},
-    {"zlib_compress", 13U, zlib_compress_fn, 1U, bytes_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U, NULL,
-     NULL, NULL, NULL},
+     compress_data_param_names, NULL, NULL, &vigil_compress_deflate_decompress_doc},
+    {"zlib_compress", 13U, zlib_compress_fn, 1U, bytes_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U,
+     compress_data_param_names, NULL, NULL, &vigil_compress_zlib_compress_doc},
     {"zlib_compress_level", 19U, zlib_compress_level_fn, 2U, bytes_int_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL,
-     NULL, 0U, NULL, NULL, NULL, NULL},
-    {"zlib_decompress", 15U, zlib_decompress_fn, 1U, bytes_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U, NULL,
-     NULL, NULL, NULL},
-    {"gzip_compress", 13U, gzip_compress_fn, 1U, bytes_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U, NULL,
-     NULL, NULL, NULL},
+     NULL, 0U, compress_data_level_param_names, NULL, NULL, &vigil_compress_zlib_compress_level_doc},
+    {"zlib_decompress", 15U, zlib_decompress_fn, 1U, bytes_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U,
+     compress_data_param_names, NULL, NULL, &vigil_compress_zlib_decompress_doc},
+    {"gzip_compress", 13U, gzip_compress_fn, 1U, bytes_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U,
+     compress_data_param_names, NULL, NULL, &vigil_compress_gzip_compress_doc},
     {"gzip_compress_level", 19U, gzip_compress_level_fn, 2U, bytes_int_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL,
-     NULL, 0U, NULL, NULL, NULL, NULL},
-    {"gzip_decompress", 15U, gzip_decompress_fn, 1U, bytes_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U, NULL,
-     NULL, NULL, NULL},
-    {"lz4_compress", 12U, lz4_compress_fn, 1U, bytes_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL,
-     NULL, NULL},
-    {"lz4_decompress", 14U, lz4_decompress_fn, 1U, bytes_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U, NULL,
-     NULL, NULL, NULL},
-    {"crc32", 5U, crc32_fn, 1U, bytes_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
-    {"adler32", 7U, adler32_fn, 1U, bytes_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
+     NULL, 0U, compress_data_level_param_names, NULL, NULL, &vigil_compress_gzip_compress_level_doc},
+    {"gzip_decompress", 15U, gzip_decompress_fn, 1U, bytes_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U,
+     compress_data_param_names, NULL, NULL, &vigil_compress_gzip_decompress_doc},
+    {"lz4_compress", 12U, lz4_compress_fn, 1U, bytes_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U,
+     compress_data_param_names, NULL, NULL, &vigil_compress_lz4_compress_doc},
+    {"lz4_decompress", 14U, lz4_decompress_fn, 1U, bytes_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U,
+     compress_data_param_names, NULL, NULL, &vigil_compress_lz4_decompress_doc},
+    {"crc32", 5U, crc32_fn, 1U, bytes_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U, compress_data_param_names,
+     NULL, NULL, &vigil_compress_crc32_doc},
+    {"adler32", 7U, adler32_fn, 1U, bytes_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U, compress_data_param_names,
+     NULL, NULL, &vigil_compress_adler32_doc},
     {"zip_list", 8U, zip_list_fn, 1U, bytes_param, VIGIL_TYPE_OBJECT, 1U, NULL, VIGIL_TYPE_STRING, NULL,
-     &array_string_return, 0U, NULL, NULL, NULL, NULL},
-    {"zip_read", 8U, zip_read_fn, 2U, two_bytes_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL,
-     NULL},
+     &array_string_return, 0U, compress_data_param_names, NULL, NULL, &vigil_compress_zip_list_doc},
+    {"zip_read", 8U, zip_read_fn, 2U, two_bytes_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U,
+     compress_data_filename_param_names, NULL, NULL, &vigil_compress_zip_read_doc},
     {"zip_create", 10U, zip_create_fn, 2U, two_arrays_param, VIGIL_TYPE_STRING, 1U, NULL, 0, create_params_ext, NULL,
-     0U, NULL, NULL, NULL, NULL},
+     0U, compress_names_contents_param_names, NULL, NULL, &vigil_compress_zip_create_doc},
     {"zip_create_level", 16U, zip_create_level_fn, 3U, two_arrays_int_param, VIGIL_TYPE_STRING, 1U, NULL, 0,
-     create_level_params_ext, NULL, 0U, NULL, NULL, NULL, NULL},
+     create_level_params_ext, NULL, 0U, compress_names_contents_level_param_names, NULL, NULL,
+     &vigil_compress_zip_create_level_doc},
     {"tar_list", 8U, tar_list_fn, 1U, bytes_param, VIGIL_TYPE_OBJECT, 1U, NULL, VIGIL_TYPE_STRING, NULL,
-     &array_string_return, 0U, NULL, NULL, NULL, NULL},
-    {"tar_read", 8U, tar_read_fn, 2U, two_bytes_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL,
-     NULL},
+     &array_string_return, 0U, compress_data_param_names, NULL, NULL, &vigil_compress_tar_list_doc},
+    {"tar_read", 8U, tar_read_fn, 2U, two_bytes_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U,
+     compress_data_filename_param_names, NULL, NULL, &vigil_compress_tar_read_doc},
     {"tar_create", 10U, tar_create_fn, 2U, two_arrays_param, VIGIL_TYPE_STRING, 1U, NULL, 0, create_params_ext, NULL,
-     0U, NULL, NULL, NULL, NULL},
+     0U, compress_names_contents_param_names, NULL, NULL, &vigil_compress_tar_create_doc},
     {"tar_gz_create", 13U, tar_gz_create_fn, 2U, two_arrays_param, VIGIL_TYPE_STRING, 1U, NULL, 0, create_params_ext,
-     NULL, 0U, NULL, NULL, NULL, NULL},
+     NULL, 0U, compress_names_contents_param_names, NULL, NULL, &vigil_compress_tar_gz_create_doc},
     {"gzip_decompress_max", 19U, gzip_decompress_max_fn, 2U, bytes_int_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL,
-     NULL, 0U, NULL, NULL, NULL, NULL},
-    {"gzip_info", 9U, gzip_info_fn, 1U, bytes_param, VIGIL_TYPE_OBJECT, 1U, NULL, 0, NULL, &map_ss_return, 0U, NULL,
-     NULL, NULL, NULL},
+     NULL, 0U, compress_data_max_bytes_param_names, NULL, NULL, &vigil_compress_gzip_decompress_max_doc},
+    {"gzip_info", 9U, gzip_info_fn, 1U, bytes_param, VIGIL_TYPE_OBJECT, 1U, NULL, 0, NULL, &map_ss_return, 0U,
+     compress_data_param_names, NULL, NULL, &vigil_compress_gzip_info_doc},
 };
 
 #define COMPRESS_FUNCTION_COUNT (sizeof(compress_functions) / sizeof(compress_functions[0]))
 
 VIGIL_API const vigil_native_module_t vigil_stdlib_compress = {
-    "compress", 8U, compress_functions, COMPRESS_FUNCTION_COUNT, NULL, 0U, NULL};
+    "compress", 8U, compress_functions, COMPRESS_FUNCTION_COUNT, NULL, 0U, &vigil_compress_module_doc};

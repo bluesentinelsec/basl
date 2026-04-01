@@ -650,39 +650,148 @@ static const int crypto_2string_params[] = {VIGIL_TYPE_STRING, VIGIL_TYPE_STRING
 static const int crypto_3string_params[] = {VIGIL_TYPE_STRING, VIGIL_TYPE_STRING, VIGIL_TYPE_STRING};
 static const int crypto_pbkdf2_params[] = {VIGIL_TYPE_STRING, VIGIL_TYPE_STRING, VIGIL_TYPE_I32, VIGIL_TYPE_I32};
 static const int crypto_i32_params[] = {VIGIL_TYPE_I32};
+static const char *const crypto_data_param_names[] = {"data"};
+static const char *const crypto_key_data_param_names[] = {"key", "data"};
+static const char *const crypto_pbkdf2_param_names[] = {"password", "salt", "iterations", "key_len"};
+static const char *const crypto_len_param_names[] = {"len"};
+static const char *const crypto_compare_param_names[] = {"a", "b"};
+static const char *const crypto_encrypt_param_names[] = {"key", "nonce", "plaintext"};
+static const char *const crypto_decrypt_param_names[] = {"key", "ciphertext"};
+static const char *const crypto_password_encrypt_param_names[] = {"password", "plaintext"};
+static const char *const crypto_password_decrypt_param_names[] = {"password", "ciphertext"};
+static const char *const crypto_hex_param_names[] = {"hex"};
+
+static const vigil_native_symbol_doc_t vigil_crypto_module_doc = {
+    "Cryptographic operations.",
+    "The crypto module provides secure hashing, encryption, and key derivation.\n"
+    "Uses AES-256-GCM for authenticated encryption and SHA-2 for hashing.\n"
+    "All functions return hex-encoded strings for hash outputs.",
+    NULL,
+};
+
+static const vigil_native_symbol_doc_t vigil_crypto_sha256_doc = {
+    "SHA-256 hash.",
+    "Returns 64-character hex string.",
+    "crypto.sha256(\"hello\")",
+};
+
+static const vigil_native_symbol_doc_t vigil_crypto_sha384_doc = {
+    "SHA-384 hash.",
+    "Returns 96-character hex string.",
+    "crypto.sha384(\"hello\")",
+};
+
+static const vigil_native_symbol_doc_t vigil_crypto_sha512_doc = {
+    "SHA-512 hash.",
+    "Returns 128-character hex string.",
+    "crypto.sha512(\"hello\")",
+};
+
+static const vigil_native_symbol_doc_t vigil_crypto_hmac_sha256_doc = {
+    "HMAC-SHA256.",
+    "Returns 64-character hex string.",
+    "crypto.hmac_sha256(\"key\", \"message\")",
+};
+
+static const vigil_native_symbol_doc_t vigil_crypto_pbkdf2_doc = {
+    "PBKDF2 key derivation.",
+    "Returns hex-encoded derived key. Use 100000+ iterations.",
+    "crypto.pbkdf2(\"password\", \"salt\", 100000, 32)",
+};
+
+static const vigil_native_symbol_doc_t vigil_crypto_random_bytes_doc = {
+    "Cryptographically secure random bytes.",
+    "Returns raw bytes (not hex). Max 65536 bytes.",
+    "crypto.random_bytes(32)",
+};
+
+static const vigil_native_symbol_doc_t vigil_crypto_constant_time_eq_doc = {
+    "Constant-time comparison.",
+    "Prevents timing attacks when comparing secrets.",
+    "crypto.constant_time_eq(hash1, hash2)",
+};
+
+static const vigil_native_symbol_doc_t vigil_crypto_encrypt_doc = {
+    "AES-256-GCM encryption.",
+    "Key must be 32 bytes. Returns nonce||ciphertext||tag.",
+    "crypto.encrypt(key, nonce, \"secret\")",
+};
+
+static const vigil_native_symbol_doc_t vigil_crypto_decrypt_doc = {
+    "AES-256-GCM decryption.",
+    "Returns empty string on authentication failure.",
+    "crypto.decrypt(key, encrypted)",
+};
+
+static const vigil_native_symbol_doc_t vigil_crypto_password_encrypt_doc = {
+    "Password-based encryption.",
+    "Uses PBKDF2 + AES-256-GCM. Password can be any length.",
+    "crypto.password_encrypt(\"my password\", \"secret\")",
+};
+
+static const vigil_native_symbol_doc_t vigil_crypto_password_decrypt_doc = {
+    "Password-based decryption.",
+    "Returns empty string on wrong password or auth failure.",
+    "crypto.password_decrypt(\"my password\", encrypted)",
+};
+
+static const vigil_native_symbol_doc_t vigil_crypto_hex_encode_doc = {
+    "Encode bytes as hex.",
+    "Returns lowercase hex string.",
+    "crypto.hex_encode(\"\\x00\\xff\")",
+};
+
+static const vigil_native_symbol_doc_t vigil_crypto_hex_decode_doc = {
+    "Decode hex to bytes.",
+    "Returns empty string on invalid input.",
+    "crypto.hex_decode(\"00ff\")",
+};
+
+static const vigil_native_symbol_doc_t vigil_crypto_base64_encode_doc = {
+    "Encode bytes as base64.",
+    "Standard base64 with padding.",
+    "crypto.base64_encode(\"hello\")",
+};
+
+static const vigil_native_symbol_doc_t vigil_crypto_base64_decode_doc = {
+    "Decode base64 to bytes.",
+    "Returns empty string on invalid input.",
+    "crypto.base64_decode(\"aGVsbG8=\")",
+};
 
 static const vigil_native_module_function_t crypto_functions[] = {
-    {"sha256", 6, crypto_sha256, 1, crypto_string_params, VIGIL_TYPE_STRING, 1, NULL, 0, NULL, NULL, 0U, NULL, NULL,
-     NULL, NULL},
-    {"sha384", 6, crypto_sha384, 1, crypto_string_params, VIGIL_TYPE_STRING, 1, NULL, 0, NULL, NULL, 0U, NULL, NULL,
-     NULL, NULL},
-    {"sha512", 6, crypto_sha512, 1, crypto_string_params, VIGIL_TYPE_STRING, 1, NULL, 0, NULL, NULL, 0U, NULL, NULL,
-     NULL, NULL},
+    {"sha256", 6, crypto_sha256, 1, crypto_string_params, VIGIL_TYPE_STRING, 1, NULL, 0, NULL, NULL, 0U,
+     crypto_data_param_names, NULL, NULL, &vigil_crypto_sha256_doc},
+    {"sha384", 6, crypto_sha384, 1, crypto_string_params, VIGIL_TYPE_STRING, 1, NULL, 0, NULL, NULL, 0U,
+     crypto_data_param_names, NULL, NULL, &vigil_crypto_sha384_doc},
+    {"sha512", 6, crypto_sha512, 1, crypto_string_params, VIGIL_TYPE_STRING, 1, NULL, 0, NULL, NULL, 0U,
+     crypto_data_param_names, NULL, NULL, &vigil_crypto_sha512_doc},
     {"hmac_sha256", 11, crypto_hmac_sha256, 2, crypto_2string_params, VIGIL_TYPE_STRING, 1, NULL, 0, NULL, NULL, 0U,
-     NULL, NULL, NULL, NULL},
-    {"pbkdf2", 6, crypto_pbkdf2, 4, crypto_pbkdf2_params, VIGIL_TYPE_STRING, 1, NULL, 0, NULL, NULL, 0U, NULL, NULL,
-     NULL, NULL},
-    {"random_bytes", 12, crypto_random_bytes, 1, crypto_i32_params, VIGIL_TYPE_STRING, 1, NULL, 0, NULL, NULL, 0U, NULL,
-     NULL, NULL, NULL},
+     crypto_key_data_param_names, NULL, NULL, &vigil_crypto_hmac_sha256_doc},
+    {"pbkdf2", 6, crypto_pbkdf2, 4, crypto_pbkdf2_params, VIGIL_TYPE_STRING, 1, NULL, 0, NULL, NULL, 0U,
+     crypto_pbkdf2_param_names, NULL, NULL, &vigil_crypto_pbkdf2_doc},
+    {"random_bytes", 12, crypto_random_bytes, 1, crypto_i32_params, VIGIL_TYPE_STRING, 1, NULL, 0, NULL, NULL, 0U,
+     crypto_len_param_names, NULL, NULL, &vigil_crypto_random_bytes_doc},
     {"constant_time_eq", 16, crypto_constant_time_eq, 2, crypto_2string_params, VIGIL_TYPE_BOOL, 1, NULL, 0, NULL, NULL,
-     0U, NULL, NULL, NULL, NULL},
-    {"encrypt", 7, crypto_encrypt, 3, crypto_3string_params, VIGIL_TYPE_STRING, 1, NULL, 0, NULL, NULL, 0U, NULL, NULL,
-     NULL, NULL},
-    {"decrypt", 7, crypto_decrypt, 2, crypto_2string_params, VIGIL_TYPE_STRING, 1, NULL, 0, NULL, NULL, 0U, NULL, NULL,
-     NULL, NULL},
+     0U, crypto_compare_param_names, NULL, NULL, &vigil_crypto_constant_time_eq_doc},
+    {"encrypt", 7, crypto_encrypt, 3, crypto_3string_params, VIGIL_TYPE_STRING, 1, NULL, 0, NULL, NULL, 0U,
+     crypto_encrypt_param_names, NULL, NULL, &vigil_crypto_encrypt_doc},
+    {"decrypt", 7, crypto_decrypt, 2, crypto_2string_params, VIGIL_TYPE_STRING, 1, NULL, 0, NULL, NULL, 0U,
+     crypto_decrypt_param_names, NULL, NULL, &vigil_crypto_decrypt_doc},
     {"password_encrypt", 16, crypto_password_encrypt, 2, crypto_2string_params, VIGIL_TYPE_STRING, 1, NULL, 0, NULL,
-     NULL, 0U, NULL, NULL, NULL, NULL},
+     NULL, 0U, crypto_password_encrypt_param_names, NULL, NULL, &vigil_crypto_password_encrypt_doc},
     {"password_decrypt", 16, crypto_password_decrypt, 2, crypto_2string_params, VIGIL_TYPE_STRING, 1, NULL, 0, NULL,
-     NULL, 0U, NULL, NULL, NULL, NULL},
-    {"hex_encode", 10, crypto_hex_encode, 1, crypto_string_params, VIGIL_TYPE_STRING, 1, NULL, 0, NULL, NULL, 0U, NULL,
-     NULL, NULL, NULL},
-    {"hex_decode", 10, crypto_hex_decode, 1, crypto_string_params, VIGIL_TYPE_STRING, 1, NULL, 0, NULL, NULL, 0U, NULL,
-     NULL, NULL, NULL},
+     NULL, 0U, crypto_password_decrypt_param_names, NULL, NULL, &vigil_crypto_password_decrypt_doc},
+    {"hex_encode", 10, crypto_hex_encode, 1, crypto_string_params, VIGIL_TYPE_STRING, 1, NULL, 0, NULL, NULL, 0U,
+     crypto_data_param_names, NULL, NULL, &vigil_crypto_hex_encode_doc},
+    {"hex_decode", 10, crypto_hex_decode, 1, crypto_string_params, VIGIL_TYPE_STRING, 1, NULL, 0, NULL, NULL, 0U,
+     crypto_hex_param_names, NULL, NULL, &vigil_crypto_hex_decode_doc},
     {"base64_encode", 13, crypto_base64_encode, 1, crypto_string_params, VIGIL_TYPE_STRING, 1, NULL, 0, NULL, NULL, 0U,
-     NULL, NULL, NULL, NULL},
+     crypto_data_param_names, NULL, NULL, &vigil_crypto_base64_encode_doc},
     {"base64_decode", 13, crypto_base64_decode, 1, crypto_string_params, VIGIL_TYPE_STRING, 1, NULL, 0, NULL, NULL, 0U,
-     NULL, NULL, NULL, NULL},
+     crypto_data_param_names, NULL, NULL, &vigil_crypto_base64_decode_doc},
 };
 
 VIGIL_API const vigil_native_module_t vigil_stdlib_crypto = {
-    "crypto", 6, crypto_functions, sizeof(crypto_functions) / sizeof(crypto_functions[0]), NULL, 0, NULL};
+    "crypto", 6, crypto_functions, sizeof(crypto_functions) / sizeof(crypto_functions[0]), NULL, 0,
+    &vigil_crypto_module_doc};

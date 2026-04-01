@@ -290,6 +290,34 @@ TEST(DocRegistryTest, DescriptorBackedDocsRenderDerivedSignaturesForNetAndTime)
     EXPECT_STREQ(time_date->signature, "time.date(y: i32, m: i32, d: i32, h: i32, min: i32, s: i32) -> i64");
 }
 
+TEST(DocRegistryTest, DescriptorBackedDocsRenderDerivedSignaturesForCrypto)
+{
+    const vigil_doc_entry_t *pbkdf2 = vigil_doc_lookup("crypto.pbkdf2");
+    const vigil_doc_entry_t *encrypt = vigil_doc_lookup("crypto.encrypt");
+
+    ASSERT_NE(pbkdf2, NULL);
+    ASSERT_NE(encrypt, NULL);
+    EXPECT_STREQ(pbkdf2->signature, "crypto.pbkdf2(password: string, salt: string, iterations: i32, key_len: i32) -> "
+                                    "string");
+    EXPECT_STREQ(pbkdf2->summary, "PBKDF2 key derivation.");
+    EXPECT_STREQ(encrypt->signature, "crypto.encrypt(key: string, nonce: string, plaintext: string) -> string");
+    EXPECT_STREQ(encrypt->summary, "AES-256-GCM encryption.");
+}
+
+TEST(DocRegistryTest, DescriptorBackedDocsRenderDerivedSignaturesForThreadAndCompress)
+{
+    const vigil_doc_entry_t *thread_wait = vigil_doc_lookup("thread.wait_timeout");
+    const vigil_doc_entry_t *compress_zip = vigil_doc_lookup("compress.zip_create_level");
+
+    ASSERT_NE(thread_wait, NULL);
+    ASSERT_NE(compress_zip, NULL);
+    EXPECT_STREQ(thread_wait->signature, "thread.wait_timeout(c: i64, m: i64, ms: i64) -> bool");
+    EXPECT_STREQ(thread_wait->summary, "Wait on a condition variable with timeout.");
+    EXPECT_STREQ(compress_zip->signature,
+                 "compress.zip_create_level(names: array<string>, contents: array<string>, level: i32) -> string");
+    EXPECT_STREQ(compress_zip->summary, "Create ZIP archive at level.");
+}
+
 TEST(DocRegistryTest, ModuleListUsesCanonicalStdlibSet)
 {
     size_t count = 0U;
@@ -319,5 +347,7 @@ void register_doc_registry_tests(void)
     REGISTER_TEST(DocRegistryTest, DescriptorBackedDocsRenderDerivedSignaturesForUrlYamlCsvAndLog);
     REGISTER_TEST(DocRegistryTest, DescriptorBackedDocsRenderDerivedSignaturesForRegexAndAtomic);
     REGISTER_TEST(DocRegistryTest, DescriptorBackedDocsRenderDerivedSignaturesForNetAndTime);
+    REGISTER_TEST(DocRegistryTest, DescriptorBackedDocsRenderDerivedSignaturesForCrypto);
+    REGISTER_TEST(DocRegistryTest, DescriptorBackedDocsRenderDerivedSignaturesForThreadAndCompress);
     REGISTER_TEST(DocRegistryTest, ModuleListUsesCanonicalStdlibSet);
 }
