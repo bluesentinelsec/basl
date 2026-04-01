@@ -330,6 +330,14 @@ static vigil_status_t handle_initialize(vigil_lsp_server_t *server, const vigil_
     /* Formatting. */
     jset_bool(capabilities, "documentFormattingProvider", 1, a, error);
 
+    /* Code lens */
+    {
+        vigil_json_value_t *cl_opts = NULL;
+        vigil_json_object_new(a, &cl_opts, error);
+        jset_bool(cl_opts, "resolveProvider", 0, a, error);
+        jset_obj(capabilities, "codeLensProvider", cl_opts, error);
+    }
+
     /* Signature help. */
     {
         vigil_json_value_t *sig_opts = NULL;
@@ -1856,6 +1864,149 @@ static vigil_status_t handle_document_symbol(vigil_lsp_server_t *server, const v
     return lsp_make_response(a, id, result, out, error);
 }
 
+/* ── Code Lens ────────────────────────────────────────────── */
+
+static vigil_status_t make_code_lens(const vigil_allocator_t *a, size_t line, const char *title, const char *command,
+                                     const char *uri, const char *func_name, vigil_json_value_t **out,
+                                     vigil_error_t *error)
+{
+    vigil_json_value_t *lens = NULL;
+    vigil_json_value_t *range = NULL;
+    vigil_json_value_t *start_pos = NULL;
+    vigil_json_value_t *end_pos = NULL;
+    vigil_json_value_t *cmd = NULL;
+    vigil_json_value_t *args = NULL;
+    vigil_json_value_t *arg_uri = NULL;
+    vigil_json_value_t *arg_func = NULL;
+
+    vigil_json_object_new(a, &lens, error);
+    vigil_json_object_new(a, &range, error);
+    vigil_json_object_new(a, &start_pos, error);
+    vigil_json_object_new(a, &end_pos, error);
+    vigil_json_object_new(a, &cmd, error);
+    vigil_json_array_new(a, &args, error);
+
+    jset_int(start_pos, "line", (int64_t)line, a, error);
+    jset_int(start_pos, "character", 0, a, error);
+    jset_int(end_pos, "line", (int64_t)line, a, error);
+    jset_int(end_pos, "character", 0, a, error);
+    jset_obj(range, "start", start_pos, error);
+    jset_obj(range, "end", end_pos, error);
+
+    jset_str(cmd, "title", title, a, error);
+    jset_str(cmd, "command", command, a, error);
+
+    vigil_json_string_new(a, uri, strlen(uri), &arg_uri, error);
+    vigil_json_array_push(args, arg_uri, error);
+    if (func_name != NULL)
+    {
+        vigil_json_string_new(a, func_name, strlen(func_name), &arg_func, error);
+        vigil_json_array_push(args, arg_func, error);
+    }
+    jset_obj(cmd, "arguments", args, error);
+
+    jset_obj(lens, "range", range, error);
+    jset_obj(lens, "command", cmd, error);
+
+    *out = lens;
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t handle_code_lens(vigil_lsp_server_t *server, const vigil_json_value_t *id,
+                                       const vigil_json_value_t *params, vigil_json_value_t **out, vigil_error_t *error)
+{
+    const vigil_allocator_t *a = &server->allocator;
+    vigil_json_value_t *result = NULL;
+    const vigil_json_value_t *text_doc;
+    const vigil_json_value_t *uri_val;
+    const char *uri;
+    size_t uri_len;
+    vigil_source_id_t source_id;
+    const vigil_source_file_t *src;
+    size_t i, count;
+    int has_tests = 0;
+    size_t first_test_line = 0;
+
+    vigil_json_array_new(a, &result, error);
+
+    text_doc = vigil_json_object_get(params, "textDocument");
+    if (text_doc == NULL)
+        return lsp_make_response(a, id, result, out, error);
+
+    uri_val = vigil_json_object_get(text_doc, "uri");
+    if (uri_val == NULL)
+        return lsp_make_response(a, id, result, out, error);
+
+    uri = vigil_json_string_value(uri_val);
+    uri_len = vigil_json_string_length(uri_val);
+    source_id = find_source_by_uri(server, uri, uri_len);
+    if (source_id == 0)
+        return lsp_make_response(a, id, result, out, error);
+
+    src = vigil_source_registry_get(&server->sources, source_id);
+
+    count = vigil_debug_symbol_table_count(&server->index->symbols);
+    for (i = 0; i < count; i++)
+    {
+        const vigil_debug_symbol_t *sym = vigil_debug_symbol_table_get(&server->index->symbols, i);
+        size_t sym_line = 0;
+        size_t sym_col = 0;
+        vigil_json_value_t *lens = NULL;
+        char uri_buf[1024];
+
+        if (sym->kind != VIGIL_DEBUG_SYMBOL_FUNCTION)
+            continue;
+        if (sym->span.source_id != source_id)
+            continue;
+
+        offset_to_line_col(vigil_string_c_str(&src->text), vigil_string_length(&src->text), sym->span.start_offset,
+                           &sym_line, &sym_col);
+
+        snprintf(uri_buf, sizeof(uri_buf), "%.*s", (int)uri_len, uri);
+
+        /* fn main() -> Run button */
+        if (sym->name_length == 4 && strncmp(sym->name, "main", 4) == 0)
+        {
+            make_code_lens(a, sym_line, "\xe2\x96\xb6 Run", "vigil.run", uri_buf, NULL, &lens, error);
+            vigil_json_array_push(result, lens, error);
+
+            lens = NULL;
+            make_code_lens(a, sym_line, "\xe2\x96\xb6 Run with Args...", "vigil.runWithArgs", uri_buf, NULL, &lens,
+                           error);
+            vigil_json_array_push(result, lens, error);
+        }
+
+        /* fn test_*() -> Run Test button */
+        if (sym->name_length > 5 && strncmp(sym->name, "test_", 5) == 0)
+        {
+            char name_buf[256];
+            snprintf(name_buf, sizeof(name_buf), "%.*s", (int)sym->name_length, sym->name);
+
+            make_code_lens(a, sym_line, "\xe2\x96\xb6 Run Test", "vigil.runTest", uri_buf, name_buf, &lens, error);
+            vigil_json_array_push(result, lens, error);
+
+            if (!has_tests)
+            {
+                first_test_line = sym_line;
+                has_tests = 1;
+            }
+        }
+    }
+
+    /* "Run All Tests" at the first test function if any tests exist */
+    if (has_tests)
+    {
+        vigil_json_value_t *lens = NULL;
+        char uri_buf[1024];
+        snprintf(uri_buf, sizeof(uri_buf), "%.*s", (int)uri_len, uri);
+        make_code_lens(a, first_test_line, "\xe2\x96\xb6 Run All Tests", "vigil.runAllTests", uri_buf, NULL, &lens,
+                       error);
+        vigil_json_array_push(result, lens, error);
+    }
+
+    return lsp_make_response(a, id, result, out, error);
+}
+
 /* ── Message Dispatch ─────────────────────────────────────── */
 
 /*
@@ -1886,6 +2037,7 @@ static const lsp_dispatch_entry_t lsp_dispatch_table[] = {
     {"textDocument/formatting", handle_formatting},
     {"textDocument/signatureHelp", handle_signature_help},
     {"textDocument/semanticTokens/full", handle_semantic_tokens_full},
+    {"textDocument/codeLens", handle_code_lens},
 };
 
 #define LSP_DISPATCH_COUNT (sizeof(lsp_dispatch_table) / sizeof(lsp_dispatch_table[0]))
