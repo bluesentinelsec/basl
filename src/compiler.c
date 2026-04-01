@@ -96,6 +96,7 @@ void vigil_parser_state_free(vigil_parser_state_t *state)
 
 void vigil_expression_result_clear(vigil_expression_result_t *result)
 {
+    size_t i;
     if (result == NULL)
     {
         return;
@@ -104,12 +105,13 @@ void vigil_expression_result_clear(vigil_expression_result_t *result)
     result->type = vigil_binding_type_invalid();
     result->types = NULL;
     result->type_count = 0U;
-    result->owned_types[0] = vigil_binding_type_invalid();
-    result->owned_types[1] = vigil_binding_type_invalid();
+    for (i = 0U; i < sizeof(result->owned_types) / sizeof(result->owned_types[0]); i++)
+        result->owned_types[i] = vigil_binding_type_invalid();
 }
 
 void vigil_expression_result_set_type(vigil_expression_result_t *result, vigil_parser_type_t type)
 {
+    size_t i;
     if (result == NULL)
     {
         return;
@@ -118,14 +120,14 @@ void vigil_expression_result_set_type(vigil_expression_result_t *result, vigil_p
     result->type = type;
     result->types = NULL;
     result->type_count = vigil_binding_type_is_valid(type) ? 1U : 0U;
-    result->owned_types[0] = vigil_binding_type_invalid();
-    result->owned_types[1] = vigil_binding_type_invalid();
-    result->owned_types[2] = vigil_binding_type_invalid();
+    for (i = 0U; i < sizeof(result->owned_types) / sizeof(result->owned_types[0]); i++)
+        result->owned_types[i] = vigil_binding_type_invalid();
 }
 
 static void vigil_expression_result_set_return_types(vigil_expression_result_t *result, vigil_parser_type_t first_type,
                                                      const vigil_parser_type_t *types, size_t type_count)
 {
+    size_t i;
     if (result == NULL)
     {
         return;
@@ -134,8 +136,8 @@ static void vigil_expression_result_set_return_types(vigil_expression_result_t *
     result->type = first_type;
     result->types = types;
     result->type_count = type_count;
-    result->owned_types[0] = vigil_binding_type_invalid();
-    result->owned_types[1] = vigil_binding_type_invalid();
+    for (i = 0U; i < sizeof(result->owned_types) / sizeof(result->owned_types[0]); i++)
+        result->owned_types[i] = vigil_binding_type_invalid();
 }
 
 void vigil_expression_result_set_pair(vigil_expression_result_t *result, vigil_parser_type_t first_type,
@@ -166,8 +168,38 @@ void vigil_expression_result_set_triple(vigil_expression_result_t *result, vigil
     result->owned_types[0] = first_type;
     result->owned_types[1] = second_type;
     result->owned_types[2] = third_type;
+    {
+        size_t i;
+        for (i = 3U; i < sizeof(result->owned_types) / sizeof(result->owned_types[0]); i++)
+            result->owned_types[i] = vigil_binding_type_invalid();
+    }
     result->types = result->owned_types;
     result->type_count = 3U;
+}
+
+static void vigil_expression_result_set_multi(vigil_expression_result_t *result, const vigil_parser_type_t *types,
+                                              size_t type_count)
+{
+    size_t i;
+
+    if (result == NULL || types == NULL || type_count == 0U)
+        return;
+
+    result->type = types[0];
+    result->types = result->owned_types;
+    result->type_count = type_count;
+
+    for (i = 0U; i < sizeof(result->owned_types) / sizeof(result->owned_types[0]); i++)
+        result->owned_types[i] = vigil_binding_type_invalid();
+
+    if (type_count > sizeof(result->owned_types) / sizeof(result->owned_types[0]))
+        type_count = sizeof(result->owned_types) / sizeof(result->owned_types[0]);
+
+    for (i = 0U; i < type_count; i++)
+        result->owned_types[i] = types[i];
+
+    result->type = result->owned_types[0];
+    result->type_count = type_count;
 }
 
 static void vigil_expression_result_copy(vigil_expression_result_t *result, const vigil_expression_result_t *source)
@@ -186,6 +218,10 @@ static void vigil_expression_result_copy(vigil_expression_result_t *result, cons
     {
         vigil_expression_result_set_triple(result, source->owned_types[0], source->owned_types[1],
                                            source->owned_types[2]);
+    }
+    else if (source->types == source->owned_types && source->type_count > 3U)
+    {
+        vigil_expression_result_set_multi(result, source->owned_types, source->type_count);
     }
 }
 
@@ -6792,6 +6828,8 @@ static vigil_status_t vigil_parser_set_native_fn_return_type(vigil_parser_state_
                                                              vigil_expression_result_t *out_result)
 {
     vigil_status_t status;
+    vigil_parser_type_t resolved_types[8];
+    size_t i;
 
     if (fn->return_count <= 1U)
     {
@@ -6818,9 +6856,26 @@ static vigil_status_t vigil_parser_set_native_fn_return_type(vigil_parser_state_
     }
     else
     {
-        vigil_expression_result_set_pair(out_result,
-                                         vigil_binding_type_primitive((vigil_type_kind_t)fn->return_types[0]),
-                                         vigil_binding_type_primitive((vigil_type_kind_t)fn->return_types[1]));
+        if (fn->return_types == NULL)
+        {
+            vigil_expression_result_set_type(out_result,
+                                             vigil_binding_type_primitive((vigil_type_kind_t)fn->return_type));
+        }
+        else if (fn->return_count == 2U)
+        {
+            vigil_expression_result_set_pair(out_result,
+                                             vigil_binding_type_primitive((vigil_type_kind_t)fn->return_types[0]),
+                                             vigil_binding_type_primitive((vigil_type_kind_t)fn->return_types[1]));
+        }
+        else
+        {
+            size_t type_count = fn->return_count;
+            if (type_count > sizeof(resolved_types) / sizeof(resolved_types[0]))
+                type_count = sizeof(resolved_types) / sizeof(resolved_types[0]);
+            for (i = 0U; i < type_count; i++)
+                resolved_types[i] = vigil_binding_type_primitive((vigil_type_kind_t)fn->return_types[i]);
+            vigil_expression_result_set_multi(out_result, resolved_types, type_count);
+        }
     }
     return VIGIL_STATUS_OK;
 }
@@ -6942,6 +6997,9 @@ static void vigil_parser_set_native_method_return_type(vigil_parser_state_t *sta
                                                        const vigil_native_class_method_t *method, size_t class_index,
                                                        vigil_expression_result_t *out_result)
 {
+    vigil_parser_type_t resolved_types[8];
+    size_t i;
+
     if (method->return_count <= 1U)
     {
         if (method->return_type == VIGIL_TYPE_OBJECT && method->return_element_type != 0)
@@ -6983,13 +7041,17 @@ static void vigil_parser_set_native_method_return_type(vigil_parser_state_t *sta
                 vigil_parser_resolve_native_method_result_type(state, method, class_index, method->return_types[0]),
                 vigil_parser_resolve_native_method_result_type(state, method, class_index, method->return_types[1]));
         }
-        else if (method->return_count >= 3U)
+        else
         {
-            vigil_expression_result_set_triple(
-                out_result,
-                vigil_parser_resolve_native_method_result_type(state, method, class_index, method->return_types[0]),
-                vigil_parser_resolve_native_method_result_type(state, method, class_index, method->return_types[1]),
-                vigil_parser_resolve_native_method_result_type(state, method, class_index, method->return_types[2]));
+            size_t type_count = method->return_count;
+            if (type_count > sizeof(resolved_types) / sizeof(resolved_types[0]))
+                type_count = sizeof(resolved_types) / sizeof(resolved_types[0]);
+            for (i = 0U; i < type_count; i++)
+            {
+                resolved_types[i] =
+                    vigil_parser_resolve_native_method_result_type(state, method, class_index, method->return_types[i]);
+            }
+            vigil_expression_result_set_multi(out_result, resolved_types, type_count);
         }
     }
 }

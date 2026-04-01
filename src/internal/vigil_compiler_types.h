@@ -290,7 +290,7 @@ typedef struct vigil_expression_result
     vigil_parser_type_t type;
     const vigil_parser_type_t *types;
     size_t type_count;
-    vigil_parser_type_t owned_types[3];
+    vigil_parser_type_t owned_types[8];
 } vigil_expression_result_t;
 
 typedef struct vigil_constant_result

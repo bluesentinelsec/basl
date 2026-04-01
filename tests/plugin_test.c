@@ -17,6 +17,20 @@
 
 #if VIGIL_PLUGIN_COUNT > 0
 
+static const vigil_native_module_function_t *FindModuleFunction(const vigil_native_module_t *module, const char *name)
+{
+    size_t i;
+    if (module == NULL || name == NULL)
+        return NULL;
+    for (i = 0; i < module->function_count; i++)
+    {
+        const vigil_native_module_function_t *function = &module->functions[i];
+        if (strcmp(function->name, name) == 0)
+            return function;
+    }
+    return NULL;
+}
+
 /*
  * Compile and run a Vigil program that imports both stdlib and plugin modules.
  * The program's main() must return i32.  Returns that value.
@@ -163,6 +177,57 @@ TEST(PluginRegistry, PluginCoexistsWithStdlib)
     EXPECT_EQ(result, 1);
 }
 
+TEST(PluginRegistry, SdlExportsParityBatchOneFunctions)
+{
+    vigil_native_registry_t natives;
+    vigil_error_t error = {0};
+    const vigil_native_module_t *mod;
+
+    if (!vigil_plugin_is_known_module("sdl", 3U))
+        return;
+
+    vigil_native_registry_init(&natives);
+    EXPECT_EQ(vigil_plugin_register_all(&natives, &error), VIGIL_STATUS_OK);
+
+    mod = vigil_native_registry_find(&natives, "sdl", 3U);
+    EXPECT_NE(mod, NULL);
+    EXPECT_NE(FindModuleFunction(mod, "create_window_with_properties"), NULL);
+    EXPECT_NE(FindModuleFunction(mod, "create_renderer_with_properties"), NULL);
+    EXPECT_NE(FindModuleFunction(mod, "get_gamepad_mapping_for_guid"), NULL);
+    EXPECT_NE(FindModuleFunction(mod, "get_gamepad_mappings"), NULL);
+    EXPECT_NE(FindModuleFunction(mod, "get_joystick_guid_info"), NULL);
+
+    vigil_native_registry_free(&natives);
+}
+
+TEST(PluginRegistry, SdlGuidHelpersViaVM)
+{
+    int64_t result;
+
+    if (!vigil_plugin_is_known_module("sdl", 3U))
+        return;
+
+    result = RunWithPlugins(vigil_test_failed_,
+                            "import \"sdl\";\n"
+                            "fn main() -> i32 {\n"
+                            "    string guid = sdl.string_to_guid(\"00000000000000000000000000000000\");\n"
+                            "    string mapping = sdl.get_gamepad_mapping_for_guid(guid);\n"
+                            "    string mappings = sdl.get_gamepad_mappings();\n"
+                            "    i32 vendor, i32 product, i32 version, i32 crc = sdl.get_joystick_guid_info(guid);\n"
+                            "    if (mapping != \"\") {\n"
+                            "        return 1;\n"
+                            "    }\n"
+                            "    if (vendor != 0 || product != 0 || version != 0 || crc != 0) {\n"
+                            "        return 2;\n"
+                            "    }\n"
+                            "    if (mappings.len() < 0) {\n"
+                            "        return 3;\n"
+                            "    }\n"
+                            "    return 0;\n"
+                            "}\n");
+    EXPECT_EQ(result, 0);
+}
+
 #endif /* VIGIL_PLUGIN_COUNT > 0 */
 
 /* ── registration ────────────────────────────────────────────────── */
@@ -177,5 +242,7 @@ void register_plugin_tests(void)
     REGISTER_TEST(PluginRegistry, PluginNegate);
     REGISTER_TEST(PluginRegistry, PluginStringReturn);
     REGISTER_TEST(PluginRegistry, PluginCoexistsWithStdlib);
+    REGISTER_TEST(PluginRegistry, SdlExportsParityBatchOneFunctions);
+    REGISTER_TEST(PluginRegistry, SdlGuidHelpersViaVM);
 #endif
 }

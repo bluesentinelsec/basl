@@ -4,6 +4,7 @@
  * See: https://github.com/bluesentinelsec/vigil/issues/307
  */
 #include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include <SDL3/SDL.h>
@@ -275,6 +276,21 @@ static size_t sdl_self_class_index(vigil_vm_t *vm, size_t base)
     vigil_object_t *obj = (vigil_object_t *)vigil_nanbox_decode_ptr(val);
     return vigil_instance_object_class_index(obj);
 }
+
+/* Class indexes must stay aligned with the sdl_classes[] table. */
+enum
+{
+    SDL_WINDOW_CLASS_INDEX = 0U,
+    SDL_RENDERER_CLASS_INDEX = 1U,
+    SDL_EVENT_CLASS_INDEX = 2U,
+    SDL_SURFACE_CLASS_INDEX = 3U,
+    SDL_TEXTURE_CLASS_INDEX = 4U,
+    SDL_AUDIO_STREAM_CLASS_INDEX = 5U,
+    SDL_GAMEPAD_CLASS_INDEX = 6U,
+    SDL_JOYSTICK_CLASS_INDEX = 7U,
+    SDL_HAPTIC_CLASS_INDEX = 8U,
+    SDL_CAMERA_CLASS_INDEX = 9U,
+};
 
 /* Push a new native class instance with one i64 field (handle). */
 static vigil_status_t sdl_push_handle_instance(vigil_vm_t *vm, size_t class_index, int64_t handle, vigil_error_t *error)
@@ -6967,6 +6983,52 @@ static vigil_status_t sdl_fn_create_window_and_renderer(vigil_vm_t *vm, size_t a
     return sdl_push_ok(vm, error);
 }
 
+static vigil_status_t sdl_fn_create_window_with_properties(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t props = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+
+    SDL_Window *win = SDL_CreateWindowWithProperties((SDL_PropertiesID)props);
+    if (!win)
+        return sdl_push_nil_and_sdl_err(vm, SDL_ERR_IO, error);
+
+    int64_t handle;
+    if (SDL_HANDLE_STORE(windows, win, &handle) < 0)
+    {
+        SDL_DestroyWindow(win);
+        return sdl_push_nil_and_err(vm, "too many windows", SDL_ERR_STATE, error);
+    }
+
+    vigil_status_t st = sdl_push_handle_instance(vm, SDL_WINDOW_CLASS_INDEX, handle, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_ok(vm, error);
+}
+
+static vigil_status_t sdl_fn_create_renderer_with_properties(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t props = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+
+    SDL_Renderer *ren = SDL_CreateRendererWithProperties((SDL_PropertiesID)props);
+    if (!ren)
+        return sdl_push_nil_and_sdl_err(vm, SDL_ERR_IO, error);
+
+    int64_t handle;
+    if (SDL_HANDLE_STORE(renderers, ren, &handle) < 0)
+    {
+        SDL_DestroyRenderer(ren);
+        return sdl_push_nil_and_err(vm, "too many renderers", SDL_ERR_STATE, error);
+    }
+
+    vigil_status_t st = sdl_push_handle_instance(vm, SDL_RENDERER_CLASS_INDEX, handle, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_ok(vm, error);
+}
+
 static vigil_status_t sdl_window_set_fullscreen_mode(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
 {
     size_t base = vigil_vm_stack_depth(vm) - arg_count;
@@ -13167,6 +13229,32 @@ static vigil_status_t sdl_fn_get_joystick_guid_for_id(vigil_vm_t *vm, size_t arg
     return sdl_push_string(vm, buf, error);
 }
 
+static vigil_status_t sdl_fn_get_joystick_guid_info(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    char guid_text[64];
+    sdl_arg_str(vm, base, 0, guid_text, sizeof(guid_text));
+    vigil_vm_stack_pop_n(vm, arg_count);
+
+    Uint16 vendor = 0;
+    Uint16 product = 0;
+    Uint16 version = 0;
+    Uint16 crc16 = 0;
+    SDL_GUID guid = SDL_StringToGUID(guid_text);
+    SDL_GetJoystickGUIDInfo(guid, &vendor, &product, &version, &crc16);
+
+    vigil_status_t st = sdl_push_i32(vm, (int32_t)vendor, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    st = sdl_push_i32(vm, (int32_t)product, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    st = sdl_push_i32(vm, (int32_t)version, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_i32(vm, (int32_t)crc16, error);
+}
+
 static vigil_status_t sdl_fn_get_joystick_axis_initial_state(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
 {
     size_t base = vigil_vm_stack_depth(vm) - arg_count;
@@ -13798,6 +13886,74 @@ static vigil_status_t sdl_fn_get_gamepad_guid_for_id(vigil_vm_t *vm, size_t arg_
     return sdl_push_string(vm, buf, error);
 }
 
+static vigil_status_t sdl_fn_get_gamepad_mapping_for_guid(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    char guid_text[64];
+    sdl_arg_str(vm, base, 0, guid_text, sizeof(guid_text));
+    vigil_vm_stack_pop_n(vm, arg_count);
+
+    SDL_GUID guid = SDL_StringToGUID(guid_text);
+    char *mapping = SDL_GetGamepadMappingForGUID(guid);
+    vigil_status_t st = sdl_push_string(vm, mapping ? mapping : "", error);
+    SDL_free(mapping);
+    return st;
+}
+
+static vigil_status_t sdl_fn_get_gamepad_mappings(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    vigil_vm_stack_pop_n(vm, arg_count);
+
+    int count = 0;
+    char **mappings = SDL_GetGamepadMappings(&count);
+    if (!mappings || count <= 0)
+        return sdl_push_string(vm, "", error);
+
+    char *joined = NULL;
+    size_t capacity = 0;
+    size_t length = 0;
+    vigil_status_t st = VIGIL_STATUS_OK;
+
+    for (int i = 0; i < count; i++)
+    {
+        const char *mapping = mappings[i] ? mappings[i] : "";
+        size_t mapping_len = strlen(mapping);
+        size_t needed = length + mapping_len + (i > 0 ? 1U : 0U) + 1U;
+        if (needed > capacity)
+        {
+            size_t new_capacity = capacity == 0 ? 256U : capacity;
+            while (new_capacity < needed)
+                new_capacity *= 2U;
+            char *next = (char *)realloc(joined, new_capacity);
+            if (!next)
+            {
+                free(joined);
+                SDL_free(mappings);
+                vigil_error_set_literal(error, VIGIL_STATUS_OUT_OF_MEMORY, "out of memory");
+                return VIGIL_STATUS_OUT_OF_MEMORY;
+            }
+            joined = next;
+            capacity = new_capacity;
+        }
+        if (i > 0)
+            joined[length++] = '\n';
+        memcpy(joined + length, mapping, mapping_len);
+        length += mapping_len;
+    }
+
+    if (!joined)
+    {
+        SDL_free(mappings);
+        return sdl_push_string(vm, "", error);
+    }
+
+    joined[length] = '\0';
+    st = sdl_push_string(vm, joined, error);
+    free(joined);
+    SDL_free(mappings);
+    return st;
+}
+
 static vigil_status_t sdl_fn_calculate_gpu_texture_format_size(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
 {
     size_t base = vigil_vm_stack_depth(vm) - arg_count;
@@ -14410,6 +14566,40 @@ SDL_CONST_FN(FLIP_VERTICAL, SDL_FLIP_VERTICAL)
 
 /* clang-format on */
 
+static const char *const sdl_properties_param_names[] = {"properties"};
+static const char *const sdl_guid_param_names[] = {"guid"};
+
+static const vigil_native_symbol_doc_t sdl_doc_create_window_with_properties = {
+    "Create a window from an SDL property bag.",
+    "Pass a properties ID configured with SDL window creation keys such as title, size, and flags.",
+    "i32 props = sdl.create_properties()\n"
+    "bool ok, err e = sdl.set_string_property(props, \"SDL.window.create.title\", \"Demo\")",
+};
+
+static const vigil_native_symbol_doc_t sdl_doc_create_renderer_with_properties = {
+    "Create a renderer from an SDL property bag.",
+    "Pass a properties ID configured with SDL renderer creation keys such as the target window and driver name.",
+    NULL,
+};
+
+static const vigil_native_symbol_doc_t sdl_doc_get_gamepad_mapping_for_guid = {
+    "Return the SDL mapping string for a gamepad GUID.",
+    "Use a GUID string returned by SDL helper functions such as get_gamepad_guid_for_id or get_joystick_guid_for_id.",
+    "string mapping = sdl.get_gamepad_mapping_for_guid(guid)",
+};
+
+static const vigil_native_symbol_doc_t sdl_doc_get_gamepad_mappings = {
+    "Return all known gamepad mappings as a newline-separated string.",
+    "Each line is one SDL gamepad mapping string. Empty output means no mappings are currently registered.",
+    "string mappings = sdl.get_gamepad_mappings()",
+};
+
+static const vigil_native_symbol_doc_t sdl_doc_get_joystick_guid_info = {
+    "Decode vendor, product, version, and CRC16 values from a joystick GUID string.",
+    "Returns four i32 values in order: vendor, product, version, crc16.",
+    "i32 vendor, i32 product, i32 version, i32 crc = sdl.get_joystick_guid_info(guid)",
+};
+
 /* ── Function table ──────────────────────────────────────────────── */
 
 static const vigil_native_module_function_t sdl_functions[] = {
@@ -14758,10 +14948,15 @@ static const vigil_native_module_function_t sdl_functions[] = {
     SDL_FN("get_camera_name", 15U, sdl_fn_get_camera_name, 1U, p_i32, VIGIL_TYPE_STRING),
     SDL_FN("get_current_camera_driver", 25U, sdl_fn_get_current_camera_driver, 0U, NULL, VIGIL_TYPE_STRING),
     /* Window complete */
+    {"create_window_with_properties", 29U, sdl_fn_create_window_with_properties, 1U, p_i32, VIGIL_TYPE_OBJECT, 2U,
+     rt_obj_err, 0, NULL, NULL, 0U, sdl_properties_param_names, NULL, "Window", &sdl_doc_create_window_with_properties},
     {"create_window_and_renderer", 26U, sdl_fn_create_window_and_renderer, 4U, p_str_i32_i32_i32, VIGIL_TYPE_I64, 2U,
      rt_i64_err, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
     SDL_FN("get_grabbed_window", 18U, sdl_fn_get_grabbed_window, 0U, NULL, VIGIL_TYPE_I32),
     /* Renderer complete - module functions */
+    {"create_renderer_with_properties", 31U, sdl_fn_create_renderer_with_properties, 1U, p_i32, VIGIL_TYPE_OBJECT, 2U,
+     rt_obj_err, 0, NULL, NULL, 0U, sdl_properties_param_names, NULL, "Renderer",
+     &sdl_doc_create_renderer_with_properties},
     SDL_FN("get_num_render_drivers", 21U, sdl_fn_get_num_render_drivers, 0U, NULL, VIGIL_TYPE_I32),
     SDL_FN("get_render_driver", 17U, sdl_fn_get_render_driver, 1U, p_i32, VIGIL_TYPE_STRING),
     /* Renderer/Surface final - module functions */
@@ -14812,6 +15007,10 @@ static const vigil_native_module_function_t sdl_functions[] = {
     SDL_FN("get_gamepad_type_from_string", 28U, sdl_fn_get_gamepad_type_from_string, 1U, p_str, VIGIL_TYPE_I32),
     SDL_FN("get_gamepad_name_for_id", 22U, sdl_fn_get_gamepad_name_for_id, 1U, p_i32, VIGIL_TYPE_STRING),
     SDL_FN("get_gamepad_type_for_id", 22U, sdl_fn_get_gamepad_type_for_id, 1U, p_i32, VIGIL_TYPE_I32),
+    {"get_gamepad_mapping_for_guid", 28U, sdl_fn_get_gamepad_mapping_for_guid, 1U, p_str, VIGIL_TYPE_STRING, 1U, NULL,
+     0, NULL, NULL, 0U, sdl_guid_param_names, NULL, NULL, &sdl_doc_get_gamepad_mapping_for_guid},
+    {"get_gamepad_mappings", 20U, sdl_fn_get_gamepad_mappings, 0U, NULL, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U,
+     NULL, NULL, NULL, &sdl_doc_get_gamepad_mappings},
     /* Joystick complete - module */
     SDL_FN_VOID("update_joysticks", 17U, sdl_fn_update_joysticks, 0U, NULL),
     SDL_FN_VOID("lock_joysticks", 15U, sdl_fn_lock_joysticks, 0U, NULL),
@@ -15232,6 +15431,8 @@ static const vigil_native_module_function_t sdl_functions[] = {
     SDL_FN("get_joystick_properties", 23U, sdl_fn_get_joystick_properties, 1U, p_i64, VIGIL_TYPE_I32),
     SDL_FN("get_joystick_guid", 18U, sdl_fn_get_joystick_guid, 1U, p_i64, VIGIL_TYPE_STRING),
     SDL_FN("get_joystick_guid_for_id", 23U, sdl_fn_get_joystick_guid_for_id, 1U, p_i32, VIGIL_TYPE_STRING),
+    {"get_joystick_guid_info", 22U, sdl_fn_get_joystick_guid_info, 1U, p_str, VIGIL_TYPE_I32, 4U, rt_i32x4, 0, NULL,
+     NULL, 0U, sdl_guid_param_names, NULL, NULL, &sdl_doc_get_joystick_guid_info},
     {"get_joystick_axis_initial_state", 30U, sdl_fn_get_joystick_axis_initial_state, 2U, p_i64_i32, VIGIL_TYPE_BOOL, 2U,
      rt_bool_i32, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
     /* Haptic */
