@@ -279,6 +279,17 @@ TEST(DocRegistryTest, DescriptorBackedDocsRenderDerivedSignaturesForRegexAndAtom
     EXPECT_STREQ(atomic_store->signature, "atomic.store(a: i64, val: i64) -> bool");
 }
 
+TEST(DocRegistryTest, DescriptorBackedDocsRenderDerivedSignaturesForNetAndTime)
+{
+    const vigil_doc_entry_t *net_send = vigil_doc_lookup("net.udp_send");
+    const vigil_doc_entry_t *time_date = vigil_doc_lookup("time.date");
+
+    ASSERT_NE(net_send, NULL);
+    ASSERT_NE(time_date, NULL);
+    EXPECT_STREQ(net_send->signature, "net.udp_send(sock: i64, host: string, port: i32, data: string) -> i32");
+    EXPECT_STREQ(time_date->signature, "time.date(y: i32, m: i32, d: i32, h: i32, min: i32, s: i32) -> i64");
+}
+
 TEST(DocRegistryTest, ModuleListUsesCanonicalStdlibSet)
 {
     size_t count = 0U;
@@ -307,5 +318,6 @@ void register_doc_registry_tests(void)
     REGISTER_TEST(DocRegistryTest, ReadlineDocsRemainAvailableForDescriptorAndFallbackPaths);
     REGISTER_TEST(DocRegistryTest, DescriptorBackedDocsRenderDerivedSignaturesForUrlYamlCsvAndLog);
     REGISTER_TEST(DocRegistryTest, DescriptorBackedDocsRenderDerivedSignaturesForRegexAndAtomic);
+    REGISTER_TEST(DocRegistryTest, DescriptorBackedDocsRenderDerivedSignaturesForNetAndTime);
     REGISTER_TEST(DocRegistryTest, ModuleListUsesCanonicalStdlibSet);
 }

@@ -499,39 +499,200 @@ static const int i64_str_param[] = {VIGIL_TYPE_I64, VIGIL_TYPE_STRING};
 static const int str_str_param[] = {VIGIL_TYPE_STRING, VIGIL_TYPE_STRING};
 static const int date_params[] = {VIGIL_TYPE_I32, VIGIL_TYPE_I32, VIGIL_TYPE_I32,
                                   VIGIL_TYPE_I32, VIGIL_TYPE_I32, VIGIL_TYPE_I32};
+static const char *const time_ms_param_names[] = {"ms"};
+static const char *const time_ts_param_names[] = {"ts"};
+static const char *const time_ts_fmt_param_names[] = {"ts", "fmt"};
+static const char *const time_s_fmt_param_names[] = {"s", "fmt"};
+static const char *const time_ts_n_i32_param_names[] = {"ts", "n"};
+static const char *const time_ts_n_i64_param_names[] = {"ts", "n"};
+static const char *const time_a_b_param_names[] = {"a", "b"};
+static const char *const time_date_param_names[] = {"y", "m", "d", "h", "min", "s"};
+
+static const vigil_native_symbol_doc_t vigil_time_module_doc = {
+    "Date and time operations.",
+    "The time module provides functions for working with Unix timestamps and local time formatting and parsing.",
+    NULL,
+};
+
+static const vigil_native_symbol_doc_t vigil_time_now_doc = {
+    "Get current Unix timestamp.",
+    "Returns seconds since 1970-01-01 UTC.",
+    "i64 ts = time.now()",
+};
+
+static const vigil_native_symbol_doc_t vigil_time_now_ms_doc = {
+    "Get current time in milliseconds.",
+    "Returns milliseconds since the Unix epoch.",
+    "i64 ms = time.now_ms()",
+};
+
+static const vigil_native_symbol_doc_t vigil_time_now_ns_doc = {
+    "Get current time in nanoseconds.",
+    "Returns nanoseconds since the Unix epoch.",
+    "i64 ns = time.now_ns()",
+};
+
+static const vigil_native_symbol_doc_t vigil_time_sleep_doc = {
+    "Sleep for milliseconds.",
+    "Pauses execution for the specified duration.",
+    "time.sleep(i64(1000))",
+};
+
+static const vigil_native_symbol_doc_t vigil_time_year_doc = {
+    "Get year from timestamp.",
+    "Returns the calendar year for the local timestamp.",
+    "time.year(time.now())",
+};
+
+static const vigil_native_symbol_doc_t vigil_time_month_doc = {
+    "Get month from timestamp.",
+    "Returns month 1 through 12.",
+    "time.month(time.now())",
+};
+
+static const vigil_native_symbol_doc_t vigil_time_day_doc = {
+    "Get day from timestamp.",
+    "Returns day of month 1 through 31.",
+    "time.day(time.now())",
+};
+
+static const vigil_native_symbol_doc_t vigil_time_hour_doc = {
+    "Get hour from timestamp.",
+    "Returns hour 0 through 23.",
+    "time.hour(time.now())",
+};
+
+static const vigil_native_symbol_doc_t vigil_time_minute_doc = {
+    "Get minute from timestamp.",
+    "Returns minute 0 through 59.",
+    "time.minute(time.now())",
+};
+
+static const vigil_native_symbol_doc_t vigil_time_second_doc = {
+    "Get second from timestamp.",
+    "Returns second 0 through 59.",
+    "time.second(time.now())",
+};
+
+static const vigil_native_symbol_doc_t vigil_time_weekday_doc = {
+    "Get day of week.",
+    "Returns 0 for Sunday through 6 for Saturday.",
+    "time.weekday(time.now())",
+};
+
+static const vigil_native_symbol_doc_t vigil_time_yearday_doc = {
+    "Get day of year.",
+    "Returns day of year 1 through 366.",
+    "time.yearday(time.now())",
+};
+
+static const vigil_native_symbol_doc_t vigil_time_is_dst_doc = {
+    "Check if DST is active.",
+    "Returns true if daylight saving time is in effect.",
+    "time.is_dst(time.now())",
+};
+
+static const vigil_native_symbol_doc_t vigil_time_utc_offset_doc = {
+    "Get local UTC offset.",
+    "Returns offset from UTC in seconds.",
+    "time.utc_offset()",
+};
+
+static const vigil_native_symbol_doc_t vigil_time_date_doc = {
+    "Create timestamp from components.",
+    "Returns a Unix timestamp for the given local time.",
+    "time.date(2024, 12, 25, 0, 0, 0)",
+};
+
+static const vigil_native_symbol_doc_t vigil_time_format_doc = {
+    "Format timestamp as string.",
+    "Uses strftime format codes.",
+    "time.format(time.now(), \"%Y-%m-%d %H:%M:%S\")",
+};
+
+static const vigil_native_symbol_doc_t vigil_time_parse_doc = {
+    "Parse string to timestamp.",
+    "Returns -1 on parse failure. Uses strptime format codes.",
+    "time.parse(\"2024-12-25\", \"%Y-%m-%d\")",
+};
+
+static const vigil_native_symbol_doc_t vigil_time_add_days_doc = {
+    "Add days to timestamp.",
+    "Returns a new timestamp offset by whole days.",
+    "time.add_days(time.now(), 7)",
+};
+
+static const vigil_native_symbol_doc_t vigil_time_add_hours_doc = {
+    "Add hours to timestamp.",
+    "Returns a new timestamp offset by whole hours.",
+    "time.add_hours(time.now(), 24)",
+};
+
+static const vigil_native_symbol_doc_t vigil_time_add_minutes_doc = {
+    "Add minutes to timestamp.",
+    "Returns a new timestamp offset by whole minutes.",
+    "time.add_minutes(time.now(), 30)",
+};
+
+static const vigil_native_symbol_doc_t vigil_time_add_seconds_doc = {
+    "Add seconds to timestamp.",
+    "Returns a new timestamp offset by whole seconds.",
+    "time.add_seconds(time.now(), i64(3600))",
+};
+
+static const vigil_native_symbol_doc_t vigil_time_diff_days_doc = {
+    "Get difference in days.",
+    "Returns the whole-day difference between two timestamps.",
+    "time.diff_days(future, past)",
+};
 
 static const vigil_native_module_function_t time_functions[] = {
-    {"now", 3U, time_now, 0U, NULL, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
-    {"now_ms", 6U, time_now_ms, 0U, NULL, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
-    {"now_ns", 6U, time_now_ns, 0U, NULL, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
-    {"sleep", 5U, time_sleep, 1U, i64_param, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
-    {"year", 4U, time_year, 1U, i64_param, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
-    {"month", 5U, time_month, 1U, i64_param, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
-    {"day", 3U, time_day, 1U, i64_param, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
-    {"hour", 4U, time_hour, 1U, i64_param, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
-    {"minute", 6U, time_minute, 1U, i64_param, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
-    {"second", 6U, time_second, 1U, i64_param, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
-    {"weekday", 7U, time_weekday, 1U, i64_param, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
-    {"yearday", 7U, time_yearday, 1U, i64_param, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
-    {"is_dst", 6U, time_is_dst, 1U, i64_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
-    {"utc_offset", 10U, time_utc_offset, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
-    {"date", 4U, time_date, 6U, date_params, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
-    {"format", 6U, time_format, 2U, i64_str_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL,
-     NULL},
-    {"parse", 5U, time_parse, 2U, str_str_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
-    {"add_days", 8U, time_add_days, 2U, i64_i32_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL,
-     NULL},
-    {"add_hours", 9U, time_add_hours, 2U, i64_i32_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL,
-     NULL},
-    {"add_minutes", 11U, time_add_minutes, 2U, i64_i32_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL,
-     NULL, NULL},
-    {"add_seconds", 11U, time_add_seconds, 2U, i64_i64_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL,
-     NULL, NULL},
-    {"diff_days", 9U, time_diff_days, 2U, i64_i64_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL,
-     NULL},
+    {"now", 3U, time_now, 0U, NULL, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, &vigil_time_now_doc},
+    {"now_ms", 6U, time_now_ms, 0U, NULL, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL,
+     &vigil_time_now_ms_doc},
+    {"now_ns", 6U, time_now_ns, 0U, NULL, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL,
+     &vigil_time_now_ns_doc},
+    {"sleep", 5U, time_sleep, 1U, i64_param, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, NULL, 0U, time_ms_param_names, NULL,
+     NULL, &vigil_time_sleep_doc},
+    {"year", 4U, time_year, 1U, i64_param, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, NULL, 0U, time_ts_param_names, NULL,
+     NULL, &vigil_time_year_doc},
+    {"month", 5U, time_month, 1U, i64_param, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, NULL, 0U, time_ts_param_names, NULL,
+     NULL, &vigil_time_month_doc},
+    {"day", 3U, time_day, 1U, i64_param, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, NULL, 0U, time_ts_param_names, NULL, NULL,
+     &vigil_time_day_doc},
+    {"hour", 4U, time_hour, 1U, i64_param, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, NULL, 0U, time_ts_param_names, NULL,
+     NULL, &vigil_time_hour_doc},
+    {"minute", 6U, time_minute, 1U, i64_param, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, NULL, 0U, time_ts_param_names, NULL,
+     NULL, &vigil_time_minute_doc},
+    {"second", 6U, time_second, 1U, i64_param, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, NULL, 0U, time_ts_param_names, NULL,
+     NULL, &vigil_time_second_doc},
+    {"weekday", 7U, time_weekday, 1U, i64_param, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, NULL, 0U, time_ts_param_names,
+     NULL, NULL, &vigil_time_weekday_doc},
+    {"yearday", 7U, time_yearday, 1U, i64_param, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, NULL, 0U, time_ts_param_names,
+     NULL, NULL, &vigil_time_yearday_doc},
+    {"is_dst", 6U, time_is_dst, 1U, i64_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U, time_ts_param_names, NULL,
+     NULL, &vigil_time_is_dst_doc},
+    {"utc_offset", 10U, time_utc_offset, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL,
+     &vigil_time_utc_offset_doc},
+    {"date", 4U, time_date, 6U, date_params, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U, time_date_param_names, NULL,
+     NULL, &vigil_time_date_doc},
+    {"format", 6U, time_format, 2U, i64_str_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U,
+     time_ts_fmt_param_names, NULL, NULL, &vigil_time_format_doc},
+    {"parse", 5U, time_parse, 2U, str_str_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U, time_s_fmt_param_names,
+     NULL, NULL, &vigil_time_parse_doc},
+    {"add_days", 8U, time_add_days, 2U, i64_i32_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U,
+     time_ts_n_i32_param_names, NULL, NULL, &vigil_time_add_days_doc},
+    {"add_hours", 9U, time_add_hours, 2U, i64_i32_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U,
+     time_ts_n_i32_param_names, NULL, NULL, &vigil_time_add_hours_doc},
+    {"add_minutes", 11U, time_add_minutes, 2U, i64_i32_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U,
+     time_ts_n_i32_param_names, NULL, NULL, &vigil_time_add_minutes_doc},
+    {"add_seconds", 11U, time_add_seconds, 2U, i64_i64_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U,
+     time_ts_n_i64_param_names, NULL, NULL, &vigil_time_add_seconds_doc},
+    {"diff_days", 9U, time_diff_days, 2U, i64_i64_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U,
+     time_a_b_param_names, NULL, NULL, &vigil_time_diff_days_doc},
 };
 
 #define TIME_FUNCTION_COUNT (sizeof(time_functions) / sizeof(time_functions[0]))
 
 VIGIL_API const vigil_native_module_t vigil_stdlib_time = {"time", 4U,  time_functions, TIME_FUNCTION_COUNT, NULL,
-                                                           0U,     NULL};
+                                                           0U,     &vigil_time_module_doc};

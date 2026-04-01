@@ -658,96 +658,6 @@ static const vigil_doc_entry_t compress_docs[] = {
 
 /* ── net Module Docs ──────────────────────────────────────── */
 
-static const vigil_doc_entry_t net_docs[] = {
-    {"net", NULL, "TCP and UDP socket networking.",
-     "The net module provides TCP and UDP socket support for network\n"
-     "programming. Handles both client and server connections.",
-     NULL},
-    {"net.tcp_listen", "net.tcp_listen(host: string, port: i32) -> i64", "Create TCP server socket.",
-     "Binds and listens on the given address. Returns socket handle or -1.",
-     "i64 server = net.tcp_listen(\"0.0.0.0\", 8080)"},
-    {"net.tcp_accept", "net.tcp_accept(listener: i64) -> i64", "Accept TCP connection.",
-     "Blocks until a client connects. Returns client socket handle.", "i64 client = net.tcp_accept(server)"},
-    {"net.tcp_connect", "net.tcp_connect(host: string, port: i32) -> i64", "Connect to TCP server.",
-     "Returns socket handle or -1 on failure.", "i64 sock = net.tcp_connect(\"example.com\", 80)"},
-    {"net.read", "net.read(sock: i64, max_bytes: i32) -> string", "Read from socket.",
-     "Returns data read, or empty string on error/EOF.", "string data = net.read(sock, 4096)"},
-    {"net.write", "net.write(sock: i64, data: string) -> i32", "Write to socket.",
-     "Returns bytes written or -1 on error.", "net.write(sock, \"Hello\")"},
-    {"net.close", "net.close(sock: i64)", "Close socket.", "Closes and releases the socket.", "net.close(sock)"},
-    {"net.udp_bind", "net.udp_bind(host: string, port: i32) -> i64", "Create bound UDP socket.",
-     "Binds UDP socket to address for receiving.", "i64 sock = net.udp_bind(\"0.0.0.0\", 5000)"},
-    {"net.udp_new", "net.udp_new() -> i64", "Create unbound UDP socket.", "Creates UDP socket for sending.",
-     "i64 sock = net.udp_new()"},
-    {"net.udp_send", "net.udp_send(sock: i64, host: string, port: i32, data: string) -> i32", "Send UDP datagram.",
-     "Returns bytes sent or -1 on error.", "net.udp_send(sock, \"127.0.0.1\", 5000, \"hello\")"},
-    {"net.udp_recv", "net.udp_recv(sock: i64, max_bytes: i32) -> string", "Receive UDP datagram.",
-     "Returns data received or empty string.", "string data = net.udp_recv(sock, 1024)"},
-    {"net.set_timeout", "net.set_timeout(sock: i64, ms: i32) -> bool", "Set socket timeout.",
-     "Sets read/write timeout in milliseconds.", "net.set_timeout(sock, 5000)"},
-};
-
-#define NET_COUNT (sizeof(net_docs) / sizeof(net_docs[0]))
-
-/* ── time Module Docs ─────────────────────────────────────── */
-
-static const vigil_doc_entry_t time_docs[] = {
-    {"time", NULL, "Date and time operations.",
-     "The time module provides functions for working with dates and times.\n"
-     "Timestamps are Unix timestamps (seconds since 1970-01-01 UTC).\n"
-     "Format strings use strftime syntax: %Y=year, %m=month, %d=day,\n"
-     "%H=hour, %M=minute, %S=second, %A=weekday name, etc.",
-     NULL},
-    {"time.now", "time.now() -> i64", "Get current Unix timestamp.", "Returns seconds since 1970-01-01 UTC.",
-     "i64 ts = time.now()"},
-    {"time.now_ms", "time.now_ms() -> i64", "Get current time in milliseconds.",
-     "Returns milliseconds since Unix epoch.", "i64 ms = time.now_ms()"},
-    {"time.now_ns", "time.now_ns() -> i64", "Get current time in nanoseconds.",
-     "Returns nanoseconds since Unix epoch. Note: values may overflow\nVIGIL's 48-bit integer limit for dates after "
-     "~1970.",
-     "i64 ns = time.now_ns()"},
-    {"time.sleep", "time.sleep(ms: i64)", "Sleep for milliseconds.", "Pauses execution for the specified duration.",
-     "time.sleep(i64(1000))  // sleep 1 second"},
-    {"time.year", "time.year(ts: i64) -> i32", "Get year from timestamp.", "Returns the year (e.g. 2024).",
-     "time.year(time.now())"},
-    {"time.month", "time.month(ts: i64) -> i32", "Get month from timestamp.", "Returns month 1-12.",
-     "time.month(time.now())"},
-    {"time.day", "time.day(ts: i64) -> i32", "Get day from timestamp.", "Returns day of month 1-31.",
-     "time.day(time.now())"},
-    {"time.hour", "time.hour(ts: i64) -> i32", "Get hour from timestamp.", "Returns hour 0-23.",
-     "time.hour(time.now())"},
-    {"time.minute", "time.minute(ts: i64) -> i32", "Get minute from timestamp.", "Returns minute 0-59.",
-     "time.minute(time.now())"},
-    {"time.second", "time.second(ts: i64) -> i32", "Get second from timestamp.", "Returns second 0-59.",
-     "time.second(time.now())"},
-    {"time.weekday", "time.weekday(ts: i64) -> i32", "Get day of week.", "Returns 0=Sunday through 6=Saturday.",
-     "time.weekday(time.now())"},
-    {"time.yearday", "time.yearday(ts: i64) -> i32", "Get day of year.", "Returns 1-366.", "time.yearday(time.now())"},
-    {"time.is_dst", "time.is_dst(ts: i64) -> bool", "Check if DST is active.",
-     "Returns true if daylight saving time is in effect.", "time.is_dst(time.now())"},
-    {"time.utc_offset", "time.utc_offset() -> i32", "Get local UTC offset.", "Returns offset from UTC in seconds.",
-     "time.utc_offset()  // e.g. -18000 for EST"},
-    {"time.date", "time.date(y: i32, m: i32, d: i32, h: i32, min: i32, s: i32) -> i64",
-     "Create timestamp from components.", "Returns Unix timestamp for the given local time.",
-     "time.date(2024, 12, 25, 0, 0, 0)"},
-    {"time.format", "time.format(ts: i64, fmt: string) -> string", "Format timestamp as string.",
-     "Uses strftime format codes.", "time.format(time.now(), \"%Y-%m-%d %H:%M:%S\")"},
-    {"time.parse", "time.parse(s: string, fmt: string) -> i64", "Parse string to timestamp.",
-     "Returns -1 on parse failure. Uses strptime format.", "time.parse(\"2024-12-25\", \"%Y-%m-%d\")"},
-    {"time.add_days", "time.add_days(ts: i64, n: i32) -> i64", "Add days to timestamp.", "Returns new timestamp.",
-     "time.add_days(time.now(), 7)"},
-    {"time.add_hours", "time.add_hours(ts: i64, n: i32) -> i64", "Add hours to timestamp.", "Returns new timestamp.",
-     "time.add_hours(time.now(), 24)"},
-    {"time.add_minutes", "time.add_minutes(ts: i64, n: i32) -> i64", "Add minutes to timestamp.",
-     "Returns new timestamp.", "time.add_minutes(time.now(), 30)"},
-    {"time.add_seconds", "time.add_seconds(ts: i64, n: i64) -> i64", "Add seconds to timestamp.",
-     "Returns new timestamp.", "time.add_seconds(time.now(), i64(3600))"},
-    {"time.diff_days", "time.diff_days(a: i64, b: i64) -> i64", "Get difference in days.", "Returns (a - b) / 86400.",
-     "time.diff_days(future, past)"},
-};
-
-#define TIME_COUNT (sizeof(time_docs) / sizeof(time_docs[0]))
-
 /* ── crypto Module Docs ───────────────────────────────────── */
 
 static const vigil_doc_entry_t crypto_docs[] = {
@@ -2264,8 +2174,6 @@ static const doc_module_table_entry_t doc_module_table[] = {
     {"crypto", crypto_docs, CRYPTO_COUNT},
     {"http", http_docs, HTTP_COUNT},
     {"readline", readline_docs, READLINE_COUNT},
-    {"net", net_docs, NET_COUNT},
-    {"time", time_docs, TIME_COUNT},
     {"ffi", ffi_docs, FFI_COUNT},
     {"unsafe", unsafe_docs, UNSAFE_COUNT},
     {"sdl", sdl_docs, SDL_DOC_COUNT},
