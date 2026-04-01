@@ -331,33 +331,6 @@ static const vigil_doc_entry_t strings_docs[] = {
 
 /* ── regex Module Docs ────────────────────────────────────── */
 
-static const vigil_doc_entry_t regex_docs[] = {
-    {"regex", NULL, "Regular expression matching (RE2-style).",
-     "The regex module provides pattern matching with linear time guarantees.\n"
-     "Uses Thompson NFA algorithm - no backtracking, no pathological cases.",
-     NULL},
-    {"regex.match", "regex.match(pattern: string, input: string) -> bool",
-     "Check if input matches the pattern (anchored).", "Returns true if the entire input matches the pattern.",
-     "regex.match(\"[a-z]+\", \"hello\")  // true\n"
-     "regex.match(\"[a-z]+\", \"hello123\")  // false"},
-    {"regex.find", "regex.find(pattern: string, input: string) -> (string, bool)",
-     "Find first match of pattern in input.", "Returns the matched substring and whether a match was found.",
-     "string m, bool ok = regex.find(\"[0-9]+\", \"abc123\")  // \"123\", true"},
-    {"regex.find_all", "regex.find_all(pattern: string, input: string) -> array<string>",
-     "Find all non-overlapping matches.", "Returns an array of all matched substrings.",
-     "regex.find_all(\"[0-9]+\", \"a1b22c333\")  // [\"1\", \"22\", \"333\"]"},
-    {"regex.replace", "regex.replace(pattern: string, input: string, replacement: string) -> string",
-     "Replace first match with replacement.", "Returns the input with the first match replaced.",
-     "regex.replace(\"[0-9]+\", \"a1b2\", \"X\")  // \"aXb2\""},
-    {"regex.replace_all", "regex.replace_all(pattern: string, input: string, replacement: string) -> string",
-     "Replace all matches with replacement.", "Returns the input with all matches replaced.",
-     "regex.replace_all(\"[0-9]+\", \"a1b2\", \"X\")  // \"aXbX\""},
-    {"regex.split", "regex.split(pattern: string, input: string) -> array<string>", "Split input by pattern.",
-     "Returns an array of substrings split by the pattern.", "regex.split(\",\", \"a,b,c\")  // [\"a\", \"b\", \"c\"]"},
-};
-
-#define REGEX_COUNT (sizeof(regex_docs) / sizeof(regex_docs[0]))
-
 /* ── random Module Docs ───────────────────────────────────── */
 
 /* ── url Module Docs ──────────────────────────────────────── */
@@ -614,41 +587,6 @@ static const vigil_doc_entry_t thread_docs[] = {
 #define THREAD_COUNT (sizeof(thread_docs) / sizeof(thread_docs[0]))
 
 /* ── atomic module ────────────────────────────────────────── */
-
-static const vigil_doc_entry_t atomic_docs[] = {
-    {"atomic", NULL, "Atomic operations.",
-     "The atomic module provides lock-free atomic integer operations\n"
-     "for thread-safe programming without mutexes.",
-     NULL},
-    {"atomic.new", "atomic.new(initial: i64) -> i64", "Create atomic integer handle.",
-     "Creates an atomic integer cell with the given initial value and returns its handle.", "i64 a = atomic.new(0)"},
-    {"atomic.load", "atomic.load(a: i64) -> i64", "Atomically load value.",
-     "Returns the current value stored in the atomic cell handle.", "atomic.load(a)"},
-    {"atomic.store", "atomic.store(a: i64, val: i64) -> bool", "Atomically store value.",
-     "Sets the atomic cell to the given value.", "atomic.store(a, 42)"},
-    {"atomic.add", "atomic.add(a: i64, val: i64) -> i64", "Atomically add.",
-     "Adds val to the cell and returns the previous value.", "atomic.add(a, 1)"},
-    {"atomic.sub", "atomic.sub(a: i64, val: i64) -> i64", "Atomically subtract.",
-     "Subtracts val from the cell and returns the previous value.", "atomic.sub(a, 1)"},
-    {"atomic.cas", "atomic.cas(a: i64, expected: i64, desired: i64) -> bool", "Compare and swap.",
-     "Sets the cell to desired if the current value equals expected.", "atomic.cas(a, 0, 1)"},
-    {"atomic.exchange", "atomic.exchange(a: i64, val: i64) -> i64", "Atomically exchange value.",
-     "Stores val in the cell and returns the previous value.", "i64 prev = atomic.exchange(a, 5)"},
-    {"atomic.fetch_or", "atomic.fetch_or(a: i64, val: i64) -> i64", "Atomically bitwise-OR value.",
-     "Applies bitwise OR with val and returns the previous value.", "i64 prev = atomic.fetch_or(a, 0x10)"},
-    {"atomic.fetch_and", "atomic.fetch_and(a: i64, val: i64) -> i64", "Atomically bitwise-AND value.",
-     "Applies bitwise AND with val and returns the previous value.", "i64 prev = atomic.fetch_and(a, 0xff)"},
-    {"atomic.fetch_xor", "atomic.fetch_xor(a: i64, val: i64) -> i64", "Atomically bitwise-XOR value.",
-     "Applies bitwise XOR with val and returns the previous value.", "i64 prev = atomic.fetch_xor(a, 0x01)"},
-    {"atomic.inc", "atomic.inc(a: i64) -> i64", "Atomically increment.",
-     "Increments the cell by 1 and returns the previous value.", "atomic.inc(a)"},
-    {"atomic.dec", "atomic.dec(a: i64) -> i64", "Atomically decrement.",
-     "Decrements the cell by 1 and returns the previous value.", "atomic.dec(a)"},
-    {"atomic.fence", "atomic.fence() -> void", "Issue a full memory fence.",
-     "Forces a full memory barrier for ordering surrounding atomic operations.", "atomic.fence()"},
-};
-
-#define ATOMIC_COUNT (sizeof(atomic_docs) / sizeof(atomic_docs[0]))
 
 /* ── compress module ──────────────────────────────────────── */
 
@@ -2319,11 +2257,9 @@ static const doc_module_table_entry_t doc_module_table[] = {
     {"builtins", builtin_docs, BUILTIN_COUNT},
     {"math", math_docs, MATH_COUNT},
     {"strings", strings_docs, STRINGS_COUNT},
-    {"regex", regex_docs, REGEX_COUNT},
     {"json", json_docs, JSON_COUNT},
     {"fs", fs_docs, FS_COUNT},
     {"thread", thread_docs, THREAD_COUNT},
-    {"atomic", atomic_docs, ATOMIC_COUNT},
     {"compress", compress_docs, COMPRESS_COUNT},
     {"crypto", crypto_docs, CRYPTO_COUNT},
     {"http", http_docs, HTTP_COUNT},

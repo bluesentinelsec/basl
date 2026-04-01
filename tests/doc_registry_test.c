@@ -268,6 +268,17 @@ TEST(DocRegistryTest, DescriptorBackedDocsRenderDerivedSignaturesForUrlYamlCsvAn
     EXPECT_STREQ(log_set_level->signature, "log.set_level(level: string) -> void");
 }
 
+TEST(DocRegistryTest, DescriptorBackedDocsRenderDerivedSignaturesForRegexAndAtomic)
+{
+    const vigil_doc_entry_t *regex_find_all = vigil_doc_lookup("regex.find_all");
+    const vigil_doc_entry_t *atomic_store = vigil_doc_lookup("atomic.store");
+
+    ASSERT_NE(regex_find_all, NULL);
+    ASSERT_NE(atomic_store, NULL);
+    EXPECT_STREQ(regex_find_all->signature, "regex.find_all(pattern: string, input: string) -> array<string>");
+    EXPECT_STREQ(atomic_store->signature, "atomic.store(a: i64, val: i64) -> bool");
+}
+
 TEST(DocRegistryTest, ModuleListUsesCanonicalStdlibSet)
 {
     size_t count = 0U;
@@ -295,5 +306,6 @@ void register_doc_registry_tests(void)
     REGISTER_TEST(DocRegistryTest, DescriptorBackedDocsRenderDerivedSignaturesForRandomAndParse);
     REGISTER_TEST(DocRegistryTest, ReadlineDocsRemainAvailableForDescriptorAndFallbackPaths);
     REGISTER_TEST(DocRegistryTest, DescriptorBackedDocsRenderDerivedSignaturesForUrlYamlCsvAndLog);
+    REGISTER_TEST(DocRegistryTest, DescriptorBackedDocsRenderDerivedSignaturesForRegexAndAtomic);
     REGISTER_TEST(DocRegistryTest, ModuleListUsesCanonicalStdlibSet);
 }

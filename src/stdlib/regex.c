@@ -522,23 +522,67 @@ static const int find_ret[] = {VIGIL_TYPE_STRING, VIGIL_TYPE_BOOL};
 static const int find_all_params[] = {VIGIL_TYPE_STRING, VIGIL_TYPE_STRING};
 static const int replace_params[] = {VIGIL_TYPE_STRING, VIGIL_TYPE_STRING, VIGIL_TYPE_STRING};
 static const int split_params[] = {VIGIL_TYPE_STRING, VIGIL_TYPE_STRING};
+static const char *const regex_pattern_input_param_names[] = {"pattern", "input"};
+static const char *const regex_pattern_input_replacement_param_names[] = {"pattern", "input", "replacement"};
+
+static const vigil_native_symbol_doc_t vigil_regex_module_doc = {
+    "Regular expression matching (RE2-style).",
+    "The regex module provides pattern matching with linear time guarantees using a Thompson NFA implementation without catastrophic backtracking.",
+    NULL,
+};
+
+static const vigil_native_symbol_doc_t vigil_regex_match_doc = {
+    "Check if input matches the pattern (anchored).",
+    "Returns true if the entire input matches the pattern.",
+    "regex.match(\"[a-z]+\", \"hello\")",
+};
+
+static const vigil_native_symbol_doc_t vigil_regex_find_doc = {
+    "Find first match of pattern in input.",
+    "Returns the matched substring and whether a match was found.",
+    "string m, bool ok = regex.find(\"[0-9]+\", \"abc123\")",
+};
+
+static const vigil_native_symbol_doc_t vigil_regex_find_all_doc = {
+    "Find all non-overlapping matches.",
+    "Returns an array of all matched substrings.",
+    "regex.find_all(\"[0-9]+\", \"a1b22c333\")",
+};
+
+static const vigil_native_symbol_doc_t vigil_regex_replace_doc = {
+    "Replace first match with replacement.",
+    "Returns the input with the first match replaced.",
+    "regex.replace(\"[0-9]+\", \"a1b2\", \"X\")",
+};
+
+static const vigil_native_symbol_doc_t vigil_regex_replace_all_doc = {
+    "Replace all matches with replacement.",
+    "Returns the input with all matches replaced.",
+    "regex.replace_all(\"[0-9]+\", \"a1b2\", \"X\")",
+};
+
+static const vigil_native_symbol_doc_t vigil_regex_split_doc = {
+    "Split input by pattern.",
+    "Returns an array of substrings split by the pattern.",
+    "regex.split(\",\", \"a,b,c\")",
+};
 
 static const vigil_native_module_function_t vigil_regex_functions[] = {
-    {"match", 5U, vigil_regex_match_fn, 2U, match_params, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL,
-     NULL, NULL},
-    {"find", 4U, vigil_regex_find_fn, 2U, find_params, VIGIL_TYPE_STRING, 2U, find_ret, 0, NULL, NULL, 0U, NULL, NULL,
-     NULL, NULL},
+    {"match", 5U, vigil_regex_match_fn, 2U, match_params, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U,
+     regex_pattern_input_param_names, NULL, NULL, &vigil_regex_match_doc},
+    {"find", 4U, vigil_regex_find_fn, 2U, find_params, VIGIL_TYPE_STRING, 2U, find_ret, 0, NULL, NULL, 0U,
+     regex_pattern_input_param_names, NULL, NULL, &vigil_regex_find_doc},
     {"find_all", 8U, vigil_regex_find_all_fn, 2U, find_all_params, VIGIL_TYPE_OBJECT, 1U, NULL, VIGIL_TYPE_STRING, NULL,
-     NULL, 0U, NULL, NULL, NULL, NULL},
-    {"replace", 7U, vigil_regex_replace_fn, 3U, replace_params, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U, NULL,
-     NULL, NULL, NULL},
-    {"replace_all", 11U, vigil_regex_replace_all_fn, 3U, replace_params, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U,
-     NULL, NULL, NULL, NULL},
+     NULL, 0U, regex_pattern_input_param_names, NULL, "array<string>", &vigil_regex_find_all_doc},
+    {"replace", 7U, vigil_regex_replace_fn, 3U, replace_params, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U,
+     regex_pattern_input_replacement_param_names, NULL, NULL, &vigil_regex_replace_doc},
+    {"replace_all", 11U, vigil_regex_replace_all_fn, 3U, replace_params, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL,
+     0U, regex_pattern_input_replacement_param_names, NULL, NULL, &vigil_regex_replace_all_doc},
     {"split", 5U, vigil_regex_split_fn, 2U, split_params, VIGIL_TYPE_OBJECT, 1U, NULL, VIGIL_TYPE_STRING, NULL, NULL,
-     0U, NULL, NULL, NULL, NULL},
+     0U, regex_pattern_input_param_names, NULL, "array<string>", &vigil_regex_split_doc},
 };
 
 #define VIGIL_REGEX_FUNCTION_COUNT (sizeof(vigil_regex_functions) / sizeof(vigil_regex_functions[0]))
 
 VIGIL_API const vigil_native_module_t vigil_stdlib_regex = {
-    "regex", 5U, vigil_regex_functions, VIGIL_REGEX_FUNCTION_COUNT, NULL, 0U, NULL};
+    "regex", 5U, vigil_regex_functions, VIGIL_REGEX_FUNCTION_COUNT, NULL, 0U, &vigil_regex_module_doc};
