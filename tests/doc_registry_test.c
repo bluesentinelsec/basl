@@ -376,6 +376,8 @@ TEST(DocRegistryTest, ReadlineDocsRenderWhenModuleIsCompiledIn)
 
     ASSERT_NE(readline_input, NULL);
     EXPECT_STREQ(readline_input->signature, "readline.input(prompt: string) -> string");
+#else
+    (void)vigil_test_failed_;
 #endif
 }
 
@@ -409,13 +411,22 @@ TEST(DocRegistryTest, DescriptorBackedDocsRenderDerivedSignaturesForRegexAndAtom
 
 TEST(DocRegistryTest, DescriptorBackedDocsRenderDerivedSignaturesForNetAndTime)
 {
+#ifdef VIGIL_HAS_STDLIB_NET
     const vigil_doc_entry_t *net_send = vigil_doc_lookup("net.udp_send");
+    ASSERT_NE(net_send, NULL);
+    EXPECT_STREQ(net_send->signature, "net.udp_send(sock: i64, host: string, port: i32, data: string) -> i32");
+#endif
+
+#ifdef VIGIL_HAS_STDLIB_TIME
     const vigil_doc_entry_t *time_date = vigil_doc_lookup("time.date");
 
-    ASSERT_NE(net_send, NULL);
     ASSERT_NE(time_date, NULL);
-    EXPECT_STREQ(net_send->signature, "net.udp_send(sock: i64, host: string, port: i32, data: string) -> i32");
     EXPECT_STREQ(time_date->signature, "time.date(y: i32, m: i32, d: i32, h: i32, min: i32, s: i32) -> i64");
+#endif
+
+#if !defined(VIGIL_HAS_STDLIB_NET) && !defined(VIGIL_HAS_STDLIB_TIME)
+    (void)vigil_test_failed_;
+#endif
 }
 
 TEST(DocRegistryTest, DescriptorBackedDocsRenderDerivedSignaturesForCrypto)
@@ -434,51 +445,75 @@ TEST(DocRegistryTest, DescriptorBackedDocsRenderDerivedSignaturesForCrypto)
 
 TEST(DocRegistryTest, DescriptorBackedDocsRenderDerivedSignaturesForThreadAndCompress)
 {
-    const vigil_doc_entry_t *thread_wait = vigil_doc_lookup("thread.wait_timeout");
     const vigil_doc_entry_t *compress_zip = vigil_doc_lookup("compress.zip_create_level");
 
-    ASSERT_NE(thread_wait, NULL);
     ASSERT_NE(compress_zip, NULL);
-    EXPECT_STREQ(thread_wait->signature, "thread.wait_timeout(c: i64, m: i64, ms: i64) -> bool");
-    EXPECT_STREQ(thread_wait->summary, "Wait on a condition variable with timeout.");
     EXPECT_STREQ(compress_zip->signature,
                  "compress.zip_create_level(names: array<string>, contents: array<string>, level: i32) -> string");
     EXPECT_STREQ(compress_zip->summary, "Create ZIP archive at level.");
+
+#ifdef VIGIL_HAS_STDLIB_THREAD
+    {
+        const vigil_doc_entry_t *thread_wait = vigil_doc_lookup("thread.wait_timeout");
+
+        ASSERT_NE(thread_wait, NULL);
+        EXPECT_STREQ(thread_wait->signature, "thread.wait_timeout(c: i64, m: i64, ms: i64) -> bool");
+        EXPECT_STREQ(thread_wait->summary, "Wait on a condition variable with timeout.");
+    }
+#endif
 }
 
 TEST(DocRegistryTest, DescriptorBackedDocsRenderDerivedSignaturesForFfiAndUnsafe)
 {
-    const vigil_doc_entry_t *ffi_bind = vigil_doc_lookup("ffi.bind");
     const vigil_doc_entry_t *unsafe_copy = vigil_doc_lookup("unsafe.copy");
 
-    ASSERT_NE(ffi_bind, NULL);
     ASSERT_NE(unsafe_copy, NULL);
-    EXPECT_STREQ(ffi_bind->signature, "ffi.bind(lib: i64, name: string, signature: string) -> i64");
-    EXPECT_STREQ(ffi_bind->summary, "Bind a C function by signature.");
     EXPECT_STREQ(unsafe_copy->signature,
                  "unsafe.copy(dst: i64, dst_off: i32, src: i64, src_off: i32, len: i32) -> void");
     EXPECT_STREQ(unsafe_copy->summary, "Copy bytes between buffers.");
+
+#ifdef VIGIL_HAS_STDLIB_FFI
+    {
+        const vigil_doc_entry_t *ffi_bind = vigil_doc_lookup("ffi.bind");
+
+        ASSERT_NE(ffi_bind, NULL);
+        EXPECT_STREQ(ffi_bind->signature, "ffi.bind(lib: i64, name: string, signature: string) -> i64");
+        EXPECT_STREQ(ffi_bind->summary, "Bind a C function by signature.");
+    }
+#endif
 }
 
 TEST(DocRegistryTest, DescriptorBackedDocsRenderDerivedSignaturesForHttpJsonFsAndMath)
 {
-    const vigil_doc_entry_t *http_get = vigil_doc_lookup("http.get");
     const vigil_doc_entry_t *json_parse = vigil_doc_lookup("json.Value.parse");
-    const vigil_doc_entry_t *fs_reader_open = vigil_doc_lookup("fs.Reader.open");
     const vigil_doc_entry_t *math_rotate = vigil_doc_lookup("math.Vec3.rotateByQuaternion");
 
-    ASSERT_NE(http_get, NULL);
     ASSERT_NE(json_parse, NULL);
-    ASSERT_NE(fs_reader_open, NULL);
     ASSERT_NE(math_rotate, NULL);
-    EXPECT_STREQ(http_get->signature, "http.get(url: string) -> (i32, string, string)");
-    EXPECT_STREQ(http_get->summary, "Issue an HTTP GET request.");
     EXPECT_STREQ(json_parse->signature, "json.Value.parse(text: string) -> (json.Value, err)");
     EXPECT_STREQ(json_parse->summary, "Parse JSON text.");
-    EXPECT_STREQ(fs_reader_open->signature, "fs.Reader.open(path: string) -> (fs.Reader, err)");
-    EXPECT_STREQ(fs_reader_open->summary, "Open a file for reading.");
     EXPECT_STREQ(math_rotate->signature, "math.Vec3.rotateByQuaternion(rotation: math.Quaternion) -> math.Vec3");
     EXPECT_STREQ(math_rotate->summary, "Rotate the vector by a quaternion.");
+
+#ifdef VIGIL_HAS_STDLIB_HTTP
+    {
+        const vigil_doc_entry_t *http_get = vigil_doc_lookup("http.get");
+
+        ASSERT_NE(http_get, NULL);
+        EXPECT_STREQ(http_get->signature, "http.get(url: string) -> (i32, string, string)");
+        EXPECT_STREQ(http_get->summary, "Issue an HTTP GET request.");
+    }
+#endif
+
+#ifdef VIGIL_HAS_STDLIB_FS
+    {
+        const vigil_doc_entry_t *fs_reader_open = vigil_doc_lookup("fs.Reader.open");
+
+        ASSERT_NE(fs_reader_open, NULL);
+        EXPECT_STREQ(fs_reader_open->signature, "fs.Reader.open(path: string) -> (fs.Reader, err)");
+        EXPECT_STREQ(fs_reader_open->summary, "Open a file for reading.");
+    }
+#endif
 }
 
 TEST(DocRegistryTest, ModuleListUsesCanonicalStdlibSet)
