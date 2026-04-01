@@ -24,7 +24,6 @@
 
 /* ── crypto Module Docs ───────────────────────────────────── */
 
-
 /* ── Module List ──────────────────────────────────────────── */
 
 typedef struct native_doc_cache
@@ -302,10 +301,9 @@ static char *native_doc_build_function_signature(const vigil_native_module_t *mo
         {
             if (i != 0U)
                 native_doc_buf_append(&buf, ", ");
-            native_doc_append_type_name(
-                &buf, module->name,
-                native_doc_type_spec(function->return_types[i], 0, 0, NULL, NULL,
-                                     i == 0U ? function->doc_return_type_name : NULL));
+            native_doc_append_type_name(&buf, module->name,
+                                        native_doc_type_spec(function->return_types[i], 0, 0, NULL, NULL,
+                                                             i == 0U ? function->doc_return_type_name : NULL));
         }
         native_doc_buf_append_char(&buf, ')');
     }
@@ -355,10 +353,9 @@ static char *native_doc_build_method_signature(const vigil_native_module_t *modu
         {
             if (i != 0U)
                 native_doc_buf_append(&buf, ", ");
-            native_doc_append_type_name(
-                &buf, module->name,
-                native_doc_type_spec(method->return_types[i], 0, 0, NULL, NULL,
-                                     i == 0U ? method->doc_return_type_name : NULL));
+            native_doc_append_type_name(&buf, module->name,
+                                        native_doc_type_spec(method->return_types[i], 0, 0, NULL, NULL,
+                                                             i == 0U ? method->doc_return_type_name : NULL));
         }
         native_doc_buf_append_char(&buf, ')');
     }

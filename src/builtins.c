@@ -14,18 +14,14 @@ static const vigil_doc_entry_t builtin_symbol_docs[] = {
      "err e = err(\"missing config\", 1)"},
     {"i32", "i32(value: integer | f64) -> i32", "Convert an integer or f64 value to i32.", NULL,
      "i32 port = i32(8080)"},
-    {"i64", "i64(value: integer | f64) -> i64", "Convert an integer or f64 value to i64.", NULL,
-     "i64 count = i64(42)"},
-    {"u8", "u8(value: integer | f64) -> u8", "Convert an integer or f64 value to u8.", NULL,
-     "u8 byte = u8(255)"},
-    {"u32", "u32(value: integer | f64) -> u32", "Convert an integer or f64 value to u32.", NULL,
-     "u32 mask = u32(7)"},
+    {"i64", "i64(value: integer | f64) -> i64", "Convert an integer or f64 value to i64.", NULL, "i64 count = i64(42)"},
+    {"u8", "u8(value: integer | f64) -> u8", "Convert an integer or f64 value to u8.", NULL, "u8 byte = u8(255)"},
+    {"u32", "u32(value: integer | f64) -> u32", "Convert an integer or f64 value to u32.", NULL, "u32 mask = u32(7)"},
     {"u64", "u64(value: integer | f64) -> u64", "Convert an integer or f64 value to u64.", NULL,
      "u64 size = u64(4096)"},
     {"f64", "f64(value: string | integer | f64 | bool) -> f64", "Convert a value to f64.", NULL,
      "f64 ratio = f64(\"3.14\")"},
-    {"bool", "bool(value: string | bool) -> bool", "Convert a bool value to bool.", NULL,
-     "bool enabled = bool(true)"},
+    {"bool", "bool(value: string | bool) -> bool", "Convert a bool value to bool.", NULL, "bool enabled = bool(true)"},
     {"string", "string(value: string | integer | f64 | bool) -> string", "Convert a value to string.", NULL,
      "string text = string(42)"},
 };
@@ -44,9 +40,9 @@ static const vigil_builtin_descriptor_t builtin_descriptors_[] = {
     {VIGIL_BUILTIN_STRING, "string", 6U, 1, VIGIL_TYPE_STRING, &builtin_symbol_docs[10]},
 };
 
-static const vigil_doc_entry_t string_method_module_doc = {"strings", NULL, "String methods available on all string values.",
-                                                           "These methods are called on string values using dot notation.",
-                                                           NULL};
+static const vigil_doc_entry_t string_method_module_doc = {
+    "strings", NULL, "String methods available on all string values.",
+    "These methods are called on string values using dot notation.", NULL};
 
 static const vigil_doc_entry_t string_method_docs[] = {
     {"strings.len", "s.len() -> i32", "Return the length of the string in bytes.", NULL, "\"hello\".len()  // 5"},
@@ -99,7 +95,8 @@ static const vigil_doc_entry_t string_method_docs[] = {
     {"strings.count", "s.count(sub: string) -> i32", "Return the number of non-overlapping occurrences of sub in s.",
      NULL, "\"banana\".count(\"a\")  // 3"},
     {"strings.fields", "s.fields() -> array<string>", "Split s on whitespace and return non-empty fields.",
-     "Similar to Go's strings.Fields. Splits on runs of whitespace.", "\"  a  b  c  \".fields()  // [\"a\", \"b\", \"c\"]"},
+     "Similar to Go's strings.Fields. Splits on runs of whitespace.",
+     "\"  a  b  c  \".fields()  // [\"a\", \"b\", \"c\"]"},
     {"strings.join", "sep.join(arr: array<string>) -> string", "Join array elements with sep as separator.",
      "The separator is the receiver, the array is the argument.", "\",\".join([\"a\", \"b\", \"c\"])  // \"a,b,c\""},
     {"strings.cut", "s.cut(sep: string) -> (string, string, bool)", "Cut s around the first instance of sep.",
@@ -141,7 +138,8 @@ static const vigil_string_method_descriptor_t string_method_descriptors_[] = {
 };
 
 static vigil_doc_entry_t builtin_module_entries[1U + sizeof(builtin_descriptors_) / sizeof(builtin_descriptors_[0])];
-static vigil_doc_entry_t string_method_module_entries[1U + sizeof(string_method_descriptors_) / sizeof(string_method_descriptors_[0])];
+static vigil_doc_entry_t
+    string_method_module_entries[1U + sizeof(string_method_descriptors_) / sizeof(string_method_descriptors_[0])];
 static int builtin_module_entries_ready = 0;
 static int string_method_module_entries_ready = 0;
 

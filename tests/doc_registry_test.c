@@ -455,7 +455,8 @@ TEST(DocRegistryTest, DescriptorBackedDocsRenderDerivedSignaturesForFfiAndUnsafe
     ASSERT_NE(unsafe_copy, NULL);
     EXPECT_STREQ(ffi_bind->signature, "ffi.bind(lib: i64, name: string, signature: string) -> i64");
     EXPECT_STREQ(ffi_bind->summary, "Bind a C function by signature.");
-    EXPECT_STREQ(unsafe_copy->signature, "unsafe.copy(dst: i64, dst_off: i32, src: i64, src_off: i32, len: i32) -> void");
+    EXPECT_STREQ(unsafe_copy->signature,
+                 "unsafe.copy(dst: i64, dst_off: i32, src: i64, src_off: i32, len: i32) -> void");
     EXPECT_STREQ(unsafe_copy->summary, "Copy bytes between buffers.");
 }
 
