@@ -10,6 +10,8 @@
 #include "vigil/stdlib.h"
 #include "vigil/type.h"
 
+#include "plugin_registry.h"
+
 /* ── regex Module Docs ────────────────────────────────────── */
 
 /* ── random Module Docs ───────────────────────────────────── */
@@ -78,6 +80,11 @@ static int native_doc_module_has_docs(const vigil_native_module_t *module)
         }
     }
     return 0;
+}
+
+static int native_doc_module_has_any_symbols(const vigil_native_module_t *module)
+{
+    return module != NULL && (module->function_count > 0U || module->class_count > 0U);
 }
 
 static void native_doc_buf_init(native_doc_buf_t *buf)
@@ -409,22 +416,37 @@ static const vigil_native_module_t *native_doc_find_stdlib_module(const char *na
     return NULL;
 }
 
+static const vigil_native_module_t *native_doc_find_plugin_module(const char *name)
+{
+    vigil_plugin_entry_t mods[1U + VIGIL_PLUGIN_COUNT];
+    size_t i;
+
+    if (name == NULL)
+        return NULL;
+
+    vigil_plugin_fill_table_(mods);
+    for (i = 0U; i < VIGIL_PLUGIN_COUNT; i++)
+    {
+        if (mods[i].module != NULL && strcmp(mods[i].name, name) == 0)
+            return mods[i].module;
+    }
+    return NULL;
+}
+
 static size_t native_doc_count_class_entries(const vigil_native_class_t *klass)
 {
     size_t count = 0U;
     size_t i;
 
-    if (klass->doc != NULL)
+    if (klass->doc != NULL || klass->field_count > 0U || klass->method_count > 0U)
         count += 1U;
     for (i = 0U; i < klass->field_count; i++)
     {
-        if (klass->fields[i].doc != NULL)
-            count += 1U;
+        count += 1U;
     }
     for (i = 0U; i < klass->method_count; i++)
     {
-        if (klass->methods[i].doc != NULL)
-            count += 1U;
+        count += 1U;
     }
     return count;
 }
@@ -435,10 +457,7 @@ static size_t native_doc_count_module_entries(const vigil_native_module_t *modul
     size_t i;
 
     for (i = 0U; i < module->function_count; i++)
-    {
-        if (module->functions[i].doc != NULL)
-            count += 1U;
-    }
+        count += 1U;
     for (i = 0U; i < module->class_count; i++)
         count += native_doc_count_class_entries(&module->classes[i]);
     return count;
@@ -449,39 +468,35 @@ static void native_doc_fill_class_entries(native_doc_cache_t *cache, size_t *ind
 {
     size_t i;
 
-    if (klass->doc != NULL)
+    if (klass->doc != NULL || klass->field_count > 0U || klass->method_count > 0U)
     {
         cache->entries[*index].name = native_doc_printf("%s.%s", module->name, klass->name);
         cache->entries[*index].signature = native_doc_build_class_signature(module, klass);
-        cache->entries[*index].summary = klass->doc->summary;
-        cache->entries[*index].description = klass->doc->description;
-        cache->entries[*index].example = klass->doc->example;
+        cache->entries[*index].summary = klass->doc != NULL ? klass->doc->summary : NULL;
+        cache->entries[*index].description = klass->doc != NULL ? klass->doc->description : NULL;
+        cache->entries[*index].example = klass->doc != NULL ? klass->doc->example : NULL;
         *index += 1U;
     }
 
     for (i = 0U; i < klass->field_count; i++)
     {
         const vigil_native_class_field_t *field = &klass->fields[i];
-        if (field->doc == NULL)
-            continue;
         cache->entries[*index].name = native_doc_printf("%s.%s.%s", module->name, klass->name, field->name);
         cache->entries[*index].signature = native_doc_build_field_signature(module, klass, field);
-        cache->entries[*index].summary = field->doc->summary;
-        cache->entries[*index].description = field->doc->description;
-        cache->entries[*index].example = field->doc->example;
+        cache->entries[*index].summary = field->doc != NULL ? field->doc->summary : NULL;
+        cache->entries[*index].description = field->doc != NULL ? field->doc->description : NULL;
+        cache->entries[*index].example = field->doc != NULL ? field->doc->example : NULL;
         *index += 1U;
     }
 
     for (i = 0U; i < klass->method_count; i++)
     {
         const vigil_native_class_method_t *method = &klass->methods[i];
-        if (method->doc == NULL)
-            continue;
         cache->entries[*index].name = native_doc_printf("%s.%s.%s", module->name, klass->name, method->name);
         cache->entries[*index].signature = native_doc_build_method_signature(module, klass, method);
-        cache->entries[*index].summary = method->doc->summary;
-        cache->entries[*index].description = method->doc->description;
-        cache->entries[*index].example = method->doc->example;
+        cache->entries[*index].summary = method->doc != NULL ? method->doc->summary : NULL;
+        cache->entries[*index].description = method->doc != NULL ? method->doc->description : NULL;
+        cache->entries[*index].example = method->doc != NULL ? method->doc->example : NULL;
         *index += 1U;
     }
 }
@@ -493,7 +508,8 @@ static native_doc_cache_t *native_doc_build_module_cache(const vigil_native_modu
     size_t i;
     size_t index = 0U;
 
-    if (module == NULL || !native_doc_module_has_docs(module) || native_doc_cache_count >= 32U)
+    if (module == NULL || (!native_doc_module_has_docs(module) && !native_doc_module_has_any_symbols(module)) ||
+        native_doc_cache_count >= 32U)
         return NULL;
 
     count = native_doc_count_module_entries(module);
@@ -519,13 +535,11 @@ static native_doc_cache_t *native_doc_build_module_cache(const vigil_native_modu
     for (i = 0U; i < module->function_count; i++)
     {
         const vigil_native_module_function_t *function = &module->functions[i];
-        if (function->doc == NULL)
-            continue;
         cache->entries[index].name = native_doc_printf("%s.%s", module->name, function->name);
         cache->entries[index].signature = native_doc_build_function_signature(module, function);
-        cache->entries[index].summary = function->doc->summary;
-        cache->entries[index].description = function->doc->description;
-        cache->entries[index].example = function->doc->example;
+        cache->entries[index].summary = function->doc != NULL ? function->doc->summary : NULL;
+        cache->entries[index].description = function->doc != NULL ? function->doc->description : NULL;
+        cache->entries[index].example = function->doc != NULL ? function->doc->example : NULL;
         index += 1U;
     }
 
@@ -551,6 +565,8 @@ static native_doc_cache_t *native_doc_get_module_cache(const char *module_name)
     }
 
     module = native_doc_find_stdlib_module(module_name);
+    if (module == NULL)
+        module = native_doc_find_plugin_module(module_name);
     if (module == NULL)
         return NULL;
     return native_doc_build_module_cache(module);
@@ -594,6 +610,7 @@ static const vigil_doc_entry_t *native_doc_lookup_entry(const char *name)
 static void native_doc_init_module_names(void)
 {
     VIGIL_STDLIB_MODULE_TABLE(mods);
+    vigil_plugin_entry_t plugin_mods[1U + VIGIL_PLUGIN_COUNT];
     size_t i;
 
     if (generated_module_names_ready)
@@ -605,6 +622,12 @@ static void native_doc_init_module_names(void)
     {
         if (mods[i].module != NULL)
             generated_module_names[generated_module_name_count++] = mods[i].name;
+    }
+    vigil_plugin_fill_table_(plugin_mods);
+    for (i = 0U; i < VIGIL_PLUGIN_COUNT; i++)
+    {
+        if (plugin_mods[i].module != NULL)
+            generated_module_names[generated_module_name_count++] = plugin_mods[i].name;
     }
     generated_module_names_ready = 1;
 }

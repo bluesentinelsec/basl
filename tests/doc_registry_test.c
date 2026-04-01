@@ -3,6 +3,8 @@
 #include "vigil/stdlib.h"
 #include "vigil_test.h"
 
+#include "plugin_registry.h"
+
 #include <stdio.h>
 #include <string.h>
 
@@ -542,8 +544,28 @@ TEST(DocRegistryTest, ModuleListUsesCanonicalStdlibSet)
     EXPECT_TRUE(module_name_in_list("builtins", modules, count));
     EXPECT_TRUE(module_name_in_list("fmt", modules, count));
     EXPECT_TRUE(module_name_in_list("args", modules, count));
+    EXPECT_TRUE(module_name_in_list("test_plugin", modules, count));
     EXPECT_FALSE(module_name_in_list("strings", modules, count));
-    EXPECT_FALSE(module_name_in_list("sdl", modules, count));
+    EXPECT_EQ(module_name_in_list("sdl", modules, count), vigil_plugin_is_known_module("sdl", 3U));
+}
+
+TEST(DocRegistryTest, LinkedPluginModulesRenderDerivedDocs)
+{
+    const vigil_doc_entry_t *module_entry = vigil_doc_lookup("test_plugin");
+    const vigil_doc_entry_t *symbol_entry = vigil_doc_lookup("test_plugin.add");
+    size_t count = 0U;
+    const vigil_doc_entry_t *entries = vigil_doc_list_module("test_plugin", &count);
+
+    ASSERT_NE(module_entry, NULL);
+    EXPECT_STREQ(module_entry->name, "test_plugin");
+    EXPECT_EQ(module_entry->signature, NULL);
+
+    ASSERT_NE(symbol_entry, NULL);
+    EXPECT_STREQ(symbol_entry->signature, "test_plugin.add(i32, i32) -> i32");
+    EXPECT_EQ(symbol_entry->summary, NULL);
+
+    ASSERT_NE(entries, NULL);
+    EXPECT_GT(count, 1U);
 }
 
 void register_doc_registry_tests(void)
@@ -571,4 +593,5 @@ void register_doc_registry_tests(void)
     REGISTER_TEST(DocRegistryTest, DescriptorBackedDocsRenderDerivedSignaturesForFfiAndUnsafe);
     REGISTER_TEST(DocRegistryTest, DescriptorBackedDocsRenderDerivedSignaturesForHttpJsonFsAndMath);
     REGISTER_TEST(DocRegistryTest, ModuleListUsesCanonicalStdlibSet);
+    REGISTER_TEST(DocRegistryTest, LinkedPluginModulesRenderDerivedDocs);
 }
