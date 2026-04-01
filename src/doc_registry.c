@@ -362,55 +362,6 @@ static const vigil_doc_entry_t regex_docs[] = {
 
 /* ── url Module Docs ──────────────────────────────────────── */
 
-static const vigil_doc_entry_t url_docs[] = {
-    {"url", NULL, "URL parsing and manipulation.",
-     "The url module provides functions for parsing and manipulating URLs\n"
-     "according to RFC 3986.",
-     NULL},
-    {"url.parse", "url.parse(url: string) -> string", "Parse a URL into components.",
-     "Returns components as pipe-separated string:\n"
-     "scheme|user|pass|host|port|path|query|fragment",
-     "url.parse(\"https://user:pass@example.com:8080/path?q=1#frag\")"},
-    {"url.scheme", "url.scheme(url: string) -> string", "Get the scheme (protocol) from a URL.",
-     "Returns the scheme component (e.g. \"https\", \"http\").", "url.scheme(\"https://example.com\")  // \"https\""},
-    {"url.host", "url.host(url: string) -> string", "Get the hostname from a URL.",
-     "Returns the host component without port.", "url.host(\"https://example.com:8080/path\")  // \"example.com\""},
-    {"url.port", "url.port(url: string) -> string", "Get the port from a URL.",
-     "Returns the port as a string, or empty if not specified.", "url.port(\"https://example.com:8080\")  // \"8080\""},
-    {"url.path", "url.path(url: string) -> string", "Get the path from a URL.", "Returns the decoded path component.",
-     "url.path(\"https://example.com/foo/bar\")  // \"/foo/bar\""},
-    {"url.query", "url.query(url: string) -> string", "Get the query string from a URL.",
-     "Returns the raw query string without the leading '?'.",
-     "url.query(\"https://example.com?a=1&b=2\")  // \"a=1&b=2\""},
-    {"url.fragment", "url.fragment(url: string) -> string", "Get the fragment from a URL.",
-     "Returns the decoded fragment without the leading '#'.",
-     "url.fragment(\"https://example.com#section\")  // \"section\""},
-    {"url.encode", "url.encode(s: string) -> string", "Percent-encode a string for use in URLs.",
-     "Encodes special characters as %XX sequences.", "url.encode(\"hello world\")  // \"hello+world\""},
-    {"url.decode", "url.decode(s: string) -> string", "Decode a percent-encoded string.",
-     "Decodes %XX sequences and '+' to space.", "url.decode(\"hello%20world\")  // \"hello world\""},
-};
-
-#define URL_COUNT (sizeof(url_docs) / sizeof(url_docs[0]))
-
-/* ── yaml module ──────────────────────────────────────────── */
-
-static const vigil_doc_entry_t yaml_docs[] = {
-    {"yaml", NULL, "YAML parsing.",
-     "The yaml module parses a subset of YAML 1.2 covering most real-world usage:\n"
-     "scalars, block mappings, block sequences, comments, and quoted strings.",
-     NULL},
-    {"yaml.parse", "yaml.parse(yaml: string) -> string", "Parse YAML string to JSON.",
-     "Parses a YAML document and returns it as a JSON string.",
-     "yaml.parse(\"name: test\\ncount: 42\")  // {\"name\":\"test\",\"count\":42}"},
-    {"yaml.get", "yaml.get(yaml: string, path: string) -> string", "Get value at path from YAML.",
-     "Parses YAML and returns the value at the given path. "
-     "Use dot notation for objects and [n] for arrays.",
-     "yaml.get(\"items:\\n  - a\\n  - b\", \"items[1]\")  // \"b\""},
-};
-
-#define YAML_COUNT (sizeof(yaml_docs) / sizeof(yaml_docs[0]))
-
 /* ── json module ──────────────────────────────────────────── */
 
 static const vigil_doc_entry_t json_docs[] = {
@@ -602,42 +553,6 @@ static const vigil_doc_entry_t fs_docs[] = {
 
 /* ── log module ───────────────────────────────────────────── */
 
-static const vigil_doc_entry_t log_docs[] = {
-    {"log", NULL, "Structured logging with levels and formats.",
-     "The log module provides structured logging similar to Go's slog package.\n"
-     "Supports debug/info/warn/error levels, text/JSON output formats,\n"
-     "and custom log handlers for embedders.",
-     NULL},
-    {"log.debug", "log.debug(msg: string) -> void", "Log at DEBUG level.", "Logs message to configured output.",
-     "log.debug(\"starting parser\")"},
-    {"log.info", "log.info(msg: string) -> void", "Log at INFO level.", "Logs message to configured output.",
-     "log.info(\"request received\")"},
-    {"log.warn", "log.warn(msg: string) -> void", "Log at WARN level.", "Logs message to configured output.",
-     "log.warn(\"slow query detected\")"},
-    {"log.error", "log.error(msg: string) -> void", "Log at ERROR level.", "Logs message to configured output.",
-     "log.error(\"connection failed\")"},
-    {"log.debug_l", "log.debug_l(logger: i64, msg: string) -> void", "Log at DEBUG with logger.",
-     "Uses preset attributes from logger handle.", "log.debug_l(logger, \"msg\")"},
-    {"log.info_l", "log.info_l(logger: i64, msg: string) -> void", "Log at INFO with logger.",
-     "Uses preset attributes from logger handle.", "log.info_l(logger, \"msg\")"},
-    {"log.warn_l", "log.warn_l(logger: i64, msg: string) -> void", "Log at WARN with logger.",
-     "Uses preset attributes from logger handle.", "log.warn_l(logger, \"msg\")"},
-    {"log.error_l", "log.error_l(logger: i64, msg: string) -> void", "Log at ERROR with logger.",
-     "Uses preset attributes from logger handle.", "log.error_l(logger, \"msg\")"},
-    {"log.set_level", "log.set_level(level: string) -> void", "Set minimum log level.",
-     "Levels: \"debug\", \"info\", \"warn\", \"error\". Default is \"info\".", "log.set_level(\"debug\")"},
-    {"log.set_format", "log.set_format(format: string) -> void", "Set output format.",
-     "Formats: \"text\" (default), \"json\".", "log.set_format(\"json\")"},
-    {"log.set_output", "log.set_output(dest: string) -> void", "Set output destination.",
-     "Values: \"stdout\", \"stderr\" (default), or file path.", "log.set_output(\"/var/log/app.log\")"},
-    {"log.set_time_format", "log.set_time_format(format: string) -> void", "Set timestamp format.",
-     "Formats: \"rfc3339\" (default), \"unix\", \"none\".", "log.set_time_format(\"unix\")"},
-    {"log.with", "log.with(key: string, value: string) -> i64", "Create logger with preset attribute.",
-     "Returns logger handle for use with _l functions.", "i64 logger = log.with(\"service\", \"api\")"},
-};
-
-#define LOG_COUNT (sizeof(log_docs) / sizeof(log_docs[0]))
-
 /* ── thread module ────────────────────────────────────────── */
 
 static const vigil_doc_entry_t thread_docs[] = {
@@ -802,23 +717,6 @@ static const vigil_doc_entry_t compress_docs[] = {
 #define COMPRESS_COUNT (sizeof(compress_docs) / sizeof(compress_docs[0]))
 
 /* ── csv Module Docs ──────────────────────────────────────── */
-
-static const vigil_doc_entry_t csv_docs[] = {
-    {"csv", NULL, "CSV parsing and generation.",
-     "The csv module provides RFC 4180 compliant CSV parsing and generation.\n"
-     "Handles quoted fields, escaped quotes, and CRLF line endings.",
-     NULL},
-    {"csv.parse", "csv.parse(data: string) -> array<array<string>>", "Parse CSV to 2D array.",
-     "Parses CSV data into array of rows, each row an array of fields.", "array<array<string>> rows = csv.parse(data)"},
-    {"csv.parse_row", "csv.parse_row(line: string) -> array<string>", "Parse single CSV row.",
-     "Parses one line of CSV into array of fields.", "array<string> fields = csv.parse_row(line)"},
-    {"csv.stringify", "csv.stringify(rows: array<array<string>>) -> string", "Convert 2D array to CSV.",
-     "Generates RFC 4180 CSV with CRLF line endings.", "string csv = csv.stringify(rows)"},
-    {"csv.stringify_row", "csv.stringify_row(row: array<string>) -> string", "Convert row to CSV line.",
-     "Generates single CSV line without trailing newline.", "string line = csv.stringify_row(row)"},
-};
-
-#define CSV_COUNT (sizeof(csv_docs) / sizeof(csv_docs[0]))
 
 /* ── net Module Docs ──────────────────────────────────────── */
 
@@ -2422,18 +2320,14 @@ static const doc_module_table_entry_t doc_module_table[] = {
     {"math", math_docs, MATH_COUNT},
     {"strings", strings_docs, STRINGS_COUNT},
     {"regex", regex_docs, REGEX_COUNT},
-    {"url", url_docs, URL_COUNT},
-    {"yaml", yaml_docs, YAML_COUNT},
     {"json", json_docs, JSON_COUNT},
     {"fs", fs_docs, FS_COUNT},
-    {"log", log_docs, LOG_COUNT},
     {"thread", thread_docs, THREAD_COUNT},
     {"atomic", atomic_docs, ATOMIC_COUNT},
     {"compress", compress_docs, COMPRESS_COUNT},
     {"crypto", crypto_docs, CRYPTO_COUNT},
     {"http", http_docs, HTTP_COUNT},
     {"readline", readline_docs, READLINE_COUNT},
-    {"csv", csv_docs, CSV_COUNT},
     {"net", net_docs, NET_COUNT},
     {"time", time_docs, TIME_COUNT},
     {"ffi", ffi_docs, FFI_COUNT},

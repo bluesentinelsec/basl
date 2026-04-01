@@ -251,6 +251,23 @@ TEST(DocRegistryTest, ReadlineDocsRemainAvailableForDescriptorAndFallbackPaths)
     EXPECT_STREQ(readline_input->signature, "readline.input(prompt: string) -> string");
 }
 
+TEST(DocRegistryTest, DescriptorBackedDocsRenderDerivedSignaturesForUrlYamlCsvAndLog)
+{
+    const vigil_doc_entry_t *url_scheme = vigil_doc_lookup("url.scheme");
+    const vigil_doc_entry_t *yaml_get = vigil_doc_lookup("yaml.get");
+    const vigil_doc_entry_t *csv_parse = vigil_doc_lookup("csv.parse");
+    const vigil_doc_entry_t *log_set_level = vigil_doc_lookup("log.set_level");
+
+    ASSERT_NE(url_scheme, NULL);
+    ASSERT_NE(yaml_get, NULL);
+    ASSERT_NE(csv_parse, NULL);
+    ASSERT_NE(log_set_level, NULL);
+    EXPECT_STREQ(url_scheme->signature, "url.scheme(url: string) -> string");
+    EXPECT_STREQ(yaml_get->signature, "yaml.get(yaml: string, path: string) -> string");
+    EXPECT_STREQ(csv_parse->signature, "csv.parse(data: string) -> array<array<string>>");
+    EXPECT_STREQ(log_set_level->signature, "log.set_level(level: string) -> void");
+}
+
 TEST(DocRegistryTest, ModuleListUsesCanonicalStdlibSet)
 {
     size_t count = 0U;
@@ -277,5 +294,6 @@ void register_doc_registry_tests(void)
     REGISTER_TEST(DocRegistryTest, DescriptorBackedDocsRenderDerivedSignaturesForFmtArgsAndTest);
     REGISTER_TEST(DocRegistryTest, DescriptorBackedDocsRenderDerivedSignaturesForRandomAndParse);
     REGISTER_TEST(DocRegistryTest, ReadlineDocsRemainAvailableForDescriptorAndFallbackPaths);
+    REGISTER_TEST(DocRegistryTest, DescriptorBackedDocsRenderDerivedSignaturesForUrlYamlCsvAndLog);
     REGISTER_TEST(DocRegistryTest, ModuleListUsesCanonicalStdlibSet);
 }

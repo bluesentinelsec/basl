@@ -214,15 +214,35 @@ static vigil_status_t vigil_yaml_get_fn(vigil_vm_t *vm, size_t arg_count, vigil_
 
 static const int str_param[] = {VIGIL_TYPE_STRING};
 static const int str_str_params[] = {VIGIL_TYPE_STRING, VIGIL_TYPE_STRING};
+static const char *const yaml_value_param_names[] = {"yaml"};
+static const char *const yaml_get_param_names[] = {"yaml", "path"};
+
+static const vigil_native_symbol_doc_t vigil_yaml_module_doc = {
+    "YAML parsing.",
+    "The yaml module parses a subset of YAML 1.2 covering scalars, block mappings, block sequences, comments, and quoted strings.",
+    NULL,
+};
+
+static const vigil_native_symbol_doc_t vigil_yaml_parse_doc = {
+    "Parse YAML string to JSON.",
+    "Parses a YAML document and returns it as a JSON string.",
+    "yaml.parse(\"name: test\\ncount: 42\")",
+};
+
+static const vigil_native_symbol_doc_t vigil_yaml_get_doc = {
+    "Get value at path from YAML.",
+    "Parses YAML and returns the value at the given path. Use dot notation for objects and [n] for arrays.",
+    "yaml.get(\"items:\\n  - a\\n  - b\", \"items[1]\")",
+};
 
 static const vigil_native_module_function_t vigil_yaml_functions[] = {
-    {"parse", 5U, vigil_yaml_parse_fn, 1U, str_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL,
-     NULL},
-    {"get", 3U, vigil_yaml_get_fn, 2U, str_str_params, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL,
-     NULL},
+    {"parse", 5U, vigil_yaml_parse_fn, 1U, str_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U,
+     yaml_value_param_names, NULL, NULL, &vigil_yaml_parse_doc},
+    {"get", 3U, vigil_yaml_get_fn, 2U, str_str_params, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U,
+     yaml_get_param_names, NULL, NULL, &vigil_yaml_get_doc},
 };
 
 #define YAML_FUNCTION_COUNT (sizeof(vigil_yaml_functions) / sizeof(vigil_yaml_functions[0]))
 
 VIGIL_API const vigil_native_module_t vigil_stdlib_yaml = {"yaml", 4U,  vigil_yaml_functions, YAML_FUNCTION_COUNT, NULL,
-                                                           0U,     NULL};
+                                                           0U,     &vigil_yaml_module_doc};

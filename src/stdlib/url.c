@@ -314,29 +314,91 @@ static vigil_status_t vigil_url_decode_fn(vigil_vm_t *vm, size_t arg_count, vigi
 /* ── Module definition ───────────────────────────────────────────── */
 
 static const int str_param[] = {VIGIL_TYPE_STRING};
+static const char *const url_value_param_names[] = {"url"};
+static const char *const url_string_param_names[] = {"s"};
+
+static const vigil_native_symbol_doc_t vigil_url_module_doc = {
+    "URL parsing and manipulation.",
+    "The url module provides functions for parsing and manipulating URLs according to RFC 3986.",
+    NULL,
+};
+
+static const vigil_native_symbol_doc_t vigil_url_parse_doc = {
+    "Parse a URL into components.",
+    "Returns components as pipe-separated string: scheme|user|pass|host|port|path|query|fragment.",
+    "url.parse(\"https://user:pass@example.com:8080/path?q=1#frag\")",
+};
+
+static const vigil_native_symbol_doc_t vigil_url_scheme_doc = {
+    "Get the scheme (protocol) from a URL.",
+    "Returns the scheme component such as \"https\" or \"http\".",
+    "url.scheme(\"https://example.com\")",
+};
+
+static const vigil_native_symbol_doc_t vigil_url_host_doc = {
+    "Get the hostname from a URL.",
+    "Returns the host component without the port.",
+    "url.host(\"https://example.com:8080/path\")",
+};
+
+static const vigil_native_symbol_doc_t vigil_url_port_doc = {
+    "Get the port from a URL.",
+    "Returns the port as a string, or an empty string if not specified.",
+    "url.port(\"https://example.com:8080\")",
+};
+
+static const vigil_native_symbol_doc_t vigil_url_path_doc = {
+    "Get the path from a URL.",
+    "Returns the decoded path component.",
+    "url.path(\"https://example.com/foo/bar\")",
+};
+
+static const vigil_native_symbol_doc_t vigil_url_query_doc = {
+    "Get the query string from a URL.",
+    "Returns the raw query string without the leading '?'.",
+    "url.query(\"https://example.com?a=1&b=2\")",
+};
+
+static const vigil_native_symbol_doc_t vigil_url_fragment_doc = {
+    "Get the fragment from a URL.",
+    "Returns the decoded fragment without the leading '#'.",
+    "url.fragment(\"https://example.com#section\")",
+};
+
+static const vigil_native_symbol_doc_t vigil_url_encode_doc = {
+    "Percent-encode a string for use in URLs.",
+    "Encodes special characters as %XX sequences.",
+    "url.encode(\"hello world\")",
+};
+
+static const vigil_native_symbol_doc_t vigil_url_decode_doc = {
+    "Decode a percent-encoded string.",
+    "Decodes %XX sequences and '+' to space.",
+    "url.decode(\"hello%20world\")",
+};
 
 static const vigil_native_module_function_t vigil_url_functions[] = {
-    {"parse", 5U, vigil_url_parse_fn, 1U, str_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL,
-     NULL},
-    {"scheme", 6U, vigil_url_scheme_fn, 1U, str_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL,
-     NULL},
-    {"host", 4U, vigil_url_host_fn, 1U, str_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL,
-     NULL},
-    {"port", 4U, vigil_url_port_fn, 1U, str_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL,
-     NULL},
-    {"path", 4U, vigil_url_path_fn, 1U, str_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL,
-     NULL},
-    {"query", 5U, vigil_url_query_fn, 1U, str_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL,
-     NULL},
-    {"fragment", 8U, vigil_url_fragment_fn, 1U, str_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL,
-     NULL, NULL},
-    {"encode", 6U, vigil_url_encode_fn, 1U, str_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL,
-     NULL},
-    {"decode", 6U, vigil_url_decode_fn, 1U, str_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL,
-     NULL},
+    {"parse", 5U, vigil_url_parse_fn, 1U, str_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U,
+     url_value_param_names, NULL, NULL, &vigil_url_parse_doc},
+    {"scheme", 6U, vigil_url_scheme_fn, 1U, str_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U,
+     url_value_param_names, NULL, NULL, &vigil_url_scheme_doc},
+    {"host", 4U, vigil_url_host_fn, 1U, str_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U,
+     url_value_param_names, NULL, NULL, &vigil_url_host_doc},
+    {"port", 4U, vigil_url_port_fn, 1U, str_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U,
+     url_value_param_names, NULL, NULL, &vigil_url_port_doc},
+    {"path", 4U, vigil_url_path_fn, 1U, str_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U,
+     url_value_param_names, NULL, NULL, &vigil_url_path_doc},
+    {"query", 5U, vigil_url_query_fn, 1U, str_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U,
+     url_value_param_names, NULL, NULL, &vigil_url_query_doc},
+    {"fragment", 8U, vigil_url_fragment_fn, 1U, str_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U,
+     url_value_param_names, NULL, NULL, &vigil_url_fragment_doc},
+    {"encode", 6U, vigil_url_encode_fn, 1U, str_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U,
+     url_string_param_names, NULL, NULL, &vigil_url_encode_doc},
+    {"decode", 6U, vigil_url_decode_fn, 1U, str_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U,
+     url_string_param_names, NULL, NULL, &vigil_url_decode_doc},
 };
 
 #define URL_FUNCTION_COUNT (sizeof(vigil_url_functions) / sizeof(vigil_url_functions[0]))
 
 VIGIL_API const vigil_native_module_t vigil_stdlib_url = {"url", 3U,  vigil_url_functions, URL_FUNCTION_COUNT, NULL,
-                                                          0U,    NULL};
+                                                          0U,    &vigil_url_module_doc};
