@@ -526,14 +526,14 @@ static const vigil_native_type_t array_array_string_param = VIGIL_NATIVE_TYPE_AR
 static const vigil_native_type_t array_string_param = VIGIL_NATIVE_TYPE_ARRAY(VIGIL_TYPE_STRING);
 
 static const vigil_native_module_function_t csv_functions[] = {
-    {"parse", 5U, csv_parse, 1U, str_param, VIGIL_TYPE_OBJECT, 1U, NULL, 0, NULL, &array_array_string_ret, 0U},
-    {"parse_row", 9U, csv_parse_row, 1U, str_param, VIGIL_TYPE_OBJECT, 1U, NULL, 0, NULL, &array_string_ret, 0U},
+    {"parse", 5U, csv_parse, 1U, str_param, VIGIL_TYPE_OBJECT, 1U, NULL, 0, NULL, &array_array_string_ret, 0U, NULL, NULL, NULL, NULL},
+    {"parse_row", 9U, csv_parse_row, 1U, str_param, VIGIL_TYPE_OBJECT, 1U, NULL, 0, NULL, &array_string_ret, 0U, NULL, NULL, NULL, NULL},
     {"stringify", 9U, csv_stringify, 1U, arr_param, VIGIL_TYPE_STRING, 1U, NULL, 0, &array_array_string_param, NULL,
-     0U},
+     0U, NULL, NULL, NULL, NULL},
     {"stringify_row", 13U, csv_stringify_row, 1U, arr_param, VIGIL_TYPE_STRING, 1U, NULL, 0, &array_string_param, NULL,
-     0U},
+     0U, NULL, NULL, NULL, NULL},
 };
 
 #define CSV_FUNCTION_COUNT (sizeof(csv_functions) / sizeof(csv_functions[0]))
 
-VIGIL_API const vigil_native_module_t vigil_stdlib_csv = {"csv", 3U, csv_functions, CSV_FUNCTION_COUNT, NULL, 0U};
+VIGIL_API const vigil_native_module_t vigil_stdlib_csv = {"csv", 3U, csv_functions, CSV_FUNCTION_COUNT, NULL, 0U, NULL};

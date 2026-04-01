@@ -88,12 +88,14 @@ static const int vigil_test_assert_params[] = {VIGIL_TYPE_BOOL, VIGIL_TYPE_STRIN
 static const int vigil_test_fail_params[] = {VIGIL_TYPE_STRING};
 
 static const vigil_native_class_method_t vigil_test_t_methods[] = {
-    {"assert", 6U, vigil_test_assert, 2U, vigil_test_assert_params, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, 0U, 0},
-    {"fail", 4U, vigil_test_fail, 1U, vigil_test_fail_params, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, 0U, 0},
+    {"assert", 6U, vigil_test_assert, 2U, vigil_test_assert_params, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, 0U, 0,
+     NULL, NULL, NULL, NULL},
+    {"fail", 4U, vigil_test_fail, 1U, vigil_test_fail_params, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, 0U, 0, NULL, NULL,
+     NULL, NULL},
 };
 
 static const vigil_native_class_t vigil_test_classes[] = {
-    {"T", 1U, NULL, 0U, vigil_test_t_methods, 2U, NULL},
+    {"T", 1U, NULL, 0U, vigil_test_t_methods, 2U, NULL, NULL},
 };
 
-VIGIL_API const vigil_native_module_t vigil_stdlib_test = {"test", 4U, NULL, 0U, vigil_test_classes, 1U};
+VIGIL_API const vigil_native_module_t vigil_stdlib_test = {"test", 4U, NULL, 0U, vigil_test_classes, 1U, NULL};

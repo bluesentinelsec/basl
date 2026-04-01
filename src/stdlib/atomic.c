@@ -306,20 +306,20 @@ static const int i64_i64_param[] = {VIGIL_TYPE_I64, VIGIL_TYPE_I64};
 static const int i64_i64_i64_param[] = {VIGIL_TYPE_I64, VIGIL_TYPE_I64, VIGIL_TYPE_I64};
 
 static const vigil_native_module_function_t atomic_funcs[] = {
-    {"new", 3U, atomic_new, 1U, i64_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U},
-    {"load", 4U, atomic_load_fn, 1U, i64_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U},
-    {"store", 5U, atomic_store_fn, 2U, i64_i64_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U},
-    {"add", 3U, atomic_add_fn, 2U, i64_i64_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U},
-    {"sub", 3U, atomic_sub_fn, 2U, i64_i64_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U},
-    {"cas", 3U, atomic_cas_fn, 3U, i64_i64_i64_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U},
-    {"exchange", 8U, atomic_exchange_fn, 2U, i64_i64_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U},
-    {"fetch_or", 8U, atomic_fetch_or_fn, 2U, i64_i64_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U},
-    {"fetch_and", 9U, atomic_fetch_and_fn, 2U, i64_i64_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U},
-    {"fetch_xor", 9U, atomic_fetch_xor_fn, 2U, i64_i64_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U},
-    {"inc", 3U, atomic_inc_fn, 1U, i64_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U},
-    {"dec", 3U, atomic_dec_fn, 1U, i64_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U},
-    {"fence", 5U, atomic_fence_fn, 0U, NULL, VIGIL_TYPE_VOID, 1U, NULL, 0, NULL, NULL, 0U},
+    {"new", 3U, atomic_new, 1U, i64_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
+    {"load", 4U, atomic_load_fn, 1U, i64_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
+    {"store", 5U, atomic_store_fn, 2U, i64_i64_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
+    {"add", 3U, atomic_add_fn, 2U, i64_i64_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
+    {"sub", 3U, atomic_sub_fn, 2U, i64_i64_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
+    {"cas", 3U, atomic_cas_fn, 3U, i64_i64_i64_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
+    {"exchange", 8U, atomic_exchange_fn, 2U, i64_i64_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
+    {"fetch_or", 8U, atomic_fetch_or_fn, 2U, i64_i64_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
+    {"fetch_and", 9U, atomic_fetch_and_fn, 2U, i64_i64_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
+    {"fetch_xor", 9U, atomic_fetch_xor_fn, 2U, i64_i64_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
+    {"inc", 3U, atomic_inc_fn, 1U, i64_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
+    {"dec", 3U, atomic_dec_fn, 1U, i64_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
+    {"fence", 5U, atomic_fence_fn, 0U, NULL, VIGIL_TYPE_VOID, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
 };
 
 VIGIL_API const vigil_native_module_t vigil_stdlib_atomic = {
-    "atomic", 6U, atomic_funcs, sizeof(atomic_funcs) / sizeof(atomic_funcs[0]), NULL, 0U};
+    "atomic", 6U, atomic_funcs, sizeof(atomic_funcs) / sizeof(atomic_funcs[0]), NULL, 0U, NULL};

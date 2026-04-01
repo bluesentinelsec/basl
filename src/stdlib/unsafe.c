@@ -909,8 +909,8 @@ static const int p_str[] = {VIGIL_TYPE_STRING};
 static const int p_str_i32[] = {VIGIL_TYPE_STRING, VIGIL_TYPE_I32};
 static const int p_copy[] = {VIGIL_TYPE_I64, VIGIL_TYPE_I32, VIGIL_TYPE_I64, VIGIL_TYPE_I32, VIGIL_TYPE_I32};
 
-#define F(n, nl, fn, pc, pt, rt) {n, nl, fn, pc, pt, rt, 1, NULL, 0, NULL, NULL, 0U}
-#define FV(n, nl, fn, pc, pt) {n, nl, fn, pc, pt, VIGIL_TYPE_VOID, 0, NULL, 0, NULL, NULL, 0U}
+#define F(n, nl, fn, pc, pt, rt) {n, nl, fn, pc, pt, rt, 1, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL}
+#define FV(n, nl, fn, pc, pt) {n, nl, fn, pc, pt, VIGIL_TYPE_VOID, 0, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL}
 
 static const vigil_native_module_function_t vigil_unsafe_functions[] = {
     /* Buffer management */
@@ -964,4 +964,4 @@ static const vigil_native_module_function_t vigil_unsafe_functions[] = {
 #undef FV
 
 VIGIL_API const vigil_native_module_t vigil_stdlib_unsafe = {
-    "unsafe", 6U, vigil_unsafe_functions, sizeof(vigil_unsafe_functions) / sizeof(vigil_unsafe_functions[0]), NULL, 0U};
+    "unsafe", 6U, vigil_unsafe_functions, sizeof(vigil_unsafe_functions) / sizeof(vigil_unsafe_functions[0]), NULL, 0U, NULL};

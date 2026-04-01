@@ -888,27 +888,130 @@ static vigil_status_t parser_help(vigil_vm_t *vm, size_t arg_count, vigil_error_
 /* ── Module descriptor ───────────────────────────────────────────── */
 
 static const int vigil_args_at_params[] = {VIGIL_TYPE_I32};
+static const char *const vigil_args_at_param_names[] = {"index"};
+
+static const vigil_native_symbol_doc_t vigil_args_module_doc = {
+    "Command-line argument access.",
+    "The args module provides access to command-line arguments.",
+    NULL,
+};
+
+static const vigil_native_symbol_doc_t vigil_args_count_doc = {
+    "Return the number of command-line arguments.",
+    "Counts the script arguments passed after the program name.",
+    "i32 argc = args.count()",
+};
+
+static const vigil_native_symbol_doc_t vigil_args_at_doc = {
+    "Return a command-line argument by index.",
+    "Returns an empty string if the index is out of range.",
+    "string first = args.at(0)",
+};
 
 static const vigil_native_module_function_t vigil_args_functions[] = {
-    {"count", 5, vigil_args_count, 0, NULL, VIGIL_TYPE_I32, 1, NULL, 0, NULL, NULL, 0U},
-    {"at", 2, vigil_args_at, 1, vigil_args_at_params, VIGIL_TYPE_STRING, 1, NULL, 0, NULL, NULL, 0U}};
+    {"count", 5, vigil_args_count, 0, NULL, VIGIL_TYPE_I32, 1, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL,
+     &vigil_args_count_doc},
+    {"at", 2, vigil_args_at, 1, vigil_args_at_params, VIGIL_TYPE_STRING, 1, NULL, 0, NULL, NULL, 0U,
+     vigil_args_at_param_names, NULL, NULL, &vigil_args_at_doc}};
 
 /* ── Parser class descriptor ─────────────────────────────────────── */
 
-#define VIGIL_PFIELD(n, nl, t) {n, nl, t, 0, NULL, 0U, 0}
-#define VIGIL_AFIELD(n, nl, elem) {n, nl, VIGIL_TYPE_OBJECT, VIGIL_NATIVE_FIELD_ARRAY, NULL, 0U, elem}
-#define VIGIL_METHOD(n, nl, fn, pc, pt, rt, rc, rts) {n, nl, fn, pc, pt, rt, rc, rts, 0, NULL, 0U, 0}
-#define VIGIL_METHOD_ARR(n, nl, fn, pc, pt, rc, rts, elem)                                                             \
-    {n, nl, fn, pc, pt, VIGIL_TYPE_OBJECT, rc, rts, 0, NULL, 0U, elem}
-#define VIGIL_STATIC(n, nl, fn, pc, pt, rt, rc, rts) {n, nl, fn, pc, pt, rt, rc, rts, 1, NULL, 0U, 0}
+static const vigil_native_symbol_doc_t parser_class_doc = {
+    "Command-line parser builder.",
+    "Builds declarative CLI parsers with flags, options, positional arguments, and generated help text.",
+    NULL,
+};
+
+static const vigil_native_symbol_doc_t parser_prog_doc = {
+    "Program name.",
+    "Stores the program name shown in generated usage text.",
+    "string name = parser.prog",
+};
+
+static const vigil_native_symbol_doc_t parser_desc_doc = {
+    "Program description.",
+    "Stores the description shown in generated help text.",
+    "string desc = parser.desc",
+};
+
+static const vigil_native_symbol_doc_t parser_names_doc = {
+    "Declared option names.",
+    "Holds the long names for declared options.",
+    "array<string> names = parser.names",
+};
+
+static const vigil_native_symbol_doc_t parser_shorts_doc = {
+    "Declared short option names.",
+    "Holds the short aliases for declared options.",
+    "array<string> shorts = parser.shorts",
+};
+
+static const vigil_native_symbol_doc_t parser_types_doc = {
+    "Declared option types.",
+    "Stores the internal option type tags for each declared option.",
+    "array<string> types = parser.types",
+};
+
+static const vigil_native_symbol_doc_t parser_defaults_doc = {
+    "Declared default values.",
+    "Stores default string values for declared options.",
+    "array<string> defaults = parser.defaults",
+};
+
+static const vigil_native_symbol_doc_t parser_descs_doc = {
+    "Declared option descriptions.",
+    "Stores help text for declared options.",
+    "array<string> descs = parser.descs",
+};
+
+static const vigil_native_symbol_doc_t parser_required_doc = {
+    "Required-option markers.",
+    "Stores whether each declared option is required.",
+    "array<string> required = parser.required",
+};
+
+static const vigil_native_symbol_doc_t parser_pos_names_doc = {
+    "Declared positional argument names.",
+    "Stores names for declared positional arguments.",
+    "array<string> names = parser.pos_names",
+};
+
+static const vigil_native_symbol_doc_t parser_pos_descs_doc = {
+    "Declared positional argument descriptions.",
+    "Stores help text for declared positional arguments.",
+    "array<string> descs = parser.pos_descs",
+};
+
+static const vigil_native_symbol_doc_t parser_values_doc = {
+    "Parsed option values.",
+    "Stores parsed option values after a successful parse.",
+    "array<string> values = parser.values",
+};
+
+static const vigil_native_symbol_doc_t parser_positionals_doc = {
+    "Parsed positional values.",
+    "Stores parsed positional arguments after a successful parse.",
+    "array<string> values = parser.positionals",
+};
 
 static const vigil_native_class_field_t parser_fields[] = {
-    VIGIL_PFIELD("prog", 4U, VIGIL_TYPE_STRING),      VIGIL_PFIELD("desc", 4U, VIGIL_TYPE_STRING),
-    VIGIL_AFIELD("names", 5U, VIGIL_TYPE_STRING),     VIGIL_AFIELD("shorts", 6U, VIGIL_TYPE_STRING),
-    VIGIL_AFIELD("types", 5U, VIGIL_TYPE_STRING),     VIGIL_AFIELD("defaults", 8U, VIGIL_TYPE_STRING),
-    VIGIL_AFIELD("descs", 5U, VIGIL_TYPE_STRING),     VIGIL_AFIELD("required", 8U, VIGIL_TYPE_STRING),
-    VIGIL_AFIELD("pos_names", 9U, VIGIL_TYPE_STRING), VIGIL_AFIELD("pos_descs", 9U, VIGIL_TYPE_STRING),
-    VIGIL_AFIELD("values", 6U, VIGIL_TYPE_STRING),    VIGIL_AFIELD("positionals", 11U, VIGIL_TYPE_STRING),
+    {"prog", 4U, VIGIL_TYPE_STRING, VIGIL_NATIVE_FIELD_PRIMITIVE, NULL, 0U, 0, NULL, &parser_prog_doc},
+    {"desc", 4U, VIGIL_TYPE_STRING, VIGIL_NATIVE_FIELD_PRIMITIVE, NULL, 0U, 0, NULL, &parser_desc_doc},
+    {"names", 5U, VIGIL_TYPE_OBJECT, VIGIL_NATIVE_FIELD_ARRAY, NULL, 0U, VIGIL_TYPE_STRING, NULL, &parser_names_doc},
+    {"shorts", 6U, VIGIL_TYPE_OBJECT, VIGIL_NATIVE_FIELD_ARRAY, NULL, 0U, VIGIL_TYPE_STRING, NULL, &parser_shorts_doc},
+    {"types", 5U, VIGIL_TYPE_OBJECT, VIGIL_NATIVE_FIELD_ARRAY, NULL, 0U, VIGIL_TYPE_STRING, NULL, &parser_types_doc},
+    {"defaults", 8U, VIGIL_TYPE_OBJECT, VIGIL_NATIVE_FIELD_ARRAY, NULL, 0U, VIGIL_TYPE_STRING, NULL,
+     &parser_defaults_doc},
+    {"descs", 5U, VIGIL_TYPE_OBJECT, VIGIL_NATIVE_FIELD_ARRAY, NULL, 0U, VIGIL_TYPE_STRING, NULL, &parser_descs_doc},
+    {"required", 8U, VIGIL_TYPE_OBJECT, VIGIL_NATIVE_FIELD_ARRAY, NULL, 0U, VIGIL_TYPE_STRING, NULL,
+     &parser_required_doc},
+    {"pos_names", 9U, VIGIL_TYPE_OBJECT, VIGIL_NATIVE_FIELD_ARRAY, NULL, 0U, VIGIL_TYPE_STRING, NULL,
+     &parser_pos_names_doc},
+    {"pos_descs", 9U, VIGIL_TYPE_OBJECT, VIGIL_NATIVE_FIELD_ARRAY, NULL, 0U, VIGIL_TYPE_STRING, NULL,
+     &parser_pos_descs_doc},
+    {"values", 6U, VIGIL_TYPE_OBJECT, VIGIL_NATIVE_FIELD_ARRAY, NULL, 0U, VIGIL_TYPE_STRING, NULL, &parser_values_doc},
+    {"positionals", 11U, VIGIL_TYPE_OBJECT, VIGIL_NATIVE_FIELD_ARRAY, NULL, 0U, VIGIL_TYPE_STRING, NULL,
+     &parser_positionals_doc},
 };
 
 static const int str3_params[] = {VIGIL_TYPE_STRING, VIGIL_TYPE_STRING, VIGIL_TYPE_STRING};
@@ -916,36 +1019,125 @@ static const int str4_params[] = {VIGIL_TYPE_STRING, VIGIL_TYPE_STRING, VIGIL_TY
 static const int str2_params[] = {VIGIL_TYPE_STRING, VIGIL_TYPE_STRING};
 static const int str1_params[] = {VIGIL_TYPE_STRING};
 static const int i32_params[] = {VIGIL_TYPE_I32};
+static const char *const parser_new_param_names[] = {"prog", "desc"};
+static const char *const parser_flag_param_names[] = {"name", "short", "desc"};
+static const char *const parser_option_param_names[] = {"name", "short", "default", "desc"};
+static const char *const parser_positional_param_names[] = {"name", "desc"};
+static const char *const parser_parse_param_names[] = {"argc"};
+static const char *const parser_name_param_names[] = {"name"};
 
-static const vigil_native_class_method_t parser_methods[] = {
-    /* static factory */
-    VIGIL_STATIC("new", 3U, parser_new, 2U, str2_params, VIGIL_TYPE_OBJECT, 1U, NULL),
-    /* builder methods (return self = OBJECT, same class) */
-    VIGIL_METHOD("flag", 4U, parser_flag, 3U, str3_params, VIGIL_TYPE_OBJECT, 1U, NULL),
-    VIGIL_METHOD("option", 6U, parser_option, 4U, str4_params, VIGIL_TYPE_OBJECT, 1U, NULL),
-    VIGIL_METHOD("option_int", 10U, parser_option_int, 4U, str4_params, VIGIL_TYPE_OBJECT, 1U, NULL),
-    VIGIL_METHOD("option_multi", 12U, parser_option_multi, 3U, str3_params, VIGIL_TYPE_OBJECT, 1U, NULL),
-    VIGIL_METHOD("mark_required", 13U, parser_mark_required, 0U, NULL, VIGIL_TYPE_OBJECT, 1U, NULL),
-    VIGIL_METHOD("positional", 10U, parser_positional, 2U, str2_params, VIGIL_TYPE_OBJECT, 1U, NULL),
-    /* terminal methods */
-    VIGIL_METHOD("parse", 5U, parser_parse, 1U, i32_params, VIGIL_TYPE_ERR, 1U, NULL),
-    VIGIL_METHOD("get", 3U, parser_get, 1U, str1_params, VIGIL_TYPE_STRING, 1U, NULL),
-    VIGIL_METHOD("get_bool", 8U, parser_get_bool, 1U, str1_params, VIGIL_TYPE_BOOL, 1U, NULL),
-    VIGIL_METHOD_ARR("get_multi", 9U, parser_get_multi, 1U, str1_params, 1U, NULL, VIGIL_TYPE_STRING),
-    VIGIL_METHOD_ARR("get_positionals", 15U, parser_get_positionals, 0U, NULL, 1U, NULL, VIGIL_TYPE_STRING),
-    VIGIL_METHOD("help", 4U, parser_help, 0U, NULL, VIGIL_TYPE_STRING, 1U, NULL),
+static const vigil_native_symbol_doc_t parser_new_doc = {
+    "Create a parser.",
+    "Constructs a new parser configured with a program name and description.",
+    "args.Parser parser = args.Parser.new(\"vigil\", \"Run scripts\")",
 };
 
-#undef VIGIL_PFIELD
-#undef VIGIL_AFIELD
-#undef VIGIL_METHOD
-#undef VIGIL_STATIC
+static const vigil_native_symbol_doc_t parser_flag_doc = {
+    "Declare a boolean flag.",
+    "Adds a boolean flag option and returns the parser for chaining.",
+    "parser.flag(\"verbose\", \"v\", \"Enable verbose output\")",
+};
+
+static const vigil_native_symbol_doc_t parser_option_doc = {
+    "Declare a string option.",
+    "Adds a string-valued option and returns the parser for chaining.",
+    "parser.option(\"output\", \"o\", \"out.txt\", \"Output file\")",
+};
+
+static const vigil_native_symbol_doc_t parser_option_int_doc = {
+    "Declare an integer option.",
+    "Adds an integer-valued option and returns the parser for chaining.",
+    "parser.option_int(\"retries\", \"r\", \"3\", \"Retry count\")",
+};
+
+static const vigil_native_symbol_doc_t parser_option_multi_doc = {
+    "Declare a repeated string option.",
+    "Adds an option that can be provided multiple times and returns the parser for chaining.",
+    "parser.option_multi(\"include\", \"I\", \"Include path\")",
+};
+
+static const vigil_native_symbol_doc_t parser_mark_required_doc = {
+    "Mark the last declared option as required.",
+    "Sets the most recently declared option to required and returns the parser for chaining.",
+    "parser.option(\"config\", \"c\", \"\", \"Config file\").mark_required()",
+};
+
+static const vigil_native_symbol_doc_t parser_positional_doc = {
+    "Declare a positional argument.",
+    "Adds a positional argument and returns the parser for chaining.",
+    "parser.positional(\"input\", \"Input file\")",
+};
+
+static const vigil_native_symbol_doc_t parser_parse_doc = {
+    "Parse command-line arguments.",
+    "Parses the process arguments currently available to the runtime. Returns an error value indicating success or failure.",
+    "error err = parser.parse(args.count())",
+};
+
+static const vigil_native_symbol_doc_t parser_get_doc = {
+    "Get a parsed string option.",
+    "Returns the parsed string value for the named option.",
+    "string out = parser.get(\"output\")",
+};
+
+static const vigil_native_symbol_doc_t parser_get_bool_doc = {
+    "Get a parsed boolean flag.",
+    "Returns true when the named flag was provided.",
+    "bool verbose = parser.get_bool(\"verbose\")",
+};
+
+static const vigil_native_symbol_doc_t parser_get_multi_doc = {
+    "Get repeated option values.",
+    "Returns all parsed values for a repeated option.",
+    "array<string> includes = parser.get_multi(\"include\")",
+};
+
+static const vigil_native_symbol_doc_t parser_get_positionals_doc = {
+    "Get parsed positional arguments.",
+    "Returns the parsed positional arguments in declaration order.",
+    "array<string> values = parser.get_positionals()",
+};
+
+static const vigil_native_symbol_doc_t parser_help_doc = {
+    "Render help text.",
+    "Builds formatted usage and option help text for the parser.",
+    "string help = parser.help()",
+};
+
+static const vigil_native_class_method_t parser_methods[] = {
+    {"new", 3U, parser_new, 2U, str2_params, VIGIL_TYPE_OBJECT, 1U, NULL, 1, "Parser", 6U, 0, parser_new_param_names,
+     NULL, NULL, &parser_new_doc},
+    {"flag", 4U, parser_flag, 3U, str3_params, VIGIL_TYPE_OBJECT, 1U, NULL, 0, "Parser", 6U, 0, parser_flag_param_names,
+     NULL, NULL, &parser_flag_doc},
+    {"option", 6U, parser_option, 4U, str4_params, VIGIL_TYPE_OBJECT, 1U, NULL, 0, "Parser", 6U, 0,
+     parser_option_param_names, NULL, NULL, &parser_option_doc},
+    {"option_int", 10U, parser_option_int, 4U, str4_params, VIGIL_TYPE_OBJECT, 1U, NULL, 0, "Parser", 6U, 0,
+     parser_option_param_names, NULL, NULL, &parser_option_int_doc},
+    {"option_multi", 12U, parser_option_multi, 3U, str3_params, VIGIL_TYPE_OBJECT, 1U, NULL, 0, "Parser", 6U, 0,
+     parser_flag_param_names, NULL, NULL, &parser_option_multi_doc},
+    {"mark_required", 13U, parser_mark_required, 0U, NULL, VIGIL_TYPE_OBJECT, 1U, NULL, 0, "Parser", 6U, 0, NULL,
+     NULL, NULL, &parser_mark_required_doc},
+    {"positional", 10U, parser_positional, 2U, str2_params, VIGIL_TYPE_OBJECT, 1U, NULL, 0, "Parser", 6U, 0,
+     parser_positional_param_names, NULL, NULL, &parser_positional_doc},
+    {"parse", 5U, parser_parse, 1U, i32_params, VIGIL_TYPE_ERR, 1U, NULL, 0, NULL, 0U, 0, parser_parse_param_names,
+     NULL, NULL, &parser_parse_doc},
+    {"get", 3U, parser_get, 1U, str1_params, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, 0U, 0, parser_name_param_names,
+     NULL, NULL, &parser_get_doc},
+    {"get_bool", 8U, parser_get_bool, 1U, str1_params, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, 0U, 0,
+     parser_name_param_names, NULL, NULL, &parser_get_bool_doc},
+    {"get_multi", 9U, parser_get_multi, 1U, str1_params, VIGIL_TYPE_OBJECT, 1U, NULL, 0, NULL, 0U, VIGIL_TYPE_STRING,
+     parser_name_param_names, NULL, NULL, &parser_get_multi_doc},
+    {"get_positionals", 15U, parser_get_positionals, 0U, NULL, VIGIL_TYPE_OBJECT, 1U, NULL, 0, NULL, 0U,
+     VIGIL_TYPE_STRING, NULL, NULL, NULL, &parser_get_positionals_doc},
+    {"help", 4U, parser_help, 0U, NULL, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, 0U, 0, NULL, NULL, NULL,
+     &parser_help_doc},
+};
 
 static const vigil_native_class_t vigil_args_classes[] = {
     {"Parser", 6U, parser_fields, FIELD_COUNT, parser_methods, sizeof(parser_methods) / sizeof(parser_methods[0]),
-     NULL},
+     NULL, &parser_class_doc},
 };
 
 VIGIL_API const vigil_native_module_t vigil_stdlib_args = {
     "args", 4, vigil_args_functions, sizeof(vigil_args_functions) / sizeof(vigil_args_functions[0]), vigil_args_classes,
-    1U};
+    1U, &vigil_args_module_doc};

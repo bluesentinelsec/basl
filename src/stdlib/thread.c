@@ -757,35 +757,35 @@ static const int object_param[] = {VIGIL_TYPE_OBJECT};
 
 static const vigil_native_module_function_t thread_funcs[] = {
     /* Thread management */
-    {"spawn", 5U, thread_spawn, 1U, object_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U},
-    {"join", 4U, thread_join, 1U, i64_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U},
-    {"detach", 6U, thread_detach, 1U, i64_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U},
-    {"current_id", 10U, thread_current_id, 0U, NULL, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U},
-    {"yield", 5U, thread_yield, 0U, NULL, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U},
-    {"sleep", 5U, thread_sleep, 1U, i64_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U},
+    {"spawn", 5U, thread_spawn, 1U, object_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
+    {"join", 4U, thread_join, 1U, i64_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
+    {"detach", 6U, thread_detach, 1U, i64_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
+    {"current_id", 10U, thread_current_id, 0U, NULL, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
+    {"yield", 5U, thread_yield, 0U, NULL, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
+    {"sleep", 5U, thread_sleep, 1U, i64_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
 
     /* Mutex */
-    {"mutex", 5U, thread_mutex, 0U, NULL, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U},
-    {"lock", 4U, mutex_lock, 1U, i64_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U},
-    {"unlock", 6U, mutex_unlock, 1U, i64_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U},
-    {"try_lock", 8U, mutex_try_lock, 1U, i64_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U},
-    {"mutex_destroy", 13U, mutex_destroy, 1U, i64_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U},
+    {"mutex", 5U, thread_mutex, 0U, NULL, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
+    {"lock", 4U, mutex_lock, 1U, i64_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
+    {"unlock", 6U, mutex_unlock, 1U, i64_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
+    {"try_lock", 8U, mutex_try_lock, 1U, i64_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
+    {"mutex_destroy", 13U, mutex_destroy, 1U, i64_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
 
     /* Condition variable */
-    {"cond", 4U, thread_cond, 0U, NULL, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U},
-    {"wait", 4U, cond_wait, 2U, i64_i64_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U},
-    {"wait_timeout", 12U, cond_wait_timeout, 3U, i64_i64_i64_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U},
-    {"signal", 6U, cond_signal, 1U, i64_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U},
-    {"broadcast", 9U, cond_broadcast, 1U, i64_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U},
-    {"cond_destroy", 12U, cond_destroy, 1U, i64_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U},
+    {"cond", 4U, thread_cond, 0U, NULL, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
+    {"wait", 4U, cond_wait, 2U, i64_i64_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
+    {"wait_timeout", 12U, cond_wait_timeout, 3U, i64_i64_i64_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
+    {"signal", 6U, cond_signal, 1U, i64_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
+    {"broadcast", 9U, cond_broadcast, 1U, i64_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
+    {"cond_destroy", 12U, cond_destroy, 1U, i64_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
 
     /* RWLock */
-    {"rwlock", 6U, thread_rwlock, 0U, NULL, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U},
-    {"read_lock", 9U, rwlock_read_lock, 1U, i64_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U},
-    {"write_lock", 10U, rwlock_write_lock, 1U, i64_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U},
-    {"rw_unlock", 9U, rwlock_unlock, 1U, i64_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U},
-    {"rwlock_destroy", 14U, rwlock_destroy, 1U, i64_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U},
+    {"rwlock", 6U, thread_rwlock, 0U, NULL, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
+    {"read_lock", 9U, rwlock_read_lock, 1U, i64_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
+    {"write_lock", 10U, rwlock_write_lock, 1U, i64_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
+    {"rw_unlock", 9U, rwlock_unlock, 1U, i64_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
+    {"rwlock_destroy", 14U, rwlock_destroy, 1U, i64_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
 };
 
 VIGIL_API const vigil_native_module_t vigil_stdlib_thread = {
-    "thread", 6U, thread_funcs, sizeof(thread_funcs) / sizeof(thread_funcs[0]), NULL, 0U};
+    "thread", 6U, thread_funcs, sizeof(thread_funcs) / sizeof(thread_funcs[0]), NULL, 0U, NULL};

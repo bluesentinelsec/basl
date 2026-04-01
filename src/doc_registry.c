@@ -2,9 +2,12 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
 #include <string.h>
 
 #include "internal/vigil_internal.h"
+#include "vigil/stdlib.h"
+#include "vigil/type.h"
 
 /* ── Builtin Function Docs ────────────────────────────────── */
 
@@ -1970,13 +1973,532 @@ static const vigil_doc_entry_t sdl_docs[] = {
 
 /* ── Module List ──────────────────────────────────────────── */
 
-static const char *module_names[] = {
-    "builtins", "compress", "crypto", "csv",    "ffi",  "fmt",      "fs",     "http",   "json",
-    "log",      "math",     "net",    "parse",  "args", "readline", "sdl",    "test",   "strings",
-    "regex",    "random",   "time",   "unsafe", "url",  "yaml",     "thread", "atomic",
-};
+typedef struct native_doc_cache
+{
+    const vigil_native_module_t *module;
+    vigil_doc_entry_t *entries;
+    size_t count;
+} native_doc_cache_t;
 
-#define MODULE_COUNT (sizeof(module_names) / sizeof(module_names[0]))
+typedef struct native_doc_buf
+{
+    char *data;
+    size_t length;
+    size_t capacity;
+} native_doc_buf_t;
+
+static native_doc_cache_t native_doc_caches[32];
+static size_t native_doc_cache_count = 0U;
+static const char *generated_module_names[32];
+static size_t generated_module_name_count = 0U;
+static int generated_module_names_ready = 0;
+
+static int native_doc_module_has_docs(const vigil_native_module_t *module)
+{
+    size_t i;
+
+    if (module == NULL)
+        return 0;
+    if (module->doc != NULL)
+        return 1;
+
+    for (i = 0U; i < module->function_count; i++)
+    {
+        if (module->functions[i].doc != NULL)
+            return 1;
+    }
+    for (i = 0U; i < module->class_count; i++)
+    {
+        size_t j;
+        const vigil_native_class_t *klass = &module->classes[i];
+        if (klass->doc != NULL)
+            return 1;
+        for (j = 0U; j < klass->field_count; j++)
+        {
+            if (klass->fields[j].doc != NULL)
+                return 1;
+        }
+        for (j = 0U; j < klass->method_count; j++)
+        {
+            if (klass->methods[j].doc != NULL)
+                return 1;
+        }
+    }
+    return 0;
+}
+
+static void native_doc_buf_init(native_doc_buf_t *buf)
+{
+    buf->data = NULL;
+    buf->length = 0U;
+    buf->capacity = 0U;
+}
+
+static int native_doc_buf_reserve(native_doc_buf_t *buf, size_t extra)
+{
+    size_t needed = buf->length + extra + 1U;
+    char *next;
+
+    if (needed <= buf->capacity)
+        return 1;
+    buf->capacity = buf->capacity == 0U ? 64U : buf->capacity;
+    while (buf->capacity < needed)
+        buf->capacity *= 2U;
+    next = (char *)realloc(buf->data, buf->capacity);
+    if (next == NULL)
+        return 0;
+    buf->data = next;
+    return 1;
+}
+
+static int native_doc_buf_append_len(native_doc_buf_t *buf, const char *text, size_t length)
+{
+    if (text == NULL || length == 0U)
+        return 1;
+    if (!native_doc_buf_reserve(buf, length))
+        return 0;
+    memcpy(buf->data + buf->length, text, length);
+    buf->length += length;
+    buf->data[buf->length] = '\0';
+    return 1;
+}
+
+static int native_doc_buf_append(native_doc_buf_t *buf, const char *text)
+{
+    if (text == NULL)
+        return 1;
+    return native_doc_buf_append_len(buf, text, strlen(text));
+}
+
+static int native_doc_buf_append_char(native_doc_buf_t *buf, char ch)
+{
+    return native_doc_buf_append_len(buf, &ch, 1U);
+}
+
+static char *native_doc_buf_take(native_doc_buf_t *buf)
+{
+    char *out = buf->data;
+    if (out == NULL)
+    {
+        out = (char *)malloc(1U);
+        if (out != NULL)
+            out[0] = '\0';
+    }
+    buf->data = NULL;
+    buf->length = 0U;
+    buf->capacity = 0U;
+    return out;
+}
+
+static char *native_doc_printf(const char *fmt, ...)
+{
+    va_list args;
+    va_list copy;
+    int length;
+    char *out;
+
+    va_start(args, fmt);
+    va_copy(copy, args);
+    length = vsnprintf(NULL, 0U, fmt, copy);
+    va_end(copy);
+    if (length < 0)
+    {
+        va_end(args);
+        return NULL;
+    }
+
+    out = (char *)malloc((size_t)length + 1U);
+    if (out == NULL)
+    {
+        va_end(args);
+        return NULL;
+    }
+    vsnprintf(out, (size_t)length + 1U, fmt, args);
+    va_end(args);
+    return out;
+}
+
+static void native_doc_append_qualified_class_name(native_doc_buf_t *buf, const char *module_name, const char *class_name)
+{
+    if (class_name == NULL)
+    {
+        native_doc_buf_append(buf, "object");
+        return;
+    }
+    if (strchr(class_name, '.') != NULL || module_name == NULL)
+    {
+        native_doc_buf_append(buf, class_name);
+        return;
+    }
+    native_doc_buf_append(buf, module_name);
+    native_doc_buf_append_char(buf, '.');
+    native_doc_buf_append(buf, class_name);
+}
+
+static void native_doc_append_type_name(native_doc_buf_t *buf, const char *module_name, int kind, int object_kind,
+                                        int element_type, const char *class_name, const vigil_native_type_t *ext,
+                                        const char *override_name)
+{
+    if (override_name != NULL)
+    {
+        native_doc_buf_append(buf, override_name);
+        return;
+    }
+
+    if (class_name != NULL && class_name[0] != '\0')
+    {
+        native_doc_append_qualified_class_name(buf, module_name, class_name);
+        return;
+    }
+
+    if (ext != NULL)
+    {
+        if (ext->kind != VIGIL_TYPE_OBJECT || ext->object_kind == 0)
+        {
+            native_doc_buf_append(buf, vigil_type_kind_name((vigil_type_kind_t)ext->kind));
+            return;
+        }
+        if (ext->object_kind == 4)
+        {
+            native_doc_buf_append(buf, "array<");
+            native_doc_append_type_name(buf, module_name, ext->element_type, 0, 0, NULL, NULL, NULL);
+            native_doc_buf_append_char(buf, '>');
+            return;
+        }
+        if (ext->object_kind == 5)
+        {
+            native_doc_buf_append(buf, "map<");
+            native_doc_append_type_name(buf, module_name, ext->key_type, 0, 0, NULL, NULL, NULL);
+            native_doc_buf_append(buf, ", ");
+            native_doc_append_type_name(buf, module_name, ext->value_type, 0, 0, NULL, NULL, NULL);
+            native_doc_buf_append_char(buf, '>');
+            return;
+        }
+    }
+
+    if (object_kind == VIGIL_NATIVE_FIELD_ARRAY || (kind == VIGIL_TYPE_OBJECT && element_type != 0))
+    {
+        native_doc_buf_append(buf, "array<");
+        native_doc_append_type_name(buf, module_name, element_type, 0, 0, NULL, NULL, NULL);
+        native_doc_buf_append_char(buf, '>');
+        return;
+    }
+
+    native_doc_buf_append(buf, vigil_type_kind_name((vigil_type_kind_t)kind));
+}
+
+static char *native_doc_build_function_signature(const vigil_native_module_t *module,
+                                                 const vigil_native_module_function_t *function)
+{
+    native_doc_buf_t buf;
+    size_t i;
+
+    native_doc_buf_init(&buf);
+    native_doc_buf_append(&buf, module->name);
+    native_doc_buf_append_char(&buf, '.');
+    native_doc_buf_append(&buf, function->name);
+    native_doc_buf_append_char(&buf, '(');
+    for (i = 0U; i < function->param_count; i++)
+    {
+        if (i != 0U)
+            native_doc_buf_append(&buf, ", ");
+        if (function->doc_param_names != NULL && function->doc_param_names[i] != NULL)
+        {
+            native_doc_buf_append(&buf, function->doc_param_names[i]);
+            native_doc_buf_append(&buf, ": ");
+        }
+        native_doc_append_type_name(&buf, module->name, function->param_types != NULL ? function->param_types[i] : VIGIL_TYPE_INVALID,
+                                    0, 0, NULL,
+                                    function->param_types_ext != NULL ? &function->param_types_ext[i] : NULL,
+                                    function->doc_param_type_names != NULL ? function->doc_param_type_names[i] : NULL);
+    }
+    native_doc_buf_append(&buf, ") -> ");
+
+    if (function->return_count > 1U && function->return_types != NULL)
+    {
+        native_doc_buf_append_char(&buf, '(');
+        for (i = 0U; i < function->return_count; i++)
+        {
+            if (i != 0U)
+                native_doc_buf_append(&buf, ", ");
+            native_doc_append_type_name(&buf, module->name, function->return_types[i], 0, 0, NULL, NULL, NULL);
+        }
+        native_doc_buf_append_char(&buf, ')');
+    }
+    else
+    {
+        native_doc_append_type_name(&buf, module->name, function->return_type, 0, function->return_element_type, NULL,
+                                    function->return_type_ext, function->doc_return_type_name);
+    }
+
+    return native_doc_buf_take(&buf);
+}
+
+static char *native_doc_build_method_signature(const vigil_native_module_t *module, const vigil_native_class_t *klass,
+                                               const vigil_native_class_method_t *method)
+{
+    native_doc_buf_t buf;
+    size_t i;
+
+    native_doc_buf_init(&buf);
+    native_doc_buf_append(&buf, module->name);
+    native_doc_buf_append_char(&buf, '.');
+    native_doc_buf_append(&buf, klass->name);
+    native_doc_buf_append_char(&buf, '.');
+    native_doc_buf_append(&buf, method->name);
+    native_doc_buf_append_char(&buf, '(');
+    for (i = 0U; i < method->param_count; i++)
+    {
+        if (i != 0U)
+            native_doc_buf_append(&buf, ", ");
+        if (method->doc_param_names != NULL && method->doc_param_names[i] != NULL)
+        {
+            native_doc_buf_append(&buf, method->doc_param_names[i]);
+            native_doc_buf_append(&buf, ": ");
+        }
+        native_doc_append_type_name(&buf, module->name, method->param_types != NULL ? method->param_types[i] : VIGIL_TYPE_INVALID,
+                                    0, 0, NULL, NULL,
+                                    method->doc_param_type_names != NULL ? method->doc_param_type_names[i] : NULL);
+    }
+    native_doc_buf_append(&buf, ") -> ");
+
+    if (method->return_count > 1U && method->return_types != NULL)
+    {
+        native_doc_buf_append_char(&buf, '(');
+        for (i = 0U; i < method->return_count; i++)
+        {
+            if (i != 0U)
+                native_doc_buf_append(&buf, ", ");
+            native_doc_append_type_name(&buf, module->name, method->return_types[i], 0, 0, NULL, NULL, NULL);
+        }
+        native_doc_buf_append_char(&buf, ')');
+    }
+    else
+    {
+        native_doc_append_type_name(&buf, module->name, method->return_type, 0, method->return_element_type,
+                                    method->return_class_name, NULL, method->doc_return_type_name);
+    }
+
+    return native_doc_buf_take(&buf);
+}
+
+static char *native_doc_build_field_signature(const vigil_native_module_t *module, const vigil_native_class_t *klass,
+                                              const vigil_native_class_field_t *field)
+{
+    native_doc_buf_t buf;
+
+    native_doc_buf_init(&buf);
+    native_doc_buf_append(&buf, module->name);
+    native_doc_buf_append_char(&buf, '.');
+    native_doc_buf_append(&buf, klass->name);
+    native_doc_buf_append_char(&buf, '.');
+    native_doc_buf_append(&buf, field->name);
+    native_doc_buf_append(&buf, ": ");
+    native_doc_append_type_name(&buf, module->name, field->type, field->object_kind, field->element_type,
+                                field->class_name, NULL, field->doc_type_name);
+    return native_doc_buf_take(&buf);
+}
+
+static char *native_doc_build_class_signature(const vigil_native_module_t *module, const vigil_native_class_t *klass)
+{
+    return native_doc_printf("class %s.%s", module->name, klass->name);
+}
+
+static const vigil_native_module_t *native_doc_find_stdlib_module(const char *name)
+{
+    VIGIL_STDLIB_MODULE_TABLE(mods);
+    size_t i;
+
+    if (name == NULL)
+        return NULL;
+
+    for (i = 0U; i < sizeof(mods) / sizeof(mods[0]); i++)
+    {
+        if (mods[i].module != NULL && strcmp(mods[i].name, name) == 0)
+            return mods[i].module;
+    }
+    return NULL;
+}
+
+static native_doc_cache_t *native_doc_build_module_cache(const vigil_native_module_t *module)
+{
+    native_doc_cache_t *cache;
+    size_t count = 1U;
+    size_t i;
+    size_t index = 0U;
+
+    if (module == NULL || !native_doc_module_has_docs(module) || native_doc_cache_count >= 32U)
+        return NULL;
+
+    for (i = 0U; i < module->function_count; i++)
+    {
+        if (module->functions[i].doc != NULL)
+            count += 1U;
+    }
+    for (i = 0U; i < module->class_count; i++)
+    {
+        size_t j;
+        const vigil_native_class_t *klass = &module->classes[i];
+        if (klass->doc != NULL)
+            count += 1U;
+        for (j = 0U; j < klass->field_count; j++)
+        {
+            if (klass->fields[j].doc != NULL)
+                count += 1U;
+        }
+        for (j = 0U; j < klass->method_count; j++)
+        {
+            if (klass->methods[j].doc != NULL)
+                count += 1U;
+        }
+    }
+
+    cache = &native_doc_caches[native_doc_cache_count++];
+    memset(cache, 0, sizeof(*cache));
+    cache->module = module;
+    cache->entries = (vigil_doc_entry_t *)calloc(count, sizeof(vigil_doc_entry_t));
+    if (cache->entries == NULL)
+    {
+        native_doc_cache_count -= 1U;
+        return NULL;
+    }
+    cache->count = count;
+
+    cache->entries[index].name = module->name;
+    cache->entries[index].signature = NULL;
+    cache->entries[index].summary = module->doc != NULL ? module->doc->summary : NULL;
+    cache->entries[index].description = module->doc != NULL ? module->doc->description : NULL;
+    cache->entries[index].example = module->doc != NULL ? module->doc->example : NULL;
+    index += 1U;
+
+    for (i = 0U; i < module->function_count; i++)
+    {
+        const vigil_native_module_function_t *function = &module->functions[i];
+        if (function->doc == NULL)
+            continue;
+        cache->entries[index].name = native_doc_printf("%s.%s", module->name, function->name);
+        cache->entries[index].signature = native_doc_build_function_signature(module, function);
+        cache->entries[index].summary = function->doc->summary;
+        cache->entries[index].description = function->doc->description;
+        cache->entries[index].example = function->doc->example;
+        index += 1U;
+    }
+
+    for (i = 0U; i < module->class_count; i++)
+    {
+        size_t j;
+        const vigil_native_class_t *klass = &module->classes[i];
+        if (klass->doc != NULL)
+        {
+            cache->entries[index].name = native_doc_printf("%s.%s", module->name, klass->name);
+            cache->entries[index].signature = native_doc_build_class_signature(module, klass);
+            cache->entries[index].summary = klass->doc->summary;
+            cache->entries[index].description = klass->doc->description;
+            cache->entries[index].example = klass->doc->example;
+            index += 1U;
+        }
+        for (j = 0U; j < klass->field_count; j++)
+        {
+            const vigil_native_class_field_t *field = &klass->fields[j];
+            if (field->doc == NULL)
+                continue;
+            cache->entries[index].name = native_doc_printf("%s.%s.%s", module->name, klass->name, field->name);
+            cache->entries[index].signature = native_doc_build_field_signature(module, klass, field);
+            cache->entries[index].summary = field->doc->summary;
+            cache->entries[index].description = field->doc->description;
+            cache->entries[index].example = field->doc->example;
+            index += 1U;
+        }
+        for (j = 0U; j < klass->method_count; j++)
+        {
+            const vigil_native_class_method_t *method = &klass->methods[j];
+            if (method->doc == NULL)
+                continue;
+            cache->entries[index].name = native_doc_printf("%s.%s.%s", module->name, klass->name, method->name);
+            cache->entries[index].signature = native_doc_build_method_signature(module, klass, method);
+            cache->entries[index].summary = method->doc->summary;
+            cache->entries[index].description = method->doc->description;
+            cache->entries[index].example = method->doc->example;
+            index += 1U;
+        }
+    }
+
+    cache->count = index;
+    return cache;
+}
+
+static native_doc_cache_t *native_doc_get_module_cache(const char *module_name)
+{
+    const vigil_native_module_t *module;
+    size_t i;
+
+    if (module_name == NULL)
+        return NULL;
+
+    for (i = 0U; i < native_doc_cache_count; i++)
+    {
+        if (strcmp(native_doc_caches[i].module->name, module_name) == 0)
+            return &native_doc_caches[i];
+    }
+
+    module = native_doc_find_stdlib_module(module_name);
+    if (module == NULL)
+        return NULL;
+    return native_doc_build_module_cache(module);
+}
+
+static const vigil_doc_entry_t *native_doc_lookup_entry(const char *name)
+{
+    const char *dot;
+    native_doc_cache_t *cache;
+    size_t i;
+    char module_name[128];
+    size_t module_length;
+
+    if (name == NULL)
+        return NULL;
+
+    dot = strchr(name, '.');
+    if (dot == NULL)
+        cache = native_doc_get_module_cache(name);
+    else
+    {
+        module_length = (size_t)(dot - name);
+        if (module_length >= sizeof(module_name))
+            return NULL;
+        memcpy(module_name, name, module_length);
+        module_name[module_length] = '\0';
+        cache = native_doc_get_module_cache(module_name);
+    }
+
+    if (cache == NULL)
+        return NULL;
+
+    for (i = 0U; i < cache->count; i++)
+    {
+        if (strcmp(cache->entries[i].name, name) == 0)
+            return &cache->entries[i];
+    }
+    return NULL;
+}
+
+static void native_doc_init_module_names(void)
+{
+    VIGIL_STDLIB_MODULE_TABLE(mods);
+    size_t i;
+
+    if (generated_module_names_ready)
+        return;
+
+    generated_module_name_count = 0U;
+    generated_module_names[generated_module_name_count++] = "builtins";
+    for (i = 0U; i < sizeof(mods) / sizeof(mods[0]); i++)
+    {
+        if (mods[i].module != NULL)
+            generated_module_names[generated_module_name_count++] = mods[i].name;
+    }
+    generated_module_names_ready = 1;
+}
 
 /* ── Lookup Implementation ────────────────────────────────── */
 
@@ -2020,10 +2542,15 @@ static const doc_module_table_entry_t doc_module_table[] = {
 
 const vigil_doc_entry_t *vigil_doc_lookup(const char *name)
 {
+    const vigil_doc_entry_t *generated;
     size_t m, i;
 
     if (name == NULL)
         return NULL;
+
+    generated = native_doc_lookup_entry(name);
+    if (generated != NULL)
+        return generated;
 
     for (m = 0; m < DOC_MODULE_TABLE_COUNT; m++)
     {
@@ -2038,18 +2565,26 @@ const vigil_doc_entry_t *vigil_doc_lookup(const char *name)
 
 const char **vigil_doc_list_modules(size_t *count)
 {
+    native_doc_init_module_names();
     if (count != NULL)
-    {
-        *count = MODULE_COUNT;
-    }
-    return module_names;
+        *count = generated_module_name_count;
+    return generated_module_names;
 }
 
 const vigil_doc_entry_t *vigil_doc_list_module(const char *module_name, size_t *count)
 {
+    native_doc_cache_t *generated;
     size_t m;
     if (module_name == NULL)
         return NULL;
+
+    generated = native_doc_get_module_cache(module_name);
+    if (generated != NULL)
+    {
+        if (count != NULL)
+            *count = generated->count;
+        return generated->entries;
+    }
 
     for (m = 0; m < DOC_MODULE_TABLE_COUNT; m++)
     {

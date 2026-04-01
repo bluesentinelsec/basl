@@ -1058,44 +1058,44 @@ static const int str_str_params[] = {VIGIL_TYPE_STRING, VIGIL_TYPE_STRING};
 
 static const vigil_native_module_function_t vigil_fs_functions[] = {
     /* Path operations */
-    {"join", 4U, fs_join, 2U, str_str_params, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U},
-    {"clean", 5U, fs_clean, 1U, str_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U},
-    {"dir", 3U, fs_dir, 1U, str_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U},
-    {"base", 4U, fs_base, 1U, str_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U},
-    {"ext", 3U, fs_ext, 1U, str_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U},
-    {"is_abs", 6U, fs_is_abs, 1U, str_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U},
+    {"join", 4U, fs_join, 2U, str_str_params, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
+    {"clean", 5U, fs_clean, 1U, str_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
+    {"dir", 3U, fs_dir, 1U, str_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
+    {"base", 4U, fs_base, 1U, str_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
+    {"ext", 3U, fs_ext, 1U, str_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
+    {"is_abs", 6U, fs_is_abs, 1U, str_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
     /* File operations */
-    {"read", 4U, fs_read, 1U, str_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U},
-    {"write", 5U, fs_write, 2U, str_str_params, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U},
-    {"append", 6U, fs_append, 2U, str_str_params, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U},
-    {"copy", 4U, fs_copy, 2U, str_str_params, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U},
-    {"move", 4U, fs_move, 2U, str_str_params, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U},
-    {"remove", 6U, fs_remove, 1U, str_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U},
-    {"remove_all", 10U, fs_remove_all, 1U, str_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U},
-    {"exists", 6U, fs_exists, 1U, str_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U},
-    {"is_dir", 6U, fs_is_dir, 1U, str_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U},
-    {"is_file", 7U, fs_is_file, 1U, str_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U},
-    {"is_symlink", 10U, fs_is_symlink, 1U, str_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U},
+    {"read", 4U, fs_read, 1U, str_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
+    {"write", 5U, fs_write, 2U, str_str_params, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
+    {"append", 6U, fs_append, 2U, str_str_params, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
+    {"copy", 4U, fs_copy, 2U, str_str_params, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
+    {"move", 4U, fs_move, 2U, str_str_params, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
+    {"remove", 6U, fs_remove, 1U, str_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
+    {"remove_all", 10U, fs_remove_all, 1U, str_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
+    {"exists", 6U, fs_exists, 1U, str_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
+    {"is_dir", 6U, fs_is_dir, 1U, str_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
+    {"is_file", 7U, fs_is_file, 1U, str_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
+    {"is_symlink", 10U, fs_is_symlink, 1U, str_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
     /* Directory operations */
-    {"mkdir", 5U, fs_mkdir, 1U, str_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U},
-    {"mkdir_all", 9U, fs_mkdir_all, 1U, str_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U},
-    {"list", 4U, fs_list, 1U, str_param, VIGIL_TYPE_OBJECT, 1U, NULL, VIGIL_TYPE_STRING, NULL, NULL, 0U},
-    {"walk", 4U, fs_walk, 1U, str_param, VIGIL_TYPE_OBJECT, 1U, NULL, VIGIL_TYPE_STRING, NULL, NULL, 0U},
-    {"glob", 4U, fs_glob, 2U, str_str_params, VIGIL_TYPE_OBJECT, 1U, NULL, VIGIL_TYPE_STRING, NULL, NULL, 0U},
+    {"mkdir", 5U, fs_mkdir, 1U, str_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
+    {"mkdir_all", 9U, fs_mkdir_all, 1U, str_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
+    {"list", 4U, fs_list, 1U, str_param, VIGIL_TYPE_OBJECT, 1U, NULL, VIGIL_TYPE_STRING, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
+    {"walk", 4U, fs_walk, 1U, str_param, VIGIL_TYPE_OBJECT, 1U, NULL, VIGIL_TYPE_STRING, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
+    {"glob", 4U, fs_glob, 2U, str_str_params, VIGIL_TYPE_OBJECT, 1U, NULL, VIGIL_TYPE_STRING, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
     /* Symlink operations */
-    {"symlink", 7U, fs_symlink, 2U, str_str_params, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U},
-    {"readlink", 8U, fs_readlink, 1U, str_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U},
+    {"symlink", 7U, fs_symlink, 2U, str_str_params, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
+    {"readlink", 8U, fs_readlink, 1U, str_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
     /* Metadata */
-    {"size", 4U, fs_size, 1U, str_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U},
-    {"mtime", 5U, fs_mtime, 1U, str_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U},
+    {"size", 4U, fs_size, 1U, str_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
+    {"mtime", 5U, fs_mtime, 1U, str_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
     /* Locations */
-    {"temp_dir", 8U, fs_temp_dir, 0U, NULL, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U},
-    {"temp_file", 9U, fs_temp_file, 1U, str_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U},
-    {"home_dir", 8U, fs_home_dir, 0U, NULL, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U},
-    {"config_dir", 10U, fs_config_dir, 0U, NULL, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U},
-    {"cache_dir", 9U, fs_cache_dir, 0U, NULL, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U},
-    {"data_dir", 8U, fs_data_dir, 0U, NULL, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U},
-    {"cwd", 3U, fs_cwd, 0U, NULL, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U},
+    {"temp_dir", 8U, fs_temp_dir, 0U, NULL, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
+    {"temp_file", 9U, fs_temp_file, 1U, str_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
+    {"home_dir", 8U, fs_home_dir, 0U, NULL, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
+    {"config_dir", 10U, fs_config_dir, 0U, NULL, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
+    {"cache_dir", 9U, fs_cache_dir, 0U, NULL, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
+    {"data_dir", 8U, fs_data_dir, 0U, NULL, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
+    {"cwd", 3U, fs_cwd, 0U, NULL, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
 };
 
 #define FS_FUNCTION_COUNT (sizeof(vigil_fs_functions) / sizeof(vigil_fs_functions[0]))
@@ -1763,11 +1763,11 @@ static vigil_status_t writer_close(vigil_vm_t *vm, size_t arg_count, vigil_error
 /* ── Class descriptors ───────────────────────────────────────────── */
 
 static const vigil_native_class_field_t reader_fields[] = {
-    {"handle", 6U, VIGIL_TYPE_I64, VIGIL_NATIVE_FIELD_PRIMITIVE, NULL, 0U, 0},
+    {"handle", 6U, VIGIL_TYPE_I64, VIGIL_NATIVE_FIELD_PRIMITIVE, NULL, 0U, 0, NULL, NULL},
 };
 
 static const vigil_native_class_field_t writer_fields[] = {
-    {"handle", 6U, VIGIL_TYPE_I64, VIGIL_NATIVE_FIELD_PRIMITIVE, NULL, 0U, 0},
+    {"handle", 6U, VIGIL_TYPE_I64, VIGIL_NATIVE_FIELD_PRIMITIVE, NULL, 0U, 0, NULL, NULL},
 };
 
 static const int obj_err_returns[] = {VIGIL_TYPE_OBJECT, VIGIL_TYPE_ERR};
@@ -1778,9 +1778,9 @@ static const int i32_1_param[] = {VIGIL_TYPE_I32};
 
 // clang-format off
 #define FS_STATIC(n, nl, fn, pc, pt, rt, rc, rts) \
-    {n, nl, fn, pc, pt, rt, rc, rts, 1, NULL, 0U, 0}
+    {n, nl, fn, pc, pt, rt, rc, rts, 1, NULL, 0U, 0, NULL, NULL, NULL, NULL}
 #define FS_METHOD(n, nl, fn, pc, pt, rt, rc, rts) \
-    {n, nl, fn, pc, pt, rt, rc, rts, 0, NULL, 0U, 0}
+    {n, nl, fn, pc, pt, rt, rc, rts, 0, NULL, 0U, 0, NULL, NULL, NULL, NULL}
 // clang-format on
 
 static const vigil_native_class_method_t reader_methods[] = {
@@ -1805,12 +1805,12 @@ static const vigil_native_class_method_t writer_methods[] = {
 
 static const vigil_native_class_t vigil_fs_classes[] = {
     {"Reader", 6U, reader_fields, READER_FIELD_COUNT, reader_methods,
-     sizeof(reader_methods) / sizeof(reader_methods[0]), NULL},
+     sizeof(reader_methods) / sizeof(reader_methods[0]), NULL, NULL},
     {"Writer", 6U, writer_fields, WRITER_FIELD_COUNT, writer_methods,
-     sizeof(writer_methods) / sizeof(writer_methods[0]), NULL},
+     sizeof(writer_methods) / sizeof(writer_methods[0]), NULL, NULL},
 };
 
 #define FS_CLASS_COUNT (sizeof(vigil_fs_classes) / sizeof(vigil_fs_classes[0]))
 
 VIGIL_API const vigil_native_module_t vigil_stdlib_fs = {
-    "fs", 2U, vigil_fs_functions, FS_FUNCTION_COUNT, vigil_fs_classes, FS_CLASS_COUNT};
+    "fs", 2U, vigil_fs_functions, FS_FUNCTION_COUNT, vigil_fs_classes, FS_CLASS_COUNT, NULL};

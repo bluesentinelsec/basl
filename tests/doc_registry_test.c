@@ -215,6 +215,32 @@ TEST(DocRegistryTest, CoversAllStdlibModulesAndFunctions)
     }
 }
 
+TEST(DocRegistryTest, DescriptorBackedFmtAndArgsDocsRenderDerivedSignatures)
+{
+    const vigil_doc_entry_t *fmt_print = vigil_doc_lookup("fmt.print");
+    const vigil_doc_entry_t *parser_new = vigil_doc_lookup("args.Parser.new");
+
+    ASSERT_NE(fmt_print, NULL);
+    ASSERT_NE(parser_new, NULL);
+    EXPECT_STREQ(fmt_print->signature, "fmt.print(value: string) -> void");
+    EXPECT_STREQ(fmt_print->summary, "Print a string to stdout without a newline.");
+    EXPECT_STREQ(parser_new->signature, "args.Parser.new(prog: string, desc: string) -> args.Parser");
+    EXPECT_STREQ(parser_new->summary, "Create a parser.");
+}
+
+TEST(DocRegistryTest, ModuleListUsesCanonicalStdlibSet)
+{
+    size_t count = 0U;
+    const char **modules = vigil_doc_list_modules(&count);
+
+    ASSERT_NE(modules, NULL);
+    EXPECT_TRUE(module_name_in_list("builtins", modules, count));
+    EXPECT_TRUE(module_name_in_list("fmt", modules, count));
+    EXPECT_TRUE(module_name_in_list("args", modules, count));
+    EXPECT_FALSE(module_name_in_list("strings", modules, count));
+    EXPECT_FALSE(module_name_in_list("sdl", modules, count));
+}
+
 void register_doc_registry_tests(void)
 {
     REGISTER_TEST(DocRegistryTest, LookupBuiltin);
@@ -225,4 +251,6 @@ void register_doc_registry_tests(void)
     REGISTER_TEST(DocRegistryTest, ListModuleContents);
     REGISTER_TEST(DocRegistryTest, RenderEntry);
     REGISTER_TEST(DocRegistryTest, CoversAllStdlibModulesAndFunctions);
+    REGISTER_TEST(DocRegistryTest, DescriptorBackedFmtAndArgsDocsRenderDerivedSignatures);
+    REGISTER_TEST(DocRegistryTest, ModuleListUsesCanonicalStdlibSet);
 }

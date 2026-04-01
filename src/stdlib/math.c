@@ -297,22 +297,22 @@ static const int vigil_math_f64_params[] = {VIGIL_TYPE_F64};
 static const int vigil_math_f64f64_params[] = {VIGIL_TYPE_F64, VIGIL_TYPE_F64};
 static const int vigil_math_f64f64f64_params[] = {VIGIL_TYPE_F64, VIGIL_TYPE_F64, VIGIL_TYPE_F64};
 
-#define MATH_FN0(id, n, nl) {n, nl, vigil_math_##id, 0U, NULL, VIGIL_TYPE_F64, 1U, NULL, 0, NULL, NULL, 0U}
+#define MATH_FN0(id, n, nl) {n, nl, vigil_math_##id, 0U, NULL, VIGIL_TYPE_F64, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL}
 
 #define MATH_FN1(id, n, nl)                                                                                            \
-    {n, nl, vigil_math_##id, 1U, vigil_math_f64_params, VIGIL_TYPE_F64, 1U, NULL, 0, NULL, NULL, 0U}
+    {n, nl, vigil_math_##id, 1U, vigil_math_f64_params, VIGIL_TYPE_F64, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL}
 
 #define MATH_FN1_BOOL(id, n, nl)                                                                                       \
-    {n, nl, vigil_math_##id, 1U, vigil_math_f64_params, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U}
+    {n, nl, vigil_math_##id, 1U, vigil_math_f64_params, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL}
 
 #define MATH_FN2(id, n, nl)                                                                                            \
-    {n, nl, vigil_math_##id, 2U, vigil_math_f64f64_params, VIGIL_TYPE_F64, 1U, NULL, 0, NULL, NULL, 0U}
+    {n, nl, vigil_math_##id, 2U, vigil_math_f64f64_params, VIGIL_TYPE_F64, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL}
 
 #define MATH_FN3(id, n, nl)                                                                                            \
-    {n, nl, vigil_math_##id, 3U, vigil_math_f64f64f64_params, VIGIL_TYPE_F64, 1U, NULL, 0, NULL, NULL, 0U}
+    {n, nl, vigil_math_##id, 3U, vigil_math_f64f64f64_params, VIGIL_TYPE_F64, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL}
 
 #define MATH_FN5(id, n, nl)                                                                                            \
-    {n, nl, vigil_math_##id, 5U, vigil_math_f64x5_params, VIGIL_TYPE_F64, 1U, NULL, 0, NULL, NULL, 0U}
+    {n, nl, vigil_math_##id, 5U, vigil_math_f64x5_params, VIGIL_TYPE_F64, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL}
 
 static const vigil_native_module_function_t vigil_math_functions[] = {
     MATH_FN0(pi, "pi", 2U),
@@ -536,19 +536,23 @@ static vigil_status_t vigil_vec2_reflect(vigil_vm_t *vm, size_t arg_count, vigil
 }
 
 /* Helper: primitive field descriptor (object_kind=0, no class/element). */
-#define VIGIL_PFIELD(n, nl, t) {n, nl, t, 0, NULL, 0U, 0}
+#define VIGIL_PFIELD(n, nl, t) {n, nl, t, 0, NULL, 0U, 0, NULL, NULL}
 
 /* Helper: instance method descriptor (is_static=0). */
-#define VIGIL_METHOD(n, nl, fn, pc, pt, rt, rc, rts) {n, nl, fn, pc, pt, rt, rc, rts, 0, NULL, 0U, 0}
+#define VIGIL_METHOD(n, nl, fn, pc, pt, rt, rc, rts)                                                                   \
+    {n, nl, fn, pc, pt, rt, rc, rts, 0, NULL, 0U, 0, NULL, NULL, NULL, NULL}
 
 /* Helper: static method descriptor (is_static=1). */
-#define VIGIL_STATIC(n, nl, fn, pc, pt, rt, rc, rts) {n, nl, fn, pc, pt, rt, rc, rts, 1, NULL, 0U, 0}
+#define VIGIL_STATIC(n, nl, fn, pc, pt, rt, rc, rts)                                                                   \
+    {n, nl, fn, pc, pt, rt, rc, rts, 1, NULL, 0U, 0, NULL, NULL, NULL, NULL}
 
 /* Helper: instance method returning a different class. */
-#define VIGIL_METHOD_RET(n, nl, fn, pc, pt, rt, rc, rts, cn, cnl) {n, nl, fn, pc, pt, rt, rc, rts, 0, cn, cnl, 0}
+#define VIGIL_METHOD_RET(n, nl, fn, pc, pt, rt, rc, rts, cn, cnl)                                                     \
+    {n, nl, fn, pc, pt, rt, rc, rts, 0, cn, cnl, 0, NULL, NULL, NULL, NULL}
 
 /* Helper: static method returning a different class. */
-#define VIGIL_STATIC_RET(n, nl, fn, pc, pt, rt, rc, rts, cn, cnl) {n, nl, fn, pc, pt, rt, rc, rts, 1, cn, cnl, 0}
+#define VIGIL_STATIC_RET(n, nl, fn, pc, pt, rt, rc, rts, cn, cnl)                                                     \
+    {n, nl, fn, pc, pt, rt, rc, rts, 1, cn, cnl, 0, NULL, NULL, NULL, NULL}
 
 /* Helper: read class_index from hidden first arg (static methods). */
 static size_t vigil_static_class_index(vigil_vm_t *vm, size_t base)
@@ -1987,7 +1991,7 @@ static const int vigil_mat4_i32i32_params[] = {VIGIL_TYPE_I32, VIGIL_TYPE_I32};
 static const int vigil_mat4_i32i32f64_params[] = {VIGIL_TYPE_I32, VIGIL_TYPE_I32, VIGIL_TYPE_F64};
 
 static const vigil_native_class_field_t vigil_mat4_fields[] = {
-    {"data", 4U, VIGIL_TYPE_OBJECT, VIGIL_NATIVE_FIELD_ARRAY, NULL, 0U, VIGIL_TYPE_F64},
+    {"data", 4U, VIGIL_TYPE_OBJECT, VIGIL_NATIVE_FIELD_ARRAY, NULL, 0U, VIGIL_TYPE_F64, NULL, NULL},
 };
 
 static const vigil_native_class_method_t vigil_mat4_methods[] = {
@@ -2013,14 +2017,14 @@ static const vigil_native_class_method_t vigil_mat4_methods[] = {
 };
 
 static const vigil_native_class_t vigil_math_classes[] = {
-    {"Vec2", 4U, vigil_vec2_fields, 2U, vigil_vec2_methods, 15U, NULL},
-    {"Vec3", 4U, vigil_vec3_fields, 3U, vigil_vec3_methods, 18U, NULL},
-    {"Vec4", 4U, vigil_vec4_fields, 4U, vigil_vec4_methods, 12U, NULL},
-    {"Quaternion", 10U, vigil_quat_fields, 4U, vigil_quat_methods, 11U, NULL},
-    {"Mat4", 4U, vigil_mat4_fields, 1U, vigil_mat4_methods, 19U, NULL},
+    {"Vec2", 4U, vigil_vec2_fields, 2U, vigil_vec2_methods, 15U, NULL, NULL},
+    {"Vec3", 4U, vigil_vec3_fields, 3U, vigil_vec3_methods, 18U, NULL, NULL},
+    {"Vec4", 4U, vigil_vec4_fields, 4U, vigil_vec4_methods, 12U, NULL, NULL},
+    {"Quaternion", 10U, vigil_quat_fields, 4U, vigil_quat_methods, 11U, NULL, NULL},
+    {"Mat4", 4U, vigil_mat4_fields, 1U, vigil_mat4_methods, 19U, NULL, NULL},
 };
 
 #define VIGIL_MATH_CLASS_COUNT (sizeof(vigil_math_classes) / sizeof(vigil_math_classes[0]))
 
 VIGIL_API const vigil_native_module_t vigil_stdlib_math = {
-    "math", 4U, vigil_math_functions, VIGIL_MATH_FUNCTION_COUNT, vigil_math_classes, VIGIL_MATH_CLASS_COUNT};
+    "math", 4U, vigil_math_functions, VIGIL_MATH_FUNCTION_COUNT, vigil_math_classes, VIGIL_MATH_CLASS_COUNT, NULL};

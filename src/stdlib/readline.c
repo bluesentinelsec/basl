@@ -215,18 +215,18 @@ static const int vigil_readline_string_param[] = {VIGIL_TYPE_STRING};
 static const int vigil_readline_i32_param[] = {VIGIL_TYPE_I32};
 
 static const vigil_native_module_function_t vigil_readline_functions[] = {
-    {"input", 5, vigil_readline_input, 1, vigil_readline_string_param, VIGIL_TYPE_STRING, 1, NULL, 0, NULL, NULL, 0U},
+    {"input", 5, vigil_readline_input, 1, vigil_readline_string_param, VIGIL_TYPE_STRING, 1, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
     {"history_add", 11, vigil_readline_history_add, 1, vigil_readline_string_param, VIGIL_TYPE_VOID, 0, NULL, 0, NULL,
-     NULL, 0U},
+     NULL, 0U, NULL, NULL, NULL, NULL},
     {"history_get", 11, vigil_readline_history_get, 1, vigil_readline_i32_param, VIGIL_TYPE_STRING, 1, NULL, 0, NULL,
-     NULL, 0U},
-    {"history_length", 14, vigil_readline_history_length, 0, NULL, VIGIL_TYPE_I32, 1, NULL, 0, NULL, NULL, 0U},
-    {"history_clear", 13, vigil_readline_history_clear, 0, NULL, VIGIL_TYPE_VOID, 0, NULL, 0, NULL, NULL, 0U},
+     NULL, 0U, NULL, NULL, NULL, NULL},
+    {"history_length", 14, vigil_readline_history_length, 0, NULL, VIGIL_TYPE_I32, 1, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
+    {"history_clear", 13, vigil_readline_history_clear, 0, NULL, VIGIL_TYPE_VOID, 0, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
     {"history_load", 12, vigil_readline_history_load, 1, vigil_readline_string_param, VIGIL_TYPE_VOID, 0, NULL, 0, NULL,
-     NULL, 0U},
+     NULL, 0U, NULL, NULL, NULL, NULL},
     {"history_save", 12, vigil_readline_history_save, 1, vigil_readline_string_param, VIGIL_TYPE_VOID, 0, NULL, 0, NULL,
-     NULL, 0U}};
+     NULL, 0U, NULL, NULL, NULL, NULL}};
 
 VIGIL_API const vigil_native_module_t vigil_stdlib_readline = {
     "readline", 8, vigil_readline_functions, sizeof(vigil_readline_functions) / sizeof(vigil_readline_functions[0]),
-    NULL,       0};
+    NULL,       0, NULL};

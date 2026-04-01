@@ -622,21 +622,21 @@ static const int str_str_params[] = {VIGIL_TYPE_STRING, VIGIL_TYPE_STRING};
 static const int i64_str_params[] = {VIGIL_TYPE_I64, VIGIL_TYPE_STRING};
 
 static const vigil_native_module_function_t log_functions[] = {
-    {"debug", 5U, log_debug, 1U, str_param, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, NULL, 0U},
-    {"info", 4U, log_info, 1U, str_param, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, NULL, 0U},
-    {"warn", 4U, log_warn, 1U, str_param, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, NULL, 0U},
-    {"error", 5U, log_error_fn, 1U, str_param, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, NULL, 0U},
-    {"debug_l", 7U, log_debug_l, 2U, i64_str_params, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, NULL, 0U},
-    {"info_l", 6U, log_info_l, 2U, i64_str_params, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, NULL, 0U},
-    {"warn_l", 6U, log_warn_l, 2U, i64_str_params, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, NULL, 0U},
-    {"error_l", 7U, log_error_l, 2U, i64_str_params, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, NULL, 0U},
-    {"set_level", 9U, log_set_level, 1U, str_param, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, NULL, 0U},
-    {"set_format", 10U, log_set_format, 1U, str_param, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, NULL, 0U},
-    {"set_output", 10U, log_set_output, 1U, str_param, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, NULL, 0U},
-    {"set_time_format", 15U, log_set_time_format, 1U, str_param, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, NULL, 0U},
-    {"with", 4U, log_with, 2U, str_str_params, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U},
+    {"debug", 5U, log_debug, 1U, str_param, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
+    {"info", 4U, log_info, 1U, str_param, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
+    {"warn", 4U, log_warn, 1U, str_param, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
+    {"error", 5U, log_error_fn, 1U, str_param, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
+    {"debug_l", 7U, log_debug_l, 2U, i64_str_params, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
+    {"info_l", 6U, log_info_l, 2U, i64_str_params, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
+    {"warn_l", 6U, log_warn_l, 2U, i64_str_params, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
+    {"error_l", 7U, log_error_l, 2U, i64_str_params, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
+    {"set_level", 9U, log_set_level, 1U, str_param, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
+    {"set_format", 10U, log_set_format, 1U, str_param, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
+    {"set_output", 10U, log_set_output, 1U, str_param, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
+    {"set_time_format", 15U, log_set_time_format, 1U, str_param, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
+    {"with", 4U, log_with, 2U, str_str_params, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
 };
 
 #define LOG_FUNCTION_COUNT (sizeof(log_functions) / sizeof(log_functions[0]))
 
-VIGIL_API const vigil_native_module_t vigil_stdlib_log = {"log", 3U, log_functions, LOG_FUNCTION_COUNT, NULL, 0U};
+VIGIL_API const vigil_native_module_t vigil_stdlib_log = {"log", 3U, log_functions, LOG_FUNCTION_COUNT, NULL, 0U, NULL};

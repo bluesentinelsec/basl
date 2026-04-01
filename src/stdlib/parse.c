@@ -203,11 +203,11 @@ static const int f64_err_returns[] = {VIGIL_TYPE_F64, VIGIL_TYPE_ERR};
 static const int bool_err_returns[] = {VIGIL_TYPE_BOOL, VIGIL_TYPE_ERR};
 
 static const vigil_native_module_function_t parse_funcs[] = {
-    {"i32", 3U, parse_i32_fn, 1U, string_param, VIGIL_TYPE_I32, 2U, i32_err_returns, 0, NULL, NULL, 0U},
-    {"i64", 3U, parse_i64_fn, 1U, string_param, VIGIL_TYPE_I64, 2U, i64_err_returns, 0, NULL, NULL, 0U},
-    {"f64", 3U, parse_f64_fn, 1U, string_param, VIGIL_TYPE_F64, 2U, f64_err_returns, 0, NULL, NULL, 0U},
-    {"bool", 4U, parse_bool_fn, 1U, string_param, VIGIL_TYPE_BOOL, 2U, bool_err_returns, 0, NULL, NULL, 0U},
+    {"i32", 3U, parse_i32_fn, 1U, string_param, VIGIL_TYPE_I32, 2U, i32_err_returns, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
+    {"i64", 3U, parse_i64_fn, 1U, string_param, VIGIL_TYPE_I64, 2U, i64_err_returns, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
+    {"f64", 3U, parse_f64_fn, 1U, string_param, VIGIL_TYPE_F64, 2U, f64_err_returns, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
+    {"bool", 4U, parse_bool_fn, 1U, string_param, VIGIL_TYPE_BOOL, 2U, bool_err_returns, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
 };
 
 VIGIL_API const vigil_native_module_t vigil_stdlib_parse = {
-    "parse", 5U, parse_funcs, sizeof(parse_funcs) / sizeof(parse_funcs[0]), NULL, 0U};
+    "parse", 5U, parse_funcs, sizeof(parse_funcs) / sizeof(parse_funcs[0]), NULL, 0U, NULL};

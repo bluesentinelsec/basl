@@ -316,17 +316,17 @@ static vigil_status_t vigil_url_decode_fn(vigil_vm_t *vm, size_t arg_count, vigi
 static const int str_param[] = {VIGIL_TYPE_STRING};
 
 static const vigil_native_module_function_t vigil_url_functions[] = {
-    {"parse", 5U, vigil_url_parse_fn, 1U, str_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U},
-    {"scheme", 6U, vigil_url_scheme_fn, 1U, str_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U},
-    {"host", 4U, vigil_url_host_fn, 1U, str_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U},
-    {"port", 4U, vigil_url_port_fn, 1U, str_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U},
-    {"path", 4U, vigil_url_path_fn, 1U, str_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U},
-    {"query", 5U, vigil_url_query_fn, 1U, str_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U},
-    {"fragment", 8U, vigil_url_fragment_fn, 1U, str_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U},
-    {"encode", 6U, vigil_url_encode_fn, 1U, str_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U},
-    {"decode", 6U, vigil_url_decode_fn, 1U, str_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U},
+    {"parse", 5U, vigil_url_parse_fn, 1U, str_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
+    {"scheme", 6U, vigil_url_scheme_fn, 1U, str_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
+    {"host", 4U, vigil_url_host_fn, 1U, str_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
+    {"port", 4U, vigil_url_port_fn, 1U, str_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
+    {"path", 4U, vigil_url_path_fn, 1U, str_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
+    {"query", 5U, vigil_url_query_fn, 1U, str_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
+    {"fragment", 8U, vigil_url_fragment_fn, 1U, str_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
+    {"encode", 6U, vigil_url_encode_fn, 1U, str_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
+    {"decode", 6U, vigil_url_decode_fn, 1U, str_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
 };
 
 #define URL_FUNCTION_COUNT (sizeof(vigil_url_functions) / sizeof(vigil_url_functions[0]))
 
-VIGIL_API const vigil_native_module_t vigil_stdlib_url = {"url", 3U, vigil_url_functions, URL_FUNCTION_COUNT, NULL, 0U};
+VIGIL_API const vigil_native_module_t vigil_stdlib_url = {"url", 3U, vigil_url_functions, URL_FUNCTION_COUNT, NULL, 0U, NULL};
