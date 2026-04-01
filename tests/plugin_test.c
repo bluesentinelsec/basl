@@ -31,6 +31,36 @@ static const vigil_native_module_function_t *FindModuleFunction(const vigil_nati
     return NULL;
 }
 
+static const vigil_native_class_t *FindModuleClass(const vigil_native_module_t *module, const char *name)
+{
+    size_t i;
+
+    if (module == NULL || name == NULL)
+        return NULL;
+    for (i = 0; i < module->class_count; i++)
+    {
+        const vigil_native_class_t *cls = &module->classes[i];
+        if (strcmp(cls->name, name) == 0)
+            return cls;
+    }
+    return NULL;
+}
+
+static const vigil_native_class_method_t *FindClassMethod(const vigil_native_class_t *cls, const char *name)
+{
+    size_t i;
+
+    if (cls == NULL || name == NULL)
+        return NULL;
+    for (i = 0; i < cls->method_count; i++)
+    {
+        const vigil_native_class_method_t *method = &cls->methods[i];
+        if (strcmp(method->name, name) == 0)
+            return method;
+    }
+    return NULL;
+}
+
 /*
  * Compile and run a Vigil program that imports both stdlib and plugin modules.
  * The program's main() must return i32.  Returns that value.
@@ -224,6 +254,32 @@ TEST(PluginRegistry, SdlExportsEnvironmentBatchFunctions)
     vigil_native_registry_free(&natives);
 }
 
+TEST(PluginRegistry, SdlExportsWindowAndMessageBoxBatchFunctions)
+{
+    vigil_native_registry_t natives;
+    vigil_error_t error = {0};
+    const vigil_native_module_t *mod;
+    const vigil_native_class_t *window_class;
+
+    if (!vigil_plugin_is_known_module("sdl", 3U))
+        return;
+
+    vigil_native_registry_init(&natives);
+    EXPECT_EQ(vigil_plugin_register_all(&natives, &error), VIGIL_STATUS_OK);
+
+    mod = vigil_native_registry_find(&natives, "sdl", 3U);
+    EXPECT_NE(mod, NULL);
+    EXPECT_NE(FindModuleFunction(mod, "show_message_box"), NULL);
+
+    window_class = FindModuleClass(mod, "Window");
+    EXPECT_NE(window_class, NULL);
+    EXPECT_NE(FindClassMethod(window_class, "get_fullscreen_mode"), NULL);
+    EXPECT_NE(FindClassMethod(window_class, "update_surface_rect"), NULL);
+    EXPECT_NE(FindClassMethod(window_class, "show_message_box"), NULL);
+
+    vigil_native_registry_free(&natives);
+}
+
 TEST(PluginRegistry, SdlGuidHelpersViaVM)
 {
     int64_t result;
@@ -308,6 +364,7 @@ void register_plugin_tests(void)
     REGISTER_TEST(PluginRegistry, PluginCoexistsWithStdlib);
     REGISTER_TEST(PluginRegistry, SdlExportsParityBatchOneFunctions);
     REGISTER_TEST(PluginRegistry, SdlExportsEnvironmentBatchFunctions);
+    REGISTER_TEST(PluginRegistry, SdlExportsWindowAndMessageBoxBatchFunctions);
     REGISTER_TEST(PluginRegistry, SdlGuidHelpersViaVM);
     REGISTER_TEST(PluginRegistry, SdlEnvironmentHelpersViaVM);
 #endif

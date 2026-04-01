@@ -751,6 +751,7 @@ static const int p_i32_str_f64[] = {VIGIL_TYPE_I32, VIGIL_TYPE_STRING, VIGIL_TYP
 static const int p_i32_str_i32[] = {VIGIL_TYPE_I32, VIGIL_TYPE_STRING, VIGIL_TYPE_I32};
 static const int p_str_str_i32[] = {VIGIL_TYPE_STRING, VIGIL_TYPE_STRING, VIGIL_TYPE_I32};
 static const int p_str_str_str[] = {VIGIL_TYPE_STRING, VIGIL_TYPE_STRING, VIGIL_TYPE_STRING};
+static const int p_i32_str_str_str[] = {VIGIL_TYPE_I32, VIGIL_TYPE_STRING, VIGIL_TYPE_STRING, VIGIL_TYPE_STRING};
 static const int p_f64_f64_str[] = {VIGIL_TYPE_F64, VIGIL_TYPE_F64, VIGIL_TYPE_STRING};
 static const int p_f64[] = {VIGIL_TYPE_F64};
 static const int p_obj[] = {VIGIL_TYPE_OBJECT};
@@ -1883,6 +1884,100 @@ static vigil_status_t sdl_fn_show_simple_message_box(vigil_vm_t *vm, size_t arg_
     return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
 }
 
+static vigil_status_t sdl_show_message_box_common(vigil_vm_t *vm, SDL_Window *window, int32_t flags, const char *title,
+                                                  const char *message, const char *buttons_text, vigil_error_t *error)
+{
+    vigil_status_t st;
+    SDL_MessageBoxData data;
+    SDL_MessageBoxButtonData buttons[8];
+    char *storage = NULL;
+    char *labels[8];
+    size_t label_count = 0;
+    int button_id = -1;
+    char default_button[] = "OK";
+    char *cursor;
+
+    memset(&data, 0, sizeof(data));
+    memset(buttons, 0, sizeof(buttons));
+    memset(labels, 0, sizeof(labels));
+
+    if (buttons_text != NULL && buttons_text[0] != '\0')
+    {
+        storage = strdup(buttons_text);
+        if (storage == NULL)
+        {
+            vigil_error_set_literal(error, VIGIL_STATUS_OUT_OF_MEMORY, "out of memory");
+            return VIGIL_STATUS_OUT_OF_MEMORY;
+        }
+
+        cursor = storage;
+        while (*cursor != '\0' && label_count < 8U)
+        {
+            char *line = cursor;
+            while (*cursor != '\0' && *cursor != '\n')
+                cursor++;
+            if (*cursor == '\n')
+            {
+                *cursor = '\0';
+                cursor++;
+            }
+            if (*line != '\0')
+                labels[label_count++] = line;
+        }
+    }
+
+    if (label_count == 0U)
+        labels[label_count++] = default_button;
+
+    for (size_t i = 0; i < label_count; i++)
+    {
+        buttons[i].flags = 0;
+        if (i == 0U)
+            buttons[i].flags |= SDL_MESSAGEBOX_BUTTON_RETURNKEY_DEFAULT;
+        if (i + 1U == label_count)
+            buttons[i].flags |= SDL_MESSAGEBOX_BUTTON_ESCAPEKEY_DEFAULT;
+        buttons[i].buttonID = (int)i;
+        buttons[i].text = labels[i];
+    }
+
+    data.flags = (SDL_MessageBoxFlags)flags;
+    data.window = window;
+    data.title = title;
+    data.message = message;
+    data.numbuttons = (int)label_count;
+    data.buttons = buttons;
+    data.colorScheme = NULL;
+
+    if (!SDL_ShowMessageBox(&data, &button_id))
+    {
+        st = sdl_push_i32(vm, -1, error);
+        free(storage);
+        if (st != VIGIL_STATUS_OK)
+            return st;
+        return sdl_push_sdl_err(vm, SDL_ERR_IO, error);
+    }
+
+    st = sdl_push_i32(vm, button_id, error);
+    free(storage);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_ok(vm, error);
+}
+
+static vigil_status_t sdl_fn_show_message_box(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t flags = sdl_arg_i32(vm, base, 0);
+    char title[256];
+    char message[4096];
+    char buttons[1024];
+    sdl_arg_str(vm, base, 1, title, sizeof(title));
+    sdl_arg_str(vm, base, 2, message, sizeof(message));
+    sdl_arg_str(vm, base, 3, buttons, sizeof(buttons));
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_show_message_box_common(vm, NULL, flags, title, message, buttons, error);
+}
+
 /* sdl.open_url(string url) -> (bool, err) */
 static vigil_status_t sdl_fn_open_url(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
 {
@@ -1971,6 +2066,10 @@ static vigil_status_t sdl_fn_log_warn(vigil_vm_t *vm, size_t arg_count, vigil_er
 SDL_CONST_FN(MESSAGEBOX_ERROR, SDL_MESSAGEBOX_ERROR)
 SDL_CONST_FN(MESSAGEBOX_WARNING, SDL_MESSAGEBOX_WARNING)
 SDL_CONST_FN(MESSAGEBOX_INFORMATION, SDL_MESSAGEBOX_INFORMATION)
+SDL_CONST_FN(MESSAGEBOX_BUTTONS_LEFT_TO_RIGHT, SDL_MESSAGEBOX_BUTTONS_LEFT_TO_RIGHT)
+SDL_CONST_FN(MESSAGEBOX_BUTTONS_RIGHT_TO_LEFT, SDL_MESSAGEBOX_BUTTONS_RIGHT_TO_LEFT)
+SDL_CONST_FN(MESSAGEBOX_BUTTON_RETURNKEY_DEFAULT, SDL_MESSAGEBOX_BUTTON_RETURNKEY_DEFAULT)
+SDL_CONST_FN(MESSAGEBOX_BUTTON_ESCAPEKEY_DEFAULT, SDL_MESSAGEBOX_BUTTON_ESCAPEKEY_DEFAULT)
 
 /* Scancode constants */
 SDL_CONST_FN(SCANCODE_A, SDL_SCANCODE_A)
@@ -7164,6 +7263,31 @@ static vigil_status_t sdl_window_has_surface(vigil_vm_t *vm, size_t arg_count, v
     return sdl_push_bool(vm, win && SDL_WindowHasSurface(win), error);
 }
 
+static vigil_status_t sdl_window_get_fullscreen_mode(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, WIN_HANDLE);
+    const SDL_DisplayMode *mode = NULL;
+    SDL_Window *win = NULL;
+    vigil_status_t st;
+    int32_t width = 0;
+    int32_t height = 0;
+
+    vigil_vm_stack_pop_n(vm, arg_count);
+    win = (SDL_Window *)SDL_HANDLE_GET(windows, h);
+    mode = win ? SDL_GetWindowFullscreenMode(win) : NULL;
+    if (mode != NULL)
+    {
+        width = (int32_t)mode->w;
+        height = (int32_t)mode->h;
+    }
+
+    st = sdl_push_i32(vm, width, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_i32(vm, height, error);
+}
+
 static vigil_status_t sdl_window_update_surface(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
 {
     size_t base = vigil_vm_stack_depth(vm) - arg_count;
@@ -7171,6 +7295,25 @@ static vigil_status_t sdl_window_update_surface(vigil_vm_t *vm, size_t arg_count
     vigil_vm_stack_pop_n(vm, arg_count);
     SDL_Window *win = (SDL_Window *)SDL_HANDLE_GET(windows, h);
     if (win && SDL_UpdateWindowSurface(win))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+static vigil_status_t sdl_window_update_surface_rect(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, WIN_HANDLE);
+    SDL_Rect rect;
+    SDL_Window *win;
+
+    rect.x = sdl_arg_i32(vm, base, 1);
+    rect.y = sdl_arg_i32(vm, base, 2);
+    rect.w = sdl_arg_i32(vm, base, 3);
+    rect.h = sdl_arg_i32(vm, base, 4);
+    vigil_vm_stack_pop_n(vm, arg_count);
+
+    win = (SDL_Window *)SDL_HANDLE_GET(windows, h);
+    if (win && SDL_UpdateWindowSurfaceRects(win, &rect, 1))
         return sdl_push_bool_ok(vm, error);
     return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
 }
@@ -7184,6 +7327,25 @@ static vigil_status_t sdl_window_destroy_surface(vigil_vm_t *vm, size_t arg_coun
     if (win && SDL_DestroyWindowSurface(win))
         return sdl_push_bool_ok(vm, error);
     return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+static vigil_status_t sdl_window_show_message_box(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, WIN_HANDLE);
+    int32_t flags = sdl_arg_i32(vm, base, 1);
+    SDL_Window *win;
+    char title[256];
+    char message[4096];
+    char buttons[1024];
+
+    sdl_arg_str(vm, base, 2, title, sizeof(title));
+    sdl_arg_str(vm, base, 3, message, sizeof(message));
+    sdl_arg_str(vm, base, 4, buttons, sizeof(buttons));
+    vigil_vm_stack_pop_n(vm, arg_count);
+
+    win = (SDL_Window *)SDL_HANDLE_GET(windows, h);
+    return sdl_show_message_box_common(vm, win, flags, title, message, buttons, error);
 }
 
 static vigil_status_t sdl_window_set_surface_vsync(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
@@ -14691,6 +14853,8 @@ static const char *const sdl_environment_handle_param_names[] = {"environment"};
 static const char *const sdl_environment_name_param_names[] = {"environment", "name"};
 static const char *const sdl_environment_set_param_names[] = {"environment", "name", "value", "overwrite"};
 static const char *const sdl_environment_create_param_names[] = {"populated"};
+static const char *const sdl_message_box_param_names[] = {"flags", "title", "message", "buttons"};
+static const char *const sdl_window_rect_param_names[] = {"x", "y", "w", "h"};
 
 static const vigil_native_symbol_doc_t sdl_doc_create_window_with_properties = {
     "Create a window from an SDL property bag.",
@@ -14745,6 +14909,25 @@ static const vigil_native_symbol_doc_t sdl_doc_set_environment_variable_in = {
     "Set one variable in an SDL environment handle.",
     "Set overwrite to 0 to keep an existing value unchanged.",
     "bool ok, err e = sdl.set_environment_variable_in(env, \"DEMO\", \"1\", 1)",
+};
+
+static const vigil_native_symbol_doc_t sdl_doc_show_message_box = {
+    "Show a message box with custom buttons and return the selected button index.",
+    "Pass button labels as a newline-separated string such as "
+    "\"Yes\\nNo\\nCancel\". The return value is the zero-based button index.",
+    "i32 button, err e = sdl.show_message_box(sdl.MESSAGEBOX_INFORMATION(), \"Question\", \"Continue?\", \"Yes\\nNo\")",
+};
+
+static const vigil_native_symbol_doc_t sdl_doc_window_get_fullscreen_mode = {
+    "Return the exclusive fullscreen mode size for the window.",
+    "Returns 0, 0 when the window is using borderless desktop fullscreen or no explicit fullscreen mode.",
+    "i32 w, i32 h = win.get_fullscreen_mode()",
+};
+
+static const vigil_native_symbol_doc_t sdl_doc_window_update_surface_rect = {
+    "Update one rectangle of the window surface.",
+    "Use this after drawing to a window surface when only one region needs to be presented.",
+    "bool ok, err e = win.update_surface_rect(0, 0, 64, 64)",
 };
 
 /* ── Function table ──────────────────────────────────────────────── */
@@ -14953,6 +15136,8 @@ static const vigil_native_module_function_t sdl_functions[] = {
     SDL_FN("get_clipboard_text", 18U, sdl_fn_get_clipboard_text, 0U, NULL, VIGIL_TYPE_STRING),
     SDL_FN("has_clipboard_text", 18U, sdl_fn_has_clipboard_text, 0U, NULL, VIGIL_TYPE_BOOL),
     SDL_FN_BOOL_ERR("show_simple_message_box", 23U, sdl_fn_show_simple_message_box, 3U, p_i32_str_str),
+    {"show_message_box", 16U, sdl_fn_show_message_box, 4U, p_i32_str_str_str, VIGIL_TYPE_I32, 2U, rt_i32_err, 0, NULL,
+     NULL, 0U, sdl_message_box_param_names, NULL, NULL, &sdl_doc_show_message_box},
     SDL_FN_BOOL_ERR("open_url", 8U, sdl_fn_open_url, 1U, p_str),
     SDL_FN("get_base_path", 13U, sdl_fn_get_base_path, 0U, NULL, VIGIL_TYPE_STRING),
     {"get_pref_path", 13U, sdl_fn_get_pref_path, 2U, p_str_str, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U, NULL,
@@ -14966,6 +15151,10 @@ static const vigil_native_module_function_t sdl_functions[] = {
     SDL_CONST_ENTRY("MESSAGEBOX_ERROR", MESSAGEBOX_ERROR),
     SDL_CONST_ENTRY("MESSAGEBOX_WARNING", MESSAGEBOX_WARNING),
     SDL_CONST_ENTRY("MESSAGEBOX_INFORMATION", MESSAGEBOX_INFORMATION),
+    SDL_CONST_ENTRY("MESSAGEBOX_BUTTONS_LEFT_TO_RIGHT", MESSAGEBOX_BUTTONS_LEFT_TO_RIGHT),
+    SDL_CONST_ENTRY("MESSAGEBOX_BUTTONS_RIGHT_TO_LEFT", MESSAGEBOX_BUTTONS_RIGHT_TO_LEFT),
+    SDL_CONST_ENTRY("MESSAGEBOX_BUTTON_RETURNKEY_DEFAULT", MESSAGEBOX_BUTTON_RETURNKEY_DEFAULT),
+    SDL_CONST_ENTRY("MESSAGEBOX_BUTTON_ESCAPEKEY_DEFAULT", MESSAGEBOX_BUTTON_ESCAPEKEY_DEFAULT),
     /* Extended display / power / screensaver (slice 13) */
     SDL_FN("get_primary_display", 19U, sdl_fn_get_primary_display, 0U, NULL, VIGIL_TYPE_I32),
     SDL_FN("get_display_content_scale", 25U, sdl_fn_get_display_content_scale, 1U, p_i32, VIGIL_TYPE_F64),
@@ -16093,9 +16282,15 @@ static const vigil_native_class_method_t sdl_window_methods[] = {
     SDL_METHOD("set_shape", 9U, sdl_window_set_shape, 1U, p_obj, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
     SDL_METHOD("get_progress_state", 18U, sdl_window_get_progress_state, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL),
     SDL_METHOD("get_progress_value", 18U, sdl_window_get_progress_value, 0U, NULL, VIGIL_TYPE_F64, 1U, NULL),
+    {"get_fullscreen_mode", 19U, sdl_window_get_fullscreen_mode, 0U, NULL, VIGIL_TYPE_I32, 2U, rt_i32_i32, 0, NULL, 0U,
+     0, NULL, NULL, NULL, &sdl_doc_window_get_fullscreen_mode},
     SDL_METHOD("has_surface", 11U, sdl_window_has_surface, 0U, NULL, VIGIL_TYPE_BOOL, 1U, NULL),
     SDL_METHOD("update_surface", 14U, sdl_window_update_surface, 0U, NULL, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
+    {"update_surface_rect", 19U, sdl_window_update_surface_rect, 4U, p_i32_i32_i32_i32, VIGIL_TYPE_BOOL, 2U, rt_bool_err,
+     0, NULL, 0U, 0, sdl_window_rect_param_names, NULL, NULL, &sdl_doc_window_update_surface_rect},
     SDL_METHOD("destroy_surface", 15U, sdl_window_destroy_surface, 0U, NULL, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
+    {"show_message_box", 16U, sdl_window_show_message_box, 4U, p_i32_str_str_str, VIGIL_TYPE_I32, 2U, rt_i32_err, 0,
+     NULL, 0U, 0, sdl_message_box_param_names, NULL, NULL, &sdl_doc_show_message_box},
     SDL_METHOD("set_surface_vsync", 17U, sdl_window_set_surface_vsync, 1U, p_i32, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
     SDL_METHOD("get_surface_vsync", 17U, sdl_window_get_surface_vsync, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL),
     /* Window remaining - methods */
