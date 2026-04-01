@@ -712,6 +712,9 @@ static const int rt_i32x4[] = {VIGIL_TYPE_I32, VIGIL_TYPE_I32, VIGIL_TYPE_I32, V
 static const int rt_i32x5[] = {VIGIL_TYPE_I32, VIGIL_TYPE_I32, VIGIL_TYPE_I32, VIGIL_TYPE_I32, VIGIL_TYPE_I32};
 static const int rt_i32x6[] = {VIGIL_TYPE_I32, VIGIL_TYPE_I32, VIGIL_TYPE_I32, VIGIL_TYPE_I32, VIGIL_TYPE_I32, VIGIL_TYPE_I32};
 static const int rt_i64_i64[] = {VIGIL_TYPE_I64, VIGIL_TYPE_I64};
+static const int rt_i32_i64[] = {VIGIL_TYPE_I32, VIGIL_TYPE_I64};
+static const int rt_f64_i64[] = {VIGIL_TYPE_F64, VIGIL_TYPE_I64};
+static const int rt_i64_bool[] = {VIGIL_TYPE_I64, VIGIL_TYPE_BOOL};
 static const int p_i64_i32x6[] = {VIGIL_TYPE_I64, VIGIL_TYPE_I32, VIGIL_TYPE_I32, VIGIL_TYPE_I32,
                                    VIGIL_TYPE_I32, VIGIL_TYPE_I32, VIGIL_TYPE_I32};
 /* clang-format on */
@@ -14160,6 +14163,200 @@ static vigil_status_t sdl_fn_blit_surface_9grid(vigil_vm_t *vm, size_t arg_count
         return sdl_push_bool_ok(vm, error);
     return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
 }
+
+/* ── C stdlib wrappers ────────────────────────────────────────────── */
+
+/* Buffer ops via unsafe buffers */
+static vigil_status_t sdl_fn_memcpy(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t dh = sdl_arg_i64(vm, base, 0);
+    int64_t sh = sdl_arg_i64(vm, base, 1);
+    int32_t len = sdl_arg_i32(vm, base, 2);
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    int32_t dsz = 0, ssz = 0;
+    void *d = vigil_unsafe_buffer_get(dh, &dsz);
+    void *s = vigil_unsafe_buffer_get(sh, &ssz);
+    if (d && s && len <= dsz && len <= ssz)
+        SDL_memcpy(d, s, (size_t)len);
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t sdl_fn_memmove(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t dh = sdl_arg_i64(vm, base, 0);
+    int64_t sh = sdl_arg_i64(vm, base, 1);
+    int32_t len = sdl_arg_i32(vm, base, 2);
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    int32_t dsz = 0, ssz = 0;
+    void *d = vigil_unsafe_buffer_get(dh, &dsz);
+    void *s = vigil_unsafe_buffer_get(sh, &ssz);
+    if (d && s && len <= dsz && len <= ssz)
+        SDL_memmove(d, s, (size_t)len);
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t sdl_fn_memset(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t dh = sdl_arg_i64(vm, base, 0);
+    int32_t c = sdl_arg_i32(vm, base, 1);
+    int32_t len = sdl_arg_i32(vm, base, 2);
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    int32_t dsz = 0;
+    void *d = vigil_unsafe_buffer_get(dh, &dsz);
+    if (d && len <= dsz)
+        SDL_memset(d, c, (size_t)len);
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t sdl_fn_memset4(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t dh = sdl_arg_i64(vm, base, 0);
+    int32_t val = sdl_arg_i32(vm, base, 1);
+    int32_t dwords = sdl_arg_i32(vm, base, 2);
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    int32_t dsz = 0;
+    void *d = vigil_unsafe_buffer_get(dh, &dsz);
+    if (d && (int32_t)(dwords * 4) <= dsz)
+        SDL_memset4(d, (Uint32)val, (size_t)dwords);
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t sdl_fn_memcmp(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t ah = sdl_arg_i64(vm, base, 0);
+    int64_t bh = sdl_arg_i64(vm, base, 1);
+    int32_t len = sdl_arg_i32(vm, base, 2);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    int32_t asz = 0, bsz = 0;
+    void *a = vigil_unsafe_buffer_get(ah, &asz);
+    void *b = vigil_unsafe_buffer_get(bh, &bsz);
+    if (a && b && len <= asz && len <= bsz)
+        return sdl_push_i32(vm, SDL_memcmp(a, b, (size_t)len), error);
+    return sdl_push_i32(vm, -1, error);
+}
+
+/* UTF-8 */
+static vigil_status_t sdl_fn_ucs4_to_utf8(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t cp = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    char buf[8] = {0};
+    SDL_UCS4ToUTF8((Uint32)cp, buf);
+    return sdl_push_string(vm, buf, error);
+}
+
+static vigil_status_t sdl_fn_step_utf8(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    char str[512];
+    sdl_arg_str(vm, base, 0, str, sizeof(str));
+    int32_t pos = sdl_arg_i32(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    const char *p = str + pos;
+    size_t slen = strlen(str) - (size_t)pos;
+    Uint32 cp = SDL_StepUTF8(&p, &slen);
+    vigil_status_t st = sdl_push_i32(vm, (int32_t)cp, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_i32(vm, (int32_t)(p - str), error);
+}
+
+/* iconv_string */
+static vigil_status_t sdl_fn_iconv_string(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    char tocode[64];
+    sdl_arg_str(vm, base, 0, tocode, sizeof(tocode));
+    char fromcode[64];
+    sdl_arg_str(vm, base, 1, fromcode, sizeof(fromcode));
+    char inbuf[1024];
+    sdl_arg_str(vm, base, 2, inbuf, sizeof(inbuf));
+    vigil_vm_stack_pop_n(vm, arg_count);
+    char *out = SDL_iconv_string(tocode, fromcode, inbuf, strlen(inbuf) + 1);
+    vigil_status_t st = sdl_push_string(vm, out ? out : "", error);
+    SDL_free(out);
+    return st;
+}
+
+/* Seeded random */
+static vigil_status_t sdl_fn_rand_r(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t state = sdl_arg_i64(vm, base, 0);
+    int32_t n = sdl_arg_i32(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    Uint64 s = (Uint64)state;
+    Sint32 r = SDL_rand_r(&s, n);
+    vigil_status_t st = sdl_push_i32(vm, r, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_i64(vm, (int64_t)s, error);
+}
+
+static vigil_status_t sdl_fn_randf_r(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t state = sdl_arg_i64(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    Uint64 s = (Uint64)state;
+    float r = SDL_randf_r(&s);
+    vigil_status_t st = sdl_push_f64(vm, r, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_i64(vm, (int64_t)s, error);
+}
+
+static vigil_status_t sdl_fn_rand_bits_r(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t state = sdl_arg_i64(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    Uint64 s = (Uint64)state;
+    Uint32 r = SDL_rand_bits_r(&s);
+    vigil_status_t st = sdl_push_i32(vm, (int32_t)r, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_i64(vm, (int64_t)s, error);
+}
+
+/* Overflow checks */
+static vigil_status_t sdl_fn_size_add_check_overflow(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t a = sdl_arg_i64(vm, base, 0);
+    int64_t b = sdl_arg_i64(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    size_t result = 0;
+    bool ok = SDL_size_add_check_overflow((size_t)a, (size_t)b, &result);
+    vigil_status_t st = sdl_push_i64(vm, (int64_t)result, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_bool(vm, ok, error);
+}
+
+static vigil_status_t sdl_fn_size_mul_check_overflow(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t a = sdl_arg_i64(vm, base, 0);
+    int64_t b = sdl_arg_i64(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    size_t result = 0;
+    bool ok = SDL_size_mul_check_overflow((size_t)a, (size_t)b, &result);
+    vigil_status_t st = sdl_push_i64(vm, (int64_t)result, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_bool(vm, ok, error);
+}
 /* Texture access constants */
 SDL_CONST_FN(TEXTUREACCESS_STATIC, SDL_TEXTUREACCESS_STATIC)
 SDL_CONST_FN(TEXTUREACCESS_STREAMING, SDL_TEXTUREACCESS_STREAMING)
@@ -15082,6 +15279,26 @@ static const vigil_native_module_function_t sdl_functions[] = {
      2U, rt_bool_err, 0, NULL, NULL, 0},
     {"blit_surface_9grid", 18U, sdl_fn_blit_surface_9grid, 16U, p_blit_9grid, VIGIL_TYPE_BOOL, 2U, rt_bool_err, 0, NULL,
      NULL, 0},
+    /* C stdlib wrappers — buffer ops */
+    SDL_FN_VOID("memcpy", 6U, sdl_fn_memcpy, 3U, p_i64_i64_i32),
+    SDL_FN_VOID("memmove", 7U, sdl_fn_memmove, 3U, p_i64_i64_i32),
+    SDL_FN_VOID("memset", 6U, sdl_fn_memset, 3U, p_i64_i32_i32),
+    SDL_FN_VOID("memset4", 7U, sdl_fn_memset4, 3U, p_i64_i32_i32),
+    SDL_FN("memcmp", 6U, sdl_fn_memcmp, 3U, p_i64_i64_i32, VIGIL_TYPE_I32),
+    /* UTF-8 */
+    SDL_FN("ucs4_to_utf8", 12U, sdl_fn_ucs4_to_utf8, 1U, p_i32, VIGIL_TYPE_STRING),
+    {"step_utf8", 9U, sdl_fn_step_utf8, 2U, p_str_i32, VIGIL_TYPE_I32, 2U, rt_i32_i32, 0, NULL, NULL, 0},
+    /* iconv */
+    {"iconv_string", 12U, sdl_fn_iconv_string, 3U, p_str_str_str, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0},
+    /* Seeded random */
+    {"rand_r", 6U, sdl_fn_rand_r, 2U, p_i64_i32, VIGIL_TYPE_I32, 2U, rt_i32_i64, 0, NULL, NULL, 0},
+    {"randf_r", 7U, sdl_fn_randf_r, 1U, p_i64, VIGIL_TYPE_F64, 2U, rt_f64_i64, 0, NULL, NULL, 0},
+    {"rand_bits_r", 11U, sdl_fn_rand_bits_r, 1U, p_i64, VIGIL_TYPE_I32, 2U, rt_i32_i64, 0, NULL, NULL, 0},
+    /* Overflow checks */
+    {"size_add_check_overflow", 23U, sdl_fn_size_add_check_overflow, 2U, p_i64_i64, VIGIL_TYPE_I64, 2U, rt_i64_bool, 0,
+     NULL, NULL, 0},
+    {"size_mul_check_overflow", 23U, sdl_fn_size_mul_check_overflow, 2U, p_i64_i64, VIGIL_TYPE_I64, 2U, rt_i64_bool, 0,
+     NULL, NULL, 0},
     /* IO constants */
     SDL_CONST_ENTRY("IO_SEEK_SET", IO_SEEK_SET),
     SDL_CONST_ENTRY("IO_SEEK_CUR", IO_SEEK_CUR),
