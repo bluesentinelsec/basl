@@ -516,15 +516,22 @@ static const vigil_native_module_function_t time_functions[] = {
     {"is_dst", 6U, time_is_dst, 1U, i64_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
     {"utc_offset", 10U, time_utc_offset, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
     {"date", 4U, time_date, 6U, date_params, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
-    {"format", 6U, time_format, 2U, i64_str_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
+    {"format", 6U, time_format, 2U, i64_str_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL,
+     NULL},
     {"parse", 5U, time_parse, 2U, str_str_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
-    {"add_days", 8U, time_add_days, 2U, i64_i32_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
-    {"add_hours", 9U, time_add_hours, 2U, i64_i32_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
-    {"add_minutes", 11U, time_add_minutes, 2U, i64_i32_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
-    {"add_seconds", 11U, time_add_seconds, 2U, i64_i64_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
-    {"diff_days", 9U, time_diff_days, 2U, i64_i64_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
+    {"add_days", 8U, time_add_days, 2U, i64_i32_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL,
+     NULL},
+    {"add_hours", 9U, time_add_hours, 2U, i64_i32_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL,
+     NULL},
+    {"add_minutes", 11U, time_add_minutes, 2U, i64_i32_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL,
+     NULL, NULL},
+    {"add_seconds", 11U, time_add_seconds, 2U, i64_i64_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL,
+     NULL, NULL},
+    {"diff_days", 9U, time_diff_days, 2U, i64_i64_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL,
+     NULL},
 };
 
 #define TIME_FUNCTION_COUNT (sizeof(time_functions) / sizeof(time_functions[0]))
 
-VIGIL_API const vigil_native_module_t vigil_stdlib_time = {"time", 4U, time_functions, TIME_FUNCTION_COUNT, NULL, 0U, NULL};
+VIGIL_API const vigil_native_module_t vigil_stdlib_time = {"time", 4U,  time_functions, TIME_FUNCTION_COUNT, NULL,
+                                                           0U,     NULL};

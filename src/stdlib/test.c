@@ -88,8 +88,8 @@ static const int vigil_test_assert_params[] = {VIGIL_TYPE_BOOL, VIGIL_TYPE_STRIN
 static const int vigil_test_fail_params[] = {VIGIL_TYPE_STRING};
 
 static const vigil_native_class_method_t vigil_test_t_methods[] = {
-    {"assert", 6U, vigil_test_assert, 2U, vigil_test_assert_params, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, 0U, 0,
-     NULL, NULL, NULL, NULL},
+    {"assert", 6U, vigil_test_assert, 2U, vigil_test_assert_params, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, 0U, 0, NULL,
+     NULL, NULL, NULL},
     {"fail", 4U, vigil_test_fail, 1U, vigil_test_fail_params, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, 0U, 0, NULL, NULL,
      NULL, NULL},
 };

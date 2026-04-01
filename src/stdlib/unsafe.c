@@ -964,4 +964,5 @@ static const vigil_native_module_function_t vigil_unsafe_functions[] = {
 #undef FV
 
 VIGIL_API const vigil_native_module_t vigil_stdlib_unsafe = {
-    "unsafe", 6U, vigil_unsafe_functions, sizeof(vigil_unsafe_functions) / sizeof(vigil_unsafe_functions[0]), NULL, 0U, NULL};
+    "unsafe", 6U,  vigil_unsafe_functions, sizeof(vigil_unsafe_functions) / sizeof(vigil_unsafe_functions[0]), NULL,
+    0U,       NULL};

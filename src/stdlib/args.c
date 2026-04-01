@@ -1070,7 +1070,8 @@ static const vigil_native_symbol_doc_t parser_positional_doc = {
 
 static const vigil_native_symbol_doc_t parser_parse_doc = {
     "Parse command-line arguments.",
-    "Parses the process arguments currently available to the runtime. Returns an error value indicating success or failure.",
+    "Parses the process arguments currently available to the runtime. Returns an error value indicating success or "
+    "failure.",
     "error err = parser.parse(args.count())",
 };
 
@@ -1115,14 +1116,14 @@ static const vigil_native_class_method_t parser_methods[] = {
      parser_option_param_names, NULL, NULL, &parser_option_int_doc},
     {"option_multi", 12U, parser_option_multi, 3U, str3_params, VIGIL_TYPE_OBJECT, 1U, NULL, 0, "Parser", 6U, 0,
      parser_flag_param_names, NULL, NULL, &parser_option_multi_doc},
-    {"mark_required", 13U, parser_mark_required, 0U, NULL, VIGIL_TYPE_OBJECT, 1U, NULL, 0, "Parser", 6U, 0, NULL,
-     NULL, NULL, &parser_mark_required_doc},
+    {"mark_required", 13U, parser_mark_required, 0U, NULL, VIGIL_TYPE_OBJECT, 1U, NULL, 0, "Parser", 6U, 0, NULL, NULL,
+     NULL, &parser_mark_required_doc},
     {"positional", 10U, parser_positional, 2U, str2_params, VIGIL_TYPE_OBJECT, 1U, NULL, 0, "Parser", 6U, 0,
      parser_positional_param_names, NULL, NULL, &parser_positional_doc},
     {"parse", 5U, parser_parse, 1U, i32_params, VIGIL_TYPE_ERR, 1U, NULL, 0, NULL, 0U, 0, parser_parse_param_names,
      NULL, NULL, &parser_parse_doc},
-    {"get", 3U, parser_get, 1U, str1_params, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, 0U, 0, parser_name_param_names,
-     NULL, NULL, &parser_get_doc},
+    {"get", 3U, parser_get, 1U, str1_params, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, 0U, 0, parser_name_param_names, NULL,
+     NULL, &parser_get_doc},
     {"get_bool", 8U, parser_get_bool, 1U, str1_params, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, 0U, 0,
      parser_name_param_names, NULL, NULL, &parser_get_bool_doc},
     {"get_multi", 9U, parser_get_multi, 1U, str1_params, VIGIL_TYPE_OBJECT, 1U, NULL, 0, NULL, 0U, VIGIL_TYPE_STRING,
@@ -1134,10 +1135,15 @@ static const vigil_native_class_method_t parser_methods[] = {
 };
 
 static const vigil_native_class_t vigil_args_classes[] = {
-    {"Parser", 6U, parser_fields, FIELD_COUNT, parser_methods, sizeof(parser_methods) / sizeof(parser_methods[0]),
-     NULL, &parser_class_doc},
+    {"Parser", 6U, parser_fields, FIELD_COUNT, parser_methods, sizeof(parser_methods) / sizeof(parser_methods[0]), NULL,
+     &parser_class_doc},
 };
 
-VIGIL_API const vigil_native_module_t vigil_stdlib_args = {
-    "args", 4, vigil_args_functions, sizeof(vigil_args_functions) / sizeof(vigil_args_functions[0]), vigil_args_classes,
-    1U, &vigil_args_module_doc};
+VIGIL_API const vigil_native_module_t vigil_stdlib_args = {"args",
+                                                           4,
+                                                           vigil_args_functions,
+                                                           sizeof(vigil_args_functions) /
+                                                               sizeof(vigil_args_functions[0]),
+                                                           vigil_args_classes,
+                                                           1U,
+                                                           &vigil_args_module_doc};

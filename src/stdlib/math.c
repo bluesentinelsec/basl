@@ -297,22 +297,57 @@ static const int vigil_math_f64_params[] = {VIGIL_TYPE_F64};
 static const int vigil_math_f64f64_params[] = {VIGIL_TYPE_F64, VIGIL_TYPE_F64};
 static const int vigil_math_f64f64f64_params[] = {VIGIL_TYPE_F64, VIGIL_TYPE_F64, VIGIL_TYPE_F64};
 
-#define MATH_FN0(id, n, nl) {n, nl, vigil_math_##id, 0U, NULL, VIGIL_TYPE_F64, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL}
+#define MATH_FN0(id, n, nl)                                                                                            \
+    {n, nl, vigil_math_##id, 0U, NULL, VIGIL_TYPE_F64, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL}
 
 #define MATH_FN1(id, n, nl)                                                                                            \
-    {n, nl, vigil_math_##id, 1U, vigil_math_f64_params, VIGIL_TYPE_F64, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL}
+    {n,    nl,  vigil_math_##id, 1U, vigil_math_f64_params, VIGIL_TYPE_F64, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL,   \
+     NULL, NULL}
 
 #define MATH_FN1_BOOL(id, n, nl)                                                                                       \
-    {n, nl, vigil_math_##id, 1U, vigil_math_f64_params, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL}
+    {n,    nl,  vigil_math_##id, 1U, vigil_math_f64_params, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL,  \
+     NULL, NULL}
 
 #define MATH_FN2(id, n, nl)                                                                                            \
-    {n, nl, vigil_math_##id, 2U, vigil_math_f64f64_params, VIGIL_TYPE_F64, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL}
+    {                                                                                                                  \
+        n,                                                                                                             \
+        nl,                                                                                                            \
+        vigil_math_##id,                                                                                               \
+        2U,                                                                                                            \
+        vigil_math_f64f64_params,                                                                                      \
+        VIGIL_TYPE_F64,                                                                                                \
+        1U,                                                                                                            \
+        NULL,                                                                                                          \
+        0,                                                                                                             \
+        NULL,                                                                                                          \
+        NULL,                                                                                                          \
+        0U,                                                                                                            \
+        NULL,                                                                                                          \
+        NULL,                                                                                                          \
+        NULL,                                                                                                          \
+        NULL}
 
 #define MATH_FN3(id, n, nl)                                                                                            \
-    {n, nl, vigil_math_##id, 3U, vigil_math_f64f64f64_params, VIGIL_TYPE_F64, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL}
+    {n,                                                                                                                \
+     nl,                                                                                                               \
+     vigil_math_##id,                                                                                                  \
+     3U,                                                                                                               \
+     vigil_math_f64f64f64_params,                                                                                      \
+     VIGIL_TYPE_F64,                                                                                                   \
+     1U,                                                                                                               \
+     NULL,                                                                                                             \
+     0,                                                                                                                \
+     NULL,                                                                                                             \
+     NULL,                                                                                                             \
+     0U,                                                                                                               \
+     NULL,                                                                                                             \
+     NULL,                                                                                                             \
+     NULL,                                                                                                             \
+     NULL}
 
 #define MATH_FN5(id, n, nl)                                                                                            \
-    {n, nl, vigil_math_##id, 5U, vigil_math_f64x5_params, VIGIL_TYPE_F64, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL}
+    {n,    nl,  vigil_math_##id, 5U, vigil_math_f64x5_params, VIGIL_TYPE_F64, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, \
+     NULL, NULL}
 
 static const vigil_native_module_function_t vigil_math_functions[] = {
     MATH_FN0(pi, "pi", 2U),
@@ -547,11 +582,11 @@ static vigil_status_t vigil_vec2_reflect(vigil_vm_t *vm, size_t arg_count, vigil
     {n, nl, fn, pc, pt, rt, rc, rts, 1, NULL, 0U, 0, NULL, NULL, NULL, NULL}
 
 /* Helper: instance method returning a different class. */
-#define VIGIL_METHOD_RET(n, nl, fn, pc, pt, rt, rc, rts, cn, cnl)                                                     \
+#define VIGIL_METHOD_RET(n, nl, fn, pc, pt, rt, rc, rts, cn, cnl)                                                      \
     {n, nl, fn, pc, pt, rt, rc, rts, 0, cn, cnl, 0, NULL, NULL, NULL, NULL}
 
 /* Helper: static method returning a different class. */
-#define VIGIL_STATIC_RET(n, nl, fn, pc, pt, rt, rc, rts, cn, cnl)                                                     \
+#define VIGIL_STATIC_RET(n, nl, fn, pc, pt, rt, rc, rts, cn, cnl)                                                      \
     {n, nl, fn, pc, pt, rt, rc, rts, 1, cn, cnl, 0, NULL, NULL, NULL, NULL}
 
 /* Helper: read class_index from hidden first arg (static methods). */
