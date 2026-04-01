@@ -524,16 +524,55 @@ static const vigil_native_type_t array_array_string_ret = VIGIL_NATIVE_TYPE_ARRA
 static const vigil_native_type_t array_string_ret = VIGIL_NATIVE_TYPE_ARRAY(VIGIL_TYPE_STRING);
 static const vigil_native_type_t array_array_string_param = VIGIL_NATIVE_TYPE_ARRAY(VIGIL_TYPE_OBJECT);
 static const vigil_native_type_t array_string_param = VIGIL_NATIVE_TYPE_ARRAY(VIGIL_TYPE_STRING);
+static const char *const csv_data_param_names[] = {"data"};
+static const char *const csv_line_param_names[] = {"line"};
+static const char *const csv_rows_param_names[] = {"rows"};
+static const char *const csv_row_param_names[] = {"row"};
+static const char *const csv_array_array_string_type_names[] = {"array<array<string>>"};
+static const char *const csv_array_string_type_names[] = {"array<string>"};
+
+static const vigil_native_symbol_doc_t vigil_csv_module_doc = {
+    "CSV parsing and generation.",
+    "The csv module provides RFC 4180 compliant CSV parsing and generation. It handles quoted fields, escaped quotes, and CRLF line endings.",
+    NULL,
+};
+
+static const vigil_native_symbol_doc_t vigil_csv_parse_doc = {
+    "Parse CSV to 2D array.",
+    "Parses CSV data into an array of rows, each row an array of fields.",
+    "array<array<string>> rows = csv.parse(data)",
+};
+
+static const vigil_native_symbol_doc_t vigil_csv_parse_row_doc = {
+    "Parse single CSV row.",
+    "Parses one line of CSV into an array of fields.",
+    "array<string> fields = csv.parse_row(line)",
+};
+
+static const vigil_native_symbol_doc_t vigil_csv_stringify_doc = {
+    "Convert 2D array to CSV.",
+    "Generates RFC 4180 CSV with CRLF line endings.",
+    "string csv_text = csv.stringify(rows)",
+};
+
+static const vigil_native_symbol_doc_t vigil_csv_stringify_row_doc = {
+    "Convert row to CSV line.",
+    "Generates a single CSV line without a trailing newline.",
+    "string line = csv.stringify_row(row)",
+};
 
 static const vigil_native_module_function_t csv_functions[] = {
-    {"parse", 5U, csv_parse, 1U, str_param, VIGIL_TYPE_OBJECT, 1U, NULL, 0, NULL, &array_array_string_ret, 0U},
-    {"parse_row", 9U, csv_parse_row, 1U, str_param, VIGIL_TYPE_OBJECT, 1U, NULL, 0, NULL, &array_string_ret, 0U},
+    {"parse", 5U, csv_parse, 1U, str_param, VIGIL_TYPE_OBJECT, 1U, NULL, 0, NULL, &array_array_string_ret, 0U,
+     csv_data_param_names, NULL, "array<array<string>>", &vigil_csv_parse_doc},
+    {"parse_row", 9U, csv_parse_row, 1U, str_param, VIGIL_TYPE_OBJECT, 1U, NULL, 0, NULL, &array_string_ret, 0U,
+     csv_line_param_names, NULL, "array<string>", &vigil_csv_parse_row_doc},
     {"stringify", 9U, csv_stringify, 1U, arr_param, VIGIL_TYPE_STRING, 1U, NULL, 0, &array_array_string_param, NULL,
-     0U},
+     0U, csv_rows_param_names, csv_array_array_string_type_names, NULL, &vigil_csv_stringify_doc},
     {"stringify_row", 13U, csv_stringify_row, 1U, arr_param, VIGIL_TYPE_STRING, 1U, NULL, 0, &array_string_param, NULL,
-     0U},
+     0U, csv_row_param_names, csv_array_string_type_names, NULL, &vigil_csv_stringify_row_doc},
 };
 
 #define CSV_FUNCTION_COUNT (sizeof(csv_functions) / sizeof(csv_functions[0]))
 
-VIGIL_API const vigil_native_module_t vigil_stdlib_csv = {"csv", 3U, csv_functions, CSV_FUNCTION_COUNT, NULL, 0U};
+VIGIL_API const vigil_native_module_t vigil_stdlib_csv = {"csv", 3U, csv_functions, CSV_FUNCTION_COUNT, NULL, 0U,
+                                                          &vigil_csv_module_doc};

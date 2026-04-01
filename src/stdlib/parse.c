@@ -201,13 +201,48 @@ static const int i32_err_returns[] = {VIGIL_TYPE_I32, VIGIL_TYPE_ERR};
 static const int i64_err_returns[] = {VIGIL_TYPE_I64, VIGIL_TYPE_ERR};
 static const int f64_err_returns[] = {VIGIL_TYPE_F64, VIGIL_TYPE_ERR};
 static const int bool_err_returns[] = {VIGIL_TYPE_BOOL, VIGIL_TYPE_ERR};
+static const char *const parse_string_param_names[] = {"s"};
+
+static const vigil_native_symbol_doc_t vigil_parse_module_doc = {
+    "String-to-value parsing.",
+    "Parse strings into typed values with error handling.",
+    NULL,
+};
+
+static const vigil_native_symbol_doc_t vigil_parse_i32_doc = {
+    "Parse string to i32.",
+    "Returns (value, error). Error is ok on success.",
+    "i32 v, error err = parse.i32(\"42\")",
+};
+
+static const vigil_native_symbol_doc_t vigil_parse_i64_doc = {
+    "Parse string to i64.",
+    "Returns (value, error). Error is ok on success.",
+    "i64 v, error err = parse.i64(\"123456789\")",
+};
+
+static const vigil_native_symbol_doc_t vigil_parse_f64_doc = {
+    "Parse string to f64.",
+    "Returns (value, error). Error is ok on success.",
+    "f64 v, error err = parse.f64(\"3.14\")",
+};
+
+static const vigil_native_symbol_doc_t vigil_parse_bool_doc = {
+    "Parse string to bool.",
+    "Accepts \"true\" and \"false\". Returns (value, error).",
+    "bool v, error err = parse.bool(\"true\")",
+};
 
 static const vigil_native_module_function_t parse_funcs[] = {
-    {"i32", 3U, parse_i32_fn, 1U, string_param, VIGIL_TYPE_I32, 2U, i32_err_returns, 0, NULL, NULL, 0U},
-    {"i64", 3U, parse_i64_fn, 1U, string_param, VIGIL_TYPE_I64, 2U, i64_err_returns, 0, NULL, NULL, 0U},
-    {"f64", 3U, parse_f64_fn, 1U, string_param, VIGIL_TYPE_F64, 2U, f64_err_returns, 0, NULL, NULL, 0U},
-    {"bool", 4U, parse_bool_fn, 1U, string_param, VIGIL_TYPE_BOOL, 2U, bool_err_returns, 0, NULL, NULL, 0U},
+    {"i32", 3U, parse_i32_fn, 1U, string_param, VIGIL_TYPE_I32, 2U, i32_err_returns, 0, NULL, NULL, 0U,
+     parse_string_param_names, NULL, NULL, &vigil_parse_i32_doc},
+    {"i64", 3U, parse_i64_fn, 1U, string_param, VIGIL_TYPE_I64, 2U, i64_err_returns, 0, NULL, NULL, 0U,
+     parse_string_param_names, NULL, NULL, &vigil_parse_i64_doc},
+    {"f64", 3U, parse_f64_fn, 1U, string_param, VIGIL_TYPE_F64, 2U, f64_err_returns, 0, NULL, NULL, 0U,
+     parse_string_param_names, NULL, NULL, &vigil_parse_f64_doc},
+    {"bool", 4U, parse_bool_fn, 1U, string_param, VIGIL_TYPE_BOOL, 2U, bool_err_returns, 0, NULL, NULL, 0U,
+     parse_string_param_names, NULL, NULL, &vigil_parse_bool_doc},
 };
 
 VIGIL_API const vigil_native_module_t vigil_stdlib_parse = {
-    "parse", 5U, parse_funcs, sizeof(parse_funcs) / sizeof(parse_funcs[0]), NULL, 0U};
+    "parse", 5U, parse_funcs, sizeof(parse_funcs) / sizeof(parse_funcs[0]), NULL, 0U, &vigil_parse_module_doc};

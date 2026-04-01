@@ -61,6 +61,7 @@ add_library(vigil_core OBJECT
     src/allocator.c
     src/array.c
     src/binding.c
+    src/builtins.c
     src/checker.c
     src/chunk.c
     src/cli_lib.c

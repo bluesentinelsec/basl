@@ -620,23 +620,128 @@ static vigil_status_t log_with(vigil_vm_t *vm, size_t arg_count, vigil_error_t *
 static const int str_param[] = {VIGIL_TYPE_STRING};
 static const int str_str_params[] = {VIGIL_TYPE_STRING, VIGIL_TYPE_STRING};
 static const int i64_str_params[] = {VIGIL_TYPE_I64, VIGIL_TYPE_STRING};
+static const char *const log_msg_param_names[] = {"msg"};
+static const char *const log_logger_msg_param_names[] = {"logger", "msg"};
+static const char *const log_level_param_names[] = {"level"};
+static const char *const log_format_param_names[] = {"format"};
+static const char *const log_dest_param_names[] = {"dest"};
+static const char *const log_time_format_param_names[] = {"format"};
+static const char *const log_with_param_names[] = {"key", "value"};
+
+static const vigil_native_symbol_doc_t vigil_log_module_doc = {
+    "Structured logging with levels and formats.",
+    "The log module provides structured logging similar to Go's slog package. It supports debug/info/warn/error levels, text and JSON output, and custom handlers for embedders.",
+    NULL,
+};
+
+static const vigil_native_symbol_doc_t vigil_log_debug_doc = {
+    "Log at DEBUG level.",
+    "Logs a message to the configured output.",
+    "log.debug(\"starting parser\")",
+};
+
+static const vigil_native_symbol_doc_t vigil_log_info_doc = {
+    "Log at INFO level.",
+    "Logs a message to the configured output.",
+    "log.info(\"request received\")",
+};
+
+static const vigil_native_symbol_doc_t vigil_log_warn_doc = {
+    "Log at WARN level.",
+    "Logs a message to the configured output.",
+    "log.warn(\"slow query detected\")",
+};
+
+static const vigil_native_symbol_doc_t vigil_log_error_doc = {
+    "Log at ERROR level.",
+    "Logs a message to the configured output.",
+    "log.error(\"connection failed\")",
+};
+
+static const vigil_native_symbol_doc_t vigil_log_debug_l_doc = {
+    "Log at DEBUG with logger.",
+    "Uses preset attributes from a logger handle created by log.with.",
+    "log.debug_l(logger, \"msg\")",
+};
+
+static const vigil_native_symbol_doc_t vigil_log_info_l_doc = {
+    "Log at INFO with logger.",
+    "Uses preset attributes from a logger handle created by log.with.",
+    "log.info_l(logger, \"msg\")",
+};
+
+static const vigil_native_symbol_doc_t vigil_log_warn_l_doc = {
+    "Log at WARN with logger.",
+    "Uses preset attributes from a logger handle created by log.with.",
+    "log.warn_l(logger, \"msg\")",
+};
+
+static const vigil_native_symbol_doc_t vigil_log_error_l_doc = {
+    "Log at ERROR with logger.",
+    "Uses preset attributes from a logger handle created by log.with.",
+    "log.error_l(logger, \"msg\")",
+};
+
+static const vigil_native_symbol_doc_t vigil_log_set_level_doc = {
+    "Set minimum log level.",
+    "Valid levels are \"debug\", \"info\", \"warn\", and \"error\". The default is \"info\".",
+    "log.set_level(\"debug\")",
+};
+
+static const vigil_native_symbol_doc_t vigil_log_set_format_doc = {
+    "Set output format.",
+    "Valid formats are \"text\" and \"json\".",
+    "log.set_format(\"json\")",
+};
+
+static const vigil_native_symbol_doc_t vigil_log_set_output_doc = {
+    "Set output destination.",
+    "Valid destinations are \"stdout\", \"stderr\", or a file path.",
+    "log.set_output(\"app.log\")",
+};
+
+static const vigil_native_symbol_doc_t vigil_log_set_time_format_doc = {
+    "Set timestamp format.",
+    "Valid formats are \"rfc3339\", \"unix\", and \"none\".",
+    "log.set_time_format(\"unix\")",
+};
+
+static const vigil_native_symbol_doc_t vigil_log_with_doc = {
+    "Create logger with preset attribute.",
+    "Returns a logger handle for use with the *_l logging functions.",
+    "i64 logger = log.with(\"service\", \"api\")",
+};
 
 static const vigil_native_module_function_t log_functions[] = {
-    {"debug", 5U, log_debug, 1U, str_param, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, NULL, 0U},
-    {"info", 4U, log_info, 1U, str_param, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, NULL, 0U},
-    {"warn", 4U, log_warn, 1U, str_param, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, NULL, 0U},
-    {"error", 5U, log_error_fn, 1U, str_param, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, NULL, 0U},
-    {"debug_l", 7U, log_debug_l, 2U, i64_str_params, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, NULL, 0U},
-    {"info_l", 6U, log_info_l, 2U, i64_str_params, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, NULL, 0U},
-    {"warn_l", 6U, log_warn_l, 2U, i64_str_params, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, NULL, 0U},
-    {"error_l", 7U, log_error_l, 2U, i64_str_params, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, NULL, 0U},
-    {"set_level", 9U, log_set_level, 1U, str_param, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, NULL, 0U},
-    {"set_format", 10U, log_set_format, 1U, str_param, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, NULL, 0U},
-    {"set_output", 10U, log_set_output, 1U, str_param, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, NULL, 0U},
-    {"set_time_format", 15U, log_set_time_format, 1U, str_param, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, NULL, 0U},
-    {"with", 4U, log_with, 2U, str_str_params, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U},
+    {"debug", 5U, log_debug, 1U, str_param, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, NULL, 0U, log_msg_param_names, NULL,
+     NULL, &vigil_log_debug_doc},
+    {"info", 4U, log_info, 1U, str_param, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, NULL, 0U, log_msg_param_names, NULL,
+     NULL, &vigil_log_info_doc},
+    {"warn", 4U, log_warn, 1U, str_param, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, NULL, 0U, log_msg_param_names, NULL,
+     NULL, &vigil_log_warn_doc},
+    {"error", 5U, log_error_fn, 1U, str_param, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, NULL, 0U, log_msg_param_names, NULL,
+     NULL, &vigil_log_error_doc},
+    {"debug_l", 7U, log_debug_l, 2U, i64_str_params, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, NULL, 0U,
+     log_logger_msg_param_names, NULL, NULL, &vigil_log_debug_l_doc},
+    {"info_l", 6U, log_info_l, 2U, i64_str_params, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, NULL, 0U,
+     log_logger_msg_param_names, NULL, NULL, &vigil_log_info_l_doc},
+    {"warn_l", 6U, log_warn_l, 2U, i64_str_params, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, NULL, 0U,
+     log_logger_msg_param_names, NULL, NULL, &vigil_log_warn_l_doc},
+    {"error_l", 7U, log_error_l, 2U, i64_str_params, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, NULL, 0U,
+     log_logger_msg_param_names, NULL, NULL, &vigil_log_error_l_doc},
+    {"set_level", 9U, log_set_level, 1U, str_param, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, NULL, 0U,
+     log_level_param_names, NULL, NULL, &vigil_log_set_level_doc},
+    {"set_format", 10U, log_set_format, 1U, str_param, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, NULL, 0U,
+     log_format_param_names, NULL, NULL, &vigil_log_set_format_doc},
+    {"set_output", 10U, log_set_output, 1U, str_param, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, NULL, 0U,
+     log_dest_param_names, NULL, NULL, &vigil_log_set_output_doc},
+    {"set_time_format", 15U, log_set_time_format, 1U, str_param, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, NULL, 0U,
+     log_time_format_param_names, NULL, NULL, &vigil_log_set_time_format_doc},
+    {"with", 4U, log_with, 2U, str_str_params, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U, log_with_param_names, NULL,
+     NULL, &vigil_log_with_doc},
 };
 
 #define LOG_FUNCTION_COUNT (sizeof(log_functions) / sizeof(log_functions[0]))
 
-VIGIL_API const vigil_native_module_t vigil_stdlib_log = {"log", 3U, log_functions, LOG_FUNCTION_COUNT, NULL, 0U};
+VIGIL_API const vigil_native_module_t vigil_stdlib_log = {"log", 3U, log_functions, LOG_FUNCTION_COUNT, NULL, 0U,
+                                                          &vigil_log_module_doc};

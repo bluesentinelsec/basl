@@ -485,21 +485,112 @@ static const int i64_param[] = {VIGIL_TYPE_I64};
 static const int i64_i32_param[] = {VIGIL_TYPE_I64, VIGIL_TYPE_I32};
 static const int i64_str_param[] = {VIGIL_TYPE_I64, VIGIL_TYPE_STRING};
 static const int udp_send_param[] = {VIGIL_TYPE_I64, VIGIL_TYPE_STRING, VIGIL_TYPE_I32, VIGIL_TYPE_STRING};
+static const char *const net_host_port_param_names[] = {"host", "port"};
+static const char *const net_listener_param_names[] = {"listener"};
+static const char *const net_sock_param_names[] = {"sock"};
+static const char *const net_sock_max_bytes_param_names[] = {"sock", "max_bytes"};
+static const char *const net_sock_data_param_names[] = {"sock", "data"};
+static const char *const net_sock_host_port_data_param_names[] = {"sock", "host", "port", "data"};
+static const char *const net_sock_ms_param_names[] = {"sock", "ms"};
+
+static const vigil_native_symbol_doc_t vigil_net_module_doc = {
+    "TCP and UDP socket networking.",
+    "The net module provides TCP and UDP socket support for client and server programming.",
+    NULL,
+};
+
+static const vigil_native_symbol_doc_t vigil_net_tcp_listen_doc = {
+    "Create TCP server socket.",
+    "Binds and listens on the given address. Returns a socket handle or -1 on failure.",
+    "i64 server = net.tcp_listen(\"0.0.0.0\", 8080)",
+};
+
+static const vigil_native_symbol_doc_t vigil_net_tcp_accept_doc = {
+    "Accept TCP connection.",
+    "Blocks until a client connects and returns a client socket handle.",
+    "i64 client = net.tcp_accept(server)",
+};
+
+static const vigil_native_symbol_doc_t vigil_net_tcp_connect_doc = {
+    "Connect to TCP server.",
+    "Returns a socket handle or -1 on failure.",
+    "i64 sock = net.tcp_connect(\"example.com\", 80)",
+};
+
+static const vigil_native_symbol_doc_t vigil_net_read_doc = {
+    "Read from socket.",
+    "Returns data read, or an empty string on error or EOF.",
+    "string data = net.read(sock, 4096)",
+};
+
+static const vigil_native_symbol_doc_t vigil_net_write_doc = {
+    "Write to socket.",
+    "Returns bytes written or -1 on error.",
+    "net.write(sock, \"Hello\")",
+};
+
+static const vigil_native_symbol_doc_t vigil_net_close_doc = {
+    "Close socket.",
+    "Closes and releases the socket.",
+    "net.close(sock)",
+};
+
+static const vigil_native_symbol_doc_t vigil_net_udp_bind_doc = {
+    "Create bound UDP socket.",
+    "Binds a UDP socket to an address for receiving.",
+    "i64 sock = net.udp_bind(\"0.0.0.0\", 5000)",
+};
+
+static const vigil_native_symbol_doc_t vigil_net_udp_new_doc = {
+    "Create unbound UDP socket.",
+    "Creates a UDP socket for sending.",
+    "i64 sock = net.udp_new()",
+};
+
+static const vigil_native_symbol_doc_t vigil_net_udp_send_doc = {
+    "Send UDP datagram.",
+    "Returns bytes sent or -1 on error.",
+    "net.udp_send(sock, \"127.0.0.1\", 5000, \"hello\")",
+};
+
+static const vigil_native_symbol_doc_t vigil_net_udp_recv_doc = {
+    "Receive UDP datagram.",
+    "Returns received data or an empty string on error.",
+    "string data = net.udp_recv(sock, 1024)",
+};
+
+static const vigil_native_symbol_doc_t vigil_net_set_timeout_doc = {
+    "Set socket timeout.",
+    "Sets the read and write timeout in milliseconds.",
+    "net.set_timeout(sock, 5000)",
+};
 
 static const vigil_native_module_function_t net_functions[] = {
-    {"tcp_listen", 10U, net_tcp_listen, 2U, str_i32_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U},
-    {"tcp_accept", 10U, net_tcp_accept, 1U, i64_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U},
-    {"tcp_connect", 11U, net_tcp_connect, 2U, str_i32_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U},
-    {"read", 4U, net_read, 2U, i64_i32_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U},
-    {"write", 5U, net_write, 2U, i64_str_param, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, NULL, 0U},
-    {"close", 5U, net_close, 1U, i64_param, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, NULL, 0U},
-    {"udp_bind", 8U, net_udp_bind, 2U, str_i32_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U},
-    {"udp_new", 7U, net_udp_new, 0U, NULL, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U},
-    {"udp_send", 8U, net_udp_send, 4U, udp_send_param, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, NULL, 0U},
-    {"udp_recv", 8U, net_udp_recv, 2U, i64_i32_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U},
-    {"set_timeout", 11U, net_set_timeout, 2U, i64_i32_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U},
+    {"tcp_listen", 10U, net_tcp_listen, 2U, str_i32_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U,
+     net_host_port_param_names, NULL, NULL, &vigil_net_tcp_listen_doc},
+    {"tcp_accept", 10U, net_tcp_accept, 1U, i64_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U,
+     net_listener_param_names, NULL, NULL, &vigil_net_tcp_accept_doc},
+    {"tcp_connect", 11U, net_tcp_connect, 2U, str_i32_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U,
+     net_host_port_param_names, NULL, NULL, &vigil_net_tcp_connect_doc},
+    {"read", 4U, net_read, 2U, i64_i32_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U,
+     net_sock_max_bytes_param_names, NULL, NULL, &vigil_net_read_doc},
+    {"write", 5U, net_write, 2U, i64_str_param, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, NULL, 0U,
+     net_sock_data_param_names, NULL, NULL, &vigil_net_write_doc},
+    {"close", 5U, net_close, 1U, i64_param, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, NULL, 0U, net_sock_param_names, NULL,
+     NULL, &vigil_net_close_doc},
+    {"udp_bind", 8U, net_udp_bind, 2U, str_i32_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U,
+     net_host_port_param_names, NULL, NULL, &vigil_net_udp_bind_doc},
+    {"udp_new", 7U, net_udp_new, 0U, NULL, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL,
+     &vigil_net_udp_new_doc},
+    {"udp_send", 8U, net_udp_send, 4U, udp_send_param, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, NULL, 0U,
+     net_sock_host_port_data_param_names, NULL, NULL, &vigil_net_udp_send_doc},
+    {"udp_recv", 8U, net_udp_recv, 2U, i64_i32_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U,
+     net_sock_max_bytes_param_names, NULL, NULL, &vigil_net_udp_recv_doc},
+    {"set_timeout", 11U, net_set_timeout, 2U, i64_i32_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U,
+     net_sock_ms_param_names, NULL, NULL, &vigil_net_set_timeout_doc},
 };
 
 #define NET_FUNCTION_COUNT (sizeof(net_functions) / sizeof(net_functions[0]))
 
-VIGIL_API const vigil_native_module_t vigil_stdlib_net = {"net", 3U, net_functions, NET_FUNCTION_COUNT, NULL, 0U};
+VIGIL_API const vigil_native_module_t vigil_stdlib_net = {"net", 3U, net_functions, NET_FUNCTION_COUNT, NULL, 0U,
+                                                          &vigil_net_module_doc};

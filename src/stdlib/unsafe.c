@@ -908,60 +908,279 @@ static const int p_i64_i32_str[] = {VIGIL_TYPE_I64, VIGIL_TYPE_I32, VIGIL_TYPE_S
 static const int p_str[] = {VIGIL_TYPE_STRING};
 static const int p_str_i32[] = {VIGIL_TYPE_STRING, VIGIL_TYPE_I32};
 static const int p_copy[] = {VIGIL_TYPE_I64, VIGIL_TYPE_I32, VIGIL_TYPE_I64, VIGIL_TYPE_I32, VIGIL_TYPE_I32};
+static const char *const unsafe_size_param_names[] = {"size"};
+static const char *const unsafe_buf_param_names[] = {"buf"};
+static const char *const unsafe_buf_size_param_names[] = {"buf", "size"};
+static const char *const unsafe_buf_offset_param_names[] = {"buf", "offset"};
+static const char *const unsafe_buf_offset_value_i32_param_names[] = {"buf", "offset", "value"};
+static const char *const unsafe_buf_offset_value_i64_param_names[] = {"buf", "offset", "value"};
+static const char *const unsafe_buf_offset_value_f64_param_names[] = {"buf", "offset", "value"};
+static const char *const unsafe_buf_offset_value_str_param_names[] = {"buf", "offset", "value"};
+static const char *const unsafe_ptr_offset_param_names[] = {"ptr", "offset"};
+static const char *const unsafe_ptr_offset_value_i32_param_names[] = {"ptr", "offset", "value"};
+static const char *const unsafe_ptr_offset_value_i64_param_names[] = {"ptr", "offset", "value"};
+static const char *const unsafe_ptr_offset_value_f64_param_names[] = {"ptr", "offset", "value"};
+static const char *const unsafe_type_param_names[] = {"type"};
+static const char *const unsafe_type_field_param_names[] = {"type", "field"};
+static const char *const unsafe_errno_param_names[] = {"value"};
+static const char *const unsafe_copy_param_names[] = {"dst", "dst_off", "src", "src_off", "len"};
+static const char *const unsafe_slot_param_names[] = {"slot"};
 
-#define F(n, nl, fn, pc, pt, rt) {n, nl, fn, pc, pt, rt, 1, NULL, 0, NULL, NULL, 0U}
-#define FV(n, nl, fn, pc, pt) {n, nl, fn, pc, pt, VIGIL_TYPE_VOID, 0, NULL, 0, NULL, NULL, 0U}
+static const vigil_native_symbol_doc_t vigil_unsafe_module_doc = {
+    "Low-level memory operations.",
+    "Allocate, read, and write raw memory buffers. Use with care.",
+    NULL,
+};
+
+static const vigil_native_symbol_doc_t vigil_unsafe_alloc_doc = {"Allocate a buffer.",
+                                                                 "Returns a handle to a zero-initialized buffer.",
+                                                                 "i64 buf = unsafe.alloc(256)"};
+static const vigil_native_symbol_doc_t vigil_unsafe_realloc_doc = {"Resize a buffer.",
+                                                                   "Returns the (possibly new) handle.",
+                                                                   "buf = unsafe.realloc(buf, 512)"};
+static const vigil_native_symbol_doc_t vigil_unsafe_free_doc = {"Free a buffer.", "Releases the buffer memory.",
+                                                                "unsafe.free(buf)"};
+static const vigil_native_symbol_doc_t vigil_unsafe_ptr_doc = {"Get raw pointer.",
+                                                               "Returns the underlying C pointer for FFI use.",
+                                                               "i64 p = unsafe.ptr(buf)"};
+static const vigil_native_symbol_doc_t vigil_unsafe_len_doc = {"Get buffer length.",
+                                                               "Returns the allocated size in bytes.",
+                                                               "i32 n = unsafe.len(buf)"};
+static const vigil_native_symbol_doc_t vigil_unsafe_get_doc = {"Read a byte.",
+                                                               "Returns the byte value at the given offset.",
+                                                               "i32 b = unsafe.get(buf, 0)"};
+static const vigil_native_symbol_doc_t vigil_unsafe_set_doc = {"Write a byte.", "Sets the byte at the given offset.",
+                                                               "unsafe.set(buf, 0, 0xFF)"};
+static const vigil_native_symbol_doc_t vigil_unsafe_get_i32_doc = {"Read a 32-bit integer.",
+                                                                   "Reads a native-endian i32 at the given byte offset.",
+                                                                   "i32 v = unsafe.get_i32(buf, 0)"};
+static const vigil_native_symbol_doc_t vigil_unsafe_set_i32_doc = {"Write a 32-bit integer.",
+                                                                   "Writes a native-endian i32 at the given byte offset.",
+                                                                   "unsafe.set_i32(buf, 0, 42)"};
+static const vigil_native_symbol_doc_t vigil_unsafe_get_i64_doc = {"Read a 64-bit integer.",
+                                                                   "Reads a native-endian i64 at the given byte offset.",
+                                                                   "i64 v = unsafe.get_i64(buf, 0)"};
+static const vigil_native_symbol_doc_t vigil_unsafe_set_i64_doc = {"Write a 64-bit integer.",
+                                                                   "Writes a native-endian i64 at the given byte offset.",
+                                                                   "unsafe.set_i64(buf, 0, 100)"};
+static const vigil_native_symbol_doc_t vigil_unsafe_get_f32_doc = {
+    "Read a 32-bit float.",
+    "Reads a native-endian f32 at the given byte offset and returns it as f64.",
+    "f64 v = unsafe.get_f32(buf, 0)",
+};
+static const vigil_native_symbol_doc_t vigil_unsafe_set_f32_doc = {
+    "Write a 32-bit float.",
+    "Writes a native-endian f32 value at the given byte offset.",
+    "unsafe.set_f32(buf, 0, 3.5)",
+};
+static const vigil_native_symbol_doc_t vigil_unsafe_get_f64_doc = {"Read a 64-bit float.",
+                                                                   "Reads a native-endian f64 at the given byte offset.",
+                                                                   "f64 v = unsafe.get_f64(buf, 0)"};
+static const vigil_native_symbol_doc_t vigil_unsafe_set_f64_doc = {"Write a 64-bit float.",
+                                                                   "Writes a native-endian f64 at the given byte offset.",
+                                                                   "unsafe.set_f64(buf, 0, 3.14)"};
+static const vigil_native_symbol_doc_t vigil_unsafe_write_str_doc = {
+    "Write a string into a buffer.",
+    "Copies the string bytes into the buffer starting at the given byte offset.",
+    "unsafe.write_str(buf, 0, \"hello\")",
+};
+static const vigil_native_symbol_doc_t vigil_unsafe_copy_doc = {"Copy bytes between buffers.",
+                                                                "Copies len bytes from src+src_off to dst+dst_off.",
+                                                                "unsafe.copy(dst, 0, src, 0, 64)"};
+static const vigil_native_symbol_doc_t vigil_unsafe_peek_u8_doc = {"Read a byte from a raw pointer.",
+                                                                   "Reads an unchecked u8 from ptr + offset.",
+                                                                   "i32 b = unsafe.peek_u8(ptr, 0)"};
+static const vigil_native_symbol_doc_t vigil_unsafe_peek_i32_doc = {
+    "Read a 32-bit integer from a raw pointer.",
+    "Reads an unchecked native-endian i32 from ptr + offset.",
+    "i32 v = unsafe.peek_i32(ptr, 0)",
+};
+static const vigil_native_symbol_doc_t vigil_unsafe_peek_i64_doc = {
+    "Read a 64-bit integer from a raw pointer.",
+    "Reads an unchecked native-endian i64 from ptr + offset.",
+    "i64 v = unsafe.peek_i64(ptr, 0)",
+};
+static const vigil_native_symbol_doc_t vigil_unsafe_peek_f32_doc = {
+    "Read a 32-bit float from a raw pointer.",
+    "Reads an unchecked native-endian f32 from ptr + offset and returns it as f64.",
+    "f64 v = unsafe.peek_f32(ptr, 0)",
+};
+static const vigil_native_symbol_doc_t vigil_unsafe_peek_f64_doc = {
+    "Read a 64-bit float from a raw pointer.",
+    "Reads an unchecked native-endian f64 from ptr + offset.",
+    "f64 v = unsafe.peek_f64(ptr, 0)",
+};
+static const vigil_native_symbol_doc_t vigil_unsafe_peek_ptr_doc = {
+    "Read a pointer from a raw pointer.",
+    "Reads an unchecked pointer-sized value from ptr + offset.",
+    "i64 p = unsafe.peek_ptr(ptr, 0)",
+};
+static const vigil_native_symbol_doc_t vigil_unsafe_poke_u8_doc = {"Write a byte to a raw pointer.",
+                                                                   "Writes an unchecked u8 value to ptr + offset.",
+                                                                   "unsafe.poke_u8(ptr, 0, 0xff)"};
+static const vigil_native_symbol_doc_t vigil_unsafe_poke_i32_doc = {
+    "Write a 32-bit integer to a raw pointer.",
+    "Writes an unchecked native-endian i32 to ptr + offset.",
+    "unsafe.poke_i32(ptr, 0, 42)",
+};
+static const vigil_native_symbol_doc_t vigil_unsafe_poke_i64_doc = {
+    "Write a 64-bit integer to a raw pointer.",
+    "Writes an unchecked native-endian i64 to ptr + offset.",
+    "unsafe.poke_i64(ptr, 0, 99)",
+};
+static const vigil_native_symbol_doc_t vigil_unsafe_poke_f32_doc = {
+    "Write a 32-bit float to a raw pointer.",
+    "Writes an unchecked native-endian f32 to ptr + offset.",
+    "unsafe.poke_f32(ptr, 0, 1.5)",
+};
+static const vigil_native_symbol_doc_t vigil_unsafe_poke_f64_doc = {
+    "Write a 64-bit float to a raw pointer.",
+    "Writes an unchecked native-endian f64 to ptr + offset.",
+    "unsafe.poke_f64(ptr, 0, 1.5)",
+};
+static const vigil_native_symbol_doc_t vigil_unsafe_poke_ptr_doc = {
+    "Write a pointer to a raw pointer.",
+    "Writes an unchecked pointer-sized value to ptr + offset.",
+    "unsafe.poke_ptr(ptr, 0, other_ptr)",
+};
+static const vigil_native_symbol_doc_t vigil_unsafe_null_doc = {"Get null pointer.",
+                                                                "Returns 0 (null pointer constant).",
+                                                                "i64 p = unsafe.null()"};
+static const vigil_native_symbol_doc_t vigil_unsafe_sizeof_doc = {"Get type size.",
+                                                                  "Returns the size in bytes of a C type name.",
+                                                                  "i32 n = unsafe.sizeof(\"int\")"};
+static const vigil_native_symbol_doc_t vigil_unsafe_sizeof_ptr_doc = {
+    "Get pointer size.",
+    "Returns the size of a pointer on this platform (4 or 8).",
+    "i32 n = unsafe.sizeof_ptr()",
+};
+static const vigil_native_symbol_doc_t vigil_unsafe_alignof_doc = {
+    "Get type alignment.",
+    "Returns the alignment requirement in bytes of a C type name.",
+    "i32 n = unsafe.alignof(\"double\")",
+};
+static const vigil_native_symbol_doc_t vigil_unsafe_offsetof_doc = {
+    "Get field offset.",
+    "Returns the byte offset of a generated struct field index within the named C struct layout.",
+    "i32 off = unsafe.offsetof(\"sockaddr_in\", 0)",
+};
+static const vigil_native_symbol_doc_t vigil_unsafe_struct_size_doc = {
+    "Get struct size.",
+    "Returns the size in bytes of a named C struct layout.",
+    "i32 n = unsafe.struct_size(\"sockaddr_in\")",
+};
+static const vigil_native_symbol_doc_t vigil_unsafe_errno_doc = {"Get errno.", "Returns the current C errno value.",
+                                                                 "i32 e = unsafe.errno()"};
+static const vigil_native_symbol_doc_t vigil_unsafe_set_errno_doc = {"Set errno.", "Sets the C errno value.",
+                                                                     "unsafe.set_errno(0)"};
+static const vigil_native_symbol_doc_t vigil_unsafe_str_doc = {"Read C string.",
+                                                               "Reads a null-terminated string from a raw pointer.",
+                                                               "string s = unsafe.str(ptr)"};
+static const vigil_native_symbol_doc_t vigil_unsafe_cb_alloc_doc = {
+    "Allocate a callback slot.",
+    "Returns an FFI callback slot handle for advanced unsafe callback plumbing.",
+    "i64 slot = unsafe.cb_alloc()",
+};
+static const vigil_native_symbol_doc_t vigil_unsafe_cb_free_doc = {
+    "Free a callback slot.",
+    "Releases a callback slot previously allocated with unsafe.cb_alloc.",
+    "unsafe.cb_free(0)",
+};
+
+#define F(n, nl, fn, pc, pt, rt) {n, nl, fn, pc, pt, rt, 1, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL}
+#define FV(n, nl, fn, pc, pt) {n, nl, fn, pc, pt, VIGIL_TYPE_VOID, 0, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL}
 
 static const vigil_native_module_function_t vigil_unsafe_functions[] = {
     /* Buffer management */
-    F("alloc", 5U, vigil_unsafe_alloc, 1U, p_i32, VIGIL_TYPE_I64),
-    F("realloc", 7U, vigil_unsafe_realloc, 2U, p_i64_i32, VIGIL_TYPE_I64),
-    FV("free", 4U, vigil_unsafe_free, 1U, p_i64),
-    F("ptr", 3U, vigil_unsafe_ptr, 1U, p_i64, VIGIL_TYPE_I64),
-    F("len", 3U, vigil_unsafe_len, 1U, p_i64, VIGIL_TYPE_I32),
+    {"alloc", 5U, vigil_unsafe_alloc, 1U, p_i32, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U, unsafe_size_param_names,
+     NULL, NULL, &vigil_unsafe_alloc_doc},
+    {"realloc", 7U, vigil_unsafe_realloc, 2U, p_i64_i32, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U,
+     unsafe_buf_size_param_names, NULL, NULL, &vigil_unsafe_realloc_doc},
+    {"free", 4U, vigil_unsafe_free, 1U, p_i64, VIGIL_TYPE_VOID, 0, NULL, 0, NULL, NULL, 0U, unsafe_buf_param_names,
+     NULL, NULL, &vigil_unsafe_free_doc},
+    {"ptr", 3U, vigil_unsafe_ptr, 1U, p_i64, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U, unsafe_buf_param_names, NULL,
+     NULL, &vigil_unsafe_ptr_doc},
+    {"len", 3U, vigil_unsafe_len, 1U, p_i64, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, NULL, 0U, unsafe_buf_param_names, NULL,
+     NULL, &vigil_unsafe_len_doc},
     /* Buffer byte access */
-    F("get", 3U, vigil_unsafe_get, 2U, p_i64_i32, VIGIL_TYPE_I32),
-    FV("set", 3U, vigil_unsafe_set, 3U, p_i64_i32_i32),
+    {"get", 3U, vigil_unsafe_get, 2U, p_i64_i32, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, NULL, 0U,
+     unsafe_buf_offset_param_names, NULL, NULL, &vigil_unsafe_get_doc},
+    {"set", 3U, vigil_unsafe_set, 3U, p_i64_i32_i32, VIGIL_TYPE_VOID, 0, NULL, 0, NULL, NULL, 0U,
+     unsafe_buf_offset_value_i32_param_names, NULL, NULL, &vigil_unsafe_set_doc},
     /* Buffer typed access */
-    F("get_i32", 7U, vigil_unsafe_get_i32, 2U, p_i64_i32, VIGIL_TYPE_I32),
-    FV("set_i32", 7U, vigil_unsafe_set_i32, 3U, p_i64_i32_i32),
-    F("get_i64", 7U, vigil_unsafe_get_i64, 2U, p_i64_i32, VIGIL_TYPE_I64),
-    FV("set_i64", 7U, vigil_unsafe_set_i64, 3U, p_i64_i32_i64),
-    F("get_f32", 7U, vigil_unsafe_get_f32, 2U, p_i64_i32, VIGIL_TYPE_F64),
-    FV("set_f32", 7U, vigil_unsafe_set_f32, 3U, p_i64_i32_f64),
-    F("get_f64", 7U, vigil_unsafe_get_f64, 2U, p_i64_i32, VIGIL_TYPE_F64),
-    FV("set_f64", 7U, vigil_unsafe_set_f64, 3U, p_i64_i32_f64),
-    FV("write_str", 9U, vigil_unsafe_write_str, 3U, p_i64_i32_str),
-    FV("copy", 4U, vigil_unsafe_copy, 5U, p_copy),
+    {"get_i32", 7U, vigil_unsafe_get_i32, 2U, p_i64_i32, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, NULL, 0U,
+     unsafe_buf_offset_param_names, NULL, NULL, &vigil_unsafe_get_i32_doc},
+    {"set_i32", 7U, vigil_unsafe_set_i32, 3U, p_i64_i32_i32, VIGIL_TYPE_VOID, 0, NULL, 0, NULL, NULL, 0U,
+     unsafe_buf_offset_value_i32_param_names, NULL, NULL, &vigil_unsafe_set_i32_doc},
+    {"get_i64", 7U, vigil_unsafe_get_i64, 2U, p_i64_i32, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U,
+     unsafe_buf_offset_param_names, NULL, NULL, &vigil_unsafe_get_i64_doc},
+    {"set_i64", 7U, vigil_unsafe_set_i64, 3U, p_i64_i32_i64, VIGIL_TYPE_VOID, 0, NULL, 0, NULL, NULL, 0U,
+     unsafe_buf_offset_value_i64_param_names, NULL, NULL, &vigil_unsafe_set_i64_doc},
+    {"get_f32", 7U, vigil_unsafe_get_f32, 2U, p_i64_i32, VIGIL_TYPE_F64, 1U, NULL, 0, NULL, NULL, 0U,
+     unsafe_buf_offset_param_names, NULL, NULL, &vigil_unsafe_get_f32_doc},
+    {"set_f32", 7U, vigil_unsafe_set_f32, 3U, p_i64_i32_f64, VIGIL_TYPE_VOID, 0, NULL, 0, NULL, NULL, 0U,
+     unsafe_buf_offset_value_f64_param_names, NULL, NULL, &vigil_unsafe_set_f32_doc},
+    {"get_f64", 7U, vigil_unsafe_get_f64, 2U, p_i64_i32, VIGIL_TYPE_F64, 1U, NULL, 0, NULL, NULL, 0U,
+     unsafe_buf_offset_param_names, NULL, NULL, &vigil_unsafe_get_f64_doc},
+    {"set_f64", 7U, vigil_unsafe_set_f64, 3U, p_i64_i32_f64, VIGIL_TYPE_VOID, 0, NULL, 0, NULL, NULL, 0U,
+     unsafe_buf_offset_value_f64_param_names, NULL, NULL, &vigil_unsafe_set_f64_doc},
+    {"write_str", 9U, vigil_unsafe_write_str, 3U, p_i64_i32_str, VIGIL_TYPE_VOID, 0, NULL, 0, NULL, NULL, 0U,
+     unsafe_buf_offset_value_str_param_names, NULL, NULL, &vigil_unsafe_write_str_doc},
+    {"copy", 4U, vigil_unsafe_copy, 5U, p_copy, VIGIL_TYPE_VOID, 0, NULL, 0, NULL, NULL, 0U, unsafe_copy_param_names,
+     NULL, NULL, &vigil_unsafe_copy_doc},
     /* Raw pointer peek/poke (unchecked) */
-    F("peek_u8", 7U, vigil_unsafe_peek_u8, 2U, p_i64_i32, VIGIL_TYPE_I32),
-    F("peek_i32", 8U, vigil_unsafe_peek_i32, 2U, p_i64_i32, VIGIL_TYPE_I32),
-    F("peek_i64", 8U, vigil_unsafe_peek_i64, 2U, p_i64_i32, VIGIL_TYPE_I64),
-    F("peek_f32", 8U, vigil_unsafe_peek_f32, 2U, p_i64_i32, VIGIL_TYPE_F64),
-    F("peek_f64", 8U, vigil_unsafe_peek_f64, 2U, p_i64_i32, VIGIL_TYPE_F64),
-    F("peek_ptr", 8U, vigil_unsafe_peek_ptr, 2U, p_i64_i32, VIGIL_TYPE_I64),
-    FV("poke_u8", 7U, vigil_unsafe_poke_u8, 3U, p_i64_i32_i32),
-    FV("poke_i32", 8U, vigil_unsafe_poke_i32, 3U, p_i64_i32_i32),
-    FV("poke_i64", 8U, vigil_unsafe_poke_i64, 3U, p_i64_i32_i64),
-    FV("poke_f32", 8U, vigil_unsafe_poke_f32, 3U, p_i64_i32_f64),
-    FV("poke_f64", 8U, vigil_unsafe_poke_f64, 3U, p_i64_i32_f64),
-    FV("poke_ptr", 8U, vigil_unsafe_poke_ptr, 3U, p_i64_i32_i64),
+    {"peek_u8", 7U, vigil_unsafe_peek_u8, 2U, p_i64_i32, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, NULL, 0U,
+     unsafe_ptr_offset_param_names, NULL, NULL, &vigil_unsafe_peek_u8_doc},
+    {"peek_i32", 8U, vigil_unsafe_peek_i32, 2U, p_i64_i32, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, NULL, 0U,
+     unsafe_ptr_offset_param_names, NULL, NULL, &vigil_unsafe_peek_i32_doc},
+    {"peek_i64", 8U, vigil_unsafe_peek_i64, 2U, p_i64_i32, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U,
+     unsafe_ptr_offset_param_names, NULL, NULL, &vigil_unsafe_peek_i64_doc},
+    {"peek_f32", 8U, vigil_unsafe_peek_f32, 2U, p_i64_i32, VIGIL_TYPE_F64, 1U, NULL, 0, NULL, NULL, 0U,
+     unsafe_ptr_offset_param_names, NULL, NULL, &vigil_unsafe_peek_f32_doc},
+    {"peek_f64", 8U, vigil_unsafe_peek_f64, 2U, p_i64_i32, VIGIL_TYPE_F64, 1U, NULL, 0, NULL, NULL, 0U,
+     unsafe_ptr_offset_param_names, NULL, NULL, &vigil_unsafe_peek_f64_doc},
+    {"peek_ptr", 8U, vigil_unsafe_peek_ptr, 2U, p_i64_i32, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U,
+     unsafe_ptr_offset_param_names, NULL, NULL, &vigil_unsafe_peek_ptr_doc},
+    {"poke_u8", 7U, vigil_unsafe_poke_u8, 3U, p_i64_i32_i32, VIGIL_TYPE_VOID, 0, NULL, 0, NULL, NULL, 0U,
+     unsafe_ptr_offset_value_i32_param_names, NULL, NULL, &vigil_unsafe_poke_u8_doc},
+    {"poke_i32", 8U, vigil_unsafe_poke_i32, 3U, p_i64_i32_i32, VIGIL_TYPE_VOID, 0, NULL, 0, NULL, NULL, 0U,
+     unsafe_ptr_offset_value_i32_param_names, NULL, NULL, &vigil_unsafe_poke_i32_doc},
+    {"poke_i64", 8U, vigil_unsafe_poke_i64, 3U, p_i64_i32_i64, VIGIL_TYPE_VOID, 0, NULL, 0, NULL, NULL, 0U,
+     unsafe_ptr_offset_value_i64_param_names, NULL, NULL, &vigil_unsafe_poke_i64_doc},
+    {"poke_f32", 8U, vigil_unsafe_poke_f32, 3U, p_i64_i32_f64, VIGIL_TYPE_VOID, 0, NULL, 0, NULL, NULL, 0U,
+     unsafe_ptr_offset_value_f64_param_names, NULL, NULL, &vigil_unsafe_poke_f32_doc},
+    {"poke_f64", 8U, vigil_unsafe_poke_f64, 3U, p_i64_i32_f64, VIGIL_TYPE_VOID, 0, NULL, 0, NULL, NULL, 0U,
+     unsafe_ptr_offset_value_f64_param_names, NULL, NULL, &vigil_unsafe_poke_f64_doc},
+    {"poke_ptr", 8U, vigil_unsafe_poke_ptr, 3U, p_i64_i32_i64, VIGIL_TYPE_VOID, 0, NULL, 0, NULL, NULL, 0U,
+     unsafe_ptr_offset_value_i64_param_names, NULL, NULL, &vigil_unsafe_poke_ptr_doc},
     /* Utility */
-    F("null", 4U, vigil_unsafe_null, 0U, NULL, VIGIL_TYPE_I64),
-    F("sizeof_ptr", 10U, vigil_unsafe_sizeof_ptr, 0U, NULL, VIGIL_TYPE_I32),
-    F("sizeof", 6U, vigil_unsafe_sizeof, 1U, p_str, VIGIL_TYPE_I32),
-    F("alignof", 7U, vigil_unsafe_alignof, 1U, p_str, VIGIL_TYPE_I32),
-    F("offsetof", 8U, vigil_unsafe_offsetof, 2U, p_str_i32, VIGIL_TYPE_I32),
-    F("struct_size", 11U, vigil_unsafe_struct_size, 1U, p_str, VIGIL_TYPE_I32),
-    F("errno", 5U, vigil_unsafe_errno, 0U, NULL, VIGIL_TYPE_I32),
-    FV("set_errno", 9U, vigil_unsafe_set_errno, 1U, p_i32),
-    F("str", 3U, vigil_unsafe_str, 1U, p_i64, VIGIL_TYPE_STRING),
-    F("cb_alloc", 8U, vigil_unsafe_cb_alloc, 0U, NULL, VIGIL_TYPE_I64),
-    FV("cb_free", 7U, vigil_unsafe_cb_free, 1U, p_i32),
+    {"null", 4U, vigil_unsafe_null, 0U, NULL, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL,
+     &vigil_unsafe_null_doc},
+    {"sizeof_ptr", 10U, vigil_unsafe_sizeof_ptr, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL,
+     NULL, &vigil_unsafe_sizeof_ptr_doc},
+    {"sizeof", 6U, vigil_unsafe_sizeof, 1U, p_str, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, NULL, 0U, unsafe_type_param_names,
+     NULL, NULL, &vigil_unsafe_sizeof_doc},
+    {"alignof", 7U, vigil_unsafe_alignof, 1U, p_str, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, NULL, 0U,
+     unsafe_type_param_names, NULL, NULL, &vigil_unsafe_alignof_doc},
+    {"offsetof", 8U, vigil_unsafe_offsetof, 2U, p_str_i32, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, NULL, 0U,
+     unsafe_type_field_param_names, NULL, NULL, &vigil_unsafe_offsetof_doc},
+    {"struct_size", 11U, vigil_unsafe_struct_size, 1U, p_str, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, NULL, 0U,
+     unsafe_type_param_names, NULL, NULL, &vigil_unsafe_struct_size_doc},
+    {"errno", 5U, vigil_unsafe_errno, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL,
+     &vigil_unsafe_errno_doc},
+    {"set_errno", 9U, vigil_unsafe_set_errno, 1U, p_i32, VIGIL_TYPE_VOID, 0, NULL, 0, NULL, NULL, 0U,
+     unsafe_errno_param_names, NULL, NULL, &vigil_unsafe_set_errno_doc},
+    {"str", 3U, vigil_unsafe_str, 1U, p_i64, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U, unsafe_ptr_offset_param_names,
+     NULL, NULL, &vigil_unsafe_str_doc},
+    {"cb_alloc", 8U, vigil_unsafe_cb_alloc, 0U, NULL, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL,
+     &vigil_unsafe_cb_alloc_doc},
+    {"cb_free", 7U, vigil_unsafe_cb_free, 1U, p_i32, VIGIL_TYPE_VOID, 0, NULL, 0, NULL, NULL, 0U,
+     unsafe_slot_param_names, NULL, NULL, &vigil_unsafe_cb_free_doc},
 };
 
 #undef F
 #undef FV
 
 VIGIL_API const vigil_native_module_t vigil_stdlib_unsafe = {
-    "unsafe", 6U, vigil_unsafe_functions, sizeof(vigil_unsafe_functions) / sizeof(vigil_unsafe_functions[0]), NULL, 0U};
+    "unsafe", 6U,  vigil_unsafe_functions, sizeof(vigil_unsafe_functions) / sizeof(vigil_unsafe_functions[0]), NULL,
+    0U,       &vigil_unsafe_module_doc};

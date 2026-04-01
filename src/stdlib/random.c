@@ -156,17 +156,67 @@ static vigil_status_t vigil_random_gaussian(vigil_vm_t *vm, size_t arg_count, vi
 
 static const int seed_params[] = {VIGIL_TYPE_I32};
 static const int range_params[] = {VIGIL_TYPE_I32, VIGIL_TYPE_I32};
+static const char *const random_seed_param_names[] = {"n"};
+static const char *const random_range_param_names[] = {"min", "max"};
+
+static const vigil_native_symbol_doc_t vigil_random_module_doc = {
+    "Random number generation.",
+    "The random module provides pseudo-random number generation using xorshift128+ algorithm.",
+    NULL,
+};
+
+static const vigil_native_symbol_doc_t vigil_random_seed_doc = {
+    "Seed the random number generator.",
+    "Sets the seed for reproducible sequences.",
+    "random.seed(42)",
+};
+
+static const vigil_native_symbol_doc_t vigil_random_i64_doc = {
+    "Generate a random 64-bit integer.",
+    "Returns a random i64 value.",
+    "i64 n = random.i64()",
+};
+
+static const vigil_native_symbol_doc_t vigil_random_i32_doc = {
+    "Generate a random 32-bit integer.",
+    "Returns a random i32 value.",
+    "i32 n = random.i32()",
+};
+
+static const vigil_native_symbol_doc_t vigil_random_f64_doc = {
+    "Generate a random float in [0, 1).",
+    "Returns a random f64 value between 0 (inclusive) and 1 (exclusive).",
+    "f64 x = random.f64()  // e.g. 0.7234...",
+};
+
+static const vigil_native_symbol_doc_t vigil_random_gaussian_doc = {
+    "Generate a random value from the standard normal distribution (mean=0, stddev=1).",
+    "Uses the Box-Muller transform. Call repeatedly for multiple samples.",
+    "f64 g = random.gaussian()  // e.g. -0.42",
+};
+
+static const vigil_native_symbol_doc_t vigil_random_range_doc = {
+    "Generate a random integer in [min, max).",
+    "Returns a random i32 value between min (inclusive) and max (exclusive).",
+    "i32 dice = random.range(1, 7)  // 1-6",
+};
 
 static const vigil_native_module_function_t vigil_random_functions[] = {
-    {"seed", 4U, vigil_random_seed, 1U, seed_params, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, NULL, 0U},
-    {"i64", 3U, vigil_random_i64, 0U, NULL, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U},
-    {"i32", 3U, vigil_random_i32, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, NULL, 0U},
-    {"f64", 3U, vigil_random_f64, 0U, NULL, VIGIL_TYPE_F64, 1U, NULL, 0, NULL, NULL, 0U},
-    {"gaussian", 8U, vigil_random_gaussian, 0U, NULL, VIGIL_TYPE_F64, 1U, NULL, 0, NULL, NULL, 0U},
-    {"range", 5U, vigil_random_range, 2U, range_params, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, NULL, 0U},
+    {"seed", 4U, vigil_random_seed, 1U, seed_params, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, NULL, 0U,
+     random_seed_param_names, NULL, NULL, &vigil_random_seed_doc},
+    {"i64", 3U, vigil_random_i64, 0U, NULL, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL,
+     &vigil_random_i64_doc},
+    {"i32", 3U, vigil_random_i32, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL,
+     &vigil_random_i32_doc},
+    {"f64", 3U, vigil_random_f64, 0U, NULL, VIGIL_TYPE_F64, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL,
+     &vigil_random_f64_doc},
+    {"gaussian", 8U, vigil_random_gaussian, 0U, NULL, VIGIL_TYPE_F64, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL,
+     &vigil_random_gaussian_doc},
+    {"range", 5U, vigil_random_range, 2U, range_params, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, NULL, 0U,
+     random_range_param_names, NULL, NULL, &vigil_random_range_doc},
 };
 
 #define RANDOM_FUNCTION_COUNT (sizeof(vigil_random_functions) / sizeof(vigil_random_functions[0]))
 
 VIGIL_API const vigil_native_module_t vigil_stdlib_random = {
-    "random", 6U, vigil_random_functions, RANDOM_FUNCTION_COUNT, NULL, 0U};
+    "random", 6U, vigil_random_functions, RANDOM_FUNCTION_COUNT, NULL, 0U, &vigil_random_module_doc};

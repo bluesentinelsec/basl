@@ -304,22 +304,123 @@ static vigil_status_t atomic_fence_fn(vigil_vm_t *vm, size_t arg_count, vigil_er
 static const int i64_param[] = {VIGIL_TYPE_I64};
 static const int i64_i64_param[] = {VIGIL_TYPE_I64, VIGIL_TYPE_I64};
 static const int i64_i64_i64_param[] = {VIGIL_TYPE_I64, VIGIL_TYPE_I64, VIGIL_TYPE_I64};
+static const char *const atomic_initial_param_names[] = {"initial"};
+static const char *const atomic_handle_param_names[] = {"a"};
+static const char *const atomic_handle_value_param_names[] = {"a", "val"};
+static const char *const atomic_handle_expected_desired_param_names[] = {"a", "expected", "desired"};
+
+static const vigil_native_symbol_doc_t vigil_atomic_module_doc = {
+    "Atomic operations.",
+    "The atomic module provides lock-free atomic integer operations for thread-safe programming without mutexes.",
+    NULL,
+};
+
+static const vigil_native_symbol_doc_t vigil_atomic_new_doc = {
+    "Create atomic integer handle.",
+    "Creates an atomic integer cell with the given initial value and returns its handle.",
+    "i64 a = atomic.new(0)",
+};
+
+static const vigil_native_symbol_doc_t vigil_atomic_load_doc = {
+    "Atomically load value.",
+    "Returns the current value stored in the atomic cell handle.",
+    "atomic.load(a)",
+};
+
+static const vigil_native_symbol_doc_t vigil_atomic_store_doc = {
+    "Atomically store value.",
+    "Sets the atomic cell to the given value.",
+    "atomic.store(a, 42)",
+};
+
+static const vigil_native_symbol_doc_t vigil_atomic_add_doc = {
+    "Atomically add.",
+    "Adds val to the cell and returns the previous value.",
+    "atomic.add(a, 1)",
+};
+
+static const vigil_native_symbol_doc_t vigil_atomic_sub_doc = {
+    "Atomically subtract.",
+    "Subtracts val from the cell and returns the previous value.",
+    "atomic.sub(a, 1)",
+};
+
+static const vigil_native_symbol_doc_t vigil_atomic_cas_doc = {
+    "Compare and swap.",
+    "Sets the cell to desired if the current value equals expected.",
+    "atomic.cas(a, 0, 1)",
+};
+
+static const vigil_native_symbol_doc_t vigil_atomic_exchange_doc = {
+    "Atomically exchange value.",
+    "Stores val in the cell and returns the previous value.",
+    "atomic.exchange(a, 5)",
+};
+
+static const vigil_native_symbol_doc_t vigil_atomic_fetch_or_doc = {
+    "Atomically bitwise-OR value.",
+    "Applies bitwise OR with val and returns the previous value.",
+    "atomic.fetch_or(a, 0x10)",
+};
+
+static const vigil_native_symbol_doc_t vigil_atomic_fetch_and_doc = {
+    "Atomically bitwise-AND value.",
+    "Applies bitwise AND with val and returns the previous value.",
+    "atomic.fetch_and(a, 0xff)",
+};
+
+static const vigil_native_symbol_doc_t vigil_atomic_fetch_xor_doc = {
+    "Atomically bitwise-XOR value.",
+    "Applies bitwise XOR with val and returns the previous value.",
+    "atomic.fetch_xor(a, 0x01)",
+};
+
+static const vigil_native_symbol_doc_t vigil_atomic_inc_doc = {
+    "Atomically increment.",
+    "Increments the cell by 1 and returns the previous value.",
+    "atomic.inc(a)",
+};
+
+static const vigil_native_symbol_doc_t vigil_atomic_dec_doc = {
+    "Atomically decrement.",
+    "Decrements the cell by 1 and returns the previous value.",
+    "atomic.dec(a)",
+};
+
+static const vigil_native_symbol_doc_t vigil_atomic_fence_doc = {
+    "Issue a full memory fence.",
+    "Forces a full memory barrier for ordering surrounding atomic operations.",
+    "atomic.fence()",
+};
 
 static const vigil_native_module_function_t atomic_funcs[] = {
-    {"new", 3U, atomic_new, 1U, i64_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U},
-    {"load", 4U, atomic_load_fn, 1U, i64_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U},
-    {"store", 5U, atomic_store_fn, 2U, i64_i64_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U},
-    {"add", 3U, atomic_add_fn, 2U, i64_i64_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U},
-    {"sub", 3U, atomic_sub_fn, 2U, i64_i64_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U},
-    {"cas", 3U, atomic_cas_fn, 3U, i64_i64_i64_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U},
-    {"exchange", 8U, atomic_exchange_fn, 2U, i64_i64_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U},
-    {"fetch_or", 8U, atomic_fetch_or_fn, 2U, i64_i64_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U},
-    {"fetch_and", 9U, atomic_fetch_and_fn, 2U, i64_i64_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U},
-    {"fetch_xor", 9U, atomic_fetch_xor_fn, 2U, i64_i64_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U},
-    {"inc", 3U, atomic_inc_fn, 1U, i64_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U},
-    {"dec", 3U, atomic_dec_fn, 1U, i64_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U},
-    {"fence", 5U, atomic_fence_fn, 0U, NULL, VIGIL_TYPE_VOID, 1U, NULL, 0, NULL, NULL, 0U},
+    {"new", 3U, atomic_new, 1U, i64_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U, atomic_initial_param_names,
+     NULL, NULL, &vigil_atomic_new_doc},
+    {"load", 4U, atomic_load_fn, 1U, i64_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U, atomic_handle_param_names,
+     NULL, NULL, &vigil_atomic_load_doc},
+    {"store", 5U, atomic_store_fn, 2U, i64_i64_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U,
+     atomic_handle_value_param_names, NULL, NULL, &vigil_atomic_store_doc},
+    {"add", 3U, atomic_add_fn, 2U, i64_i64_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U,
+     atomic_handle_value_param_names, NULL, NULL, &vigil_atomic_add_doc},
+    {"sub", 3U, atomic_sub_fn, 2U, i64_i64_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U,
+     atomic_handle_value_param_names, NULL, NULL, &vigil_atomic_sub_doc},
+    {"cas", 3U, atomic_cas_fn, 3U, i64_i64_i64_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U,
+     atomic_handle_expected_desired_param_names, NULL, NULL, &vigil_atomic_cas_doc},
+    {"exchange", 8U, atomic_exchange_fn, 2U, i64_i64_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U,
+     atomic_handle_value_param_names, NULL, NULL, &vigil_atomic_exchange_doc},
+    {"fetch_or", 8U, atomic_fetch_or_fn, 2U, i64_i64_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U,
+     atomic_handle_value_param_names, NULL, NULL, &vigil_atomic_fetch_or_doc},
+    {"fetch_and", 9U, atomic_fetch_and_fn, 2U, i64_i64_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U,
+     atomic_handle_value_param_names, NULL, NULL, &vigil_atomic_fetch_and_doc},
+    {"fetch_xor", 9U, atomic_fetch_xor_fn, 2U, i64_i64_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U,
+     atomic_handle_value_param_names, NULL, NULL, &vigil_atomic_fetch_xor_doc},
+    {"inc", 3U, atomic_inc_fn, 1U, i64_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U, atomic_handle_param_names,
+     NULL, NULL, &vigil_atomic_inc_doc},
+    {"dec", 3U, atomic_dec_fn, 1U, i64_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U, atomic_handle_param_names,
+     NULL, NULL, &vigil_atomic_dec_doc},
+    {"fence", 5U, atomic_fence_fn, 0U, NULL, VIGIL_TYPE_VOID, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL,
+     &vigil_atomic_fence_doc},
 };
 
 VIGIL_API const vigil_native_module_t vigil_stdlib_atomic = {
-    "atomic", 6U, atomic_funcs, sizeof(atomic_funcs) / sizeof(atomic_funcs[0]), NULL, 0U};
+    "atomic", 6U, atomic_funcs, sizeof(atomic_funcs) / sizeof(atomic_funcs[0]), NULL, 0U, &vigil_atomic_module_doc};

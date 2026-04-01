@@ -46,6 +46,13 @@ extern "C"
     }
     /* clang-format on */
 
+    typedef struct vigil_native_symbol_doc
+    {
+        const char *summary;
+        const char *description;
+        const char *example;
+    } vigil_native_symbol_doc_t;
+
     /**
      * Describes one function exported by a native module.
      * The compiler uses name, param_types, param_count, and return_type
@@ -66,6 +73,10 @@ extern "C"
         const vigil_native_type_t *param_types_ext;
         const vigil_native_type_t *return_type_ext;
         size_t return_same_as_param_1based; /* 0 = static return type, otherwise same type as this arg (1-based) */
+        const char *const *doc_param_names;
+        const char *const *doc_param_type_names;
+        const char *doc_return_type_name;
+        const vigil_native_symbol_doc_t *doc;
     } vigil_native_module_function_t;
 
     /**
@@ -81,6 +92,8 @@ extern "C"
         const char *class_name; /* object_kind == CLASS: class name to resolve */
         size_t class_name_length;
         int element_type; /* object_kind == ARRAY: element vigil_type_kind_t */
+        const char *doc_type_name;
+        const vigil_native_symbol_doc_t *doc;
     } vigil_native_class_field_t;
 
 /* Object kind constants for native class fields.
@@ -103,6 +116,10 @@ extern "C"
         const char *return_class_name; /* non-NULL: resolve to this class */
         size_t return_class_name_length;
         int return_element_type; /* For array returns: element type (vigil_type_kind_t) */
+        const char *const *doc_param_names;
+        const char *const *doc_param_type_names;
+        const char *doc_return_type_name;
+        const vigil_native_symbol_doc_t *doc;
     } vigil_native_class_method_t;
 
     typedef struct vigil_native_class
@@ -114,6 +131,7 @@ extern "C"
         const vigil_native_class_method_t *methods;
         size_t method_count;
         vigil_native_fn_t constructor; /* NULL = default (field-per-arg) */
+        const vigil_native_symbol_doc_t *doc;
     } vigil_native_class_t;
 
     typedef struct vigil_native_module
@@ -124,6 +142,7 @@ extern "C"
         size_t function_count;
         const vigil_native_class_t *classes;
         size_t class_count;
+        const vigil_native_symbol_doc_t *doc;
     } vigil_native_module_t;
 
     /**

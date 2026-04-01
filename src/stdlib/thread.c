@@ -754,38 +754,208 @@ static const int i64_param[] = {VIGIL_TYPE_I64};
 static const int i64_i64_param[] = {VIGIL_TYPE_I64, VIGIL_TYPE_I64};
 static const int i64_i64_i64_param[] = {VIGIL_TYPE_I64, VIGIL_TYPE_I64, VIGIL_TYPE_I64};
 static const int object_param[] = {VIGIL_TYPE_OBJECT};
+static const char *const thread_fn_param_names[] = {"fn"};
+static const char *const thread_handle_param_names[] = {"t"};
+static const char *const thread_ms_param_names[] = {"ms"};
+static const char *const thread_mutex_param_names[] = {"m"};
+static const char *const thread_cond_mutex_param_names[] = {"c", "m"};
+static const char *const thread_cond_mutex_ms_param_names[] = {"c", "m", "ms"};
+static const char *const thread_cond_param_names[] = {"c"};
+static const char *const thread_rwlock_param_names[] = {"rw"};
+
+static const vigil_native_symbol_doc_t vigil_thread_module_doc = {
+    "Threading primitives.",
+    "The thread module provides cross-platform threading:\n"
+    "spawn threads, mutexes, condition variables, and read-write locks.",
+    NULL,
+};
+
+static const vigil_native_symbol_doc_t vigil_thread_current_id_doc = {
+    "Get current thread ID.",
+    "Returns unique identifier for current thread.",
+    "thread.current_id()",
+};
+
+static const vigil_native_symbol_doc_t vigil_thread_spawn_doc = {
+    "Spawn a new thread.",
+    "Runs a zero-argument function on a new OS thread. Returns a thread handle for join, or -1 on error.",
+    "i64 t = thread.spawn(fn() -> void { fmt.println(\"hello\") })",
+};
+
+static const vigil_native_symbol_doc_t vigil_thread_join_doc = {
+    "Wait for thread to finish.",
+    "Blocks until the spawned thread completes and returns its i64 result. Returns INT64_MIN on invalid handle or "
+    "join failure.",
+    "i64 result = thread.join(t)",
+};
+
+static const vigil_native_symbol_doc_t vigil_thread_detach_doc = {
+    "Detach a thread.",
+    "Marks a spawned thread as detached so its resources are released without joining.",
+    "thread.detach(t)",
+};
+
+static const vigil_native_symbol_doc_t vigil_thread_yield_doc = {
+    "Yield to other threads.",
+    "Hints scheduler to run other threads.",
+    "thread.yield()",
+};
+
+static const vigil_native_symbol_doc_t vigil_thread_sleep_doc = {
+    "Sleep for milliseconds.",
+    "Pauses current thread for specified duration.",
+    "thread.sleep(100)",
+};
+
+static const vigil_native_symbol_doc_t vigil_thread_mutex_doc = {
+    "Create a mutex.",
+    "Creates a mutual exclusion lock and returns its handle.",
+    "i64 m = thread.mutex()",
+};
+
+static const vigil_native_symbol_doc_t vigil_thread_lock_doc = {
+    "Lock a mutex.",
+    "Acquires a mutex handle, blocking if it is already held.",
+    "thread.lock(m)",
+};
+
+static const vigil_native_symbol_doc_t vigil_thread_unlock_doc = {
+    "Unlock a mutex.",
+    "Releases a held mutex handle.",
+    "thread.unlock(m)",
+};
+
+static const vigil_native_symbol_doc_t vigil_thread_try_lock_doc = {
+    "Try to lock a mutex.",
+    "Attempts to acquire a mutex without blocking.",
+    "if (thread.try_lock(m)) { /* critical section */ }",
+};
+
+static const vigil_native_symbol_doc_t vigil_thread_mutex_destroy_doc = {
+    "Destroy a mutex.",
+    "Destroys a mutex handle and releases its underlying platform resource.",
+    "thread.mutex_destroy(m)",
+};
+
+static const vigil_native_symbol_doc_t vigil_thread_cond_doc = {
+    "Create a condition variable.",
+    "Creates a condition variable handle for signaling between threads.",
+    "i64 c = thread.cond()",
+};
+
+static const vigil_native_symbol_doc_t vigil_thread_wait_doc = {
+    "Wait on a condition variable.",
+    "Atomically releases the mutex and waits until the condition variable is signaled.",
+    "thread.wait(c, m)",
+};
+
+static const vigil_native_symbol_doc_t vigil_thread_wait_timeout_doc = {
+    "Wait on a condition variable with timeout.",
+    "Waits until signaled or the timeout expires. Returns false on timeout or invalid handles.",
+    "thread.wait_timeout(c, m, 5000)",
+};
+
+static const vigil_native_symbol_doc_t vigil_thread_signal_doc = {
+    "Signal one waiter.",
+    "Wakes one thread waiting on the condition variable.",
+    "thread.signal(c)",
+};
+
+static const vigil_native_symbol_doc_t vigil_thread_broadcast_doc = {
+    "Signal all waiters.",
+    "Wakes all threads waiting on the condition variable.",
+    "thread.broadcast(c)",
+};
+
+static const vigil_native_symbol_doc_t vigil_thread_cond_destroy_doc = {
+    "Destroy a condition variable.",
+    "Destroys a condition-variable handle and releases its underlying platform resource.",
+    "thread.cond_destroy(c)",
+};
+
+static const vigil_native_symbol_doc_t vigil_thread_rwlock_doc = {
+    "Create a read-write lock.",
+    "Creates a read-write lock handle allowing multiple readers or one writer.",
+    "i64 rw = thread.rwlock()",
+};
+
+static const vigil_native_symbol_doc_t vigil_thread_read_lock_doc = {
+    "Acquire read lock.",
+    "Acquires shared read access on a read-write lock handle.",
+    "thread.read_lock(rw)",
+};
+
+static const vigil_native_symbol_doc_t vigil_thread_write_lock_doc = {
+    "Acquire write lock.",
+    "Acquires exclusive write access on a read-write lock handle.",
+    "thread.write_lock(rw)",
+};
+
+static const vigil_native_symbol_doc_t vigil_thread_rw_unlock_doc = {
+    "Release read-write lock.",
+    "Releases either a read or write lock previously acquired on the handle.",
+    "thread.rw_unlock(rw)",
+};
+
+static const vigil_native_symbol_doc_t vigil_thread_rwlock_destroy_doc = {
+    "Destroy a read-write lock.",
+    "Destroys a read-write lock handle and releases its underlying platform resource.",
+    "thread.rwlock_destroy(rw)",
+};
 
 static const vigil_native_module_function_t thread_funcs[] = {
     /* Thread management */
-    {"spawn", 5U, thread_spawn, 1U, object_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U},
-    {"join", 4U, thread_join, 1U, i64_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U},
-    {"detach", 6U, thread_detach, 1U, i64_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U},
-    {"current_id", 10U, thread_current_id, 0U, NULL, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U},
-    {"yield", 5U, thread_yield, 0U, NULL, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U},
-    {"sleep", 5U, thread_sleep, 1U, i64_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U},
+    {"spawn", 5U, thread_spawn, 1U, object_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U, thread_fn_param_names,
+     NULL, NULL, &vigil_thread_spawn_doc},
+    {"join", 4U, thread_join, 1U, i64_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U, thread_handle_param_names,
+     NULL, NULL, &vigil_thread_join_doc},
+    {"detach", 6U, thread_detach, 1U, i64_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U, thread_handle_param_names,
+     NULL, NULL, &vigil_thread_detach_doc},
+    {"current_id", 10U, thread_current_id, 0U, NULL, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL,
+     &vigil_thread_current_id_doc},
+    {"yield", 5U, thread_yield, 0U, NULL, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL,
+     &vigil_thread_yield_doc},
+    {"sleep", 5U, thread_sleep, 1U, i64_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U, thread_ms_param_names,
+     NULL, NULL, &vigil_thread_sleep_doc},
 
     /* Mutex */
-    {"mutex", 5U, thread_mutex, 0U, NULL, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U},
-    {"lock", 4U, mutex_lock, 1U, i64_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U},
-    {"unlock", 6U, mutex_unlock, 1U, i64_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U},
-    {"try_lock", 8U, mutex_try_lock, 1U, i64_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U},
-    {"mutex_destroy", 13U, mutex_destroy, 1U, i64_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U},
+    {"mutex", 5U, thread_mutex, 0U, NULL, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL,
+     &vigil_thread_mutex_doc},
+    {"lock", 4U, mutex_lock, 1U, i64_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U, thread_mutex_param_names,
+     NULL, NULL, &vigil_thread_lock_doc},
+    {"unlock", 6U, mutex_unlock, 1U, i64_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U, thread_mutex_param_names,
+     NULL, NULL, &vigil_thread_unlock_doc},
+    {"try_lock", 8U, mutex_try_lock, 1U, i64_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U,
+     thread_mutex_param_names, NULL, NULL, &vigil_thread_try_lock_doc},
+    {"mutex_destroy", 13U, mutex_destroy, 1U, i64_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U,
+     thread_mutex_param_names, NULL, NULL, &vigil_thread_mutex_destroy_doc},
 
     /* Condition variable */
-    {"cond", 4U, thread_cond, 0U, NULL, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U},
-    {"wait", 4U, cond_wait, 2U, i64_i64_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U},
-    {"wait_timeout", 12U, cond_wait_timeout, 3U, i64_i64_i64_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U},
-    {"signal", 6U, cond_signal, 1U, i64_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U},
-    {"broadcast", 9U, cond_broadcast, 1U, i64_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U},
-    {"cond_destroy", 12U, cond_destroy, 1U, i64_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U},
+    {"cond", 4U, thread_cond, 0U, NULL, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL,
+     &vigil_thread_cond_doc},
+    {"wait", 4U, cond_wait, 2U, i64_i64_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U,
+     thread_cond_mutex_param_names, NULL, NULL, &vigil_thread_wait_doc},
+    {"wait_timeout", 12U, cond_wait_timeout, 3U, i64_i64_i64_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U,
+     thread_cond_mutex_ms_param_names, NULL, NULL, &vigil_thread_wait_timeout_doc},
+    {"signal", 6U, cond_signal, 1U, i64_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U, thread_cond_param_names,
+     NULL, NULL, &vigil_thread_signal_doc},
+    {"broadcast", 9U, cond_broadcast, 1U, i64_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U,
+     thread_cond_param_names, NULL, NULL, &vigil_thread_broadcast_doc},
+    {"cond_destroy", 12U, cond_destroy, 1U, i64_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U,
+     thread_cond_param_names, NULL, NULL, &vigil_thread_cond_destroy_doc},
 
     /* RWLock */
-    {"rwlock", 6U, thread_rwlock, 0U, NULL, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U},
-    {"read_lock", 9U, rwlock_read_lock, 1U, i64_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U},
-    {"write_lock", 10U, rwlock_write_lock, 1U, i64_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U},
-    {"rw_unlock", 9U, rwlock_unlock, 1U, i64_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U},
-    {"rwlock_destroy", 14U, rwlock_destroy, 1U, i64_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U},
+    {"rwlock", 6U, thread_rwlock, 0U, NULL, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL,
+     &vigil_thread_rwlock_doc},
+    {"read_lock", 9U, rwlock_read_lock, 1U, i64_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U,
+     thread_rwlock_param_names, NULL, NULL, &vigil_thread_read_lock_doc},
+    {"write_lock", 10U, rwlock_write_lock, 1U, i64_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U,
+     thread_rwlock_param_names, NULL, NULL, &vigil_thread_write_lock_doc},
+    {"rw_unlock", 9U, rwlock_unlock, 1U, i64_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U,
+     thread_rwlock_param_names, NULL, NULL, &vigil_thread_rw_unlock_doc},
+    {"rwlock_destroy", 14U, rwlock_destroy, 1U, i64_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U,
+     thread_rwlock_param_names, NULL, NULL, &vigil_thread_rwlock_destroy_doc},
 };
 
 VIGIL_API const vigil_native_module_t vigil_stdlib_thread = {
-    "thread", 6U, thread_funcs, sizeof(thread_funcs) / sizeof(thread_funcs[0]), NULL, 0U};
+    "thread", 6U, thread_funcs, sizeof(thread_funcs) / sizeof(thread_funcs[0]), NULL, 0U, &vigil_thread_module_doc};

@@ -119,14 +119,42 @@ static vigil_status_t vigil_fmt_eprintln(vigil_vm_t *vm, size_t arg_count, vigil
 static const int vigil_fmt_println_params[] = {VIGIL_TYPE_STRING};
 static const int vigil_fmt_print_params[] = {VIGIL_TYPE_STRING};
 static const int vigil_fmt_eprintln_params[] = {VIGIL_TYPE_STRING};
+static const char *const vigil_fmt_value_param_names[] = {"value"};
+
+static const vigil_native_symbol_doc_t vigil_fmt_module_doc = {
+    "Formatted output functions.",
+    "The fmt module provides functions for printing to stdout and stderr.",
+    NULL,
+};
+
+static const vigil_native_symbol_doc_t vigil_fmt_print_doc = {
+    "Print a string to stdout without a newline.",
+    NULL,
+    "fmt.print(\"hello \")\nfmt.print(\"world\")",
+};
+
+static const vigil_native_symbol_doc_t vigil_fmt_println_doc = {
+    "Print a string to stdout with a newline.",
+    NULL,
+    "fmt.println(\"Hello, world!\")",
+};
+
+static const vigil_native_symbol_doc_t vigil_fmt_eprintln_doc = {
+    "Print a string to stderr with a newline.",
+    NULL,
+    "fmt.eprintln(\"Error: something went wrong\")",
+};
 
 static const vigil_native_module_function_t vigil_fmt_functions[] = {
-    {"println", 7U, vigil_fmt_println, 1U, vigil_fmt_println_params, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, NULL, 0U},
-    {"print", 5U, vigil_fmt_print, 1U, vigil_fmt_print_params, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, NULL, 0U},
-    {"eprintln", 8U, vigil_fmt_eprintln, 1U, vigil_fmt_eprintln_params, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, NULL, 0U},
+    {"println", 7U, vigil_fmt_println, 1U, vigil_fmt_println_params, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, NULL, 0U,
+     vigil_fmt_value_param_names, NULL, NULL, &vigil_fmt_println_doc},
+    {"print", 5U, vigil_fmt_print, 1U, vigil_fmt_print_params, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, NULL, 0U,
+     vigil_fmt_value_param_names, NULL, NULL, &vigil_fmt_print_doc},
+    {"eprintln", 8U, vigil_fmt_eprintln, 1U, vigil_fmt_eprintln_params, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, NULL, 0U,
+     vigil_fmt_value_param_names, NULL, NULL, &vigil_fmt_eprintln_doc},
 };
 
 #define VIGIL_FMT_FUNCTION_COUNT (sizeof(vigil_fmt_functions) / sizeof(vigil_fmt_functions[0]))
 
-VIGIL_API const vigil_native_module_t vigil_stdlib_fmt = {"fmt", 3U, vigil_fmt_functions, VIGIL_FMT_FUNCTION_COUNT,
-                                                          NULL,  0U};
+VIGIL_API const vigil_native_module_t vigil_stdlib_fmt = {"fmt", 3U, vigil_fmt_functions,  VIGIL_FMT_FUNCTION_COUNT,
+                                                          NULL,  0U, &vigil_fmt_module_doc};
