@@ -1147,13 +1147,115 @@ static vigil_status_t handle_rename(vigil_lsp_server_t *server, const vigil_json
     return lsp_make_response(a, id, result, out, error);
 }
 
+static int completion_kind_for_symbol(vigil_debug_symbol_kind_t kind)
+{
+    switch (kind)
+    {
+    case VIGIL_DEBUG_SYMBOL_FUNCTION:
+        return 3;
+    case VIGIL_DEBUG_SYMBOL_CLASS:
+        return 7;
+    case VIGIL_DEBUG_SYMBOL_INTERFACE:
+        return 8;
+    case VIGIL_DEBUG_SYMBOL_ENUM:
+        return 13;
+    case VIGIL_DEBUG_SYMBOL_FIELD:
+        return 5;
+    case VIGIL_DEBUG_SYMBOL_METHOD:
+        return 2;
+    case VIGIL_DEBUG_SYMBOL_GLOBAL_CONST:
+        return 21;
+    case VIGIL_DEBUG_SYMBOL_GLOBAL_VAR:
+        return 6;
+    default:
+        return 1;
+    }
+}
+
+static vigil_status_t append_string_method_completions(const vigil_allocator_t *a, vigil_json_value_t *result,
+                                                       vigil_error_t *error)
+{
+    const vigil_string_method_descriptor_t *methods;
+    size_t count;
+    size_t i;
+
+    methods = vigil_string_method_descriptors(&count);
+    for (i = 0U; i < count; i += 1U)
+    {
+        const vigil_doc_entry_t *entry = methods[i].doc_entry;
+        vigil_json_value_t *item = NULL;
+        vigil_json_value_t *label = NULL;
+        vigil_json_value_t *detail = NULL;
+        vigil_json_value_t *doc = NULL;
+
+        vigil_json_object_new(a, &item, error);
+        vigil_json_string_new(a, methods[i].name, methods[i].name_length, &label, error);
+        vigil_json_string_new(a, entry->signature, strlen(entry->signature), &detail, error);
+        vigil_json_string_new(a, entry->summary, strlen(entry->summary), &doc, error);
+
+        jset_obj(item, "label", label, error);
+        jset_obj(item, "detail", detail, error);
+        jset_int(item, "kind", 2, a, error);
+        jset_obj(item, "documentation", doc, error);
+
+        vigil_json_array_push(result, item, error);
+    }
+
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t append_native_module_completions(const vigil_allocator_t *a, vigil_json_value_t *result,
+                                                       vigil_error_t *error)
+{
+    vigil_native_registry_t natives;
+
+    vigil_native_registry_init(&natives);
+    if (vigil_stdlib_register_all(&natives, error) == VIGIL_STATUS_OK)
+    {
+        size_t mi;
+
+        vigil_plugin_register_all(&natives, error);
+        for (mi = 0; mi < natives.module_count; mi++)
+        {
+            const vigil_native_module_t *mod = natives.modules[mi];
+            size_t fi;
+
+            for (fi = 0; fi < mod->function_count; fi++)
+            {
+                const vigil_native_module_function_t *fn = &mod->functions[fi];
+                vigil_json_value_t *item = NULL;
+                vigil_json_value_t *label = NULL;
+                vigil_json_value_t *detail = NULL;
+                char qualified[256];
+                char det[128];
+
+                snprintf(qualified, sizeof(qualified), "%.*s.%.*s", (int)mod->name_length, mod->name,
+                         (int)fn->name_length, fn->name);
+                snprintf(det, sizeof(det), "%.*s module", (int)mod->name_length, mod->name);
+
+                vigil_json_object_new(a, &item, error);
+                vigil_json_string_new(a, qualified, strlen(qualified), &label, error);
+                vigil_json_string_new(a, det, strlen(det), &detail, error);
+                jset_obj(item, "label", label, error);
+                jset_int(item, "kind", 3, a, error);
+                jset_obj(item, "detail", detail, error);
+
+                vigil_json_array_push(result, item, error);
+            }
+        }
+    }
+    vigil_native_registry_free(&natives);
+    return VIGIL_STATUS_OK;
+}
+
 static vigil_status_t handle_completion(vigil_lsp_server_t *server, const vigil_json_value_t *id,
                                         const vigil_json_value_t *params, vigil_json_value_t **out,
                                         vigil_error_t *error)
 {
     const vigil_allocator_t *a = &server->allocator;
     vigil_json_value_t *result = NULL;
-    size_t i, count;
+    size_t i;
+    size_t count;
 
     (void)params; /* Position not used yet - return all symbols */
     vigil_json_array_new(a, &result, error);
@@ -1164,39 +1266,7 @@ static vigil_status_t handle_completion(vigil_lsp_server_t *server, const vigil_
         const vigil_debug_symbol_t *sym = vigil_debug_symbol_table_get(&server->index->symbols, i);
         vigil_json_value_t *item = NULL;
         vigil_json_value_t *label = NULL;
-        int kind;
-
-        /* Map to LSP CompletionItemKind */
-        switch (sym->kind)
-        {
-        case VIGIL_DEBUG_SYMBOL_FUNCTION:
-            kind = 3;
-            break; /* Function */
-        case VIGIL_DEBUG_SYMBOL_CLASS:
-            kind = 7;
-            break; /* Class */
-        case VIGIL_DEBUG_SYMBOL_INTERFACE:
-            kind = 8;
-            break; /* Interface */
-        case VIGIL_DEBUG_SYMBOL_ENUM:
-            kind = 13;
-            break; /* Enum */
-        case VIGIL_DEBUG_SYMBOL_FIELD:
-            kind = 5;
-            break; /* Field */
-        case VIGIL_DEBUG_SYMBOL_METHOD:
-            kind = 2;
-            break; /* Method */
-        case VIGIL_DEBUG_SYMBOL_GLOBAL_CONST:
-            kind = 21;
-            break; /* Constant */
-        case VIGIL_DEBUG_SYMBOL_GLOBAL_VAR:
-            kind = 6;
-            break; /* Variable */
-        default:
-            kind = 1;
-            break; /* Text */
-        }
+        int kind = completion_kind_for_symbol(sym->kind);
 
         vigil_json_object_new(a, &item, error);
         vigil_json_string_new(a, sym->name, sym->name_length, &label, error);
@@ -1206,72 +1276,8 @@ static vigil_status_t handle_completion(vigil_lsp_server_t *server, const vigil_
         vigil_json_array_push(result, item, error);
     }
 
-    /* Add string method completions */
-    {
-        const vigil_string_method_descriptor_t *methods = vigil_string_method_descriptors(&count);
-        for (i = 0U; i < count; i += 1U)
-        {
-            const vigil_doc_entry_t *entry = methods[i].doc_entry;
-            vigil_json_value_t *item = NULL;
-            vigil_json_value_t *label = NULL;
-            vigil_json_value_t *detail = NULL;
-            vigil_json_value_t *doc = NULL;
-
-            vigil_json_object_new(a, &item, error);
-            vigil_json_string_new(a, methods[i].name, methods[i].name_length, &label, error);
-            vigil_json_string_new(a, entry->signature, strlen(entry->signature), &detail, error);
-            vigil_json_string_new(a, entry->summary, strlen(entry->summary), &doc, error);
-
-            jset_obj(item, "label", label, error);
-            jset_obj(item, "detail", detail, error);
-            jset_int(item, "kind", 2, a, error); /* Method */
-            jset_obj(item, "documentation", doc, error);
-
-            vigil_json_array_push(result, item, error);
-        }
-    }
-
-    /* Add native module function completions */
-    {
-        vigil_native_registry_t natives;
-        vigil_native_registry_init(&natives);
-        if (vigil_stdlib_register_all(&natives, error) == VIGIL_STATUS_OK)
-        {
-            vigil_plugin_register_all(&natives, error);
-            size_t mi;
-            for (mi = 0; mi < natives.module_count; mi++)
-            {
-                const vigil_native_module_t *mod = natives.modules[mi];
-                size_t fi;
-                for (fi = 0; fi < mod->function_count; fi++)
-                {
-                    const vigil_native_module_function_t *fn = &mod->functions[fi];
-                    vigil_json_value_t *item = NULL;
-                    vigil_json_value_t *label = NULL;
-                    vigil_json_value_t *detail = NULL;
-
-                    /* Build qualified label: "module.function" */
-                    char qualified[256];
-                    snprintf(qualified, sizeof(qualified), "%.*s.%.*s", (int)mod->name_length, mod->name,
-                             (int)fn->name_length, fn->name);
-
-                    vigil_json_object_new(a, &item, error);
-                    vigil_json_string_new(a, qualified, strlen(qualified), &label, error);
-                    jset_obj(item, "label", label, error);
-                    jset_int(item, "kind", 3, a, error); /* Function */
-
-                    /* Build detail string with module name */
-                    char det[128];
-                    snprintf(det, sizeof(det), "%.*s module", (int)mod->name_length, mod->name);
-                    vigil_json_string_new(a, det, strlen(det), &detail, error);
-                    jset_obj(item, "detail", detail, error);
-
-                    vigil_json_array_push(result, item, error);
-                }
-            }
-        }
-        vigil_native_registry_free(&natives);
-    }
+    append_string_method_completions(a, result, error);
+    append_native_module_completions(a, result, error);
 
     return lsp_make_response(a, id, result, out, error);
 }

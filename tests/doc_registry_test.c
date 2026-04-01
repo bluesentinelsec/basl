@@ -127,6 +127,54 @@ static int module_name_in_list(const char *name, const char **modules, size_t mo
     return 0;
 }
 
+static void assert_native_class_docs_complete(const vigil_native_class_t *klass, int *vigil_test_failed_)
+{
+    size_t field_index;
+    size_t method_index;
+
+    ASSERT_NE(klass->doc, NULL);
+    ASSERT_NE(klass->doc->summary, NULL);
+
+    for (field_index = 0U; field_index < klass->field_count; field_index += 1U)
+    {
+        const vigil_native_class_field_t *field = &klass->fields[field_index];
+
+        ASSERT_NE(field->doc, NULL);
+        ASSERT_NE(field->doc->summary, NULL);
+    }
+
+    for (method_index = 0U; method_index < klass->method_count; method_index += 1U)
+    {
+        const vigil_native_class_method_t *method = &klass->methods[method_index];
+
+        ASSERT_NE(method->doc, NULL);
+        ASSERT_NE(method->doc->summary, NULL);
+    }
+}
+
+static void assert_native_module_docs_complete(const vigil_native_module_t *module, int *vigil_test_failed_)
+{
+    size_t function_index;
+    size_t class_index;
+
+    ASSERT_NE(module, NULL);
+    ASSERT_NE(module->doc, NULL);
+    ASSERT_NE(module->doc->summary, NULL);
+
+    for (function_index = 0U; function_index < module->function_count; function_index += 1U)
+    {
+        const vigil_native_module_function_t *function = &module->functions[function_index];
+
+        ASSERT_NE(function->doc, NULL);
+        ASSERT_NE(function->doc->summary, NULL);
+    }
+
+    for (class_index = 0U; class_index < module->class_count; class_index += 1U)
+    {
+        assert_native_class_docs_complete(&module->classes[class_index], vigil_test_failed_);
+    }
+}
+
 TEST(DocRegistryTest, CoversAllStdlibModulesAndFunctions)
 {
     const vigil_native_module_t *modules[] = {
@@ -297,47 +345,7 @@ TEST(DocRegistryTest, NativeDescriptorDocsAreCompleteForCompiledModules)
 
     for (module_index = 0U; module_index < sizeof(modules) / sizeof(modules[0]); module_index += 1U)
     {
-        const vigil_native_module_t *module = modules[module_index];
-        size_t function_index;
-        size_t class_index;
-
-        ASSERT_NE(module, NULL);
-        ASSERT_NE(module->doc, NULL);
-        ASSERT_NE(module->doc->summary, NULL);
-
-        for (function_index = 0U; function_index < module->function_count; function_index += 1U)
-        {
-            const vigil_native_module_function_t *function = &module->functions[function_index];
-
-            ASSERT_NE(function->doc, NULL);
-            ASSERT_NE(function->doc->summary, NULL);
-        }
-
-        for (class_index = 0U; class_index < module->class_count; class_index += 1U)
-        {
-            const vigil_native_class_t *klass = &module->classes[class_index];
-            size_t field_index;
-            size_t method_index;
-
-            ASSERT_NE(klass->doc, NULL);
-            ASSERT_NE(klass->doc->summary, NULL);
-
-            for (field_index = 0U; field_index < klass->field_count; field_index += 1U)
-            {
-                const vigil_native_class_field_t *field = &klass->fields[field_index];
-
-                ASSERT_NE(field->doc, NULL);
-                ASSERT_NE(field->doc->summary, NULL);
-            }
-
-            for (method_index = 0U; method_index < klass->method_count; method_index += 1U)
-            {
-                const vigil_native_class_method_t *method = &klass->methods[method_index];
-
-                ASSERT_NE(method->doc, NULL);
-                ASSERT_NE(method->doc->summary, NULL);
-            }
-        }
+        assert_native_module_docs_complete(modules[module_index], vigil_test_failed_);
     }
 }
 
