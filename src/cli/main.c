@@ -1328,7 +1328,10 @@ static int cmd_doc_builtin(const char *name)
                 printf("\nSymbols:\n");
                 for (i = 1; i < count; i++)
                 { /* Skip module entry itself */
-                    printf("  %-20s %s\n", entries[i].name, entries[i].summary);
+                    if (entries[i].summary != NULL)
+                        printf("  %-20s %s\n", entries[i].name, entries[i].summary);
+                    else
+                        printf("  %s\n", entries[i].name);
                 }
             }
         }
