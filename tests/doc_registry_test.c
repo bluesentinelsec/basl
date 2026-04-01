@@ -1,3 +1,4 @@
+#include "vigil/builtins.h"
 #include "vigil/doc_registry.h"
 #include "vigil/stdlib.h"
 #include "vigil_test.h"
@@ -21,8 +22,43 @@ TEST(DocRegistryTest, LookupBuiltinConversionsAndErrorConstructor)
 
     ASSERT_NE(to_i32, NULL);
     ASSERT_NE(err_ctor, NULL);
-    EXPECT_STREQ(to_i32->signature, "i32(value: string | integer | f64 | bool) -> i32");
+    EXPECT_STREQ(to_i32->signature, "i32(value: integer | f64) -> i32");
     EXPECT_STREQ(err_ctor->signature, "err(message: string, kind: i32) -> err");
+}
+
+TEST(DocRegistryTest, CoversAllDeclaredBuiltinsAndStringMethods)
+{
+    const vigil_builtin_descriptor_t *builtins = NULL;
+    const vigil_string_method_descriptor_t *string_methods = NULL;
+    size_t builtin_count = 0U;
+    size_t string_method_count = 0U;
+    size_t i;
+
+    builtins = vigil_builtin_descriptors(&builtin_count);
+    ASSERT_NE(builtins, NULL);
+    EXPECT_GT(builtin_count, 0U);
+
+    for (i = 0U; i < builtin_count; i += 1U)
+    {
+        const vigil_doc_entry_t *entry = vigil_doc_lookup(builtins[i].name);
+        ASSERT_NE(entry, NULL);
+        EXPECT_STREQ(entry->name, builtins[i].name);
+        ASSERT_NE(entry->signature, NULL);
+        ASSERT_NE(entry->summary, NULL);
+    }
+
+    string_methods = vigil_string_method_descriptors(&string_method_count);
+    ASSERT_NE(string_methods, NULL);
+    EXPECT_GT(string_method_count, 0U);
+
+    for (i = 0U; i < string_method_count; i += 1U)
+    {
+        const vigil_doc_entry_t *entry = vigil_doc_lookup(string_methods[i].doc_entry->name);
+        ASSERT_NE(entry, NULL);
+        EXPECT_STREQ(entry->name, string_methods[i].doc_entry->name);
+        ASSERT_NE(entry->signature, NULL);
+        ASSERT_NE(entry->summary, NULL);
+    }
 }
 
 TEST(DocRegistryTest, LookupModule)
@@ -380,6 +416,7 @@ void register_doc_registry_tests(void)
 {
     REGISTER_TEST(DocRegistryTest, LookupBuiltin);
     REGISTER_TEST(DocRegistryTest, LookupBuiltinConversionsAndErrorConstructor);
+    REGISTER_TEST(DocRegistryTest, CoversAllDeclaredBuiltinsAndStringMethods);
     REGISTER_TEST(DocRegistryTest, LookupModule);
     REGISTER_TEST(DocRegistryTest, LookupQualified);
     REGISTER_TEST(DocRegistryTest, LookupNotFound);

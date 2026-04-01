@@ -11,6 +11,7 @@
 #include "internal/vigil_compiler_types.h"
 #include "internal/vigil_internal.h"
 #include "internal/vigil_nanbox.h"
+#include "vigil/builtins.h"
 #include "vigil/chunk.h"
 #include "vigil/lexer.h"
 #include "vigil/native_module.h"
@@ -5729,9 +5730,9 @@ static vigil_status_t vigil_parser_parse_builtin_char(vigil_parser_state_t *stat
 static int vigil_parser_resolve_builtin_conversion_kind(const vigil_parser_state_t *state,
                                                         const vigil_token_t *name_token, vigil_type_kind_t *out_kind)
 {
+    const vigil_builtin_descriptor_t *builtin;
     const char *name_text;
     size_t name_length;
-    vigil_type_kind_t kind;
 
     if (out_kind != NULL)
     {
@@ -5743,16 +5744,15 @@ static int vigil_parser_resolve_builtin_conversion_kind(const vigil_parser_state
     }
 
     name_text = vigil_parser_token_text(state, name_token, &name_length);
-    kind = vigil_type_kind_from_name(name_text, name_length);
-    if (kind != VIGIL_TYPE_I32 && kind != VIGIL_TYPE_I64 && kind != VIGIL_TYPE_U8 && kind != VIGIL_TYPE_U32 &&
-        kind != VIGIL_TYPE_U64 && kind != VIGIL_TYPE_F64 && kind != VIGIL_TYPE_STRING && kind != VIGIL_TYPE_BOOL)
+    builtin = vigil_builtin_find(name_text, name_length);
+    if (builtin == NULL || !builtin->is_conversion)
     {
         return 0;
     }
 
     if (out_kind != NULL)
     {
-        *out_kind = kind;
+        *out_kind = builtin->conversion_target;
     }
     return 1;
 }
@@ -8195,21 +8195,25 @@ static vigil_status_t try_builtin_call(vigil_parser_state_t *state, const vigil_
                                        const identifier_context_t *ctx, vigil_expression_result_t *out_result,
                                        int *handled)
 {
+    const vigil_builtin_descriptor_t *builtin;
     vigil_type_kind_t conversion_kind;
+
     *handled = 0;
+
+    builtin = vigil_builtin_find(ctx->name_text, ctx->name_length);
     if (vigil_parser_resolve_builtin_conversion_kind(state, token, &conversion_kind))
     {
         *handled = 1;
         return vigil_parser_parse_builtin_conversion(state, token, conversion_kind, out_result);
     }
-    if (!ctx->local_found)
+    if (!ctx->local_found && builtin != NULL)
     {
-        if (vigil_program_names_equal(ctx->name_text, ctx->name_length, "err", 3U))
+        if (builtin->kind == VIGIL_BUILTIN_ERR)
         {
             *handled = 1;
             return vigil_parser_parse_builtin_error_constructor(state, token, out_result);
         }
-        if (vigil_program_names_equal(ctx->name_text, ctx->name_length, "char", 4U))
+        if (builtin->kind == VIGIL_BUILTIN_CHAR)
         {
             *handled = 1;
             return vigil_parser_parse_builtin_char(state, token, out_result);

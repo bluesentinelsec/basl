@@ -6,108 +6,9 @@
 #include <string.h>
 
 #include "internal/vigil_internal.h"
+#include "vigil/builtins.h"
 #include "vigil/stdlib.h"
 #include "vigil/type.h"
-
-/* ── Builtin Function Docs ────────────────────────────────── */
-
-static const vigil_doc_entry_t builtin_docs[] = {
-    {"builtins", NULL, "Built-in functions available without import.",
-     "These functions are always available in VIGIL programs.", NULL},
-    {"len", "len(value: string | array | map) -> i32", "Return the length of a string, array, or map.", NULL,
-     "len(\"hello\")  // 5\nlen([1, 2, 3])  // 3"},
-    {"char", "char(code: integer) -> string", "Convert a byte value (0-255) to a single-character string.", NULL,
-     "char(65)   // \"A\"\nchar(0x0a) // \"\\n\""},
-    {"err", "err(message: string, kind: i32) -> err", "Construct an error value.", NULL,
-     "err e = err(\"missing config\", 1)"},
-    {"i32", "i32(value: string | integer | f64 | bool) -> i32", "Convert a value to i32.", NULL,
-     "i32 port = i32(\"8080\")"},
-    {"i64", "i64(value: string | integer | f64 | bool) -> i64", "Convert a value to i64.", NULL,
-     "i64 count = i64(42)"},
-    {"u8", "u8(value: string | integer | f64 | bool) -> u8", "Convert a value to u8.", NULL,
-     "u8 byte = u8(255)"},
-    {"u32", "u32(value: string | integer | f64 | bool) -> u32", "Convert a value to u32.", NULL,
-     "u32 mask = u32(7)"},
-    {"u64", "u64(value: string | integer | f64 | bool) -> u64", "Convert a value to u64.", NULL,
-     "u64 size = u64(4096)"},
-    {"f64", "f64(value: string | integer | f64 | bool) -> f64", "Convert a value to f64.", NULL,
-     "f64 ratio = f64(\"3.14\")"},
-    {"bool", "bool(value: string | integer | f64 | bool) -> bool", "Convert a value to bool.", NULL,
-     "bool enabled = bool(\"true\")"},
-    {"string", "string(value: string | integer | f64 | bool) -> string", "Convert a value to string.", NULL,
-     "string text = string(42)"},
-};
-
-#define BUILTIN_COUNT (sizeof(builtin_docs) / sizeof(builtin_docs[0]))
-
-/* ── strings Module Docs ──────────────────────────────────── */
-
-static const vigil_doc_entry_t strings_docs[] = {
-    {"strings", NULL, "String methods available on all string values.",
-     "These methods are called on string values using dot notation.", NULL},
-    {"strings.len", "s.len() -> i32", "Return the length of the string in bytes.", NULL, "\"hello\".len()  // 5"},
-    {"strings.contains", "s.contains(sub: string) -> bool", "Return true if s contains the substring sub.", NULL,
-     "\"hello\".contains(\"ell\")  // true"},
-    {"strings.starts_with", "s.starts_with(prefix: string) -> bool", "Return true if s starts with prefix.", NULL,
-     "\"hello\".starts_with(\"he\")  // true"},
-    {"strings.ends_with", "s.ends_with(suffix: string) -> bool", "Return true if s ends with suffix.", NULL,
-     "\"hello\".ends_with(\"lo\")  // true"},
-    {"strings.trim", "s.trim() -> string", "Return s with leading and trailing whitespace removed.", NULL,
-     "\"  hello  \".trim()  // \"hello\""},
-    {"strings.trim_left", "s.trim_left() -> string", "Return s with leading whitespace removed.", NULL,
-     "\"  hello\".trim_left()  // \"hello\""},
-    {"strings.trim_right", "s.trim_right() -> string", "Return s with trailing whitespace removed.", NULL,
-     "\"hello  \".trim_right()  // \"hello\""},
-    {"strings.trim_prefix", "s.trim_prefix(prefix: string) -> string",
-     "Return s without the leading prefix if present.", NULL, "\"hello\".trim_prefix(\"he\")  // \"llo\""},
-    {"strings.trim_suffix", "s.trim_suffix(suffix: string) -> string",
-     "Return s without the trailing suffix if present.", NULL, "\"hello\".trim_suffix(\"lo\")  // \"hel\""},
-    {"strings.to_upper", "s.to_upper() -> string", "Return s with all ASCII letters converted to uppercase.", NULL,
-     "\"Hello\".to_upper()  // \"HELLO\""},
-    {"strings.to_lower", "s.to_lower() -> string", "Return s with all ASCII letters converted to lowercase.", NULL,
-     "\"Hello\".to_lower()  // \"hello\""},
-    {"strings.replace", "s.replace(old: string, new: string) -> string",
-     "Return s with all occurrences of old replaced by new.", NULL, "\"hello\".replace(\"l\", \"L\")  // \"heLLo\""},
-    {"strings.split", "s.split(sep: string) -> array<string>",
-     "Split s by separator and return an array of substrings.", NULL,
-     "\"a,b,c\".split(\",\")  // [\"a\", \"b\", \"c\"]"},
-    {"strings.index_of", "s.index_of(sub: string) -> (i32, bool)",
-     "Return the index of the first occurrence of sub, or (-1, false) if not found.", NULL,
-     "i32 idx, bool found = \"hello\".index_of(\"l\")  // 2, true"},
-    {"strings.last_index_of", "s.last_index_of(sub: string) -> (i32, bool)",
-     "Return the index of the last occurrence of sub, or (-1, false) if not found.", NULL,
-     "i32 idx, bool found = \"hello\".last_index_of(\"l\")  // 3, true"},
-    {"strings.substr", "s.substr(start: i32, len: i32) -> (string, err)",
-     "Return a substring starting at start with length len.", NULL,
-     "string sub, err e = \"hello\".substr(1, 3)  // \"ell\""},
-    {"strings.char_at", "s.char_at(i: i32) -> (string, err)",
-     "Return the character at index i as a single-character string.", NULL,
-     "string c, err e = \"hello\".char_at(0)  // \"h\""},
-    {"strings.bytes", "s.bytes() -> array<u8>", "Return the raw bytes of the string as an array.", NULL,
-     "\"AB\".bytes()  // [65, 66]"},
-    {"strings.reverse", "s.reverse() -> string", "Return s with characters in reverse order.", NULL,
-     "\"hello\".reverse()  // \"olleh\""},
-    {"strings.is_empty", "s.is_empty() -> bool", "Return true if s has length zero.", NULL, "\"\".is_empty()  // true"},
-    {"strings.char_count", "s.char_count() -> i32", "Return the number of Unicode code points in s (not bytes).", NULL,
-     "\"café\".char_count()  // 4"},
-    {"strings.repeat", "s.repeat(n: i32) -> string", "Return s repeated n times.", NULL,
-     "\"ab\".repeat(3)  // \"ababab\""},
-    {"strings.count", "s.count(sub: string) -> i32", "Return the number of non-overlapping occurrences of sub in s.",
-     NULL, "\"banana\".count(\"a\")  // 3"},
-    {"strings.fields", "s.fields() -> array<string>", "Split s on whitespace and return non-empty fields.",
-     "Similar to Go's strings.Fields. Splits on runs of whitespace.",
-     "\"  a  b  c  \".fields()  // [\"a\", \"b\", \"c\"]"},
-    {"strings.join", "sep.join(arr: array<string>) -> string", "Join array elements with sep as separator.",
-     "The separator is the receiver, the array is the argument.", "\",\".join([\"a\", \"b\", \"c\"])  // \"a,b,c\""},
-    {"strings.cut", "s.cut(sep: string) -> (string, string, bool)", "Cut s around the first instance of sep.",
-     "Returns (before, after, found). If sep is not found, returns (s, \"\", false).",
-     "string k, string v, bool ok = \"key=val\".cut(\"=\")  // \"key\", \"val\", true"},
-    {"strings.equal_fold", "s.equal_fold(t: string) -> bool",
-     "Return true if s equals t under case-insensitive comparison.", "Compares ASCII letters case-insensitively.",
-     "\"Go\".equal_fold(\"go\")  // true"},
-};
-
-#define STRINGS_COUNT (sizeof(strings_docs) / sizeof(strings_docs[0]))
 
 /* ── regex Module Docs ────────────────────────────────────── */
 
@@ -1377,24 +1278,9 @@ static void native_doc_init_module_names(void)
 
 /* ── Lookup Implementation ────────────────────────────────── */
 
-typedef struct
-{
-    const char *name;
-    const vigil_doc_entry_t *entries;
-    size_t count;
-} doc_module_table_entry_t;
-
-static const doc_module_table_entry_t doc_module_table[] = {
-    {"builtins", builtin_docs, BUILTIN_COUNT},
-    {"strings", strings_docs, STRINGS_COUNT},
-};
-
-#define DOC_MODULE_TABLE_COUNT (sizeof(doc_module_table) / sizeof(doc_module_table[0]))
-
 const vigil_doc_entry_t *vigil_doc_lookup(const char *name)
 {
     const vigil_doc_entry_t *generated;
-    size_t m, i;
 
     if (name == NULL)
         return NULL;
@@ -1402,16 +1288,10 @@ const vigil_doc_entry_t *vigil_doc_lookup(const char *name)
     generated = native_doc_lookup_entry(name);
     if (generated != NULL)
         return generated;
-
-    for (m = 0; m < DOC_MODULE_TABLE_COUNT; m++)
-    {
-        for (i = 0; i < doc_module_table[m].count; i++)
-        {
-            if (strcmp(doc_module_table[m].entries[i].name, name) == 0)
-                return &doc_module_table[m].entries[i];
-        }
-    }
-    return NULL;
+    generated = vigil_builtin_doc_lookup(name);
+    if (generated != NULL)
+        return generated;
+    return vigil_string_method_doc_lookup(name);
 }
 
 const char **vigil_doc_list_modules(size_t *count)
@@ -1425,7 +1305,6 @@ const char **vigil_doc_list_modules(size_t *count)
 const vigil_doc_entry_t *vigil_doc_list_module(const char *module_name, size_t *count)
 {
     native_doc_cache_t *generated;
-    size_t m;
     if (module_name == NULL)
         return NULL;
 
@@ -1436,15 +1315,13 @@ const vigil_doc_entry_t *vigil_doc_list_module(const char *module_name, size_t *
             *count = generated->count;
         return generated->entries;
     }
-
-    for (m = 0; m < DOC_MODULE_TABLE_COUNT; m++)
+    if (strcmp(module_name, "builtins") == 0)
     {
-        if (strcmp(doc_module_table[m].name, module_name) == 0)
-        {
-            if (count)
-                *count = doc_module_table[m].count;
-            return doc_module_table[m].entries;
-        }
+        return vigil_builtin_doc_entries(count);
+    }
+    if (strcmp(module_name, "strings") == 0)
+    {
+        return vigil_string_method_doc_entries(count);
     }
     return NULL;
 }

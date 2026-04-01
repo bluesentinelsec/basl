@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include "internal/vigil_internal.h"
+#include "vigil/builtins.h"
 #include "vigil/doc_registry.h"
 #include "vigil/fmt.h"
 #include "vigil/json.h"
@@ -1146,44 +1147,6 @@ static vigil_status_t handle_rename(vigil_lsp_server_t *server, const vigil_json
     return lsp_make_response(a, id, result, out, error);
 }
 
-/* String method completions for LSP */
-static const struct
-{
-    const char *name;
-    const char *detail;
-    const char *doc;
-} string_method_completions[] = {
-    {"len", "() -> i32", "Return the length of the string"},
-    {"contains", "(sub: string) -> bool", "Check if string contains substring"},
-    {"starts_with", "(prefix: string) -> bool", "Check if string starts with prefix"},
-    {"ends_with", "(suffix: string) -> bool", "Check if string ends with suffix"},
-    {"trim", "() -> string", "Remove leading/trailing whitespace"},
-    {"trim_left", "() -> string", "Remove leading whitespace"},
-    {"trim_right", "() -> string", "Remove trailing whitespace"},
-    {"trim_prefix", "(prefix: string) -> string", "Remove prefix if present"},
-    {"trim_suffix", "(suffix: string) -> string", "Remove suffix if present"},
-    {"to_upper", "() -> string", "Convert to uppercase"},
-    {"to_lower", "() -> string", "Convert to lowercase"},
-    {"replace", "(old: string, new: string) -> string", "Replace all occurrences"},
-    {"split", "(sep: string) -> array<string>", "Split by separator"},
-    {"index_of", "(sub: string) -> (i32, bool)", "Find first occurrence"},
-    {"last_index_of", "(sub: string) -> (i32, bool)", "Find last occurrence"},
-    {"substr", "(start: i32, len: i32) -> (string, err)", "Extract substring"},
-    {"char_at", "(i: i32) -> (string, err)", "Get character at index"},
-    {"bytes", "() -> array<u8>", "Get raw bytes"},
-    {"reverse", "() -> string", "Reverse the string"},
-    {"is_empty", "() -> bool", "Check if empty"},
-    {"char_count", "() -> i32", "Count Unicode code points"},
-    {"repeat", "(n: i32) -> string", "Repeat n times"},
-    {"count", "(sub: string) -> i32", "Count occurrences"},
-    {"fields", "() -> array<string>", "Split on whitespace"},
-    {"join", "(arr: array<string>) -> string", "Join array with separator"},
-    {"cut", "(sep: string) -> (string, string, bool)", "Cut around first separator"},
-    {"equal_fold", "(t: string) -> bool", "Case-insensitive comparison"},
-};
-
-#define STRING_METHOD_COUNT (sizeof(string_method_completions) / sizeof(string_method_completions[0]))
-
 static vigil_status_t handle_completion(vigil_lsp_server_t *server, const vigil_json_value_t *id,
                                         const vigil_json_value_t *params, vigil_json_value_t **out,
                                         vigil_error_t *error)
@@ -1244,27 +1207,28 @@ static vigil_status_t handle_completion(vigil_lsp_server_t *server, const vigil_
     }
 
     /* Add string method completions */
-    for (i = 0; i < STRING_METHOD_COUNT; i++)
     {
-        vigil_json_value_t *item = NULL;
-        vigil_json_value_t *label = NULL;
-        vigil_json_value_t *detail = NULL;
-        vigil_json_value_t *doc = NULL;
+        const vigil_string_method_descriptor_t *methods = vigil_string_method_descriptors(&count);
+        for (i = 0U; i < count; i += 1U)
+        {
+            const vigil_doc_entry_t *entry = methods[i].doc_entry;
+            vigil_json_value_t *item = NULL;
+            vigil_json_value_t *label = NULL;
+            vigil_json_value_t *detail = NULL;
+            vigil_json_value_t *doc = NULL;
 
-        vigil_json_object_new(a, &item, error);
-        vigil_json_string_new(a, string_method_completions[i].name, strlen(string_method_completions[i].name), &label,
-                              error);
-        vigil_json_string_new(a, string_method_completions[i].detail, strlen(string_method_completions[i].detail),
-                              &detail, error);
-        vigil_json_string_new(a, string_method_completions[i].doc, strlen(string_method_completions[i].doc), &doc,
-                              error);
+            vigil_json_object_new(a, &item, error);
+            vigil_json_string_new(a, methods[i].name, methods[i].name_length, &label, error);
+            vigil_json_string_new(a, entry->signature, strlen(entry->signature), &detail, error);
+            vigil_json_string_new(a, entry->summary, strlen(entry->summary), &doc, error);
 
-        jset_obj(item, "label", label, error);
-        jset_obj(item, "detail", detail, error);
-        jset_int(item, "kind", 2, a, error); /* Method */
-        jset_obj(item, "documentation", doc, error);
+            jset_obj(item, "label", label, error);
+            jset_obj(item, "detail", detail, error);
+            jset_int(item, "kind", 2, a, error); /* Method */
+            jset_obj(item, "documentation", doc, error);
 
-        vigil_json_array_push(result, item, error);
+            vigil_json_array_push(result, item, error);
+        }
     }
 
     /* Add native module function completions */
