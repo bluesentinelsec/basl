@@ -1204,8 +1204,70 @@ static vigil_status_t append_string_method_completions(const vigil_allocator_t *
     return VIGIL_STATUS_OK;
 }
 
-static vigil_status_t append_native_module_completions(const vigil_allocator_t *a, vigil_json_value_t *result,
-                                                       vigil_error_t *error)
+/* Extract the word (and optional module prefix) at the cursor position from source text.
+ * Returns the prefix length written into `prefix`. If the cursor is after "fmt.",
+ * module_out gets "fmt" and prefix gets "". If after "fmt.pr", module_out gets "fmt"
+ * and prefix gets "pr". If just "pri", module_out is empty and prefix gets "pri". */
+static void extract_completion_context(const char *text, size_t text_len, size_t offset, char *module_out,
+                                       size_t module_size, char *prefix_out, size_t prefix_size)
+{
+    size_t end = offset;
+    size_t start;
+    size_t dot_pos;
+    size_t len;
+
+    module_out[0] = '\0';
+    prefix_out[0] = '\0';
+
+    if (offset > text_len)
+        offset = text_len;
+
+    /* Walk back from cursor to find start of identifier */
+    start = offset;
+    while (start > 0 &&
+           (text[start - 1] == '_' || text[start - 1] == '.' || (text[start - 1] >= 'a' && text[start - 1] <= 'z') ||
+            (text[start - 1] >= 'A' && text[start - 1] <= 'Z') || (text[start - 1] >= '0' && text[start - 1] <= '9')))
+    {
+        start--;
+    }
+
+    len = end - start;
+    if (len == 0)
+        return;
+
+    /* Look for a dot to split module.prefix */
+    dot_pos = start;
+    while (dot_pos < end && text[dot_pos] != '.')
+        dot_pos++;
+
+    if (dot_pos < end)
+    {
+        size_t mod_len = dot_pos - start;
+        size_t pfx_len = end - dot_pos - 1;
+        if (mod_len < module_size)
+        {
+            memcpy(module_out, text + start, mod_len);
+            module_out[mod_len] = '\0';
+        }
+        if (pfx_len < prefix_size)
+        {
+            memcpy(prefix_out, text + dot_pos + 1, pfx_len);
+            prefix_out[pfx_len] = '\0';
+        }
+    }
+    else
+    {
+        if (len < prefix_size)
+        {
+            memcpy(prefix_out, text + start, len);
+            prefix_out[len] = '\0';
+        }
+    }
+}
+
+static vigil_status_t append_filtered_native_completions(const vigil_allocator_t *a, vigil_json_value_t *result,
+                                                         const char *module_filter, const char *prefix,
+                                                         vigil_error_t *error)
 {
     vigil_native_registry_t natives;
 
@@ -1219,6 +1281,16 @@ static vigil_status_t append_native_module_completions(const vigil_allocator_t *
         {
             const vigil_native_module_t *mod = natives.modules[mi];
             size_t fi;
+            int mod_match;
+
+            /* If filtering by module, skip non-matching modules */
+            if (module_filter[0] != '\0')
+            {
+                mod_match = (strncmp(mod->name, module_filter, mod->name_length) == 0 &&
+                             module_filter[mod->name_length] == '\0');
+                if (!mod_match)
+                    continue;
+            }
 
             for (fi = 0; fi < mod->function_count; fi++)
             {
@@ -1226,21 +1298,76 @@ static vigil_status_t append_native_module_completions(const vigil_allocator_t *
                 vigil_json_value_t *item = NULL;
                 vigil_json_value_t *label = NULL;
                 vigil_json_value_t *detail = NULL;
+                const char *label_str;
+                size_t label_len;
                 char qualified[256];
-                char det[128];
 
-                snprintf(qualified, sizeof(qualified), "%.*s.%.*s", (int)mod->name_length, mod->name,
-                         (int)fn->name_length, fn->name);
-                snprintf(det, sizeof(det), "%.*s module", (int)mod->name_length, mod->name);
+                /* When inside a module (after dot), show unqualified names */
+                if (module_filter[0] != '\0')
+                {
+                    label_str = fn->name;
+                    label_len = fn->name_length;
+                }
+                else
+                {
+                    snprintf(qualified, sizeof(qualified), "%.*s.%.*s", (int)mod->name_length, mod->name,
+                             (int)fn->name_length, fn->name);
+                    label_str = qualified;
+                    label_len = strlen(qualified);
+                }
+
+                /* Filter by prefix */
+                if (prefix[0] != '\0' && strncmp(label_str, prefix, strlen(prefix)) != 0)
+                    continue;
 
                 vigil_json_object_new(a, &item, error);
-                vigil_json_string_new(a, qualified, strlen(qualified), &label, error);
-                vigil_json_string_new(a, det, strlen(det), &detail, error);
+                vigil_json_string_new(a, label_str, label_len, &label, error);
                 jset_obj(item, "label", label, error);
                 jset_int(item, "kind", 3, a, error);
-                jset_obj(item, "detail", detail, error);
+
+                /* Add doc summary if available */
+                if (fn->doc != NULL && fn->doc->summary != NULL)
+                {
+                    vigil_json_value_t *doc = NULL;
+                    vigil_json_string_new(a, fn->doc->summary, strlen(fn->doc->summary), &doc, error);
+                    jset_obj(item, "documentation", doc, error);
+                }
+
+                {
+                    char det[128];
+                    snprintf(det, sizeof(det), "%.*s module", (int)mod->name_length, mod->name);
+                    vigil_json_string_new(a, det, strlen(det), &detail, error);
+                    jset_obj(item, "detail", detail, error);
+                }
 
                 vigil_json_array_push(result, item, error);
+            }
+
+            /* Also add class methods/statics when filtering by module */
+            if (module_filter[0] != '\0')
+            {
+                size_t ci;
+                for (ci = 0; ci < mod->class_count; ci++)
+                {
+                    const vigil_native_class_t *klass = &mod->classes[ci];
+                    vigil_json_value_t *item = NULL;
+                    vigil_json_value_t *label_val = NULL;
+
+                    if (prefix[0] != '\0' && strncmp(klass->name, prefix, strlen(prefix)) != 0)
+                        continue;
+
+                    vigil_json_object_new(a, &item, error);
+                    vigil_json_string_new(a, klass->name, klass->name_length, &label_val, error);
+                    jset_obj(item, "label", label_val, error);
+                    jset_int(item, "kind", 7, a, error);
+                    if (klass->doc != NULL && klass->doc->summary != NULL)
+                    {
+                        vigil_json_value_t *doc = NULL;
+                        vigil_json_string_new(a, klass->doc->summary, strlen(klass->doc->summary), &doc, error);
+                        jset_obj(item, "documentation", doc, error);
+                    }
+                    vigil_json_array_push(result, item, error);
+                }
             }
         }
     }
@@ -1254,30 +1381,74 @@ static vigil_status_t handle_completion(vigil_lsp_server_t *server, const vigil_
 {
     const vigil_allocator_t *a = &server->allocator;
     vigil_json_value_t *result = NULL;
-    size_t i;
-    size_t count;
+    const vigil_json_value_t *text_doc;
+    const vigil_json_value_t *position;
+    const vigil_json_value_t *uri_val;
+    const vigil_json_value_t *line_val;
+    const vigil_json_value_t *char_val;
+    char module_ctx[128] = {0};
+    char prefix[128] = {0};
 
-    (void)params; /* Position not used yet - return all symbols */
     vigil_json_array_new(a, &result, error);
 
-    count = vigil_debug_symbol_table_count(&server->index->symbols);
-    for (i = 0; i < count; i++)
+    /* Extract position context for filtering */
+    text_doc = vigil_json_object_get(params, "textDocument");
+    position = vigil_json_object_get(params, "position");
+    if (text_doc != NULL && position != NULL)
     {
-        const vigil_debug_symbol_t *sym = vigil_debug_symbol_table_get(&server->index->symbols, i);
-        vigil_json_value_t *item = NULL;
-        vigil_json_value_t *label = NULL;
-        int kind = completion_kind_for_symbol(sym->kind);
-
-        vigil_json_object_new(a, &item, error);
-        vigil_json_string_new(a, sym->name, sym->name_length, &label, error);
-        jset_obj(item, "label", label, error);
-        jset_int(item, "kind", kind, a, error);
-
-        vigil_json_array_push(result, item, error);
+        uri_val = vigil_json_object_get(text_doc, "uri");
+        line_val = vigil_json_object_get(position, "line");
+        char_val = vigil_json_object_get(position, "character");
+        if (uri_val != NULL && line_val != NULL && char_val != NULL)
+        {
+            vigil_source_id_t source_id =
+                find_source_by_uri(server, vigil_json_string_value(uri_val), vigil_json_string_length(uri_val));
+            if (source_id != 0)
+            {
+                const vigil_source_file_t *src = vigil_source_registry_get(&server->sources, source_id);
+                size_t line = (size_t)vigil_json_number_value(line_val);
+                size_t col = (size_t)vigil_json_number_value(char_val);
+                size_t offset =
+                    line_col_to_offset(vigil_string_c_str(&src->text), vigil_string_length(&src->text), line, col);
+                extract_completion_context(vigil_string_c_str(&src->text), vigil_string_length(&src->text), offset,
+                                           module_ctx, sizeof(module_ctx), prefix, sizeof(prefix));
+            }
+        }
     }
 
-    append_string_method_completions(a, result, error);
-    append_native_module_completions(a, result, error);
+    /* If we're inside a module (after a dot), show only that module's members */
+    if (module_ctx[0] != '\0')
+    {
+        append_filtered_native_completions(a, result, module_ctx, prefix, error);
+        /* Also add string methods when receiver might be a string */
+        append_string_method_completions(a, result, error);
+    }
+    else
+    {
+        /* No module context: show user symbols + all native module functions */
+        size_t i;
+        size_t count = vigil_debug_symbol_table_count(&server->index->symbols);
+        for (i = 0; i < count; i++)
+        {
+            const vigil_debug_symbol_t *sym = vigil_debug_symbol_table_get(&server->index->symbols, i);
+            vigil_json_value_t *item = NULL;
+            vigil_json_value_t *label = NULL;
+            int kind = completion_kind_for_symbol(sym->kind);
+
+            if (prefix[0] != '\0' && strncmp(sym->name, prefix, strlen(prefix)) != 0)
+                continue;
+
+            vigil_json_object_new(a, &item, error);
+            vigil_json_string_new(a, sym->name, sym->name_length, &label, error);
+            jset_obj(item, "label", label, error);
+            jset_int(item, "kind", kind, a, error);
+
+            vigil_json_array_push(result, item, error);
+        }
+
+        append_string_method_completions(a, result, error);
+        append_filtered_native_completions(a, result, "", prefix, error);
+    }
 
     return lsp_make_response(a, id, result, out, error);
 }
@@ -1419,26 +1590,88 @@ static vigil_status_t handle_hover(vigil_lsp_server_t *server, const vigil_json_
     col = (size_t)vigil_json_number_value(char_val);
     offset = line_col_to_offset(vigil_string_c_str(&src->text), vigil_string_length(&src->text), line, col);
 
-    /* Try to get node at position for doc lookup */
+    /* Try to get node at position for doc lookup.
+     * For module-qualified names like fmt.println we need to reconstruct
+     * the dotted name from the AST (field_access or method_call nodes). */
     node = vigil_semantic_file_node_at(sem_file, offset);
     if (node != NULL)
     {
-        const char *name = NULL;
+        char qualified[256];
+        const char *lookup_name = NULL;
+
         if (node->kind == VIGIL_NODE_IDENTIFIER_EXPR)
         {
-            name = node->data.identifier.name;
+            lookup_name = node->data.identifier.name;
         }
-        else if (node->kind == VIGIL_NODE_CALL_EXPR && node->data.call.callee != NULL &&
-                 node->data.call.callee->kind == VIGIL_NODE_IDENTIFIER_EXPR)
+        else if (node->kind == VIGIL_NODE_FIELD_ACCESS_EXPR && node->data.field_access.object != NULL &&
+                 node->data.field_access.object->kind == VIGIL_NODE_IDENTIFIER_EXPR)
         {
-            name = node->data.call.callee->data.identifier.name;
+            snprintf(qualified, sizeof(qualified), "%s.%.*s", node->data.field_access.object->data.identifier.name,
+                     (int)node->data.field_access.field_name_length, node->data.field_access.field_name);
+            lookup_name = qualified;
         }
-        if (name != NULL)
+        else if (node->kind == VIGIL_NODE_METHOD_CALL_EXPR && node->data.method_call.receiver != NULL &&
+                 node->data.method_call.receiver->kind == VIGIL_NODE_IDENTIFIER_EXPR)
         {
-            const vigil_doc_entry_t *doc = vigil_doc_lookup(name);
+            snprintf(qualified, sizeof(qualified), "%s.%.*s", node->data.method_call.receiver->data.identifier.name,
+                     (int)node->data.method_call.method_name_length, node->data.method_call.method_name);
+            lookup_name = qualified;
+        }
+        else if (node->kind == VIGIL_NODE_CALL_EXPR && node->data.call.callee != NULL)
+        {
+            const vigil_semantic_node_t *callee = node->data.call.callee;
+            if (callee->kind == VIGIL_NODE_IDENTIFIER_EXPR)
+            {
+                lookup_name = callee->data.identifier.name;
+            }
+            else if (callee->kind == VIGIL_NODE_FIELD_ACCESS_EXPR && callee->data.field_access.object != NULL &&
+                     callee->data.field_access.object->kind == VIGIL_NODE_IDENTIFIER_EXPR)
+            {
+                snprintf(qualified, sizeof(qualified), "%s.%.*s",
+                         callee->data.field_access.object->data.identifier.name,
+                         (int)callee->data.field_access.field_name_length, callee->data.field_access.field_name);
+                lookup_name = qualified;
+            }
+        }
+        if (lookup_name != NULL)
+        {
+            const vigil_doc_entry_t *doc = vigil_doc_lookup(lookup_name);
             if (doc != NULL)
             {
                 vigil_doc_entry_render(&server->runtime->allocator, doc, &hover_text, NULL, error);
+            }
+        }
+    }
+
+    /* Text-based fallback: extract the dotted identifier at cursor from source
+     * and look it up directly. This handles cases where the semantic index
+     * doesn't produce a compound node (e.g. cursor on "println" in "fmt.println"). */
+    if (hover_text == NULL)
+    {
+        const char *text = vigil_string_c_str(&src->text);
+        size_t text_len = vigil_string_length(&src->text);
+        char word[256];
+        size_t ws, we, wlen;
+
+        we = offset;
+        while (we < text_len && (text[we] == '_' || (text[we] >= 'a' && text[we] <= 'z') ||
+                                 (text[we] >= 'A' && text[we] <= 'Z') || (text[we] >= '0' && text[we] <= '9')))
+            we++;
+        ws = offset;
+        while (ws > 0 && (text[ws - 1] == '_' || text[ws - 1] == '.' || (text[ws - 1] >= 'a' && text[ws - 1] <= 'z') ||
+                          (text[ws - 1] >= 'A' && text[ws - 1] <= 'Z') || (text[ws - 1] >= '0' && text[ws - 1] <= '9')))
+            ws--;
+        wlen = we - ws;
+        if (wlen > 0 && wlen < sizeof(word))
+        {
+            memcpy(word, text + ws, wlen);
+            word[wlen] = '\0';
+            {
+                const vigil_doc_entry_t *doc = vigil_doc_lookup(word);
+                if (doc != NULL)
+                {
+                    vigil_doc_entry_render(&server->runtime->allocator, doc, &hover_text, NULL, error);
+                }
             }
         }
     }
