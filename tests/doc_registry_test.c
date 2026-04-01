@@ -318,6 +318,19 @@ TEST(DocRegistryTest, DescriptorBackedDocsRenderDerivedSignaturesForThreadAndCom
     EXPECT_STREQ(compress_zip->summary, "Create ZIP archive at level.");
 }
 
+TEST(DocRegistryTest, DescriptorBackedDocsRenderDerivedSignaturesForFfiAndUnsafe)
+{
+    const vigil_doc_entry_t *ffi_bind = vigil_doc_lookup("ffi.bind");
+    const vigil_doc_entry_t *unsafe_copy = vigil_doc_lookup("unsafe.copy");
+
+    ASSERT_NE(ffi_bind, NULL);
+    ASSERT_NE(unsafe_copy, NULL);
+    EXPECT_STREQ(ffi_bind->signature, "ffi.bind(lib: i64, name: string, signature: string) -> i64");
+    EXPECT_STREQ(ffi_bind->summary, "Bind a C function by signature.");
+    EXPECT_STREQ(unsafe_copy->signature, "unsafe.copy(dst: i64, dst_off: i32, src: i64, src_off: i32, len: i32) -> void");
+    EXPECT_STREQ(unsafe_copy->summary, "Copy bytes between buffers.");
+}
+
 TEST(DocRegistryTest, ModuleListUsesCanonicalStdlibSet)
 {
     size_t count = 0U;
@@ -349,5 +362,6 @@ void register_doc_registry_tests(void)
     REGISTER_TEST(DocRegistryTest, DescriptorBackedDocsRenderDerivedSignaturesForNetAndTime);
     REGISTER_TEST(DocRegistryTest, DescriptorBackedDocsRenderDerivedSignaturesForCrypto);
     REGISTER_TEST(DocRegistryTest, DescriptorBackedDocsRenderDerivedSignaturesForThreadAndCompress);
+    REGISTER_TEST(DocRegistryTest, DescriptorBackedDocsRenderDerivedSignaturesForFfiAndUnsafe);
     REGISTER_TEST(DocRegistryTest, ModuleListUsesCanonicalStdlibSet);
 }

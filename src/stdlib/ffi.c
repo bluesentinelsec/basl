@@ -942,6 +942,74 @@ static const int p_call[] = {VIGIL_TYPE_I64, VIGIL_TYPE_I64, VIGIL_TYPE_I64, VIG
 static const int p_call_f[] = {VIGIL_TYPE_I64, VIGIL_TYPE_F64, VIGIL_TYPE_F64};
 static const int p_call_s[] = {VIGIL_TYPE_I64, VIGIL_TYPE_I64, VIGIL_TYPE_I64};
 static const int p_obj_str[] = {VIGIL_TYPE_OBJECT, VIGIL_TYPE_STRING};
+static const char *const ffi_path_param_names[] = {"path"};
+static const char *const ffi_lib_name_param_names[] = {"lib", "name"};
+static const char *const ffi_lib_name_sig_param_names[] = {"lib", "name", "signature"};
+static const char *const ffi_call_param_names[] = {"fn", "a1", "a2", "a3", "a4", "a5", "a6"};
+static const char *const ffi_call_f_param_names[] = {"fn", "a1", "a2"};
+static const char *const ffi_call_s_param_names[] = {"fn", "a1", "a2"};
+static const char *const ffi_callback_param_names[] = {"fn", "sig"};
+static const char *const ffi_callback_free_param_names[] = {"slot"};
+
+static const vigil_native_symbol_doc_t vigil_ffi_module_doc = {
+    "Foreign function interface.",
+    "Load shared libraries and call C functions at runtime. Use 'extern fn' for type-safe declarations.",
+    NULL,
+};
+
+static const vigil_native_symbol_doc_t vigil_ffi_open_doc = {
+    "Open a shared library.",
+    "Returns a library handle or 0 on failure.",
+    "i64 lib = ffi.open(\"libm.so\")",
+};
+
+static const vigil_native_symbol_doc_t vigil_ffi_sym_doc = {
+    "Look up a symbol.",
+    "Returns a function pointer address or 0 if not found.",
+    "i64 fn = ffi.sym(lib, \"sqrt\")",
+};
+
+static const vigil_native_symbol_doc_t vigil_ffi_close_doc = {
+    "Close a shared library.",
+    "Releases the library handle.",
+    "ffi.close(lib)",
+};
+
+static const vigil_native_symbol_doc_t vigil_ffi_bind_doc = {
+    "Bind a C function by signature.",
+    "Signature format: \"ret_type(param_types)\". Returns a callable handle.",
+    "i64 fn = ffi.bind(lib, \"sqrt\", \"f64(f64)\")",
+};
+
+static const vigil_native_symbol_doc_t vigil_ffi_call_doc = {
+    "Call a bound function returning i64.",
+    "Pass up to 6 integer/pointer arguments.",
+    "i64 r = ffi.call(fn, arg1, arg2, 0, 0, 0, 0)",
+};
+
+static const vigil_native_symbol_doc_t vigil_ffi_call_f_doc = {
+    "Call a bound function returning f64.",
+    "For functions that take and return floating-point values.",
+    "f64 r = ffi.call_f(fn, 2.0, 0.0)",
+};
+
+static const vigil_native_symbol_doc_t vigil_ffi_call_s_doc = {
+    "Call a bound function returning a string.",
+    "Reads a null-terminated C string from the returned pointer.",
+    "string s = ffi.call_s(fn, ptr, len)",
+};
+
+static const vigil_native_symbol_doc_t vigil_ffi_callback_doc = {
+    "Wrap a Vigil function as a C callback.",
+    "Returns a C function pointer (as i64) that invokes the Vigil function. Up to 8 active callbacks.",
+    "i64 cb = ffi.callback(my_cmp, \"i64(i64,i64)\")",
+};
+
+static const vigil_native_symbol_doc_t vigil_ffi_callback_free_doc = {
+    "Free a callback slot.",
+    "Releases the callback slot for reuse.",
+    "ffi.callback_free(0)",
+};
 
 // clang-format off
 #define F(n, nl, fn, pc, pt, rt) {n, nl, fn, pc, pt, rt, 1, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL}
@@ -949,19 +1017,29 @@ static const int p_obj_str[] = {VIGIL_TYPE_OBJECT, VIGIL_TYPE_STRING};
 // clang-format on
 
 static const vigil_native_module_function_t vigil_ffi_functions[] = {
-    F("open", 4U, vigil_ffi_open, 1U, p_str, VIGIL_TYPE_I64),
-    F("sym", 3U, vigil_ffi_sym, 2U, p_i64_str, VIGIL_TYPE_I64),
-    FV("close", 5U, vigil_ffi_close, 1U, p_i64),
-    F("bind", 4U, vigil_ffi_bind, 3U, p_i64_str_str, VIGIL_TYPE_I64),
-    F("call", 4U, vigil_ffi_call, 7U, p_call, VIGIL_TYPE_I64),
-    F("call_f", 6U, vigil_ffi_call_f, 3U, p_call_f, VIGIL_TYPE_F64),
-    F("call_s", 6U, vigil_ffi_call_s, 3U, p_call_s, VIGIL_TYPE_STRING),
-    F("callback", 8U, vigil_ffi_callback, 2U, p_obj_str, VIGIL_TYPE_I64),
-    FV("callback_free", 13U, vigil_ffi_callback_free_fn, 1U, p_i64),
+    {"open", 4U, vigil_ffi_open, 1U, p_str, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U, ffi_path_param_names, NULL,
+     NULL, &vigil_ffi_open_doc},
+    {"sym", 3U, vigil_ffi_sym, 2U, p_i64_str, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U, ffi_lib_name_param_names,
+     NULL, NULL, &vigil_ffi_sym_doc},
+    {"close", 5U, vigil_ffi_close, 1U, p_i64, VIGIL_TYPE_VOID, 0, NULL, 0, NULL, NULL, 0U, ffi_lib_name_param_names,
+     NULL, NULL, &vigil_ffi_close_doc},
+    {"bind", 4U, vigil_ffi_bind, 3U, p_i64_str_str, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U,
+     ffi_lib_name_sig_param_names, NULL, NULL, &vigil_ffi_bind_doc},
+    {"call", 4U, vigil_ffi_call, 7U, p_call, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U, ffi_call_param_names, NULL,
+     NULL, &vigil_ffi_call_doc},
+    {"call_f", 6U, vigil_ffi_call_f, 3U, p_call_f, VIGIL_TYPE_F64, 1U, NULL, 0, NULL, NULL, 0U,
+     ffi_call_f_param_names, NULL, NULL, &vigil_ffi_call_f_doc},
+    {"call_s", 6U, vigil_ffi_call_s, 3U, p_call_s, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U,
+     ffi_call_s_param_names, NULL, NULL, &vigil_ffi_call_s_doc},
+    {"callback", 8U, vigil_ffi_callback, 2U, p_obj_str, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U,
+     ffi_callback_param_names, NULL, NULL, &vigil_ffi_callback_doc},
+    {"callback_free", 13U, vigil_ffi_callback_free_fn, 1U, p_i64, VIGIL_TYPE_VOID, 0, NULL, 0, NULL, NULL, 0U,
+     ffi_callback_free_param_names, NULL, NULL, &vigil_ffi_callback_free_doc},
 };
 
 #undef F
 #undef FV
 
 VIGIL_API const vigil_native_module_t vigil_stdlib_ffi = {
-    "ffi", 3U, vigil_ffi_functions, sizeof(vigil_ffi_functions) / sizeof(vigil_ffi_functions[0]), NULL, 0U, NULL};
+    "ffi", 3U, vigil_ffi_functions, sizeof(vigil_ffi_functions) / sizeof(vigil_ffi_functions[0]), NULL, 0U,
+    &vigil_ffi_module_doc};
