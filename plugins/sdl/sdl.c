@@ -157,6 +157,51 @@ static vigil_status_t sdl_push_string(vigil_vm_t *vm, const char *s, vigil_error
     return st;
 }
 
+static vigil_status_t sdl_push_joined_lines(vigil_vm_t *vm, char **items, int count, vigil_error_t *error)
+{
+    char *joined = NULL;
+    size_t capacity = 0;
+    size_t length = 0;
+    vigil_status_t st = VIGIL_STATUS_OK;
+
+    if (!items || count <= 0)
+        return sdl_push_string(vm, "", error);
+
+    for (int i = 0; i < count; i++)
+    {
+        const char *item = items[i] ? items[i] : "";
+        size_t item_len = strlen(item);
+        size_t needed = length + item_len + (i > 0 ? 1U : 0U) + 1U;
+        if (needed > capacity)
+        {
+            size_t new_capacity = capacity == 0 ? 256U : capacity;
+            while (new_capacity < needed)
+                new_capacity *= 2U;
+            char *next = (char *)realloc(joined, new_capacity);
+            if (!next)
+            {
+                free(joined);
+                vigil_error_set_literal(error, VIGIL_STATUS_OUT_OF_MEMORY, "out of memory");
+                return VIGIL_STATUS_OUT_OF_MEMORY;
+            }
+            joined = next;
+            capacity = new_capacity;
+        }
+        if (i > 0)
+            joined[length++] = '\n';
+        memcpy(joined + length, item, item_len);
+        length += item_len;
+    }
+
+    if (!joined)
+        return sdl_push_string(vm, "", error);
+
+    joined[length] = '\0';
+    st = sdl_push_string(vm, joined, error);
+    free(joined);
+    return st;
+}
+
 /* ── Error helpers ───────────────────────────────────────────────── */
 
 /* Vigil error kinds matching err.* constants. */
@@ -847,6 +892,7 @@ static const int p_i64_i32_i64[] = {VIGIL_TYPE_I64, VIGIL_TYPE_I32, VIGIL_TYPE_I
 static const int p_i64_str[] = {VIGIL_TYPE_I64, VIGIL_TYPE_STRING};
 static const int p_i64_str_i64_i32[] = {VIGIL_TYPE_I64, VIGIL_TYPE_STRING, VIGIL_TYPE_I64, VIGIL_TYPE_I32};
 static const int p_i64_str_str[] = {VIGIL_TYPE_I64, VIGIL_TYPE_STRING, VIGIL_TYPE_STRING};
+static const int p_i64_str_str_i32[] = {VIGIL_TYPE_I64, VIGIL_TYPE_STRING, VIGIL_TYPE_STRING, VIGIL_TYPE_I32};
 static const int p_i64_i32_str_i32[] = {VIGIL_TYPE_I64, VIGIL_TYPE_I32, VIGIL_TYPE_STRING, VIGIL_TYPE_I32};
 static const int p_i64_i32_i32_i32_i32_i32[] = {VIGIL_TYPE_I64, VIGIL_TYPE_I32, VIGIL_TYPE_I32,
                                                 VIGIL_TYPE_I32, VIGIL_TYPE_I32, VIGIL_TYPE_I32};
@@ -1367,6 +1413,7 @@ static vigil_status_t sdl_fn_delay_precise(vigil_vm_t *vm, size_t arg_count, vig
 /* ── Slice 8: Audio ───────────────────────────────────────────────── */
 
 SDL_HANDLE_REGISTRY(audio_streams);
+SDL_HANDLE_REGISTRY(environments);
 
 enum
 {
@@ -13696,6 +13743,114 @@ static vigil_status_t sdl_fn_get_environment_variable(vigil_vm_t *vm, size_t arg
     return sdl_push_string(vm, v ? v : "", error);
 }
 
+static vigil_status_t sdl_fn_create_environment(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t populated = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Environment *env = SDL_CreateEnvironment(populated != 0);
+    int64_t handle = -1;
+    vigil_status_t st;
+
+    if (!env)
+    {
+        st = sdl_push_i64(vm, -1, error);
+        if (st != VIGIL_STATUS_OK)
+            return st;
+        return sdl_push_sdl_err(vm, SDL_ERR_IO, error);
+    }
+
+    if (SDL_HANDLE_STORE(environments, env, &handle) < 0)
+    {
+        SDL_DestroyEnvironment(env);
+        st = sdl_push_i64(vm, -1, error);
+        if (st != VIGIL_STATUS_OK)
+            return st;
+        return sdl_push_err(vm, "too many environments", SDL_ERR_STATE, error);
+    }
+
+    st = sdl_push_i64(vm, handle, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_ok(vm, error);
+}
+
+static vigil_status_t sdl_fn_destroy_environment(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    (void)error;
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t handle = sdl_arg_i64(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Environment *env = (SDL_Environment *)SDL_HANDLE_GET(environments, handle);
+    if (env)
+    {
+        SDL_DestroyEnvironment(env);
+        SDL_HANDLE_CLEAR(environments, handle);
+    }
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t sdl_fn_get_environment_variables(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t handle = sdl_arg_i64(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Environment *env = (SDL_Environment *)SDL_HANDLE_GET(environments, handle);
+    char **items = env ? SDL_GetEnvironmentVariables(env) : NULL;
+    vigil_status_t st;
+    int count = 0;
+
+    if (!items)
+        return sdl_push_string(vm, "", error);
+
+    while (items[count] != NULL)
+        count++;
+    st = sdl_push_joined_lines(vm, items, count, error);
+    SDL_free(items);
+    return st;
+}
+
+static vigil_status_t sdl_fn_get_environment_variable_from(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t handle = sdl_arg_i64(vm, base, 0);
+    char name[256];
+    sdl_arg_str(vm, base, 1, name, sizeof(name));
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Environment *env = (SDL_Environment *)SDL_HANDLE_GET(environments, handle);
+    const char *value = env ? SDL_GetEnvironmentVariable(env, name) : NULL;
+    return sdl_push_string(vm, value ? value : "", error);
+}
+
+static vigil_status_t sdl_fn_set_environment_variable_in(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t handle = sdl_arg_i64(vm, base, 0);
+    char name[256];
+    char value[512];
+    int32_t overwrite = sdl_arg_i32(vm, base, 3);
+    sdl_arg_str(vm, base, 1, name, sizeof(name));
+    sdl_arg_str(vm, base, 2, value, sizeof(value));
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Environment *env = (SDL_Environment *)SDL_HANDLE_GET(environments, handle);
+    if (env && SDL_SetEnvironmentVariable(env, name, value, overwrite != 0))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+static vigil_status_t sdl_fn_unset_environment_variable_in(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t handle = sdl_arg_i64(vm, base, 0);
+    char name[256];
+    sdl_arg_str(vm, base, 1, name, sizeof(name));
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Environment *env = (SDL_Environment *)SDL_HANDLE_GET(environments, handle);
+    if (env && SDL_UnsetEnvironmentVariable(env, name))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
 static vigil_status_t sdl_fn_gl_get_current_window(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
 {
     vigil_vm_stack_pop_n(vm, arg_count);
@@ -13913,48 +14068,7 @@ static vigil_status_t sdl_fn_get_gamepad_mappings(vigil_vm_t *vm, size_t arg_cou
         SDL_free(mappings);
         return sdl_push_string(vm, "", error);
     }
-
-    char *joined = NULL;
-    size_t capacity = 0;
-    size_t length = 0;
-    vigil_status_t st = VIGIL_STATUS_OK;
-
-    for (int i = 0; i < count; i++)
-    {
-        const char *mapping = mappings[i] ? mappings[i] : "";
-        size_t mapping_len = strlen(mapping);
-        size_t needed = length + mapping_len + (i > 0 ? 1U : 0U) + 1U;
-        if (needed > capacity)
-        {
-            size_t new_capacity = capacity == 0 ? 256U : capacity;
-            while (new_capacity < needed)
-                new_capacity *= 2U;
-            char *next = (char *)realloc(joined, new_capacity);
-            if (!next)
-            {
-                free(joined);
-                SDL_free(mappings);
-                vigil_error_set_literal(error, VIGIL_STATUS_OUT_OF_MEMORY, "out of memory");
-                return VIGIL_STATUS_OUT_OF_MEMORY;
-            }
-            joined = next;
-            capacity = new_capacity;
-        }
-        if (i > 0)
-            joined[length++] = '\n';
-        memcpy(joined + length, mapping, mapping_len);
-        length += mapping_len;
-    }
-
-    if (!joined)
-    {
-        SDL_free(mappings);
-        return sdl_push_string(vm, "", error);
-    }
-
-    joined[length] = '\0';
-    st = sdl_push_string(vm, joined, error);
-    free(joined);
+    vigil_status_t st = sdl_push_joined_lines(vm, mappings, count, error);
     SDL_free(mappings);
     return st;
 }
@@ -14573,6 +14687,10 @@ SDL_CONST_FN(FLIP_VERTICAL, SDL_FLIP_VERTICAL)
 
 static const char *const sdl_properties_param_names[] = {"properties"};
 static const char *const sdl_guid_param_names[] = {"guid"};
+static const char *const sdl_environment_handle_param_names[] = {"environment"};
+static const char *const sdl_environment_name_param_names[] = {"environment", "name"};
+static const char *const sdl_environment_set_param_names[] = {"environment", "name", "value", "overwrite"};
+static const char *const sdl_environment_create_param_names[] = {"populated"};
 
 static const vigil_native_symbol_doc_t sdl_doc_create_window_with_properties = {
     "Create a window from an SDL property bag.",
@@ -14603,6 +14721,30 @@ static const vigil_native_symbol_doc_t sdl_doc_get_joystick_guid_info = {
     "Decode vendor, product, version, and CRC16 values from a joystick GUID string.",
     "Returns four i32 values in order: vendor, product, version, crc16.",
     "i32 vendor, i32 product, i32 version, i32 crc = sdl.get_joystick_guid_info(guid)",
+};
+
+static const vigil_native_symbol_doc_t sdl_doc_create_environment = {
+    "Create an SDL environment handle for isolated variable editing.",
+    "Pass 1 to clone the current process environment or 0 to start with an empty environment.",
+    "i64 env, err e = sdl.create_environment(1)",
+};
+
+static const vigil_native_symbol_doc_t sdl_doc_get_environment_variables = {
+    "List environment variables from an SDL environment handle.",
+    "Returns newline-separated NAME=value pairs.",
+    "string vars = sdl.get_environment_variables(env)",
+};
+
+static const vigil_native_symbol_doc_t sdl_doc_get_environment_variable_from = {
+    "Read one variable from an SDL environment handle.",
+    "Returns an empty string when the variable is missing.",
+    "string home = sdl.get_environment_variable_from(env, \"HOME\")",
+};
+
+static const vigil_native_symbol_doc_t sdl_doc_set_environment_variable_in = {
+    "Set one variable in an SDL environment handle.",
+    "Set overwrite to 0 to keep an existing value unchanged.",
+    "bool ok, err e = sdl.set_environment_variable_in(env, \"DEMO\", \"1\", 1)",
 };
 
 /* ── Function table ──────────────────────────────────────────────── */
@@ -15379,6 +15521,17 @@ static const vigil_native_module_function_t sdl_functions[] = {
      NULL, NULL},
     {"save_file", 9U, sdl_fn_save_file, 3U, p_str_i64_i32, VIGIL_TYPE_BOOL, 2U, rt_bool_err, 0, NULL, NULL, 0U, NULL,
      NULL, NULL, NULL},
+    {"create_environment", 18U, sdl_fn_create_environment, 1U, p_i32, VIGIL_TYPE_I64, 2U, rt_i64_err, 0, NULL, NULL, 0U,
+     sdl_environment_create_param_names, NULL, NULL, &sdl_doc_create_environment},
+    SDL_FN_VOID("destroy_environment", 19U, sdl_fn_destroy_environment, 1U, p_i64),
+    {"get_environment_variables", 25U, sdl_fn_get_environment_variables, 1U, p_i64, VIGIL_TYPE_STRING, 1U, NULL, 0,
+     NULL, NULL, 0U, sdl_environment_handle_param_names, NULL, NULL, &sdl_doc_get_environment_variables},
+    {"get_environment_variable_from", 29U, sdl_fn_get_environment_variable_from, 2U, p_i64_str, VIGIL_TYPE_STRING, 1U,
+     NULL, 0, NULL, NULL, 0U, sdl_environment_name_param_names, NULL, NULL, &sdl_doc_get_environment_variable_from},
+    {"set_environment_variable_in", 27U, sdl_fn_set_environment_variable_in, 4U, p_i64_str_str_i32, VIGIL_TYPE_BOOL, 2U,
+     rt_bool_err, 0, NULL, NULL, 0U, sdl_environment_set_param_names, NULL, NULL, &sdl_doc_set_environment_variable_in},
+    {"unset_environment_variable_in", 29U, sdl_fn_unset_environment_variable_in, 2U, p_i64_str, VIGIL_TYPE_BOOL, 2U,
+     rt_bool_err, 0, NULL, NULL, 0U, sdl_environment_name_param_names, NULL, NULL, NULL},
     SDL_FN_BOOL_ERR("clear_clipboard_data", 20U, sdl_fn_clear_clipboard_data, 0U, NULL),
     SDL_FN("has_clipboard_data", 18U, sdl_fn_has_clipboard_data, 1U, p_str, VIGIL_TYPE_BOOL),
     {"set_hint_with_priority", 22U, sdl_fn_set_hint_with_priority, 3U, p_str_str_i32, VIGIL_TYPE_BOOL, 1U, NULL, 0,

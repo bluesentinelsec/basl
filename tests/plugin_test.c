@@ -200,6 +200,30 @@ TEST(PluginRegistry, SdlExportsParityBatchOneFunctions)
     vigil_native_registry_free(&natives);
 }
 
+TEST(PluginRegistry, SdlExportsEnvironmentBatchFunctions)
+{
+    vigil_native_registry_t natives;
+    vigil_error_t error = {0};
+    const vigil_native_module_t *mod;
+
+    if (!vigil_plugin_is_known_module("sdl", 3U))
+        return;
+
+    vigil_native_registry_init(&natives);
+    EXPECT_EQ(vigil_plugin_register_all(&natives, &error), VIGIL_STATUS_OK);
+
+    mod = vigil_native_registry_find(&natives, "sdl", 3U);
+    EXPECT_NE(mod, NULL);
+    EXPECT_NE(FindModuleFunction(mod, "create_environment"), NULL);
+    EXPECT_NE(FindModuleFunction(mod, "destroy_environment"), NULL);
+    EXPECT_NE(FindModuleFunction(mod, "get_environment_variables"), NULL);
+    EXPECT_NE(FindModuleFunction(mod, "get_environment_variable_from"), NULL);
+    EXPECT_NE(FindModuleFunction(mod, "set_environment_variable_in"), NULL);
+    EXPECT_NE(FindModuleFunction(mod, "unset_environment_variable_in"), NULL);
+
+    vigil_native_registry_free(&natives);
+}
+
 TEST(PluginRegistry, SdlGuidHelpersViaVM)
 {
     int64_t result;
@@ -228,6 +252,46 @@ TEST(PluginRegistry, SdlGuidHelpersViaVM)
     EXPECT_EQ(result, 0);
 }
 
+TEST(PluginRegistry, SdlEnvironmentHelpersViaVM)
+{
+    int64_t result;
+
+    if (!vigil_plugin_is_known_module("sdl", 3U))
+        return;
+
+    result =
+        RunWithPlugins(vigil_test_failed_,
+                       "import \"sdl\";\n"
+                       "fn main() -> i32 {\n"
+                       "    i64 env, err e = sdl.create_environment(0);\n"
+                       "    if (e != ok) {\n"
+                       "        return 1;\n"
+                       "    }\n"
+                       "    bool success, err set_err = sdl.set_environment_variable_in(env, \"ALPHA\", \"beta\", 1);\n"
+                       "    if (success == false || set_err != ok) {\n"
+                       "        return 2;\n"
+                       "    }\n"
+                       "    string value = sdl.get_environment_variable_from(env, \"ALPHA\");\n"
+                       "    if (value != \"beta\") {\n"
+                       "        return 3;\n"
+                       "    }\n"
+                       "    string vars = sdl.get_environment_variables(env);\n"
+                       "    if (vars.contains(\"ALPHA=beta\") == false) {\n"
+                       "        return 4;\n"
+                       "    }\n"
+                       "    bool unset_success, err unset_err = sdl.unset_environment_variable_in(env, \"ALPHA\");\n"
+                       "    if (unset_success == false || unset_err != ok) {\n"
+                       "        return 5;\n"
+                       "    }\n"
+                       "    if (sdl.get_environment_variable_from(env, \"ALPHA\") != \"\") {\n"
+                       "        return 6;\n"
+                       "    }\n"
+                       "    sdl.destroy_environment(env);\n"
+                       "    return 0;\n"
+                       "}\n");
+    EXPECT_EQ(result, 0);
+}
+
 #endif /* VIGIL_PLUGIN_COUNT > 0 */
 
 /* ── registration ────────────────────────────────────────────────── */
@@ -243,6 +307,8 @@ void register_plugin_tests(void)
     REGISTER_TEST(PluginRegistry, PluginStringReturn);
     REGISTER_TEST(PluginRegistry, PluginCoexistsWithStdlib);
     REGISTER_TEST(PluginRegistry, SdlExportsParityBatchOneFunctions);
+    REGISTER_TEST(PluginRegistry, SdlExportsEnvironmentBatchFunctions);
     REGISTER_TEST(PluginRegistry, SdlGuidHelpersViaVM);
+    REGISTER_TEST(PluginRegistry, SdlEnvironmentHelpersViaVM);
 #endif
 }
