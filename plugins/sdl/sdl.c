@@ -13906,8 +13906,13 @@ static vigil_status_t sdl_fn_get_gamepad_mappings(vigil_vm_t *vm, size_t arg_cou
 
     int count = 0;
     char **mappings = SDL_GetGamepadMappings(&count);
-    if (!mappings || count <= 0)
+    if (!mappings)
         return sdl_push_string(vm, "", error);
+    if (count <= 0)
+    {
+        SDL_free(mappings);
+        return sdl_push_string(vm, "", error);
+    }
 
     char *joined = NULL;
     size_t capacity = 0;
