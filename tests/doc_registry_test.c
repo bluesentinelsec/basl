@@ -14,6 +14,17 @@ TEST(DocRegistryTest, LookupBuiltin)
     ASSERT_NE(entry->summary, NULL);
 }
 
+TEST(DocRegistryTest, LookupBuiltinConversionsAndErrorConstructor)
+{
+    const vigil_doc_entry_t *to_i32 = vigil_doc_lookup("i32");
+    const vigil_doc_entry_t *err_ctor = vigil_doc_lookup("err");
+
+    ASSERT_NE(to_i32, NULL);
+    ASSERT_NE(err_ctor, NULL);
+    EXPECT_STREQ(to_i32->signature, "i32(value: string | integer | f64 | bool) -> i32");
+    EXPECT_STREQ(err_ctor->signature, "err(message: string, kind: i32) -> err");
+}
+
 TEST(DocRegistryTest, LookupModule)
 {
     const vigil_doc_entry_t *entry = vigil_doc_lookup("math");
@@ -368,6 +379,7 @@ TEST(DocRegistryTest, ModuleListUsesCanonicalStdlibSet)
 void register_doc_registry_tests(void)
 {
     REGISTER_TEST(DocRegistryTest, LookupBuiltin);
+    REGISTER_TEST(DocRegistryTest, LookupBuiltinConversionsAndErrorConstructor);
     REGISTER_TEST(DocRegistryTest, LookupModule);
     REGISTER_TEST(DocRegistryTest, LookupQualified);
     REGISTER_TEST(DocRegistryTest, LookupNotFound);

@@ -14,20 +14,28 @@
 static const vigil_doc_entry_t builtin_docs[] = {
     {"builtins", NULL, "Built-in functions available without import.",
      "These functions are always available in VIGIL programs.", NULL},
-    {"len", "len(value: string | array | map) -> int", "Return the length of a string, array, or map.", NULL,
+    {"len", "len(value: string | array | map) -> i32", "Return the length of a string, array, or map.", NULL,
      "len(\"hello\")  // 5\nlen([1, 2, 3])  // 3"},
-    {"type", "type(value: any) -> string", "Return the type name of a value.", NULL,
-     "type(42)       // \"int\"\ntype(\"hello\")  // \"string\""},
-    {"str", "str(value: any) -> string", "Convert a value to its string representation.", NULL,
-     "str(42)    // \"42\"\nstr(true)  // \"true\""},
-    {"int", "int(value: string | float) -> int", "Convert a string or float to an integer.", NULL,
-     "int(\"42\")   // 42\nint(3.14)   // 3"},
-    {"float", "float(value: string | int) -> float", "Convert a string or integer to a float.", NULL,
-     "float(\"3.14\")  // 3.14\nfloat(42)      // 42.0"},
-    {"exit", "exit(code: int) -> void", "Exit the program with the given status code.", NULL,
-     "exit(0)  // success\nexit(1)  // failure"},
-    {"char", "char(code: int) -> string", "Convert a byte value (0-255) to a single-character string.", NULL,
+    {"char", "char(code: integer) -> string", "Convert a byte value (0-255) to a single-character string.", NULL,
      "char(65)   // \"A\"\nchar(0x0a) // \"\\n\""},
+    {"err", "err(message: string, kind: i32) -> err", "Construct an error value.", NULL,
+     "err e = err(\"missing config\", 1)"},
+    {"i32", "i32(value: string | integer | f64 | bool) -> i32", "Convert a value to i32.", NULL,
+     "i32 port = i32(\"8080\")"},
+    {"i64", "i64(value: string | integer | f64 | bool) -> i64", "Convert a value to i64.", NULL,
+     "i64 count = i64(42)"},
+    {"u8", "u8(value: string | integer | f64 | bool) -> u8", "Convert a value to u8.", NULL,
+     "u8 byte = u8(255)"},
+    {"u32", "u32(value: string | integer | f64 | bool) -> u32", "Convert a value to u32.", NULL,
+     "u32 mask = u32(7)"},
+    {"u64", "u64(value: string | integer | f64 | bool) -> u64", "Convert a value to u64.", NULL,
+     "u64 size = u64(4096)"},
+    {"f64", "f64(value: string | integer | f64 | bool) -> f64", "Convert a value to f64.", NULL,
+     "f64 ratio = f64(\"3.14\")"},
+    {"bool", "bool(value: string | integer | f64 | bool) -> bool", "Convert a value to bool.", NULL,
+     "bool enabled = bool(\"true\")"},
+    {"string", "string(value: string | integer | f64 | bool) -> string", "Convert a value to string.", NULL,
+     "string text = string(42)"},
 };
 
 #define BUILTIN_COUNT (sizeof(builtin_docs) / sizeof(builtin_docs[0]))
@@ -114,6 +122,9 @@ static const vigil_doc_entry_t strings_docs[] = {
 /* ── net Module Docs ──────────────────────────────────────── */
 
 /* ── crypto Module Docs ───────────────────────────────────── */
+
+/* Legacy fallback docs kept out of the binary-authoritative path. */
+#if 0
 
 /* ── readline module ─────────────────────────────────────────────── */
 
@@ -775,6 +786,8 @@ static const vigil_doc_entry_t sdl_docs[] = {
 
 #define SDL_DOC_COUNT (sizeof(sdl_docs) / sizeof(sdl_docs[0]))
 
+#endif
+
 /* ── Module List ──────────────────────────────────────────── */
 
 typedef struct native_doc_cache
@@ -1374,8 +1387,6 @@ typedef struct
 static const doc_module_table_entry_t doc_module_table[] = {
     {"builtins", builtin_docs, BUILTIN_COUNT},
     {"strings", strings_docs, STRINGS_COUNT},
-    {"readline", readline_docs, READLINE_COUNT},
-    {"sdl", sdl_docs, SDL_DOC_COUNT},
 };
 
 #define DOC_MODULE_TABLE_COUNT (sizeof(doc_module_table) / sizeof(doc_module_table[0]))

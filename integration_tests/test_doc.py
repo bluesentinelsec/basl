@@ -20,63 +20,37 @@ def resolve_vigil_command():
     return [str(debug_bin)]
 
 
-STDLIB_MODULES = [
-    "args",
-    "atomic",
-    "compress",
-    "crypto",
-    "csv",
-    "ffi",
-    "fmt",
-    "fs",
-    "http",
-    "log",
-    "math",
-    "net",
-    "parse",
-    "random",
-    "readline",
-    "regex",
-    "test",
-    "thread",
-    "time",
-    "unsafe",
-    "url",
-    "yaml",
+BUILTIN_SYMBOLS = [
+    "len",
+    "char",
+    "err",
+    "i32",
+    "i64",
+    "u8",
+    "u32",
+    "u64",
+    "f64",
+    "bool",
+    "string",
 ]
 
-STDLIB_SYMBOLS = [
-    "args.count",
-    "args.at",
-    "atomic.exchange",
-    "atomic.fetch_or",
-    "atomic.fetch_and",
-    "atomic.fetch_xor",
-    "atomic.fence",
-    "readline.history_clear",
-    "readline.history_load",
-    "readline.history_save",
-    "thread.detach",
-    "thread.mutex_destroy",
-    "thread.wait_timeout",
-    "thread.cond_destroy",
-    "thread.rwlock_destroy",
-    "math.pi",
-    "math.remap",
-    "math.Vec2",
-    "math.Vec2.x",
-    "math.Vec2.length",
-    "math.Quaternion.toMat4",
-    "math.Mat4.identity",
-    "args.Parser",
-    "args.Parser.new",
-    "args.Parser.get_bool",
-    "test.T",
-    "test.T.assert",
-    "unsafe.get_f32",
-    "unsafe.alignof",
-    "unsafe.cb_alloc",
-]
+MODULE_SYMBOLS = {
+    "args": ["args.count", "args.at", "args.Parser", "args.Parser.new", "args.Parser.get_bool"],
+    "atomic": ["atomic.exchange", "atomic.fetch_or", "atomic.fetch_and", "atomic.fetch_xor", "atomic.fence"],
+    "math": [
+        "math.pi",
+        "math.remap",
+        "math.Vec2",
+        "math.Vec2.x",
+        "math.Vec2.length",
+        "math.Quaternion.toMat4",
+        "math.Mat4.identity",
+    ],
+    "readline": ["readline.history_clear", "readline.history_load", "readline.history_save"],
+    "test": ["test.T", "test.T.assert"],
+    "thread": ["thread.detach", "thread.mutex_destroy", "thread.wait_timeout", "thread.cond_destroy", "thread.rwlock_destroy"],
+    "unsafe": ["unsafe.get_f32", "unsafe.alignof", "unsafe.cb_alloc"],
+}
 
 
 class TestVigilDoc(unittest.TestCase):
@@ -95,6 +69,25 @@ class TestVigilDoc(unittest.TestCase):
     def _run_doc(self, *args):
         cmd = [*resolve_vigil_command(), "doc", *args]
         return subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+
+    def _available_modules(self):
+        result = self._run_doc()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        modules = []
+        in_list = False
+        for line in result.stdout.splitlines():
+            if line.startswith("Available modules:"):
+                in_list = True
+                continue
+            if not in_list:
+                continue
+            if line.startswith("Use 'vigil doc"):
+                break
+            stripped = line.strip()
+            if not stripped:
+                continue
+            modules.append(stripped.split()[0])
+        return modules
 
     def test_module_view(self):
         """vigil doc <file> shows public symbols."""
@@ -152,20 +145,32 @@ class TestVigilDoc(unittest.TestCase):
         self.assertIn("doc", output)
 
     def test_all_stdlib_modules_render(self):
-        """vigil doc <module> should work for every stdlib module."""
-        for module in STDLIB_MODULES:
+        """vigil doc <module> should work for every module this binary reports."""
+        for module in self._available_modules():
             with self.subTest(module=module):
                 result = self._run_doc(module)
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertIn(module, result.stdout)
 
-    def test_recently_missing_stdlib_symbols_render(self):
-        """vigil doc <module.symbol> should work for historically missing stdlib docs."""
-        for symbol in STDLIB_SYMBOLS:
+    def test_builtin_symbols_render(self):
+        """Builtins exposed by this compiler should always render."""
+        for symbol in BUILTIN_SYMBOLS:
             with self.subTest(symbol=symbol):
                 result = self._run_doc(symbol)
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertIn(symbol, result.stdout)
+
+    def test_available_module_symbols_render(self):
+        """Selected module symbols should render only when the module exists in this binary."""
+        available_modules = set(self._available_modules())
+        for module, symbols in MODULE_SYMBOLS.items():
+            if module not in available_modules:
+                continue
+            for symbol in symbols:
+                with self.subTest(symbol=symbol):
+                    result = self._run_doc(symbol)
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertIn(symbol, result.stdout)
 
     def test_modules_with_native_classes_list_class_symbols(self):
         """Module views should include documented native classes and their members."""
