@@ -409,6 +409,15 @@ TEST(DocRegistryTest, DescriptorBackedDocsRenderDerivedSignaturesForRegexAndAtom
     EXPECT_STREQ(atomic_store->signature, "atomic.store(a: i64, val: i64) -> bool");
 }
 
+TEST(DocRegistryTest, StringMethodDocsIncludeToC)
+{
+    const vigil_doc_entry_t *to_c = vigil_doc_lookup("strings.to_c");
+
+    ASSERT_NE(to_c, NULL);
+    EXPECT_STREQ(to_c->signature, "s.to_c() -> string");
+    EXPECT_STREQ(to_c->summary, "Return s escaped as a C string literal body.");
+}
+
 TEST(DocRegistryTest, DescriptorBackedDocsRenderDerivedSignaturesForNetAndTime)
 {
 #ifdef VIGIL_HAS_STDLIB_NET
@@ -547,6 +556,7 @@ void register_doc_registry_tests(void)
     REGISTER_TEST(DocRegistryTest, ReadlineDocsRenderWhenModuleIsCompiledIn);
     REGISTER_TEST(DocRegistryTest, DescriptorBackedDocsRenderDerivedSignaturesForUrlYamlCsvAndLog);
     REGISTER_TEST(DocRegistryTest, DescriptorBackedDocsRenderDerivedSignaturesForRegexAndAtomic);
+    REGISTER_TEST(DocRegistryTest, StringMethodDocsIncludeToC);
     REGISTER_TEST(DocRegistryTest, DescriptorBackedDocsRenderDerivedSignaturesForNetAndTime);
     REGISTER_TEST(DocRegistryTest, DescriptorBackedDocsRenderDerivedSignaturesForCrypto);
     REGISTER_TEST(DocRegistryTest, DescriptorBackedDocsRenderDerivedSignaturesForThreadAndCompress);

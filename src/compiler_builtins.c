@@ -1,5 +1,9 @@
 #include "internal/vigil_compiler_types.h"
 #include "internal/vigil_internal.h"
+
+#include "vigil/builtins.h"
+#include "vigil/native_module.h"
+
 #include <string.h>
 
 vigil_status_t vigil_parser_emit_default_value(vigil_parser_state_t *state, vigil_parser_type_t type,
@@ -36,91 +40,35 @@ vigil_status_t vigil_parser_emit_default_value(vigil_parser_state_t *state, vigi
 
 /* ── String method helpers ─────────────────────────────────────────── */
 
-typedef enum
-{
-    STRING_RESULT_STRING,
-    STRING_RESULT_BOOL,
-    STRING_RESULT_I32,
-    STRING_RESULT_PAIR_I32_BOOL,
-    STRING_RESULT_TRIPLE_SSB,
-    STRING_RESULT_ARRAY_STRING,
-    STRING_RESULT_ARRAY_U8
-} string_result_kind_t;
-
-typedef struct
-{
-    const char *name;
-    size_t name_length;
-    vigil_opcode_t opcode;
-    string_result_kind_t result_kind;
-} string_method_entry_t;
-
-static const string_method_entry_t string_noarg_methods[] = {
-    {"trim", 4U, VIGIL_OPCODE_STRING_TRIM, STRING_RESULT_STRING},
-    {"to_upper", 8U, VIGIL_OPCODE_STRING_TO_UPPER, STRING_RESULT_STRING},
-    {"to_lower", 8U, VIGIL_OPCODE_STRING_TO_LOWER, STRING_RESULT_STRING},
-    {"trim_left", 9U, VIGIL_OPCODE_STRING_TRIM_LEFT, STRING_RESULT_STRING},
-    {"trim_right", 10U, VIGIL_OPCODE_STRING_TRIM_RIGHT, STRING_RESULT_STRING},
-    {"reverse", 7U, VIGIL_OPCODE_STRING_REVERSE, STRING_RESULT_STRING},
-    {"is_empty", 8U, VIGIL_OPCODE_STRING_IS_EMPTY, STRING_RESULT_BOOL},
-    {"char_count", 10U, VIGIL_OPCODE_STRING_CHAR_COUNT, STRING_RESULT_I32},
-    {"to_c", 4U, VIGIL_OPCODE_STRING_TO_C, STRING_RESULT_STRING},
-    {"fields", 6U, VIGIL_OPCODE_STRING_FIELDS, STRING_RESULT_ARRAY_STRING},
-    {"bytes", 5U, VIGIL_OPCODE_STRING_BYTES, STRING_RESULT_ARRAY_U8},
-};
-
-static const string_method_entry_t string_onearg_methods[] = {
-    {"contains", 8U, VIGIL_OPCODE_STRING_CONTAINS, STRING_RESULT_BOOL},
-    {"starts_with", 11U, VIGIL_OPCODE_STRING_STARTS_WITH, STRING_RESULT_BOOL},
-    {"ends_with", 9U, VIGIL_OPCODE_STRING_ENDS_WITH, STRING_RESULT_BOOL},
-    {"split", 5U, VIGIL_OPCODE_STRING_SPLIT, STRING_RESULT_ARRAY_STRING},
-    {"count", 5U, VIGIL_OPCODE_STRING_COUNT, STRING_RESULT_I32},
-    {"last_index_of", 13U, VIGIL_OPCODE_STRING_LAST_INDEX_OF, STRING_RESULT_PAIR_I32_BOOL},
-    {"trim_prefix", 11U, VIGIL_OPCODE_STRING_TRIM_PREFIX, STRING_RESULT_STRING},
-    {"trim_suffix", 11U, VIGIL_OPCODE_STRING_TRIM_SUFFIX, STRING_RESULT_STRING},
-    {"equal_fold", 10U, VIGIL_OPCODE_STRING_EQUAL_FOLD, STRING_RESULT_BOOL},
-    {"cut", 3U, VIGIL_OPCODE_STRING_CUT, STRING_RESULT_TRIPLE_SSB},
-    {"index_of", 8U, VIGIL_OPCODE_STRING_INDEX_OF, STRING_RESULT_PAIR_I32_BOOL},
-};
-
-static vigil_status_t compile_string_set_result(vigil_parser_state_t *state, string_result_kind_t kind,
+static vigil_status_t compile_string_set_result(vigil_parser_state_t *state,
+                                                const vigil_string_method_descriptor_t *descriptor,
                                                 vigil_expression_result_t *out_result)
 {
     vigil_status_t status;
     vigil_parser_type_t array_type;
 
-    switch (kind)
+    if (descriptor->return_tuple_type_count == 2U)
     {
-    case STRING_RESULT_STRING:
-        vigil_expression_result_set_type(out_result, vigil_binding_type_primitive(VIGIL_TYPE_STRING));
+        vigil_expression_result_set_pair(
+            out_result, vigil_binding_type_primitive((vigil_type_kind_t)descriptor->return_tuple_type_kinds[0]),
+            vigil_binding_type_primitive((vigil_type_kind_t)descriptor->return_tuple_type_kinds[1]));
         return VIGIL_STATUS_OK;
-    case STRING_RESULT_BOOL:
-        vigil_expression_result_set_type(out_result, vigil_binding_type_primitive(VIGIL_TYPE_BOOL));
+    }
+
+    if (descriptor->return_tuple_type_count == 3U)
+    {
+        vigil_expression_result_set_triple(
+            out_result, vigil_binding_type_primitive((vigil_type_kind_t)descriptor->return_tuple_type_kinds[0]),
+            vigil_binding_type_primitive((vigil_type_kind_t)descriptor->return_tuple_type_kinds[1]),
+            vigil_binding_type_primitive((vigil_type_kind_t)descriptor->return_tuple_type_kinds[2]));
         return VIGIL_STATUS_OK;
-    case STRING_RESULT_I32:
-        vigil_expression_result_set_type(out_result, vigil_binding_type_primitive(VIGIL_TYPE_I32));
-        return VIGIL_STATUS_OK;
-    case STRING_RESULT_PAIR_I32_BOOL:
-        vigil_expression_result_set_pair(out_result, vigil_binding_type_primitive(VIGIL_TYPE_I32),
-                                         vigil_binding_type_primitive(VIGIL_TYPE_BOOL));
-        return VIGIL_STATUS_OK;
-    case STRING_RESULT_TRIPLE_SSB:
-        vigil_expression_result_set_triple(out_result, vigil_binding_type_primitive(VIGIL_TYPE_STRING),
-                                           vigil_binding_type_primitive(VIGIL_TYPE_STRING),
-                                           vigil_binding_type_primitive(VIGIL_TYPE_BOOL));
-        return VIGIL_STATUS_OK;
-    case STRING_RESULT_ARRAY_STRING:
-        status = vigil_program_intern_array_type((vigil_program_state_t *)state->program,
-                                                 vigil_binding_type_primitive(VIGIL_TYPE_STRING), &array_type);
-        if (status != VIGIL_STATUS_OK)
-        {
-            return status;
-        }
-        vigil_expression_result_set_type(out_result, array_type);
-        return VIGIL_STATUS_OK;
-    case STRING_RESULT_ARRAY_U8:
-        status = vigil_program_intern_array_type((vigil_program_state_t *)state->program,
-                                                 vigil_binding_type_primitive(VIGIL_TYPE_U8), &array_type);
+    }
+
+    if (descriptor->return_type_kind == VIGIL_TYPE_OBJECT && descriptor->return_object_kind == VIGIL_NATIVE_FIELD_ARRAY)
+    {
+        status = vigil_program_intern_array_type(
+            (vigil_program_state_t *)state->program,
+            vigil_binding_type_primitive((vigil_type_kind_t)descriptor->return_element_type_kind), &array_type);
         if (status != VIGIL_STATUS_OK)
         {
             return status;
@@ -128,218 +76,61 @@ static vigil_status_t compile_string_set_result(vigil_parser_state_t *state, str
         vigil_expression_result_set_type(out_result, array_type);
         return VIGIL_STATUS_OK;
     }
-    return VIGIL_STATUS_INTERNAL;
-}
 
-static const string_method_entry_t *string_table_find(const char *method_name, size_t method_length,
-                                                      const string_method_entry_t *table, size_t table_count)
-{
-    size_t i;
-
-    for (i = 0U; i < table_count; i += 1U)
-    {
-        if (vigil_program_names_equal(method_name, method_length, table[i].name, table[i].name_length))
-        {
-            return &table[i];
-        }
-    }
-    return NULL;
-}
-
-static vigil_status_t compile_string_table_emit(vigil_parser_state_t *state, const vigil_token_t *method_token,
-                                                const string_method_entry_t *entry,
-                                                vigil_expression_result_t *out_result)
-{
-    vigil_status_t status = vigil_parser_emit_opcode(state, entry->opcode, method_token->span);
-    if (status != VIGIL_STATUS_OK)
-    {
-        return status;
-    }
-    return compile_string_set_result(state, entry->result_kind, out_result);
-}
-
-static vigil_status_t compile_string_replace(vigil_parser_state_t *state, const vigil_token_t *method_token,
-                                             vigil_expression_result_t *arg_result,
-                                             vigil_expression_result_t *out_result)
-{
-    vigil_status_t status;
-    vigil_expression_result_t second_arg;
-
-    vigil_expression_result_clear(&second_arg);
-    status = vigil_parser_require_type(state, method_token->span, arg_result->type,
-                                       vigil_binding_type_primitive(VIGIL_TYPE_STRING),
-                                       "string replace() arguments must be strings");
-    if (status != VIGIL_STATUS_OK)
-    {
-        return status;
-    }
-    status = vigil_parser_expect(state, VIGIL_TOKEN_COMMA, "string replace() expects two arguments", NULL);
-    if (status != VIGIL_STATUS_OK)
-    {
-        return status;
-    }
-    status = vigil_parser_parse_expression(state, &second_arg);
-    if (status != VIGIL_STATUS_OK)
-    {
-        return status;
-    }
-    status = vigil_parser_require_scalar_expression(state, method_token->span, &second_arg,
-                                                    "string method arguments must be single values");
-    if (status != VIGIL_STATUS_OK)
-    {
-        return status;
-    }
-    status = vigil_parser_require_type(state, method_token->span, second_arg.type,
-                                       vigil_binding_type_primitive(VIGIL_TYPE_STRING),
-                                       "string replace() arguments must be strings");
-    if (status != VIGIL_STATUS_OK)
-    {
-        return status;
-    }
-    status = vigil_parser_expect(state, VIGIL_TOKEN_RPAREN, "expected ')' after string method arguments", NULL);
-    if (status != VIGIL_STATUS_OK)
-    {
-        return status;
-    }
-    status = vigil_parser_emit_opcode(state, VIGIL_OPCODE_STRING_REPLACE, method_token->span);
-    if (status != VIGIL_STATUS_OK)
-    {
-        return status;
-    }
-    vigil_expression_result_set_type(out_result, vigil_binding_type_primitive(VIGIL_TYPE_STRING));
+    vigil_expression_result_set_type(out_result,
+                                     vigil_binding_type_primitive((vigil_type_kind_t)descriptor->return_type_kind));
     return VIGIL_STATUS_OK;
 }
 
-static vigil_status_t compile_string_substr_or_char_at(vigil_parser_state_t *state, const vigil_token_t *method_token,
-                                                       const char *method_name, size_t method_length,
-                                                       vigil_expression_result_t *arg_result,
-                                                       vigil_expression_result_t *out_result)
+static vigil_status_t compile_string_emit(vigil_parser_state_t *state, const vigil_token_t *method_token,
+                                          const vigil_string_method_descriptor_t *descriptor,
+                                          vigil_expression_result_t *out_result)
 {
-    vigil_status_t status;
-
-    status =
-        vigil_parser_require_type(state, method_token->span, arg_result->type,
-                                  vigil_binding_type_primitive(VIGIL_TYPE_I32), "string index arguments must be i32");
+    vigil_status_t status = vigil_parser_emit_opcode(state, descriptor->opcode, method_token->span);
     if (status != VIGIL_STATUS_OK)
     {
         return status;
     }
-    if (vigil_program_names_equal(method_name, method_length, "substr", 6U))
+    return compile_string_set_result(state, descriptor, out_result);
+}
+
+static vigil_status_t compile_string_require_arg_type(vigil_parser_state_t *state, const vigil_token_t *method_token,
+                                                      const vigil_string_method_descriptor_t *descriptor, size_t index,
+                                                      vigil_parser_type_t actual_type)
+{
+    if (descriptor->arg_type_kinds[index] == VIGIL_TYPE_STRING)
     {
-        vigil_expression_result_t second_arg;
-        vigil_expression_result_clear(&second_arg);
-        status = vigil_parser_expect(state, VIGIL_TOKEN_COMMA, "string substr() expects two arguments", NULL);
+        return vigil_parser_require_type(state, method_token->span, actual_type,
+                                         vigil_binding_type_primitive(VIGIL_TYPE_STRING),
+                                         "string method argument must be string");
+    }
+
+    if (descriptor->arg_type_kinds[index] == VIGIL_TYPE_I32)
+    {
+        return vigil_parser_require_type(state, method_token->span, actual_type,
+                                         vigil_binding_type_primitive(VIGIL_TYPE_I32),
+                                         "string method argument must be i32");
+    }
+
+    if (descriptor->arg_type_kinds[index] == VIGIL_TYPE_OBJECT &&
+        descriptor->arg_object_kinds[index] == VIGIL_NATIVE_FIELD_ARRAY)
+    {
+        vigil_status_t status;
+        vigil_parser_type_t expected_array;
+
+        status = vigil_program_intern_array_type(
+            (vigil_program_state_t *)state->program,
+            vigil_binding_type_primitive((vigil_type_kind_t)descriptor->arg_element_type_kinds[index]),
+            &expected_array);
         if (status != VIGIL_STATUS_OK)
         {
             return status;
         }
-        status = vigil_parser_parse_expression(state, &second_arg);
-        if (status != VIGIL_STATUS_OK)
-        {
-            return status;
-        }
-        status = vigil_parser_require_scalar_expression(state, method_token->span, &second_arg,
-                                                        "string method arguments must be single values");
-        if (status != VIGIL_STATUS_OK)
-        {
-            return status;
-        }
-        status = vigil_parser_require_type(state, method_token->span, second_arg.type,
-                                           vigil_binding_type_primitive(VIGIL_TYPE_I32),
-                                           "string index arguments must be i32");
-        if (status != VIGIL_STATUS_OK)
-        {
-            return status;
-        }
+        return vigil_parser_require_type(state, method_token->span, actual_type, expected_array,
+                                         "string method argument must match required array type");
     }
-    status = vigil_parser_expect(state, VIGIL_TOKEN_RPAREN, "expected ')' after string method arguments", NULL);
-    if (status != VIGIL_STATUS_OK)
-    {
-        return status;
-    }
-    status = vigil_parser_emit_opcode(state,
-                                      vigil_program_names_equal(method_name, method_length, "substr", 6U)
-                                          ? VIGIL_OPCODE_STRING_SUBSTR
-                                          : VIGIL_OPCODE_STRING_CHAR_AT,
-                                      method_token->span);
-    if (status != VIGIL_STATUS_OK)
-    {
-        return status;
-    }
-    vigil_expression_result_set_pair(out_result, vigil_binding_type_primitive(VIGIL_TYPE_STRING),
-                                     vigil_binding_type_primitive(VIGIL_TYPE_ERR));
+
     return VIGIL_STATUS_OK;
-}
-
-static vigil_status_t compile_string_repeat(vigil_parser_state_t *state, const vigil_token_t *method_token,
-                                            vigil_expression_result_t *arg_result,
-                                            vigil_expression_result_t *out_result)
-{
-    vigil_status_t status;
-
-    status =
-        vigil_parser_require_type(state, method_token->span, arg_result->type,
-                                  vigil_binding_type_primitive(VIGIL_TYPE_I32), "string repeat() argument must be i32");
-    if (status != VIGIL_STATUS_OK)
-    {
-        return status;
-    }
-    status = vigil_parser_expect(state, VIGIL_TOKEN_RPAREN, "expected ')' after string method arguments", NULL);
-    if (status != VIGIL_STATUS_OK)
-    {
-        return status;
-    }
-    status = vigil_parser_emit_opcode(state, VIGIL_OPCODE_STRING_REPEAT, method_token->span);
-    if (status != VIGIL_STATUS_OK)
-    {
-        return status;
-    }
-    vigil_expression_result_set_type(out_result, vigil_binding_type_primitive(VIGIL_TYPE_STRING));
-    return VIGIL_STATUS_OK;
-}
-
-static vigil_status_t compile_string_join(vigil_parser_state_t *state, const vigil_token_t *method_token,
-                                          vigil_expression_result_t *arg_result, vigil_expression_result_t *out_result)
-{
-    vigil_status_t status;
-    vigil_parser_type_t expected_array;
-
-    status = vigil_program_intern_array_type((vigil_program_state_t *)state->program,
-                                             vigil_binding_type_primitive(VIGIL_TYPE_STRING), &expected_array);
-    if (status != VIGIL_STATUS_OK)
-    {
-        return status;
-    }
-    status = vigil_parser_require_type(state, method_token->span, arg_result->type, expected_array,
-                                       "string join() argument must be array<string>");
-    if (status != VIGIL_STATUS_OK)
-    {
-        return status;
-    }
-    status = vigil_parser_expect(state, VIGIL_TOKEN_RPAREN, "expected ')' after string method arguments", NULL);
-    if (status != VIGIL_STATUS_OK)
-    {
-        return status;
-    }
-    status = vigil_parser_emit_opcode(state, VIGIL_OPCODE_STRING_JOIN, method_token->span);
-    if (status != VIGIL_STATUS_OK)
-    {
-        return status;
-    }
-    vigil_expression_result_set_type(out_result, vigil_binding_type_primitive(VIGIL_TYPE_STRING));
-    return VIGIL_STATUS_OK;
-}
-
-static const string_method_entry_t *string_find_noarg_method(const char *name, size_t length)
-{
-    return string_table_find(name, length, string_noarg_methods,
-                             sizeof(string_noarg_methods) / sizeof(string_noarg_methods[0]));
-}
-
-static const string_method_entry_t *string_find_onearg_method(const char *name, size_t length)
-{
-    return string_table_find(name, length, string_onearg_methods,
-                             sizeof(string_onearg_methods) / sizeof(string_onearg_methods[0]));
 }
 
 /* ── Refactored string method dispatch ─────────────────────────────── */
@@ -348,13 +139,16 @@ vigil_status_t vigil_parser_parse_string_method_call(vigil_parser_state_t *state
                                                      vigil_expression_result_t *out_result)
 {
     vigil_status_t status;
-    vigil_expression_result_t arg_result;
+    vigil_expression_result_t arg_results[2];
     const char *method_name;
     size_t method_length;
-    const string_method_entry_t *entry;
+    const vigil_string_method_descriptor_t *descriptor;
+    size_t arg_index;
 
-    vigil_expression_result_clear(&arg_result);
+    vigil_expression_result_clear(&arg_results[0]);
+    vigil_expression_result_clear(&arg_results[1]);
     method_name = vigil_parser_token_text(state, method_token, &method_length);
+    descriptor = vigil_string_method_find(method_name, method_length);
 
     status = vigil_parser_expect(state, VIGIL_TOKEN_LPAREN, "expected '(' after string method name", NULL);
     if (status != VIGIL_STATUS_OK)
@@ -362,86 +156,60 @@ vigil_status_t vigil_parser_parse_string_method_call(vigil_parser_state_t *state
         return status;
     }
 
-    if (vigil_program_names_equal(method_name, method_length, "len", 3U))
+    if (descriptor == NULL)
     {
-        status = vigil_parser_expect(state, VIGIL_TOKEN_RPAREN, "string len() does not accept arguments", NULL);
-        if (status != VIGIL_STATUS_OK)
-        {
-            return status;
-        }
-        status = vigil_parser_emit_opcode(state, VIGIL_OPCODE_GET_STRING_SIZE, method_token->span);
-        if (status != VIGIL_STATUS_OK)
-        {
-            return status;
-        }
-        vigil_expression_result_set_type(out_result, vigil_binding_type_primitive(VIGIL_TYPE_I32));
-        return VIGIL_STATUS_OK;
+        return vigil_parser_report(state, method_token->span, "unknown string method");
     }
 
-    entry = string_find_noarg_method(method_name, method_length);
-    if (entry != NULL)
+    if (descriptor->arg_count == 0U)
     {
         status = vigil_parser_expect(state, VIGIL_TOKEN_RPAREN, "string method does not accept arguments", NULL);
         if (status != VIGIL_STATUS_OK)
         {
             return status;
         }
-        return compile_string_table_emit(state, method_token, entry, out_result);
+        return compile_string_emit(state, method_token, descriptor, out_result);
     }
 
-    status = vigil_parser_parse_expression(state, &arg_result);
-    if (status != VIGIL_STATUS_OK)
+    for (arg_index = 0U; arg_index < descriptor->arg_count; arg_index += 1U)
     {
-        return status;
-    }
-    status = vigil_parser_require_scalar_expression(state, method_token->span, &arg_result,
-                                                    "string method arguments must be single values");
-    if (status != VIGIL_STATUS_OK)
-    {
-        return status;
-    }
+        if (arg_index != 0U)
+        {
+            status = vigil_parser_expect(state, VIGIL_TOKEN_COMMA, "string method expects more arguments", NULL);
+            if (status != VIGIL_STATUS_OK)
+            {
+                return status;
+            }
+        }
 
-    entry = string_find_onearg_method(method_name, method_length);
-    if (entry != NULL)
-    {
-        status = vigil_parser_require_type(state, method_token->span, arg_result.type,
-                                           vigil_binding_type_primitive(VIGIL_TYPE_STRING),
-                                           "string method argument must be string");
+        status = vigil_parser_parse_expression(state, &arg_results[arg_index]);
         if (status != VIGIL_STATUS_OK)
         {
             return status;
         }
-        status = vigil_parser_expect(state, VIGIL_TOKEN_RPAREN, "expected ')' after string method arguments", NULL);
+
+        status = vigil_parser_require_scalar_expression(state, method_token->span, &arg_results[arg_index],
+                                                        "string method arguments must be single values");
         if (status != VIGIL_STATUS_OK)
         {
             return status;
         }
-        return compile_string_table_emit(state, method_token, entry, out_result);
+
+        status =
+            compile_string_require_arg_type(state, method_token, descriptor, arg_index, arg_results[arg_index].type);
+        if (status != VIGIL_STATUS_OK)
+        {
+            return status;
+        }
     }
 
-    if (vigil_program_names_equal(method_name, method_length, "replace", 7U))
+    status = vigil_parser_expect(state, VIGIL_TOKEN_RPAREN, "expected ')' after string method arguments", NULL);
+    if (status != VIGIL_STATUS_OK)
     {
-        return compile_string_replace(state, method_token, &arg_result, out_result);
+        return status;
     }
 
-    if (vigil_program_names_equal(method_name, method_length, "substr", 6U) ||
-        vigil_program_names_equal(method_name, method_length, "char_at", 7U))
-    {
-        return compile_string_substr_or_char_at(state, method_token, method_name, method_length, &arg_result,
-                                                out_result);
-    }
-
-    if (vigil_program_names_equal(method_name, method_length, "repeat", 6U))
-    {
-        return compile_string_repeat(state, method_token, &arg_result, out_result);
-    }
-
-    if (vigil_program_names_equal(method_name, method_length, "join", 4U))
-    {
-        return compile_string_join(state, method_token, &arg_result, out_result);
-    }
-
-    return vigil_parser_report(state, method_token->span, "unknown string method");
+    return compile_string_emit(state, method_token, descriptor, out_result);
 }
 
 /* ── Array method helpers ──────────────────────────────────────────── */

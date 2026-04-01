@@ -2,6 +2,8 @@
 
 #include <string.h>
 
+#include "vigil/native_module.h"
+
 static const vigil_doc_entry_t builtin_module_doc = {"builtins", NULL, "Built-in functions available without import.",
                                                      "These functions are always available in VIGIL programs.", NULL};
 
@@ -90,6 +92,8 @@ static const vigil_doc_entry_t string_method_docs[] = {
     {"strings.is_empty", "s.is_empty() -> bool", "Return true if s has length zero.", NULL, "\"\".is_empty()  // true"},
     {"strings.char_count", "s.char_count() -> i32", "Return the number of Unicode code points in s (not bytes).", NULL,
      "\"café\".char_count()  // 4"},
+    {"strings.to_c", "s.to_c() -> string", "Return s escaped as a C string literal body.", NULL,
+     "\"a\\n\\\"b\".to_c()  // a\\\\n\\\\\\\"b"},
     {"strings.repeat", "s.repeat(n: i32) -> string", "Return s repeated n times.", NULL,
      "\"ab\".repeat(3)  // \"ababab\""},
     {"strings.count", "s.count(sub: string) -> i32", "Return the number of non-overlapping occurrences of sub in s.",
@@ -108,33 +112,103 @@ static const vigil_doc_entry_t string_method_docs[] = {
 };
 
 static const vigil_string_method_descriptor_t string_method_descriptors_[] = {
-    {"len", 3U, &string_method_docs[0]},
-    {"contains", 8U, &string_method_docs[1]},
-    {"starts_with", 11U, &string_method_docs[2]},
-    {"ends_with", 9U, &string_method_docs[3]},
-    {"trim", 4U, &string_method_docs[4]},
-    {"trim_left", 9U, &string_method_docs[5]},
-    {"trim_right", 10U, &string_method_docs[6]},
-    {"trim_prefix", 11U, &string_method_docs[7]},
-    {"trim_suffix", 11U, &string_method_docs[8]},
-    {"to_upper", 8U, &string_method_docs[9]},
-    {"to_lower", 8U, &string_method_docs[10]},
-    {"replace", 7U, &string_method_docs[11]},
-    {"split", 5U, &string_method_docs[12]},
-    {"index_of", 8U, &string_method_docs[13]},
-    {"last_index_of", 13U, &string_method_docs[14]},
-    {"substr", 6U, &string_method_docs[15]},
-    {"char_at", 7U, &string_method_docs[16]},
-    {"bytes", 5U, &string_method_docs[17]},
-    {"reverse", 7U, &string_method_docs[18]},
-    {"is_empty", 8U, &string_method_docs[19]},
-    {"char_count", 10U, &string_method_docs[20]},
-    {"repeat", 6U, &string_method_docs[21]},
-    {"count", 5U, &string_method_docs[22]},
-    {"fields", 6U, &string_method_docs[23]},
-    {"join", 4U, &string_method_docs[24]},
-    {"cut", 3U, &string_method_docs[25]},
-    {"equal_fold", 10U, &string_method_docs[26]},
+#define STRING_METHOD_DESCRIPTOR(name_, opcode_, arg_count_, arg0_type_, arg0_object_kind_, arg0_element_type_,        \
+                                 arg1_type_, arg1_object_kind_, arg1_element_type_, return_type_, return_object_kind_, \
+                                 return_element_type_, tuple_count_, tuple0_, tuple1_, tuple2_, doc_index_)            \
+    {name_,                                                                                                            \
+     sizeof(name_) - 1U,                                                                                               \
+     arg_count_,                                                                                                       \
+     opcode_,                                                                                                          \
+     {arg0_type_, arg1_type_},                                                                                         \
+     {arg0_object_kind_, arg1_object_kind_},                                                                           \
+     {arg0_element_type_, arg1_element_type_},                                                                         \
+     return_type_,                                                                                                     \
+     return_object_kind_,                                                                                              \
+     return_element_type_,                                                                                             \
+     {tuple0_, tuple1_, tuple2_},                                                                                      \
+     tuple_count_,                                                                                                     \
+     &string_method_docs[doc_index_]}
+    STRING_METHOD_DESCRIPTOR("len", VIGIL_OPCODE_GET_STRING_SIZE, 0U, VIGIL_TYPE_INVALID, 0, 0, VIGIL_TYPE_INVALID, 0,
+                             0, VIGIL_TYPE_I32, 0, 0, 0U, VIGIL_TYPE_INVALID, VIGIL_TYPE_INVALID, VIGIL_TYPE_INVALID,
+                             0),
+    STRING_METHOD_DESCRIPTOR("contains", VIGIL_OPCODE_STRING_CONTAINS, 1U, VIGIL_TYPE_STRING, 0, 0, VIGIL_TYPE_INVALID,
+                             0, 0, VIGIL_TYPE_BOOL, 0, 0, 0U, VIGIL_TYPE_INVALID, VIGIL_TYPE_INVALID,
+                             VIGIL_TYPE_INVALID, 1),
+    STRING_METHOD_DESCRIPTOR("starts_with", VIGIL_OPCODE_STRING_STARTS_WITH, 1U, VIGIL_TYPE_STRING, 0, 0,
+                             VIGIL_TYPE_INVALID, 0, 0, VIGIL_TYPE_BOOL, 0, 0, 0U, VIGIL_TYPE_INVALID,
+                             VIGIL_TYPE_INVALID, VIGIL_TYPE_INVALID, 2),
+    STRING_METHOD_DESCRIPTOR("ends_with", VIGIL_OPCODE_STRING_ENDS_WITH, 1U, VIGIL_TYPE_STRING, 0, 0,
+                             VIGIL_TYPE_INVALID, 0, 0, VIGIL_TYPE_BOOL, 0, 0, 0U, VIGIL_TYPE_INVALID,
+                             VIGIL_TYPE_INVALID, VIGIL_TYPE_INVALID, 3),
+    STRING_METHOD_DESCRIPTOR("trim", VIGIL_OPCODE_STRING_TRIM, 0U, VIGIL_TYPE_INVALID, 0, 0, VIGIL_TYPE_INVALID, 0, 0,
+                             VIGIL_TYPE_STRING, 0, 0, 0U, VIGIL_TYPE_INVALID, VIGIL_TYPE_INVALID, VIGIL_TYPE_INVALID,
+                             4),
+    STRING_METHOD_DESCRIPTOR("trim_left", VIGIL_OPCODE_STRING_TRIM_LEFT, 0U, VIGIL_TYPE_INVALID, 0, 0,
+                             VIGIL_TYPE_INVALID, 0, 0, VIGIL_TYPE_STRING, 0, 0, 0U, VIGIL_TYPE_INVALID,
+                             VIGIL_TYPE_INVALID, VIGIL_TYPE_INVALID, 5),
+    STRING_METHOD_DESCRIPTOR("trim_right", VIGIL_OPCODE_STRING_TRIM_RIGHT, 0U, VIGIL_TYPE_INVALID, 0, 0,
+                             VIGIL_TYPE_INVALID, 0, 0, VIGIL_TYPE_STRING, 0, 0, 0U, VIGIL_TYPE_INVALID,
+                             VIGIL_TYPE_INVALID, VIGIL_TYPE_INVALID, 6),
+    STRING_METHOD_DESCRIPTOR("trim_prefix", VIGIL_OPCODE_STRING_TRIM_PREFIX, 1U, VIGIL_TYPE_STRING, 0, 0,
+                             VIGIL_TYPE_INVALID, 0, 0, VIGIL_TYPE_STRING, 0, 0, 0U, VIGIL_TYPE_INVALID,
+                             VIGIL_TYPE_INVALID, VIGIL_TYPE_INVALID, 7),
+    STRING_METHOD_DESCRIPTOR("trim_suffix", VIGIL_OPCODE_STRING_TRIM_SUFFIX, 1U, VIGIL_TYPE_STRING, 0, 0,
+                             VIGIL_TYPE_INVALID, 0, 0, VIGIL_TYPE_STRING, 0, 0, 0U, VIGIL_TYPE_INVALID,
+                             VIGIL_TYPE_INVALID, VIGIL_TYPE_INVALID, 8),
+    STRING_METHOD_DESCRIPTOR("to_upper", VIGIL_OPCODE_STRING_TO_UPPER, 0U, VIGIL_TYPE_INVALID, 0, 0, VIGIL_TYPE_INVALID,
+                             0, 0, VIGIL_TYPE_STRING, 0, 0, 0U, VIGIL_TYPE_INVALID, VIGIL_TYPE_INVALID,
+                             VIGIL_TYPE_INVALID, 9),
+    STRING_METHOD_DESCRIPTOR("to_lower", VIGIL_OPCODE_STRING_TO_LOWER, 0U, VIGIL_TYPE_INVALID, 0, 0, VIGIL_TYPE_INVALID,
+                             0, 0, VIGIL_TYPE_STRING, 0, 0, 0U, VIGIL_TYPE_INVALID, VIGIL_TYPE_INVALID,
+                             VIGIL_TYPE_INVALID, 10),
+    STRING_METHOD_DESCRIPTOR("replace", VIGIL_OPCODE_STRING_REPLACE, 2U, VIGIL_TYPE_STRING, 0, 0, VIGIL_TYPE_STRING, 0,
+                             0, VIGIL_TYPE_STRING, 0, 0, 0U, VIGIL_TYPE_INVALID, VIGIL_TYPE_INVALID, VIGIL_TYPE_INVALID,
+                             11),
+    STRING_METHOD_DESCRIPTOR("split", VIGIL_OPCODE_STRING_SPLIT, 1U, VIGIL_TYPE_STRING, 0, 0, VIGIL_TYPE_INVALID, 0, 0,
+                             VIGIL_TYPE_OBJECT, VIGIL_NATIVE_FIELD_ARRAY, VIGIL_TYPE_STRING, 0U, VIGIL_TYPE_INVALID,
+                             VIGIL_TYPE_INVALID, VIGIL_TYPE_INVALID, 12),
+    STRING_METHOD_DESCRIPTOR("index_of", VIGIL_OPCODE_STRING_INDEX_OF, 1U, VIGIL_TYPE_STRING, 0, 0, VIGIL_TYPE_INVALID,
+                             0, 0, VIGIL_TYPE_INVALID, 0, 0, 2U, VIGIL_TYPE_I32, VIGIL_TYPE_BOOL, VIGIL_TYPE_INVALID,
+                             13),
+    STRING_METHOD_DESCRIPTOR("last_index_of", VIGIL_OPCODE_STRING_LAST_INDEX_OF, 1U, VIGIL_TYPE_STRING, 0, 0,
+                             VIGIL_TYPE_INVALID, 0, 0, VIGIL_TYPE_INVALID, 0, 0, 2U, VIGIL_TYPE_I32, VIGIL_TYPE_BOOL,
+                             VIGIL_TYPE_INVALID, 14),
+    STRING_METHOD_DESCRIPTOR("substr", VIGIL_OPCODE_STRING_SUBSTR, 2U, VIGIL_TYPE_I32, 0, 0, VIGIL_TYPE_I32, 0, 0,
+                             VIGIL_TYPE_INVALID, 0, 0, 2U, VIGIL_TYPE_STRING, VIGIL_TYPE_ERR, VIGIL_TYPE_INVALID, 15),
+    STRING_METHOD_DESCRIPTOR("char_at", VIGIL_OPCODE_STRING_CHAR_AT, 1U, VIGIL_TYPE_I32, 0, 0, VIGIL_TYPE_INVALID, 0, 0,
+                             VIGIL_TYPE_INVALID, 0, 0, 2U, VIGIL_TYPE_STRING, VIGIL_TYPE_ERR, VIGIL_TYPE_INVALID, 16),
+    STRING_METHOD_DESCRIPTOR("bytes", VIGIL_OPCODE_STRING_BYTES, 0U, VIGIL_TYPE_INVALID, 0, 0, VIGIL_TYPE_INVALID, 0, 0,
+                             VIGIL_TYPE_OBJECT, VIGIL_NATIVE_FIELD_ARRAY, VIGIL_TYPE_U8, 0U, VIGIL_TYPE_INVALID,
+                             VIGIL_TYPE_INVALID, VIGIL_TYPE_INVALID, 17),
+    STRING_METHOD_DESCRIPTOR("reverse", VIGIL_OPCODE_STRING_REVERSE, 0U, VIGIL_TYPE_INVALID, 0, 0, VIGIL_TYPE_INVALID,
+                             0, 0, VIGIL_TYPE_STRING, 0, 0, 0U, VIGIL_TYPE_INVALID, VIGIL_TYPE_INVALID,
+                             VIGIL_TYPE_INVALID, 18),
+    STRING_METHOD_DESCRIPTOR("is_empty", VIGIL_OPCODE_STRING_IS_EMPTY, 0U, VIGIL_TYPE_INVALID, 0, 0, VIGIL_TYPE_INVALID,
+                             0, 0, VIGIL_TYPE_BOOL, 0, 0, 0U, VIGIL_TYPE_INVALID, VIGIL_TYPE_INVALID,
+                             VIGIL_TYPE_INVALID, 19),
+    STRING_METHOD_DESCRIPTOR("char_count", VIGIL_OPCODE_STRING_CHAR_COUNT, 0U, VIGIL_TYPE_INVALID, 0, 0,
+                             VIGIL_TYPE_INVALID, 0, 0, VIGIL_TYPE_I32, 0, 0, 0U, VIGIL_TYPE_INVALID, VIGIL_TYPE_INVALID,
+                             VIGIL_TYPE_INVALID, 20),
+    STRING_METHOD_DESCRIPTOR("to_c", VIGIL_OPCODE_STRING_TO_C, 0U, VIGIL_TYPE_INVALID, 0, 0, VIGIL_TYPE_INVALID, 0, 0,
+                             VIGIL_TYPE_STRING, 0, 0, 0U, VIGIL_TYPE_INVALID, VIGIL_TYPE_INVALID, VIGIL_TYPE_INVALID,
+                             21),
+    STRING_METHOD_DESCRIPTOR("repeat", VIGIL_OPCODE_STRING_REPEAT, 1U, VIGIL_TYPE_I32, 0, 0, VIGIL_TYPE_INVALID, 0, 0,
+                             VIGIL_TYPE_STRING, 0, 0, 0U, VIGIL_TYPE_INVALID, VIGIL_TYPE_INVALID, VIGIL_TYPE_INVALID,
+                             22),
+    STRING_METHOD_DESCRIPTOR("count", VIGIL_OPCODE_STRING_COUNT, 1U, VIGIL_TYPE_STRING, 0, 0, VIGIL_TYPE_INVALID, 0, 0,
+                             VIGIL_TYPE_I32, 0, 0, 0U, VIGIL_TYPE_INVALID, VIGIL_TYPE_INVALID, VIGIL_TYPE_INVALID, 23),
+    STRING_METHOD_DESCRIPTOR("fields", VIGIL_OPCODE_STRING_FIELDS, 0U, VIGIL_TYPE_INVALID, 0, 0, VIGIL_TYPE_INVALID, 0,
+                             0, VIGIL_TYPE_OBJECT, VIGIL_NATIVE_FIELD_ARRAY, VIGIL_TYPE_STRING, 0U, VIGIL_TYPE_INVALID,
+                             VIGIL_TYPE_INVALID, VIGIL_TYPE_INVALID, 24),
+    STRING_METHOD_DESCRIPTOR("join", VIGIL_OPCODE_STRING_JOIN, 1U, VIGIL_TYPE_OBJECT, VIGIL_NATIVE_FIELD_ARRAY,
+                             VIGIL_TYPE_STRING, VIGIL_TYPE_INVALID, 0, 0, VIGIL_TYPE_STRING, 0, 0, 0U,
+                             VIGIL_TYPE_INVALID, VIGIL_TYPE_INVALID, VIGIL_TYPE_INVALID, 25),
+    STRING_METHOD_DESCRIPTOR("cut", VIGIL_OPCODE_STRING_CUT, 1U, VIGIL_TYPE_STRING, 0, 0, VIGIL_TYPE_INVALID, 0, 0,
+                             VIGIL_TYPE_INVALID, 0, 0, 3U, VIGIL_TYPE_STRING, VIGIL_TYPE_STRING, VIGIL_TYPE_BOOL, 26),
+    STRING_METHOD_DESCRIPTOR("equal_fold", VIGIL_OPCODE_STRING_EQUAL_FOLD, 1U, VIGIL_TYPE_STRING, 0, 0,
+                             VIGIL_TYPE_INVALID, 0, 0, VIGIL_TYPE_BOOL, 0, 0, 0U, VIGIL_TYPE_INVALID,
+                             VIGIL_TYPE_INVALID, VIGIL_TYPE_INVALID, 27),
+#undef STRING_METHOD_DESCRIPTOR
 };
 
 static vigil_doc_entry_t builtin_module_entries[1U + sizeof(builtin_descriptors_) / sizeof(builtin_descriptors_[0])];
@@ -241,6 +315,27 @@ const vigil_string_method_descriptor_t *vigil_string_method_descriptors(size_t *
         *count = sizeof(string_method_descriptors_) / sizeof(string_method_descriptors_[0]);
     }
     return string_method_descriptors_;
+}
+
+const vigil_string_method_descriptor_t *vigil_string_method_find(const char *name, size_t name_length)
+{
+    size_t i;
+
+    if (name == NULL)
+    {
+        return NULL;
+    }
+
+    for (i = 0U; i < sizeof(string_method_descriptors_) / sizeof(string_method_descriptors_[0]); i += 1U)
+    {
+        if (string_method_descriptors_[i].name_length == name_length &&
+            memcmp(string_method_descriptors_[i].name, name, name_length) == 0)
+        {
+            return &string_method_descriptors_[i];
+        }
+    }
+
+    return NULL;
 }
 
 const vigil_doc_entry_t *vigil_string_method_doc_entries(size_t *count)
