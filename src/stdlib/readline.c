@@ -213,28 +213,75 @@ static vigil_status_t vigil_readline_history_save(vigil_vm_t *vm, size_t arg_cou
 
 static const int vigil_readline_string_param[] = {VIGIL_TYPE_STRING};
 static const int vigil_readline_i32_param[] = {VIGIL_TYPE_I32};
+static const char *const readline_prompt_param_names[] = {"prompt"};
+static const char *const readline_line_param_names[] = {"line"};
+static const char *const readline_index_param_names[] = {"index"};
+static const char *const readline_path_param_names[] = {"path"};
+
+static const vigil_native_symbol_doc_t vigil_readline_module_doc = {
+    "Interactive line input.",
+    "Read user input with prompt and history support.",
+    NULL,
+};
+
+static const vigil_native_symbol_doc_t vigil_readline_input_doc = {
+    "Read a line of input.",
+    "Displays the prompt and reads a line from the terminal.",
+    "string line = readline.input(\"> \")",
+};
+
+static const vigil_native_symbol_doc_t vigil_readline_history_add_doc = {
+    "Add a line to history.",
+    "Stores the line for recall with history_get.",
+    "readline.history_add(line)",
+};
+
+static const vigil_native_symbol_doc_t vigil_readline_history_get_doc = {
+    "Get a history entry.",
+    "Returns the history entry at the given index.",
+    "string h = readline.history_get(0)",
+};
+
+static const vigil_native_symbol_doc_t vigil_readline_history_length_doc = {
+    "Get history length.",
+    "Returns the number of entries in the history.",
+    "i32 n = readline.history_length()",
+};
+
+static const vigil_native_symbol_doc_t vigil_readline_history_clear_doc = {
+    "Clear line history.",
+    "Removes all entries from the in-memory history list.",
+    "readline.history_clear()",
+};
+
+static const vigil_native_symbol_doc_t vigil_readline_history_load_doc = {
+    "Load history from a file.",
+    "Loads previously saved history entries from the given file path.",
+    "readline.history_load(\".vigil_history\")",
+};
+
+static const vigil_native_symbol_doc_t vigil_readline_history_save_doc = {
+    "Save history to a file.",
+    "Writes the current in-memory history entries to the given file path.",
+    "readline.history_save(\".vigil_history\")",
+};
 
 static const vigil_native_module_function_t vigil_readline_functions[] = {
     {"input", 5, vigil_readline_input, 1, vigil_readline_string_param, VIGIL_TYPE_STRING, 1, NULL, 0, NULL, NULL, 0U,
-     NULL, NULL, NULL, NULL},
+     readline_prompt_param_names, NULL, NULL, &vigil_readline_input_doc},
     {"history_add", 11, vigil_readline_history_add, 1, vigil_readline_string_param, VIGIL_TYPE_VOID, 0, NULL, 0, NULL,
-     NULL, 0U, NULL, NULL, NULL, NULL},
+     NULL, 0U, readline_line_param_names, NULL, NULL, &vigil_readline_history_add_doc},
     {"history_get", 11, vigil_readline_history_get, 1, vigil_readline_i32_param, VIGIL_TYPE_STRING, 1, NULL, 0, NULL,
-     NULL, 0U, NULL, NULL, NULL, NULL},
+     NULL, 0U, readline_index_param_names, NULL, NULL, &vigil_readline_history_get_doc},
     {"history_length", 14, vigil_readline_history_length, 0, NULL, VIGIL_TYPE_I32, 1, NULL, 0, NULL, NULL, 0U, NULL,
-     NULL, NULL, NULL},
+     NULL, NULL, &vigil_readline_history_length_doc},
     {"history_clear", 13, vigil_readline_history_clear, 0, NULL, VIGIL_TYPE_VOID, 0, NULL, 0, NULL, NULL, 0U, NULL,
-     NULL, NULL, NULL},
+     NULL, NULL, &vigil_readline_history_clear_doc},
     {"history_load", 12, vigil_readline_history_load, 1, vigil_readline_string_param, VIGIL_TYPE_VOID, 0, NULL, 0, NULL,
-     NULL, 0U, NULL, NULL, NULL, NULL},
+     NULL, 0U, readline_path_param_names, NULL, NULL, &vigil_readline_history_load_doc},
     {"history_save", 12, vigil_readline_history_save, 1, vigil_readline_string_param, VIGIL_TYPE_VOID, 0, NULL, 0, NULL,
-     NULL, 0U, NULL, NULL, NULL, NULL}};
+     NULL, 0U, readline_path_param_names, NULL, NULL, &vigil_readline_history_save_doc}};
 
 VIGIL_API const vigil_native_module_t vigil_stdlib_readline = {
-    "readline",
-    8,
-    vigil_readline_functions,
-    sizeof(vigil_readline_functions) / sizeof(vigil_readline_functions[0]),
-    NULL,
-    0,
-    NULL};
+    "readline", 8, vigil_readline_functions,  sizeof(vigil_readline_functions) / sizeof(vigil_readline_functions[0]),
+    NULL,       0, &vigil_readline_module_doc};

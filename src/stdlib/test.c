@@ -86,16 +86,43 @@ static vigil_status_t vigil_test_fail(vigil_vm_t *vm, size_t arg_count, vigil_er
 
 static const int vigil_test_assert_params[] = {VIGIL_TYPE_BOOL, VIGIL_TYPE_STRING};
 static const int vigil_test_fail_params[] = {VIGIL_TYPE_STRING};
+static const char *const vigil_test_assert_param_names[] = {"condition", "message"};
+static const char *const vigil_test_fail_param_names[] = {"message"};
+
+static const vigil_native_symbol_doc_t vigil_test_module_doc = {
+    "Testing utilities.",
+    "The test module provides the test.T assertion helper used by VIGIL test files.",
+    NULL,
+};
+
+static const vigil_native_symbol_doc_t vigil_test_t_doc = {
+    "Test assertion context.",
+    "Supplies assertion helpers to VIGIL test functions.",
+    NULL,
+};
+
+static const vigil_native_symbol_doc_t vigil_test_assert_doc = {
+    "Assert that a condition is true.",
+    "Fails the current test with the provided message when the condition is false.",
+    "t.assert(1 + 1 == 2, \"math still works\")",
+};
+
+static const vigil_native_symbol_doc_t vigil_test_fail_doc = {
+    "Fail the current test.",
+    "Unconditionally fails the current test with the provided message.",
+    "t.fail(\"expected connection to close\")",
+};
 
 static const vigil_native_class_method_t vigil_test_t_methods[] = {
-    {"assert", 6U, vigil_test_assert, 2U, vigil_test_assert_params, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, 0U, 0, NULL,
-     NULL, NULL, NULL},
-    {"fail", 4U, vigil_test_fail, 1U, vigil_test_fail_params, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, 0U, 0, NULL, NULL,
-     NULL, NULL},
+    {"assert", 6U, vigil_test_assert, 2U, vigil_test_assert_params, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, 0U, 0,
+     vigil_test_assert_param_names, NULL, NULL, &vigil_test_assert_doc},
+    {"fail", 4U, vigil_test_fail, 1U, vigil_test_fail_params, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, 0U, 0,
+     vigil_test_fail_param_names, NULL, NULL, &vigil_test_fail_doc},
 };
 
 static const vigil_native_class_t vigil_test_classes[] = {
-    {"T", 1U, NULL, 0U, vigil_test_t_methods, 2U, NULL, NULL},
+    {"T", 1U, NULL, 0U, vigil_test_t_methods, 2U, NULL, &vigil_test_t_doc},
 };
 
-VIGIL_API const vigil_native_module_t vigil_stdlib_test = {"test", 4U, NULL, 0U, vigil_test_classes, 1U, NULL};
+VIGIL_API const vigil_native_module_t vigil_stdlib_test = {
+    "test", 4U, NULL, 0U, vigil_test_classes, 1U, &vigil_test_module_doc};

@@ -32,21 +32,6 @@ static const vigil_doc_entry_t builtin_docs[] = {
 
 #define BUILTIN_COUNT (sizeof(builtin_docs) / sizeof(builtin_docs[0]))
 
-/* ── fmt Module Docs ──────────────────────────────────────── */
-
-static const vigil_doc_entry_t fmt_docs[] = {
-    {"fmt", NULL, "Formatted output functions.", "The fmt module provides functions for printing to stdout and stderr.",
-     NULL},
-    {"fmt.print", "fmt.print(value: string) -> void", "Print a string to stdout without a newline.", NULL,
-     "fmt.print(\"hello \")\nfmt.print(\"world\")"},
-    {"fmt.println", "fmt.println(value: string) -> void", "Print a string to stdout with a newline.", NULL,
-     "fmt.println(\"Hello, world!\")"},
-    {"fmt.eprintln", "fmt.eprintln(value: string) -> void", "Print a string to stderr with a newline.", NULL,
-     "fmt.eprintln(\"Error: something went wrong\")"},
-};
-
-#define FMT_COUNT (sizeof(fmt_docs) / sizeof(fmt_docs[0]))
-
 /* ── math Module Docs ─────────────────────────────────────── */
 
 static const vigil_doc_entry_t math_docs[] = {
@@ -275,99 +260,6 @@ static const vigil_doc_entry_t math_docs[] = {
 
 #define MATH_COUNT (sizeof(math_docs) / sizeof(math_docs[0]))
 
-/* ── args Module Docs ─────────────────────────────────────── */
-
-static const vigil_doc_entry_t args_docs[] = {
-    {"args", NULL, "Command-line argument access.", "The args module provides access to command-line arguments.", NULL},
-    {"args.count", "args.count() -> i32", "Return the number of command-line arguments.",
-     "Counts the script arguments passed after the program name.", "i32 argc = args.count()"},
-    {"args.at", "args.at(index: i32) -> string", "Return a command-line argument by index.",
-     "Returns an empty string if the index is out of range.", "string first = args.at(0)"},
-    {"args.Parser", "class args.Parser", "Command-line parser builder.",
-     "Builds declarative CLI parsers with flags, options, positional arguments, and generated help text.", NULL},
-    {"args.Parser.prog", "args.Parser.prog: string", "Program name.",
-     "Stores the program name shown in generated usage text.", "string name = parser.prog"},
-    {"args.Parser.desc", "args.Parser.desc: string", "Program description.",
-     "Stores the description shown in generated help text.", "string desc = parser.desc"},
-    {"args.Parser.names", "args.Parser.names: array<string>", "Declared option names.",
-     "Holds the long names for declared options.", "array<string> names = parser.names"},
-    {"args.Parser.shorts", "args.Parser.shorts: array<string>", "Declared short option names.",
-     "Holds the short aliases for declared options.", "array<string> shorts = parser.shorts"},
-    {"args.Parser.types", "args.Parser.types: array<string>", "Declared option types.",
-     "Stores the internal option type tags for each declared option.", "array<string> types = parser.types"},
-    {"args.Parser.defaults", "args.Parser.defaults: array<string>", "Declared default values.",
-     "Stores default string values for declared options.", "array<string> defaults = parser.defaults"},
-    {"args.Parser.descs", "args.Parser.descs: array<string>", "Declared option descriptions.",
-     "Stores help text for declared options.", "array<string> descs = parser.descs"},
-    {"args.Parser.required", "args.Parser.required: array<string>", "Required-option markers.",
-     "Stores whether each declared option is required.", "array<string> required = parser.required"},
-    {"args.Parser.pos_names", "args.Parser.pos_names: array<string>", "Declared positional argument names.",
-     "Stores names for declared positional arguments.", "array<string> names = parser.pos_names"},
-    {"args.Parser.pos_descs", "args.Parser.pos_descs: array<string>", "Declared positional argument descriptions.",
-     "Stores help text for declared positional arguments.", "array<string> descs = parser.pos_descs"},
-    {"args.Parser.values", "args.Parser.values: array<string>", "Parsed option values.",
-     "Stores parsed option values after a successful parse.", "array<string> values = parser.values"},
-    {"args.Parser.positionals", "args.Parser.positionals: array<string>", "Parsed positional values.",
-     "Stores parsed positional arguments after a successful parse.", "array<string> values = parser.positionals"},
-    {"args.Parser.new", "args.Parser.new(prog: string, desc: string) -> args.Parser", "Create a parser.",
-     "Constructs a new parser configured with a program name and description.",
-     "args.Parser parser = args.Parser.new(\"vigil\", \"Run scripts\")"},
-    {"args.Parser.flag", "args.Parser.flag(name: string, short: string, desc: string) -> args.Parser",
-     "Declare a boolean flag.", "Adds a boolean flag option and returns the parser for chaining.",
-     "parser.flag(\"verbose\", \"v\", \"Enable verbose output\")"},
-    {"args.Parser.option",
-     "args.Parser.option(name: string, short: string, default: string, desc: string) -> args.Parser",
-     "Declare a string option.", "Adds a string-valued option and returns the parser for chaining.",
-     "parser.option(\"output\", \"o\", \"out.txt\", \"Output file\")"},
-    {"args.Parser.option_int",
-     "args.Parser.option_int(name: string, short: string, default: string, desc: string) -> args.Parser",
-     "Declare an integer option.", "Adds an integer-valued option and returns the parser for chaining.",
-     "parser.option_int(\"retries\", \"r\", \"3\", \"Retry count\")"},
-    {"args.Parser.option_multi", "args.Parser.option_multi(name: string, short: string, desc: string) -> args.Parser",
-     "Declare a repeated string option.",
-     "Adds an option that can be provided multiple times and returns the parser for chaining.",
-     "parser.option_multi(\"include\", \"I\", \"Include path\")"},
-    {"args.Parser.mark_required", "args.Parser.mark_required() -> args.Parser",
-     "Mark the last declared option as required.",
-     "Sets the most recently declared option to required and returns the parser for chaining.",
-     "parser.option(\"config\", \"c\", \"\", \"Config file\").mark_required()"},
-    {"args.Parser.positional", "args.Parser.positional(name: string, desc: string) -> args.Parser",
-     "Declare a positional argument.", "Adds a positional argument and returns the parser for chaining.",
-     "parser.positional(\"input\", \"Input file\")"},
-    {"args.Parser.parse", "args.Parser.parse(argc: i32) -> error", "Parse command-line arguments.",
-     "Parses the process arguments currently available to the runtime. Returns an error value indicating success or "
-     "failure.",
-     "error err = parser.parse(args.count())"},
-    {"args.Parser.get", "args.Parser.get(name: string) -> string", "Get a parsed string option.",
-     "Returns the parsed string value for the named option.", "string out = parser.get(\"output\")"},
-    {"args.Parser.get_bool", "args.Parser.get_bool(name: string) -> bool", "Get a parsed boolean flag.",
-     "Returns true when the named flag was provided.", "bool verbose = parser.get_bool(\"verbose\")"},
-    {"args.Parser.get_multi", "args.Parser.get_multi(name: string) -> array<string>", "Get repeated option values.",
-     "Returns all parsed values for a repeated option.", "array<string> includes = parser.get_multi(\"include\")"},
-    {"args.Parser.get_positionals", "args.Parser.get_positionals() -> array<string>",
-     "Get parsed positional arguments.", "Returns the parsed positional arguments in declaration order.",
-     "array<string> values = parser.get_positionals()"},
-    {"args.Parser.help", "args.Parser.help() -> string", "Render help text.",
-     "Builds formatted usage and option help text for the parser.", "string help = parser.help()"},
-};
-
-#define ARGS_COUNT (sizeof(args_docs) / sizeof(args_docs[0]))
-
-/* ── test Module Docs ─────────────────────────────────────── */
-
-static const vigil_doc_entry_t test_docs[] = {
-    {"test", NULL, "Testing utilities.",
-     "The test module provides the test.T assertion helper used by VIGIL test files.", NULL},
-    {"test.T", "class test.T", "Test assertion context.", "Supplies assertion helpers to VIGIL test functions.", NULL},
-    {"test.T.assert", "test.T.assert(condition: bool, message: string) -> void", "Assert that a condition is true.",
-     "Fails the current test with the provided message when the condition is false.",
-     "t.assert(1 + 1 == 2, \"math still works\")"},
-    {"test.T.fail", "test.T.fail(message: string) -> void", "Fail the current test.",
-     "Unconditionally fails the current test with the provided message.", "t.fail(\"expected connection to close\")"},
-};
-
-#define TEST_COUNT (sizeof(test_docs) / sizeof(test_docs[0]))
-
 /* ── strings Module Docs ──────────────────────────────────── */
 
 static const vigil_doc_entry_t strings_docs[] = {
@@ -467,30 +359,6 @@ static const vigil_doc_entry_t regex_docs[] = {
 #define REGEX_COUNT (sizeof(regex_docs) / sizeof(regex_docs[0]))
 
 /* ── random Module Docs ───────────────────────────────────── */
-
-static const vigil_doc_entry_t random_docs[] = {
-    {"random", NULL, "Random number generation.",
-     "The random module provides pseudo-random number generation\n"
-     "using xorshift128+ algorithm.",
-     NULL},
-    {"random.seed", "random.seed(n: i32)", "Seed the random number generator.",
-     "Sets the seed for reproducible sequences.", "random.seed(42)"},
-    {"random.i64", "random.i64() -> i64", "Generate a random 64-bit integer.", "Returns a random i64 value.",
-     "i64 n = random.i64()"},
-    {"random.i32", "random.i32() -> i32", "Generate a random 32-bit integer.", "Returns a random i32 value.",
-     "i32 n = random.i32()"},
-    {"random.f64", "random.f64() -> f64", "Generate a random float in [0, 1).",
-     "Returns a random f64 value between 0 (inclusive) and 1 (exclusive).", "f64 x = random.f64()  // e.g. 0.7234..."},
-    {"random.range", "random.range(min: i32, max: i32) -> i32", "Generate a random integer in [min, max).",
-     "Returns a random i32 value between min (inclusive) and max (exclusive).",
-     "i32 dice = random.range(1, 7)  // 1-6"},
-    {"random.gaussian", "random.gaussian() -> f64",
-     "Generate a random value from the standard normal distribution (mean=0, stddev=1).",
-     "Uses the Box-Muller transform. Call repeatedly for multiple samples.",
-     "f64 g = random.gaussian()  // e.g. -0.42"},
-};
-
-#define RANDOM_COUNT (sizeof(random_docs) / sizeof(random_docs[0]))
 
 /* ── url Module Docs ──────────────────────────────────────── */
 
@@ -1300,43 +1168,6 @@ static const vigil_doc_entry_t unsafe_docs[] = {
 #define UNSAFE_COUNT (sizeof(unsafe_docs) / sizeof(unsafe_docs[0]))
 
 /* ── parse module ────────────────────────────────────────────────── */
-
-static const vigil_doc_entry_t parse_docs[] = {
-    {"parse", NULL, "String-to-value parsing.", "Parse strings into typed values with error handling.", NULL},
-    {"parse.i32", "parse.i32(s: string) -> (i32, error)", "Parse string to i32.",
-     "Returns (value, error). Error is ok on success.", "i32 v, error err = parse.i32(\"42\")"},
-    {"parse.i64", "parse.i64(s: string) -> (i64, error)", "Parse string to i64.",
-     "Returns (value, error). Error is ok on success.", "i64 v, error err = parse.i64(\"123456789\")"},
-    {"parse.f64", "parse.f64(s: string) -> (f64, error)", "Parse string to f64.",
-     "Returns (value, error). Error is ok on success.", "f64 v, error err = parse.f64(\"3.14\")"},
-    {"parse.bool", "parse.bool(s: string) -> (bool, error)", "Parse string to bool.",
-     "Accepts \"true\" and \"false\". Returns (value, error).", "bool v, error err = parse.bool(\"true\")"},
-};
-
-#define PARSE_COUNT (sizeof(parse_docs) / sizeof(parse_docs[0]))
-
-/* ── readline module ─────────────────────────────────────────────── */
-
-static const vigil_doc_entry_t readline_docs[] = {
-    {"readline", NULL, "Interactive line input.", "Read user input with prompt and history support.", NULL},
-    {"readline.input", "readline.input(prompt: string) -> string", "Read a line of input.",
-     "Displays the prompt and reads a line from the terminal.", "string line = readline.input(\"> \")"},
-    {"readline.history_add", "readline.history_add(line: string) -> void", "Add a line to history.",
-     "Stores the line for recall with history_get.", "readline.history_add(line)"},
-    {"readline.history_get", "readline.history_get(index: i32) -> string", "Get a history entry.",
-     "Returns the history entry at the given index.", "string h = readline.history_get(0)"},
-    {"readline.history_length", "readline.history_length() -> i32", "Get history length.",
-     "Returns the number of entries in the history.", "i32 n = readline.history_length()"},
-    {"readline.history_clear", "readline.history_clear() -> void", "Clear line history.",
-     "Removes all entries from the in-memory history list.", "readline.history_clear()"},
-    {"readline.history_load", "readline.history_load(path: string) -> void", "Load history from a file.",
-     "Loads previously saved history entries from the given file path.", "readline.history_load(\".vigil_history\")"},
-    {"readline.history_save", "readline.history_save(path: string) -> void", "Save history to a file.",
-     "Writes the current in-memory history entries to the given file path.",
-     "readline.history_save(\".vigil_history\")"},
-};
-
-#define READLINE_COUNT (sizeof(readline_docs) / sizeof(readline_docs[0]))
 
 /* ── sdl module ──────────────────────────────────────────────────── */
 
@@ -2565,13 +2396,9 @@ typedef struct
 
 static const doc_module_table_entry_t doc_module_table[] = {
     {"builtins", builtin_docs, BUILTIN_COUNT},
-    {"fmt", fmt_docs, FMT_COUNT},
     {"math", math_docs, MATH_COUNT},
-    {"args", args_docs, ARGS_COUNT},
-    {"test", test_docs, TEST_COUNT},
     {"strings", strings_docs, STRINGS_COUNT},
     {"regex", regex_docs, REGEX_COUNT},
-    {"random", random_docs, RANDOM_COUNT},
     {"url", url_docs, URL_COUNT},
     {"yaml", yaml_docs, YAML_COUNT},
     {"json", json_docs, JSON_COUNT},
@@ -2587,8 +2414,6 @@ static const doc_module_table_entry_t doc_module_table[] = {
     {"time", time_docs, TIME_COUNT},
     {"ffi", ffi_docs, FFI_COUNT},
     {"unsafe", unsafe_docs, UNSAFE_COUNT},
-    {"parse", parse_docs, PARSE_COUNT},
-    {"readline", readline_docs, READLINE_COUNT},
     {"sdl", sdl_docs, SDL_DOC_COUNT},
 };
 
