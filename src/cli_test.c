@@ -48,6 +48,79 @@ typedef struct
     const char *filter;
 } test_options_t;
 
+typedef struct
+{
+    const char *test_file_path;
+    const char *original_source;
+    size_t original_length;
+    const char *test_name;
+    const test_options_t *options;
+    vigil_coverage_session_t *coverage;
+} test_run_request_t;
+
+typedef struct
+{
+    vigil_source_registry_t *registry;
+    vigil_object_t *function;
+    const char *scope_root;
+    const char *wrapper_path;
+    char *err_msg;
+    size_t err_msg_size;
+    vigil_error_t *error;
+} test_coverage_state_t;
+
+typedef struct
+{
+    const test_run_request_t *request;
+    vigil_vm_t *vm;
+    vigil_source_registry_t *registry;
+    vigil_object_t *function;
+    vigil_value_t *result;
+    const char *scope_root;
+    const char *wrapper_path;
+    char *err_msg;
+    size_t err_msg_size;
+    vigil_error_t *error;
+} test_execution_state_t;
+
+typedef struct
+{
+    const char *test_file_path;
+    const test_options_t *options;
+    FILE *stream;
+    int *total_pass;
+    int *total_fail;
+    int *file_failed;
+} test_result_state_t;
+
+typedef struct
+{
+    vigil_source_registry_t *registry;
+    vigil_diagnostic_list_t *diagnostics;
+    const char *test_file_path;
+    const char *project_root;
+    const char *wrapper_path;
+    const char *combined;
+    size_t total_length;
+    vigil_object_t **out_function;
+    char *err_msg;
+    size_t err_msg_size;
+} test_compile_state_t;
+
+typedef struct
+{
+    const test_run_request_t *request;
+    char *project_root;
+    size_t project_root_size;
+    char *scope_root_buffer;
+    size_t scope_root_size;
+    const char **out_root;
+    const char **out_scope_root;
+    char **out_combined;
+    char **out_wrapper_path;
+    size_t *out_total_length;
+} test_runtime_input_state_t;
+
 static FILE *test_output_stream(const test_options_t *options)
 {
     if (options != NULL && options->coverage && options->coverage_format == VIGIL_COVERAGE_OUTPUT_JSON)
@@ -338,6 +411,20 @@ static void format_first_diagnostic_message(const vigil_source_registry_t *regis
     vigil_string_free(&line);
 }
 
+static size_t test_parent_directory_length(const char *path)
+{
+    size_t length;
+
+    if (path == NULL)
+        return 0U;
+    length = strlen(path);
+    while (length > 0U && path[length - 1U] != '/' && path[length - 1U] != '\\')
+        length -= 1U;
+    while (length > 1U && (path[length - 1U] == '/' || path[length - 1U] == '\\'))
+        length -= 1U;
+    return length;
+}
+
 static const char *test_scope_root(const char *test_file_path, const char *project_root, char *buffer,
                                    size_t buffer_size)
 {
@@ -348,26 +435,142 @@ static const char *test_scope_root(const char *test_file_path, const char *proje
     if (test_file_path == NULL || buffer == NULL || buffer_size == 0U)
         return NULL;
 
-    length = strlen(test_file_path);
-    if (length + 1U > buffer_size)
-        return NULL;
-    memcpy(buffer, test_file_path, length + 1U);
-    while (length > 0U && buffer[length - 1U] != '/' && buffer[length - 1U] != '\\')
-        length -= 1U;
+    length = test_parent_directory_length(test_file_path);
     if (length == 0U)
     {
         snprintf(buffer, buffer_size, ".");
         return buffer;
     }
-    while (length > 1U && (buffer[length - 1U] == '/' || buffer[length - 1U] == '\\'))
-        length -= 1U;
+    if (length + 1U > buffer_size)
+        return NULL;
+    memcpy(buffer, test_file_path, length);
     buffer[length] = '\0';
     return buffer;
 }
 
-static int run_one_test(const char *test_file_path, const char *original_source, size_t original_length,
-                        const char *test_name, const test_options_t *options, vigil_coverage_session_t *coverage,
-                        char *err_msg, size_t err_msg_size)
+static int prepare_test_coverage(const test_run_request_t *request, const test_coverage_state_t *state)
+{
+    vigil_status_t status;
+
+    status = vigil_coverage_session_track_registry(request->coverage, state->registry, state->scope_root,
+                                                   state->wrapper_path, request->options->include_deps, state->error);
+    if (status != VIGIL_STATUS_OK)
+    {
+        snprintf(state->err_msg, state->err_msg_size, "%s", vigil_error_message(state->error));
+        return 0;
+    }
+
+    status =
+        vigil_coverage_session_register_function(request->coverage, state->registry, state->function, state->error);
+    if (status != VIGIL_STATUS_OK)
+    {
+        snprintf(state->err_msg, state->err_msg_size, "%s", vigil_error_message(state->error));
+        return 0;
+    }
+    return 1;
+}
+
+static int compile_wrapped_test_function(const test_compile_state_t *state, vigil_source_id_t *out_source_id,
+                                         vigil_error_t *error)
+{
+    vigil_status_t status;
+
+    if (!register_source_tree(state->registry, state->test_file_path, state->project_root, NULL, error))
+    {
+        snprintf(state->err_msg, state->err_msg_size, "%s", vigil_error_message(error));
+        return 0;
+    }
+    if (vigil_source_registry_register(state->registry, state->wrapper_path, strlen(state->wrapper_path),
+                                       state->combined, state->total_length, out_source_id, error) != VIGIL_STATUS_OK)
+    {
+        snprintf(state->err_msg, state->err_msg_size, "source registration failed");
+        return 0;
+    }
+
+    status = compile_test_source(state->registry, *out_source_id, state->out_function, state->diagnostics, error);
+    if (status == VIGIL_STATUS_OK)
+        return 1;
+    if (vigil_diagnostic_list_count(state->diagnostics) != 0U)
+    {
+        format_first_diagnostic_message(state->registry, state->diagnostics, state->err_msg, state->err_msg_size);
+        if (state->err_msg[0] == '\0')
+            snprintf(state->err_msg, state->err_msg_size, "compile error");
+    }
+    else
+    {
+        snprintf(state->err_msg, state->err_msg_size, "%s", vigil_error_message(error));
+    }
+    return 0;
+}
+
+static int open_test_runtime_vm(vigil_runtime_t **out_runtime, vigil_vm_t **out_vm, char *err_msg, size_t err_msg_size)
+{
+    vigil_error_t error;
+
+    memset(&error, 0, sizeof(error));
+    if (vigil_runtime_open(out_runtime, NULL, &error) != VIGIL_STATUS_OK)
+    {
+        snprintf(err_msg, err_msg_size, "runtime init failed");
+        return 0;
+    }
+    if (vigil_vm_open(out_vm, *out_runtime, NULL, &error) != VIGIL_STATUS_OK)
+    {
+        vigil_runtime_close(out_runtime);
+        snprintf(err_msg, err_msg_size, "vm init failed");
+        return 0;
+    }
+    return 1;
+}
+
+static int run_one_test_with_coverage(const test_execution_state_t *state)
+{
+    test_coverage_state_t coverage_state;
+    vigil_status_t status;
+
+    coverage_state.registry = state->registry;
+    coverage_state.function = state->function;
+    coverage_state.scope_root = state->scope_root;
+    coverage_state.wrapper_path = state->wrapper_path;
+    coverage_state.err_msg = state->err_msg;
+    coverage_state.err_msg_size = state->err_msg_size;
+    coverage_state.error = state->error;
+    if (!prepare_test_coverage(state->request, &coverage_state))
+        return 1;
+
+    vigil_coverage_session_attach_vm(state->request->coverage, state->vm, state->registry);
+    status = vigil_vm_execute_function(state->vm, state->function, state->result, state->error);
+    vigil_coverage_session_detach_vm(state->request->coverage, state->vm);
+    if (status == VIGIL_STATUS_OK)
+    {
+        /* Re-scan after execution so imported callable globals resolved at
+         * runtime still contribute their chunks to the final report. */
+        (void)vigil_coverage_session_register_function(state->request->coverage, state->registry, state->function,
+                                                       state->error);
+        return 0;
+    }
+
+    snprintf(state->err_msg, state->err_msg_size, "%s", vigil_error_message(state->error));
+    return 1;
+}
+
+static int prepare_test_runtime_inputs(const test_runtime_input_state_t *state)
+{
+    const char *root;
+
+    *state->out_total_length = 0U;
+    root = find_project_root(state->request->test_file_path, state->project_root, state->project_root_size)
+               ? state->project_root
+               : NULL;
+    *state->out_scope_root =
+        test_scope_root(state->request->test_file_path, root, state->scope_root_buffer, state->scope_root_size);
+    *state->out_combined = build_test_wrapper_source(state->request->original_source, state->request->original_length,
+                                                     state->request->test_name, state->out_total_length);
+    *state->out_wrapper_path = build_test_wrapper_path(state->request->test_file_path);
+    *state->out_root = root;
+    return *state->out_combined != NULL && *state->out_wrapper_path != NULL;
+}
+
+static int run_one_test(const test_run_request_t *request, char *err_msg, size_t err_msg_size)
 {
     vigil_runtime_t *runtime;
     vigil_vm_t *vm;
@@ -386,6 +589,9 @@ static int run_one_test(const char *test_file_path, const char *original_source,
     const char *scope_root;
     char *combined;
     char *wrapper_path;
+    test_compile_state_t compile_state;
+    test_runtime_input_state_t input_state;
+    test_execution_state_t execution_state;
 
     runtime = NULL;
     vm = NULL;
@@ -394,11 +600,17 @@ static int run_one_test(const char *test_file_path, const char *original_source,
     exit_code = 0;
     total_length = 0U;
     memset(&error, 0, sizeof(error));
-    root = find_project_root(test_file_path, project_root, sizeof(project_root)) ? project_root : NULL;
-    scope_root = test_scope_root(test_file_path, root, scope_root_buffer, sizeof(scope_root_buffer));
-    combined = build_test_wrapper_source(original_source, original_length, test_name, &total_length);
-    wrapper_path = build_test_wrapper_path(test_file_path);
-    if (combined == NULL || wrapper_path == NULL)
+    input_state.request = request;
+    input_state.project_root = project_root;
+    input_state.project_root_size = sizeof(project_root);
+    input_state.scope_root_buffer = scope_root_buffer;
+    input_state.scope_root_size = sizeof(scope_root_buffer);
+    input_state.out_root = &root;
+    input_state.out_scope_root = &scope_root;
+    input_state.out_combined = &combined;
+    input_state.out_wrapper_path = &wrapper_path;
+    input_state.out_total_length = &total_length;
+    if (!prepare_test_runtime_inputs(&input_state))
     {
         snprintf(err_msg, err_msg_size, "out of memory");
         free(wrapper_path);
@@ -406,19 +618,10 @@ static int run_one_test(const char *test_file_path, const char *original_source,
         return 1;
     }
 
-    if (vigil_runtime_open(&runtime, NULL, &error) != VIGIL_STATUS_OK)
-    {
-        snprintf(err_msg, err_msg_size, "runtime init failed");
-        free(wrapper_path);
-        free(combined);
-        return 1;
-    }
-    if (vigil_vm_open(&vm, runtime, NULL, &error) != VIGIL_STATUS_OK)
+    if (!open_test_runtime_vm(&runtime, &vm, err_msg, err_msg_size))
     {
         free(wrapper_path);
         free(combined);
-        vigil_runtime_close(&runtime);
-        snprintf(err_msg, err_msg_size, "vm init failed");
         return 1;
     }
 
@@ -426,67 +629,41 @@ static int run_one_test(const char *test_file_path, const char *original_source,
     vigil_diagnostic_list_init(&diagnostics, runtime);
     vigil_value_init_nil(&result);
 
-    if (!register_source_tree(&registry, test_file_path, root, NULL, &error))
+    compile_state.registry = &registry;
+    compile_state.diagnostics = &diagnostics;
+    compile_state.test_file_path = request->test_file_path;
+    compile_state.project_root = root;
+    compile_state.wrapper_path = wrapper_path;
+    compile_state.combined = combined;
+    compile_state.total_length = total_length;
+    compile_state.out_function = &function;
+    compile_state.err_msg = err_msg;
+    compile_state.err_msg_size = err_msg_size;
+    if (!compile_wrapped_test_function(&compile_state, &source_id, &error))
     {
-        snprintf(err_msg, err_msg_size, "%s", vigil_error_message(&error));
-        exit_code = 1;
-        goto cleanup;
-    }
-    if (vigil_source_registry_register(&registry, wrapper_path, strlen(wrapper_path), combined, total_length,
-                                       &source_id, &error) != VIGIL_STATUS_OK)
-    {
-        snprintf(err_msg, err_msg_size, "source registration failed");
-        exit_code = 1;
-        goto cleanup;
-    }
-
-    status = compile_test_source(&registry, source_id, &function, &diagnostics, &error);
-    if (status != VIGIL_STATUS_OK)
-    {
-        if (vigil_diagnostic_list_count(&diagnostics) != 0U)
-        {
-            format_first_diagnostic_message(&registry, &diagnostics, err_msg, err_msg_size);
-            if (err_msg[0] == '\0')
-                snprintf(err_msg, err_msg_size, "compile error");
-        }
-        else
-        {
-            snprintf(err_msg, err_msg_size, "%s", vigil_error_message(&error));
-        }
         vigil_object_release(&function);
         exit_code = 1;
         goto cleanup;
     }
 
-    if (options->coverage)
+    if (request->options->coverage)
     {
-        status = vigil_coverage_session_track_registry(coverage, &registry, scope_root, wrapper_path,
-                                                       options->include_deps, &error);
-        if (status != VIGIL_STATUS_OK)
-        {
-            snprintf(err_msg, err_msg_size, "%s", vigil_error_message(&error));
-            vigil_object_release(&function);
-            exit_code = 1;
-            goto cleanup;
-        }
-        status = vigil_coverage_session_register_function(coverage, &registry, function, &error);
-        if (status != VIGIL_STATUS_OK)
-        {
-            snprintf(err_msg, err_msg_size, "%s", vigil_error_message(&error));
-            vigil_object_release(&function);
-            exit_code = 1;
-            goto cleanup;
-        }
-        vigil_coverage_session_attach_vm(coverage, vm, &registry);
+        execution_state.request = request;
+        execution_state.vm = vm;
+        execution_state.registry = &registry;
+        execution_state.function = function;
+        execution_state.result = &result;
+        execution_state.scope_root = scope_root;
+        execution_state.wrapper_path = wrapper_path;
+        execution_state.err_msg = err_msg;
+        execution_state.err_msg_size = err_msg_size;
+        execution_state.error = &error;
+        exit_code = run_one_test_with_coverage(&execution_state);
+        vigil_object_release(&function);
+        goto cleanup;
     }
 
     status = vigil_vm_execute_function(vm, function, &result, &error);
-    if (options->coverage)
-    {
-        vigil_coverage_session_detach_vm(coverage, vm);
-        if (status == VIGIL_STATUS_OK)
-            (void)vigil_coverage_session_register_function(coverage, &registry, function, &error);
-    }
     vigil_object_release(&function);
     if (status != VIGIL_STATUS_OK)
     {
@@ -505,6 +682,110 @@ cleanup:
     return exit_code;
 }
 
+static int cmd_test_parse_coverage_toggle_arg(const char *arg, test_options_t *options)
+{
+    if (strcmp(arg, "--coverage") == 0)
+    {
+        options->coverage = 1;
+        return 1;
+    }
+    if (strcmp(arg, "--include-deps") == 0)
+    {
+        options->include_deps = 1;
+        return 1;
+    }
+    return 0;
+}
+
+static int cmd_test_parse_coverage_format_arg(int argc, char **argv, int *index, test_options_t *options)
+{
+    if (strcmp(argv[*index], "--format") == 0)
+    {
+        *index += 1;
+        if (*index >= argc)
+        {
+            fprintf(stderr, "error: --format requires a value\n");
+            return 2;
+        }
+        if (strcmp(argv[*index], "json") == 0)
+        {
+            options->coverage_format = VIGIL_COVERAGE_OUTPUT_JSON;
+            return 1;
+        }
+        if (strcmp(argv[*index], "text") == 0)
+        {
+            options->coverage_format = VIGIL_COVERAGE_OUTPUT_TEXT;
+            return 1;
+        }
+        fprintf(stderr, "error: unsupported coverage format '%s'\n", argv[*index]);
+        return 2;
+    }
+    return 0;
+}
+
+static int cmd_test_parse_min_coverage_arg(int argc, char **argv, int *index, test_options_t *options)
+{
+    char *end;
+
+    if (strcmp(argv[*index], "--min-coverage") != 0)
+        return 0;
+    *index += 1;
+    if (*index >= argc)
+    {
+        fprintf(stderr, "error: --min-coverage requires a percentage\n");
+        return 2;
+    }
+    options->min_coverage = strtod(argv[*index], &end);
+    if (end == argv[*index] || *end != '\0' || options->min_coverage < 0.0 || options->min_coverage > 100.0)
+    {
+        fprintf(stderr, "error: --min-coverage must be a number between 0 and 100\n");
+        return 2;
+    }
+    options->min_coverage_set = 1;
+    return 1;
+}
+
+static int cmd_test_is_help_flag(const char *arg)
+{
+    return strcmp(arg, "-h") == 0 || strcmp(arg, "--help") == 0;
+}
+
+static int cmd_test_parse_core_arg(int argc, char **argv, int *index, test_options_t *options)
+{
+    if (strcmp(argv[*index], "-v") == 0 || strcmp(argv[*index], "--verbose") == 0)
+    {
+        options->verbose = 1;
+        return 1;
+    }
+    if (strcmp(argv[*index], "-run") != 0 && strcmp(argv[*index], "--run") != 0)
+        return 0;
+    *index += 1;
+    if (*index >= argc)
+    {
+        fprintf(stderr, "error: -run requires a pattern\n");
+        return 2;
+    }
+    options->filter = argv[*index];
+    return 1;
+}
+
+static int cmd_test_print_help_and_exit(const char *arg)
+{
+    if (!cmd_test_is_help_flag(arg))
+        return 0;
+    printf("Usage: vigil test [--run pattern] [-v] [--coverage] [path...]\n\n"
+           "Recursively finds and runs VIGIL test files (*_test.vigil).\n"
+           "In a project root, defaults to the ./test directory.\n\n"
+           "Flags:\n"
+           "  -v, --verbose           Print passing tests and verbose coverage details\n"
+           "  -run, --run             Filter test names by substring\n"
+           "      --coverage          Collect line and branch coverage\n"
+           "      --format            Coverage output format: text|json\n"
+           "      --min-coverage      Fail if total line coverage is below N percent\n"
+           "      --include-deps      Include imported user modules outside the project root\n");
+    return 1;
+}
+
 static int cmd_test_parse_args(int argc, char **argv, test_options_t *options, str_list_t *targets)
 {
     int index;
@@ -518,86 +799,32 @@ static int cmd_test_parse_args(int argc, char **argv, test_options_t *options, s
     options->filter = NULL;
     for (index = 2; index < argc; index += 1)
     {
-        if (strcmp(argv[index], "-v") == 0 || strcmp(argv[index], "--verbose") == 0)
-        {
-            options->verbose = 1;
-            continue;
-        }
-        if (strcmp(argv[index], "-run") == 0 || strcmp(argv[index], "--run") == 0)
-        {
-            index += 1;
-            if (index >= argc)
-            {
-                fprintf(stderr, "error: -run requires a pattern\n");
-                return 2;
-            }
-            options->filter = argv[index];
-            continue;
-        }
-        if (strcmp(argv[index], "--coverage") == 0)
-        {
-            options->coverage = 1;
-            continue;
-        }
-        if (strcmp(argv[index], "--include-deps") == 0)
-        {
-            options->include_deps = 1;
-            continue;
-        }
-        if (strcmp(argv[index], "--format") == 0)
-        {
-            index += 1;
-            if (index >= argc)
-            {
-                fprintf(stderr, "error: --format requires a value\n");
-                return 2;
-            }
-            if (strcmp(argv[index], "json") == 0)
-            {
-                options->coverage_format = VIGIL_COVERAGE_OUTPUT_JSON;
-                continue;
-            }
-            if (strcmp(argv[index], "text") == 0)
-            {
-                options->coverage_format = VIGIL_COVERAGE_OUTPUT_TEXT;
-                continue;
-            }
-            fprintf(stderr, "error: unsupported coverage format '%s'\n", argv[index]);
-            return 2;
-        }
-        if (strcmp(argv[index], "--min-coverage") == 0)
-        {
-            char *end;
+        int parse_status;
 
-            index += 1;
-            if (index >= argc)
-            {
-                fprintf(stderr, "error: --min-coverage requires a percentage\n");
-                return 2;
-            }
-            options->min_coverage = strtod(argv[index], &end);
-            if (end == argv[index] || *end != '\0' || options->min_coverage < 0.0 || options->min_coverage > 100.0)
-            {
-                fprintf(stderr, "error: --min-coverage must be a number between 0 and 100\n");
-                return 2;
-            }
-            options->min_coverage_set = 1;
+        parse_status = cmd_test_parse_core_arg(argc, argv, &index, options);
+        if (parse_status == 1)
             continue;
-        }
-        if (strcmp(argv[index], "-h") == 0 || strcmp(argv[index], "--help") == 0)
-        {
-            printf("Usage: vigil test [--run pattern] [-v] [--coverage] [path...]\n\n"
-                   "Recursively finds and runs VIGIL test files (*_test.vigil).\n"
-                   "In a project root, defaults to the ./test directory.\n\n"
-                   "Flags:\n"
-                   "  -v, --verbose           Print passing tests and verbose coverage details\n"
-                   "  -run, --run             Filter test names by substring\n"
-                   "      --coverage          Collect line and branch coverage\n"
-                   "      --format            Coverage output format: text|json\n"
-                   "      --min-coverage      Fail if total line coverage is below N percent\n"
-                   "      --include-deps      Include imported user modules outside the project root\n");
+        if (parse_status == 2)
+            return 2;
+
+        parse_status = cmd_test_parse_coverage_toggle_arg(argv[index], options);
+        if (parse_status == 1)
+            continue;
+
+        parse_status = cmd_test_parse_coverage_format_arg(argc, argv, &index, options);
+        if (parse_status == 1)
+            continue;
+        if (parse_status == 2)
+            return 2;
+
+        parse_status = cmd_test_parse_min_coverage_arg(argc, argv, &index, options);
+        if (parse_status == 1)
+            continue;
+        if (parse_status == 2)
+            return 2;
+
+        if (cmd_test_print_help_and_exit(argv[index]))
             return 0;
-        }
         sl_add(targets, argv[index]);
     }
     return -1;
@@ -658,6 +885,45 @@ static void cmd_test_print_summary(const test_options_t *options, int total_pass
         fprintf(stream, "\nPASS: %d passed\n", total_pass);
 }
 
+static int scan_test_file_functions(const char *test_file_path, const char *source, size_t source_length,
+                                    str_list_t *function_names)
+{
+    vigil_runtime_t *runtime;
+    vigil_source_registry_t registry;
+    vigil_source_id_t source_id;
+
+    runtime = NULL;
+    source_id = 0U;
+    if (vigil_runtime_open(&runtime, NULL, NULL) != VIGIL_STATUS_OK)
+        return 0;
+
+    vigil_source_registry_init(&registry, runtime);
+    if (vigil_source_registry_register(&registry, test_file_path, strlen(test_file_path), source, source_length,
+                                       &source_id, NULL) == VIGIL_STATUS_OK)
+    {
+        scan_test_functions(runtime, &registry, source_id, function_names);
+    }
+    vigil_source_registry_free(&registry);
+    vigil_runtime_close(&runtime);
+    return 1;
+}
+
+static void report_test_result(const test_result_state_t *state, const char *name, double elapsed, int result,
+                               const char *err_msg)
+{
+    if (result == 0)
+    {
+        *state->total_pass += 1;
+        if (state->options->verbose)
+            fprintf(state->stream, "=== RUN   %s\n--- PASS: %s (%.3fs)\n", name, name, elapsed);
+        return;
+    }
+
+    *state->total_fail += 1;
+    *state->file_failed = 1;
+    fprintf(state->stream, "--- FAIL: %s (%s)\n    %s\n", name, state->test_file_path, err_msg);
+}
+
 static int run_test_file(const char *test_file_path, const test_options_t *options, vigil_coverage_session_t *coverage,
                          int *total_pass, int *total_fail)
 {
@@ -669,6 +935,7 @@ static int run_test_file(const char *test_file_path, const test_options_t *optio
     int exit_code;
     clock_t file_start;
     FILE *stream;
+    test_result_state_t result_state;
 
     source = NULL;
     source_length = 0U;
@@ -678,6 +945,12 @@ static int run_test_file(const char *test_file_path, const test_options_t *optio
     exit_code = 0;
     file_start = clock();
     stream = test_output_stream(options);
+    result_state.test_file_path = test_file_path;
+    result_state.options = options;
+    result_state.stream = stream;
+    result_state.total_pass = total_pass;
+    result_state.total_fail = total_fail;
+    result_state.file_failed = &file_failed;
 
     if (vigil_platform_read_file(NULL, test_file_path, &source, &source_length, &error) != VIGIL_STATUS_OK)
     {
@@ -685,28 +958,11 @@ static int run_test_file(const char *test_file_path, const test_options_t *optio
         return 1;
     }
 
-    {
-        vigil_runtime_t *runtime;
-        vigil_source_registry_t registry;
-        vigil_source_id_t source_id;
-
-        runtime = NULL;
-        source_id = 0U;
-        if (vigil_runtime_open(&runtime, NULL, NULL) == VIGIL_STATUS_OK)
-        {
-            vigil_source_registry_init(&registry, runtime);
-            if (vigil_source_registry_register(&registry, test_file_path, strlen(test_file_path), source, source_length,
-                                               &source_id, NULL) == VIGIL_STATUS_OK)
-            {
-                scan_test_functions(runtime, &registry, source_id, &function_names);
-            }
-            vigil_source_registry_free(&registry);
-            vigil_runtime_close(&runtime);
-        }
-    }
+    (void)scan_test_file_functions(test_file_path, source, source_length, &function_names);
 
     for (size_t index = 0U; index < function_names.count; index += 1U)
     {
+        test_run_request_t request;
         const char *name;
         clock_t test_start;
         double elapsed;
@@ -719,20 +975,15 @@ static int run_test_file(const char *test_file_path, const test_options_t *optio
 
         memset(err_msg, 0, sizeof(err_msg));
         test_start = clock();
-        result = run_one_test(test_file_path, source, source_length, name, options, coverage, err_msg, sizeof(err_msg));
+        request.test_file_path = test_file_path;
+        request.original_source = source;
+        request.original_length = source_length;
+        request.test_name = name;
+        request.options = options;
+        request.coverage = coverage;
+        result = run_one_test(&request, err_msg, sizeof(err_msg));
         elapsed = (double)(clock() - test_start) / CLOCKS_PER_SEC;
-        if (result == 0)
-        {
-            *total_pass += 1;
-            if (options->verbose)
-                fprintf(stream, "=== RUN   %s\n--- PASS: %s (%.3fs)\n", name, name, elapsed);
-        }
-        else
-        {
-            *total_fail += 1;
-            file_failed = 1;
-            fprintf(stream, "--- FAIL: %s (%s)\n    %s\n", name, test_file_path, err_msg);
-        }
+        report_test_result(&result_state, name, elapsed, result, err_msg);
     }
 
     if (file_failed)

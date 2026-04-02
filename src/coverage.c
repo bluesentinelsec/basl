@@ -86,6 +86,111 @@ static int coverage_is_separator(char ch)
     return ch == '/' || ch == '\\';
 }
 
+static size_t coverage_init_normalized_root(const char *path, char *normalized, size_t *out_index, int *out_absolute)
+{
+    size_t index;
+    size_t root_length;
+
+    *out_index = 0U;
+    *out_absolute = 0;
+    root_length = 0U;
+    if (path[0] == '\0')
+        return root_length;
+
+    if (path[1] == ':' && isalpha((unsigned char)path[0]) != 0)
+    {
+        normalized[(*out_index)++] = path[0];
+        normalized[(*out_index)++] = ':';
+        root_length = *out_index;
+        index = 2U;
+        if (coverage_is_separator(path[index]))
+        {
+            normalized[(*out_index)++] = '/';
+            *out_absolute = 1;
+            root_length = *out_index;
+            while (coverage_is_separator(path[index]))
+                index += 1U;
+        }
+        return root_length;
+    }
+
+    if (!coverage_is_separator(path[0]))
+        return root_length;
+
+    normalized[(*out_index)++] = '/';
+    *out_absolute = 1;
+    root_length = *out_index;
+    index = 0U;
+    while (coverage_is_separator(path[index]))
+        index += 1U;
+    return root_length;
+}
+
+static size_t coverage_skip_root(const char *path)
+{
+    size_t index;
+
+    index = 0U;
+    if (path[0] == '\0')
+        return 0U;
+    if (path[1] == ':' && isalpha((unsigned char)path[0]) != 0)
+    {
+        index = 2U;
+        while (coverage_is_separator(path[index]))
+            index += 1U;
+        return index;
+    }
+    while (coverage_is_separator(path[index]))
+        index += 1U;
+    return index;
+}
+
+static size_t coverage_next_segment(const char *path, size_t length, size_t *index, size_t *segment_length)
+{
+    size_t segment_start;
+
+    while (*index < length && coverage_is_separator(path[*index]))
+        *index += 1U;
+    if (*index >= length)
+    {
+        *segment_length = 0U;
+        return length;
+    }
+    segment_start = *index;
+    while (*index < length && !coverage_is_separator(path[*index]))
+        *index += 1U;
+    *segment_length = *index - segment_start;
+    return segment_start;
+}
+
+static void coverage_append_segment(char *normalized, size_t *segments, size_t *segment_count, size_t *out_length,
+                                    const char *segment, size_t segment_length)
+{
+    if (*out_length != 0U && normalized[*out_length - 1U] != '/')
+        normalized[(*out_length)++] = '/';
+    segments[(*segment_count)++] = *out_length;
+    memcpy(normalized + *out_length, segment, segment_length);
+    *out_length += segment_length;
+}
+
+static int coverage_handle_dot_segment(char *normalized, size_t *segments, size_t *segment_count, size_t *out_length,
+                                       int absolute, const char *segment, size_t segment_length)
+{
+    if (segment_length == 1U && segment[0] == '.')
+        return 1;
+    if (!(segment_length == 2U && segment[0] == '.' && segment[1] == '.'))
+        return 0;
+    if (*segment_count > 0U)
+    {
+        *out_length = segments[*segment_count - 1U];
+        *segment_count -= 1U;
+        return 1;
+    }
+    if (!absolute)
+        coverage_append_segment(normalized, segments, segment_count, out_length, segment, segment_length);
+    return 1;
+}
+
 static char *coverage_normalize_path(const char *path)
 {
     char *normalized;
@@ -99,6 +204,10 @@ static char *coverage_normalize_path(const char *path)
 
     if (path == NULL)
         return NULL;
+    /* Coverage needs stable path identity across source registration and CLI
+     * scope filtering. The platform layer does not expose a canonicalization
+     * helper for synthetic import paths, so normalize separators and dot
+     * segments here before comparing paths. */
     length = strlen(path);
     normalized = malloc(length + 3U);
     segments = malloc((length + 1U) * sizeof(size_t));
@@ -111,74 +220,22 @@ static char *coverage_normalize_path(const char *path)
 
     segment_count = 0U;
     out_length = 0U;
-    root_length = 0U;
-    absolute = 0;
-    if (length >= 2U && isalpha((unsigned char)path[0]) != 0 && path[1] == ':')
-    {
-        normalized[out_length++] = path[0];
-        normalized[out_length++] = ':';
-        root_length = out_length;
-        index = 2U;
-        if (coverage_is_separator(path[index]))
-        {
-            normalized[out_length++] = '/';
-            absolute = 1;
-            root_length = out_length;
-            while (coverage_is_separator(path[index]))
-                index += 1U;
-        }
-    }
-    else
-    {
-        index = 0U;
-        if (coverage_is_separator(path[0]))
-        {
-            normalized[out_length++] = '/';
-            absolute = 1;
-            root_length = out_length;
-            while (coverage_is_separator(path[index]))
-                index += 1U;
-        }
-    }
+    root_length = coverage_init_normalized_root(path, normalized, &out_length, &absolute);
+    index = coverage_skip_root(path);
 
     while (index < length)
     {
         size_t segment_start;
         size_t segment_length;
 
-        while (index < length && coverage_is_separator(path[index]))
-            index += 1U;
-        if (index >= length)
+        segment_start = coverage_next_segment(path, length, &index, &segment_length);
+        if (segment_length == 0U)
             break;
-        segment_start = index;
-        while (index < length && !coverage_is_separator(path[index]))
-            index += 1U;
-        segment_length = index - segment_start;
-        if (segment_length == 1U && path[segment_start] == '.')
+        if (coverage_handle_dot_segment(normalized, segments, &segment_count, &out_length, absolute,
+                                        path + segment_start, segment_length))
             continue;
-        if (segment_length == 2U && path[segment_start] == '.' && path[segment_start + 1U] == '.')
-        {
-            if (segment_count > 0U)
-            {
-                out_length = segments[segment_count - 1U];
-                segment_count -= 1U;
-                continue;
-            }
-            if (!absolute)
-            {
-                if (out_length != 0U && normalized[out_length - 1U] != '/')
-                    normalized[out_length++] = '/';
-                segments[segment_count++] = out_length;
-                normalized[out_length++] = '.';
-                normalized[out_length++] = '.';
-            }
-            continue;
-        }
-        if (out_length != 0U && normalized[out_length - 1U] != '/')
-            normalized[out_length++] = '/';
-        segments[segment_count++] = out_length;
-        memcpy(normalized + out_length, path + segment_start, segment_length);
-        out_length += segment_length;
+        coverage_append_segment(normalized, segments, &segment_count, &out_length, path + segment_start,
+                                segment_length);
     }
 
     if (out_length == 0U)
@@ -499,101 +556,6 @@ static vigil_coverage_branch_kind_t coverage_branch_kind_for_opcode(vigil_opcode
     return VIGIL_COVERAGE_BRANCH_CONDITION;
 }
 
-static uint8_t coverage_opcode_size(vigil_opcode_t opcode)
-{
-    static const struct
-    {
-        vigil_opcode_t opcode;
-        uint8_t size;
-    } sizes[] = {
-        {VIGIL_OPCODE_CONSTANT, 5U},
-        {VIGIL_OPCODE_RETURN, 5U},
-        {VIGIL_OPCODE_GET_LOCAL, 5U},
-        {VIGIL_OPCODE_SET_LOCAL, 5U},
-        {VIGIL_OPCODE_GET_GLOBAL, 5U},
-        {VIGIL_OPCODE_SET_GLOBAL, 5U},
-        {VIGIL_OPCODE_GET_FUNCTION, 5U},
-        {VIGIL_OPCODE_GET_CAPTURE, 5U},
-        {VIGIL_OPCODE_SET_CAPTURE, 5U},
-        {VIGIL_OPCODE_JUMP, 5U},
-        {VIGIL_OPCODE_JUMP_IF_FALSE, 5U},
-        {VIGIL_OPCODE_LOOP, 5U},
-        {VIGIL_OPCODE_FORMAT_F64, 5U},
-        {VIGIL_OPCODE_GET_FIELD, 5U},
-        {VIGIL_OPCODE_SET_FIELD, 5U},
-        {VIGIL_OPCODE_DEFER_CALL_VALUE, 5U},
-        {VIGIL_OPCODE_LESS_I32_JUMP_IF_FALSE, 5U},
-        {VIGIL_OPCODE_LESS_EQUAL_I32_JUMP_IF_FALSE, 5U},
-        {VIGIL_OPCODE_GREATER_I32_JUMP_IF_FALSE, 5U},
-        {VIGIL_OPCODE_GREATER_EQUAL_I32_JUMP_IF_FALSE, 5U},
-        {VIGIL_OPCODE_EQUAL_I32_JUMP_IF_FALSE, 5U},
-        {VIGIL_OPCODE_NOT_EQUAL_I32_JUMP_IF_FALSE, 5U},
-        {VIGIL_OPCODE_LESS_I64_JUMP_IF_FALSE, 5U},
-        {VIGIL_OPCODE_LESS_EQUAL_I64_JUMP_IF_FALSE, 5U},
-        {VIGIL_OPCODE_GREATER_I64_JUMP_IF_FALSE, 5U},
-        {VIGIL_OPCODE_GREATER_EQUAL_I64_JUMP_IF_FALSE, 5U},
-        {VIGIL_OPCODE_EQUAL_I64_JUMP_IF_FALSE, 5U},
-        {VIGIL_OPCODE_NOT_EQUAL_I64_JUMP_IF_FALSE, 5U},
-        {VIGIL_OPCODE_ADD_F64_STORE, 5U},
-        {VIGIL_OPCODE_SUBTRACT_F64_STORE, 5U},
-        {VIGIL_OPCODE_MULTIPLY_F64_STORE, 5U},
-        {VIGIL_OPCODE_INCREMENT_LOCAL_I32, 6U},
-        {VIGIL_OPCODE_INCREMENT_LOCAL_I64, 6U},
-        {VIGIL_OPCODE_NEW_CLOSURE, 9U},
-        {VIGIL_OPCODE_CALL_VALUE, 9U},
-        {VIGIL_OPCODE_NEW_INSTANCE, 9U},
-        {VIGIL_OPCODE_NEW_ARRAY, 9U},
-        {VIGIL_OPCODE_NEW_MAP, 9U},
-        {VIGIL_OPCODE_DEFER_NEW_INSTANCE, 9U},
-        {VIGIL_OPCODE_LOCALS_ADD_I64, 9U},
-        {VIGIL_OPCODE_LOCALS_SUBTRACT_I64, 9U},
-        {VIGIL_OPCODE_LOCALS_MULTIPLY_I64, 9U},
-        {VIGIL_OPCODE_LOCALS_MODULO_I64, 9U},
-        {VIGIL_OPCODE_LOCALS_LESS_I64, 9U},
-        {VIGIL_OPCODE_LOCALS_LESS_EQUAL_I64, 9U},
-        {VIGIL_OPCODE_LOCALS_GREATER_I64, 9U},
-        {VIGIL_OPCODE_LOCALS_GREATER_EQUAL_I64, 9U},
-        {VIGIL_OPCODE_LOCALS_EQUAL_I64, 9U},
-        {VIGIL_OPCODE_LOCALS_NOT_EQUAL_I64, 9U},
-        {VIGIL_OPCODE_TAIL_CALL, 9U},
-        {VIGIL_OPCODE_CALL_NATIVE, 13U},
-        {VIGIL_OPCODE_FORMAT_SPEC, 9U},
-        {VIGIL_OPCODE_CALL_SELF, 9U},
-        {VIGIL_OPCODE_LOCALS_ADD_F64, 9U},
-        {VIGIL_OPCODE_LOCALS_SUBTRACT_F64, 9U},
-        {VIGIL_OPCODE_LOCALS_MULTIPLY_F64, 9U},
-        {VIGIL_OPCODE_CALL, 13U},
-        {VIGIL_OPCODE_DEFER_CALL, 13U},
-        {VIGIL_OPCODE_CALL_INTERFACE, 17U},
-        {VIGIL_OPCODE_DEFER_CALL_INTERFACE, 13U},
-        {VIGIL_OPCODE_LOCALS_ADD_I32_STORE, 13U},
-        {VIGIL_OPCODE_LOCALS_SUBTRACT_I32_STORE, 13U},
-        {VIGIL_OPCODE_LOCALS_MULTIPLY_I32_STORE, 13U},
-        {VIGIL_OPCODE_LOCALS_LESS_I32_STORE, 13U},
-        {VIGIL_OPCODE_LOCALS_LESS_EQUAL_I32_STORE, 13U},
-        {VIGIL_OPCODE_LOCALS_GREATER_I32_STORE, 13U},
-        {VIGIL_OPCODE_LOCALS_GREATER_EQUAL_I32_STORE, 13U},
-        {VIGIL_OPCODE_LOCALS_EQUAL_I32_STORE, 13U},
-        {VIGIL_OPCODE_LOCALS_NOT_EQUAL_I32_STORE, 13U},
-        {VIGIL_OPCODE_LOCALS_MODULO_I32_STORE, 13U},
-        {VIGIL_OPCODE_DEFER_CALL_NATIVE, 13U},
-        {VIGIL_OPCODE_CALL_EXTERN, 9U},
-        {VIGIL_OPCODE_FORLOOP_I32, 15U},
-        {VIGIL_OPCODE_FORLOOP_I64, 15U},
-        {VIGIL_OPCODE_LOCALS_ADD_F64_STORE, 13U},
-        {VIGIL_OPCODE_LOCALS_SUBTRACT_F64_STORE, 13U},
-        {VIGIL_OPCODE_LOCALS_MULTIPLY_F64_STORE, 13U},
-    };
-    size_t index;
-
-    for (index = 0U; index < sizeof(sizes) / sizeof(sizes[0]); index += 1U)
-    {
-        if (sizes[index].opcode == opcode)
-            return sizes[index].size;
-    }
-    return 1U;
-}
-
 static size_t coverage_branch_ordinal_for_line(const vigil_coverage_chunk_map_t *chunk_map, size_t line_index,
                                                size_t ip)
 {
@@ -715,6 +677,76 @@ static void coverage_mark_branch_arm(vigil_coverage_session_t *session, size_t b
     session->branches[branch_index].hit_mask |= mask;
 }
 
+static vigil_coverage_chunk_map_t *coverage_debug_chunk_map(vigil_coverage_session_t *session,
+                                                            vigil_coverage_vm_state_t *vm_state,
+                                                            const vigil_chunk_t *chunk)
+{
+    size_t chunk_index;
+
+    chunk_index = coverage_find_chunk_map_index(session, chunk);
+    if (chunk_index == k_coverage_none && vm_state->registry != NULL)
+    {
+        if (!coverage_scan_chunk(session, vm_state->registry, chunk))
+            return NULL;
+        chunk_index = coverage_find_chunk_map_index(session, chunk);
+    }
+    if (chunk_index == k_coverage_none)
+        return NULL;
+    return &session->chunks[chunk_index];
+}
+
+static void coverage_debug_resolve_pending(vigil_coverage_session_t *session, vigil_coverage_vm_state_t *vm_state,
+                                           const vigil_chunk_t *chunk, size_t frame_depth, size_t ip)
+{
+    if (!vm_state->has_pending || vm_state->pending_branch_index == k_coverage_none)
+        return;
+
+    if (vm_state->pending_chunk == chunk && vm_state->pending_frame_depth == frame_depth)
+    {
+        coverage_mark_branch_arm(session, vm_state->pending_branch_index, ip == vm_state->pending_fallthrough_ip);
+    }
+    else
+    {
+        /* If control moved to a different frame or chunk before the next
+         * instruction hook, the conditional must have taken the non-fallthrough
+         * arm. This covers common cases like function calls in the taken branch. */
+        coverage_mark_branch_arm(session, vm_state->pending_branch_index, 0);
+    }
+    vm_state->has_pending = 0;
+    vm_state->pending_branch_index = k_coverage_none;
+}
+
+static void coverage_debug_mark_line(vigil_coverage_session_t *session, const vigil_coverage_chunk_map_t *chunk_map,
+                                     size_t ip)
+{
+    size_t line_index;
+    size_t file_index;
+
+    if (ip >= chunk_map->code_size || chunk_map->line_indexes[ip] == k_coverage_none)
+        return;
+
+    line_index = chunk_map->line_indexes[ip];
+    file_index = chunk_map->file_indexes[ip];
+    if (file_index != k_coverage_none && file_index < session->file_count &&
+        line_index < session->files[file_index].line_count)
+    {
+        session->files[file_index].hit_lines[line_index] = 1U;
+    }
+}
+
+static void coverage_debug_begin_branch(vigil_coverage_vm_state_t *vm_state,
+                                        const vigil_coverage_chunk_map_t *chunk_map, const vigil_chunk_t *chunk,
+                                        size_t frame_depth, size_t ip)
+{
+    if (ip >= chunk_map->code_size || chunk_map->branch_indexes[ip] == k_coverage_none)
+        return;
+    vm_state->has_pending = 1;
+    vm_state->pending_branch_index = chunk_map->branch_indexes[ip];
+    vm_state->pending_fallthrough_ip = ip + vigil_opcode_size((vigil_opcode_t)vigil_chunk_code(chunk)[ip]);
+    vm_state->pending_frame_depth = frame_depth;
+    vm_state->pending_chunk = chunk;
+}
+
 static int coverage_debug_hook(vigil_vm_t *vm, void *userdata)
 {
     vigil_coverage_session_t *session;
@@ -723,7 +755,6 @@ static int coverage_debug_hook(vigil_vm_t *vm, void *userdata)
     size_t frame_index;
     const vigil_chunk_t *chunk;
     size_t ip;
-    size_t chunk_index;
     vigil_coverage_chunk_map_t *chunk_map;
 
     session = userdata;
@@ -739,55 +770,13 @@ static int coverage_debug_hook(vigil_vm_t *vm, void *userdata)
     frame_index = frame_depth - 1U;
     chunk = vigil_vm_frame_chunk(vm, frame_index);
     ip = vigil_vm_frame_ip(vm, frame_index);
-    chunk_index = coverage_find_chunk_map_index(session, chunk);
-    if (chunk_index == k_coverage_none && vm_state->registry != NULL)
-    {
-        if (!coverage_scan_chunk(session, vm_state->registry, chunk))
-            goto done;
-        chunk_index = coverage_find_chunk_map_index(session, chunk);
-    }
-    if (chunk_index == k_coverage_none)
+    chunk_map = coverage_debug_chunk_map(session, vm_state, chunk);
+    if (chunk_map == NULL)
         goto done;
 
-    chunk_map = &session->chunks[chunk_index];
-    if (vm_state->has_pending && vm_state->pending_branch_index != k_coverage_none &&
-        vm_state->pending_chunk == chunk && vm_state->pending_frame_depth == frame_depth)
-    {
-        coverage_mark_branch_arm(session, vm_state->pending_branch_index, ip == vm_state->pending_fallthrough_ip);
-        vm_state->has_pending = 0;
-        vm_state->pending_branch_index = k_coverage_none;
-    }
-    else if (vm_state->has_pending && vm_state->pending_branch_index != k_coverage_none)
-    {
-        coverage_mark_branch_arm(session, vm_state->pending_branch_index, 0);
-        vm_state->has_pending = 0;
-        vm_state->pending_branch_index = k_coverage_none;
-    }
-
-    if (ip >= chunk_map->code_size)
-        goto done;
-    if (chunk_map->line_indexes[ip] != k_coverage_none)
-    {
-        size_t line_index;
-        size_t file_index;
-
-        line_index = chunk_map->line_indexes[ip];
-        file_index = chunk_map->file_indexes[ip];
-        if (file_index != k_coverage_none && file_index < session->file_count &&
-            line_index < session->files[file_index].line_count)
-        {
-            session->files[file_index].hit_lines[line_index] = 1U;
-        }
-    }
-
-    if (chunk_map->branch_indexes[ip] != k_coverage_none)
-    {
-        vm_state->has_pending = 1;
-        vm_state->pending_branch_index = chunk_map->branch_indexes[ip];
-        vm_state->pending_fallthrough_ip = ip + coverage_opcode_size((vigil_opcode_t)vigil_chunk_code(chunk)[ip]);
-        vm_state->pending_frame_depth = frame_depth;
-        vm_state->pending_chunk = chunk;
-    }
+    coverage_debug_resolve_pending(session, vm_state, chunk, frame_depth, ip);
+    coverage_debug_mark_line(session, chunk_map, ip);
+    coverage_debug_begin_branch(vm_state, chunk_map, chunk, frame_depth, ip);
 
 done:
     vigil_platform_mutex_unlock(session->lock);
@@ -859,7 +848,7 @@ static int coverage_scan_chunk(vigil_coverage_session_t *session, const vigil_so
 
         span = vigil_chunk_span_at(chunk, ip);
         file_index = coverage_file_index_for_span(session, registry, span);
-        size = coverage_opcode_size((vigil_opcode_t)code[ip]);
+        size = vigil_opcode_size((vigil_opcode_t)code[ip]);
         if (size > code_size - ip)
             size = (uint8_t)(code_size - ip);
         if (file_index != k_coverage_none)
@@ -1163,6 +1152,7 @@ void vigil_coverage_session_print_text(const vigil_coverage_session_t *session, 
                                        size_t test_file_count)
 {
     size_t index;
+    size_t width;
     size_t total_line_covered;
     size_t total_line_total;
     size_t total_branch_covered;
@@ -1175,6 +1165,15 @@ void vigil_coverage_session_print_text(const vigil_coverage_session_t *session, 
     total_line_total = 0U;
     total_branch_covered = 0U;
     total_branch_total = 0U;
+    width = strlen("total");
+    for (index = 0U; index < session->file_count; index += 1U)
+    {
+        size_t display_length;
+
+        display_length = strlen(session->files[index].display_path);
+        if (display_length > width)
+            width = display_length;
+    }
 
     fprintf(stream, "\ncoverage: %zu files, %zu test files\n\n", session->file_count, test_file_count);
     for (index = 0U; index < session->file_count; index += 1U)
@@ -1192,7 +1191,7 @@ void vigil_coverage_session_print_text(const vigil_coverage_session_t *session, 
         total_branch_covered += branch_covered;
         total_branch_total += branch_total;
 
-        fprintf(stream, "%-20s %5.1f%% lines (%zu/%zu)   %5.1f%% branches (%zu/%zu)\n",
+        fprintf(stream, "%-*s %5.1f%% lines (%zu/%zu)   %5.1f%% branches (%zu/%zu)\n", (int)width,
                 session->files[index].display_path, coverage_percent(line_covered, line_total), line_covered,
                 line_total, coverage_percent(branch_covered, branch_total), branch_covered, branch_total);
 
@@ -1220,7 +1219,7 @@ void vigil_coverage_session_print_text(const vigil_coverage_session_t *session, 
         fprintf(stream, "\n");
     }
 
-    fprintf(stream, "%-20s %5.1f%% lines (%zu/%zu)   %5.1f%% branches (%zu/%zu)\n", "total",
+    fprintf(stream, "%-*s %5.1f%% lines (%zu/%zu)   %5.1f%% branches (%zu/%zu)\n", (int)width, "total",
             coverage_percent(total_line_covered, total_line_total), total_line_covered, total_line_total,
             coverage_percent(total_branch_covered, total_branch_total), total_branch_covered, total_branch_total);
 }

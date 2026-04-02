@@ -242,6 +242,7 @@ class TestVigilTest(unittest.TestCase):
                 '}\n'
             )
         import_path = os.path.relpath(os.path.join(shared_root, "helper"), os.path.join(self.tmpdir, "test"))
+        import_path = import_path.replace(os.sep, "/")
         test_path = self._write("test/dep_test.vigil",
             'import "test";\n'
             f'import "{import_path}" as helper;\n'
@@ -256,6 +257,35 @@ class TestVigilTest(unittest.TestCase):
         self.assertEqual(with_deps.returncode, 0, msg=f"stdout:\n{with_deps.stdout}\nstderr:\n{with_deps.stderr}")
         self.assertIn("coverage: 1 files, 1 test files", with_deps.stdout)
         self.assertIn("shared/helper.vigil", with_deps.stdout)
+
+    def test_coverage_no_test_files(self):
+        self._write("regular.vigil", 'fn main() -> i32 { return 0; }\n')
+        r = run_test("--coverage", self.tmpdir)
+        self.assertEqual(r.returncode, 0)
+        self.assertIn("no test files found", r.stdout)
+        self.assertNotIn("coverage:", r.stdout)
+
+    def test_coverage_still_reports_when_tests_fail(self):
+        self._write("vigil.toml", '[project]\nname = "coverage"\n')
+        self._write("lib/helper.vigil",
+            'pub fn classify(i32 value) -> i32 {\n'
+            '    if value > 0 {\n'
+            '        return 1;\n'
+            '    }\n'
+            '    return 0;\n'
+            '}\n')
+        test_path = self._write("test/helper_test.vigil",
+            'import "test";\n'
+            'import "helper" as helper;\n'
+            'fn test_classify(test.T t) -> void {\n'
+            '    helper.classify(1);\n'
+            '    t.fail("boom");\n'
+            '}\n')
+        r = run_test("--coverage", test_path)
+        self.assertEqual(r.returncode, 1, msg=f"stdout:\n{r.stdout}\nstderr:\n{r.stderr}")
+        self.assertIn("boom", r.stdout)
+        self.assertIn("coverage: 1 files, 1 test files", r.stdout)
+        self.assertIn("66.7% lines (2/3)", r.stdout)
 
 
 if __name__ == "__main__":
