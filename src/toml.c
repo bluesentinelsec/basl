@@ -4,6 +4,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "internal/vigil_utf8.h"
+
 #include "internal/vigil_internal.h"
 #include "vigil/toml.h"
 
@@ -579,41 +581,20 @@ static vigil_status_t buf_push(toml_parser_t *p, char c, vigil_error_t *error)
 
 static vigil_status_t buf_push_utf8(toml_parser_t *p, uint32_t cp, vigil_error_t *error)
 {
-    if (cp <= 0x7F)
+    char buf[VIGIL_UTF8_MAX_BYTES];
+    size_t len;
+    size_t i;
+
+    len = vigil_utf8_encode(cp, buf);
+    if (len == 0U)
+        return parser_error(p, "invalid unicode codepoint", error);
+    for (i = 0U; i < len; i++)
     {
-        return buf_push(p, (char)cp, error);
+        vigil_status_t s = buf_push(p, buf[i], error);
+        if (s != VIGIL_STATUS_OK)
+            return s;
     }
-    else if (cp <= 0x7FF)
-    {
-        vigil_status_t s = buf_push(p, (char)(0xC0 | (cp >> 6)), error);
-        if (s != VIGIL_STATUS_OK)
-            return s;
-        return buf_push(p, (char)(0x80 | (cp & 0x3F)), error);
-    }
-    else if (cp <= 0xFFFF)
-    {
-        vigil_status_t s = buf_push(p, (char)(0xE0 | (cp >> 12)), error);
-        if (s != VIGIL_STATUS_OK)
-            return s;
-        s = buf_push(p, (char)(0x80 | ((cp >> 6) & 0x3F)), error);
-        if (s != VIGIL_STATUS_OK)
-            return s;
-        return buf_push(p, (char)(0x80 | (cp & 0x3F)), error);
-    }
-    else if (cp <= 0x10FFFF)
-    {
-        vigil_status_t s = buf_push(p, (char)(0xF0 | (cp >> 18)), error);
-        if (s != VIGIL_STATUS_OK)
-            return s;
-        s = buf_push(p, (char)(0x80 | ((cp >> 12) & 0x3F)), error);
-        if (s != VIGIL_STATUS_OK)
-            return s;
-        s = buf_push(p, (char)(0x80 | ((cp >> 6) & 0x3F)), error);
-        if (s != VIGIL_STATUS_OK)
-            return s;
-        return buf_push(p, (char)(0x80 | (cp & 0x3F)), error);
-    }
-    return parser_error(p, "invalid unicode codepoint", error);
+    return VIGIL_STATUS_OK;
 }
 
 /* ── String parsing ──────────────────────────────────────────────── */

@@ -57,6 +57,7 @@ add_executable(vigil_tests
     tests/type_test.c
     tests/unsafe_test.c
     tests/url_test.c
+    tests/utf8_test.c
     tests/value_test.c
     tests/vigil_new_test.c
     tests/vm_ops_collection_test.c
