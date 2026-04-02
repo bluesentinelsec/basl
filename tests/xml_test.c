@@ -7,6 +7,7 @@
 
 /* ── Basic parsing ───────────────────────────────────────────────── */
 
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
 TEST(VigilXmlTest, ParsesSimpleElement)
 {
     vigil_xml_document_t *doc = NULL;
@@ -29,6 +30,7 @@ TEST(VigilXmlTest, ParsesElementWithText)
     vigil_xml_document_free(doc);
 }
 
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
 TEST(VigilXmlTest, ParsesAttributes)
 {
     vigil_xml_document_t *doc = NULL;
@@ -42,6 +44,7 @@ TEST(VigilXmlTest, ParsesAttributes)
     vigil_xml_document_free(doc);
 }
 
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
 TEST(VigilXmlTest, ParsesNestedElements)
 {
     vigil_xml_document_t *doc = NULL;
@@ -70,6 +73,7 @@ TEST(VigilXmlTest, DecodesEntityReferences)
     vigil_xml_document_free(doc);
 }
 
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
 TEST(VigilXmlTest, DecodesCharacterReferences)
 {
     vigil_xml_document_t *doc = NULL;
@@ -144,6 +148,7 @@ TEST(VigilXmlTest, SkipsDoctype)
 
 /* ── XML declaration ─────────────────────────────────────────────── */
 
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
 TEST(VigilXmlTest, ParsesXmlDeclaration)
 {
     vigil_xml_document_t *doc = NULL;
@@ -231,6 +236,7 @@ TEST(VigilXmlTest, RejectsDeeplyNestedInput)
 
 /* ── Query helpers ───────────────────────────────────────────────── */
 
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
 TEST(VigilXmlTest, ElementChildFindsFirstMatch)
 {
     vigil_xml_document_t *doc = NULL;
@@ -245,6 +251,7 @@ TEST(VigilXmlTest, ElementChildFindsFirstMatch)
     vigil_xml_document_free(doc);
 }
 
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
 TEST(VigilXmlTest, ChildrenByTagCollectsMatches)
 {
     vigil_xml_document_t *doc = NULL;
@@ -277,6 +284,7 @@ TEST(VigilXmlTest, AllTextConcatenatesRecursively)
 
 /* ── Serialization round-trip ────────────────────────────────────── */
 
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
 TEST(VigilXmlTest, SerializationRoundTrip)
 {
     vigil_xml_document_t *doc = NULL;

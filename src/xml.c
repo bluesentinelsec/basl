@@ -529,6 +529,7 @@ static int xml_parse_closing_tag(xml_parser_t *p, const char *close_tag)
     return 1;
 }
 
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
 static int xml_parse_children(xml_parser_t *p, vigil_xml_element_t *el, const char *close_tag)
 {
     while (!xml_eof(p))
