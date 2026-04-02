@@ -8,6 +8,7 @@
 #include "internal/vigil_compiler_backend.h"
 #include "internal/vigil_compiler_internal.h"
 #include "internal/vigil_compiler_semantics.h"
+#include "internal/vigil_utf8.h"
 #include "internal/vigil_compiler_types.h"
 #include "internal/vigil_internal.h"
 #include "internal/vigil_nanbox.h"
@@ -1624,54 +1625,6 @@ static int vigil_program_values_equal(const vigil_value_t *left, const vigil_val
     }
 }
 
-static size_t vigil_program_utf8_codepoint_count(const char *text, size_t length)
-{
-    size_t count;
-    size_t index;
-    unsigned char lead;
-
-    if (text == NULL)
-    {
-        return 0U;
-    }
-
-    count = 0U;
-    index = 0U;
-    while (index < length)
-    {
-        lead = (unsigned char)text[index];
-        if ((lead & 0x80U) == 0U)
-        {
-            index += 1U;
-        }
-        else if ((lead & 0xE0U) == 0xC0U && index + 1U < length && (((unsigned char)text[index + 1U]) & 0xC0U) == 0x80U)
-        {
-            index += 2U;
-        }
-        else if ((lead & 0xF0U) == 0xE0U && index + 2U < length &&
-                 (((unsigned char)text[index + 1U]) & 0xC0U) == 0x80U &&
-                 (((unsigned char)text[index + 2U]) & 0xC0U) == 0x80U)
-        {
-            index += 3U;
-        }
-        else if ((lead & 0xF8U) == 0xF0U && index + 3U < length &&
-                 (((unsigned char)text[index + 1U]) & 0xC0U) == 0x80U &&
-                 (((unsigned char)text[index + 2U]) & 0xC0U) == 0x80U &&
-                 (((unsigned char)text[index + 3U]) & 0xC0U) == 0x80U)
-        {
-            index += 4U;
-        }
-        else
-        {
-            return 0U;
-        }
-
-        count += 1U;
-    }
-
-    return count;
-}
-
 static int decode_hex_digit(unsigned int ch)
 {
     if (ch >= '0' && ch <= '9')
@@ -1794,7 +1747,7 @@ static vigil_status_t vigil_program_decode_string_literal(const vigil_program_st
     }
 
     if (token->kind == VIGIL_TOKEN_CHAR_LITERAL &&
-        vigil_program_utf8_codepoint_count(vigil_string_c_str(out_text), vigil_string_length(out_text)) != 1U)
+        vigil_utf8_codepoint_count(vigil_string_c_str(out_text), vigil_string_length(out_text)) != 1U)
     {
         return vigil_compile_report(program, token->span, "character literals must contain exactly one character");
     }

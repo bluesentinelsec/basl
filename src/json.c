@@ -1,4 +1,5 @@
 #include <inttypes.h>
+#include "internal/vigil_utf8.h"
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -483,34 +484,6 @@ static vigil_status_t json_read_surrogate_pair(json_parser_t *p, uint32_t *hi)
     return VIGIL_STATUS_OK;
 }
 
-/* Encode a Unicode codepoint as UTF-8 into buf[*pos].  Returns bytes written (1-4). */
-static size_t json_encode_utf8(char *buf, size_t pos, uint32_t cp)
-{
-    if (cp < 0x80U)
-    {
-        buf[pos] = (char)cp;
-        return 1;
-    }
-    if (cp < 0x800U)
-    {
-        buf[pos] = (char)(0xC0 | (cp >> 6));
-        buf[pos + 1] = (char)(0x80 | (cp & 0x3F));
-        return 2;
-    }
-    if (cp < 0x10000U)
-    {
-        buf[pos] = (char)(0xE0 | (cp >> 12));
-        buf[pos + 1] = (char)(0x80 | ((cp >> 6) & 0x3F));
-        buf[pos + 2] = (char)(0x80 | (cp & 0x3F));
-        return 3;
-    }
-    buf[pos] = (char)(0xF0 | (cp >> 18));
-    buf[pos + 1] = (char)(0x80 | ((cp >> 12) & 0x3F));
-    buf[pos + 2] = (char)(0x80 | ((cp >> 6) & 0x3F));
-    buf[pos + 3] = (char)(0x80 | (cp & 0x3F));
-    return 4;
-}
-
 /* ── Growable string buffer for parse_string_content ──────────────── */
 
 typedef struct
@@ -580,7 +553,7 @@ static vigil_status_t parse_unicode_escape(json_parser_t *p, json_strbuf_t *sb)
     s = json_strbuf_ensure(sb, 4);
     if (s != VIGIL_STATUS_OK)
         return s;
-    sb->len += json_encode_utf8(sb->data, sb->len, cp);
+    sb->len += vigil_utf8_encode(cp, sb->data + sb->len);
     return VIGIL_STATUS_OK;
 }
 
