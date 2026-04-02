@@ -35,8 +35,24 @@
       "line_percent": 75.0
     },
     {
+      "pattern": "src/regvm.c",
+      "line_percent": 75.0
+    },
+    {
       "pattern": "src/vm.c",
       "line_percent": 85.0
+    },
+    {
+      "pattern": "src/vm_ops_collection.c",
+      "line_percent": 88.0
+    },
+    {
+      "pattern": "src/vm_ops_convert.c",
+      "line_percent": 82.0
+    },
+    {
+      "pattern": "src/vm_ops_string.c",
+      "line_percent": 80.0
     }
   ]
 }
