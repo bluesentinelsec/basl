@@ -371,6 +371,7 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS" AND NOT CMAKE_SYSTEM_NAME STREQUAL "Andr
         src/cli/main.c
         src/cli_test.c
         src/cli_frontend.c
+        src/coverage.c
     )
 
     set_target_properties(vigil_cli PROPERTIES OUTPUT_NAME vigil)
