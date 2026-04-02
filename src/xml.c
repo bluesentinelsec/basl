@@ -500,7 +500,32 @@ static int xml_parse_text_content(xml_parser_t *p, vigil_xml_element_t *el)
     return 1;
 }
 
-// NOLINTNEXTLINE(readability-function-cognitive-complexity)
+static int xml_parse_closing_tag(xml_parser_t *p, const char *close_tag)
+{
+    char *end_name;
+    xml_advance(p); /* < */
+    xml_advance(p); /* / */
+    end_name = xml_parse_name(p);
+    xml_skip_whitespace(p);
+    if (!xml_match_char(p, '>'))
+    {
+        xml_set_error(p, "expected '>' in closing tag");
+        free(end_name);
+        return -1;
+    }
+    if (end_name == NULL || strcmp(end_name, close_tag) != 0)
+    {
+        char msg[128];
+        snprintf(msg, sizeof(msg), "mismatched closing tag: expected </%s>, got </%s>", close_tag,
+                 end_name ? end_name : "?");
+        xml_set_error(p, msg);
+        free(end_name);
+        return -1;
+    }
+    free(end_name);
+    return 1;
+}
+
 static int xml_parse_children(xml_parser_t *p, vigil_xml_element_t *el, const char *close_tag)
 {
     while (!xml_eof(p))
@@ -511,33 +536,11 @@ static int xml_parse_children(xml_parser_t *p, vigil_xml_element_t *el, const ch
                 return 0;
             continue;
         }
-        /* Check for closing tag */
         if (p->pos + 1U < p->length && p->text[p->pos + 1U] == '/')
         {
-            char *end_name;
-            xml_advance(p); /* < */
-            xml_advance(p); /* / */
-            end_name = xml_parse_name(p);
-            xml_skip_whitespace(p);
-            if (!xml_match_char(p, '>'))
-            {
-                xml_set_error(p, "expected '>' in closing tag");
-                free(end_name);
-                return 0;
-            }
-            if (end_name == NULL || strcmp(end_name, close_tag) != 0)
-            {
-                char msg[128];
-                snprintf(msg, sizeof(msg), "mismatched closing tag: expected </%s>, got </%s>", close_tag,
-                         end_name ? end_name : "?");
-                xml_set_error(p, msg);
-                free(end_name);
-                return 0;
-            }
-            free(end_name);
-            return 1;
+            int rc = xml_parse_closing_tag(p, close_tag);
+            return rc < 0 ? 0 : 1;
         }
-        /* Check for special sequences */
         if (xml_match_str(p, "<!--"))
         {
             if (!xml_skip_comment(p))
@@ -556,7 +559,6 @@ static int xml_parse_children(xml_parser_t *p, vigil_xml_element_t *el, const ch
                 return 0;
             continue;
         }
-        /* Child element */
         {
             vigil_xml_element_t *child = xml_parse_element(p);
             if (child == NULL)
@@ -709,6 +711,53 @@ static int xml_parse_declaration(xml_parser_t *p, vigil_xml_document_t *doc)
 
 /* ── Public API ──────────────────────────────────────────────────── */
 
+static int xml_skip_prolog(xml_parser_t *p)
+{
+    for (;;)
+    {
+        xml_skip_whitespace(p);
+        if (xml_match_str(p, "<!--"))
+        {
+            if (!xml_skip_comment(p))
+                return 0;
+            continue;
+        }
+        if (xml_match_str(p, "<?"))
+        {
+            if (!xml_skip_pi(p))
+                return 0;
+            continue;
+        }
+        if (xml_match_str(p, "<!DOCTYPE"))
+        {
+            if (!xml_skip_doctype(p))
+            {
+                xml_set_error(p, "unterminated DOCTYPE");
+                return 0;
+            }
+            continue;
+        }
+        break;
+    }
+    return 1;
+}
+
+static int xml_skip_trailing(xml_parser_t *p)
+{
+    for (;;)
+    {
+        xml_skip_whitespace(p);
+        if (xml_match_str(p, "<!--"))
+        {
+            if (!xml_skip_comment(p))
+                return 0;
+            continue;
+        }
+        break;
+    }
+    return 1;
+}
+
 vigil_status_t vigil_xml_parse(const char *text, size_t length, vigil_xml_document_t **out_document,
                                vigil_xml_error_t *out_error)
 {
@@ -740,50 +789,13 @@ vigil_status_t vigil_xml_parse(const char *text, size_t length, vigil_xml_docume
         p.pos = 3U;
     }
 
-    /* XML declaration */
     xml_skip_whitespace(&p);
-    if (!xml_parse_declaration(&p, doc))
+    if (!xml_parse_declaration(&p, doc) || !xml_skip_prolog(&p))
     {
         vigil_xml_document_free(doc);
         return VIGIL_STATUS_SYNTAX_ERROR;
     }
 
-    /* Skip leading comments, PIs, whitespace */
-    for (;;)
-    {
-        xml_skip_whitespace(&p);
-        if (xml_match_str(&p, "<!--"))
-        {
-            if (!xml_skip_comment(&p))
-            {
-                vigil_xml_document_free(doc);
-                return VIGIL_STATUS_SYNTAX_ERROR;
-            }
-            continue;
-        }
-        if (xml_match_str(&p, "<?"))
-        {
-            if (!xml_skip_pi(&p))
-            {
-                vigil_xml_document_free(doc);
-                return VIGIL_STATUS_SYNTAX_ERROR;
-            }
-            continue;
-        }
-        if (xml_match_str(&p, "<!DOCTYPE"))
-        {
-            if (!xml_skip_doctype(&p))
-            {
-                xml_set_error(&p, "unterminated DOCTYPE");
-                vigil_xml_document_free(doc);
-                return VIGIL_STATUS_SYNTAX_ERROR;
-            }
-            continue;
-        }
-        break;
-    }
-
-    /* Root element */
     if (xml_eof(&p) || xml_peek(&p) != '<')
     {
         xml_set_error(&p, "expected root element");
@@ -791,26 +803,10 @@ vigil_status_t vigil_xml_parse(const char *text, size_t length, vigil_xml_docume
         return VIGIL_STATUS_SYNTAX_ERROR;
     }
     doc->root = xml_parse_element(&p);
-    if (doc->root == NULL)
+    if (doc->root == NULL || !xml_skip_trailing(&p))
     {
         vigil_xml_document_free(doc);
         return VIGIL_STATUS_SYNTAX_ERROR;
-    }
-
-    /* Skip trailing whitespace/comments */
-    for (;;)
-    {
-        xml_skip_whitespace(&p);
-        if (xml_match_str(&p, "<!--"))
-        {
-            if (!xml_skip_comment(&p))
-            {
-                vigil_xml_document_free(doc);
-                return VIGIL_STATUS_SYNTAX_ERROR;
-            }
-            continue;
-        }
-        break;
     }
 
     *out_document = doc;

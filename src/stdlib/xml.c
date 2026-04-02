@@ -136,8 +136,7 @@ static vigil_status_t xml_doc_parse(vigil_vm_t *vm, size_t arg_count, vigil_erro
         status = xml_push_string(vm, "", error);
         if (status != VIGIL_STATUS_OK)
             return status;
-        return xml_push_err(vm, "xml.parse() requires a string argument", 38U,
-                                        error);
+        return xml_push_err(vm, "xml.parse() requires a string argument", 38U, error);
     }
     text = vigil_string_object_c_str(text_obj);
     text_len = vigil_string_object_length(text_obj);
@@ -153,8 +152,7 @@ static vigil_status_t xml_doc_parse(vigil_vm_t *vm, size_t arg_count, vigil_erro
     }
 
     vigil_value_init_int(&fields[DOC_FIELD_PTR], (int64_t)(uintptr_t)doc);
-    status =
-        vigil_instance_object_new(vigil_vm_runtime(vm), class_index, fields, DOC_FIELD_COUNT, &instance, error);
+    status = vigil_instance_object_new(vigil_vm_runtime(vm), class_index, fields, DOC_FIELD_COUNT, &instance, error);
     if (status != VIGIL_STATUS_OK)
     {
         vigil_xml_document_free(doc);
@@ -475,16 +473,22 @@ static const vigil_native_symbol_doc_t xml_elem_doc = {"XML element.", "Represen
 static const vigil_native_symbol_doc_t xml_parse_doc = {"Parse XML text.",
                                                         "Parses a string as XML and returns a Document.", NULL};
 static const vigil_native_symbol_doc_t xml_root_doc = {"Get root element.", "Returns the document root element.", NULL};
-static const vigil_native_symbol_doc_t xml_version_doc = {"Get XML version.", "Returns the version from the XML declaration.", NULL};
-static const vigil_native_symbol_doc_t xml_encoding_doc = {"Get encoding.", "Returns the encoding from the XML declaration.", NULL};
-static const vigil_native_symbol_doc_t xml_to_string_doc = {"Serialize to XML.", "Returns the document as an XML string.", NULL};
+static const vigil_native_symbol_doc_t xml_version_doc = {"Get XML version.",
+                                                          "Returns the version from the XML declaration.", NULL};
+static const vigil_native_symbol_doc_t xml_encoding_doc = {"Get encoding.",
+                                                           "Returns the encoding from the XML declaration.", NULL};
+static const vigil_native_symbol_doc_t xml_to_string_doc = {"Serialize to XML.",
+                                                            "Returns the document as an XML string.", NULL};
 static const vigil_native_symbol_doc_t xml_tag_doc = {"Get tag name.", "Returns the element tag name.", NULL};
 static const vigil_native_symbol_doc_t xml_text_doc = {"Get text content.", "Returns the direct text content.", NULL};
 static const vigil_native_symbol_doc_t xml_all_text_doc = {"Get all text.", "Returns recursive text content.", NULL};
-static const vigil_native_symbol_doc_t xml_attr_doc = {"Get attribute.", "Returns the attribute value and whether it exists.", NULL};
+static const vigil_native_symbol_doc_t xml_attr_doc = {"Get attribute.",
+                                                       "Returns the attribute value and whether it exists.", NULL};
 static const vigil_native_symbol_doc_t xml_children_doc = {"Get children.", "Returns all child elements.", NULL};
-static const vigil_native_symbol_doc_t xml_children_by_tag_doc = {"Get children by tag.", "Returns child elements matching the tag.", NULL};
-static const vigil_native_symbol_doc_t xml_child_doc = {"Get first child by tag.", "Returns the first child with the given tag.", NULL};
+static const vigil_native_symbol_doc_t xml_children_by_tag_doc = {"Get children by tag.",
+                                                                  "Returns child elements matching the tag.", NULL};
+static const vigil_native_symbol_doc_t xml_child_doc = {"Get first child by tag.",
+                                                        "Returns the first child with the given tag.", NULL};
 
 static const vigil_native_symbol_doc_t xml_doc_ptr_doc = {"Internal pointer.", "Opaque document handle.", NULL};
 static const vigil_native_symbol_doc_t xml_elem_ptr_doc = {"Internal pointer.", "Opaque element handle.", NULL};
@@ -512,8 +516,7 @@ static const vigil_native_class_method_t xml_doc_methods[] = {
 
 static const vigil_native_class_method_t xml_elem_methods[] = {
     {"tag", 3U, xml_elem_tag, 0U, NULL, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, 0U, 0, NULL, NULL, NULL, &xml_tag_doc},
-    {"text", 4U, xml_elem_text, 0U, NULL, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, 0U, 0, NULL, NULL, NULL,
-     &xml_text_doc},
+    {"text", 4U, xml_elem_text, 0U, NULL, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, 0U, 0, NULL, NULL, NULL, &xml_text_doc},
     {"all_text", 8U, xml_elem_all_text, 0U, NULL, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, 0U, 0, NULL, NULL, NULL,
      &xml_all_text_doc},
     {"attr", 4U, xml_elem_attr, 1U, str_param, VIGIL_TYPE_STRING, 2U, str_bool_returns, 0, NULL, 0U, 0,
