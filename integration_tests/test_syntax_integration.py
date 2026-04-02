@@ -388,6 +388,54 @@ class DocsConformanceTest(unittest.TestCase):
             self.assertEqual(result.returncode, 200, msg=result.stderr)
             self.assertEqual(result.stderr, "")
 
+    def test_for_in_string_iteration(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="vigil_syntax_") as tmpdir:
+            root = Path(tmpdir)
+            write_sources(root, {"main.vigil": """
+                fn main() -> i32 {
+                    // ASCII iteration
+                    i32 count = 0;
+                    for ch in "hello" {
+                        count += 1;
+                    }
+                    if count != 5 { return 1; }
+
+                    // Unicode codepoint iteration
+                    i32 ucount = 0;
+                    for ch in "héllo" {
+                        ucount += 1;
+                    }
+                    if ucount != 5 { return 2; }
+
+                    // Empty string
+                    i32 ecount = 0;
+                    for ch in "" {
+                        ecount += 1;
+                    }
+                    if ecount != 0 { return 3; }
+
+                    // Byte iteration via .bytes()
+                    i32 bcount = 0;
+                    for b in "hi".bytes() {
+                        bcount += 1;
+                    }
+                    if bcount != 2 { return 4; }
+
+                    // break in string iteration
+                    i32 bk = 0;
+                    for ch in "abcdef" {
+                        if ch == "d" { break; }
+                        bk += 1;
+                    }
+                    if bk != 3 { return 5; }
+
+                    return 0;
+                }
+            """})
+            result = run_vigil(root, "main.vigil")
+            self.assertEqual(result.returncode, 0, msg=result.stderr)
+            self.assertEqual(result.stderr, "")
+
     # -- switch and enum --
 
     def test_switch_with_enum(self) -> None:

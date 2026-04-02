@@ -13,7 +13,7 @@
 #define VIGIL_REG_CACHE_STATE_BUILDING 1LL
 #define VIGIL_REG_CACHE_STATE_READY 2LL
 
-static const char *const kVigilOpcodeNames[VIGIL_OPCODE_MULTIPLY_F64_STORE + 1] = {
+static const char *const kVigilOpcodeNames[VIGIL_OPCODE_STRING_NEXT_CHAR + 1] = {
     [VIGIL_OPCODE_CONSTANT] = "CONSTANT",
     [VIGIL_OPCODE_NIL] = "NIL",
     [VIGIL_OPCODE_TRUE] = "TRUE",
@@ -203,6 +203,7 @@ static const char *const kVigilOpcodeNames[VIGIL_OPCODE_MULTIPLY_F64_STORE + 1] 
     [VIGIL_OPCODE_ADD_F64_STORE] = "ADD_F64_STORE",
     [VIGIL_OPCODE_SUBTRACT_F64_STORE] = "SUBTRACT_F64_STORE",
     [VIGIL_OPCODE_MULTIPLY_F64_STORE] = "MULTIPLY_F64_STORE",
+    [VIGIL_OPCODE_STRING_NEXT_CHAR] = "STRING_NEXT_CHAR",
 };
 
 static vigil_status_t vigil_chunk_append_text(vigil_string_t *output, const char *text, vigil_error_t *error);
@@ -666,7 +667,7 @@ static int vigil_chunk_is_forloop_opcode(vigil_opcode_t opcode)
 static int vigil_chunk_is_u32_operand_opcode(vigil_opcode_t opcode)
 {
     /* Lookup table avoids a long OR-chain that inflates cyclomatic complexity. */
-    static const uint8_t table[VIGIL_OPCODE_MULTIPLY_F64_STORE + 1] = {
+    static const uint8_t table[VIGIL_OPCODE_STRING_NEXT_CHAR + 1] = {
         [VIGIL_OPCODE_CONSTANT] = 1,
         [VIGIL_OPCODE_GET_LOCAL] = 1,
         [VIGIL_OPCODE_SET_LOCAL] = 1,
@@ -1262,7 +1263,7 @@ vigil_source_span_t vigil_chunk_span_at(const vigil_chunk_t *chunk, size_t offse
 
 const char *vigil_opcode_name(vigil_opcode_t opcode)
 {
-    if (opcode > VIGIL_OPCODE_MULTIPLY_F64_STORE)
+    if (opcode > VIGIL_OPCODE_STRING_NEXT_CHAR)
     {
         return "UNKNOWN";
     }

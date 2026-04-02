@@ -610,6 +610,7 @@ static size_t stack_op_size(const uint8_t *code, size_t ip, size_t code_size)
     case VIGIL_OPCODE_STRING_TRIM_PREFIX:
     case VIGIL_OPCODE_STRING_TRIM_SUFFIX:
     case VIGIL_OPCODE_STRING_JOIN:
+    case VIGIL_OPCODE_STRING_NEXT_CHAR:
     case VIGIL_OPCODE_STRING_CUT:
     case VIGIL_OPCODE_STRING_FIELDS:
     case VIGIL_OPCODE_STRING_EQUAL_FOLD:
@@ -2600,6 +2601,17 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
         }
         case VIGIL_OPCODE_STRING_CHAR_AT: {
             /* Pop 2 (str, idx), push 2 (char, err). */
+            SYNC_PACK(2);
+            uint8_t arg = vs_pop(&vs);
+            uint8_t str = vs_pop(&vs);
+            uint8_t result_base;
+            PUSH_RESULT_REGS(str, 2, result_base);
+            TR_EMIT(vigil_reg_abc(VREG_STRING_OP, result_base, arg, op));
+            ip += 1;
+            break;
+        }
+        case VIGIL_OPCODE_STRING_NEXT_CHAR: {
+            /* Pop 2 (str, offset), push 2 (char, next_offset). */
             SYNC_PACK(2);
             uint8_t arg = vs_pop(&vs);
             uint8_t str = vs_pop(&vs);
@@ -5011,6 +5023,11 @@ r_dispatch_switch_check:
             pop_count = 2;
             helper_ret_count = 2;
             status = vigil_vm_op_string_char_at(vm, frame, error);
+            break;
+        case VIGIL_OPCODE_STRING_NEXT_CHAR:
+            pop_count = 2;
+            helper_ret_count = 2;
+            status = vigil_vm_op_string_next_char(vm, frame, error);
             break;
         case VIGIL_OPCODE_STRING_TRIM:
         case VIGIL_OPCODE_STRING_TO_UPPER:
