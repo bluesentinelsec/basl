@@ -64,6 +64,7 @@ extern "C"
 #endif
     extern VIGIL_API const vigil_native_module_t vigil_stdlib_unsafe;
     extern VIGIL_API const vigil_native_module_t vigil_stdlib_url;
+    extern VIGIL_API const vigil_native_module_t vigil_stdlib_xml;
     extern VIGIL_API const vigil_native_module_t vigil_stdlib_yaml;
 
     /* ── Table-driven stdlib registry ───────────────────────────────── */
@@ -102,6 +103,7 @@ extern "C"
             VIGIL_STDLIB_TIME_ENTRY                                                                                    \
             {"unsafe",   6U, &vigil_stdlib_unsafe},                                                                    \
             {"url",      3U, &vigil_stdlib_url},                                                                       \
+            {"xml",      3U, &vigil_stdlib_xml},                                                                       \
             {"yaml",     4U, &vigil_stdlib_yaml},                                                                      \
         }
     // clang-format on
