@@ -298,6 +298,8 @@ TEST(PluginRegistry, SdlExportsCameraClipboardAndBindingsBatchFunctions)
     mod = vigil_native_registry_find(&natives, "sdl", 3U);
     EXPECT_NE(mod, NULL);
     EXPECT_NE(FindModuleFunction(mod, "get_camera_supported_formats"), NULL);
+    EXPECT_NE(FindModuleFunction(mod, "get_cameras"), NULL);
+    EXPECT_NE(FindModuleFunction(mod, "get_gamepads"), NULL);
     EXPECT_NE(FindModuleFunction(mod, "get_clipboard_data"), NULL);
     EXPECT_NE(FindModuleFunction(mod, "set_clipboard_data"), NULL);
 
@@ -308,6 +310,8 @@ TEST(PluginRegistry, SdlExportsCameraClipboardAndBindingsBatchFunctions)
     gamepad_class = FindModuleClass(mod, "Gamepad");
     EXPECT_NE(gamepad_class, NULL);
     EXPECT_NE(FindClassMethod(gamepad_class, "get_bindings"), NULL);
+    EXPECT_NE(FindClassMethod(gamepad_class, "get_guid"), NULL);
+    EXPECT_NE(FindClassMethod(gamepad_class, "get_power_info"), NULL);
 
     camera_class = FindModuleClass(mod, "Camera");
     EXPECT_NE(camera_class, NULL);
@@ -402,6 +406,32 @@ TEST(PluginRegistry, SdlCameraFormatHelpersViaVM)
     EXPECT_EQ(result, 0);
 }
 
+TEST(PluginRegistry, SdlDeviceListingHelpersViaVM)
+{
+    int64_t result;
+
+    if (!vigil_plugin_is_known_module("sdl", 3U))
+        return;
+
+    result = RunWithPlugins(vigil_test_failed_, "import \"sdl\";\n"
+                                                "fn main() -> i32 {\n"
+                                                "    string cameras = sdl.get_cameras();\n"
+                                                "    string pads = sdl.get_gamepads();\n"
+                                                "    string mimes = sdl.get_clipboard_mime_types();\n"
+                                                "    if (cameras.len() < 0) {\n"
+                                                "        return 1;\n"
+                                                "    }\n"
+                                                "    if (pads.len() < 0) {\n"
+                                                "        return 2;\n"
+                                                "    }\n"
+                                                "    if (mimes.len() < 0) {\n"
+                                                "        return 3;\n"
+                                                "    }\n"
+                                                "    return 0;\n"
+                                                "}\n");
+    EXPECT_EQ(result, 0);
+}
+
 #endif /* VIGIL_PLUGIN_COUNT > 0 */
 
 /* ── registration ────────────────────────────────────────────────── */
@@ -423,5 +453,6 @@ void register_plugin_tests(void)
     REGISTER_TEST(PluginRegistry, SdlGuidHelpersViaVM);
     REGISTER_TEST(PluginRegistry, SdlEnvironmentHelpersViaVM);
     REGISTER_TEST(PluginRegistry, SdlCameraFormatHelpersViaVM);
+    REGISTER_TEST(PluginRegistry, SdlDeviceListingHelpersViaVM);
 #endif
 }

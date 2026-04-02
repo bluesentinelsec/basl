@@ -1763,6 +1763,47 @@ static void sdl_refresh_gamepad_list(void)
     g_gamepad_ids = SDL_GetGamepads(&g_gamepad_count);
 }
 
+static vigil_status_t sdl_fn_get_gamepads(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    SDL_JoystickID *ids = NULL;
+    int count = 0;
+    char *joined = NULL;
+    size_t joined_len = 0;
+    size_t joined_cap = 0;
+    vigil_status_t st = VIGIL_STATUS_OK;
+
+    vigil_vm_stack_pop_n(vm, arg_count);
+    ids = SDL_GetGamepads(&count);
+    if (!ids || count <= 0)
+        return sdl_push_string(vm, "", error);
+
+    for (int i = 0; i < count; i++)
+    {
+        SDL_JoystickID id = ids[i];
+        const char *name = SDL_GetGamepadNameForID(id);
+        const char *path = SDL_GetGamepadPathForID(id);
+        int player_index = SDL_GetGamepadPlayerIndexForID(id);
+        SDL_GamepadType type = SDL_GetGamepadTypeForID(id);
+
+        if (joined_len > 0 && sdl_append_bytes(&joined, &joined_len, &joined_cap, "\n", 1U) != 0)
+            goto oom;
+        if (sdl_append_format(&joined, &joined_len, &joined_cap, "%d,%s,%d,%d,%s", (int)id, name ? name : "", (int)type,
+                              player_index, path ? path : "") != 0)
+            goto oom;
+    }
+
+    st = sdl_push_string(vm, joined ? joined : "", error);
+    SDL_free(ids);
+    free(joined);
+    return st;
+
+oom:
+    SDL_free(ids);
+    free(joined);
+    vigil_error_set_literal(error, VIGIL_STATUS_OUT_OF_MEMORY, "out of memory");
+    return VIGIL_STATUS_OUT_OF_MEMORY;
+}
+
 /* sdl.get_gamepad_count() -> i32 */
 static vigil_status_t sdl_fn_get_gamepad_count(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
 {
@@ -3757,6 +3798,26 @@ static vigil_status_t sdl_gamepad_get_power_percent(vigil_vm_t *vm, size_t arg_c
     return sdl_push_i32(vm, (int32_t)percent, error);
 }
 
+static vigil_status_t sdl_gamepad_get_power_info(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, GP_HANDLE);
+    int percent = -1;
+    SDL_PowerState state = SDL_POWERSTATE_ERROR;
+    SDL_Gamepad *gp = NULL;
+    vigil_status_t st = VIGIL_STATUS_OK;
+
+    vigil_vm_stack_pop_n(vm, arg_count);
+    gp = (SDL_Gamepad *)SDL_HANDLE_GET(gamepads, h);
+    if (gp)
+        state = SDL_GetGamepadPowerInfo(gp, &percent);
+
+    st = sdl_push_i32(vm, (int32_t)state, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_i32(vm, (int32_t)percent, error);
+}
+
 static vigil_status_t sdl_gamepad_set_led(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
 {
     size_t base = vigil_vm_stack_depth(vm) - arg_count;
@@ -4873,6 +4934,45 @@ static vigil_status_t sdl_fn_get_camera_count(vigil_vm_t *vm, size_t arg_count, 
     }
     g_camera_ids = SDL_GetCameras(&g_camera_count);
     return sdl_push_i32(vm, (int32_t)g_camera_count, error);
+}
+
+static vigil_status_t sdl_fn_get_cameras(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    SDL_CameraID *ids = NULL;
+    int count = 0;
+    char *joined = NULL;
+    size_t joined_len = 0;
+    size_t joined_cap = 0;
+    vigil_status_t st = VIGIL_STATUS_OK;
+
+    vigil_vm_stack_pop_n(vm, arg_count);
+    ids = SDL_GetCameras(&count);
+    if (!ids || count <= 0)
+        return sdl_push_string(vm, "", error);
+
+    for (int i = 0; i < count; i++)
+    {
+        SDL_CameraID id = ids[i];
+        const char *name = SDL_GetCameraName(id);
+        SDL_CameraPosition position = SDL_GetCameraPosition(id);
+
+        if (joined_len > 0 && sdl_append_bytes(&joined, &joined_len, &joined_cap, "\n", 1U) != 0)
+            goto oom;
+        if (sdl_append_format(&joined, &joined_len, &joined_cap, "%d,%s,%d", (int)id, name ? name : "",
+                              (int)position) != 0)
+            goto oom;
+    }
+
+    st = sdl_push_string(vm, joined ? joined : "", error);
+    SDL_free(ids);
+    free(joined);
+    return st;
+
+oom:
+    SDL_free(ids);
+    free(joined);
+    vigil_error_set_literal(error, VIGIL_STATUS_OUT_OF_MEMORY, "out of memory");
+    return VIGIL_STATUS_OUT_OF_MEMORY;
 }
 
 static vigil_status_t sdl_fn_get_camera_name(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
@@ -14400,22 +14500,33 @@ static vigil_status_t sdl_fn_get_clipboard_mime_types(vigil_vm_t *vm, size_t arg
     vigil_vm_stack_pop_n(vm, arg_count);
     size_t count = 0;
     char **types = SDL_GetClipboardMimeTypes(&count);
+    char *joined = NULL;
+    size_t joined_len = 0;
+    size_t joined_cap = 0;
+    vigil_status_t st = VIGIL_STATUS_OK;
+
     if (!types || count == 0)
         return sdl_push_string(vm, "", error);
-    char buf[2048] = {0};
-    size_t off = 0;
-    for (size_t i = 0; i < count && off < sizeof(buf) - 1; i++)
+
+    for (size_t i = 0; i < count; i++)
     {
-        if (i > 0 && off < sizeof(buf) - 1)
-            buf[off++] = ',';
-        size_t len = strlen(types[i]);
-        if (off + len >= sizeof(buf))
-            break;
-        memcpy(buf + off, types[i], len);
-        off += len;
+        const char *type = types[i] ? types[i] : "";
+        if (i > 0 && sdl_append_bytes(&joined, &joined_len, &joined_cap, ",", 1U) != 0)
+            goto oom;
+        if (sdl_append_cstr(&joined, &joined_len, &joined_cap, type) != 0)
+            goto oom;
     }
+
+    st = sdl_push_string(vm, joined ? joined : "", error);
     SDL_free(types);
-    return sdl_push_string(vm, buf, error);
+    free(joined);
+    return st;
+
+oom:
+    SDL_free(types);
+    free(joined);
+    vigil_error_set_literal(error, VIGIL_STATUS_OUT_OF_MEMORY, "out of memory");
+    return VIGIL_STATUS_OUT_OF_MEMORY;
 }
 
 static vigil_status_t sdl_fn_set_tray_icon(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
@@ -14663,6 +14774,24 @@ oom:
     free(joined);
     vigil_error_set_literal(error, VIGIL_STATUS_OUT_OF_MEMORY, "out of memory");
     return VIGIL_STATUS_OUT_OF_MEMORY;
+}
+
+static vigil_status_t sdl_gamepad_get_guid(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t handle = sdl_field_i64(vm, base, GP_HANDLE);
+    SDL_Gamepad *gamepad = NULL;
+    SDL_JoystickID id = 0;
+    char buf[64] = {0};
+
+    vigil_vm_stack_pop_n(vm, arg_count);
+    gamepad = (SDL_Gamepad *)SDL_HANDLE_GET(gamepads, handle);
+    if (!gamepad)
+        return sdl_push_string(vm, "", error);
+
+    id = SDL_GetGamepadID(gamepad);
+    SDL_GUIDToString(SDL_GetGamepadGUIDForID(id), buf, sizeof(buf));
+    return sdl_push_string(vm, buf, error);
 }
 
 static vigil_status_t sdl_fn_calculate_gpu_texture_format_size(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
@@ -15289,7 +15418,6 @@ static const char *const sdl_window_rects_param_names[] = {"rects", "count"};
 static const char *const sdl_clipboard_mime_param_names[] = {"mime_type"};
 static const char *const sdl_clipboard_set_param_names[] = {"mime_type", "buffer", "size"};
 static const char *const sdl_camera_index_param_names[] = {"camera_index"};
-
 static const vigil_native_symbol_doc_t sdl_doc_create_window_with_properties = {
     "Create a window from an SDL property bag.",
     "Pass a properties ID configured with SDL window creation keys such as title, size, and flags.",
@@ -15371,6 +15499,12 @@ static const vigil_native_symbol_doc_t sdl_doc_get_camera_supported_formats = {
     "string specs = sdl.get_camera_supported_formats(0)",
 };
 
+static const vigil_native_symbol_doc_t sdl_doc_get_cameras = {
+    "List enumerated camera devices in a compact newline-separated form.",
+    "Each line is instance_id,name,position using SDL camera position constants.",
+    "string cameras = sdl.get_cameras()",
+};
+
 static const vigil_native_symbol_doc_t sdl_doc_camera_get_spec = {
     "Return the active camera format specification.",
     "Returns six i32 values in order: pixel format, colorspace, width, height, fps numerator, fps denominator.",
@@ -15381,6 +15515,24 @@ static const vigil_native_symbol_doc_t sdl_doc_gamepad_get_bindings = {
     "Describe the current SDL gamepad bindings for one opened controller.",
     "Each line summarizes one SDL_GamepadBinding using a practical textual form for debugging and tooling.",
     "string bindings = pad.get_bindings()",
+};
+
+static const vigil_native_symbol_doc_t sdl_doc_get_gamepads = {
+    "List connected gamepads in a compact newline-separated form.",
+    "Each line is instance_id,name,type,player_index,path using SDL gamepad type constants.",
+    "string pads = sdl.get_gamepads()",
+};
+
+static const vigil_native_symbol_doc_t sdl_doc_gamepad_get_guid = {
+    "Return the SDL GUID string for an opened gamepad.",
+    "This is equivalent to looking up the opened gamepad's instance ID and converting its GUID to text.",
+    "string guid = pad.get_guid()",
+};
+
+static const vigil_native_symbol_doc_t sdl_doc_gamepad_get_power_info = {
+    "Return the power state and battery percentage for an opened gamepad.",
+    "Returns two i32 values in order: SDL power state and percentage, with -1 when the percentage is unavailable.",
+    "i32 state, i32 percent = pad.get_power_info()",
 };
 
 static const vigil_native_symbol_doc_t sdl_doc_window_update_surface_rects = {
@@ -15572,6 +15724,8 @@ static const vigil_native_module_function_t sdl_functions[] = {
     SDL_CONST_ENTRY("AUDIO_F32", AUDIO_F32),
     /* Gamepad (slice 9) */
     SDL_FN("has_gamepad", 11U, sdl_fn_has_gamepad, 0U, NULL, VIGIL_TYPE_BOOL),
+    {"get_gamepads", 12U, sdl_fn_get_gamepads, 0U, NULL, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL,
+     NULL, &sdl_doc_get_gamepads},
     SDL_FN("get_gamepad_count", 17U, sdl_fn_get_gamepad_count, 0U, NULL, VIGIL_TYPE_I32),
     SDL_FN("get_gamepad_id", 14U, sdl_fn_get_gamepad_id, 1U, p_i32, VIGIL_TYPE_I32),
     /* Gamepad axis/button constants */
@@ -15752,6 +15906,8 @@ static const vigil_native_module_function_t sdl_functions[] = {
     SDL_CONST_ENTRY("PATHTYPE_DIRECTORY", PATHTYPE_DIRECTORY),
     /* Camera (slice 35) */
     SDL_FN("get_camera_count", 16U, sdl_fn_get_camera_count, 0U, NULL, VIGIL_TYPE_I32),
+    {"get_cameras", 11U, sdl_fn_get_cameras, 0U, NULL, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL,
+     &sdl_doc_get_cameras},
     SDL_FN("get_camera_name", 15U, sdl_fn_get_camera_name, 1U, p_i32, VIGIL_TYPE_STRING),
     SDL_FN("get_current_camera_driver", 25U, sdl_fn_get_current_camera_driver, 0U, NULL, VIGIL_TYPE_STRING),
     {"get_camera_supported_formats", 28U, sdl_fn_get_camera_supported_formats, 1U, p_i32, VIGIL_TYPE_STRING, 1U, NULL,
@@ -17030,6 +17186,8 @@ static const vigil_native_class_method_t sdl_gamepad_methods[] = {
     SDL_METHOD("connected", 9U, sdl_gamepad_connected, 0U, NULL, VIGIL_TYPE_BOOL, 1U, NULL),
     SDL_METHOD("get_type", 8U, sdl_gamepad_get_type, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL),
     SDL_METHOD("get_power_percent", 17U, sdl_gamepad_get_power_percent, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL),
+    {"get_power_info", 14U, sdl_gamepad_get_power_info, 0U, NULL, VIGIL_TYPE_I32, 2U, rt_i32_i32, 0, NULL, 0U, 0, NULL,
+     NULL, NULL, &sdl_doc_gamepad_get_power_info},
     SDL_METHOD("set_led", 7U, sdl_gamepad_set_led, 3U, p_i32_i32_i32, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
     SDL_METHOD("rumble_triggers", 15U, sdl_gamepad_rumble_triggers, 3U, p_i32_i32_i32, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
     SDL_METHOD("has_axis", 8U, sdl_gamepad_has_axis, 1U, p_i32, VIGIL_TYPE_BOOL, 1U, NULL),
@@ -17044,6 +17202,8 @@ static const vigil_native_class_method_t sdl_gamepad_methods[] = {
     SDL_METHOD("get_firmware_version", 20U, sdl_gamepad_get_firmware_version, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL),
     SDL_METHOD("get_player_index", 16U, sdl_gamepad_get_player_index, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL),
     SDL_METHOD("set_player_index", 16U, sdl_gamepad_set_player_index, 1U, p_i32, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
+    {"get_guid", 8U, sdl_gamepad_get_guid, 0U, NULL, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, 0U, 0, NULL, NULL, NULL,
+     &sdl_doc_gamepad_get_guid},
     SDL_METHOD("get_steam_handle", 16U, sdl_gamepad_get_steam_handle, 0U, NULL, VIGIL_TYPE_I64, 1U, NULL),
     SDL_METHOD("get_connection_state", 20U, sdl_gamepad_get_connection_state, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL),
     SDL_METHOD("get_real_type", 13U, sdl_gamepad_get_real_type, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL),
