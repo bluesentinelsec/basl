@@ -40,8 +40,15 @@
 #ifndef VIGIL_NANBOX_H
 #define VIGIL_NANBOX_H
 
+#include <limits.h>
 #include <stdint.h>
 #include <string.h>
+
+/* ── Portability assertions ──────────────────────────────────────── */
+
+_Static_assert(CHAR_BIT == 8, "VIGIL requires 8-bit bytes");
+_Static_assert(sizeof(double) == 8, "VIGIL requires IEEE 754 binary64 doubles");
+_Static_assert(sizeof(void *) <= 8, "VIGIL NaN-boxing requires pointer width <= 64 bits");
 
 /* ── Bit constants ───────────────────────────────────────────────── */
 
