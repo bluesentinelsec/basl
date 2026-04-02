@@ -89,6 +89,7 @@ add_library(vigil_core OBJECT
     src/compiler_typeparsing.c
     src/compiler_declarations.c
     src/compiler_types.c
+    src/coverage.c
     src/diagnostic.c
     src/gc.c
     src/json.c

@@ -136,6 +136,7 @@ const vigil_object_t *vigil_function_object_sibling(const vigil_object_t *functi
 const vigil_object_t *vigil_function_object_resolve_interface_method(const vigil_object_t *function, size_t class_index,
                                                                      size_t interface_index, size_t method_index);
 int vigil_function_object_get_global(const vigil_object_t *function, size_t index, vigil_value_t *out_value);
+size_t vigil_function_object_global_count(const vigil_object_t *function);
 vigil_status_t vigil_function_object_set_global(const vigil_object_t *function, size_t index,
                                                 const vigil_value_t *value, vigil_error_t *error);
 int vigil_function_object_get_class_field(const vigil_object_t *function, size_t class_index, size_t field_index,

@@ -840,6 +840,8 @@ vigil test                     # discover and run *_test.vigil files
 vigil test path/to/test.vigil   # run a specific test file
 vigil test -v                  # verbose output
 vigil test -run pattern        # filter by test name
+vigil test --coverage         # line + branch coverage for project source files
+vigil test --coverage --format json
 ```
 
 In a project, `vigil test` defaults to the `test/` directory.

@@ -54,7 +54,7 @@ Type-check a program without running it:
 | `vigil lsp` | Start the Language Server Protocol server |
 | `vigil version` | Print version information |
 | `vigil embed` | Embed files as generated VIGIL source |
-| `vigil test` | Discover and run `*_test.vigil` files |
+| `vigil test` | Discover and run `*_test.vigil` files, with optional built-in coverage reporting |
 | `vigil get` | Sync, install, or remove dependencies |
 | `vigil editor` | Manage editor integrations |
 | `vigil profile` | Print compile/runtime timing and memory stats |

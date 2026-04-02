@@ -1,5 +1,6 @@
 """Integration tests for vigil test."""
 
+import json
 import os
 import subprocess
 import tempfile
@@ -29,6 +30,23 @@ class TestVigilTest(unittest.TestCase):
         with open(path, "w") as f:
             f.write(content)
         return path
+
+    def _write_coverage_project(self):
+        self._write("vigil.toml", '[project]\nname = "coverage"\n')
+        self._write("lib/helper.vigil",
+            'pub fn classify(i32 value) -> i32 {\n'
+            '    if value > 0 {\n'
+            '        return 1;\n'
+            '    }\n'
+            '    return 0;\n'
+            '}\n')
+        test_path = self._write("test/helper_test.vigil",
+            'import "test";\n'
+            'import "helper" as helper;\n'
+            'fn test_classify(test.T t) -> void {\n'
+            '    t.assert(helper.classify(1) == 1, "positive");\n'
+            '}\n')
+        return test_path
 
     def test_passing(self):
         self._write("pass_test.vigil",
@@ -172,6 +190,72 @@ class TestVigilTest(unittest.TestCase):
         r = run_test("--help")
         self.assertEqual(r.returncode, 0)
         self.assertIn("Usage:", r.stdout)
+
+    def test_coverage_summary(self):
+        test_path = self._write_coverage_project()
+        r = run_test("--coverage", test_path)
+        self.assertEqual(r.returncode, 0, msg=f"stdout:\n{r.stdout}\nstderr:\n{r.stderr}")
+        self.assertIn("coverage: 1 files, 1 test files", r.stdout)
+        self.assertIn("helper.vigil", r.stdout)
+        self.assertIn("66.7% lines (2/3)", r.stdout)
+        self.assertIn("50.0% branches (1/2)", r.stdout)
+
+    def test_coverage_verbose_lists_uncovered_details(self):
+        test_path = self._write_coverage_project()
+        r = run_test("--coverage", "--verbose", test_path)
+        self.assertEqual(r.returncode, 0, msg=f"stdout:\n{r.stdout}\nstderr:\n{r.stderr}")
+        self.assertIn("line 5: not covered", r.stdout)
+        self.assertIn("line 2: true branch not taken", r.stdout)
+
+    def test_coverage_json(self):
+        test_path = self._write_coverage_project()
+        r = run_test("--coverage", "--format", "json", test_path)
+        self.assertEqual(r.returncode, 0, msg=f"stdout:\n{r.stdout}\nstderr:\n{r.stderr}")
+        payload = json.loads(r.stdout)
+        self.assertEqual(len(payload["files"]), 1)
+        self.assertEqual(payload["files"][0]["lines"]["covered"], 2)
+        self.assertEqual(payload["files"][0]["lines"]["total"], 3)
+        self.assertEqual(payload["files"][0]["branches"]["covered"], 1)
+        self.assertEqual(payload["files"][0]["branches"]["total"], 2)
+        self.assertEqual(payload["files"][0]["uncovered_lines"], [5])
+        self.assertEqual(payload["files"][0]["missed_branches"][0]["line"], 2)
+        self.assertIn("PASS: 1 passed", r.stderr)
+
+    def test_coverage_min_threshold_fails(self):
+        test_path = self._write_coverage_project()
+        r = run_test("--coverage", "--min-coverage", "80", test_path)
+        self.assertEqual(r.returncode, 1, msg=f"stdout:\n{r.stdout}\nstderr:\n{r.stderr}")
+        self.assertIn("coverage threshold not met: 66.7% < 80.0%", r.stdout)
+
+    def test_coverage_include_deps(self):
+        self._write("vigil.toml", '[project]\nname = "coverage"\n')
+        external_root = tempfile.mkdtemp()
+        shared_root = os.path.join(external_root, "shared")
+        os.makedirs(shared_root, exist_ok=True)
+        with open(os.path.join(shared_root, "helper.vigil"), "w") as f:
+            f.write(
+                'pub fn external() -> i32 {\n'
+                '    if true {\n'
+                '        return 7;\n'
+                '    }\n'
+                '    return 0;\n'
+                '}\n'
+            )
+        import_path = os.path.relpath(os.path.join(shared_root, "helper"), os.path.join(self.tmpdir, "test"))
+        test_path = self._write("test/dep_test.vigil",
+            'import "test";\n'
+            f'import "{import_path}" as helper;\n'
+            'fn test_dep(test.T t) -> void {\n'
+            '    t.assert(helper.external() == 7, "ok");\n'
+            '}\n')
+        without_deps = run_test("--coverage", test_path)
+        self.assertEqual(without_deps.returncode, 0,
+                         msg=f"stdout:\n{without_deps.stdout}\nstderr:\n{without_deps.stderr}")
+        self.assertIn("coverage: 0 files, 1 test files", without_deps.stdout)
+        with_deps = run_test("--coverage", "--include-deps", test_path)
+        self.assertEqual(with_deps.returncode, 0, msg=f"stdout:\n{with_deps.stdout}\nstderr:\n{with_deps.stderr}")
+        self.assertIn("coverage: 1 files, 1 test files", with_deps.stdout)
+        self.assertIn("shared/helper.vigil", with_deps.stdout)
 
 
 if __name__ == "__main__":

@@ -10,6 +10,7 @@
 #endif
 
 #include "internal/vigil_cli_frontend.h"
+#include "internal/vigil_coverage.h"
 #include "platform/platform.h"
 #include "vigil/stdlib.h"
 #include "vigil/vigil.h"
@@ -39,8 +40,20 @@ typedef struct
 typedef struct
 {
     int verbose;
+    int coverage;
+    int include_deps;
+    int min_coverage_set;
+    double min_coverage;
+    vigil_coverage_output_format_t coverage_format;
     const char *filter;
 } test_options_t;
+
+static FILE *test_output_stream(const test_options_t *options)
+{
+    if (options != NULL && options->coverage && options->coverage_format == VIGIL_COVERAGE_OUTPUT_JSON)
+        return stderr;
+    return stdout;
+}
 
 static vigil_status_t dir_list_cb(const char *name, int is_dir, void *ud)
 {
@@ -325,8 +338,36 @@ static void format_first_diagnostic_message(const vigil_source_registry_t *regis
     vigil_string_free(&line);
 }
 
+static const char *test_scope_root(const char *test_file_path, const char *project_root, char *buffer,
+                                   size_t buffer_size)
+{
+    size_t length;
+
+    if (project_root != NULL)
+        return project_root;
+    if (test_file_path == NULL || buffer == NULL || buffer_size == 0U)
+        return NULL;
+
+    length = strlen(test_file_path);
+    if (length + 1U > buffer_size)
+        return NULL;
+    memcpy(buffer, test_file_path, length + 1U);
+    while (length > 0U && buffer[length - 1U] != '/' && buffer[length - 1U] != '\\')
+        length -= 1U;
+    if (length == 0U)
+    {
+        snprintf(buffer, buffer_size, ".");
+        return buffer;
+    }
+    while (length > 1U && (buffer[length - 1U] == '/' || buffer[length - 1U] == '\\'))
+        length -= 1U;
+    buffer[length] = '\0';
+    return buffer;
+}
+
 static int run_one_test(const char *test_file_path, const char *original_source, size_t original_length,
-                        const char *test_name, char *err_msg, size_t err_msg_size)
+                        const char *test_name, const test_options_t *options, vigil_coverage_session_t *coverage,
+                        char *err_msg, size_t err_msg_size)
 {
     vigil_runtime_t *runtime;
     vigil_vm_t *vm;
@@ -340,7 +381,9 @@ static int run_one_test(const char *test_file_path, const char *original_source,
     int exit_code;
     size_t total_length;
     char project_root[4096];
+    char scope_root_buffer[4096];
     const char *root;
+    const char *scope_root;
     char *combined;
     char *wrapper_path;
 
@@ -352,6 +395,7 @@ static int run_one_test(const char *test_file_path, const char *original_source,
     total_length = 0U;
     memset(&error, 0, sizeof(error));
     root = find_project_root(test_file_path, project_root, sizeof(project_root)) ? project_root : NULL;
+    scope_root = test_scope_root(test_file_path, root, scope_root_buffer, sizeof(scope_root_buffer));
     combined = build_test_wrapper_source(original_source, original_length, test_name, &total_length);
     wrapper_path = build_test_wrapper_path(test_file_path);
     if (combined == NULL || wrapper_path == NULL)
@@ -414,7 +458,35 @@ static int run_one_test(const char *test_file_path, const char *original_source,
         goto cleanup;
     }
 
+    if (options->coverage)
+    {
+        status = vigil_coverage_session_track_registry(coverage, &registry, scope_root, wrapper_path,
+                                                       options->include_deps, &error);
+        if (status != VIGIL_STATUS_OK)
+        {
+            snprintf(err_msg, err_msg_size, "%s", vigil_error_message(&error));
+            vigil_object_release(&function);
+            exit_code = 1;
+            goto cleanup;
+        }
+        status = vigil_coverage_session_register_function(coverage, &registry, function, &error);
+        if (status != VIGIL_STATUS_OK)
+        {
+            snprintf(err_msg, err_msg_size, "%s", vigil_error_message(&error));
+            vigil_object_release(&function);
+            exit_code = 1;
+            goto cleanup;
+        }
+        vigil_coverage_session_attach_vm(coverage, vm, &registry);
+    }
+
     status = vigil_vm_execute_function(vm, function, &result, &error);
+    if (options->coverage)
+    {
+        vigil_coverage_session_detach_vm(coverage, vm);
+        if (status == VIGIL_STATUS_OK)
+            (void)vigil_coverage_session_register_function(coverage, &registry, function, &error);
+    }
     vigil_object_release(&function);
     if (status != VIGIL_STATUS_OK)
     {
@@ -438,6 +510,11 @@ static int cmd_test_parse_args(int argc, char **argv, test_options_t *options, s
     int index;
 
     options->verbose = 0;
+    options->coverage = 0;
+    options->include_deps = 0;
+    options->min_coverage_set = 0;
+    options->min_coverage = 0.0;
+    options->coverage_format = VIGIL_COVERAGE_OUTPUT_TEXT;
     options->filter = NULL;
     for (index = 2; index < argc; index += 1)
     {
@@ -457,14 +534,68 @@ static int cmd_test_parse_args(int argc, char **argv, test_options_t *options, s
             options->filter = argv[index];
             continue;
         }
+        if (strcmp(argv[index], "--coverage") == 0)
+        {
+            options->coverage = 1;
+            continue;
+        }
+        if (strcmp(argv[index], "--include-deps") == 0)
+        {
+            options->include_deps = 1;
+            continue;
+        }
+        if (strcmp(argv[index], "--format") == 0)
+        {
+            index += 1;
+            if (index >= argc)
+            {
+                fprintf(stderr, "error: --format requires a value\n");
+                return 2;
+            }
+            if (strcmp(argv[index], "json") == 0)
+            {
+                options->coverage_format = VIGIL_COVERAGE_OUTPUT_JSON;
+                continue;
+            }
+            if (strcmp(argv[index], "text") == 0)
+            {
+                options->coverage_format = VIGIL_COVERAGE_OUTPUT_TEXT;
+                continue;
+            }
+            fprintf(stderr, "error: unsupported coverage format '%s'\n", argv[index]);
+            return 2;
+        }
+        if (strcmp(argv[index], "--min-coverage") == 0)
+        {
+            char *end;
+
+            index += 1;
+            if (index >= argc)
+            {
+                fprintf(stderr, "error: --min-coverage requires a percentage\n");
+                return 2;
+            }
+            options->min_coverage = strtod(argv[index], &end);
+            if (end == argv[index] || *end != '\0' || options->min_coverage < 0.0 || options->min_coverage > 100.0)
+            {
+                fprintf(stderr, "error: --min-coverage must be a number between 0 and 100\n");
+                return 2;
+            }
+            options->min_coverage_set = 1;
+            continue;
+        }
         if (strcmp(argv[index], "-h") == 0 || strcmp(argv[index], "--help") == 0)
         {
-            printf("Usage: vigil test [--run pattern] [-v] [path...]\n\n"
+            printf("Usage: vigil test [--run pattern] [-v] [--coverage] [path...]\n\n"
                    "Recursively finds and runs VIGIL test files (*_test.vigil).\n"
                    "In a project root, defaults to the ./test directory.\n\n"
                    "Flags:\n"
-                   "  -v, --verbose    Print passing tests\n"
-                   "  -run, --run      Filter test names by substring\n");
+                   "  -v, --verbose           Print passing tests and verbose coverage details\n"
+                   "  -run, --run             Filter test names by substring\n"
+                   "      --coverage          Collect line and branch coverage\n"
+                   "      --format            Coverage output format: text|json\n"
+                   "      --min-coverage      Fail if total line coverage is below N percent\n"
+                   "      --include-deps      Include imported user modules outside the project root\n");
             return 0;
         }
         sl_add(targets, argv[index]);
@@ -516,15 +647,19 @@ static void cmd_test_collect_files(str_list_t *targets, str_list_t *test_files)
     }
 }
 
-static void cmd_test_print_summary(int total_pass, int total_fail)
+static void cmd_test_print_summary(const test_options_t *options, int total_pass, int total_fail)
 {
+    FILE *stream;
+
+    stream = test_output_stream(options);
     if (total_fail > 0)
-        printf("\nFAIL: %d passed, %d failed\n", total_pass, total_fail);
+        fprintf(stream, "\nFAIL: %d passed, %d failed\n", total_pass, total_fail);
     else if (total_pass > 0)
-        printf("\nPASS: %d passed\n", total_pass);
+        fprintf(stream, "\nPASS: %d passed\n", total_pass);
 }
 
-static int run_test_file(const char *test_file_path, const test_options_t *options, int *total_pass, int *total_fail)
+static int run_test_file(const char *test_file_path, const test_options_t *options, vigil_coverage_session_t *coverage,
+                         int *total_pass, int *total_fail)
 {
     char *source;
     size_t source_length;
@@ -533,6 +668,7 @@ static int run_test_file(const char *test_file_path, const test_options_t *optio
     int file_failed;
     int exit_code;
     clock_t file_start;
+    FILE *stream;
 
     source = NULL;
     source_length = 0U;
@@ -541,10 +677,11 @@ static int run_test_file(const char *test_file_path, const test_options_t *optio
     file_failed = 0;
     exit_code = 0;
     file_start = clock();
+    stream = test_output_stream(options);
 
     if (vigil_platform_read_file(NULL, test_file_path, &source, &source_length, &error) != VIGIL_STATUS_OK)
     {
-        fprintf(stderr, "error: %s: %s\n", test_file_path, vigil_error_message(&error));
+        fprintf(stream, "error: %s: %s\n", test_file_path, vigil_error_message(&error));
         return 1;
     }
 
@@ -582,30 +719,30 @@ static int run_test_file(const char *test_file_path, const test_options_t *optio
 
         memset(err_msg, 0, sizeof(err_msg));
         test_start = clock();
-        result = run_one_test(test_file_path, source, source_length, name, err_msg, sizeof(err_msg));
+        result = run_one_test(test_file_path, source, source_length, name, options, coverage, err_msg, sizeof(err_msg));
         elapsed = (double)(clock() - test_start) / CLOCKS_PER_SEC;
         if (result == 0)
         {
             *total_pass += 1;
             if (options->verbose)
-                printf("=== RUN   %s\n--- PASS: %s (%.3fs)\n", name, name, elapsed);
+                fprintf(stream, "=== RUN   %s\n--- PASS: %s (%.3fs)\n", name, name, elapsed);
         }
         else
         {
             *total_fail += 1;
             file_failed = 1;
-            printf("--- FAIL: %s (%s)\n    %s\n", name, test_file_path, err_msg);
+            fprintf(stream, "--- FAIL: %s (%s)\n    %s\n", name, test_file_path, err_msg);
         }
     }
 
     if (file_failed)
     {
-        printf("FAIL\t%s\t%.3fs\n", test_file_path, (double)(clock() - file_start) / CLOCKS_PER_SEC);
+        fprintf(stream, "FAIL\t%s\t%.3fs\n", test_file_path, (double)(clock() - file_start) / CLOCKS_PER_SEC);
         exit_code = 1;
     }
     else if (function_names.count > 0U)
     {
-        printf("ok  \t%s\t%.3fs\n", test_file_path, (double)(clock() - file_start) / CLOCKS_PER_SEC);
+        fprintf(stream, "ok  \t%s\t%.3fs\n", test_file_path, (double)(clock() - file_start) / CLOCKS_PER_SEC);
     }
 
     sl_free(&function_names);
@@ -618,6 +755,9 @@ int vigil_cli_run_test_command(int argc, char **argv)
     test_options_t options;
     str_list_t targets;
     str_list_t test_files;
+    vigil_coverage_session_t coverage;
+    vigil_coverage_summary_t coverage_summary;
+    vigil_error_t coverage_error;
     int total_pass;
     int total_fail;
     int exit_code;
@@ -626,6 +766,8 @@ int vigil_cli_run_test_command(int argc, char **argv)
 
     memset(&targets, 0, sizeof(targets));
     memset(&test_files, 0, sizeof(test_files));
+    vigil_coverage_session_init(&coverage);
+    memset(&coverage_error, 0, sizeof(coverage_error));
     total_pass = 0;
     total_fail = 0;
     exit_code = 0;
@@ -634,6 +776,7 @@ int vigil_cli_run_test_command(int argc, char **argv)
     if (parse_result >= 0)
     {
         sl_free(&targets);
+        vigil_coverage_session_free(&coverage);
         return parse_result;
     }
 
@@ -644,17 +787,41 @@ int vigil_cli_run_test_command(int argc, char **argv)
         printf("no test files found\n");
         sl_free(&targets);
         sl_free(&test_files);
+        vigil_coverage_session_free(&coverage);
         return 0;
     }
 
     for (index = 0U; index < test_files.count; index += 1U)
     {
-        if (run_test_file(test_files.items[index], &options, &total_pass, &total_fail) != 0)
+        if (run_test_file(test_files.items[index], &options, &coverage, &total_pass, &total_fail) != 0)
             exit_code = 1;
     }
 
-    cmd_test_print_summary(total_pass, total_fail);
+    cmd_test_print_summary(&options, total_pass, total_fail);
+    if (options.coverage)
+    {
+        coverage_summary = vigil_coverage_session_total_line_summary(&coverage);
+        if (options.coverage_format == VIGIL_COVERAGE_OUTPUT_JSON)
+        {
+            if (vigil_coverage_session_print_json(&coverage, stdout, &coverage_error) != VIGIL_STATUS_OK)
+            {
+                fprintf(stderr, "error: failed to emit coverage json: %s\n", vigil_error_message(&coverage_error));
+                exit_code = 1;
+            }
+        }
+        else
+        {
+            vigil_coverage_session_print_text(&coverage, stdout, options.verbose, test_files.count);
+        }
+        if (options.min_coverage_set && coverage_summary.percent + 0.0001 < options.min_coverage)
+        {
+            fprintf(test_output_stream(&options), "coverage threshold not met: %.1f%% < %.1f%%\n",
+                    coverage_summary.percent, options.min_coverage);
+            exit_code = 1;
+        }
+    }
     sl_free(&targets);
     sl_free(&test_files);
+    vigil_coverage_session_free(&coverage);
     return exit_code;
 }

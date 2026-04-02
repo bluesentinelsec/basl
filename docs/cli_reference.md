@@ -422,7 +422,7 @@ vigil embed assets/ static/ -o embedded_assets.vigil
 Usage:
 
 ```text
-vigil test [--run pattern] [-v] [path...]
+vigil test [--run pattern] [-v] [--coverage] [path...]
 ```
 
 Arguments:
@@ -433,6 +433,10 @@ Flags:
 
 - `-v`, `--verbose`: print passing tests as they run
 - `-run`, `--run <pattern>`: only run test function names containing the substring pattern
+- `--coverage`: collect line and branch coverage while tests execute
+- `--format <text|json>`: choose text or JSON coverage output
+- `--min-coverage <N>`: fail the command if total line coverage is below `N`
+- `--include-deps`: include imported user modules outside the project root in coverage
 
 Behavior:
 
@@ -443,7 +447,11 @@ Behavior:
   - otherwise, scans `.`
 - Builds a wrapper `main()` that constructs `test.T` and invokes each matched test function.
 - Prints Go-style per-file summaries such as `ok` and `FAIL`.
+- Coverage mode tracks line and branch coverage for non-test user source files in the current project.
+- `--include-deps` extends coverage to imported user modules outside the project root. Stdlib modules are never tracked.
+- `--format json` writes machine-readable coverage JSON to stdout and sends the normal test progress stream to stderr.
 - Exits non-zero if any test fails.
+- `--min-coverage` also makes the command fail when total line coverage is below the requested threshold.
 
 Examples:
 
@@ -452,6 +460,9 @@ vigil test
 vigil test test/
 vigil test ./examples --run parse
 vigil test -v
+vigil test --coverage
+vigil test --coverage --format json
+vigil test --coverage --min-coverage 85
 ```
 
 ## `get`
