@@ -1224,6 +1224,62 @@ void vigil_coverage_session_print_text(const vigil_coverage_session_t *session, 
             coverage_percent(total_branch_covered, total_branch_total), total_branch_covered, total_branch_total);
 }
 
+static void coverage_print_json_uncovered_lines(const vigil_coverage_session_t *session, size_t file_index,
+                                                FILE *stream)
+{
+    size_t line_index;
+    int first;
+
+    first = 1;
+    for (line_index = 0U; line_index < session->files[file_index].line_count; line_index += 1U)
+    {
+        if (session->files[file_index].track_lines[line_index] == 0U ||
+            session->files[file_index].hit_lines[line_index] != 0U)
+            continue;
+        fprintf(stream, "%s%zu", first ? "" : ", ", line_index + 1U);
+        first = 0;
+    }
+}
+
+static void coverage_print_json_missed_branch(const vigil_coverage_branch_t *branch, FILE *stream, int fallthrough,
+                                               int *first)
+{
+    const char *kind;
+
+    if (fallthrough)
+        kind = branch->kind == VIGIL_COVERAGE_BRANCH_LOOP ? "loop-exit" : "true";
+    else
+        kind = branch->kind == VIGIL_COVERAGE_BRANCH_LOOP ? "loop-body" : "false";
+    fprintf(stream, "%s{\"line\": %zu, \"kind\": ", *first ? "" : ", ", branch->line);
+    coverage_write_json_string(stream, kind);
+    fputs(", \"description\": ", stream);
+    coverage_write_json_string(stream, coverage_branch_description(branch, fallthrough));
+    fputc('}', stream);
+    *first = 0;
+}
+
+static void coverage_print_json_missed_branches(const vigil_coverage_session_t *session, size_t file_index,
+                                                 FILE *stream)
+{
+    size_t branch_index;
+    int first;
+
+    first = 1;
+    for (branch_index = 0U; branch_index < session->branch_count; branch_index += 1U)
+    {
+        const vigil_coverage_branch_t *branch;
+
+        branch = &session->branches[branch_index];
+        if (branch->file_index != file_index)
+            continue;
+        if ((branch->hit_mask & 0x1U) == 0U)
+            coverage_print_json_missed_branch(branch, stream, 1, &first);
+        if ((branch->hit_mask & 0x2U) == 0U)
+            coverage_print_json_missed_branch(branch, stream, 0, &first);
+    }
+}
+
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
 vigil_status_t vigil_coverage_session_print_json(const vigil_coverage_session_t *session, FILE *stream,
                                                  vigil_error_t *error)
 {
@@ -1251,10 +1307,6 @@ vigil_status_t vigil_coverage_session_print_json(const vigil_coverage_session_t 
         size_t line_total;
         size_t branch_covered;
         size_t branch_total;
-        size_t line_index;
-        size_t branch_index;
-        int first_line;
-        int first_branch;
 
         coverage_collect_counts(session, index, &line_covered, &line_total, &branch_covered, &branch_total);
         total_line_covered += line_covered;
@@ -1271,44 +1323,9 @@ vigil_status_t vigil_coverage_session_print_json(const vigil_coverage_session_t 
                 line_covered, line_total, coverage_percent(line_covered, line_total), branch_covered, branch_total,
                 coverage_percent(branch_covered, branch_total));
 
-        first_line = 1;
-        for (line_index = 0U; line_index < session->files[index].line_count; line_index += 1U)
-        {
-            if (session->files[index].track_lines[line_index] == 0U ||
-                session->files[index].hit_lines[line_index] != 0U)
-                continue;
-            fprintf(stream, "%s%zu", first_line ? "" : ", ", line_index + 1U);
-            first_line = 0;
-        }
-
+        coverage_print_json_uncovered_lines(session, index, stream);
         fputs("],\n      \"missed_branches\": [", stream);
-        first_branch = 1;
-        for (branch_index = 0U; branch_index < session->branch_count; branch_index += 1U)
-        {
-            const vigil_coverage_branch_t *branch;
-
-            branch = &session->branches[branch_index];
-            if (branch->file_index != index)
-                continue;
-            if ((branch->hit_mask & 0x1U) == 0U)
-            {
-                fprintf(stream, "%s{\"line\": %zu, \"kind\": ", first_branch ? "" : ", ", branch->line);
-                coverage_write_json_string(stream, branch->kind == VIGIL_COVERAGE_BRANCH_LOOP ? "loop-exit" : "true");
-                fputs(", \"description\": ", stream);
-                coverage_write_json_string(stream, coverage_branch_description(branch, 1));
-                fputc('}', stream);
-                first_branch = 0;
-            }
-            if ((branch->hit_mask & 0x2U) == 0U)
-            {
-                fprintf(stream, "%s{\"line\": %zu, \"kind\": ", first_branch ? "" : ", ", branch->line);
-                coverage_write_json_string(stream, branch->kind == VIGIL_COVERAGE_BRANCH_LOOP ? "loop-body" : "false");
-                fputs(", \"description\": ", stream);
-                coverage_write_json_string(stream, coverage_branch_description(branch, 0));
-                fputc('}', stream);
-                first_branch = 0;
-            }
-        }
+        coverage_print_json_missed_branches(session, index, stream);
         fprintf(stream, "]\n    }%s\n", index + 1U == session->file_count ? "" : ",");
     }
 
