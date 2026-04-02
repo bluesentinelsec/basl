@@ -61,6 +61,57 @@ static const vigil_native_class_method_t *FindClassMethod(const vigil_native_cla
     return NULL;
 }
 
+static void FailNotFound(int *vigil_test_failed_, const char *kind, const char *name)
+{
+    fprintf(stderr, "  %s:%d: Failure\n    Missing %s: %s\n", __FILE__, __LINE__, kind, name);
+    *vigil_test_failed_ = 1;
+}
+
+static int InitSdlRegistry(int *vigil_test_failed_, vigil_native_registry_t *natives, vigil_error_t *error,
+                           const vigil_native_module_t **mod)
+{
+    if (!vigil_plugin_is_known_module("sdl", 3U))
+        return 0;
+
+    vigil_native_registry_init(natives);
+    EXPECT_EQ(vigil_plugin_register_all(natives, error), VIGIL_STATUS_OK);
+
+    *mod = vigil_native_registry_find(natives, "sdl", 3U);
+    EXPECT_NE(*mod, NULL);
+    return 1;
+}
+
+static void ExpectModuleFunctionsPresent(int *vigil_test_failed_, const vigil_native_module_t *module,
+                                         const char *const *names, size_t count)
+{
+    size_t i;
+
+    for (i = 0; i < count; i++)
+    {
+        if (FindModuleFunction(module, names[i]) == NULL)
+            FailNotFound(vigil_test_failed_, "module function", names[i]);
+    }
+}
+
+static void ExpectClassMethodsPresent(int *vigil_test_failed_, const vigil_native_module_t *module,
+                                      const char *class_name, const char *const *names, size_t count)
+{
+    const vigil_native_class_t *cls = FindModuleClass(module, class_name);
+    size_t i;
+
+    if (cls == NULL)
+    {
+        FailNotFound(vigil_test_failed_, "class", class_name);
+        return;
+    }
+
+    for (i = 0; i < count; i++)
+    {
+        if (FindClassMethod(cls, names[i]) == NULL)
+            FailNotFound(vigil_test_failed_, "class method", names[i]);
+    }
+}
+
 /*
  * Compile and run a Vigil program that imports both stdlib and plugin modules.
  * The program's main() must return i32.  Returns that value.
@@ -212,20 +263,14 @@ TEST(PluginRegistry, SdlExportsParityBatchOneFunctions)
     vigil_native_registry_t natives;
     vigil_error_t error = {0};
     const vigil_native_module_t *mod;
+    static const char *const module_functions[] = {"create_window_with_properties", "create_renderer_with_properties",
+                                                   "get_gamepad_mapping_for_guid", "get_gamepad_mappings",
+                                                   "get_joystick_guid_info"};
 
-    if (!vigil_plugin_is_known_module("sdl", 3U))
+    if (!InitSdlRegistry(vigil_test_failed_, &natives, &error, &mod))
         return;
-
-    vigil_native_registry_init(&natives);
-    EXPECT_EQ(vigil_plugin_register_all(&natives, &error), VIGIL_STATUS_OK);
-
-    mod = vigil_native_registry_find(&natives, "sdl", 3U);
-    EXPECT_NE(mod, NULL);
-    EXPECT_NE(FindModuleFunction(mod, "create_window_with_properties"), NULL);
-    EXPECT_NE(FindModuleFunction(mod, "create_renderer_with_properties"), NULL);
-    EXPECT_NE(FindModuleFunction(mod, "get_gamepad_mapping_for_guid"), NULL);
-    EXPECT_NE(FindModuleFunction(mod, "get_gamepad_mappings"), NULL);
-    EXPECT_NE(FindModuleFunction(mod, "get_joystick_guid_info"), NULL);
+    ExpectModuleFunctionsPresent(vigil_test_failed_, mod, module_functions,
+                                 sizeof(module_functions) / sizeof(module_functions[0]));
 
     vigil_native_registry_free(&natives);
 }
@@ -235,21 +280,14 @@ TEST(PluginRegistry, SdlExportsEnvironmentBatchFunctions)
     vigil_native_registry_t natives;
     vigil_error_t error = {0};
     const vigil_native_module_t *mod;
+    static const char *const module_functions[] = {"create_environment",          "destroy_environment",
+                                                   "get_environment_variables",   "get_environment_variable_from",
+                                                   "set_environment_variable_in", "unset_environment_variable_in"};
 
-    if (!vigil_plugin_is_known_module("sdl", 3U))
+    if (!InitSdlRegistry(vigil_test_failed_, &natives, &error, &mod))
         return;
-
-    vigil_native_registry_init(&natives);
-    EXPECT_EQ(vigil_plugin_register_all(&natives, &error), VIGIL_STATUS_OK);
-
-    mod = vigil_native_registry_find(&natives, "sdl", 3U);
-    EXPECT_NE(mod, NULL);
-    EXPECT_NE(FindModuleFunction(mod, "create_environment"), NULL);
-    EXPECT_NE(FindModuleFunction(mod, "destroy_environment"), NULL);
-    EXPECT_NE(FindModuleFunction(mod, "get_environment_variables"), NULL);
-    EXPECT_NE(FindModuleFunction(mod, "get_environment_variable_from"), NULL);
-    EXPECT_NE(FindModuleFunction(mod, "set_environment_variable_in"), NULL);
-    EXPECT_NE(FindModuleFunction(mod, "unset_environment_variable_in"), NULL);
+    ExpectModuleFunctionsPresent(vigil_test_failed_, mod, module_functions,
+                                 sizeof(module_functions) / sizeof(module_functions[0]));
 
     vigil_native_registry_free(&natives);
 }
@@ -259,23 +297,15 @@ TEST(PluginRegistry, SdlExportsWindowAndMessageBoxBatchFunctions)
     vigil_native_registry_t natives;
     vigil_error_t error = {0};
     const vigil_native_module_t *mod;
-    const vigil_native_class_t *window_class;
+    static const char *const module_functions[] = {"show_message_box"};
+    static const char *const window_methods[] = {"get_fullscreen_mode", "update_surface_rect", "show_message_box"};
 
-    if (!vigil_plugin_is_known_module("sdl", 3U))
+    if (!InitSdlRegistry(vigil_test_failed_, &natives, &error, &mod))
         return;
-
-    vigil_native_registry_init(&natives);
-    EXPECT_EQ(vigil_plugin_register_all(&natives, &error), VIGIL_STATUS_OK);
-
-    mod = vigil_native_registry_find(&natives, "sdl", 3U);
-    EXPECT_NE(mod, NULL);
-    EXPECT_NE(FindModuleFunction(mod, "show_message_box"), NULL);
-
-    window_class = FindModuleClass(mod, "Window");
-    EXPECT_NE(window_class, NULL);
-    EXPECT_NE(FindClassMethod(window_class, "get_fullscreen_mode"), NULL);
-    EXPECT_NE(FindClassMethod(window_class, "update_surface_rect"), NULL);
-    EXPECT_NE(FindClassMethod(window_class, "show_message_box"), NULL);
+    ExpectModuleFunctionsPresent(vigil_test_failed_, mod, module_functions,
+                                 sizeof(module_functions) / sizeof(module_functions[0]));
+    ExpectClassMethodsPresent(vigil_test_failed_, mod, "Window", window_methods,
+                              sizeof(window_methods) / sizeof(window_methods[0]));
 
     vigil_native_registry_free(&natives);
 }
@@ -285,37 +315,22 @@ TEST(PluginRegistry, SdlExportsCameraClipboardAndBindingsBatchFunctions)
     vigil_native_registry_t natives;
     vigil_error_t error = {0};
     const vigil_native_module_t *mod;
-    const vigil_native_class_t *window_class;
-    const vigil_native_class_t *gamepad_class;
-    const vigil_native_class_t *camera_class;
+    static const char *const module_functions[] = {"get_camera_supported_formats", "get_cameras", "get_gamepads",
+                                                   "get_clipboard_data", "set_clipboard_data"};
+    static const char *const window_methods[] = {"update_surface_rects"};
+    static const char *const gamepad_methods[] = {"get_bindings", "get_guid", "get_power_info"};
+    static const char *const camera_methods[] = {"get_spec"};
 
-    if (!vigil_plugin_is_known_module("sdl", 3U))
+    if (!InitSdlRegistry(vigil_test_failed_, &natives, &error, &mod))
         return;
-
-    vigil_native_registry_init(&natives);
-    EXPECT_EQ(vigil_plugin_register_all(&natives, &error), VIGIL_STATUS_OK);
-
-    mod = vigil_native_registry_find(&natives, "sdl", 3U);
-    EXPECT_NE(mod, NULL);
-    EXPECT_NE(FindModuleFunction(mod, "get_camera_supported_formats"), NULL);
-    EXPECT_NE(FindModuleFunction(mod, "get_cameras"), NULL);
-    EXPECT_NE(FindModuleFunction(mod, "get_gamepads"), NULL);
-    EXPECT_NE(FindModuleFunction(mod, "get_clipboard_data"), NULL);
-    EXPECT_NE(FindModuleFunction(mod, "set_clipboard_data"), NULL);
-
-    window_class = FindModuleClass(mod, "Window");
-    EXPECT_NE(window_class, NULL);
-    EXPECT_NE(FindClassMethod(window_class, "update_surface_rects"), NULL);
-
-    gamepad_class = FindModuleClass(mod, "Gamepad");
-    EXPECT_NE(gamepad_class, NULL);
-    EXPECT_NE(FindClassMethod(gamepad_class, "get_bindings"), NULL);
-    EXPECT_NE(FindClassMethod(gamepad_class, "get_guid"), NULL);
-    EXPECT_NE(FindClassMethod(gamepad_class, "get_power_info"), NULL);
-
-    camera_class = FindModuleClass(mod, "Camera");
-    EXPECT_NE(camera_class, NULL);
-    EXPECT_NE(FindClassMethod(camera_class, "get_spec"), NULL);
+    ExpectModuleFunctionsPresent(vigil_test_failed_, mod, module_functions,
+                                 sizeof(module_functions) / sizeof(module_functions[0]));
+    ExpectClassMethodsPresent(vigil_test_failed_, mod, "Window", window_methods,
+                              sizeof(window_methods) / sizeof(window_methods[0]));
+    ExpectClassMethodsPresent(vigil_test_failed_, mod, "Gamepad", gamepad_methods,
+                              sizeof(gamepad_methods) / sizeof(gamepad_methods[0]));
+    ExpectClassMethodsPresent(vigil_test_failed_, mod, "Camera", camera_methods,
+                              sizeof(camera_methods) / sizeof(camera_methods[0]));
 
     vigil_native_registry_free(&natives);
 }

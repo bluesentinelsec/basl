@@ -267,6 +267,21 @@ static int sdl_append_format(char **buffer, size_t *length, size_t *capacity, co
     return 0;
 }
 
+static char *sdl_dup_cstr(const char *text)
+{
+    size_t length;
+    char *copy;
+
+    if (text == NULL)
+        return NULL;
+    length = strlen(text) + 1U;
+    copy = (char *)malloc(length);
+    if (copy == NULL)
+        return NULL;
+    memcpy(copy, text, length);
+    return copy;
+}
+
 typedef struct
 {
     char *mime_type;
@@ -1775,7 +1790,10 @@ static vigil_status_t sdl_fn_get_gamepads(vigil_vm_t *vm, size_t arg_count, vigi
     vigil_vm_stack_pop_n(vm, arg_count);
     ids = SDL_GetGamepads(&count);
     if (!ids || count <= 0)
+    {
+        SDL_free(ids);
         return sdl_push_string(vm, "", error);
+    }
 
     for (int i = 0; i < count; i++)
     {
@@ -2040,7 +2058,7 @@ static vigil_status_t sdl_show_message_box_common(vigil_vm_t *vm, SDL_Window *wi
 
     if (buttons_text != NULL && buttons_text[0] != '\0')
     {
-        storage = strdup(buttons_text);
+        storage = sdl_dup_cstr(buttons_text);
         if (storage == NULL)
         {
             vigil_error_set_literal(error, VIGIL_STATUS_OUT_OF_MEMORY, "out of memory");
