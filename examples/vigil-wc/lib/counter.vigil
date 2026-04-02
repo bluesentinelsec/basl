@@ -1,37 +1,32 @@
 // Counter logic for wc utility
-
 pub fn count_content(string content) -> (i32, i32, i32, err) {
     i32 lines = 0;
     i32 words = 0;
     i32 bytes = content.len();
-    
     array<u8> byte_array = content.bytes();
-    
     bool in_word = false;
     for (i32 i = 0; i < byte_array.len(); i++) {
         u8 b, err e = byte_array.get(i);
-        if (e != ok) {
+        if e != ok {
             return 0, 0, 0, e;
         }
-        
         // Count newlines
-        if (b == u8(10)) {  // \n
+        if b == u8(10) {
+            // \n
             lines++;
         }
-        
         // Unix wc semantics: whitespace separates words
         // Whitespace: space (32), tab (9), newline (10), carriage return (13)
         bool is_space = (b == u8(32) || b == u8(9) || b == u8(10) || b == u8(13));
-        
-        if (is_space) {
+        if is_space {
             in_word = false;
         } else {
-            if (!in_word) {
+            if ! in_word {
                 words++;
                 in_word = true;
             }
         }
     }
-    
+
     return lines, words, bytes, ok;
 }

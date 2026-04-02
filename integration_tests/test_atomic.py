@@ -26,7 +26,7 @@ class AtomicNewTest(unittest.TestCase):
         code = '''import "atomic";
 fn main() -> i32 {
     i64 a = atomic.new(i64(0));
-    if (a >= i64(0)) { return 0; }
+    if a >= i64(0) { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -37,7 +37,7 @@ fn main() -> i32 {
 fn main() -> i32 {
     i64 a = atomic.new(i64(42));
     i64 val = atomic.load(a);
-    if (val == i64(42)) { return 0; }
+    if val == i64(42) { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -51,7 +51,7 @@ fn main() -> i32 {
     i64 a = atomic.new(i64(0));
     atomic.store(a, i64(100));
     i64 val = atomic.load(a);
-    if (val == i64(100)) { return 0; }
+    if val == i64(100) { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -65,7 +65,7 @@ fn main() -> i32 {
     i64 a = atomic.new(i64(10));
     i64 old = atomic.add(a, i64(5));
     i64 new_val = atomic.load(a);
-    if (old == i64(10) && new_val == i64(15)) { return 0; }
+    if old == i64(10) && new_val == i64(15) { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -77,7 +77,7 @@ fn main() -> i32 {
     i64 a = atomic.new(i64(20));
     i64 old = atomic.sub(a, i64(7));
     i64 new_val = atomic.load(a);
-    if (old == i64(20) && new_val == i64(13)) { return 0; }
+    if old == i64(20) && new_val == i64(13) { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -91,7 +91,7 @@ fn main() -> i32 {
     i64 a = atomic.new(i64(50));
     bool ok = atomic.cas(a, i64(50), i64(60));
     i64 val = atomic.load(a);
-    if (ok && val == i64(60)) { return 0; }
+    if ok && val == i64(60) { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -103,7 +103,7 @@ fn main() -> i32 {
     i64 a = atomic.new(i64(50));
     bool ok = atomic.cas(a, i64(99), i64(60));
     i64 val = atomic.load(a);
-    if (!ok && val == i64(50)) { return 0; }
+    if !ok && val == i64(50) { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -117,7 +117,7 @@ fn main() -> i32 {
     i64 a = atomic.new(i64(5));
     i64 old = atomic.inc(a);
     i64 new_val = atomic.load(a);
-    if (old == i64(5) && new_val == i64(6)) { return 0; }
+    if old == i64(5) && new_val == i64(6) { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -129,7 +129,7 @@ fn main() -> i32 {
     i64 a = atomic.new(i64(5));
     i64 old = atomic.dec(a);
     i64 new_val = atomic.load(a);
-    if (old == i64(5) && new_val == i64(4)) { return 0; }
+    if old == i64(5) && new_val == i64(4) { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -145,7 +145,7 @@ fn main() -> i32 {
         handles.push(atomic.new(i));
     }
     for (i32 i = 0; i < handles.len(); i = i + 1) {
-        if (atomic.load(handles[i]) != i64(i)) { return 1; }
+        if atomic.load(handles[i]) != i64(i) { return 1; }
     }
     return 0;
 }'''

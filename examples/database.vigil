@@ -10,7 +10,7 @@ import "parse";
 string DB_FILE = "users.csv";
 
 fn db_init() -> void {
-    if (! fs.exists(DB_FILE)) {
+    if ! fs.exists(DB_FILE) {
         fs.write(DB_FILE, "id,name,age\n");
     }
 }
@@ -36,12 +36,12 @@ fn main() -> i32 {
     for (i32 i = 1; i < lines.len(); i++) {
         // skip header
         string line = lines[i].trim();
-        if (line.is_empty()) {
+        if line.is_empty() {
             continue;
         }
 
         array<string> row = csv.parse_row(line);
-        if (row.len() >= 3) {
+        if row.len() >= 3 {
             string id = row[0];
             string name = row[1];
             string age = row[2];
@@ -52,16 +52,16 @@ fn main() -> i32 {
     fmt.println("\nUsers older than 28:");
     for (i32 i = 1; i < lines.len(); i++) {
         string line = lines[i].trim();
-        if (line.is_empty()) {
+        if line.is_empty() {
             continue;
         }
 
         array<string> row = csv.parse_row(line);
-        if (row.len() >= 3) {
+        if row.len() >= 3 {
             string name = row[1];
             string age_str = row[2];
             i32 age, err parse_err = parse.i32(age_str);
-            if (parse_err == ok && age > 28) {
+            if parse_err == ok && age > 28 {
                 fmt.println(f"  - {name}");
             }
         }

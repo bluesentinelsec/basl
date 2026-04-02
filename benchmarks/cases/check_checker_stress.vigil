@@ -28,7 +28,7 @@ fn parse_numbers(array<string> raw) -> array<i32> {
     array<i32> out = [];
     for (i32 i = 0; i < raw.len(); i++) {
         i32 value, err e = parse.i32(raw[i]);
-        if (e == ok) {
+        if e == ok {
             out.push(value);
         }
     }
@@ -49,7 +49,7 @@ fn score_line(string line) -> i32 {
     array<string> row = csv.parse_row(line);
     array<i32> nums = parse_numbers(row);
     i32 total = fold_values(nums);
-    if (regex.match(".*critical.*", line)) {
+    if regex.match(".*critical.*", line) {
         total = total + 10;
     }
 
@@ -71,7 +71,7 @@ fn main() -> i32 {
     f64 projection = project(samples);
     f64 magnitude = math.hypot(projection, f64(line_score));
     array<string> labels = [samples[0].describe(), samples[1].describe(), samples[2].describe(), samples[3].describe()];
-    if (labels.len() == 4 && magnitude > 0.0) {
+    if labels.len() == 4 && magnitude > 0.0 {
         return 0;
     }
 

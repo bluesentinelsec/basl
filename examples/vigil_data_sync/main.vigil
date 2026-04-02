@@ -11,16 +11,15 @@
 // during this exercise).  We consolidate into 3 lib modules to work around.
 
 import "fmt";
+import "lib/data_pipeline";
 import "lib/ffi_bindings";
 import "lib/ffi_tests";
-import "lib/data_pipeline";
 
 fn main() -> i32 {
     fmt.println("╔══════════════════════════════════════╗");
     fmt.println("║     VigilDataSync — FFI Stress Test  ║");
     fmt.println("╚══════════════════════════════════════╝");
     fmt.println("");
-
     // Platform info
     fmt.println(f"Pointer size: {ffi_bindings.ptr_size()} bytes");
     string t_i32 = "i32";
@@ -32,26 +31,22 @@ fn main() -> i32 {
     fmt.println(f"sizeof(f64):  {ffi_bindings.sizeof_type(t_f64)} bytes");
     fmt.println(f"sizeof(ptr):  {ffi_bindings.sizeof_type(t_ptr)} bytes");
     fmt.println("");
-
     // Run safety tests
     i32 failures = ffi_tests.run_safety_tests();
     fmt.println("");
-
     // Run benchmarks
     ffi_tests.run_benchmarks();
     fmt.println("");
-
     // Run data pipeline
     failures = failures + data_pipeline.run_pipeline("", "");
     fmt.println("");
-
     // Cleanup
     ffi_bindings.cleanup();
-
-    if (failures > 0) {
+    if failures > 0 {
         fmt.println(f"DONE with {failures} failure(s).");
         return 1;
     }
+
     fmt.println("DONE — all tests passed.");
     return 0;
 }

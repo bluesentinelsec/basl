@@ -41,7 +41,7 @@ class TestVigilFmt(unittest.TestCase):
 
     def test_if_else(self):
         src = ('fn main() -> i32 {\n'
-               'if (x > 0) {\nreturn 1;\n} else {\nreturn 0;\n}\n}\n')
+               'if x > 0 {\nreturn 1;\n} else {\nreturn 0;\n}\n}\n')
         got, _ = fmt(src)
         self.assertIn("} else {", got)
         self.assertIn("        return 1;", got)
@@ -56,6 +56,7 @@ class TestVigilFmt(unittest.TestCase):
         src = ('fn main() -> i32 {\nswitch (x) {\n'
                'case 1: return 1;\ndefault: return 0;\n}\n}\n')
         got, _ = fmt(src)
+        self.assertIn("    switch x {", got)
         self.assertIn("        case 1:", got)
         self.assertIn("        default:", got)
 
@@ -120,7 +121,7 @@ class TestVigilFmt(unittest.TestCase):
         src = ('fn main() -> i32 {\nwhile (x > 0) {\n'
                'x = x - 1;\n}\nreturn 0;\n}\n')
         got, _ = fmt(src)
-        self.assertIn("    while (x > 0) {", got)
+        self.assertIn("    while x > 0 {", got)
         self.assertIn("        x = x - 1;", got)
 
     def test_blank_line_between_decls(self):

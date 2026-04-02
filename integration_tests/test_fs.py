@@ -30,7 +30,7 @@ class FsPathTest(unittest.TestCase):
     def test_join(self):
         code = '''import "fs";
 fn main() -> i32 {
-    if (fs.join("a", "b") == "a/b") { return 0; }
+    if fs.join("a", "b") == "a/b" { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -39,7 +39,7 @@ fn main() -> i32 {
     def test_clean(self):
         code = '''import "fs";
 fn main() -> i32 {
-    if (fs.clean("a/./b/../c") == "a/c") { return 0; }
+    if fs.clean("a/./b/../c") == "a/c" { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -48,7 +48,7 @@ fn main() -> i32 {
     def test_dir(self):
         code = '''import "fs";
 fn main() -> i32 {
-    if (fs.dir("/foo/bar.txt") == "/foo") { return 0; }
+    if fs.dir("/foo/bar.txt") == "/foo" { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -57,7 +57,7 @@ fn main() -> i32 {
     def test_base(self):
         code = '''import "fs";
 fn main() -> i32 {
-    if (fs.base("/foo/bar.txt") == "bar.txt") { return 0; }
+    if fs.base("/foo/bar.txt") == "bar.txt" { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -66,7 +66,7 @@ fn main() -> i32 {
     def test_ext(self):
         code = '''import "fs";
 fn main() -> i32 {
-    if (fs.ext("file.txt") == ".txt") { return 0; }
+    if fs.ext("file.txt") == ".txt" { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -82,7 +82,7 @@ fn main() -> i32 {
     string tmp = fs.temp_dir();
     string path = fs.join(tmp, "vigil_test_wr.txt");
     fs.write(path, "hello");
-    if (fs.read(path) == "hello") {
+    if fs.read(path) == "hello" {
         fs.remove(path);
         return 0;
     }
@@ -97,9 +97,9 @@ fn main() -> i32 {
     string tmp = fs.temp_dir();
     string path = fs.join(tmp, "vigil_test_ex.txt");
     fs.write(path, "x");
-    if (fs.exists(path)) {
+    if fs.exists(path) {
         fs.remove(path);
-        if (!fs.exists(path)) { return 0; }
+        if !fs.exists(path) { return 0; }
     }
     return 1;
 }'''
@@ -114,7 +114,7 @@ fn main() -> i32 {
     string dst = fs.join(tmp, "vigil_test_cp2.txt");
     fs.write(src, "copy");
     fs.copy(src, dst);
-    if (fs.read(dst) == "copy") {
+    if fs.read(dst) == "copy" {
         fs.remove(src);
         fs.remove(dst);
         return 0;
@@ -134,7 +134,7 @@ fn main() -> i32 {
     string tmp = fs.temp_dir();
     string path = fs.join(tmp, "vigil_test_mkdir");
     fs.mkdir(path);
-    if (fs.is_dir(path)) {
+    if fs.is_dir(path) {
         fs.remove(path);
         return 0;
     }
@@ -150,7 +150,7 @@ fn main() -> i32 {
     string base = fs.join(tmp, "vigil_test_mkdirall");
     string path = fs.join(base, "a/b");
     fs.mkdir_all(path);
-    if (fs.is_dir(path)) {
+    if fs.is_dir(path) {
         fs.remove(path);
         fs.remove(fs.join(base, "a"));
         fs.remove(base);
@@ -169,7 +169,7 @@ class FsLocationTest(unittest.TestCase):
         code = '''import "fs";
 fn main() -> i32 {
     string home = fs.home_dir();
-    if (home.len() > 0) { return 0; }
+    if home.len() > 0 { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -179,7 +179,7 @@ fn main() -> i32 {
         code = '''import "fs";
 fn main() -> i32 {
     string tmp = fs.temp_dir();
-    if (tmp.len() > 0) { return 0; }
+    if tmp.len() > 0 { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -189,7 +189,7 @@ fn main() -> i32 {
         code = '''import "fs";
 fn main() -> i32 {
     string cwd = fs.cwd();
-    if (cwd.len() > 0) { return 0; }
+    if cwd.len() > 0 { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -201,8 +201,8 @@ fn main() -> i32 {
     string base = fs.join(fs.temp_dir(), "vigil_it_rmall");
     fs.mkdir_all(fs.join(base, "a/b"));
     fs.write(fs.join(base, "a/b/c.txt"), "x");
-    if (!fs.remove_all(base)) { return 1; }
-    if (fs.exists(base)) { return 2; }
+    if !fs.remove_all(base) { return 1; }
+    if fs.exists(base) { return 2; }
     return 0;
 }'''
         rc, out, err = run_vigil(code)
@@ -219,7 +219,7 @@ fn main() -> i32 {
     fs.write(fs.join(base, "c.md"), "c");
     array<string> matches = fs.glob(base, "*.txt");
     fs.remove_all(base);
-    if (matches.len() == 2) { return 0; }
+    if matches.len() == 2 { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)

@@ -30,7 +30,7 @@ class RegexMatchTest(unittest.TestCase):
     def test_match_literal(self):
         code = '''import "regex";
 fn main() -> i32 {
-    if (regex.match("hello", "hello")) { return 0; }
+    if regex.match("hello", "hello") { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -39,7 +39,7 @@ fn main() -> i32 {
     def test_match_literal_no_match(self):
         code = '''import "regex";
 fn main() -> i32 {
-    if (regex.match("hello", "world")) { return 1; }
+    if regex.match("hello", "world") { return 1; }
     return 0;
 }'''
         rc, out, err = run_vigil(code)
@@ -48,7 +48,7 @@ fn main() -> i32 {
     def test_match_dot(self):
         code = '''import "regex";
 fn main() -> i32 {
-    if (regex.match("h.llo", "hello")) { return 0; }
+    if regex.match("h.llo", "hello") { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -57,7 +57,7 @@ fn main() -> i32 {
     def test_match_star(self):
         code = '''import "regex";
 fn main() -> i32 {
-    if (regex.match("hel*o", "heo") && regex.match("hel*o", "hello")) { return 0; }
+    if regex.match("hel*o", "heo") && regex.match("hel*o", "hello") { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -66,7 +66,7 @@ fn main() -> i32 {
     def test_match_plus(self):
         code = '''import "regex";
 fn main() -> i32 {
-    if (!regex.match("hel+o", "heo") && regex.match("hel+o", "hello")) { return 0; }
+    if !regex.match("hel+o", "heo") && regex.match("hel+o", "hello") { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -75,7 +75,7 @@ fn main() -> i32 {
     def test_match_question(self):
         code = '''import "regex";
 fn main() -> i32 {
-    if (regex.match("hel?o", "heo") && regex.match("hel?o", "helo")) { return 0; }
+    if regex.match("hel?o", "heo") && regex.match("hel?o", "helo") { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -84,7 +84,7 @@ fn main() -> i32 {
     def test_match_exact_zero_quantifier(self):
         code = '''import "regex";
 fn main() -> i32 {
-    if (regex.match("a{0}", "") && !regex.match("a{0}", "a")) { return 0; }
+    if regex.match("a{0}", "") && !regex.match("a{0}", "a") { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -93,11 +93,11 @@ fn main() -> i32 {
     def test_match_open_brace_quantifiers(self):
         code = '''import "regex";
 fn main() -> i32 {
-    if (regex.match("a{0,}", "")
+    if regex.match("a{0,}", "")
         && regex.match("a{0,}", "aaaa")
         && regex.match("a{1,}", "a")
         && regex.match("a{1,}", "aaaa")
-        && !regex.match("a{1,}", "")) { return 0; }
+        && !regex.match("a{1,}", "") { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -106,10 +106,10 @@ fn main() -> i32 {
     def test_match_lazy_quantifiers(self):
         code = '''import "regex";
 fn main() -> i32 {
-    if (regex.match("a*?", "aaaa")
+    if regex.match("a*?", "aaaa")
         && regex.match("a+?", "aaaa")
         && regex.match("a??", "")
-        && regex.match("a{0,}?", "aaaa")) { return 0; }
+        && regex.match("a{0,}?", "aaaa") { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -118,7 +118,7 @@ fn main() -> i32 {
     def test_match_exact_one_quantifier(self):
         code = '''import "regex";
 fn main() -> i32 {
-    if (regex.match("a{1}", "a") && !regex.match("a{1}", "")) { return 0; }
+    if regex.match("a{1}", "a") && !regex.match("a{1}", "") { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -127,12 +127,12 @@ fn main() -> i32 {
     def test_match_unsupported_brace_quantifiers_return_false(self):
         code = '''import "regex";
 fn main() -> i32 {
-    if (!regex.match("a{2}", "aa")
+    if !regex.match("a{2}", "aa")
         && !regex.match("a{1", "a")
         && !regex.match("a{101}", "a")
         && !regex.match("a{0,11}", "")
         && !regex.match("a{2,}", "aa")
-        && !regex.match("a{1,2}", "a")) { return 0; }
+        && !regex.match("a{1,2}", "a") { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -141,7 +141,7 @@ fn main() -> i32 {
     def test_match_char_class(self):
         code = '''import "regex";
 fn main() -> i32 {
-    if (regex.match("[abc]", "a") && !regex.match("[abc]", "d")) { return 0; }
+    if regex.match("[abc]", "a") && !regex.match("[abc]", "d") { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -150,7 +150,7 @@ fn main() -> i32 {
     def test_match_char_class_range(self):
         code = '''import "regex";
 fn main() -> i32 {
-    if (regex.match("[a-z]+", "hello") && !regex.match("[a-z]+", "HELLO")) { return 0; }
+    if regex.match("[a-z]+", "hello") && !regex.match("[a-z]+", "HELLO") { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -159,7 +159,7 @@ fn main() -> i32 {
     def test_match_negated_class(self):
         code = '''import "regex";
 fn main() -> i32 {
-    if (regex.match("[^0-9]+", "hello") && !regex.match("[^0-9]+", "123")) { return 0; }
+    if regex.match("[^0-9]+", "hello") && !regex.match("[^0-9]+", "123") { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -168,7 +168,7 @@ fn main() -> i32 {
     def test_match_alternation(self):
         code = '''import "regex";
 fn main() -> i32 {
-    if (regex.match("cat|dog", "cat") && regex.match("cat|dog", "dog")) { return 0; }
+    if regex.match("cat|dog", "cat") && regex.match("cat|dog", "dog") { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -177,7 +177,7 @@ fn main() -> i32 {
     def test_match_digit(self):
         code = r'''import "regex";
 fn main() -> i32 {
-    if (regex.match("\\d+", "123") && !regex.match("\\d+", "abc")) { return 0; }
+    if regex.match("\\d+", "123") && !regex.match("\\d+", "abc") { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -186,7 +186,7 @@ fn main() -> i32 {
     def test_match_word(self):
         code = r'''import "regex";
 fn main() -> i32 {
-    if (regex.match("\\w+", "hello_123")) { return 0; }
+    if regex.match("\\w+", "hello_123") { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -195,7 +195,7 @@ fn main() -> i32 {
     def test_match_whitespace(self):
         code = r'''import "regex";
 fn main() -> i32 {
-    if (regex.match("\\s+", "   ") && !regex.match("\\s+", "abc")) { return 0; }
+    if regex.match("\\s+", "   ") && !regex.match("\\s+", "abc") { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -210,7 +210,7 @@ class RegexFindTest(unittest.TestCase):
         code = '''import "regex";
 fn main() -> i32 {
     string match, bool found = regex.find("[0-9]+", "abc123def");
-    if (found && match == "123") { return 0; }
+    if found && match == "123" { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -220,7 +220,7 @@ fn main() -> i32 {
         code = '''import "regex";
 fn main() -> i32 {
     string match, bool found = regex.find("[0-9]+", "abcdef");
-    if (!found) { return 0; }
+    if !found { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -234,7 +234,7 @@ class RegexFindAllTest(unittest.TestCase):
         code = '''import "regex";
 fn main() -> i32 {
     array<string> matches = regex.find_all("[0-9]+", "a1b22c333");
-    if (matches.len() == 3) { return 0; }
+    if matches.len() == 3 { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -244,7 +244,7 @@ fn main() -> i32 {
         code = '''import "regex";
 fn main() -> i32 {
     array<string> matches = regex.find_all("[0-9]+", "abcdef");
-    if (matches.len() == 0) { return 0; }
+    if matches.len() == 0 { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -258,7 +258,7 @@ class RegexReplaceTest(unittest.TestCase):
         code = '''import "regex";
 fn main() -> i32 {
     string result = regex.replace("[0-9]+", "a1b2c3", "X");
-    if (result == "aXb2c3") { return 0; }
+    if result == "aXb2c3" { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -268,7 +268,7 @@ fn main() -> i32 {
         code = '''import "regex";
 fn main() -> i32 {
     string result = regex.replace_all("[0-9]+", "a1b2c3", "X");
-    if (result == "aXbXcX") { return 0; }
+    if result == "aXbXcX" { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -278,7 +278,7 @@ fn main() -> i32 {
         code = '''import "regex";
 fn main() -> i32 {
     string result = regex.replace("[0-9]+", "abc", "X");
-    if (result == "abc") { return 0; }
+    if result == "abc" { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -292,7 +292,7 @@ class RegexSplitTest(unittest.TestCase):
         code = '''import "regex";
 fn main() -> i32 {
     array<string> parts = regex.split(",", "a,b,c");
-    if (parts.len() == 3) { return 0; }
+    if parts.len() == 3 { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -302,7 +302,7 @@ fn main() -> i32 {
         code = r'''import "regex";
 fn main() -> i32 {
     array<string> parts = regex.split("\\s+", "a  b   c");
-    if (parts.len() == 3) { return 0; }
+    if parts.len() == 3 { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -312,7 +312,7 @@ fn main() -> i32 {
         code = '''import "regex";
 fn main() -> i32 {
     array<string> parts = regex.split(",", "abc");
-    if (parts.len() == 1) { return 0; }
+    if parts.len() == 1 { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)

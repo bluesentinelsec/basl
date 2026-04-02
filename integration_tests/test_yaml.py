@@ -33,7 +33,7 @@ import "fmt";
 fn main() -> i32 {
     string y = "name: test\\ncount: 42";
     string j = yaml.parse(y);
-    if (j == "{\\"name\\":\\"test\\",\\"count\\":42}") { return 0; }
+    if j == "{\\"name\\":\\"test\\",\\"count\\":42}" { return 0; }
     fmt.println(j);
     return 1;
 }'''
@@ -46,7 +46,7 @@ import "fmt";
 fn main() -> i32 {
     string y = "- a\\n- b\\n- c";
     string j = yaml.parse(y);
-    if (j == "[\\"a\\",\\"b\\",\\"c\\"]") { return 0; }
+    if j == "[\\"a\\",\\"b\\",\\"c\\"]" { return 0; }
     fmt.println(j);
     return 1;
 }'''
@@ -59,7 +59,7 @@ import "fmt";
 fn main() -> i32 {
     string y = "items:\\n  - x\\n  - y";
     string j = yaml.parse(y);
-    if (j == "{\\"items\\":[\\"x\\",\\"y\\"]}") { return 0; }
+    if j == "{\\"items\\":[\\"x\\",\\"y\\"]}" { return 0; }
     fmt.println(j);
     return 1;
 }'''
@@ -74,7 +74,7 @@ class YamlGetTest(unittest.TestCase):
         code = '''import "yaml";
 fn main() -> i32 {
     string y = "name: test";
-    if (yaml.get(y, "name") == "test") { return 0; }
+    if yaml.get(y, "name") == "test" { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -84,7 +84,7 @@ fn main() -> i32 {
         code = '''import "yaml";
 fn main() -> i32 {
     string y = "server:\\n  host: localhost";
-    if (yaml.get(y, "server.host") == "localhost") { return 0; }
+    if yaml.get(y, "server.host") == "localhost" { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -94,7 +94,7 @@ fn main() -> i32 {
         code = '''import "yaml";
 fn main() -> i32 {
     string y = "items:\\n  - a\\n  - b\\n  - c";
-    if (yaml.get(y, "items[1]") == "b") { return 0; }
+    if yaml.get(y, "items[1]") == "b" { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -104,7 +104,7 @@ fn main() -> i32 {
         code = '''import "yaml";
 fn main() -> i32 {
     string y = "count: 42";
-    if (yaml.get(y, "count") == "42") { return 0; }
+    if yaml.get(y, "count") == "42" { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -114,7 +114,7 @@ fn main() -> i32 {
         code = '''import "yaml";
 fn main() -> i32 {
     string y = "enabled: true";
-    if (yaml.get(y, "enabled") == "true") { return 0; }
+    if yaml.get(y, "enabled") == "true" { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -128,7 +128,7 @@ class YamlFeaturesTest(unittest.TestCase):
         code = '''import "yaml";
 fn main() -> i32 {
     string y = "# comment\\nname: test  # inline";
-    if (yaml.get(y, "name") == "test") { return 0; }
+    if yaml.get(y, "name") == "test" { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -138,7 +138,7 @@ fn main() -> i32 {
         code = '''import "yaml";
 fn main() -> i32 {
     string y = "msg: \\"hello world\\"";
-    if (yaml.get(y, "msg") == "hello world") { return 0; }
+    if yaml.get(y, "msg") == "hello world" { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)

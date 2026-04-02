@@ -1,23 +1,21 @@
 import "args";
-import "fs";
 import "fmt";
+import "fs";
 
 fn copy_recursive(string src, string dst) -> bool {
-    if (!fs.is_dir(src)) {
+    if ! fs.is_dir(src) {
         return fs.copy(src, dst);
     }
-
     // Directory - create destination and copy contents
-    if (!fs.mkdir(dst)) {
+    if ! fs.mkdir(dst) {
         return false;
     }
 
     array<string> entries = fs.list(src);
-
     for (i32 i = 0; i < entries.len(); i++) {
         string src_child = fs.join(src, entries[i]);
         string dst_child = fs.join(dst, entries[i]);
-        if (!copy_recursive(src_child, dst_child)) {
+        if ! copy_recursive(src_child, dst_child) {
             return false;
         }
     }
@@ -30,15 +28,14 @@ fn main() -> i32 {
     parser.flag("recursive", "r", "copy directories recursively");
     parser.positional("src", "source file");
     parser.positional("dst", "destination file");
-
     err e = parser.parse(0);
-    if (e != ok) {
+    if e != ok {
         fmt.eprintln(f"vigil-cp: {e.message()}");
         return 1;
     }
 
     array<string> positionals = parser.get_positionals();
-    if (positionals.len() < 2) {
+    if positionals.len() < 2 {
         fmt.eprintln("vigil-cp: missing file operand");
         return 1;
     }
@@ -46,15 +43,14 @@ fn main() -> i32 {
     string src = positionals[0];
     string dst = positionals[1];
     bool recursive = parser.get_bool("recursive");
-
     bool ok2 = false;
-    if (recursive) {
+    if recursive {
         ok2 = copy_recursive(src, dst);
     } else {
         ok2 = fs.copy(src, dst);
     }
 
-    if (!ok2) {
+    if ! ok2 {
         fmt.eprintln(f"vigil-cp: failed to copy {src} to {dst}");
         return 1;
     }

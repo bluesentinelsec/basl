@@ -5,7 +5,7 @@ fn main() -> i32 {
     // Write to a file
     string content = "Hello from VIGIL!\nThis is line 2.\n";
     bool ok_write = fs.write("test.txt", content);
-    if (! ok_write) {
+    if ! ok_write {
         fmt.println("Error writing file");
         return 1;
     }

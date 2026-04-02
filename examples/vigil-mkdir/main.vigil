@@ -1,35 +1,34 @@
 import "args";
-import "fs";
 import "fmt";
+import "fs";
 
 fn main() -> i32 {
     args.Parser parser = args.Parser.new("vigil-mkdir", "create directories");
     parser.flag("parents", "p", "make parent directories as needed");
     parser.positional("dir", "directory to create");
-
     err e = parser.parse(0);
-    if (e != ok) {
+    if e != ok {
         fmt.eprintln(f"vigil-mkdir: {e.message()}");
         return 1;
     }
 
     array<string> positionals = parser.get_positionals();
-    if (positionals.len() == 0) {
+    if positionals.len() == 0 {
         fmt.eprintln("vigil-mkdir: missing operand");
         return 1;
     }
 
     bool parents = parser.get_bool("parents");
-
     for (i32 i = 0; i < positionals.len(); i++) {
         string path = positionals[i];
         bool ok2 = false;
-        if (parents) {
+        if parents {
             ok2 = fs.mkdir_all(path);
         } else {
             ok2 = fs.mkdir(path);
         }
-        if (!ok2) {
+
+        if ! ok2 {
             fmt.eprintln(f"vigil-mkdir: cannot create directory '{path}'");
             return 1;
         }

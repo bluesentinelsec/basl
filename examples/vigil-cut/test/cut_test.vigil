@@ -1,17 +1,15 @@
-import "test";
-import "os";
-import "file";
-
 // Note: Tests use sh for stdin redirection, which requires Unix-like shell.
 // Windows users should run tests in WSL, Git Bash, or similar environment.
 
+import "file";
+import "os";
+import "test";
+
 fn test_cut_basic(test.T t) -> void {
     file.write_all("test_cut_in.txt", "a:b:c\nd:e:f\n");
-    
     string out, string errs, i32 exitCode, err e = os.exec("sh", "-c", "./vigil examples/vigil-cut/main.vigil --f 2 --d : < test_cut_in.txt");
     t.assert(string(e) == "ok", "cut should exit 0");
     t.assert(out == "b\ne\n", "should extract field 2 from both lines");
-    
     file.remove("test_cut_in.txt");
 }
 

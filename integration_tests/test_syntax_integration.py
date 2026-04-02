@@ -89,7 +89,7 @@ class SyntaxIntegrationTest(unittest.TestCase):
                             string letter = 'A';
                             string newline = '\\n';
 
-                            if (letter == "A" && newline.len() == 1) {
+                            if letter == "A" && newline.len() == 1 {
                                 return total;
                             }
                             return 0;
@@ -174,7 +174,7 @@ class SyntaxIntegrationTest(unittest.TestCase):
                         }
 
                         fn describe(Named named, Sized sized) -> i32 {
-                            if (named.name() == "ok") {
+                            if named.name() == "ok" {
                                 return sized.size();
                             }
                             return 0;
@@ -251,7 +251,7 @@ class DocsConformanceTest(unittest.TestCase):
             root = Path(tmpdir)
             write_sources(root, {"main.vigil": """
                 fn risky(bool fail) -> (i32, err) {
-                    if (fail) {
+                    if fail {
                         return 0, err("bad", err.arg);
                     }
                     return 42, ok;
@@ -259,11 +259,11 @@ class DocsConformanceTest(unittest.TestCase):
 
                 fn main() -> i32 {
                     i32 v1, err e1 = risky(false);
-                    if (e1 != ok) { return 1; }
-                    if (v1 != 42) { return 2; }
+                    if e1 != ok { return 1; }
+                    if v1 != 42 { return 2; }
 
                     i32 v2, err e2 = risky(true);
-                    if (e2 == ok) { return 3; }
+                    if e2 == ok { return 3; }
 
                     return 0;
                 }
@@ -277,7 +277,7 @@ class DocsConformanceTest(unittest.TestCase):
             root = Path(tmpdir)
             write_sources(root, {"main.vigil": """
                 fn fallible(i32 x) -> (i32, err) {
-                    if (x == 0) {
+                    if x == 0 {
                         return 0, err("zero", err.arg);
                     }
                     return x * 2, ok;
@@ -302,7 +302,7 @@ class DocsConformanceTest(unittest.TestCase):
                     pub string host;
 
                     fn init(string host) -> err {
-                        if (host == "") {
+                        if host == "" {
                             return err("empty host", err.arg);
                         }
                         self.host = host;
@@ -312,11 +312,11 @@ class DocsConformanceTest(unittest.TestCase):
 
                 fn main() -> i32 {
                     Conn c1, err e1 = Conn("localhost");
-                    if (e1 != ok) { return 1; }
-                    if (c1.host != "localhost") { return 2; }
+                    if e1 != ok { return 1; }
+                    if c1.host != "localhost" { return 2; }
 
                     Conn c2, err e2 = Conn("");
-                    if (e2 == ok) { return 3; }
+                    if e2 == ok { return 3; }
 
                     return 0;
                 }
@@ -335,12 +335,12 @@ class DocsConformanceTest(unittest.TestCase):
                     i32 total = 0;
 
                     for (i32 i = 0; i < 5; i++) {
-                        if (i == 3) { continue; }
+                        if i == 3 { continue; }
                         total += i;
                     }
 
                     i32 w = 0;
-                    while (w < 3) {
+                    while w < 3 {
                         total += 10;
                         w++;
                     }
@@ -356,7 +356,7 @@ class DocsConformanceTest(unittest.TestCase):
                     }
 
                     for (i32 j = 0; j < 100; j++) {
-                        if (j == 2) { break; }
+                        if j == 2 { break; }
                         total += 50;
                     }
 
@@ -382,7 +382,7 @@ class DocsConformanceTest(unittest.TestCase):
 
                 fn main() -> i32 {
                     Color c = Color.Green;
-                    switch (c) {
+                    switch c {
                         case Color.Red:
                             return 1;
                         case Color.Green:
@@ -404,7 +404,7 @@ class DocsConformanceTest(unittest.TestCase):
             write_sources(root, {"main.vigil": """
                 fn main() -> i32 {
                     i32 x = 3;
-                    switch (x) {
+                    switch x {
                         case 1:
                             return 10;
                         case 2, 3:
@@ -429,7 +429,7 @@ class DocsConformanceTest(unittest.TestCase):
 
                 fn main() -> i32 {
                     HttpStatus s = HttpStatus.NotFound;
-                    switch (s) {
+                    switch s {
                         case HttpStatus.NotFound:
                             return 44;
                         default:
@@ -479,26 +479,26 @@ class DocsConformanceTest(unittest.TestCase):
                 fn main() -> i32 {
                     string s = "  Hello World  ";
                     string trimmed = s.trim();
-                    if (trimmed != "Hello World") { return 1; }
-                    if (!trimmed.contains("World")) { return 2; }
-                    if (!trimmed.starts_with("Hello")) { return 3; }
-                    if (!trimmed.ends_with("World")) { return 4; }
-                    if (trimmed.to_upper() != "HELLO WORLD") { return 5; }
-                    if (trimmed.to_lower() != "hello world") { return 6; }
-                    if (trimmed.replace("World", "VIGIL") != "Hello VIGIL") { return 7; }
+                    if trimmed != "Hello World" { return 1; }
+                    if !trimmed.contains("World") { return 2; }
+                    if !trimmed.starts_with("Hello") { return 3; }
+                    if !trimmed.ends_with("World") { return 4; }
+                    if trimmed.to_upper() != "HELLO WORLD" { return 5; }
+                    if trimmed.to_lower() != "hello world" { return 6; }
+                    if trimmed.replace("World", "VIGIL") != "Hello VIGIL" { return 7; }
                     array<string> parts = trimmed.split(" ");
-                    if (parts.len() != 2) { return 8; }
+                    if parts.len() != 2 { return 8; }
                     i32 idx, bool found = trimmed.index_of("World");
-                    if (!found) { return 9; }
-                    if (idx != 6) { return 10; }
+                    if !found { return 9; }
+                    if idx != 6 { return 10; }
                     string sub, err e1 = trimmed.substr(0, 5);
-                    if (e1 != ok) { return 11; }
-                    if (sub != "Hello") { return 12; }
+                    if e1 != ok { return 11; }
+                    if sub != "Hello" { return 12; }
                     array<u8> bytes = trimmed.bytes();
-                    if (bytes.len() != 11) { return 13; }
+                    if bytes.len() != 11 { return 13; }
                     string ch, err e2 = trimmed.char_at(0);
-                    if (e2 != ok) { return 14; }
-                    if (ch != "H") { return 15; }
+                    if e2 != ok { return 14; }
+                    if ch != "H" { return 15; }
                     return 0;
                 }
             """})
@@ -515,19 +515,19 @@ class DocsConformanceTest(unittest.TestCase):
                 fn main() -> i32 {
                     array<i32> a = [1, 2, 3];
                     a.push(4);
-                    if (a.len() != 4) { return 1; }
+                    if a.len() != 4 { return 1; }
                     i32 popped, err e1 = a.pop();
-                    if (e1 != ok) { return 2; }
-                    if (popped != 4) { return 3; }
+                    if e1 != ok { return 2; }
+                    if popped != 4 { return 3; }
                     i32 val, err e2 = a.get(1);
-                    if (e2 != ok) { return 4; }
-                    if (val != 2) { return 5; }
+                    if e2 != ok { return 4; }
+                    if val != 2 { return 5; }
                     err e3 = a.set(0, 99);
-                    if (e3 != ok) { return 6; }
-                    if (a[0] != 99) { return 7; }
+                    if e3 != ok { return 6; }
+                    if a[0] != 99 { return 7; }
                     array<i32> sliced = a.slice(1, 3);
-                    if (sliced.len() != 2) { return 8; }
-                    if (!a.contains(99)) { return 9; }
+                    if sliced.len() != 2 { return 8; }
+                    if !a.contains(99) { return 9; }
                     return 0;
                 }
             """})
@@ -543,21 +543,21 @@ class DocsConformanceTest(unittest.TestCase):
             write_sources(root, {"main.vigil": """
                 fn main() -> i32 {
                     map<string, i32> m = {"a": 1, "b": 2};
-                    if (m.len() != 2) { return 1; }
+                    if m.len() != 2 { return 1; }
                     i32 val, bool found = m.get("a");
-                    if (!found) { return 2; }
-                    if (val != 1) { return 3; }
-                    if (!m.has("b")) { return 4; }
+                    if !found { return 2; }
+                    if val != 1 { return 3; }
+                    if !m.has("b") { return 4; }
                     err e = m.set("c", 3);
-                    if (e != ok) { return 5; }
-                    if (m.len() != 3) { return 6; }
+                    if e != ok { return 5; }
+                    if m.len() != 3 { return 6; }
                     i32 removed, bool had = m.remove("b");
-                    if (!had) { return 7; }
-                    if (removed != 2) { return 8; }
+                    if !had { return 7; }
+                    if removed != 2 { return 8; }
                     array<string> keys = m.keys();
-                    if (keys.len() != 2) { return 9; }
+                    if keys.len() != 2 { return 9; }
                     array<i32> vals = m.values();
-                    if (vals.len() != 2) { return 10; }
+                    if vals.len() != 2 { return 10; }
                     return 0;
                 }
             """})
@@ -574,21 +574,21 @@ class DocsConformanceTest(unittest.TestCase):
                 import "fmt";
                 fn main() -> i32 {
                     string s = "  Hello World  ";
-                    if (s.trim_left() != "Hello World  ") { return 1; }
-                    if (s.trim_right() != "  Hello World") { return 2; }
-                    if ("abc".reverse() != "cba") { return 3; }
-                    if ("".is_empty() != true) { return 4; }
-                    if ("hi".is_empty() != false) { return 5; }
-                    if ("hello".char_count() != 5) { return 6; }
-                    if ("ab".repeat(3) != "ababab") { return 7; }
-                    if ("ababa".count("ab") != 2) { return 8; }
+                    if s.trim_left() != "Hello World  " { return 1; }
+                    if s.trim_right() != "  Hello World" { return 2; }
+                    if "abc".reverse() != "cba" { return 3; }
+                    if "".is_empty() != true { return 4; }
+                    if "hi".is_empty() != false { return 5; }
+                    if "hello".char_count() != 5 { return 6; }
+                    if "ab".repeat(3) != "ababab" { return 7; }
+                    if "ababa".count("ab") != 2 { return 8; }
                     i32 idx, bool found = "hello world".last_index_of("o");
-                    if (!found) { return 9; }
-                    if (idx != 7) { return 10; }
-                    if ("hello world".trim_prefix("hello ") != "world") { return 11; }
-                    if ("hello world".trim_suffix(" world") != "hello") { return 12; }
-                    if (!"Hello".equal_fold("hello")) { return 13; }
-                    if ("abc".len() != 3) { return 14; }
+                    if !found { return 9; }
+                    if idx != 7 { return 10; }
+                    if "hello world".trim_prefix("hello ") != "world" { return 11; }
+                    if "hello world".trim_suffix(" world") != "hello" { return 12; }
+                    if !"Hello".equal_fold("hello") { return 13; }
+                    if "abc".len() != 3 { return 14; }
                     return 0;
                 }
             """})
@@ -604,12 +604,12 @@ class DocsConformanceTest(unittest.TestCase):
             write_sources(root, {"main.vigil": """
                 fn main() -> i32 {
                     array<i32> a = [10, 20, 30, 40, 50];
-                    if (!a.contains(30)) { return 1; }
-                    if (a.contains(99)) { return 2; }
+                    if !a.contains(30) { return 1; }
+                    if a.contains(99) { return 2; }
                     array<i32> sl = a.slice(1, 3);
-                    if (sl.len() != 2) { return 3; }
-                    if (sl[0] != 20) { return 4; }
-                    if (sl[1] != 30) { return 5; }
+                    if sl.len() != 2 { return 3; }
+                    if sl[0] != 20 { return 4; }
+                    if sl[1] != 30 { return 5; }
                     return 0;
                 }
             """})
@@ -630,52 +630,52 @@ class DocsConformanceTest(unittest.TestCase):
                     string name = "hi";
 
                     string s1 = f"{n:d}";
-                    if (s1 != "42") { return 1; }
+                    if s1 != "42" { return 1; }
 
                     string s2 = f"{n:x}";
-                    if (s2 != "2a") { return 2; }
+                    if s2 != "2a" { return 2; }
 
                     string s3 = f"{n:X}";
-                    if (s3 != "2A") { return 3; }
+                    if s3 != "2A" { return 3; }
 
                     string s4 = f"{n:b}";
-                    if (s4 != "101010") { return 4; }
+                    if s4 != "101010" { return 4; }
 
                     string s5 = f"{n:o}";
-                    if (s5 != "52") { return 5; }
+                    if s5 != "52" { return 5; }
 
                     string s6 = f"{pi:.2f}";
-                    if (s6 != "3.14") { return 6; }
+                    if s6 != "3.14" { return 6; }
 
                     string s7 = f"{name:>10}";
-                    if (s7 != "        hi") { return 7; }
+                    if s7 != "        hi" { return 7; }
 
                     string s8 = f"{name:<10}";
-                    if (s8 != "hi        ") { return 8; }
+                    if s8 != "hi        " { return 8; }
 
                     string s9 = f"{name:^10}";
-                    if (s9 != "    hi    ") { return 9; }
+                    if s9 != "    hi    " { return 9; }
 
                     string s10 = f"{name:*>10}";
-                    if (s10 != "********hi") { return 10; }
+                    if s10 != "********hi" { return 10; }
 
                     string s11 = f"{n:>10d}";
-                    if (s11 != "        42") { return 11; }
+                    if s11 != "        42" { return 11; }
 
                     string s12 = f"{1000:,}";
-                    if (s12 != "1,000") { return 12; }
+                    if s12 != "1,000" { return 12; }
 
                     string s13 = f"plain text";
-                    if (s13 != "plain text") { return 13; }
+                    if s13 != "plain text" { return 13; }
 
                     string s14 = f"val={n}";
-                    if (s14 != "val=42") { return 14; }
+                    if s14 != "val=42" { return 14; }
 
                     string s15 = f"{true}";
-                    if (s15 != "true") { return 15; }
+                    if s15 != "true" { return 15; }
 
                     string s16 = f"{pi}";
-                    if (s16.len() < 3) { return 16; }
+                    if s16.len() < 3 { return 16; }
 
                     return 0;
                 }
@@ -693,13 +693,13 @@ class DocsConformanceTest(unittest.TestCase):
                 import "fmt";
                 fn main() -> i32 {
                     string s1 = f"{{braces}}";
-                    if (s1 != "{braces}") { return 1; }
+                    if s1 != "{braces}" { return 1; }
 
                     string s2 = "\x48\x69";
-                    if (s2 != "Hi") { return 2; }
+                    if s2 != "Hi" { return 2; }
 
                     string s3 = "tab\there";
-                    if (s3.len() != 8) { return 3; }
+                    if s3.len() != 8 { return 3; }
 
                     return 0;
                 }
@@ -718,8 +718,8 @@ class DocsConformanceTest(unittest.TestCase):
                     i64 big = i64(x);
                     f64 fval = f64(x);
                     string s = string(x);
-                    if (s != "42") { return 1; }
-                    if (big != i64(42)) { return 2; }
+                    if s != "42" { return 1; }
+                    if big != i64(42) { return 2; }
                     return 0;
                 }
             """})
@@ -739,7 +739,7 @@ class DocsConformanceTest(unittest.TestCase):
                     u64 big = u64(999);
                     i64 signed_big = i64(500);
                     i32 result = i32(byte) + i32(mid) + i32(big) + i32(signed_big);
-                    if (result != 2754) { return 1; }
+                    if result != 2754 { return 1; }
                     return 0;
                 }
             """})
@@ -758,9 +758,9 @@ class DocsConformanceTest(unittest.TestCase):
 
                 fn main() -> i32 {
                     const i32 LOCAL_MAX = 50;
-                    if (LABEL != "test") { return 1; }
-                    if (MAX != 100) { return 2; }
-                    if (LOCAL_MAX != 50) { return 3; }
+                    if LABEL != "test" { return 1; }
+                    if MAX != 100 { return 2; }
+                    if LOCAL_MAX != 50 { return 3; }
                     return 0;
                 }
             """})
@@ -813,7 +813,7 @@ class DocsConformanceTest(unittest.TestCase):
                     i32 x = 5;
                     i32 y = 10;
                     string msg = f"sum={x + y}";
-                    if (msg != "sum=15") { return 1; }
+                    if msg != "sum=15" { return 1; }
                     return 0;
                 }
             """})
@@ -909,10 +909,10 @@ class RealProgramPatternsTest(unittest.TestCase):
             root = Path(tmpdir)
             write_sources(root, {"main.vigil": """
                 fn lookup(string key) -> (string, err) {
-                    if (key == "") {
+                    if key == "" {
                         return "", err("empty key", err.arg);
                     }
-                    if (key == "missing") {
+                    if key == "missing" {
                         return "", err("not found", err.not_found);
                     }
                     return "value_" + key, ok;
@@ -920,8 +920,8 @@ class RealProgramPatternsTest(unittest.TestCase):
 
                 fn main() -> i32 {
                     string v, err e = lookup("missing");
-                    if (e == ok) { return 1; }
-                    switch (e.kind()) {
+                    if e == ok { return 1; }
+                    switch e.kind() {
                         case err.not_found:
                             return 10;
                         case err.arg:
@@ -975,7 +975,7 @@ class RealProgramPatternsTest(unittest.TestCase):
                     fn main() -> i32 {
                         types.User u = types.User("alice", types.Status.Active);
                         string desc = print_desc(u);
-                        if (desc == "User(alice)") {
+                        if desc == "User(alice)" {
                             return 0;
                         }
                         return 1;
@@ -1014,7 +1014,7 @@ class RealProgramPatternsTest(unittest.TestCase):
                 fn main() -> i32 {
                     map<string, array<i32>> data = {"a": [1, 2], "b": [3, 4]};
                     array<i32> a_vals, bool found = data.get("a");
-                    if (!found) { return 1; }
+                    if !found { return 1; }
                     return a_vals[0] + a_vals[1];
                 }
             """})
@@ -1042,7 +1042,7 @@ class RealProgramPatternsTest(unittest.TestCase):
             root = Path(tmpdir)
             write_sources(root, {"main.vigil": """
                 fn maybe(i32 x) -> (i32, err) {
-                    if (x == 2) {
+                    if x == 2 {
                         return 0, err("skip", err.arg);
                     }
                     return x * 10, ok;
@@ -1077,7 +1077,7 @@ class RealProgramPatternsTest(unittest.TestCase):
                 fn work() -> i32 {
                     defer bump();
                     for (i32 i = 0; i < 10; i++) {
-                        if (i == 3) { break; }
+                        if i == 3 { break; }
                     }
                     return counter;
                 }
@@ -1103,7 +1103,7 @@ class RealProgramPatternsTest(unittest.TestCase):
                 }
 
                 fn maybe_val(i32 x) -> (i32, err) {
-                    if (x < 0) {
+                    if x < 0 {
                         return 0, err("negative", err.arg);
                     }
                     return x, ok;
@@ -1124,7 +1124,7 @@ class RealProgramPatternsTest(unittest.TestCase):
                 fn main() -> i32 {
                     array<i32> data = [1, -2, 3, -4, 5];
                     i32 result = process(data);
-                    if (cleanup_count != 1) { return 99; }
+                    if cleanup_count != 1 { return 99; }
                     return result;
                 }
             """})
@@ -1183,7 +1183,7 @@ class RealProgramPatternsTest(unittest.TestCase):
             write_sources(root, {"main.vigil": """
                 fn main() -> i32 {
                     string result = "  Hello World  ".trim().to_lower().replace("world", "vigil");
-                    if (result == "hello vigil") {
+                    if result == "hello vigil" {
                         return 0;
                     }
                     return 1;
@@ -1234,7 +1234,7 @@ class RealProgramPatternsTest(unittest.TestCase):
                 fn main() -> i32 {
                     string name = "  alice  ";
                     string msg = f"hello {name.trim()}!";
-                    if (msg == "hello alice!") {
+                    if msg == "hello alice!" {
                         return 0;
                     }
                     return 1;

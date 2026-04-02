@@ -221,7 +221,7 @@ TEST(CompilerBackendTest, MaterializesLoweredMainFunctionBody)
 TEST(CompilerBackendTest, MaterializesLoweredConditionalBytecodeShape)
 {
     static const char source[] = "fn main() -> i32 {"
-                                 "    if (1 < 2) {"
+                                 "    if 1 < 2 {"
                                  "        return 7;"
                                  "    }"
                                  "    return 4;"
@@ -279,7 +279,7 @@ TEST(CompilerBackendTest, MaterializesLoweredForLoopProgram)
 TEST(CompilerBackendTest, MaterializesSelfTailCallFunction)
 {
     static const char source[] = "fn bounce(i32 n, i32 acc) -> i32 {"
-                                 "    if (n == 0) {"
+                                 "    if n == 0 {"
                                  "        return acc;"
                                  "    }"
                                  "    return bounce(n - 1, acc + 1);"

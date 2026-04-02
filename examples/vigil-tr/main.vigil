@@ -3,60 +3,66 @@ import "fmt";
 import "readline";
 
 fn expand_set(string s) -> string {
-    if (s == "a-z") {
+    if s == "a-z" {
         return "abcdefghijklmnopqrstuvwxyz";
     }
-    if (s == "A-Z") {
+
+    if s == "A-Z" {
         return "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
     }
-    if (s == "0-9") {
+
+    if s == "0-9" {
         return "0123456789";
     }
+
     return s;
 }
 
 fn main() -> i32 {
-    if (args.count() < 2) {
+    if args.count() < 2 {
         fmt.eprintln("usage: tr SET1 SET2");
         return 1;
     }
 
     string set1 = expand_set(args.at(0));
     string set2 = expand_set(args.at(1));
-
-    if (set1.len() != set2.len()) {
+    if set1.len() != set2.len() {
         fmt.eprintln("tr: SET1 and SET2 must be same length");
         return 1;
     }
 
     string line = readline.input("");
-    while (!line.is_empty()) {
+    while ! line.is_empty() {
         string output = "";
         for (i32 i = 0; i < line.len(); i++) {
             string ch, err e2 = line.char_at(i);
-            if (e2 != ok) {
+            if e2 != ok {
                 continue;
             }
 
             bool found = false;
             for (i32 j = 0; j < set1.len(); j++) {
                 string s1, err e3 = set1.char_at(j);
-                if (e3 != ok) {
+                if e3 != ok {
                     continue;
                 }
-                if (ch == s1) {
+
+                if ch == s1 {
                     string s2, err e4 = set2.char_at(j);
-                    if (e4 == ok) {
+                    if e4 == ok {
                         output += s2;
                     }
+
                     found = true;
                     break;
                 }
             }
-            if (!found) {
+
+            if ! found {
                 output += ch;
             }
         }
+
         fmt.println(output);
         line = readline.input("");
     }

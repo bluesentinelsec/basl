@@ -1,56 +1,52 @@
 import "args";
-import "fs";
 import "fmt";
+import "fs";
 
 fn main() -> i32 {
     args.Parser parser = args.Parser.new("vigil-ls", "list directory contents");
     parser.flag("long", "l", "use a long listing format");
     parser.flag("all", "a", "do not ignore entries starting with .");
     parser.positional("dir", "directory to list");
-
     err e = parser.parse(0);
-    if (e != ok) {
+    if e != ok {
         fmt.eprintln(f"vigil-ls: {e.message()}");
         return 1;
     }
 
     array<string> positionals = parser.get_positionals();
     string dir = ".";
-    if (positionals.len() > 0) {
+    if positionals.len() > 0 {
         dir = positionals[0];
     }
 
     bool long_format = parser.get_bool("long");
     bool show_all = parser.get_bool("all");
-
-    if (!fs.exists(dir)) {
+    if ! fs.exists(dir) {
         fmt.eprintln(f"vigil-ls: {dir}: No such file or directory");
         return 1;
     }
 
     array<string> entries = fs.list(dir);
-
     for (i32 i = 0; i < entries.len(); i++) {
         string name = entries[i];
-
         // Skip hidden files unless -a
-        if (!show_all && name.len() > 0) {
+        if ! show_all && name.len() > 0 {
             string first_char, err ec = name.char_at(0);
-            if (ec == ok && first_char == ".") {
+            if ec == ok && first_char == "." {
                 continue;
             }
         }
 
-        if (long_format) {
+        if long_format {
             string path = fs.join(dir, name);
             bool is_dir = fs.is_dir(path);
             i64 size = fs.size(path);
             i64 mtime = fs.mtime(path);
-
             string type_char = "-";
-            if (is_dir) {
+            if is_dir {
                 type_char = "d";
             }
+
             fmt.println(f"{type_char} {size} {mtime} {name}");
         } else {
             fmt.println(name);

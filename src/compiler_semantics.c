@@ -894,21 +894,61 @@ vigil_status_t parse_bool_condition_expression(vigil_parser_state_t *state, vigi
                                      type_message);
 }
 
-vigil_status_t parse_parenthesized_bool_condition(vigil_parser_state_t *state, const vigil_token_t *keyword_token,
-                                                  const char *lparen_message, const char *rparen_message,
-                                                  const char *scalar_message, const char *type_message,
-                                                  vigil_expression_result_t *condition_result)
+int vigil_parser_expression_has_wrapping_parens(const vigil_parser_state_t *state, size_t start_index, size_t end_index)
+{
+    const vigil_token_t *token;
+    size_t index;
+    size_t depth;
+
+    if (state == NULL || end_index <= start_index)
+        return 0;
+
+    token = vigil_program_token_at(state->program, start_index);
+    if (token == NULL || token->kind != VIGIL_TOKEN_LPAREN)
+        return 0;
+
+    depth = 0U;
+    for (index = start_index; index < end_index; index++)
+    {
+        token = vigil_program_token_at(state->program, index);
+        if (token == NULL)
+            return 0;
+        if (token->kind == VIGIL_TOKEN_LPAREN)
+        {
+            depth += 1U;
+        }
+        else if (token->kind == VIGIL_TOKEN_RPAREN)
+        {
+            if (depth == 0U)
+                return 0;
+            depth -= 1U;
+            if (depth == 0U)
+                return index + 1U == end_index;
+        }
+    }
+
+    return 0;
+}
+
+vigil_status_t parse_unwrapped_bool_condition(vigil_parser_state_t *state, const vigil_token_t *keyword_token,
+                                              const char *scalar_message, const char *type_message,
+                                              vigil_expression_result_t *condition_result)
 {
     vigil_status_t status;
+    size_t start_index;
 
-    status = vigil_parser_expect(state, VIGIL_TOKEN_LPAREN, lparen_message, NULL);
-    if (status != VIGIL_STATUS_OK)
-        return status;
+    start_index = state->current;
     status =
         parse_bool_condition_expression(state, keyword_token->span, scalar_message, type_message, condition_result);
     if (status != VIGIL_STATUS_OK)
         return status;
-    return vigil_parser_expect(state, VIGIL_TOKEN_RPAREN, rparen_message, NULL);
+    if (vigil_parser_expression_has_wrapping_parens(state, start_index, state->current))
+    {
+        const vigil_token_t *token = vigil_program_token_at(state->program, start_index);
+        return vigil_parser_report(state, token != NULL ? token->span : keyword_token->span,
+                                   "unnecessary parentheses around condition (remove them)");
+    }
+    return VIGIL_STATUS_OK;
 }
 
 vigil_status_t vigil_semantic_parse_statement_sequence(vigil_parser_state_t *state,

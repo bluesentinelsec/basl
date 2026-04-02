@@ -1,5 +1,5 @@
-import "test";
 import "../lib/counter";
+import "test";
 
 fn test_count_empty(test.T t) -> void {
     i32 lines, i32 words, i32 bytes, err e = counter.count_content("");

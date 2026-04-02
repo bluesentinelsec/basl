@@ -2,34 +2,35 @@
 //
 // Usage: vigil run sdl_audio.vigil <path-to-wav>
 
-import "sdl";
-import "fmt";
 import "args";
+import "fmt";
+import "sdl";
 
 fn main() -> i32 {
     args.Parser p = args.Parser.new("sdl_audio", "Play a WAV file");
     args.Parser p2 = p.positional("file", "Path to a .wav file");
     err pe = p.parse(args.count());
-    if (pe != ok) {
+    if pe != ok {
         fmt.eprintln(p.help());
         return 1;
     }
+
     array<string> positionals = p.get_positionals();
-    if (positionals.len() < 1) {
+    if positionals.len() < 1 {
         fmt.eprintln("Usage: sdl_audio <file.wav>");
         return 1;
     }
-    string wav_path = positionals[0];
 
+    string wav_path = positionals[0];
     bool init_ok, err ie = sdl.init(sdl.INIT_AUDIO());
-    if (ie != ok) {
+    if ie != ok {
         fmt.eprintln(f"SDL init failed: {ie.message()}");
         return 1;
     }
-    defer sdl.quit();
 
+    defer sdl.quit();
     i64 wav, err we = sdl.load_wav(wav_path);
-    if (we != ok) {
+    if we != ok {
         fmt.eprintln(f"Failed to load WAV: {we.message()}");
         return 1;
     }
@@ -38,27 +39,25 @@ fn main() -> i32 {
     i32 wav_ch = sdl.wav_channels(wav);
     i32 wav_freq = sdl.wav_freq(wav);
     fmt.println(f"WAV: format={wav_fmt} channels={wav_ch} freq={wav_freq}");
-
     sdl.AudioStream stream, err se = sdl.AudioStream.open(wav_fmt, wav_ch, wav_freq);
-    if (se != ok) {
+    if se != ok {
         fmt.eprintln(f"Audio stream failed: {se.message()}");
         sdl.wav_free(wav);
         return 1;
     }
 
     bool put_ok, err pute = stream.put_wav(wav);
-    if (pute != ok) {
+    if pute != ok {
         fmt.eprintln(f"Failed to queue audio: {pute.message()}");
     }
 
     bool res_ok, err rese = stream.resume();
     fmt.println("Playing... waiting for audio to finish.");
-
-    while (stream.get_queued() > 0) {
+    while stream.get_queued() > 0 {
         sdl.delay(100);
     }
-    sdl.delay(500);
 
+    sdl.delay(500);
     fmt.println("Done.");
     stream.destroy();
     sdl.wav_free(wav);

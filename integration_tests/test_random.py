@@ -35,7 +35,7 @@ fn main() -> i32 {
     i32 a = random.i32();
     random.seed(12345);
     i32 b = random.i32();
-    if (a == b) { return 0; }
+    if a == b { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -65,7 +65,7 @@ class RandomF64Test(unittest.TestCase):
 fn main() -> i32 {
     random.seed(42);
     f64 x = random.f64();
-    if (x >= 0.0 && x < 1.0) { return 0; }
+    if x >= 0.0 && x < 1.0 { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -81,7 +81,7 @@ class RandomRangeTest(unittest.TestCase):
 fn main() -> i32 {
     random.seed(42);
     i32 r = random.range(10, 20);
-    if (r >= 10 && r < 20) { return 0; }
+    if r >= 10 && r < 20 { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -93,7 +93,7 @@ fn main() -> i32 {
 fn main() -> i32 {
     random.seed(42);
     i32 r = random.range(5, 5);
-    if (r == 5) { return 0; }
+    if r == 5 { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)

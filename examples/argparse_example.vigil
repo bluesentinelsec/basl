@@ -14,14 +14,14 @@ fn main() -> i32 {
     // Check for --help before parsing
     for (i32 i = 0; i < args.count(); i++) {
         string a = args.at(i);
-        if (a == "--help" || a == "-h") {
+        if a == "--help" || a == "-h" {
             fmt.println(p.help());
             return 0;
         }
     }
     // Parse arguments
     err e = p.parse(0);
-    if (e != ok) {
+    if e != ok {
         fmt.eprintln("Error: parse failed");
         fmt.eprintln(p.help());
         return 1;

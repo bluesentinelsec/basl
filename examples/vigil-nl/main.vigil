@@ -3,9 +3,8 @@ import "readline";
 
 fn main() -> i32 {
     i32 n = 1;
-
     string line = readline.input("");
-    while (!line.is_empty()) {
+    while ! line.is_empty() {
         fmt.println(f"     {n}\t{line}");
         n++;
         line = readline.input("");

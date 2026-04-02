@@ -70,7 +70,7 @@ class BoundaryTest(unittest.TestCase):
             fn main() -> i32 {
                 array<i32> a = [];
                 i32 v, err e = a.pop();
-                if (e != ok) { return 1; }
+                if e != ok { return 1; }
                 return 0;
             }
         """, 1)
@@ -80,7 +80,7 @@ class BoundaryTest(unittest.TestCase):
             fn main() -> i32 {
                 array<i32> a = [1];
                 i32 v, err e = a.get(99);
-                if (e != ok) { return 1; }
+                if e != ok { return 1; }
                 return 0;
             }
         """, 1)
@@ -90,7 +90,7 @@ class BoundaryTest(unittest.TestCase):
             fn main() -> i32 {
                 array<i32> a = [1];
                 err e = a.set(99, 5);
-                if (e != ok) { return 1; }
+                if e != ok { return 1; }
                 return 0;
             }
         """, 1)
@@ -108,7 +108,7 @@ class BoundaryTest(unittest.TestCase):
             fn main() -> i32 {
                 string s = "hi";
                 string ch, err e = s.char_at(99);
-                if (e != ok) { return 1; }
+                if e != ok { return 1; }
                 return 0;
             }
         """, 1)
@@ -118,7 +118,7 @@ class BoundaryTest(unittest.TestCase):
             fn main() -> i32 {
                 string s = "hello";
                 string sub, err e = s.substr(3, 99);
-                if (e != ok) { return 1; }
+                if e != ok { return 1; }
                 return 0;
             }
         """, 1)
@@ -128,7 +128,7 @@ class BoundaryTest(unittest.TestCase):
             fn main() -> i32 {
                 map<string, i32> m = {};
                 i32 v, bool found = m.get("x");
-                if (!found) { return 1; }
+                if !found { return 1; }
                 return 0;
             }
         """, 1)
@@ -146,7 +146,7 @@ class BoundaryTest(unittest.TestCase):
             fn main() -> i32 {
                 map<string, i32> m = {"a": 1};
                 i32 v, bool had = m.remove("z");
-                if (!had) { return 1; }
+                if !had { return 1; }
                 return 0;
             }
         """, 1)
@@ -163,7 +163,7 @@ class BoundaryTest(unittest.TestCase):
         self._run("""
             fn main() -> i32 {
                 i32 idx, bool found = "hello".index_of("xyz");
-                if (!found) { return 1; }
+                if !found { return 1; }
                 return 0;
             }
         """, 1)
@@ -181,7 +181,7 @@ class BoundaryTest(unittest.TestCase):
         self._run("""
             fn main() -> i32 {
                 array<i32> a = [1, 2, 3];
-                if (!a.contains(99)) { return 1; }
+                if !a.contains(99) { return 1; }
                 return 0;
             }
         """, 1)
@@ -199,7 +199,7 @@ class RecursionAndControlFlowTest(unittest.TestCase):
     def test_recursive_fibonacci(self) -> None:
         self._run("""
             fn fib(i32 n) -> i32 {
-                if (n <= 1) { return n; }
+                if n <= 1 { return n; }
                 return fib(n - 1) + fib(n - 2);
             }
             fn main() -> i32 { return fib(10); }
@@ -208,15 +208,15 @@ class RecursionAndControlFlowTest(unittest.TestCase):
     def test_mutual_recursion(self) -> None:
         self._run("""
             fn is_even(i32 n) -> bool {
-                if (n == 0) { return true; }
+                if n == 0 { return true; }
                 return is_odd(n - 1);
             }
             fn is_odd(i32 n) -> bool {
-                if (n == 0) { return false; }
+                if n == 0 { return false; }
                 return is_even(n - 1);
             }
             fn main() -> i32 {
-                if (is_even(10) && is_odd(7)) { return 0; }
+                if is_even(10) && is_odd(7) { return 0; }
                 return 1;
             }
         """, 0)
@@ -227,7 +227,7 @@ class RecursionAndControlFlowTest(unittest.TestCase):
                 i32 total = 0;
                 for (i32 i = 0; i < 3; i++) {
                     for (i32 j = 0; j < 3; j++) {
-                        if (j == 1) { continue; }
+                        if j == 1 { continue; }
                         total += 1;
                     }
                 }
@@ -241,7 +241,7 @@ class RecursionAndControlFlowTest(unittest.TestCase):
                 i32 total = 0;
                 for (i32 i = 0; i < 5; i++) {
                     for (i32 j = 0; j < 5; j++) {
-                        if (j == 2) { break; }
+                        if j == 2 { break; }
                         total += 1;
                     }
                 }
@@ -253,9 +253,9 @@ class RecursionAndControlFlowTest(unittest.TestCase):
         self._run("""
             fn main() -> i32 {
                 i32 x = 0;
-                while (true) {
+                while true {
                     x += 1;
-                    if (x == 10) { break; }
+                    if x == 10 { break; }
                 }
                 return x;
             }
@@ -264,7 +264,7 @@ class RecursionAndControlFlowTest(unittest.TestCase):
     def test_nested_for_in_with_guard(self) -> None:
         self._run("""
             fn safe_div(i32 a, i32 b) -> (i32, err) {
-                if (b == 0) { return 0, err("zero", err.arg); }
+                if b == 0 { return 0, err("zero", err.arg); }
                 return a / b, ok;
             }
             fn main() -> i32 {
@@ -283,7 +283,7 @@ class RecursionAndControlFlowTest(unittest.TestCase):
     def test_self_recursive_tail_call(self) -> None:
         self._run("""
             fn count_down(i32 n, i32 acc) -> i32 {
-                if (n <= 0) { return acc; }
+                if n <= 0 { return acc; }
                 return count_down(n - 1, acc + n);
             }
             fn main() -> i32 { return count_down(10, 0); }
@@ -293,7 +293,7 @@ class RecursionAndControlFlowTest(unittest.TestCase):
         self._run("""
             fn main() -> i32 {
                 i32 x = 99;
-                switch (x) {
+                switch x {
                     case 1: return 10;
                     case 2: return 20;
                     default: return 30;
@@ -304,7 +304,7 @@ class RecursionAndControlFlowTest(unittest.TestCase):
     def test_switch_first_case_match(self) -> None:
         self._run("""
             fn main() -> i32 {
-                switch (0) {
+                switch 0 {
                     case 0: return 10;
                     default: return 20;
                 }
@@ -400,7 +400,7 @@ class DeferTest(unittest.TestCase):
             }
             fn main() -> i32 {
                 work();
-                if (seq == 321) { return 0; }
+                if seq == 321 { return 0; }
                 return 1;
             }
         """, 0)
@@ -411,7 +411,7 @@ class DeferTest(unittest.TestCase):
             fn cleanup() -> void { ran = 1; }
             fn work(bool early) -> i32 {
                 defer cleanup();
-                if (early) { return 1; }
+                if early { return 1; }
                 return 2;
             }
             fn main() -> i32 {
@@ -482,16 +482,16 @@ class ClassAndInterfaceTest(unittest.TestCase):
             class Validated {
                 pub i32 value;
                 fn init(i32 v) -> err {
-                    if (v < 0) { return err("negative", err.arg); }
+                    if v < 0 { return err("negative", err.arg); }
                     self.value = v;
                     return ok;
                 }
             }
             fn main() -> i32 {
                 Validated good, err e1 = Validated(10);
-                if (e1 != ok) { return 1; }
+                if e1 != ok { return 1; }
                 Validated bad, err e2 = Validated(-1);
-                if (e2 == ok) { return 2; }
+                if e2 == ok { return 2; }
                 return good.value;
             }
         """, 10)
@@ -527,9 +527,9 @@ class ErrorFlowTest(unittest.TestCase):
             }
             fn main() -> i32 {
                 i32 v, err e = fail();
-                if (e != ok) {
+                if e != ok {
                     string msg = e.message();
-                    if (msg == "test error") { return 0; }
+                    if msg == "test error" { return 0; }
                 }
                 return 1;
             }
@@ -538,28 +538,28 @@ class ErrorFlowTest(unittest.TestCase):
     def test_error_kind_routing(self) -> None:
         self._run("""
             fn fail(i32 mode) -> (i32, err) {
-                if (mode == 1) { return 0, err("a", err.not_found); }
-                if (mode == 2) { return 0, err("b", err.permission); }
+                if mode == 1 { return 0, err("a", err.not_found); }
+                if mode == 2 { return 0, err("b", err.permission); }
                 return 42, ok;
             }
             fn main() -> i32 {
                 i32 v1, err e1 = fail(1);
                 i32 kind1 = 0;
-                switch (e1.kind()) {
+                switch e1.kind() {
                     case err.not_found: kind1 = 1;
                     default: kind1 = 9;
                 }
-                if (kind1 != 1) { return 1; }
+                if kind1 != 1 { return 1; }
                 i32 v2, err e2 = fail(2);
                 i32 kind2 = 0;
-                switch (e2.kind()) {
+                switch e2.kind() {
                     case err.permission: kind2 = 2;
                     default: kind2 = 9;
                 }
-                if (kind2 != 2) { return 2; }
+                if kind2 != 2 { return 2; }
                 i32 v3, err e3 = fail(0);
-                if (e3 != ok) { return 3; }
-                if (v3 != 42) { return 4; }
+                if e3 != ok { return 3; }
+                if v3 != 42 { return 4; }
                 return 0;
             }
         """, 0)
@@ -590,7 +590,7 @@ class ErrorFlowTest(unittest.TestCase):
         self._run("""
             fn main() -> i32 {
                 err e = err("test", err.arg);
-                if (e != ok) { return 1; }
+                if e != ok { return 1; }
                 return 0;
             }
         """, 1)
@@ -618,7 +618,7 @@ class MultiModuleTest(unittest.TestCase):
                     fn get_label(lib.Printable p) -> string { return p.label(); }
                     fn main() -> i32 {
                         lib.Item item = lib.Item("test");
-                        if (get_label(item) == "test") { return 0; }
+                        if get_label(item) == "test" { return 0; }
                         return 1;
                     }
                 """,
@@ -636,7 +636,7 @@ class MultiModuleTest(unittest.TestCase):
                     import "defs";
                     fn main() -> i32 {
                         defs.Level lv = defs.Level.Medium;
-                        switch (lv) {
+                        switch lv {
                             case defs.Level.Low: return 1;
                             case defs.Level.Medium: return 2;
                             case defs.Level.High: return 3;
@@ -720,7 +720,7 @@ class TypeConversionAndArithmeticTest(unittest.TestCase):
                 u64 e = u64(a);
                 f64 f = f64(a);
                 i32 back = i32(b) + i32(c) + i32(d) + i32(e);
-                if (back != 168) { return 1; }
+                if back != 168 { return 1; }
                 return 0;
             }
         """, 0)
@@ -728,9 +728,9 @@ class TypeConversionAndArithmeticTest(unittest.TestCase):
     def test_string_conversion(self) -> None:
         self._run("""
             fn main() -> i32 {
-                if (string(42) != "42") { return 1; }
-                if (string(true) != "true") { return 2; }
-                if (string(false) != "false") { return 3; }
+                if string(42) != "42" { return 1; }
+                if string(true) != "true" { return 2; }
+                if string(false) != "false" { return 3; }
                 return 0;
             }
         """, 0)
@@ -739,7 +739,7 @@ class TypeConversionAndArithmeticTest(unittest.TestCase):
         self._run("""
             fn main() -> i32 {
                 i32 a = 17 % 5;
-                if (a != 2) { return 1; }
+                if a != 2 { return 1; }
                 return 0;
             }
         """, 0)
@@ -760,8 +760,8 @@ class TypeConversionAndArithmeticTest(unittest.TestCase):
             fn main() -> i32 {
                 i32 a = 1 << 4;
                 i32 b = a >> 2;
-                if (a != 16) { return 1; }
-                if (b != 4) { return 2; }
+                if a != 16 { return 1; }
+                if b != 4 { return 2; }
                 return 0;
             }
         """, 0)
@@ -779,7 +779,7 @@ class TypeConversionAndArithmeticTest(unittest.TestCase):
         self._run("""
             fn main() -> i32 {
                 string s = "hello world".replace("o", "0");
-                if (s == "hell0 w0rld") { return 0; }
+                if s == "hell0 w0rld" { return 0; }
                 return 1;
             }
         """, 0)
@@ -871,7 +871,7 @@ class FStringAndStringTest(unittest.TestCase):
             fn main() -> i32 {
                 f64 pi = 3.14159;
                 string s = f"pi={pi:.2f}";
-                if (s == "pi=3.14") { return 0; }
+                if s == "pi=3.14" { return 0; }
                 return 1;
             }
         """, 0)
@@ -904,25 +904,25 @@ class FStringAndStringTest(unittest.TestCase):
                 string q = f"{neg:b}";
                 string r = f"{neg:o}";
                 string s = f"{pi:.4f}";
-                if (a != "Alice") { return 1; }
-                if (b != "30") { return 2; }
-                if (c != "3.1415926535000001") { return 3; }
-                if (d != "true") { return 4; }
-                if (e != "Alice     ") { return 5; }
-                if (f != "     Alice") { return 6; }
-                if (g != "   Alice   ") { return 7; }
-                if (h != "00000030") { return 8; }
-                if (i != "1e") { return 9; }
-                if (j != "1E") { return 10; }
-                if (k != "11110") { return 11; }
-                if (l != "36") { return 12; }
-                if (m != "1,234,567") { return 13; }
-                if (n != "-1,234,567") { return 14; }
-                if (o != "0") { return 15; }
-                if (p != "-2a") { return 16; }
-                if (q != "-101010") { return 17; }
-                if (r != "-52") { return 18; }
-                if (s != "3.1416") { return 19; }
+                if a != "Alice" { return 1; }
+                if b != "30" { return 2; }
+                if c != "3.1415926535000001" { return 3; }
+                if d != "true" { return 4; }
+                if e != "Alice     " { return 5; }
+                if f != "     Alice" { return 6; }
+                if g != "   Alice   " { return 7; }
+                if h != "00000030" { return 8; }
+                if i != "1e" { return 9; }
+                if j != "1E" { return 10; }
+                if k != "11110" { return 11; }
+                if l != "36" { return 12; }
+                if m != "1,234,567" { return 13; }
+                if n != "-1,234,567" { return 14; }
+                if o != "0" { return 15; }
+                if p != "-2a" { return 16; }
+                if q != "-101010" { return 17; }
+                if r != "-52" { return 18; }
+                if s != "3.1416" { return 19; }
                 return 0;
             }
         """, 0)
@@ -931,7 +931,7 @@ class FStringAndStringTest(unittest.TestCase):
         self._run("""
             fn main() -> i32 {
                 string s = f"literal {{braces}}";
-                if (s == "literal {braces}") { return 0; }
+                if s == "literal {braces}" { return 0; }
                 return 1;
             }
         """, 0)
@@ -942,7 +942,7 @@ class FStringAndStringTest(unittest.TestCase):
                 i32 a = 1;
                 i32 b = 2;
                 string s = f"{a}+{b}={a+b}";
-                if (s == "1+2=3") { return 0; }
+                if s == "1+2=3" { return 0; }
                 return 1;
             }
         """, 0)
@@ -975,7 +975,7 @@ class FStringAndStringTest(unittest.TestCase):
         self._run("""
             fn main() -> i32 {
                 string raw = `hello\\nworld`;
-                if (raw.len() == 12) { return 0; }
+                if raw.len() == 12 { return 0; }
                 return 1;
             }
         """, 0)
@@ -985,9 +985,9 @@ class FStringAndStringTest(unittest.TestCase):
             fn main() -> i32 {
                 string s = "ABC";
                 array<u8> b = s.bytes();
-                if (b.len() != 3) { return 1; }
+                if b.len() != 3 { return 1; }
                 u8 v, err e = b.get(0);
-                if (i32(v) != 65) { return 2; }
+                if i32(v) != 65 { return 2; }
                 return 0;
             }
         """, 0)

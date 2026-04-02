@@ -26,7 +26,7 @@ i32 g_total = 0;
 
 fn check(bool cond, string label) -> void {
     g_total++;
-    if (cond) {
+    if cond {
         g_pass++;
     } else {
         g_fail++;
@@ -43,18 +43,18 @@ fn gen_log_data(i32 lines) -> string {
     // Simulated log file — highly compressible, realistic text
     string out = "";
     i32 i = 0;
-    while (i < lines) {
+    while i < lines {
         string level = "INFO";
         i32 mod = i % 5;
-        if (mod == 0) {
+        if mod == 0 {
             level = "DEBUG";
         }
 
-        if (mod == 3) {
+        if mod == 3 {
             level = "WARN";
         }
 
-        if (mod == 4) {
+        if mod == 4 {
             level = "ERROR";
         }
 
@@ -73,8 +73,8 @@ fn gen_json_data(i32 records) -> string {
     // Simulated JSON array — structured, repetitive keys
     string out = "[\n";
     i32 i = 0;
-    while (i < records) {
-        if (i > 0) {
+    while i < records {
+        if i > 0 {
             out = out + ",\n";
         }
 
@@ -103,39 +103,39 @@ fn gen_pseudo_random(i32 size) -> string {
     random.seed(42);
     string out = "";
     i32 i = 0;
-    while (i < size) {
+    while i < size {
         i32 b = random.range(32, 127);
         string ch = "";
         // Build printable ASCII character
-        if (b == 32) {
+        if b == 32 {
             ch = " ";
         }
 
-        if (b == 33) {
+        if b == 33 {
             ch = "!";
         }
 
-        if (b == 34) {
+        if b == 34 {
             ch = "A";
         }
 
-        if (b >= 35 && b <= 57) {
+        if b >= 35 && b <= 57 {
             ch = string(b % 10);
         }
 
-        if (b >= 58 && b <= 90) {
+        if b >= 58 && b <= 90 {
             ch = "X";
         }
 
-        if (b >= 91 && b <= 122) {
+        if b >= 91 && b <= 122 {
             ch = "z";
         }
 
-        if (b >= 123) {
+        if b >= 123 {
             ch = "~";
         }
 
-        if (ch.len() == 0) {
+        if ch.len() == 0 {
             ch = ".";
         }
 
@@ -150,12 +150,12 @@ fn gen_source_code() -> string {
     // Simulated Vigil source — realistic code patterns
     string out = "import \"fmt\";\nimport \"math\";\n\n";
     out = out + "fn fibonacci(i32 n) -> i32 {\n";
-    out = out + "    if (n <= 1) { return n; }\n";
+    out = out + "    if n <= 1 { return n; }\n";
     out = out + "    return fibonacci(n - 1) + fibonacci(n - 2);\n";
     out = out + "}\n\n";
     out = out + "fn main() -> i32 {\n";
     out = out + "    i32 i = 0;\n";
-    out = out + "    while (i < 20) {\n";
+    out = out + "    while i < 20 {\n";
     out = out + "        fmt.println(\"fib(\" + string(i) + \") = \" + string(fibonacci(i)));\n";
     out = out + "        i++;\n";
     out = out + "    }\n";
@@ -306,16 +306,15 @@ fn test_zip_archive() -> void {
     i32 found = 0;
     for entry in listed {
         for name in names {
-            if (entry == name) {
-                found++;
-            }
+            if entry == name {
+                found++;}
         }
     }
 
     check(found == 5, "all 5 filenames found in zip listing");
     // Read back each file and verify content
     i32 idx = 0;
-    while (idx < 5) {
+    while idx < 5 {
         string read_back = compress.zip_read(zip_data, names[idx]);
         check(read_back == contents[idx], "zip_read '" + names[idx] + "' matches original");
         idx++;
@@ -344,7 +343,7 @@ fn test_tar_archive() -> void {
     check(listed.len() == 4, "tar_list returns 4 entries (got " + string(listed.len()) + ")");
     // Read back each file
     i32 idx = 0;
-    while (idx < 4) {
+    while idx < 4 {
         string read_back = compress.tar_read(tar_data, names[idx]);
         check(read_back == contents[idx], "tar_read '" + names[idx] + "' matches original");
         idx++;
@@ -384,7 +383,7 @@ fn test_tar_gz_pipeline() -> void {
     array<string> restored_list = compress.tar_list(tar_restored);
     check(restored_list.len() == 5, "restored tar has 5 entries");
     i32 idx = 0;
-    while (idx < 5) {
+    while idx < 5 {
         string extracted = compress.tar_read(tar_restored, names[idx]);
         check(extracted == contents[idx], "tar.gz pipeline: '" + names[idx] + "' intact");
         idx++;
@@ -466,7 +465,7 @@ fn test_edge_cases() -> void {
     array<string> many_names = [];
     array<string> many_contents = [];
     i32 i = 0;
-    while (i < 50) {
+    while i < 50 {
         many_names.push("file_" + string(i) + ".txt");
         many_contents.push("Content of file " + string(i) + "\n");
         i++;
@@ -735,7 +734,7 @@ fn main() -> i32 {
     fmt.println("  Failed: " + string(g_fail));
     fmt.println("  Time:   " + string(elapsed) + "ms");
     fmt.println("════════════════════════════════════════");
-    if (g_fail == 0) {
+    if g_fail == 0 {
         fmt.println("ALL PASS");
         return 0;
     } else {

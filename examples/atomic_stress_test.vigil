@@ -113,9 +113,9 @@ fn rb_try_enqueue(i64 value) -> bool {
         i64 head = atomic.load(rb_head);
         i64 idx = head % QUEUE_CAPACITY;
         i64 seq = atomic.load(rb_seq_handle(idx));
-        if (seq == head) {
+        if seq == head {
             // Slot is ready for writing — try to claim it
-            if (atomic.cas(rb_head, head, head + i64(1))) {
+            if atomic.cas(rb_head, head, head + i64(1)) {
                 // We own this slot.  Write value, then publish.
                 atomic.store(rb_val_handle(idx), value);
                 atomic.store(rb_seq_handle(idx), head + i64(1));
@@ -123,7 +123,7 @@ fn rb_try_enqueue(i64 value) -> bool {
                 return true;
             }
             // CAS failed — another producer won, retry
-        } else if (seq < head) {
+        } else if seq < head {
             // Queue is full (consumer hasn't freed this slot yet)
             return false;
         }
@@ -139,16 +139,16 @@ fn rb_try_dequeue() -> i64 {
         i64 tail = atomic.load(rb_tail);
         i64 idx = tail % QUEUE_CAPACITY;
         i64 seq = atomic.load(rb_seq_handle(idx));
-        if (seq == tail + i64(1)) {
+        if seq == tail + i64(1) {
             // Slot has data — try to claim it
-            if (atomic.cas(rb_tail, tail, tail + i64(1))) {
+            if atomic.cas(rb_tail, tail, tail + i64(1)) {
                 i64 val = atomic.load(rb_val_handle(idx));
                 // Release slot for next cycle
                 atomic.store(rb_seq_handle(idx), tail + QUEUE_CAPACITY);
                 atomic.inc(rb_dequeue_count);
                 return val;
             }
-        } else if (seq <= tail) {
+        } else if seq <= tail {
             // Queue is empty
             return POISON_PILL;
         }
@@ -161,7 +161,7 @@ fn rb_try_dequeue() -> i64 {
 // Blocking enqueue — spins until successful
 fn rb_enqueue(i64 value) -> void {
     for (;;) {
-        if (rb_try_enqueue(value)) {
+        if rb_try_enqueue(value) {
             return;
         }
 
@@ -172,14 +172,14 @@ fn rb_enqueue(i64 value) -> void {
 fn rb_dequeue(i64 shutdown_flag) -> i64 {
     for (;;) {
         i64 val = rb_try_dequeue();
-        if (val != POISON_PILL) {
+        if val != POISON_PILL {
             return val;
         }
         // Check if we should shut down
-        if (atomic.load(shutdown_flag) != i64(0)) {
+        if atomic.load(shutdown_flag) != i64(0) {
             // Drain any remaining items
             val = rb_try_dequeue();
-            if (val != POISON_PILL) {
+            if val != POISON_PILL {
                 return val;
             }
 
@@ -240,11 +240,11 @@ fn metrics_update_max(i64 shard, i64 value) -> void {
     i64 handle = metrics_gauge_max_handle(shard);
     for (;;) {
         i64 current = atomic.load(handle);
-        if (value <= current) {
+        if value <= current {
             return;
         }
 
-        if (atomic.cas(handle, current, value)) {
+        if atomic.cas(handle, current, value) {
             return;
         }
     }
@@ -254,11 +254,11 @@ fn metrics_update_min(i64 shard, i64 value) -> void {
     i64 handle = metrics_gauge_min_handle(shard);
     for (;;) {
         i64 current = atomic.load(handle);
-        if (value >= current) {
+        if value >= current {
             return;
         }
 
-        if (atomic.cas(handle, current, value)) {
+        if atomic.cas(handle, current, value) {
             return;
         }
     }
@@ -277,7 +277,7 @@ fn metrics_global_max() -> i64 {
     i64 m = i64(0);
     for (i64 i = i64(0); i < METRICS_SHARDS; i++) {
         i64 v = atomic.load(metrics_gauge_max_handle(i));
-        if (v > m) {
+        if v > m {
             m = v;
         }
     }
@@ -289,7 +289,7 @@ fn metrics_global_min() -> i64 {
     i64 m = i64(999999);
     for (i64 i = i64(0); i < METRICS_SHARDS; i++) {
         i64 v = atomic.load(metrics_gauge_min_handle(i));
-        if (v < m) {
+        if v < m {
             m = v;
         }
     }
@@ -318,7 +318,7 @@ fn spinlock_init() -> void {
 
 fn spinlock_acquire() -> void {
     for (;;) {
-        if (atomic.cas(spinlock_atom, i64(0), i64(1))) {
+        if atomic.cas(spinlock_atom, i64(0), i64(1)) {
             return;
         }
 
@@ -379,7 +379,7 @@ fn stack_node_next(i64 idx) -> i64 {
 fn stack_push(i64 value) -> bool {
     // Allocate a node from the pool
     i64 node = atomic.add(stack_alloc_idx, i64(1));
-    if (node >= STACK_POOL_SIZE) {
+    if node >= STACK_POOL_SIZE {
         return false;
         // pool exhausted
     }
@@ -389,7 +389,7 @@ fn stack_push(i64 value) -> bool {
     for (;;) {
         i64 top = atomic.load(stack_top);
         atomic.store(stack_node_next(node), top);
-        if (atomic.cas(stack_top, top, node)) {
+        if atomic.cas(stack_top, top, node) {
             atomic.inc(stack_push_count);
             return true;
         }
@@ -401,13 +401,13 @@ fn stack_push(i64 value) -> bool {
 fn stack_pop() -> i64 {
     for (;;) {
         i64 top = atomic.load(stack_top);
-        if (top == i64(- 1)) {
+        if top == i64(- 1) {
             return i64(- 1);
             // empty
         }
 
         i64 next = atomic.load(stack_node_next(top));
-        if (atomic.cas(stack_top, top, next)) {
+        if atomic.cas(stack_top, top, next) {
             atomic.inc(stack_pop_count);
             return atomic.load(stack_node_val(top));
         }
@@ -437,12 +437,12 @@ fn barrier_init(i64 n) -> void {
 fn barrier_wait() -> void {
     i64 remaining = atomic.sub(barrier_count, i64(1));
     // remaining is the OLD value, so if it was 1, we're the last
-    if (remaining == i64(1)) {
+    if remaining == i64(1) {
         atomic.store(barrier_flag, i64(1));
     } else {
         // Spin until flag is set
         for (;;) {
-            if (atomic.load(barrier_flag) != i64(0)) {
+            if atomic.load(barrier_flag) != i64(0) {
                 return;
             }
 
@@ -498,7 +498,7 @@ fn run_new_ops_test() -> bool {
                 // Acquire via exchange
                 for (;;) {
                     i64 was = atomic.exchange(xchg_lock, i64(1));
-                    if (was == i64(0)) {
+                    if was == i64(0) {
                         break;
                     }
 
@@ -525,7 +525,7 @@ fn run_new_ops_test() -> bool {
     i64 xchg_result = atomic.load(xchg_counter);
     i64 xchg_expected = SPINLOCK_THREADS * SPINLOCK_ITERS;
     fmt.println(f"  Exchange spinlock: {xchg_result}, Expected: {xchg_expected}");
-    if (xchg_result != xchg_expected) {
+    if xchg_result != xchg_expected {
         pass = false;
     }
     // Part B: concurrent bitmap via fetch_or (32 threads set bits 0-15)
@@ -534,7 +534,7 @@ fn run_new_ops_test() -> bool {
         i64 tid = thread.spawn(fn () -> i64 {
             i64 id = thread.current_id();
             i64 bit = id % i64(16);
-            if (bit < i64(0)) {
+            if bit < i64(0) {
                 bit = bit * i64(- 1);
             }
 
@@ -581,7 +581,7 @@ fn run_new_ops_test() -> bool {
 
     i64 xor_result = atomic.load(xor_atom);
     fmt.println(f"  XOR toggle result: {xor_result} (expected 0)");
-    if (xor_result != i64(0)) {
+    if xor_result != i64(0) {
         pass = false;
     }
     // Part D: fence (verify it doesn't crash under contention)
@@ -606,7 +606,7 @@ fn run_new_ops_test() -> bool {
     fmt.println("  Fence stress: OK");
     i64 elapsed = time.now_ms() - t0;
     fmt.println(f"  Time: {elapsed}ms");
-    if (pass) {
+    if pass {
         fmt.println("  PASS: All new operations correct");
     } else {
         fmt.println("  FAIL: New operation error!");
@@ -649,7 +649,7 @@ fn run_ring_buffer_test() -> bool {
             i64 local_sum = i64(0);
             for (;;) {
                 i64 val = rb_dequeue(shutdown);
-                if (val == POISON_PILL) {
+                if val == POISON_PILL {
                     break;
                 }
 
@@ -690,7 +690,7 @@ fn run_ring_buffer_test() -> bool {
     fmt.println(f"  Enqueue ops: {atomic.load(rb_enqueue_count)}, Dequeue ops: {atomic.load(rb_dequeue_count)}");
     fmt.println(f"  Time: {elapsed}ms");
     bool pass = actual_produced == expected_total && actual_consumed == expected_total && actual_sum == expected_sum;
-    if (pass) {
+    if pass {
         fmt.println("  PASS: No lost items, sum correct");
     } else {
         fmt.println("  FAIL: Data integrity violation!");
@@ -709,7 +709,7 @@ fn run_metrics_test() -> bool {
         i64 tid = thread.spawn(fn () -> i64 {
             i64 id = thread.current_id();
             i64 shard = id % METRICS_SHARDS;
-            if (shard < i64(0)) {
+            if shard < i64(0) {
                 shard = shard * i64(- 1);
             }
 
@@ -719,7 +719,7 @@ fn run_metrics_test() -> bool {
                 atomic.add(metrics_counter_handle(shard), i64(1));
                 // Update gauges with a synthetic value
                 i64 val = (id * i64(7) + i) % i64(1000);
-                if (val < i64(0)) {
+                if val < i64(0) {
                     val = val * i64(- 1);
                 }
 
@@ -752,7 +752,7 @@ fn run_metrics_test() -> bool {
     fmt.println(f"  Gauge max: {gmax}, Gauge min: {gmin}");
     fmt.println(f"  Time: {elapsed}ms");
     bool pass = total_count == expected_count;
-    if (pass) {
+    if pass {
         fmt.println("  PASS: All increments accounted for");
     } else {
         fmt.println("  FAIL: Lost increments!");
@@ -797,7 +797,7 @@ fn run_spinlock_test() -> bool {
     fmt.println(f"  CAS contention events: {contention}");
     fmt.println(f"  Time: {elapsed}ms");
     bool pass = actual == expected;
-    if (pass) {
+    if pass {
         fmt.println("  PASS: Spinlock protected all updates");
     } else {
         fmt.println("  FAIL: Race condition detected!");
@@ -819,7 +819,7 @@ fn run_stack_test() -> bool {
         i64 tid = thread.spawn(fn () -> i64 {
             i64 local_sum = i64(0);
             for (i64 i = i64(1); i <= STACK_OPS; i++) {
-                if (stack_push(i)) {
+                if stack_push(i) {
                     local_sum = local_sum + i;
                 }
             }
@@ -842,7 +842,7 @@ fn run_stack_test() -> bool {
             i64 local_sum = i64(0);
             for (;;) {
                 i64 val = stack_pop();
-                if (val == i64(- 1)) {
+                if val == i64(- 1) {
                     break;
                 }
 
@@ -872,7 +872,7 @@ fn run_stack_test() -> bool {
     fmt.println(f"  Push sum: {psum}, Pop sum: {ppsum}");
     fmt.println(f"  Time: {elapsed}ms");
     bool pass = total_pushed == total_popped && psum == ppsum;
-    if (pass) {
+    if pass {
         fmt.println("  PASS: All values accounted for, sums match");
     } else {
         fmt.println("  FAIL: Push/pop mismatch!");
@@ -894,7 +894,7 @@ fn run_barrier_test() -> bool {
             barrier_wait();
             // After barrier, all threads should see the full count
             i64 val = atomic.load(barrier_result);
-            if (val < BARRIER_THREADS) {
+            if val < BARRIER_THREADS {
                 return i64(1);
                 // error: saw partial state
             }
@@ -919,7 +919,7 @@ fn run_barrier_test() -> bool {
     fmt.println(f"  Post-barrier visibility errors: {errors}");
     fmt.println(f"  Time: {elapsed}ms");
     bool pass = final_val == BARRIER_THREADS && errors == i64(0);
-    if (pass) {
+    if pass {
         fmt.println("  PASS: All threads synchronized correctly");
     } else {
         fmt.println("  FAIL: Barrier synchronization failed!");
@@ -962,7 +962,7 @@ fn run_mutex_reference_test() -> bool {
     fmt.println(f"  Counter: {actual}, Expected: {expected}");
     fmt.println(f"  Time: {elapsed}ms");
     bool pass = actual == expected;
-    if (pass) {
+    if pass {
         fmt.println("  PASS: Mutex protected all updates");
     } else {
         fmt.println("  FAIL: Race condition under mutex!");
@@ -982,43 +982,43 @@ fn main() -> i32 {
     i64 t_start = time.now_ms();
     i32 pass_count = 0;
     i32 fail_count = 0;
-    if (run_ring_buffer_test()) {
+    if run_ring_buffer_test() {
         pass_count = pass_count + 1;
     } else {
         fail_count = fail_count + 1;
     }
 
-    if (run_metrics_test()) {
+    if run_metrics_test() {
         pass_count = pass_count + 1;
     } else {
         fail_count = fail_count + 1;
     }
 
-    if (run_spinlock_test()) {
+    if run_spinlock_test() {
         pass_count = pass_count + 1;
     } else {
         fail_count = fail_count + 1;
     }
 
-    if (run_stack_test()) {
+    if run_stack_test() {
         pass_count = pass_count + 1;
     } else {
         fail_count = fail_count + 1;
     }
 
-    if (run_barrier_test()) {
+    if run_barrier_test() {
         pass_count = pass_count + 1;
     } else {
         fail_count = fail_count + 1;
     }
 
-    if (run_mutex_reference_test()) {
+    if run_mutex_reference_test() {
         pass_count = pass_count + 1;
     } else {
         fail_count = fail_count + 1;
     }
 
-    if (run_new_ops_test()) {
+    if run_new_ops_test() {
         pass_count = pass_count + 1;
     } else {
         fail_count = fail_count + 1;
@@ -1041,7 +1041,7 @@ fn main() -> i32 {
     // - atomic.fence:     contended fence stress
     // - atomic.inc:       ring buffer enq/deq counts, metrics ops, spinlock contention, barrier result
     // - atomic.dec:       (available, functionally same as sub(h,1))
-    if (fail_count > 0) {
+    if fail_count > 0 {
         fmt.println("  STATUS: FAIL");
         return 1;
     }

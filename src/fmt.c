@@ -103,6 +103,7 @@ typedef struct
     int generic_depth;
     int ternary_depth;
     bool in_enum_body;
+    size_t skipped_control_rparen;
 } fmt_ctx_t;
 
 static void emit_indent(fmt_state_t *f)
@@ -289,6 +290,11 @@ static int import_cmp(const void *a, const void *b)
 static bool is_call_prefix(vigil_token_kind_t pk)
 {
     return pk == VIGIL_TOKEN_IDENTIFIER || pk == VIGIL_TOKEN_RPAREN || pk == VIGIL_TOKEN_RBRACKET;
+}
+
+static bool is_control_condition_keyword(vigil_token_kind_t kind)
+{
+    return kind == VIGIL_TOKEN_IF || kind == VIGIL_TOKEN_WHILE || kind == VIGIL_TOKEN_SWITCH;
 }
 
 static bool need_space_before(const vigil_token_t *prev, const vigil_token_t *cur, const fmt_state_t *f)
@@ -614,6 +620,49 @@ static bool fmt_preceded_by_enum(const fmt_state_t *f, size_t i)
     return false;
 }
 
+static size_t fmt_find_matching_rparen(const fmt_state_t *f, size_t i)
+{
+    size_t depth = 0U;
+
+    for (; i < f->count; i++)
+    {
+        const vigil_token_t *token = vigil_token_list_get(f->tokens, i);
+        if (token->kind == VIGIL_TOKEN_LPAREN)
+            depth += 1U;
+        else if (token->kind == VIGIL_TOKEN_RPAREN)
+        {
+            if (depth == 0U)
+                return SIZE_MAX;
+            depth -= 1U;
+            if (depth == 0U)
+                return i;
+        }
+    }
+
+    return SIZE_MAX;
+}
+
+static bool fmt_is_control_condition_paren(const fmt_state_t *f, size_t i)
+{
+    const vigil_token_t *prev;
+    size_t closing;
+
+    if (i == 0 || i >= f->count)
+        return false;
+    if (vigil_token_list_get(f->tokens, i)->kind != VIGIL_TOKEN_LPAREN)
+        return false;
+
+    prev = vigil_token_list_get(f->tokens, i - 1);
+    if (!is_control_condition_keyword(prev->kind))
+        return false;
+
+    closing = fmt_find_matching_rparen(f, i);
+    if (closing == SIZE_MAX || closing + 1U >= f->count)
+        return false;
+
+    return vigil_token_list_get(f->tokens, closing + 1U)->kind == VIGIL_TOKEN_LBRACE;
+}
+
 static void fmt_track_lbrace(fmt_state_t *f, fmt_ctx_t *ctx, size_t i)
 {
     bool is_lit = (i > 0) && TOK_TEST(kLiteralBraceOpenerBits, vigil_token_list_get(f->tokens, i - 1)->kind);
@@ -739,24 +788,38 @@ vigil_status_t vigil_fmt(const vigil_allocator_t *allocator, const char *source_
 
     fmt_ctx_t ctx;
     memset(&ctx, 0, sizeof(ctx));
+    ctx.skipped_control_rparen = SIZE_MAX;
+    size_t prev_emitted_idx = SIZE_MAX;
 
     for (size_t i = first_non_import; i < f.count; i++)
     {
         const vigil_token_t *cur = vigil_token_list_get(tokens, i);
         if (cur->kind == VIGIL_TOKEN_EOF)
             break;
+        if (i == ctx.skipped_control_rparen)
+        {
+            ctx.skipped_control_rparen = SIZE_MAX;
+            continue;
+        }
+        if (fmt_is_control_condition_paren(&f, i))
+        {
+            ctx.skipped_control_rparen = fmt_find_matching_rparen(&f, i);
+            continue;
+        }
 
-        size_t gap_start =
-            (i > first_non_import) ? vigil_token_list_get(tokens, i - 1)->span.end_offset : initial_comment_end;
+        size_t gap_start = prev_emitted_idx != SIZE_MAX
+                               ? vigil_token_list_get(tokens, prev_emitted_idx)->span.end_offset
+                               : initial_comment_end;
         bool had_comment = emit_comments_between(&f, gap_start, cur->span.start_offset);
 
         fmt_adjust_indent_before(&f, &ctx, cur->kind);
 
-        if (i > first_non_import && !had_comment)
-            fmt_emit_spacing(&f, &ctx, vigil_token_list_get(tokens, i - 1), cur);
+        if (prev_emitted_idx != SIZE_MAX && !had_comment)
+            fmt_emit_spacing(&f, &ctx, vigil_token_list_get(tokens, prev_emitted_idx), cur);
 
         emit_str(&f, tok_text(&f, cur), tok_len(cur));
         fmt_update_state_after(&f, &ctx, cur, i);
+        prev_emitted_idx = i;
     }
 
     fmt_finalize_output(&f);

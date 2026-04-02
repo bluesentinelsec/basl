@@ -3,7 +3,7 @@
 import "fmt";
 
 fn divide(i32 a, i32 b) -> (i32, err) {
-    if (b == 0) {
+    if b == 0 {
         return 0, err("division by zero", err.arg);
     }
 
@@ -11,11 +11,11 @@ fn divide(i32 a, i32 b) -> (i32, err) {
 }
 // Function that validates input
 fn validate_age(i32 age) -> err {
-    if (age < 0) {
+    if age < 0 {
         return err("age cannot be negative", err.arg);
     }
 
-    if (age > 150) {
+    if age > 150 {
         return err("age is unrealistic", err.arg);
     }
 
@@ -25,7 +25,7 @@ fn validate_age(i32 age) -> err {
 fn main() -> i32 {
     // Example 1: Handle division error
     i32 result, err e = divide(10, 2);
-    if (e != ok) {
+    if e != ok {
         fmt.println(f"Error: {e.message()}");
         return 1;
     }
@@ -33,24 +33,24 @@ fn main() -> i32 {
     fmt.println(f"10 / 2 = {result}");
     // Example 2: Division by zero
     i32 result2, err e2 = divide(10, 0);
-    if (e2 != ok) {
+    if e2 != ok {
         fmt.println(f"Error: {e2.message()}");
     } else {
         fmt.println(f"Result: {result2}");
     }
     // Example 3: Validate age
     err e3 = validate_age(25);
-    if (e3 == ok) {
+    if e3 == ok {
         fmt.println("Age 25 is valid");
     }
 
     err e4 = validate_age(- 5);
-    if (e4 != ok) {
+    if e4 != ok {
         fmt.println(f"Invalid age: {e4.message()}");
     }
 
     err e5 = validate_age(200);
-    if (e5 != ok) {
+    if e5 != ok {
         fmt.println(f"Invalid age: {e5.message()}");
     }
     // Example 4: Discard error with _

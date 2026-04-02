@@ -10418,9 +10418,8 @@ static vigil_status_t vigil_parser_parse_if_statement(vigil_parser_state_t *stat
         return status;
     }
 
-    status = parse_parenthesized_bool_condition(
-        state, if_token, "expected '(' after 'if'", "expected ')' after if condition",
-        "if condition must be a single bool value", "if condition must be bool", &condition_result);
+    status = parse_unwrapped_bool_condition(state, if_token, "if condition must be a single bool value",
+                                            "if condition must be bool", &condition_result);
     if (status != VIGIL_STATUS_OK)
     {
         return status;
@@ -10745,9 +10744,8 @@ static vigil_status_t vigil_parser_parse_while_statement(vigil_parser_state_t *s
     }
 
     loop_start = vigil_chunk_code_size(&state->chunk);
-    status = parse_parenthesized_bool_condition(
-        state, while_token, "expected '(' after 'while'", "expected ')' after while condition",
-        "while condition must be a single bool value", "while condition must be bool", &condition_result);
+    status = parse_unwrapped_bool_condition(state, while_token, "while condition must be a single bool value",
+                                            "while condition must be bool", &condition_result);
     if (status != VIGIL_STATUS_OK)
     {
         return status;
@@ -11470,12 +11468,20 @@ static vigil_status_t vigil_parser_parse_switch_statement(vigil_parser_state_t *
     status = vigil_parser_expect(state, VIGIL_TOKEN_SWITCH, "expected 'switch'", &switch_token);
     if (status != VIGIL_STATUS_OK)
         goto cleanup;
-    status = vigil_parser_expect(state, VIGIL_TOKEN_LPAREN, "expected '(' after 'switch'", NULL);
-    if (status != VIGIL_STATUS_OK)
-        goto cleanup;
-    status = vigil_parser_parse_expression(state, &switch_result);
-    if (status != VIGIL_STATUS_OK)
-        goto cleanup;
+    {
+        size_t condition_start = state->current;
+
+        status = vigil_parser_parse_expression(state, &switch_result);
+        if (status != VIGIL_STATUS_OK)
+            goto cleanup;
+        if (vigil_parser_expression_has_wrapping_parens(state, condition_start, state->current))
+        {
+            const vigil_token_t *token = vigil_program_token_at(state->program, condition_start);
+            status = vigil_parser_report(state, token != NULL ? token->span : switch_token->span,
+                                         "unnecessary parentheses around condition (remove them)");
+            goto cleanup;
+        }
+    }
     if (!vigil_parser_type_is_integer(switch_result.type) &&
         !vigil_parser_type_equal(switch_result.type, vigil_binding_type_primitive(VIGIL_TYPE_BOOL)) &&
         !vigil_parser_type_is_enum(switch_result.type))
@@ -11483,9 +11489,6 @@ static vigil_status_t vigil_parser_parse_switch_statement(vigil_parser_state_t *
         status = vigil_parser_report(state, switch_token->span, "switch expression must be an integer, bool, or enum");
         goto cleanup;
     }
-    status = vigil_parser_expect(state, VIGIL_TOKEN_RPAREN, "expected ')' after switch expression", NULL);
-    if (status != VIGIL_STATUS_OK)
-        goto cleanup;
     status = vigil_parser_expect(state, VIGIL_TOKEN_LBRACE, "expected '{' after switch expression", NULL);
     if (status != VIGIL_STATUS_OK)
         goto cleanup;

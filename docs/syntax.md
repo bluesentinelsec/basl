@@ -346,7 +346,7 @@ VIGIL performs no implicit numeric coercion. Mixed-type operations require expli
 ```
 i32 a = 10;
 i64 b = i64(20);
-if (i64(a) < b) { }
+if i64(a) < b { }
 ```
 
 For parsing strings to numbers, use the `parse` module:
@@ -374,7 +374,7 @@ fn greet(string name) -> void {
 
 ```
 fn divide(i32 a, i32 b) -> (i32, err) {
-    if (b == 0) {
+    if b == 0 {
         return 0, err("division by zero", err.arg);
     }
     return a / b, ok;
@@ -385,7 +385,7 @@ A function returning only `err` uses `-> err`:
 
 ```
 fn validate(i32 age) -> err {
-    if (age < 0) {
+    if age < 0 {
         return err("negative age", err.arg);
     }
     return ok;
@@ -429,9 +429,9 @@ fn main() -> i32 {
 ### if / else if / else
 
 ```
-if (x > 10) {
+if x > 10 {
     fmt.println("big");
-} else if (x > 5) {
+} else if x > 5 {
     fmt.println("medium");
 } else {
     fmt.println("small");
@@ -443,7 +443,7 @@ Parentheses around the condition are required. The condition must be `bool` — 
 ### while
 
 ```
-while (running) {
+while running {
     tick();
 }
 ```
@@ -473,7 +473,7 @@ for key, val in m {
 ### switch
 
 ```
-switch (x) {
+switch x {
     case 1:
         fmt.println("one");
     case 2, 3:
@@ -491,8 +491,8 @@ switch (x) {
 
 ```
 for (i32 i = 0; i < 100; i++) {
-    if (i == 50) { break; }
-    if (i % 2 == 0) { continue; }
+    if i == 50 { break; }
+    if i % 2 == 0 { continue; }
 }
 ```
 
@@ -533,7 +533,7 @@ Equivalent expanded form:
 
 ```
 string data, err e = file.read_all("config.txt");
-if (e != ok) {
+if e != ok {
     fmt.eprintln(f"read failed: {e.message()}");
     return 1;
 }
@@ -555,7 +555,7 @@ return err("file not found", err.not_found);
 ### Inspecting Errors
 
 ```
-if (e != ok) {
+if e != ok {
     fmt.eprintln(e.message());
     fmt.eprintln(e.kind());
 }
@@ -570,7 +570,7 @@ Built-in error kinds:
 ### Routing by Kind
 
 ```
-switch (e.kind()) {
+switch e.kind() {
     case err.not_found:
         fmt.println("missing");
     case err.permission:
@@ -614,7 +614,7 @@ class Connection {
     pub string host;
 
     fn init(string host) -> err {
-        if (host == "") {
+        if host == "" {
             return err("empty host", err.arg);
         }
         self.host = host;
@@ -701,7 +701,7 @@ Enum values are `i32`-backed. Access members with dot syntax:
 ```
 Color c = Color.Red;
 
-switch (c) {
+switch c {
     case Color.Red:
         fmt.println("red");
     default:
