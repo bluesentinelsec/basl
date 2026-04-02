@@ -1283,3 +1283,63 @@ vigil_status_t vigil_vm_op_string_join(vigil_vm_t *vm, vigil_vm_frame_t *frame, 
     VIGIL_VM_VALUE_RELEASE(&value);
     return status;
 }
+
+/* ── STRING_NEXT_CHAR ──────────────────────────────────────────── */
+
+vigil_status_t vigil_vm_op_string_next_char(vigil_vm_t *vm, vigil_vm_frame_t *frame, vigil_error_t *error)
+{
+    vigil_status_t status;
+    vigil_value_t str_val, offset_val, char_val, next_val;
+    const char *text;
+    size_t text_length;
+    int64_t offset;
+    size_t char_len;
+
+    frame->ip += 1U;
+    offset_val = vigil_vm_pop_or_nil(vm);
+    str_val = vigil_vm_pop_or_nil(vm);
+
+    if (!vigil_vm_get_string_parts(&str_val, &text, &text_length) || !vigil_nanbox_is_int(offset_val))
+    {
+        VIGIL_VM_VALUE_RELEASE(&str_val);
+        VIGIL_VM_VALUE_RELEASE(&offset_val);
+        return vigil_vm_fail_at_ip(vm, VIGIL_STATUS_INVALID_ARGUMENT,
+                                   "string next_char requires a string and i32 offset", error);
+    }
+
+    offset = vigil_value_as_int(&offset_val);
+    if (offset < 0 || (size_t)offset >= text_length)
+    {
+        VIGIL_VM_VALUE_RELEASE(&str_val);
+        VIGIL_VM_VALUE_RELEASE(&offset_val);
+        return vigil_vm_fail_at_ip(vm, VIGIL_STATUS_INVALID_ARGUMENT, "string next_char offset out of range", error);
+    }
+
+    {
+        unsigned char uc = (unsigned char)text[(size_t)offset];
+        if (uc < 0x80U)
+            char_len = 1U;
+        else if ((uc & 0xE0U) == 0xC0U)
+            char_len = 2U;
+        else if ((uc & 0xF0U) == 0xE0U)
+            char_len = 3U;
+        else
+            char_len = 4U;
+        if ((size_t)offset + char_len > text_length)
+            char_len = text_length - (size_t)offset;
+    }
+
+    status = vigil_vm_new_string_value(vm, text + (size_t)offset, char_len, &char_val, error);
+    VIGIL_VM_VALUE_RELEASE(&str_val);
+    VIGIL_VM_VALUE_RELEASE(&offset_val);
+    if (status != VIGIL_STATUS_OK)
+        return status;
+
+    vigil_value_init_int(&next_val, offset + (int64_t)char_len);
+    status = vigil_vm_push(vm, &char_val, error);
+    VIGIL_VM_VALUE_RELEASE(&char_val);
+    if (status == VIGIL_STATUS_OK)
+        status = vigil_vm_push(vm, &next_val, error);
+    VIGIL_VM_VALUE_RELEASE(&next_val);
+    return status;
+}

@@ -2938,7 +2938,7 @@ TEST(VigilCompilerTest, RejectsInvalidForInBindingsAndIterables)
     EXPECT_EQ(vigil_compile_source(&registry, source_id, &function, &diagnostics, &error), VIGIL_STATUS_SYNTAX_ERROR);
     ASSERT_EQ(vigil_diagnostic_list_count(&diagnostics), 1U);
     EXPECT_STREQ(vigil_string_c_str(&vigil_diagnostic_list_get(&diagnostics, 0U)->message),
-                 "for-in requires an array or map iterable");
+                 "for-in requires an array, map, or string iterable");
 
     vigil_diagnostic_list_free(&diagnostics);
     vigil_source_registry_free(&registry);

@@ -294,7 +294,8 @@ extern "C"
            Format: [opcode(1)][u32 dst_local]  (5 bytes) */
         VIGIL_OPCODE_ADD_F64_STORE = 186,
         VIGIL_OPCODE_SUBTRACT_F64_STORE = 187,
-        VIGIL_OPCODE_MULTIPLY_F64_STORE = 188
+        VIGIL_OPCODE_MULTIPLY_F64_STORE = 188,
+        VIGIL_OPCODE_STRING_NEXT_CHAR = 189
     } vigil_opcode_t;
 
     /* Forward-declare the register chunk for the translation cache. */

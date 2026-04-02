@@ -11267,7 +11267,8 @@ static vigil_status_t vigil_parser_bind_inferred_target(vigil_parser_state_t *st
 }
 
 static vigil_status_t emit_for_in_condition(vigil_parser_state_t *state, vigil_source_span_t span, size_t index_slot,
-                                            size_t collection_slot, size_t *exit_jump, size_t *body_jump)
+                                            size_t collection_slot, vigil_parser_type_t iterable_type,
+                                            size_t *exit_jump, size_t *body_jump)
 {
     vigil_status_t status;
 
@@ -11277,7 +11278,10 @@ static vigil_status_t emit_for_in_condition(vigil_parser_state_t *state, vigil_s
     status = emit_opcode_u32(state, VIGIL_OPCODE_GET_LOCAL, (uint32_t)collection_slot, span);
     if (status != VIGIL_STATUS_OK)
         return status;
-    status = vigil_parser_emit_opcode(state, VIGIL_OPCODE_GET_COLLECTION_SIZE, span);
+    if (vigil_parser_type_is_string(iterable_type))
+        status = vigil_parser_emit_opcode(state, VIGIL_OPCODE_GET_STRING_SIZE, span);
+    else
+        status = vigil_parser_emit_opcode(state, VIGIL_OPCODE_GET_COLLECTION_SIZE, span);
     if (status != VIGIL_STATUS_OK)
         return status;
     status = vigil_parser_emit_opcode(state, VIGIL_OPCODE_LESS, span);
@@ -11337,6 +11341,27 @@ static vigil_status_t emit_for_in_bind_array(vigil_parser_state_t *state, vigil_
     if (status != VIGIL_STATUS_OK)
         return status;
     return vigil_parser_bind_inferred_target(state, name, element_type);
+}
+
+static vigil_status_t emit_for_in_bind_string(vigil_parser_state_t *state, vigil_source_span_t span,
+                                              size_t collection_slot, size_t index_slot, const vigil_token_t *name)
+{
+    vigil_status_t status;
+
+    /* STRING_NEXT_CHAR(string, byte_offset) -> (char_string, next_offset) */
+    status = emit_for_in_get_element(state, span, collection_slot, index_slot, VIGIL_OPCODE_STRING_NEXT_CHAR);
+    if (status != VIGIL_STATUS_OK)
+        return status;
+    /* Stack: ... char_string next_offset */
+    /* Store next_offset back to the index slot. */
+    status = emit_opcode_u32(state, VIGIL_OPCODE_SET_LOCAL, (uint32_t)index_slot, span);
+    if (status != VIGIL_STATUS_OK)
+        return status;
+    status = vigil_parser_emit_opcode(state, VIGIL_OPCODE_POP, span);
+    if (status != VIGIL_STATUS_OK)
+        return status;
+    /* Stack: ... char_string — bind to loop variable. */
+    return vigil_parser_bind_inferred_target(state, name, vigil_binding_type_primitive(VIGIL_TYPE_STRING));
 }
 
 typedef struct
@@ -11399,7 +11424,14 @@ static vigil_status_t validate_for_in_iterable(vigil_parser_state_t *state, cons
         types->value_type = vigil_program_map_type_value(state->program, iterable_type);
         return VIGIL_STATUS_OK;
     }
-    return vigil_parser_report(state, for_token->span, "for-in requires an array or map iterable");
+    if (vigil_parser_type_is_string(iterable_type))
+    {
+        if (second_name != NULL)
+            return vigil_parser_report(state, second_name->span, "for-in over strings requires a single loop binding");
+        types->element_type = vigil_binding_type_primitive(VIGIL_TYPE_STRING);
+        return VIGIL_STATUS_OK;
+    }
+    return vigil_parser_report(state, for_token->span, "for-in requires an array, map, or string iterable");
 }
 
 static vigil_status_t for_in_emit_scaffolding(vigil_parser_state_t *state, const vigil_token_t *for_token,
@@ -11420,13 +11452,16 @@ static vigil_status_t for_in_emit_scaffolding(vigil_parser_state_t *state, const
         return status;
 
     ls->condition_start = vigil_chunk_code_size(&state->chunk);
-    status = emit_for_in_condition(state, for_token->span, ls->index_slot, ls->collection_slot, &ls->exit_jump_offset,
-                                   &ls->body_jump_offset);
+    status = emit_for_in_condition(state, for_token->span, ls->index_slot, ls->collection_slot, iterable_type,
+                                   &ls->exit_jump_offset, &ls->body_jump_offset);
     if (status != VIGIL_STATUS_OK)
         return status;
 
     ls->increment_start = vigil_chunk_code_size(&state->chunk);
-    status = emit_for_in_increment(state, for_token->span, ls->index_slot, ls->condition_start);
+    if (vigil_parser_type_is_string(iterable_type))
+        status = vigil_parser_emit_loop(state, ls->condition_start, for_token->span);
+    else
+        status = emit_for_in_increment(state, for_token->span, ls->index_slot, ls->condition_start);
     if (status != VIGIL_STATUS_OK)
         return status;
 
@@ -11441,7 +11476,9 @@ static vigil_status_t for_in_parse_body(vigil_parser_state_t *state, const vigil
 {
     vigil_status_t status;
     vigil_parser_begin_scope(state);
-    if (vigil_parser_type_is_array(iterable_type))
+    if (vigil_parser_type_is_string(iterable_type))
+        status = emit_for_in_bind_string(state, for_token->span, ls->collection_slot, ls->index_slot, first_name);
+    else if (vigil_parser_type_is_array(iterable_type))
         status = emit_for_in_bind_array(state, for_token->span, ls->collection_slot, ls->index_slot, first_name,
                                         types->element_type);
     else

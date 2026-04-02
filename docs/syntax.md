@@ -463,7 +463,7 @@ for (i32 i = 0; i < 10; i++) {
 
 ### for-in
 
-Iterates over arrays (single binding) and maps (key-value pair):
+Iterates over arrays (single binding), maps (key-value pair), and strings (single codepoint):
 
 ```
 for val in arr {
@@ -472,6 +472,18 @@ for val in arr {
 
 for key, val in m {
     fmt.println(key + "=" + string(val));
+}
+
+for ch in "hello" {
+    fmt.println(ch);
+}
+```
+
+String iteration yields one-codepoint `string` values, walking UTF-8 codepoints in order. For byte-level iteration, use `.bytes()`:
+
+```
+for b in "hello".bytes() {
+    // b is u8
 }
 ```
 

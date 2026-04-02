@@ -34,5 +34,6 @@ vigil_status_t vigil_vm_op_string_fields(vigil_vm_t *vm, vigil_vm_frame_t *frame
 vigil_status_t vigil_vm_op_string_equal_fold(vigil_vm_t *vm, vigil_vm_frame_t *frame, vigil_error_t *error);
 vigil_status_t vigil_vm_op_string_cut(vigil_vm_t *vm, vigil_vm_frame_t *frame, vigil_error_t *error);
 vigil_status_t vigil_vm_op_string_join(vigil_vm_t *vm, vigil_vm_frame_t *frame, vigil_error_t *error);
+vigil_status_t vigil_vm_op_string_next_char(vigil_vm_t *vm, vigil_vm_frame_t *frame, vigil_error_t *error);
 
 #endif /* VIGIL_VM_OPS_STRING_H */

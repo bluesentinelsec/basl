@@ -508,7 +508,7 @@ TEST(VigilChunkTest, DisassembleRejectsTruncatedU32OperandInstructions)
 TEST(VigilChunkTest, OpcodeNameReturnsUnknownForOutOfRangeOpcode)
 {
     EXPECT_STREQ(vigil_opcode_name(VIGIL_OPCODE_RETURN), "RETURN");
-    EXPECT_STREQ(vigil_opcode_name((vigil_opcode_t)(VIGIL_OPCODE_MULTIPLY_F64_STORE + 1)), "UNKNOWN");
+    EXPECT_STREQ(vigil_opcode_name((vigil_opcode_t)(VIGIL_OPCODE_STRING_NEXT_CHAR + 1)), "UNKNOWN");
 }
 
 TEST(VigilChunkTest, UsesRuntimeAllocatorHooks)
