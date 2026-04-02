@@ -237,7 +237,7 @@ static int sdl_append_format(char **buffer, size_t *length, size_t *capacity, co
 
     va_start(args, fmt);
     va_copy(copy, args);
-    required = vsnprintf(NULL, 0, fmt, copy);
+    required = SDL_vsnprintf(NULL, 0, fmt, copy);
     va_end(copy);
     if (required < 0)
     {
@@ -261,7 +261,7 @@ static int sdl_append_format(char **buffer, size_t *length, size_t *capacity, co
         *capacity = new_capacity;
     }
 
-    vsnprintf(*buffer + *length, *capacity - *length, fmt, args);
+    SDL_vsnprintf(*buffer + *length, *capacity - *length, fmt, args);
     *length += (size_t)required;
     va_end(args);
     return 0;
