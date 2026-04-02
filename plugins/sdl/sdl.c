@@ -3,7 +3,9 @@
  * SDL3 bindings for Vigil.
  * See: https://github.com/bluesentinelsec/vigil/issues/307
  */
+#include <stdarg.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include <SDL3/SDL.h>
@@ -156,6 +158,161 @@ static vigil_status_t sdl_push_string(vigil_vm_t *vm, const char *s, vigil_error
     return st;
 }
 
+static vigil_status_t sdl_push_joined_lines(vigil_vm_t *vm, char **items, int count, vigil_error_t *error)
+{
+    char *joined = NULL;
+    size_t capacity = 0;
+    size_t length = 0;
+    vigil_status_t st = VIGIL_STATUS_OK;
+
+    if (!items || count <= 0)
+        return sdl_push_string(vm, "", error);
+
+    for (int i = 0; i < count; i++)
+    {
+        const char *item = items[i] ? items[i] : "";
+        size_t item_len = strlen(item);
+        size_t needed = length + item_len + (i > 0 ? 1U : 0U) + 1U;
+        if (needed > capacity)
+        {
+            size_t new_capacity = capacity == 0 ? 256U : capacity;
+            while (new_capacity < needed)
+                new_capacity *= 2U;
+            char *next = (char *)realloc(joined, new_capacity);
+            if (!next)
+            {
+                free(joined);
+                vigil_error_set_literal(error, VIGIL_STATUS_OUT_OF_MEMORY, "out of memory");
+                return VIGIL_STATUS_OUT_OF_MEMORY;
+            }
+            joined = next;
+            capacity = new_capacity;
+        }
+        if (i > 0)
+            joined[length++] = '\n';
+        memcpy(joined + length, item, item_len);
+        length += item_len;
+    }
+
+    if (!joined)
+        return sdl_push_string(vm, "", error);
+
+    joined[length] = '\0';
+    st = sdl_push_string(vm, joined, error);
+    free(joined);
+    return st;
+}
+
+static int sdl_append_bytes(char **buffer, size_t *length, size_t *capacity, const char *text, size_t text_len)
+{
+    size_t needed = *length + text_len + 1U;
+    if (needed > *capacity)
+    {
+        size_t new_capacity = *capacity == 0 ? 256U : *capacity;
+        while (new_capacity < needed)
+            new_capacity *= 2U;
+        char *next = (char *)realloc(*buffer, new_capacity);
+        if (!next)
+            return -1;
+        *buffer = next;
+        *capacity = new_capacity;
+    }
+
+    memcpy(*buffer + *length, text, text_len);
+    *length += text_len;
+    (*buffer)[*length] = '\0';
+    return 0;
+}
+
+static int sdl_append_cstr(char **buffer, size_t *length, size_t *capacity, const char *text)
+{
+    return sdl_append_bytes(buffer, length, capacity, text, strlen(text));
+}
+
+static int sdl_append_format(char **buffer, size_t *length, size_t *capacity, const char *fmt, ...)
+{
+    va_list args;
+    va_list copy;
+    int required = 0;
+
+    va_start(args, fmt);
+    va_copy(copy, args);
+    required = SDL_vsnprintf(NULL, 0, fmt, copy);
+    va_end(copy);
+    if (required < 0)
+    {
+        va_end(args);
+        return -1;
+    }
+
+    size_t needed = *length + (size_t)required + 1U;
+    if (needed > *capacity)
+    {
+        size_t new_capacity = *capacity == 0 ? 256U : *capacity;
+        while (new_capacity < needed)
+            new_capacity *= 2U;
+        char *next = (char *)realloc(*buffer, new_capacity);
+        if (!next)
+        {
+            va_end(args);
+            return -1;
+        }
+        *buffer = next;
+        *capacity = new_capacity;
+    }
+
+    SDL_vsnprintf(*buffer + *length, *capacity - *length, fmt, args);
+    *length += (size_t)required;
+    va_end(args);
+    return 0;
+}
+
+static char *sdl_dup_cstr(const char *text)
+{
+    size_t length;
+    char *copy;
+
+    if (text == NULL)
+        return NULL;
+    length = strlen(text) + 1U;
+    copy = (char *)malloc(length);
+    if (copy == NULL)
+        return NULL;
+    memcpy(copy, text, length);
+    return copy;
+}
+
+typedef struct
+{
+    char *mime_type;
+    uint8_t *data;
+    size_t size;
+} sdl_clipboard_payload_t;
+
+static const void *SDLCALL sdl_clipboard_data_callback(void *userdata, const char *mime_type, size_t *size)
+{
+    sdl_clipboard_payload_t *payload = (sdl_clipboard_payload_t *)userdata;
+    if (!payload || !mime_type || strcmp(payload->mime_type, mime_type) != 0)
+    {
+        if (size)
+            *size = 0;
+        return NULL;
+    }
+    if (size)
+        *size = payload->size;
+    return payload->data;
+}
+
+static void SDLCALL sdl_clipboard_cleanup(void *userdata)
+{
+    sdl_clipboard_payload_t *payload = (sdl_clipboard_payload_t *)userdata;
+    if (!payload)
+        return;
+    free(payload->mime_type);
+    free(payload->data);
+    free(payload);
+}
+
 /* ── Error helpers ───────────────────────────────────────────────── */
 
 /* Vigil error kinds matching err.* constants. */
@@ -275,6 +432,21 @@ static size_t sdl_self_class_index(vigil_vm_t *vm, size_t base)
     vigil_object_t *obj = (vigil_object_t *)vigil_nanbox_decode_ptr(val);
     return vigil_instance_object_class_index(obj);
 }
+
+/* Class indexes must stay aligned with the sdl_classes[] table. */
+enum
+{
+    SDL_WINDOW_CLASS_INDEX = 0U,
+    SDL_RENDERER_CLASS_INDEX = 1U,
+    SDL_EVENT_CLASS_INDEX = 2U,
+    SDL_SURFACE_CLASS_INDEX = 3U,
+    SDL_TEXTURE_CLASS_INDEX = 4U,
+    SDL_AUDIO_STREAM_CLASS_INDEX = 5U,
+    SDL_GAMEPAD_CLASS_INDEX = 6U,
+    SDL_JOYSTICK_CLASS_INDEX = 7U,
+    SDL_HAPTIC_CLASS_INDEX = 8U,
+    SDL_CAMERA_CLASS_INDEX = 9U,
+};
 
 /* Push a new native class instance with one i64 field (handle). */
 static vigil_status_t sdl_push_handle_instance(vigil_vm_t *vm, size_t class_index, int64_t handle, vigil_error_t *error)
@@ -690,6 +862,7 @@ static const int p_i32_str_f64[] = {VIGIL_TYPE_I32, VIGIL_TYPE_STRING, VIGIL_TYP
 static const int p_i32_str_i32[] = {VIGIL_TYPE_I32, VIGIL_TYPE_STRING, VIGIL_TYPE_I32};
 static const int p_str_str_i32[] = {VIGIL_TYPE_STRING, VIGIL_TYPE_STRING, VIGIL_TYPE_I32};
 static const int p_str_str_str[] = {VIGIL_TYPE_STRING, VIGIL_TYPE_STRING, VIGIL_TYPE_STRING};
+static const int p_i32_str_str_str[] = {VIGIL_TYPE_I32, VIGIL_TYPE_STRING, VIGIL_TYPE_STRING, VIGIL_TYPE_STRING};
 static const int p_f64_f64_str[] = {VIGIL_TYPE_F64, VIGIL_TYPE_F64, VIGIL_TYPE_STRING};
 static const int p_f64[] = {VIGIL_TYPE_F64};
 static const int p_obj[] = {VIGIL_TYPE_OBJECT};
@@ -831,6 +1004,7 @@ static const int p_i64_i32_i64[] = {VIGIL_TYPE_I64, VIGIL_TYPE_I32, VIGIL_TYPE_I
 static const int p_i64_str[] = {VIGIL_TYPE_I64, VIGIL_TYPE_STRING};
 static const int p_i64_str_i64_i32[] = {VIGIL_TYPE_I64, VIGIL_TYPE_STRING, VIGIL_TYPE_I64, VIGIL_TYPE_I32};
 static const int p_i64_str_str[] = {VIGIL_TYPE_I64, VIGIL_TYPE_STRING, VIGIL_TYPE_STRING};
+static const int p_i64_str_str_i32[] = {VIGIL_TYPE_I64, VIGIL_TYPE_STRING, VIGIL_TYPE_STRING, VIGIL_TYPE_I32};
 static const int p_i64_i32_str_i32[] = {VIGIL_TYPE_I64, VIGIL_TYPE_I32, VIGIL_TYPE_STRING, VIGIL_TYPE_I32};
 static const int p_i64_i32_i32_i32_i32_i32[] = {VIGIL_TYPE_I64, VIGIL_TYPE_I32, VIGIL_TYPE_I32,
                                                 VIGIL_TYPE_I32, VIGIL_TYPE_I32, VIGIL_TYPE_I32};
@@ -1351,6 +1525,7 @@ static vigil_status_t sdl_fn_delay_precise(vigil_vm_t *vm, size_t arg_count, vig
 /* ── Slice 8: Audio ───────────────────────────────────────────────── */
 
 SDL_HANDLE_REGISTRY(audio_streams);
+SDL_HANDLE_REGISTRY(environments);
 
 enum
 {
@@ -1603,6 +1778,50 @@ static void sdl_refresh_gamepad_list(void)
     g_gamepad_ids = SDL_GetGamepads(&g_gamepad_count);
 }
 
+static vigil_status_t sdl_fn_get_gamepads(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    SDL_JoystickID *ids = NULL;
+    int count = 0;
+    char *joined = NULL;
+    size_t joined_len = 0;
+    size_t joined_cap = 0;
+    vigil_status_t st = VIGIL_STATUS_OK;
+
+    vigil_vm_stack_pop_n(vm, arg_count);
+    ids = SDL_GetGamepads(&count);
+    if (!ids || count <= 0)
+    {
+        SDL_free(ids);
+        return sdl_push_string(vm, "", error);
+    }
+
+    for (int i = 0; i < count; i++)
+    {
+        SDL_JoystickID id = ids[i];
+        const char *name = SDL_GetGamepadNameForID(id);
+        const char *path = SDL_GetGamepadPathForID(id);
+        int player_index = SDL_GetGamepadPlayerIndexForID(id);
+        SDL_GamepadType type = SDL_GetGamepadTypeForID(id);
+
+        if (joined_len > 0 && sdl_append_bytes(&joined, &joined_len, &joined_cap, "\n", 1U) != 0)
+            goto oom;
+        if (sdl_append_format(&joined, &joined_len, &joined_cap, "%d,%s,%d,%d,%s", (int)id, name ? name : "", (int)type,
+                              player_index, path ? path : "") != 0)
+            goto oom;
+    }
+
+    st = sdl_push_string(vm, joined ? joined : "", error);
+    SDL_free(ids);
+    free(joined);
+    return st;
+
+oom:
+    SDL_free(ids);
+    free(joined);
+    vigil_error_set_literal(error, VIGIL_STATUS_OUT_OF_MEMORY, "out of memory");
+    return VIGIL_STATUS_OUT_OF_MEMORY;
+}
+
 /* sdl.get_gamepad_count() -> i32 */
 static vigil_status_t sdl_fn_get_gamepad_count(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
 {
@@ -1820,6 +2039,100 @@ static vigil_status_t sdl_fn_show_simple_message_box(vigil_vm_t *vm, size_t arg_
     return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
 }
 
+static vigil_status_t sdl_show_message_box_common(vigil_vm_t *vm, SDL_Window *window, int32_t flags, const char *title,
+                                                  const char *message, const char *buttons_text, vigil_error_t *error)
+{
+    vigil_status_t st;
+    SDL_MessageBoxData data;
+    SDL_MessageBoxButtonData buttons[8];
+    char *storage = NULL;
+    char *labels[8];
+    size_t label_count = 0;
+    int button_id = -1;
+    char default_button[] = "OK";
+    char *cursor;
+
+    memset(&data, 0, sizeof(data));
+    memset(buttons, 0, sizeof(buttons));
+    memset(labels, 0, sizeof(labels));
+
+    if (buttons_text != NULL && buttons_text[0] != '\0')
+    {
+        storage = sdl_dup_cstr(buttons_text);
+        if (storage == NULL)
+        {
+            vigil_error_set_literal(error, VIGIL_STATUS_OUT_OF_MEMORY, "out of memory");
+            return VIGIL_STATUS_OUT_OF_MEMORY;
+        }
+
+        cursor = storage;
+        while (*cursor != '\0' && label_count < 8U)
+        {
+            char *line = cursor;
+            while (*cursor != '\0' && *cursor != '\n')
+                cursor++;
+            if (*cursor == '\n')
+            {
+                *cursor = '\0';
+                cursor++;
+            }
+            if (*line != '\0')
+                labels[label_count++] = line;
+        }
+    }
+
+    if (label_count == 0U)
+        labels[label_count++] = default_button;
+
+    for (size_t i = 0; i < label_count; i++)
+    {
+        buttons[i].flags = 0;
+        if (i == 0U)
+            buttons[i].flags |= SDL_MESSAGEBOX_BUTTON_RETURNKEY_DEFAULT;
+        if (i + 1U == label_count)
+            buttons[i].flags |= SDL_MESSAGEBOX_BUTTON_ESCAPEKEY_DEFAULT;
+        buttons[i].buttonID = (int)i;
+        buttons[i].text = labels[i];
+    }
+
+    data.flags = (SDL_MessageBoxFlags)flags;
+    data.window = window;
+    data.title = title;
+    data.message = message;
+    data.numbuttons = (int)label_count;
+    data.buttons = buttons;
+    data.colorScheme = NULL;
+
+    if (!SDL_ShowMessageBox(&data, &button_id))
+    {
+        st = sdl_push_i32(vm, -1, error);
+        free(storage);
+        if (st != VIGIL_STATUS_OK)
+            return st;
+        return sdl_push_sdl_err(vm, SDL_ERR_IO, error);
+    }
+
+    st = sdl_push_i32(vm, button_id, error);
+    free(storage);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_ok(vm, error);
+}
+
+static vigil_status_t sdl_fn_show_message_box(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t flags = sdl_arg_i32(vm, base, 0);
+    char title[256];
+    char message[4096];
+    char buttons[1024];
+    sdl_arg_str(vm, base, 1, title, sizeof(title));
+    sdl_arg_str(vm, base, 2, message, sizeof(message));
+    sdl_arg_str(vm, base, 3, buttons, sizeof(buttons));
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return sdl_show_message_box_common(vm, NULL, flags, title, message, buttons, error);
+}
+
 /* sdl.open_url(string url) -> (bool, err) */
 static vigil_status_t sdl_fn_open_url(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
 {
@@ -1908,6 +2221,10 @@ static vigil_status_t sdl_fn_log_warn(vigil_vm_t *vm, size_t arg_count, vigil_er
 SDL_CONST_FN(MESSAGEBOX_ERROR, SDL_MESSAGEBOX_ERROR)
 SDL_CONST_FN(MESSAGEBOX_WARNING, SDL_MESSAGEBOX_WARNING)
 SDL_CONST_FN(MESSAGEBOX_INFORMATION, SDL_MESSAGEBOX_INFORMATION)
+SDL_CONST_FN(MESSAGEBOX_BUTTONS_LEFT_TO_RIGHT, SDL_MESSAGEBOX_BUTTONS_LEFT_TO_RIGHT)
+SDL_CONST_FN(MESSAGEBOX_BUTTONS_RIGHT_TO_LEFT, SDL_MESSAGEBOX_BUTTONS_RIGHT_TO_LEFT)
+SDL_CONST_FN(MESSAGEBOX_BUTTON_RETURNKEY_DEFAULT, SDL_MESSAGEBOX_BUTTON_RETURNKEY_DEFAULT)
+SDL_CONST_FN(MESSAGEBOX_BUTTON_ESCAPEKEY_DEFAULT, SDL_MESSAGEBOX_BUTTON_ESCAPEKEY_DEFAULT)
 
 /* Scancode constants */
 SDL_CONST_FN(SCANCODE_A, SDL_SCANCODE_A)
@@ -3499,6 +3816,26 @@ static vigil_status_t sdl_gamepad_get_power_percent(vigil_vm_t *vm, size_t arg_c
     return sdl_push_i32(vm, (int32_t)percent, error);
 }
 
+static vigil_status_t sdl_gamepad_get_power_info(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, GP_HANDLE);
+    int percent = -1;
+    SDL_PowerState state = SDL_POWERSTATE_ERROR;
+    SDL_Gamepad *gp = NULL;
+    vigil_status_t st = VIGIL_STATUS_OK;
+
+    vigil_vm_stack_pop_n(vm, arg_count);
+    gp = (SDL_Gamepad *)SDL_HANDLE_GET(gamepads, h);
+    if (gp)
+        state = SDL_GetGamepadPowerInfo(gp, &percent);
+
+    st = sdl_push_i32(vm, (int32_t)state, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_i32(vm, (int32_t)percent, error);
+}
+
 static vigil_status_t sdl_gamepad_set_led(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
 {
     size_t base = vigil_vm_stack_depth(vm) - arg_count;
@@ -4617,6 +4954,45 @@ static vigil_status_t sdl_fn_get_camera_count(vigil_vm_t *vm, size_t arg_count, 
     return sdl_push_i32(vm, (int32_t)g_camera_count, error);
 }
 
+static vigil_status_t sdl_fn_get_cameras(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    SDL_CameraID *ids = NULL;
+    int count = 0;
+    char *joined = NULL;
+    size_t joined_len = 0;
+    size_t joined_cap = 0;
+    vigil_status_t st = VIGIL_STATUS_OK;
+
+    vigil_vm_stack_pop_n(vm, arg_count);
+    ids = SDL_GetCameras(&count);
+    if (!ids || count <= 0)
+        return sdl_push_string(vm, "", error);
+
+    for (int i = 0; i < count; i++)
+    {
+        SDL_CameraID id = ids[i];
+        const char *name = SDL_GetCameraName(id);
+        SDL_CameraPosition position = SDL_GetCameraPosition(id);
+
+        if (joined_len > 0 && sdl_append_bytes(&joined, &joined_len, &joined_cap, "\n", 1U) != 0)
+            goto oom;
+        if (sdl_append_format(&joined, &joined_len, &joined_cap, "%d,%s,%d", (int)id, name ? name : "",
+                              (int)position) != 0)
+            goto oom;
+    }
+
+    st = sdl_push_string(vm, joined ? joined : "", error);
+    SDL_free(ids);
+    free(joined);
+    return st;
+
+oom:
+    SDL_free(ids);
+    free(joined);
+    vigil_error_set_literal(error, VIGIL_STATUS_OUT_OF_MEMORY, "out of memory");
+    return VIGIL_STATUS_OUT_OF_MEMORY;
+}
+
 static vigil_status_t sdl_fn_get_camera_name(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
 {
     size_t base = vigil_vm_stack_depth(vm) - arg_count;
@@ -4631,6 +5007,53 @@ static vigil_status_t sdl_fn_get_current_camera_driver(vigil_vm_t *vm, size_t ar
 {
     vigil_vm_stack_pop_n(vm, arg_count);
     return sdl_push_string(vm, SDL_GetCurrentCameraDriver(), error);
+}
+
+static vigil_status_t sdl_fn_get_camera_supported_formats(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t idx = sdl_arg_i32(vm, base, 0);
+    SDL_CameraID camera_id = 0;
+    SDL_CameraSpec **specs = NULL;
+    char *joined = NULL;
+    size_t joined_len = 0;
+    size_t joined_cap = 0;
+    vigil_status_t st = VIGIL_STATUS_OK;
+    int count = 0;
+
+    vigil_vm_stack_pop_n(vm, arg_count);
+    if (idx >= 0 && idx < g_camera_count && g_camera_ids)
+        camera_id = g_camera_ids[idx];
+    if (!camera_id)
+        return sdl_push_string(vm, "", error);
+
+    specs = SDL_GetCameraSupportedFormats(camera_id, &count);
+    if (!specs || count <= 0)
+        return sdl_push_string(vm, "", error);
+
+    for (int i = 0; i < count; i++)
+    {
+        const SDL_CameraSpec *spec = specs[i];
+        if (!spec)
+            continue;
+        if (joined_len > 0 && sdl_append_bytes(&joined, &joined_len, &joined_cap, "\n", 1U) != 0)
+            goto oom;
+        if (sdl_append_format(&joined, &joined_len, &joined_cap, "%d,%d,%d,%d,%d,%d", (int)spec->format,
+                              (int)spec->colorspace, spec->width, spec->height, spec->framerate_numerator,
+                              spec->framerate_denominator) != 0)
+            goto oom;
+    }
+
+    st = sdl_push_string(vm, joined ? joined : "", error);
+    SDL_free(specs);
+    free(joined);
+    return st;
+
+oom:
+    SDL_free(specs);
+    free(joined);
+    vigil_error_set_literal(error, VIGIL_STATUS_OUT_OF_MEMORY, "out of memory");
+    return VIGIL_STATUS_OUT_OF_MEMORY;
 }
 
 /* Camera.open(i32 index, i32 w, i32 h, i32 fps) -> (Camera, err) */
@@ -4710,6 +5133,37 @@ static vigil_status_t sdl_camera_get_format(vigil_vm_t *vm, size_t arg_count, vi
     if (st != VIGIL_STATUS_OK)
         return st;
     return sdl_push_i32(vm, spec.height, error);
+}
+
+static vigil_status_t sdl_camera_get_spec(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, CAM_HANDLE);
+    SDL_CameraSpec spec = {0};
+    SDL_Camera *cam = NULL;
+    vigil_status_t st = VIGIL_STATUS_OK;
+
+    vigil_vm_stack_pop_n(vm, arg_count);
+    cam = (SDL_Camera *)SDL_HANDLE_GET(cameras, h);
+    if (cam)
+        SDL_GetCameraFormat(cam, &spec);
+
+    st = sdl_push_i32(vm, (int32_t)spec.format, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    st = sdl_push_i32(vm, (int32_t)spec.colorspace, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    st = sdl_push_i32(vm, spec.width, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    st = sdl_push_i32(vm, spec.height, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    st = sdl_push_i32(vm, spec.framerate_numerator, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_i32(vm, spec.framerate_denominator, error);
 }
 
 /* cam.acquire_frame() -> (i64, err) — returns surface handle or -1
@@ -6967,6 +7421,52 @@ static vigil_status_t sdl_fn_create_window_and_renderer(vigil_vm_t *vm, size_t a
     return sdl_push_ok(vm, error);
 }
 
+static vigil_status_t sdl_fn_create_window_with_properties(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t props = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+
+    SDL_Window *win = SDL_CreateWindowWithProperties((SDL_PropertiesID)props);
+    if (!win)
+        return sdl_push_nil_and_sdl_err(vm, SDL_ERR_IO, error);
+
+    int64_t handle;
+    if (SDL_HANDLE_STORE(windows, win, &handle) < 0)
+    {
+        SDL_DestroyWindow(win);
+        return sdl_push_nil_and_err(vm, "too many windows", SDL_ERR_STATE, error);
+    }
+
+    vigil_status_t st = sdl_push_handle_instance(vm, SDL_WINDOW_CLASS_INDEX, handle, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_ok(vm, error);
+}
+
+static vigil_status_t sdl_fn_create_renderer_with_properties(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t props = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+
+    SDL_Renderer *ren = SDL_CreateRendererWithProperties((SDL_PropertiesID)props);
+    if (!ren)
+        return sdl_push_nil_and_sdl_err(vm, SDL_ERR_IO, error);
+
+    int64_t handle;
+    if (SDL_HANDLE_STORE(renderers, ren, &handle) < 0)
+    {
+        SDL_DestroyRenderer(ren);
+        return sdl_push_nil_and_err(vm, "too many renderers", SDL_ERR_STATE, error);
+    }
+
+    vigil_status_t st = sdl_push_handle_instance(vm, SDL_RENDERER_CLASS_INDEX, handle, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_ok(vm, error);
+}
+
 static vigil_status_t sdl_window_set_fullscreen_mode(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
 {
     size_t base = vigil_vm_stack_depth(vm) - arg_count;
@@ -7055,6 +7555,31 @@ static vigil_status_t sdl_window_has_surface(vigil_vm_t *vm, size_t arg_count, v
     return sdl_push_bool(vm, win && SDL_WindowHasSurface(win), error);
 }
 
+static vigil_status_t sdl_window_get_fullscreen_mode(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, WIN_HANDLE);
+    const SDL_DisplayMode *mode = NULL;
+    SDL_Window *win = NULL;
+    vigil_status_t st;
+    int32_t width = 0;
+    int32_t height = 0;
+
+    vigil_vm_stack_pop_n(vm, arg_count);
+    win = (SDL_Window *)SDL_HANDLE_GET(windows, h);
+    mode = win ? SDL_GetWindowFullscreenMode(win) : NULL;
+    if (mode != NULL)
+    {
+        width = (int32_t)mode->w;
+        height = (int32_t)mode->h;
+    }
+
+    st = sdl_push_i32(vm, width, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_i32(vm, height, error);
+}
+
 static vigil_status_t sdl_window_update_surface(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
 {
     size_t base = vigil_vm_stack_depth(vm) - arg_count;
@@ -7066,6 +7591,70 @@ static vigil_status_t sdl_window_update_surface(vigil_vm_t *vm, size_t arg_count
     return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
 }
 
+static vigil_status_t sdl_window_update_surface_rect(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, WIN_HANDLE);
+    SDL_Rect rect;
+    SDL_Window *win;
+
+    rect.x = sdl_arg_i32(vm, base, 1);
+    rect.y = sdl_arg_i32(vm, base, 2);
+    rect.w = sdl_arg_i32(vm, base, 3);
+    rect.h = sdl_arg_i32(vm, base, 4);
+    vigil_vm_stack_pop_n(vm, arg_count);
+
+    win = (SDL_Window *)SDL_HANDLE_GET(windows, h);
+    if (win && SDL_UpdateWindowSurfaceRects(win, &rect, 1))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+static vigil_status_t sdl_window_update_surface_rects(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, WIN_HANDLE);
+    int64_t rect_buffer = sdl_arg_i64(vm, base, 1);
+    int32_t rect_count = sdl_arg_i32(vm, base, 2);
+    SDL_Window *win = NULL;
+    SDL_Rect *rects = NULL;
+    int32_t buffer_size = 0;
+    int32_t *raw = NULL;
+    vigil_status_t st = VIGIL_STATUS_OK;
+
+    vigil_vm_stack_pop_n(vm, arg_count);
+    if (rect_count <= 0)
+        return sdl_push_bool_sdl_err(vm, SDL_ERR_ARG, error);
+
+    raw = (int32_t *)vigil_unsafe_buffer_get(rect_buffer, &buffer_size);
+    if (!raw || buffer_size < rect_count * (int32_t)(4 * sizeof(int32_t)))
+        return sdl_push_bool_sdl_err(vm, SDL_ERR_ARG, error);
+
+    rects = (SDL_Rect *)malloc((size_t)rect_count * sizeof(SDL_Rect));
+    if (!rects)
+    {
+        vigil_error_set_literal(error, VIGIL_STATUS_OUT_OF_MEMORY, "out of memory");
+        return VIGIL_STATUS_OUT_OF_MEMORY;
+    }
+
+    for (int32_t i = 0; i < rect_count; i++)
+    {
+        rects[i].x = raw[i * 4];
+        rects[i].y = raw[i * 4 + 1];
+        rects[i].w = raw[i * 4 + 2];
+        rects[i].h = raw[i * 4 + 3];
+    }
+
+    win = (SDL_Window *)SDL_HANDLE_GET(windows, h);
+    if (win && SDL_UpdateWindowSurfaceRects(win, rects, rect_count))
+        st = sdl_push_bool_ok(vm, error);
+    else
+        st = sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+
+    free(rects);
+    return st;
+}
+
 static vigil_status_t sdl_window_destroy_surface(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
 {
     size_t base = vigil_vm_stack_depth(vm) - arg_count;
@@ -7075,6 +7664,25 @@ static vigil_status_t sdl_window_destroy_surface(vigil_vm_t *vm, size_t arg_coun
     if (win && SDL_DestroyWindowSurface(win))
         return sdl_push_bool_ok(vm, error);
     return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+static vigil_status_t sdl_window_show_message_box(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, WIN_HANDLE);
+    int32_t flags = sdl_arg_i32(vm, base, 1);
+    SDL_Window *win;
+    char title[256];
+    char message[4096];
+    char buttons[1024];
+
+    sdl_arg_str(vm, base, 2, title, sizeof(title));
+    sdl_arg_str(vm, base, 3, message, sizeof(message));
+    sdl_arg_str(vm, base, 4, buttons, sizeof(buttons));
+    vigil_vm_stack_pop_n(vm, arg_count);
+
+    win = (SDL_Window *)SDL_HANDLE_GET(windows, h);
+    return sdl_show_message_box_common(vm, win, flags, title, message, buttons, error);
 }
 
 static vigil_status_t sdl_window_set_surface_vsync(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
@@ -12721,6 +13329,129 @@ static vigil_status_t sdl_fn_has_clipboard_data(vigil_vm_t *vm, size_t arg_count
     return sdl_push_bool(vm, SDL_HasClipboardData(mime), error);
 }
 
+static vigil_status_t sdl_fn_get_clipboard_data(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    char mime[256];
+    size_t size = 0;
+    void *data = NULL;
+    uint8_t *copy = NULL;
+    int64_t buffer_handle = -1;
+    vigil_status_t st = VIGIL_STATUS_OK;
+
+    sdl_arg_str(vm, base, 0, mime, sizeof(mime));
+    vigil_vm_stack_pop_n(vm, arg_count);
+
+    data = SDL_GetClipboardData(mime, &size);
+    if (!data)
+    {
+        st = sdl_push_i64(vm, -1, error);
+        if (st != VIGIL_STATUS_OK)
+            return st;
+        st = sdl_push_i64(vm, 0, error);
+        if (st != VIGIL_STATUS_OK)
+            return st;
+        return sdl_push_sdl_err(vm, SDL_ERR_IO, error);
+    }
+
+    if (size > 0)
+    {
+        copy = (uint8_t *)malloc(size);
+        if (!copy)
+        {
+            SDL_free(data);
+            vigil_error_set_literal(error, VIGIL_STATUS_OUT_OF_MEMORY, "out of memory");
+            return VIGIL_STATUS_OUT_OF_MEMORY;
+        }
+        memcpy(copy, data, size);
+    }
+    SDL_free(data);
+
+    if (size == 0)
+    {
+        st = sdl_push_i64(vm, -1, error);
+        if (st != VIGIL_STATUS_OK)
+            return st;
+        st = sdl_push_i64(vm, 0, error);
+        if (st != VIGIL_STATUS_OK)
+            return st;
+        return sdl_push_ok(vm, error);
+    }
+
+    buffer_handle = vigil_unsafe_buffer_register(copy, (int32_t)size);
+    if (buffer_handle < 0)
+    {
+        free(copy);
+        st = sdl_push_i64(vm, -1, error);
+        if (st != VIGIL_STATUS_OK)
+            return st;
+        st = sdl_push_i64(vm, 0, error);
+        if (st != VIGIL_STATUS_OK)
+            return st;
+        return sdl_push_err(vm, "too many buffers", SDL_ERR_STATE, error);
+    }
+
+    st = sdl_push_i64(vm, buffer_handle, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    st = sdl_push_i64(vm, (int64_t)size, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_ok(vm, error);
+}
+
+static vigil_status_t sdl_fn_set_clipboard_data(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    char mime[256];
+    int64_t buffer_handle = sdl_arg_i64(vm, base, 1);
+    int32_t length = sdl_arg_i32(vm, base, 2);
+    int32_t buffer_size = 0;
+    void *source = NULL;
+    sdl_clipboard_payload_t *payload = NULL;
+    const char *mime_types[1];
+
+    sdl_arg_str(vm, base, 0, mime, sizeof(mime));
+    vigil_vm_stack_pop_n(vm, arg_count);
+
+    source = vigil_unsafe_buffer_get(buffer_handle, &buffer_size);
+    if (!source)
+        return sdl_push_bool_sdl_err(vm, SDL_ERR_ARG, error);
+
+    if (length <= 0)
+        length = buffer_size;
+    if (length < 0 || length > buffer_size)
+        return sdl_push_bool_sdl_err(vm, SDL_ERR_ARG, error);
+
+    payload = (sdl_clipboard_payload_t *)calloc(1U, sizeof(*payload));
+    if (!payload)
+    {
+        vigil_error_set_literal(error, VIGIL_STATUS_OUT_OF_MEMORY, "out of memory");
+        return VIGIL_STATUS_OUT_OF_MEMORY;
+    }
+
+    payload->mime_type = (char *)malloc(strlen(mime) + 1U);
+    payload->data = (uint8_t *)malloc((size_t)length);
+    if (!payload->mime_type || (!payload->data && length > 0))
+    {
+        sdl_clipboard_cleanup(payload);
+        vigil_error_set_literal(error, VIGIL_STATUS_OUT_OF_MEMORY, "out of memory");
+        return VIGIL_STATUS_OUT_OF_MEMORY;
+    }
+
+    memcpy(payload->mime_type, mime, strlen(mime) + 1U);
+    if (length > 0)
+        memcpy(payload->data, source, (size_t)length);
+    payload->size = (size_t)length;
+
+    mime_types[0] = payload->mime_type;
+    if (SDL_SetClipboardData(sdl_clipboard_data_callback, sdl_clipboard_cleanup, payload, mime_types, 1U))
+        return sdl_push_bool_ok(vm, error);
+
+    sdl_clipboard_cleanup(payload);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
 static vigil_status_t sdl_fn_set_hint_with_priority(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
 {
     size_t base = vigil_vm_stack_depth(vm) - arg_count;
@@ -13167,6 +13898,32 @@ static vigil_status_t sdl_fn_get_joystick_guid_for_id(vigil_vm_t *vm, size_t arg
     return sdl_push_string(vm, buf, error);
 }
 
+static vigil_status_t sdl_fn_get_joystick_guid_info(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    char guid_text[64];
+    sdl_arg_str(vm, base, 0, guid_text, sizeof(guid_text));
+    vigil_vm_stack_pop_n(vm, arg_count);
+
+    Uint16 vendor = 0;
+    Uint16 product = 0;
+    Uint16 version = 0;
+    Uint16 crc16 = 0;
+    SDL_GUID guid = SDL_StringToGUID(guid_text);
+    SDL_GetJoystickGUIDInfo(guid, &vendor, &product, &version, &crc16);
+
+    vigil_status_t st = sdl_push_i32(vm, (int32_t)vendor, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    st = sdl_push_i32(vm, (int32_t)product, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    st = sdl_push_i32(vm, (int32_t)version, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_i32(vm, (int32_t)crc16, error);
+}
+
 static vigil_status_t sdl_fn_get_joystick_axis_initial_state(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
 {
     size_t base = vigil_vm_stack_depth(vm) - arg_count;
@@ -13608,6 +14365,114 @@ static vigil_status_t sdl_fn_get_environment_variable(vigil_vm_t *vm, size_t arg
     return sdl_push_string(vm, v ? v : "", error);
 }
 
+static vigil_status_t sdl_fn_create_environment(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int32_t populated = sdl_arg_i32(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Environment *env = SDL_CreateEnvironment(populated != 0);
+    int64_t handle = -1;
+    vigil_status_t st;
+
+    if (!env)
+    {
+        st = sdl_push_i64(vm, -1, error);
+        if (st != VIGIL_STATUS_OK)
+            return st;
+        return sdl_push_sdl_err(vm, SDL_ERR_IO, error);
+    }
+
+    if (SDL_HANDLE_STORE(environments, env, &handle) < 0)
+    {
+        SDL_DestroyEnvironment(env);
+        st = sdl_push_i64(vm, -1, error);
+        if (st != VIGIL_STATUS_OK)
+            return st;
+        return sdl_push_err(vm, "too many environments", SDL_ERR_STATE, error);
+    }
+
+    st = sdl_push_i64(vm, handle, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_ok(vm, error);
+}
+
+static vigil_status_t sdl_fn_destroy_environment(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    (void)error;
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t handle = sdl_arg_i64(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Environment *env = (SDL_Environment *)SDL_HANDLE_GET(environments, handle);
+    if (env)
+    {
+        SDL_DestroyEnvironment(env);
+        SDL_HANDLE_CLEAR(environments, handle);
+    }
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t sdl_fn_get_environment_variables(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t handle = sdl_arg_i64(vm, base, 0);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Environment *env = (SDL_Environment *)SDL_HANDLE_GET(environments, handle);
+    char **items = env ? SDL_GetEnvironmentVariables(env) : NULL;
+    vigil_status_t st;
+    int count = 0;
+
+    if (!items)
+        return sdl_push_string(vm, "", error);
+
+    while (items[count] != NULL)
+        count++;
+    st = sdl_push_joined_lines(vm, items, count, error);
+    SDL_free(items);
+    return st;
+}
+
+static vigil_status_t sdl_fn_get_environment_variable_from(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t handle = sdl_arg_i64(vm, base, 0);
+    char name[256];
+    sdl_arg_str(vm, base, 1, name, sizeof(name));
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Environment *env = (SDL_Environment *)SDL_HANDLE_GET(environments, handle);
+    const char *value = env ? SDL_GetEnvironmentVariable(env, name) : NULL;
+    return sdl_push_string(vm, value ? value : "", error);
+}
+
+static vigil_status_t sdl_fn_set_environment_variable_in(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t handle = sdl_arg_i64(vm, base, 0);
+    char name[256];
+    char value[512];
+    int32_t overwrite = sdl_arg_i32(vm, base, 3);
+    sdl_arg_str(vm, base, 1, name, sizeof(name));
+    sdl_arg_str(vm, base, 2, value, sizeof(value));
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Environment *env = (SDL_Environment *)SDL_HANDLE_GET(environments, handle);
+    if (env && SDL_SetEnvironmentVariable(env, name, value, overwrite != 0))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
+static vigil_status_t sdl_fn_unset_environment_variable_in(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t handle = sdl_arg_i64(vm, base, 0);
+    char name[256];
+    sdl_arg_str(vm, base, 1, name, sizeof(name));
+    vigil_vm_stack_pop_n(vm, arg_count);
+    SDL_Environment *env = (SDL_Environment *)SDL_HANDLE_GET(environments, handle);
+    if (env && SDL_UnsetEnvironmentVariable(env, name))
+        return sdl_push_bool_ok(vm, error);
+    return sdl_push_bool_sdl_err(vm, SDL_ERR_IO, error);
+}
+
 static vigil_status_t sdl_fn_gl_get_current_window(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
 {
     vigil_vm_stack_pop_n(vm, arg_count);
@@ -13653,22 +14518,33 @@ static vigil_status_t sdl_fn_get_clipboard_mime_types(vigil_vm_t *vm, size_t arg
     vigil_vm_stack_pop_n(vm, arg_count);
     size_t count = 0;
     char **types = SDL_GetClipboardMimeTypes(&count);
+    char *joined = NULL;
+    size_t joined_len = 0;
+    size_t joined_cap = 0;
+    vigil_status_t st = VIGIL_STATUS_OK;
+
     if (!types || count == 0)
         return sdl_push_string(vm, "", error);
-    char buf[2048] = {0};
-    size_t off = 0;
-    for (size_t i = 0; i < count && off < sizeof(buf) - 1; i++)
+
+    for (size_t i = 0; i < count; i++)
     {
-        if (i > 0 && off < sizeof(buf) - 1)
-            buf[off++] = ',';
-        size_t len = strlen(types[i]);
-        if (off + len >= sizeof(buf))
-            break;
-        memcpy(buf + off, types[i], len);
-        off += len;
+        const char *type = types[i] ? types[i] : "";
+        if (i > 0 && sdl_append_bytes(&joined, &joined_len, &joined_cap, ",", 1U) != 0)
+            goto oom;
+        if (sdl_append_cstr(&joined, &joined_len, &joined_cap, type) != 0)
+            goto oom;
     }
+
+    st = sdl_push_string(vm, joined ? joined : "", error);
     SDL_free(types);
-    return sdl_push_string(vm, buf, error);
+    free(joined);
+    return st;
+
+oom:
+    SDL_free(types);
+    free(joined);
+    vigil_error_set_literal(error, VIGIL_STATUS_OUT_OF_MEMORY, "out of memory");
+    return VIGIL_STATUS_OUT_OF_MEMORY;
 }
 
 static vigil_status_t sdl_fn_set_tray_icon(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
@@ -13795,6 +14671,144 @@ static vigil_status_t sdl_fn_get_gamepad_guid_for_id(vigil_vm_t *vm, size_t arg_
     char buf[64] = {0};
     SDL_GUID g = SDL_GetGamepadGUIDForID((SDL_JoystickID)id);
     SDL_GUIDToString(g, buf, sizeof(buf));
+    return sdl_push_string(vm, buf, error);
+}
+
+static vigil_status_t sdl_fn_get_gamepad_mapping_for_guid(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    char guid_text[64];
+    sdl_arg_str(vm, base, 0, guid_text, sizeof(guid_text));
+    vigil_vm_stack_pop_n(vm, arg_count);
+
+    SDL_GUID guid = SDL_StringToGUID(guid_text);
+    char *mapping = SDL_GetGamepadMappingForGUID(guid);
+    vigil_status_t st = sdl_push_string(vm, mapping ? mapping : "", error);
+    SDL_free(mapping);
+    return st;
+}
+
+static vigil_status_t sdl_fn_get_gamepad_mappings(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    vigil_vm_stack_pop_n(vm, arg_count);
+
+    int count = 0;
+    char **mappings = SDL_GetGamepadMappings(&count);
+    if (!mappings)
+        return sdl_push_string(vm, "", error);
+    if (count <= 0)
+    {
+        SDL_free(mappings);
+        return sdl_push_string(vm, "", error);
+    }
+    vigil_status_t st = sdl_push_joined_lines(vm, mappings, count, error);
+    SDL_free(mappings);
+    return st;
+}
+
+static vigil_status_t sdl_gamepad_get_bindings(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t handle = sdl_field_i64(vm, base, GP_HANDLE);
+    SDL_Gamepad *gamepad = NULL;
+    SDL_GamepadBinding **bindings = NULL;
+    char *joined = NULL;
+    size_t joined_len = 0;
+    size_t joined_cap = 0;
+    vigil_status_t st = VIGIL_STATUS_OK;
+    int count = 0;
+
+    vigil_vm_stack_pop_n(vm, arg_count);
+    gamepad = (SDL_Gamepad *)SDL_HANDLE_GET(gamepads, handle);
+    if (!gamepad)
+        return sdl_push_string(vm, "", error);
+
+    bindings = SDL_GetGamepadBindings(gamepad, &count);
+    if (!bindings || count <= 0)
+        return sdl_push_string(vm, "", error);
+
+    for (int i = 0; i < count; i++)
+    {
+        const SDL_GamepadBinding *binding = bindings[i];
+        if (!binding)
+            continue;
+
+        if (joined_len > 0 && sdl_append_bytes(&joined, &joined_len, &joined_cap, "\n", 1U) != 0)
+            goto oom;
+
+        switch (binding->input_type)
+        {
+        case SDL_GAMEPAD_BINDTYPE_BUTTON:
+            if (sdl_append_format(&joined, &joined_len, &joined_cap, "input=button:%d ", binding->input.button) != 0)
+                goto oom;
+            break;
+        case SDL_GAMEPAD_BINDTYPE_AXIS:
+            if (sdl_append_format(&joined, &joined_len, &joined_cap, "input=axis:%d[%d:%d] ", binding->input.axis.axis,
+                                  binding->input.axis.axis_min, binding->input.axis.axis_max) != 0)
+                goto oom;
+            break;
+        case SDL_GAMEPAD_BINDTYPE_HAT:
+            if (sdl_append_format(&joined, &joined_len, &joined_cap, "input=hat:%d:%d ", binding->input.hat.hat,
+                                  binding->input.hat.hat_mask) != 0)
+                goto oom;
+            break;
+        default:
+            if (sdl_append_cstr(&joined, &joined_len, &joined_cap, "input=none ") != 0)
+                goto oom;
+            break;
+        }
+
+        switch (binding->output_type)
+        {
+        case SDL_GAMEPAD_BINDTYPE_BUTTON: {
+            const char *button_name = SDL_GetGamepadStringForButton(binding->output.button);
+            if (sdl_append_format(&joined, &joined_len, &joined_cap, "output=button:%s",
+                                  button_name ? button_name : "unknown") != 0)
+                goto oom;
+            break;
+        }
+        case SDL_GAMEPAD_BINDTYPE_AXIS: {
+            const char *axis_name = SDL_GetGamepadStringForAxis(binding->output.axis.axis);
+            if (sdl_append_format(&joined, &joined_len, &joined_cap, "output=axis:%s[%d:%d]",
+                                  axis_name ? axis_name : "unknown", binding->output.axis.axis_min,
+                                  binding->output.axis.axis_max) != 0)
+                goto oom;
+            break;
+        }
+        default:
+            if (sdl_append_cstr(&joined, &joined_len, &joined_cap, "output=none") != 0)
+                goto oom;
+            break;
+        }
+    }
+
+    st = sdl_push_string(vm, joined ? joined : "", error);
+    SDL_free(bindings);
+    free(joined);
+    return st;
+
+oom:
+    SDL_free(bindings);
+    free(joined);
+    vigil_error_set_literal(error, VIGIL_STATUS_OUT_OF_MEMORY, "out of memory");
+    return VIGIL_STATUS_OUT_OF_MEMORY;
+}
+
+static vigil_status_t sdl_gamepad_get_guid(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t handle = sdl_field_i64(vm, base, GP_HANDLE);
+    SDL_Gamepad *gamepad = NULL;
+    SDL_JoystickID id = 0;
+    char buf[64] = {0};
+
+    vigil_vm_stack_pop_n(vm, arg_count);
+    gamepad = (SDL_Gamepad *)SDL_HANDLE_GET(gamepads, handle);
+    if (!gamepad)
+        return sdl_push_string(vm, "", error);
+
+    id = SDL_GetGamepadID(gamepad);
+    SDL_GUIDToString(SDL_GetGamepadGUIDForID(id), buf, sizeof(buf));
     return sdl_push_string(vm, buf, error);
 }
 
@@ -14410,6 +15424,153 @@ SDL_CONST_FN(FLIP_VERTICAL, SDL_FLIP_VERTICAL)
 
 /* clang-format on */
 
+static const char *const sdl_properties_param_names[] = {"properties"};
+static const char *const sdl_guid_param_names[] = {"guid"};
+static const char *const sdl_environment_handle_param_names[] = {"environment"};
+static const char *const sdl_environment_name_param_names[] = {"environment", "name"};
+static const char *const sdl_environment_set_param_names[] = {"environment", "name", "value", "overwrite"};
+static const char *const sdl_environment_create_param_names[] = {"populated"};
+static const char *const sdl_message_box_param_names[] = {"flags", "title", "message", "buttons"};
+static const char *const sdl_window_rect_param_names[] = {"x", "y", "w", "h"};
+static const char *const sdl_window_rects_param_names[] = {"rects", "count"};
+static const char *const sdl_clipboard_mime_param_names[] = {"mime_type"};
+static const char *const sdl_clipboard_set_param_names[] = {"mime_type", "buffer", "size"};
+static const char *const sdl_camera_index_param_names[] = {"camera_index"};
+static const vigil_native_symbol_doc_t sdl_doc_create_window_with_properties = {
+    "Create a window from an SDL property bag.",
+    "Pass a properties ID configured with SDL window creation keys such as title, size, and flags.",
+    "i32 props = sdl.create_properties()\n"
+    "bool ok, err e = sdl.set_string_property(props, \"SDL.window.create.title\", \"Demo\")",
+};
+
+static const vigil_native_symbol_doc_t sdl_doc_create_renderer_with_properties = {
+    "Create a renderer from an SDL property bag.",
+    "Pass a properties ID configured with SDL renderer creation keys such as the target window and driver name.",
+    NULL,
+};
+
+static const vigil_native_symbol_doc_t sdl_doc_get_gamepad_mapping_for_guid = {
+    "Return the SDL mapping string for a gamepad GUID.",
+    "Use a GUID string returned by SDL helper functions such as get_gamepad_guid_for_id or get_joystick_guid_for_id.",
+    "string mapping = sdl.get_gamepad_mapping_for_guid(guid)",
+};
+
+static const vigil_native_symbol_doc_t sdl_doc_get_gamepad_mappings = {
+    "Return all known gamepad mappings as a newline-separated string.",
+    "Each line is one SDL gamepad mapping string. Empty output means no mappings are currently registered.",
+    "string mappings = sdl.get_gamepad_mappings()",
+};
+
+static const vigil_native_symbol_doc_t sdl_doc_get_joystick_guid_info = {
+    "Decode vendor, product, version, and CRC16 values from a joystick GUID string.",
+    "Returns four i32 values in order: vendor, product, version, crc16.",
+    "i32 vendor, i32 product, i32 version, i32 crc = sdl.get_joystick_guid_info(guid)",
+};
+
+static const vigil_native_symbol_doc_t sdl_doc_create_environment = {
+    "Create an SDL environment handle for isolated variable editing.",
+    "Pass 1 to clone the current process environment or 0 to start with an empty environment.",
+    "i64 env, err e = sdl.create_environment(1)",
+};
+
+static const vigil_native_symbol_doc_t sdl_doc_get_environment_variables = {
+    "List environment variables from an SDL environment handle.",
+    "Returns newline-separated NAME=value pairs.",
+    "string vars = sdl.get_environment_variables(env)",
+};
+
+static const vigil_native_symbol_doc_t sdl_doc_get_environment_variable_from = {
+    "Read one variable from an SDL environment handle.",
+    "Returns an empty string when the variable is missing.",
+    "string home = sdl.get_environment_variable_from(env, \"HOME\")",
+};
+
+static const vigil_native_symbol_doc_t sdl_doc_set_environment_variable_in = {
+    "Set one variable in an SDL environment handle.",
+    "Set overwrite to 0 to keep an existing value unchanged.",
+    "bool ok, err e = sdl.set_environment_variable_in(env, \"DEMO\", \"1\", 1)",
+};
+
+static const vigil_native_symbol_doc_t sdl_doc_show_message_box = {
+    "Show a message box with custom buttons and return the selected button index.",
+    "Pass button labels as a newline-separated string such as "
+    "\"Yes\\nNo\\nCancel\". The return value is the zero-based button index.",
+    "i32 button, err e = sdl.show_message_box(sdl.MESSAGEBOX_INFORMATION(), \"Question\", \"Continue?\", \"Yes\\nNo\")",
+};
+
+static const vigil_native_symbol_doc_t sdl_doc_window_get_fullscreen_mode = {
+    "Return the exclusive fullscreen mode size for the window.",
+    "Returns 0, 0 when the window is using borderless desktop fullscreen or no explicit fullscreen mode.",
+    "i32 w, i32 h = win.get_fullscreen_mode()",
+};
+
+static const vigil_native_symbol_doc_t sdl_doc_window_update_surface_rect = {
+    "Update one rectangle of the window surface.",
+    "Use this after drawing to a window surface when only one region needs to be presented.",
+    "bool ok, err e = win.update_surface_rect(0, 0, 64, 64)",
+};
+
+static const vigil_native_symbol_doc_t sdl_doc_get_camera_supported_formats = {
+    "List camera formats supported by one enumerated camera device.",
+    "Each line is format,colorspace,width,height,fps_num,fps_den using SDL numeric constants. "
+    "Pass the same camera index used by Camera.open.",
+    "string specs = sdl.get_camera_supported_formats(0)",
+};
+
+static const vigil_native_symbol_doc_t sdl_doc_get_cameras = {
+    "List enumerated camera devices in a compact newline-separated form.",
+    "Each line is instance_id,name,position using SDL camera position constants.",
+    "string cameras = sdl.get_cameras()",
+};
+
+static const vigil_native_symbol_doc_t sdl_doc_camera_get_spec = {
+    "Return the active camera format specification.",
+    "Returns six i32 values in order: pixel format, colorspace, width, height, fps numerator, fps denominator.",
+    "i32 fmt, i32 cs, i32 w, i32 h, i32 fps_num, i32 fps_den = cam.get_spec()",
+};
+
+static const vigil_native_symbol_doc_t sdl_doc_gamepad_get_bindings = {
+    "Describe the current SDL gamepad bindings for one opened controller.",
+    "Each line summarizes one SDL_GamepadBinding using a practical textual form for debugging and tooling.",
+    "string bindings = pad.get_bindings()",
+};
+
+static const vigil_native_symbol_doc_t sdl_doc_get_gamepads = {
+    "List connected gamepads in a compact newline-separated form.",
+    "Each line is instance_id,name,type,player_index,path using SDL gamepad type constants.",
+    "string pads = sdl.get_gamepads()",
+};
+
+static const vigil_native_symbol_doc_t sdl_doc_gamepad_get_guid = {
+    "Return the SDL GUID string for an opened gamepad.",
+    "This is equivalent to looking up the opened gamepad's instance ID and converting its GUID to text.",
+    "string guid = pad.get_guid()",
+};
+
+static const vigil_native_symbol_doc_t sdl_doc_gamepad_get_power_info = {
+    "Return the power state and battery percentage for an opened gamepad.",
+    "Returns two i32 values in order: SDL power state and percentage, with -1 when the percentage is unavailable.",
+    "i32 state, i32 percent = pad.get_power_info()",
+};
+
+static const vigil_native_symbol_doc_t sdl_doc_window_update_surface_rects = {
+    "Update multiple rectangles of the window surface from an unsafe buffer.",
+    "The buffer must contain count rectangles packed as repeating i32 x, y, w, h quads.",
+    "bool ok, err e = win.update_surface_rects(rects, 2)",
+};
+
+static const vigil_native_symbol_doc_t sdl_doc_get_clipboard_data = {
+    "Read clipboard data for one MIME type into an unsafe buffer.",
+    "Returns a buffer handle, the byte size, and err. Free the buffer with unsafe.free when done.",
+    "i64 buf, i64 size, err e = sdl.get_clipboard_data(\"text/plain\")",
+};
+
+static const vigil_native_symbol_doc_t sdl_doc_set_clipboard_data = {
+    "Publish one clipboard payload from an unsafe buffer under a MIME type.",
+    "Pass size <= 0 to publish the whole buffer. The data is copied before SDL takes ownership.",
+    "bool ok, err e = sdl.set_clipboard_data(\"text/plain\", buf, size)",
+};
+
 /* ── Function table ──────────────────────────────────────────────── */
 
 static const vigil_native_module_function_t sdl_functions[] = {
@@ -14581,6 +15742,8 @@ static const vigil_native_module_function_t sdl_functions[] = {
     SDL_CONST_ENTRY("AUDIO_F32", AUDIO_F32),
     /* Gamepad (slice 9) */
     SDL_FN("has_gamepad", 11U, sdl_fn_has_gamepad, 0U, NULL, VIGIL_TYPE_BOOL),
+    {"get_gamepads", 12U, sdl_fn_get_gamepads, 0U, NULL, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL,
+     NULL, &sdl_doc_get_gamepads},
     SDL_FN("get_gamepad_count", 17U, sdl_fn_get_gamepad_count, 0U, NULL, VIGIL_TYPE_I32),
     SDL_FN("get_gamepad_id", 14U, sdl_fn_get_gamepad_id, 1U, p_i32, VIGIL_TYPE_I32),
     /* Gamepad axis/button constants */
@@ -14616,6 +15779,8 @@ static const vigil_native_module_function_t sdl_functions[] = {
     SDL_FN("get_clipboard_text", 18U, sdl_fn_get_clipboard_text, 0U, NULL, VIGIL_TYPE_STRING),
     SDL_FN("has_clipboard_text", 18U, sdl_fn_has_clipboard_text, 0U, NULL, VIGIL_TYPE_BOOL),
     SDL_FN_BOOL_ERR("show_simple_message_box", 23U, sdl_fn_show_simple_message_box, 3U, p_i32_str_str),
+    {"show_message_box", 16U, sdl_fn_show_message_box, 4U, p_i32_str_str_str, VIGIL_TYPE_I32, 2U, rt_i32_err, 0, NULL,
+     NULL, 0U, sdl_message_box_param_names, NULL, NULL, &sdl_doc_show_message_box},
     SDL_FN_BOOL_ERR("open_url", 8U, sdl_fn_open_url, 1U, p_str),
     SDL_FN("get_base_path", 13U, sdl_fn_get_base_path, 0U, NULL, VIGIL_TYPE_STRING),
     {"get_pref_path", 13U, sdl_fn_get_pref_path, 2U, p_str_str, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U, NULL,
@@ -14629,6 +15794,10 @@ static const vigil_native_module_function_t sdl_functions[] = {
     SDL_CONST_ENTRY("MESSAGEBOX_ERROR", MESSAGEBOX_ERROR),
     SDL_CONST_ENTRY("MESSAGEBOX_WARNING", MESSAGEBOX_WARNING),
     SDL_CONST_ENTRY("MESSAGEBOX_INFORMATION", MESSAGEBOX_INFORMATION),
+    SDL_CONST_ENTRY("MESSAGEBOX_BUTTONS_LEFT_TO_RIGHT", MESSAGEBOX_BUTTONS_LEFT_TO_RIGHT),
+    SDL_CONST_ENTRY("MESSAGEBOX_BUTTONS_RIGHT_TO_LEFT", MESSAGEBOX_BUTTONS_RIGHT_TO_LEFT),
+    SDL_CONST_ENTRY("MESSAGEBOX_BUTTON_RETURNKEY_DEFAULT", MESSAGEBOX_BUTTON_RETURNKEY_DEFAULT),
+    SDL_CONST_ENTRY("MESSAGEBOX_BUTTON_ESCAPEKEY_DEFAULT", MESSAGEBOX_BUTTON_ESCAPEKEY_DEFAULT),
     /* Extended display / power / screensaver (slice 13) */
     SDL_FN("get_primary_display", 19U, sdl_fn_get_primary_display, 0U, NULL, VIGIL_TYPE_I32),
     SDL_FN("get_display_content_scale", 25U, sdl_fn_get_display_content_scale, 1U, p_i32, VIGIL_TYPE_F64),
@@ -14755,13 +15924,22 @@ static const vigil_native_module_function_t sdl_functions[] = {
     SDL_CONST_ENTRY("PATHTYPE_DIRECTORY", PATHTYPE_DIRECTORY),
     /* Camera (slice 35) */
     SDL_FN("get_camera_count", 16U, sdl_fn_get_camera_count, 0U, NULL, VIGIL_TYPE_I32),
+    {"get_cameras", 11U, sdl_fn_get_cameras, 0U, NULL, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL,
+     &sdl_doc_get_cameras},
     SDL_FN("get_camera_name", 15U, sdl_fn_get_camera_name, 1U, p_i32, VIGIL_TYPE_STRING),
     SDL_FN("get_current_camera_driver", 25U, sdl_fn_get_current_camera_driver, 0U, NULL, VIGIL_TYPE_STRING),
+    {"get_camera_supported_formats", 28U, sdl_fn_get_camera_supported_formats, 1U, p_i32, VIGIL_TYPE_STRING, 1U, NULL,
+     0, NULL, NULL, 0U, sdl_camera_index_param_names, NULL, NULL, &sdl_doc_get_camera_supported_formats},
     /* Window complete */
+    {"create_window_with_properties", 29U, sdl_fn_create_window_with_properties, 1U, p_i32, VIGIL_TYPE_OBJECT, 2U,
+     rt_obj_err, 0, NULL, NULL, 0U, sdl_properties_param_names, NULL, "Window", &sdl_doc_create_window_with_properties},
     {"create_window_and_renderer", 26U, sdl_fn_create_window_and_renderer, 4U, p_str_i32_i32_i32, VIGIL_TYPE_I64, 2U,
      rt_i64_err, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
     SDL_FN("get_grabbed_window", 18U, sdl_fn_get_grabbed_window, 0U, NULL, VIGIL_TYPE_I32),
     /* Renderer complete - module functions */
+    {"create_renderer_with_properties", 31U, sdl_fn_create_renderer_with_properties, 1U, p_i32, VIGIL_TYPE_OBJECT, 2U,
+     rt_obj_err, 0, NULL, NULL, 0U, sdl_properties_param_names, NULL, "Renderer",
+     &sdl_doc_create_renderer_with_properties},
     SDL_FN("get_num_render_drivers", 21U, sdl_fn_get_num_render_drivers, 0U, NULL, VIGIL_TYPE_I32),
     SDL_FN("get_render_driver", 17U, sdl_fn_get_render_driver, 1U, p_i32, VIGIL_TYPE_STRING),
     /* Renderer/Surface final - module functions */
@@ -14812,6 +15990,10 @@ static const vigil_native_module_function_t sdl_functions[] = {
     SDL_FN("get_gamepad_type_from_string", 28U, sdl_fn_get_gamepad_type_from_string, 1U, p_str, VIGIL_TYPE_I32),
     SDL_FN("get_gamepad_name_for_id", 22U, sdl_fn_get_gamepad_name_for_id, 1U, p_i32, VIGIL_TYPE_STRING),
     SDL_FN("get_gamepad_type_for_id", 22U, sdl_fn_get_gamepad_type_for_id, 1U, p_i32, VIGIL_TYPE_I32),
+    {"get_gamepad_mapping_for_guid", 28U, sdl_fn_get_gamepad_mapping_for_guid, 1U, p_str, VIGIL_TYPE_STRING, 1U, NULL,
+     0, NULL, NULL, 0U, sdl_guid_param_names, NULL, NULL, &sdl_doc_get_gamepad_mapping_for_guid},
+    {"get_gamepad_mappings", 20U, sdl_fn_get_gamepad_mappings, 0U, NULL, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U,
+     NULL, NULL, NULL, &sdl_doc_get_gamepad_mappings},
     /* Joystick complete - module */
     SDL_FN_VOID("update_joysticks", 17U, sdl_fn_update_joysticks, 0U, NULL),
     SDL_FN_VOID("lock_joysticks", 15U, sdl_fn_lock_joysticks, 0U, NULL),
@@ -15175,8 +16357,23 @@ static const vigil_native_module_function_t sdl_functions[] = {
      NULL, NULL},
     {"save_file", 9U, sdl_fn_save_file, 3U, p_str_i64_i32, VIGIL_TYPE_BOOL, 2U, rt_bool_err, 0, NULL, NULL, 0U, NULL,
      NULL, NULL, NULL},
+    {"create_environment", 18U, sdl_fn_create_environment, 1U, p_i32, VIGIL_TYPE_I64, 2U, rt_i64_err, 0, NULL, NULL, 0U,
+     sdl_environment_create_param_names, NULL, NULL, &sdl_doc_create_environment},
+    SDL_FN_VOID("destroy_environment", 19U, sdl_fn_destroy_environment, 1U, p_i64),
+    {"get_environment_variables", 25U, sdl_fn_get_environment_variables, 1U, p_i64, VIGIL_TYPE_STRING, 1U, NULL, 0,
+     NULL, NULL, 0U, sdl_environment_handle_param_names, NULL, NULL, &sdl_doc_get_environment_variables},
+    {"get_environment_variable_from", 29U, sdl_fn_get_environment_variable_from, 2U, p_i64_str, VIGIL_TYPE_STRING, 1U,
+     NULL, 0, NULL, NULL, 0U, sdl_environment_name_param_names, NULL, NULL, &sdl_doc_get_environment_variable_from},
+    {"set_environment_variable_in", 27U, sdl_fn_set_environment_variable_in, 4U, p_i64_str_str_i32, VIGIL_TYPE_BOOL, 2U,
+     rt_bool_err, 0, NULL, NULL, 0U, sdl_environment_set_param_names, NULL, NULL, &sdl_doc_set_environment_variable_in},
+    {"unset_environment_variable_in", 29U, sdl_fn_unset_environment_variable_in, 2U, p_i64_str, VIGIL_TYPE_BOOL, 2U,
+     rt_bool_err, 0, NULL, NULL, 0U, sdl_environment_name_param_names, NULL, NULL, NULL},
     SDL_FN_BOOL_ERR("clear_clipboard_data", 20U, sdl_fn_clear_clipboard_data, 0U, NULL),
     SDL_FN("has_clipboard_data", 18U, sdl_fn_has_clipboard_data, 1U, p_str, VIGIL_TYPE_BOOL),
+    {"get_clipboard_data", 18U, sdl_fn_get_clipboard_data, 1U, p_str, VIGIL_TYPE_I64, 3U, rt_i64_i64_err, 0, NULL, NULL,
+     0U, sdl_clipboard_mime_param_names, NULL, NULL, &sdl_doc_get_clipboard_data},
+    {"set_clipboard_data", 18U, sdl_fn_set_clipboard_data, 3U, p_str_i64_i32, VIGIL_TYPE_BOOL, 2U, rt_bool_err, 0, NULL,
+     NULL, 0U, sdl_clipboard_set_param_names, NULL, NULL, &sdl_doc_set_clipboard_data},
     {"set_hint_with_priority", 22U, sdl_fn_set_hint_with_priority, 3U, p_str_str_i32, VIGIL_TYPE_BOOL, 1U, NULL, 0,
      NULL, NULL, 0U, NULL, NULL, NULL, NULL},
     SDL_FN_BOOL_ERR("set_log_priority_prefix", 23U, sdl_fn_set_log_priority_prefix, 2U, p_i32_str),
@@ -15232,6 +16429,8 @@ static const vigil_native_module_function_t sdl_functions[] = {
     SDL_FN("get_joystick_properties", 23U, sdl_fn_get_joystick_properties, 1U, p_i64, VIGIL_TYPE_I32),
     SDL_FN("get_joystick_guid", 18U, sdl_fn_get_joystick_guid, 1U, p_i64, VIGIL_TYPE_STRING),
     SDL_FN("get_joystick_guid_for_id", 23U, sdl_fn_get_joystick_guid_for_id, 1U, p_i32, VIGIL_TYPE_STRING),
+    {"get_joystick_guid_info", 22U, sdl_fn_get_joystick_guid_info, 1U, p_str, VIGIL_TYPE_I32, 4U, rt_i32x4, 0, NULL,
+     NULL, 0U, sdl_guid_param_names, NULL, NULL, &sdl_doc_get_joystick_guid_info},
     {"get_joystick_axis_initial_state", 30U, sdl_fn_get_joystick_axis_initial_state, 2U, p_i64_i32, VIGIL_TYPE_BOOL, 2U,
      rt_bool_i32, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
     /* Haptic */
@@ -15734,9 +16933,17 @@ static const vigil_native_class_method_t sdl_window_methods[] = {
     SDL_METHOD("set_shape", 9U, sdl_window_set_shape, 1U, p_obj, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
     SDL_METHOD("get_progress_state", 18U, sdl_window_get_progress_state, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL),
     SDL_METHOD("get_progress_value", 18U, sdl_window_get_progress_value, 0U, NULL, VIGIL_TYPE_F64, 1U, NULL),
+    {"get_fullscreen_mode", 19U, sdl_window_get_fullscreen_mode, 0U, NULL, VIGIL_TYPE_I32, 2U, rt_i32_i32, 0, NULL, 0U,
+     0, NULL, NULL, NULL, &sdl_doc_window_get_fullscreen_mode},
     SDL_METHOD("has_surface", 11U, sdl_window_has_surface, 0U, NULL, VIGIL_TYPE_BOOL, 1U, NULL),
     SDL_METHOD("update_surface", 14U, sdl_window_update_surface, 0U, NULL, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
+    {"update_surface_rect", 19U, sdl_window_update_surface_rect, 4U, p_i32_i32_i32_i32, VIGIL_TYPE_BOOL, 2U, rt_bool_err,
+     0, NULL, 0U, 0, sdl_window_rect_param_names, NULL, NULL, &sdl_doc_window_update_surface_rect},
+    {"update_surface_rects", 20U, sdl_window_update_surface_rects, 2U, p_i64_i32, VIGIL_TYPE_BOOL, 2U, rt_bool_err, 0,
+     NULL, 0U, 0, sdl_window_rects_param_names, NULL, NULL, &sdl_doc_window_update_surface_rects},
     SDL_METHOD("destroy_surface", 15U, sdl_window_destroy_surface, 0U, NULL, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
+    {"show_message_box", 16U, sdl_window_show_message_box, 4U, p_i32_str_str_str, VIGIL_TYPE_I32, 2U, rt_i32_err, 0,
+     NULL, 0U, 0, sdl_message_box_param_names, NULL, NULL, &sdl_doc_show_message_box},
     SDL_METHOD("set_surface_vsync", 17U, sdl_window_set_surface_vsync, 1U, p_i32, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
     SDL_METHOD("get_surface_vsync", 17U, sdl_window_get_surface_vsync, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL),
     /* Window remaining - methods */
@@ -15997,6 +17204,8 @@ static const vigil_native_class_method_t sdl_gamepad_methods[] = {
     SDL_METHOD("connected", 9U, sdl_gamepad_connected, 0U, NULL, VIGIL_TYPE_BOOL, 1U, NULL),
     SDL_METHOD("get_type", 8U, sdl_gamepad_get_type, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL),
     SDL_METHOD("get_power_percent", 17U, sdl_gamepad_get_power_percent, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL),
+    {"get_power_info", 14U, sdl_gamepad_get_power_info, 0U, NULL, VIGIL_TYPE_I32, 2U, rt_i32_i32, 0, NULL, 0U, 0, NULL,
+     NULL, NULL, &sdl_doc_gamepad_get_power_info},
     SDL_METHOD("set_led", 7U, sdl_gamepad_set_led, 3U, p_i32_i32_i32, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
     SDL_METHOD("rumble_triggers", 15U, sdl_gamepad_rumble_triggers, 3U, p_i32_i32_i32, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
     SDL_METHOD("has_axis", 8U, sdl_gamepad_has_axis, 1U, p_i32, VIGIL_TYPE_BOOL, 1U, NULL),
@@ -16011,6 +17220,8 @@ static const vigil_native_class_method_t sdl_gamepad_methods[] = {
     SDL_METHOD("get_firmware_version", 20U, sdl_gamepad_get_firmware_version, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL),
     SDL_METHOD("get_player_index", 16U, sdl_gamepad_get_player_index, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL),
     SDL_METHOD("set_player_index", 16U, sdl_gamepad_set_player_index, 1U, p_i32, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
+    {"get_guid", 8U, sdl_gamepad_get_guid, 0U, NULL, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, 0U, 0, NULL, NULL, NULL,
+     &sdl_doc_gamepad_get_guid},
     SDL_METHOD("get_steam_handle", 16U, sdl_gamepad_get_steam_handle, 0U, NULL, VIGIL_TYPE_I64, 1U, NULL),
     SDL_METHOD("get_connection_state", 20U, sdl_gamepad_get_connection_state, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL),
     SDL_METHOD("get_real_type", 13U, sdl_gamepad_get_real_type, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL),
@@ -16019,6 +17230,8 @@ static const vigil_native_class_method_t sdl_gamepad_methods[] = {
     SDL_METHOD("set_sensor_enabled", 18U, sdl_gamepad_set_sensor_enabled, 2U, p_i32_i32, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
     SDL_METHOD("sensor_enabled", 14U, sdl_gamepad_sensor_enabled, 1U, p_i32, VIGIL_TYPE_BOOL, 1U, NULL),
     SDL_METHOD("get_button_label", 16U, sdl_gamepad_get_button_label, 1U, p_i32, VIGIL_TYPE_I32, 1U, NULL),
+    {"get_bindings", 12U, sdl_gamepad_get_bindings, 0U, NULL, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, 0U, 0, NULL, NULL,
+     NULL, &sdl_doc_gamepad_get_bindings},
 };
 
 /* ── Joystick class descriptor ───────────────────────────────────── */
@@ -16096,6 +17309,8 @@ static const vigil_native_class_method_t sdl_camera_methods[] = {
     SDL_METHOD("close", 5U, sdl_camera_close, 0U, NULL, VIGIL_TYPE_VOID, 0U, NULL),
     SDL_METHOD("get_permission", 14U, sdl_camera_get_permission, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL),
     SDL_METHOD("get_format", 10U, sdl_camera_get_format, 0U, NULL, VIGIL_TYPE_I32, 2U, rt_i32_i32),
+    {"get_spec", 8U, sdl_camera_get_spec, 0U, NULL, VIGIL_TYPE_I32, 6U, rt_i32x6, 0, NULL, 0U, 0, NULL, NULL, NULL,
+     &sdl_doc_camera_get_spec},
     {"acquire_frame", 13U, sdl_camera_acquire_frame, 0U, NULL, VIGIL_TYPE_I64, 2U, rt_i64_err, 0, NULL, 0U, 0, NULL,
      NULL, NULL, NULL},
     SDL_METHOD("release_frame", 13U, sdl_camera_release_frame, 1U, p_i64, VIGIL_TYPE_VOID, 0U, NULL),
