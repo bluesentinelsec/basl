@@ -74,7 +74,7 @@ fn monte_carlo_sequential(i64 total_iters) -> i64 {
         i64 xi = rng % i64(10000);
         rng = lcg_next(rng);
         i64 yi = rng % i64(10000);
-        if (xi * xi + yi * yi < i64(100000000)) {
+        if xi * xi + yi * yi < i64(100000000) {
             inside = inside + i64(1);
         }
     }
@@ -93,7 +93,7 @@ fn monte_carlo_worker(i64 iters, i64 seed) -> i64 {
         i64 xi = rng % i64(10000);
         rng = lcg_next(rng);
         i64 yi = rng % i64(10000);
-        if (xi * xi + yi * yi < i64(100000000)) {
+        if xi * xi + yi * yi < i64(100000000) {
             inside = inside + i64(1);
         }
     }
@@ -128,7 +128,7 @@ fn consumer_work(i64 q_mtx, i64 q_not_full, i64 q_not_empty, i64 q_head, i64 q_t
     for (;;) {
         thread.lock(q_mtx);
         for (; atomic.load(q_count) == i64(0);) {
-            if (atomic.load(done_flag) == i64(1)) {
+            if atomic.load(done_flag) == i64(1) {
                 thread.unlock(q_mtx);
                 return;
             }
@@ -136,9 +136,9 @@ fn consumer_work(i64 q_mtx, i64 q_not_full, i64 q_not_empty, i64 q_head, i64 q_t
             thread.wait_timeout(q_not_empty, q_mtx, i64(10));
         }
 
-        if (atomic.load(q_count) == i64(0)) {
+        if atomic.load(q_count) == i64(0) {
             thread.unlock(q_mtx);
-            if (atomic.load(done_flag) == i64(1)) {
+            if atomic.load(done_flag) == i64(1) {
                 return;
             }
 
@@ -195,7 +195,7 @@ fn cas_worker(i64 counter, i64 iters) -> void {
     for (i64 i = i64(0); i < iters; i = i + i64(1)) {
         for (;;) {
             i64 old = atomic.load(counter);
-            if (atomic.cas(counter, old, old + i64(1))) {
+            if atomic.cas(counter, old, old + i64(1)) {
                 break;
             }
         }
@@ -207,7 +207,7 @@ fn cas_worker(i64 counter, i64 iters) -> void {
 fn barrier_worker(i64 bar_mtx, i64 bar_cond, i64 arrived, i64 total, i64 result_counter) -> void {
     thread.lock(bar_mtx);
     atomic.inc(arrived);
-    if (atomic.load(arrived) == total) {
+    if atomic.load(arrived) == total {
         thread.broadcast(bar_cond);
     } else {
         for (; atomic.load(arrived) < total;) {
@@ -269,7 +269,7 @@ fn main() -> i32 {
     i64 par_ms = t3 - t2;
     fmt.println(f"    Hits: {par_result}");
     fmt.println(f"    Time: {par_ms} ms");
-    if (par_ms > i64(0)) {
+    if par_ms > i64(0) {
         fmt.println(f"    Speedup: ~{seq_ms / par_ms}x");
     }
     // ── Section 3: Producer-consumer pipeline (wait_timeout) ────────────
@@ -340,11 +340,11 @@ fn main() -> i32 {
     fmt.println(f"    Produced: {total_produced}, Consumed: {total_consumed}");
     fmt.println(f"    Sum: {total_sum} (expected: {expected_sum})");
     fmt.println(f"    Time: {pc_ms} ms");
-    if (total_consumed != total_produced) {
+    if total_consumed != total_produced {
         fmt.println("    *** FAIL: produced != consumed ***");
     }
 
-    if (total_sum != expected_sum) {
+    if total_sum != expected_sum {
         fmt.println("    *** FAIL: sum mismatch ***");
     }
     // Clean up queue synchronization primitives
@@ -390,7 +390,7 @@ fn main() -> i32 {
     fmt.println(f"    Writers: {RW_WRITERS} x {RW_OPS_PER_THREAD} ops = {expected_writes} expected increments");
     fmt.println(f"    Final shared value: {final_shared}");
     fmt.println(f"    Time: {rw_ms} ms");
-    if (final_shared != expected_writes) {
+    if final_shared != expected_writes {
         fmt.println("    *** FAIL: write count mismatch ***");
     }
 
@@ -422,7 +422,7 @@ fn main() -> i32 {
     i64 tl_expected = TRYLOCK_THREADS * TRYLOCK_ITERS;
     fmt.println(f"    Counter: {tl_result} (expected: {tl_expected})");
     fmt.println(f"    Time: {tl_ms} ms");
-    if (tl_result != tl_expected) {
+    if tl_result != tl_expected {
         fmt.println("    *** FAIL: try_lock counter mismatch ***");
     }
 
@@ -453,7 +453,7 @@ fn main() -> i32 {
     i64 cas_expected = CAS_THREADS * CAS_ITERS;
     fmt.println(f"    Counter: {cas_result} (expected: {cas_expected})");
     fmt.println(f"    Time: {cas_ms} ms");
-    if (cas_result != cas_expected) {
+    if cas_result != cas_expected {
         fmt.println("    *** FAIL: CAS counter mismatch ***");
     }
     // ── Section 7: Broadcast barrier + cond_destroy ─────────────────────
@@ -483,7 +483,7 @@ fn main() -> i32 {
     i64 bar_count = atomic.load(bar_result);
     fmt.println(f"    Threads past barrier: {bar_count} (expected: {BROADCAST_THREADS})");
     fmt.println(f"    Time: {bar_ms} ms");
-    if (bar_count != BROADCAST_THREADS) {
+    if bar_count != BROADCAST_THREADS {
         fmt.println("    *** FAIL: not all threads passed barrier ***");
     }
 
@@ -509,59 +509,59 @@ fn main() -> i32 {
     i64 detach_count = atomic.load(detach_counter);
     fmt.println(f"    Completed: {detach_count} (expected: {DETACH_THREADS})");
     fmt.println(f"    Time: {detach_ms} ms");
-    if (detach_count != DETACH_THREADS) {
+    if detach_count != DETACH_THREADS {
         fmt.println("    *** FAIL: not all detached threads completed ***");
     }
     // ── Section 9: Summary ──────────────────────────────────────────────
     fmt.println("");
     fmt.println("=== Summary ===");
     i64 failures = i64(0);
-    if (seq_hits == i64(0)) {
+    if seq_hits == i64(0) {
         fmt.println("FAIL: Sequential hits = 0");
         failures = failures + i64(1);
     }
 
-    if (par_result == i64(0)) {
+    if par_result == i64(0) {
         fmt.println("FAIL: Parallel hits = 0");
         failures = failures + i64(1);
     }
 
-    if (total_consumed != total_produced) {
+    if total_consumed != total_produced {
         fmt.println("FAIL: Producer-consumer count mismatch");
         failures = failures + i64(1);
     }
 
-    if (total_sum != expected_sum) {
+    if total_sum != expected_sum {
         fmt.println("FAIL: Producer-consumer sum mismatch");
         failures = failures + i64(1);
     }
 
-    if (final_shared != expected_writes) {
+    if final_shared != expected_writes {
         fmt.println("FAIL: RWLock write count mismatch");
         failures = failures + i64(1);
     }
 
-    if (tl_result != tl_expected) {
+    if tl_result != tl_expected {
         fmt.println("FAIL: try_lock counter mismatch");
         failures = failures + i64(1);
     }
 
-    if (cas_result != cas_expected) {
+    if cas_result != cas_expected {
         fmt.println("FAIL: CAS counter mismatch");
         failures = failures + i64(1);
     }
 
-    if (bar_count != BROADCAST_THREADS) {
+    if bar_count != BROADCAST_THREADS {
         fmt.println("FAIL: Barrier count mismatch");
         failures = failures + i64(1);
     }
 
-    if (detach_count != DETACH_THREADS) {
+    if detach_count != DETACH_THREADS {
         fmt.println("FAIL: Detached thread count mismatch");
         failures = failures + i64(1);
     }
 
-    if (failures == i64(0)) {
+    if failures == i64(0) {
         fmt.println("ALL CHECKS PASSED");
     } else {
         fmt.println(f"{failures} CHECK(S) FAILED");
@@ -571,7 +571,7 @@ fn main() -> i32 {
     fmt.println(f"Total threads spawned: {total_threads}");
     i64 total_ms = time.now_ms() - t0;
     fmt.println(f"Total wall time: {total_ms} ms");
-    if (failures > i64(0)) {
+    if failures > i64(0) {
         return 1;
     }
 

@@ -19,7 +19,7 @@ class ComplexityTest(unittest.TestCase):
     def test_single_file(self):
         with tempfile.TemporaryDirectory() as d:
             p = Path(d) / "main.vigil"
-            p.write_text("fn main() -> i32 {\n    if (true) { return 1; }\n    return 0;\n}\n")
+            p.write_text("fn main() -> i32 {\n    if true { return 1; }\n    return 0;\n}\n")
             rc, out, _ = self._run([str(p)])
             self.assertEqual(rc, 0)
             self.assertIn("main", out)
@@ -42,7 +42,7 @@ class ComplexityTest(unittest.TestCase):
             # Generate a function with ccn > 10
             body = "fn big() -> i32 {\n"
             for i in range(12):
-                body += f"    if (true) {{ return {i}; }}\n"
+                body += f"    if true {{ return {i}; }}\n"
             body += "    return 0;\n}\n"
             (Path(d) / "t.vigil").write_text(body)
             rc, out, _ = self._run([str(Path(d) / "t.vigil")])

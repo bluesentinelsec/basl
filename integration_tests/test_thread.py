@@ -26,7 +26,7 @@ class ThreadCurrentIdTest(unittest.TestCase):
         code = '''import "thread";
 fn main() -> i32 {
     i64 id = thread.current_id();
-    if (id > i64(0)) { return 0; }
+    if id > i64(0) { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -38,7 +38,7 @@ class ThreadYieldTest(unittest.TestCase):
         code = '''import "thread";
 fn main() -> i32 {
     bool ok = thread.yield();
-    if (ok) { return 0; }
+    if ok { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -53,7 +53,7 @@ fn main() -> i32 {
     i64 start = time.now_ms();
     thread.sleep(i64(50));
     i64 end = time.now_ms();
-    if (end - start >= i64(40)) { return 0; }
+    if end - start >= i64(40) { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -65,7 +65,7 @@ class MutexTest(unittest.TestCase):
         code = '''import "thread";
 fn main() -> i32 {
     i64 m = thread.mutex();
-    if (m >= i64(0)) { return 0; }
+    if m >= i64(0) { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -77,7 +77,7 @@ fn main() -> i32 {
     i64 m = thread.mutex();
     bool locked = thread.lock(m);
     bool unlocked = thread.unlock(m);
-    if (locked && unlocked) { return 0; }
+    if locked && unlocked { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -89,7 +89,7 @@ fn main() -> i32 {
     i64 m = thread.mutex();
     bool got = thread.try_lock(m);
     thread.unlock(m);
-    if (got) { return 0; }
+    if got { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -101,7 +101,7 @@ class RwlockTest(unittest.TestCase):
         code = '''import "thread";
 fn main() -> i32 {
     i64 rw = thread.rwlock();
-    if (rw >= i64(0)) { return 0; }
+    if rw >= i64(0) { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -113,7 +113,7 @@ fn main() -> i32 {
     i64 rw = thread.rwlock();
     bool locked = thread.read_lock(rw);
     bool unlocked = thread.rw_unlock(rw);
-    if (locked && unlocked) { return 0; }
+    if locked && unlocked { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -125,7 +125,7 @@ fn main() -> i32 {
     i64 rw = thread.rwlock();
     bool locked = thread.write_lock(rw);
     bool unlocked = thread.rw_unlock(rw);
-    if (locked && unlocked) { return 0; }
+    if locked && unlocked { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)

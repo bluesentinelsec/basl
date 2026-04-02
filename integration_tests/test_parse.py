@@ -28,7 +28,7 @@ class ParseI32Test(unittest.TestCase):
         code = '''import "parse";
 fn main() -> i32 {
     i32 value, err e = parse.i32("42");
-    if (e == ok && value == 42) { return 0; }
+    if e == ok && value == 42 { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -38,7 +38,7 @@ fn main() -> i32 {
         code = '''import "parse";
 fn main() -> i32 {
     i32 value, err e = parse.i32("oops");
-    if (e != ok && value == 0) { return 0; }
+    if e != ok && value == 0 { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -48,7 +48,7 @@ fn main() -> i32 {
         code = '''import "parse";
 fn main() -> i32 {
     i32 value, err e = parse.i32("");
-    if (e != ok && value == 0) { return 0; }
+    if e != ok && value == 0 { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -60,7 +60,7 @@ class ParseF64Test(unittest.TestCase):
         code = '''import "parse";
 fn main() -> i32 {
     f64 value, err e = parse.f64("3.5");
-    if (e == ok && value > 3.49 && value < 3.51) { return 0; }
+    if e == ok && value > 3.49 && value < 3.51 { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -70,7 +70,7 @@ fn main() -> i32 {
         code = '''import "parse";
 fn main() -> i32 {
     f64 value, err e = parse.f64("abc");
-    if (e != ok && value == 0.0) { return 0; }
+    if e != ok && value == 0.0 { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -82,7 +82,7 @@ class ParseBoolTest(unittest.TestCase):
         code = '''import "parse";
 fn main() -> i32 {
     bool value, err e = parse.bool("true");
-    if (e == ok && value) { return 0; }
+    if e == ok && value { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -92,7 +92,7 @@ fn main() -> i32 {
         code = '''import "parse";
 fn main() -> i32 {
     bool value, err e = parse.bool("false");
-    if (e == ok && !value) { return 0; }
+    if e == ok && !value { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -102,7 +102,7 @@ fn main() -> i32 {
         code = '''import "parse";
 fn main() -> i32 {
     bool value, err e = parse.bool("not-bool");
-    if (e != ok && !value) { return 0; }
+    if e != ok && !value { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)

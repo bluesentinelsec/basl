@@ -26,7 +26,7 @@ class TimeNowTest(unittest.TestCase):
         code = '''import "time";
 fn main() -> i32 {
     i64 ts = time.now();
-    if (ts > i64(1700000000)) { return 0; }
+    if ts > i64(1700000000) { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -37,7 +37,7 @@ fn main() -> i32 {
 fn main() -> i32 {
     i64 s = time.now();
     i64 ms = time.now_ms();
-    if (ms >= s * i64(1000)) { return 0; }
+    if ms >= s * i64(1000) { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -48,7 +48,7 @@ fn main() -> i32 {
 fn main() -> i32 {
     i64 ms = time.now_ms();
     i64 ns = time.now_ns();
-    if (ns >= ms * i64(1000000)) { return 0; }
+    if ns >= ms * i64(1000000) { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -61,7 +61,7 @@ class TimeComponentsTest(unittest.TestCase):
 fn main() -> i32 {
     i64 ts = time.date(2024, 1, 15, 12, 0, 0);
     i32 y = time.year(ts);
-    if (y == 2024) { return 0; }
+    if y == 2024 { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -72,7 +72,7 @@ fn main() -> i32 {
 fn main() -> i32 {
     i64 ts = time.date(2024, 1, 15, 12, 0, 0);
     i32 m = time.month(ts);
-    if (m == 1) { return 0; }
+    if m == 1 { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -83,7 +83,7 @@ fn main() -> i32 {
 fn main() -> i32 {
     i64 ts = time.date(2024, 1, 15, 12, 0, 0);
     i32 d = time.day(ts);
-    if (d == 15) { return 0; }
+    if d == 15 { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -94,7 +94,7 @@ fn main() -> i32 {
 fn main() -> i32 {
     i64 ts = time.date(2024, 1, 15, 14, 30, 0);
     i32 h = time.hour(ts);
-    if (h == 14) { return 0; }
+    if h == 14 { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -109,7 +109,7 @@ fn main() -> i32 {
     i32 y = time.year(ts);
     i32 m = time.month(ts);
     i32 d = time.day(ts);
-    if (y == 2024 && m == 6 && d == 20) { return 0; }
+    if y == 2024 && m == 6 && d == 20 { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -123,7 +123,7 @@ fn main() -> i32 {
     i64 ts = time.date(2024, 1, 15, 12, 0, 0);
     i64 ts2 = time.add_days(ts, 10);
     i32 d = time.day(ts2);
-    if (d == 25) { return 0; }
+    if d == 25 { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -135,7 +135,7 @@ fn main() -> i32 {
     i64 ts = time.date(2024, 1, 15, 10, 0, 0);
     i64 ts2 = time.add_hours(ts, 5);
     i32 h = time.hour(ts2);
-    if (h == 15) { return 0; }
+    if h == 15 { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -147,7 +147,7 @@ fn main() -> i32 {
     i64 ts = time.date(2024, 1, 15, 12, 0, 0);
     i64 ts2 = time.add_seconds(ts, i64(3600));
     i32 h = time.hour(ts2);
-    if (h == 13) { return 0; }
+    if h == 13 { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -160,7 +160,7 @@ class TimeFormatTest(unittest.TestCase):
 fn main() -> i32 {
     i64 ts = time.date(2024, 1, 15, 12, 30, 45);
     string s = time.format(ts, "%Y-%m-%d");
-    if (s == "2024-01-15") { return 0; }
+    if s == "2024-01-15" { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -174,7 +174,7 @@ fn main() -> i32 {
     i64 start = time.now_ms();
     time.sleep(i64(50));
     i64 end = time.now_ms();
-    if (end - start >= i64(40)) { return 0; }
+    if end - start >= i64(40) { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)

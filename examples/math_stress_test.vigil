@@ -39,12 +39,12 @@ fn run_scalar_test() -> bool {
     f64 pi = math.pi();
     f64 e = math.e();
     total++;
-    if (math.abs(pi - 3.14159265358979323846) < tol) {
+    if math.abs(pi - 3.14159265358979323846) < tol {
         pass++;
     }
 
     total++;
-    if (math.abs(e - 2.71828182845904523536) < tol) {
+    if math.abs(e - 2.71828182845904523536) < tol {
         pass++;
     }
     // Trig identities: sin^2 + cos^2 = 1
@@ -55,161 +55,161 @@ fn run_scalar_test() -> bool {
         f64 s = math.sin(theta);
         f64 c = math.cos(theta);
         f64 err = math.abs(s * s + c * c - 1.0);
-        if (err > tol) {
+        if err > tol {
             trig_ok = false;
         }
     }
 
     total++;
-    if (trig_ok) {
+    if trig_ok {
         pass++;
     }
     // atan2 quadrant checks
     total++;
-    if (math.abs(math.atan2(1.0, 1.0) - pi / 4.0) < tol) {
+    if math.abs(math.atan2(1.0, 1.0) - pi / 4.0) < tol {
         pass++;
     }
 
     total++;
-    if (math.abs(math.atan2(1.0, - 1.0) - 3.0 * pi / 4.0) < tol) {
+    if math.abs(math.atan2(1.0, - 1.0) - 3.0 * pi / 4.0) < tol {
         pass++;
     }
 
     total++;
-    if (math.abs(math.atan2(- 1.0, - 1.0) - (- 3.0 * pi / 4.0)) < tol) {
+    if math.abs(math.atan2(- 1.0, - 1.0) - (- 3.0 * pi / 4.0)) < tol {
         pass++;
     }
     // Inverse trig round-trip: asin(sin(x)) = x for x in [-pi/2, pi/2]
     total++;
     f64 x = 0.7;
-    if (math.abs(math.asin(math.sin(x)) - x) < tol) {
+    if math.abs(math.asin(math.sin(x)) - x) < tol {
         pass++;
     }
 
     total++;
-    if (math.abs(math.acos(math.cos(x)) - x) < tol) {
+    if math.abs(math.acos(math.cos(x)) - x) < tol {
         pass++;
     }
 
     total++;
-    if (math.abs(math.atan(math.tan(x)) - x) < tol) {
+    if math.abs(math.atan(math.tan(x)) - x) < tol {
         pass++;
     }
     // Exponential / logarithmic identities
     total++;
-    if (math.abs(math.exp(1.0) - e) < tol) {
+    if math.abs(math.exp(1.0) - e) < tol {
         pass++;
     }
 
     total++;
-    if (math.abs(math.log(e) - 1.0) < tol) {
+    if math.abs(math.log(e) - 1.0) < tol {
         pass++;
     }
 
     total++;
-    if (math.abs(math.log2(8.0) - 3.0) < tol) {
+    if math.abs(math.log2(8.0) - 3.0) < tol {
         pass++;
     }
 
     total++;
-    if (math.abs(math.log10(1000.0) - 3.0) < tol) {
+    if math.abs(math.log10(1000.0) - 3.0) < tol {
         pass++;
     }
 
     total++;
-    if (math.abs(math.exp(math.log(42.0)) - 42.0) < tol) {
+    if math.abs(math.exp(math.log(42.0)) - 42.0) < tol {
         pass++;
     }
     // pow
     total++;
-    if (math.abs(math.pow(2.0, 10.0) - 1024.0) < tol) {
+    if math.abs(math.pow(2.0, 10.0) - 1024.0) < tol {
         pass++;
     }
 
     total++;
-    if (math.abs(math.pow(27.0, 1.0 / 3.0) - 3.0) < 1.0e-9) {
+    if math.abs(math.pow(27.0, 1.0 / 3.0) - 3.0) < 1.0e-9 {
         pass++;
     }
     // sqrt
     total++;
-    if (math.abs(math.sqrt(144.0) - 12.0) < tol) {
+    if math.abs(math.sqrt(144.0) - 12.0) < tol {
         pass++;
     }
 
     total++;
-    if (math.abs(math.sqrt(2.0) - 1.41421356237) < 1.0e-9) {
+    if math.abs(math.sqrt(2.0) - 1.41421356237) < 1.0e-9 {
         pass++;
     }
     // hypot (avoids overflow for large values)
     total++;
-    if (math.abs(math.hypot(3.0, 4.0) - 5.0) < tol) {
+    if math.abs(math.hypot(3.0, 4.0) - 5.0) < tol {
         pass++;
     }
 
     total++;
     f64 big = 1.0e150;
     f64 h = math.hypot(big, big);
-    if (h > 1.0e150 && h < 2.0e150) {
+    if h > 1.0e150 && h < 2.0e150 {
         pass++;
     }
     // Rounding
     total++;
-    if (math.floor(3.7) == 3.0) {
+    if math.floor(3.7) == 3.0 {
         pass++;
     }
 
     total++;
-    if (math.ceil(3.2) == 4.0) {
+    if math.ceil(3.2) == 4.0 {
         pass++;
     }
 
     total++;
-    if (math.round(3.5) == 4.0) {
+    if math.round(3.5) == 4.0 {
         pass++;
     }
 
     total++;
-    if (math.trunc(- 3.7) == - 3.0) {
+    if math.trunc(- 3.7) == - 3.0 {
         pass++;
     }
     // abs, sign
     total++;
-    if (math.abs(- 42.5) == 42.5) {
+    if math.abs(- 42.5) == 42.5 {
         pass++;
     }
 
     total++;
-    if (math.sign(- 7.0) == - 1.0) {
+    if math.sign(- 7.0) == - 1.0 {
         pass++;
     }
 
     total++;
-    if (math.sign(0.0) == 0.0) {
+    if math.sign(0.0) == 0.0 {
         pass++;
     }
 
     total++;
-    if (math.sign(99.0) == 1.0) {
+    if math.sign(99.0) == 1.0 {
         pass++;
     }
     // fmod
     total++;
-    if (math.abs(math.fmod(10.0, 3.0) - 1.0) < tol) {
+    if math.abs(math.fmod(10.0, 3.0) - 1.0) < tol {
         pass++;
     }
     // min, max
     total++;
-    if (math.min(3.0, 7.0) == 3.0) {
+    if math.min(3.0, 7.0) == 3.0 {
         pass++;
     }
 
     total++;
-    if (math.max(3.0, 7.0) == 7.0) {
+    if math.max(3.0, 7.0) == 7.0 {
         pass++;
     }
     // deg2rad, rad2deg round-trip
     total++;
-    if (math.abs(math.rad2deg(math.deg2rad(180.0)) - 180.0) < tol) {
+    if math.abs(math.rad2deg(math.deg2rad(180.0)) - 180.0) < tol {
         pass++;
     }
 
@@ -229,25 +229,25 @@ fn run_vec3_test() -> bool {
     // add
     math.Vec3 c = a.add(b);
     total++;
-    if (c.x == 5.0 && c.y == 7.0 && c.z == 9.0) {
+    if c.x == 5.0 && c.y == 7.0 && c.z == 9.0 {
         pass++;
     }
     // sub
     math.Vec3 d = b.sub(a);
     total++;
-    if (d.x == 3.0 && d.y == 3.0 && d.z == 3.0) {
+    if d.x == 3.0 && d.y == 3.0 && d.z == 3.0 {
         pass++;
     }
     // scale
     math.Vec3 s = a.scale(2.0);
     total++;
-    if (s.x == 2.0 && s.y == 4.0 && s.z == 6.0) {
+    if s.x == 2.0 && s.y == 4.0 && s.z == 6.0 {
         pass++;
     }
     // dot product
     f64 dot = a.dot(b);
     total++;
-    if (math.abs(dot - 32.0) < tol) {
+    if math.abs(dot - 32.0) < tol {
         pass++;
     }
     // cross product: (1,0,0) x (0,1,0) = (0,0,1)
@@ -255,46 +255,46 @@ fn run_vec3_test() -> bool {
     math.Vec3 j_hat = math.Vec3(0.0, 1.0, 0.0);
     math.Vec3 k_hat = i_hat.cross(j_hat);
     total++;
-    if (math.abs(k_hat.x) < tol && math.abs(k_hat.y) < tol && math.abs(k_hat.z - 1.0) < tol) {
+    if math.abs(k_hat.x) < tol && math.abs(k_hat.y) < tol && math.abs(k_hat.z - 1.0) < tol {
         pass++;
     }
     // Anti-commutativity: a x b = -(b x a)
     math.Vec3 axb = a.cross(b);
     math.Vec3 bxa = b.cross(a);
     total++;
-    if (math.abs(axb.x + bxa.x) < tol && math.abs(axb.y + bxa.y) < tol && math.abs(axb.z + bxa.z) < tol) {
+    if math.abs(axb.x + bxa.x) < tol && math.abs(axb.y + bxa.y) < tol && math.abs(axb.z + bxa.z) < tol {
         pass++;
     }
     // normalize
     math.Vec3 n = a.normalize();
     f64 nlen = n.length();
     total++;
-    if (math.abs(nlen - 1.0) < tol) {
+    if math.abs(nlen - 1.0) < tol {
         pass++;
     }
     // length and lengthSqr
     f64 len = a.length();
     f64 lsq = a.lengthSqr();
     total++;
-    if (math.abs(len * len - lsq) < tol) {
+    if math.abs(len * len - lsq) < tol {
         pass++;
     }
     // distance
     f64 dist = a.distance(b);
     total++;
-    if (math.abs(dist - math.sqrt(27.0)) < tol) {
+    if math.abs(dist - math.sqrt(27.0)) < tol {
         pass++;
     }
     // negate
     math.Vec3 neg = a.negate();
     total++;
-    if (neg.x == - 1.0 && neg.y == - 2.0 && neg.z == - 3.0) {
+    if neg.x == - 1.0 && neg.y == - 2.0 && neg.z == - 3.0 {
         pass++;
     }
     // lerp at t=0.5
     math.Vec3 mid = a.lerp(b, 0.5);
     total++;
-    if (math.abs(mid.x - 2.5) < tol && math.abs(mid.y - 3.5) < tol && math.abs(mid.z - 4.5) < tol) {
+    if math.abs(mid.x - 2.5) < tol && math.abs(mid.y - 3.5) < tol && math.abs(mid.z - 4.5) < tol {
         pass++;
     }
     // reflect: v reflected over normal n
@@ -302,7 +302,7 @@ fn run_vec3_test() -> bool {
     math.Vec3 normal = math.Vec3(0.0, 1.0, 0.0);
     math.Vec3 refl = v.reflect(normal);
     total++;
-    if (math.abs(refl.x - 1.0) < tol && math.abs(refl.y - 1.0) < tol) {
+    if math.abs(refl.x - 1.0) < tol && math.abs(refl.y - 1.0) < tol {
         pass++;
     }
     // angle between parallel vectors = 0
@@ -310,31 +310,31 @@ fn run_vec3_test() -> bool {
     math.Vec3 p2 = math.Vec3(2.0, 0.0, 0.0);
     f64 ang = p1.angle(p2);
     total++;
-    if (math.abs(ang) < tol) {
+    if math.abs(ang) < tol {
         pass++;
     }
     // angle between perpendicular vectors = pi/2
     f64 ang90 = i_hat.angle(j_hat);
     total++;
-    if (math.abs(ang90 - math.pi() / 2.0) < tol) {
+    if math.abs(ang90 - math.pi() / 2.0) < tol {
         pass++;
     }
     // Static factories
     math.Vec3 z = math.Vec3.zero();
     total++;
-    if (z.x == 0.0 && z.y == 0.0 && z.z == 0.0) {
+    if z.x == 0.0 && z.y == 0.0 && z.z == 0.0 {
         pass++;
     }
 
     math.Vec3 o = math.Vec3.one();
     total++;
-    if (o.x == 1.0 && o.y == 1.0 && o.z == 1.0) {
+    if o.x == 1.0 && o.y == 1.0 && o.z == 1.0 {
         pass++;
     }
     // Normalize zero vector should not crash
     math.Vec3 zn = z.normalize();
     total++;
-    if (zn.x == 0.0 && zn.y == 0.0 && zn.z == 0.0) {
+    if zn.x == 0.0 && zn.y == 0.0 && zn.z == 0.0 {
         pass++;
     }
 
@@ -354,87 +354,87 @@ fn run_mat4_quat_test() -> bool {
     // Identity properties
     math.Mat4 id = math.Mat4.identity();
     total++;
-    if (math.abs(id.determinant() - 1.0) < tol) {
+    if math.abs(id.determinant() - 1.0) < tol {
         pass++;
     }
 
     total++;
-    if (math.abs(id.trace() - 4.0) < tol) {
+    if math.abs(id.trace() - 4.0) < tol {
         pass++;
     }
     // I * I = I
     math.Mat4 ii = id.multiply(id);
     total++;
-    if (math.abs(ii.determinant() - 1.0) < tol) {
+    if math.abs(ii.determinant() - 1.0) < tol {
         pass++;
     }
     // Rotation preserves determinant = 1
     math.Mat4 rx = id.rotateX(math.pi() / 3.0);
     total++;
-    if (math.abs(rx.determinant() - 1.0) < tol) {
+    if math.abs(rx.determinant() - 1.0) < tol {
         pass++;
     }
 
     math.Mat4 ry = id.rotateY(math.pi() / 4.0);
     total++;
-    if (math.abs(ry.determinant() - 1.0) < tol) {
+    if math.abs(ry.determinant() - 1.0) < tol {
         pass++;
     }
 
     math.Mat4 rz = id.rotateZ(math.pi() / 6.0);
     total++;
-    if (math.abs(rz.determinant() - 1.0) < tol) {
+    if math.abs(rz.determinant() - 1.0) < tol {
         pass++;
     }
     // Combined rotation: det should still be 1
     math.Mat4 combined = rx.multiply(ry).multiply(rz);
     total++;
-    if (math.abs(combined.determinant() - 1.0) < tol) {
+    if math.abs(combined.determinant() - 1.0) < tol {
         pass++;
     }
     // Translation: det = 1, inverse recovers identity
     math.Vec3 tv = math.Vec3(5.0, - 3.0, 7.0);
     math.Mat4 t = id.translate(tv);
     total++;
-    if (math.abs(t.determinant() - 1.0) < tol) {
+    if math.abs(t.determinant() - 1.0) < tol {
         pass++;
     }
 
     math.Mat4 tinv = t.invert();
     math.Mat4 check = t.multiply(tinv);
     total++;
-    if (math.abs(check.get(0, 0) - 1.0) < tol && math.abs(check.get(3, 3) - 1.0) < tol) {
+    if math.abs(check.get(0, 0) - 1.0) < tol && math.abs(check.get(3, 3) - 1.0) < tol {
         pass++;
     }
     // Transpose of identity = identity
     math.Mat4 idt = id.transpose();
     total++;
-    if (math.abs(idt.get(0, 0) - 1.0) < tol && math.abs(idt.get(1, 1) - 1.0) < tol) {
+    if math.abs(idt.get(0, 0) - 1.0) < tol && math.abs(idt.get(1, 1) - 1.0) < tol {
         pass++;
     }
     // Scale matrix
     math.Vec3 sv = math.Vec3(2.0, 3.0, 4.0);
     math.Mat4 sm = id.scaleV(sv);
     total++;
-    if (math.abs(sm.determinant() - 24.0) < tol) {
+    if math.abs(sm.determinant() - 24.0) < tol {
         pass++;
     }
     // get/set
     math.Mat4 m = id.set(1, 2, 42.0);
     total++;
-    if (math.abs(m.get(1, 2) - 42.0) < tol) {
+    if math.abs(m.get(1, 2) - 42.0) < tol {
         pass++;
     }
     // add
     math.Mat4 sum = id.add(id);
     total++;
-    if (math.abs(sum.get(0, 0) - 2.0) < tol) {
+    if math.abs(sum.get(0, 0) - 2.0) < tol {
         pass++;
     }
     // scalar scale
     math.Mat4 scaled = id.scale(3.0);
     total++;
-    if (math.abs(scaled.get(0, 0) - 3.0) < tol && math.abs(scaled.get(1, 0)) < tol) {
+    if math.abs(scaled.get(0, 0) - 3.0) < tol && math.abs(scaled.get(1, 0)) < tol {
         pass++;
     }
     // lookAt produces valid view matrix
@@ -443,13 +443,13 @@ fn run_mat4_quat_test() -> bool {
     math.Vec3 up = math.Vec3(0.0, 1.0, 0.0);
     math.Mat4 view = math.Mat4.lookAt(eye, target, up);
     total++;
-    if (math.abs(view.determinant()) > 0.0) {
+    if math.abs(view.determinant()) > 0.0 {
         pass++;
     }
     // perspective produces valid projection
     math.Mat4 proj = math.Mat4.perspective(math.deg2rad(60.0), 16.0 / 9.0, 0.1, 100.0);
     total++;
-    if (proj.get(3, 3) == 0.0 && proj.get(3, 2) == - 1.0) {
+    if proj.get(3, 3) == 0.0 && proj.get(3, 2) == - 1.0 {
         pass++;
     }
     // ── Quaternion tests ──
@@ -457,33 +457,33 @@ fn run_mat4_quat_test() -> bool {
     math.Vec3 yaxis = math.Vec3(0.0, 1.0, 0.0);
     math.Quaternion qi = math.Quaternion.fromAxisAngle(yaxis, 0.0);
     total++;
-    if (math.abs(qi.w - 1.0) < tol && math.abs(qi.x) < tol) {
+    if math.abs(qi.w - 1.0) < tol && math.abs(qi.x) < tol {
         pass++;
     }
     // 90-degree rotation around Y
     math.Quaternion q90 = math.Quaternion.fromAxisAngle(yaxis, math.pi() / 2.0);
     total++;
-    if (math.abs(q90.length() - 1.0) < tol) {
+    if math.abs(q90.length() - 1.0) < tol {
         pass++;
     }
     // Quaternion multiply: two 90-deg rotations = 180-deg
     math.Quaternion q180 = q90.multiply(q90);
     total++;
-    if (math.abs(q180.length() - 1.0) < tol) {
+    if math.abs(q180.length() - 1.0) < tol {
         pass++;
     }
     // Conjugate: q * conj(q) should have w ≈ 1, xyz ≈ 0
     math.Quaternion qc = q90.conjugate();
     math.Quaternion qid = q90.multiply(qc);
     total++;
-    if (math.abs(qid.w - 1.0) < tol) {
+    if math.abs(qid.w - 1.0) < tol {
         pass++;
     }
     // Inverse
     math.Quaternion qinv = q90.inverse();
     math.Quaternion qcheck = q90.multiply(qinv);
     total++;
-    if (math.abs(qcheck.w - 1.0) < tol) {
+    if math.abs(qcheck.w - 1.0) < tol {
         pass++;
     }
     // slerp at t=0 and t=1
@@ -492,12 +492,12 @@ fn run_mat4_quat_test() -> bool {
     math.Quaternion s0 = q0.slerp(q1, 0.0);
     math.Quaternion s1 = q0.slerp(q1, 1.0);
     total++;
-    if (math.abs(s0.w - q0.w) < tol) {
+    if math.abs(s0.w - q0.w) < tol {
         pass++;
     }
 
     total++;
-    if (math.abs(s1.y - q1.y) < 0.01 || math.abs(s1.y + q1.y) < 0.01) {
+    if math.abs(s1.y - q1.y) < 0.01 || math.abs(s1.y + q1.y) < 0.01 {
         pass++;
     }
     // fromEuler / toEuler round-trip (approximate due to convention differences)
@@ -510,26 +510,26 @@ fn run_mat4_quat_test() -> bool {
     // Euler angles may differ slightly due to gimbal representation; check quaternion survives round-trip
     math.Quaternion qe2 = math.Quaternion.fromEuler(euler.x, euler.y, euler.z);
     f64 qdiff = math.abs(qe.dot(qe2));
-    if (qdiff > 0.99) {
+    if qdiff > 0.99 {
         pass++;
     }
     // Normalize non-unit quaternion
     math.Quaternion qu = math.Quaternion(2.0, 0.0, 0.0, 2.0);
     math.Quaternion qn = qu.normalize();
     total++;
-    if (math.abs(qn.length() - 1.0) < tol) {
+    if math.abs(qn.length() - 1.0) < tol {
         pass++;
     }
     // dot product
     f64 qdot = q0.dot(q0);
     total++;
-    if (math.abs(qdot - 1.0) < tol) {
+    if math.abs(qdot - 1.0) < tol {
         pass++;
     }
     // toMat4: rotation matrix from quaternion should have det = 1
     math.Mat4 qmat = q90.toMat4();
     total++;
-    if (math.abs(qmat.determinant() - 1.0) < tol) {
+    if math.abs(qmat.determinant() - 1.0) < tol {
         pass++;
     }
 
@@ -560,7 +560,7 @@ fn compute_accel(array<f64> pos, array<f64> mass, i32 i, i32 n) -> math.Vec3 {
     f64 zi = pos[i * 3 + 2];
     f64 soft2 = SOFTENING() * SOFTENING();
     for (i32 j = 0; j < n; j++) {
-        if (j == i) {
+        if j == i {
             continue;
         }
 
@@ -763,7 +763,7 @@ fn run_montecarlo_test() -> bool {
         f64 vmax = 0.0;
         for (i32 i = 0; i <n; i++) {
             f64 spd = math.sqrt(vel[i * 3] * vel[i * 3] + vel[i * 3 + 1] * vel[i * 3 + 1] + vel[i * 3 + 2] * vel[i * 3 + 2]);
-            if (spd>vmax) {
+            if spd>vmax {
                 vmax = spd;
             }
         }
@@ -839,7 +839,7 @@ fn arr_sorted(array<f64>a) -> array<f64>{
     for (i32 i = 1; i <s.len(); i++) {
         f64 key = s[i];
         i32 j = i - 1;
-        while (j >= 0 && s[j]>key) {
+        while j >= 0 && s[j]>key {
             s[j + 1] = s[j];
             j--;
         }
@@ -853,7 +853,7 @@ fn arr_sorted(array<f64>a) -> array<f64>{
 fn arr_median(array<f64>a) -> f64 {
     array<f64>s = arr_sorted(a);
     i32 n = s.len();
-    if (n % 2 == 1) {
+    if n % 2 == 1 {
         return s[n / 2];
     }
 
@@ -864,7 +864,7 @@ fn print_histogram(array<f64>a, i32 bins) -> void {
     f64 lo = arr_min(a);
     f64 hi = arr_max(a);
     f64 range = hi - lo;
-    if (range == 0.0) {
+    if range == 0.0 {
         range = 1.0;
     }
 
@@ -876,7 +876,7 @@ fn print_histogram(array<f64>a, i32 bins) -> void {
 
     for (i32 i = 0; i <a.len(); i++) {
         i32 b = i32(math.floor((a[i] - lo) / bin_width));
-        if (b >= bins) {
+        if b >= bins {
             b = bins - 1;
         }
 
@@ -885,7 +885,7 @@ fn print_histogram(array<f64>a, i32 bins) -> void {
 
     i32 max_count = 0;
     for (i32 b = 0; b <bins; b++) {
-        if (counts[b]>max_count) {
+        if counts[b]>max_count {
             max_count = counts[b];
         }
     }
@@ -893,7 +893,7 @@ fn print_histogram(array<f64>a, i32 bins) -> void {
     for (i32 b = 0; b <bins; b++) {
         f64 edge = lo + f64(b) * bin_width;
         i32 bar_len = 0;
-        if (max_count>0) {
+        if max_count>0 {
             bar_len = counts[b] * 30 / max_count;
         }
 
@@ -910,32 +910,32 @@ fn run_stats_test() -> bool {
     // Test with known data
     array<f64>data = [2.0, 4.0, 4.0, 4.0, 5.0, 5.0, 7.0, 9.0];
     total++;
-    if (math.abs(arr_mean(data) - 5.0) <tol) {
+    if math.abs(arr_mean(data) - 5.0) <tol {
         pass++;
     }
 
     total++;
-    if (math.abs(arr_variance(data) - 4.0) <tol) {
+    if math.abs(arr_variance(data) - 4.0) <tol {
         pass++;
     }
 
     total++;
-    if (math.abs(arr_stddev(data) - 2.0) <tol) {
+    if math.abs(arr_stddev(data) - 2.0) <tol {
         pass++;
     }
 
     total++;
-    if (math.abs(arr_min(data) - 2.0) <tol) {
+    if math.abs(arr_min(data) - 2.0) <tol {
         pass++;
     }
 
     total++;
-    if (math.abs(arr_max(data) - 9.0) <tol) {
+    if math.abs(arr_max(data) - 9.0) <tol {
         pass++;
     }
 
     total++;
-    if (math.abs(arr_median(data) - 4.5) <tol) {
+    if math.abs(arr_median(data) - 4.5) <tol {
         pass++;
     }
     // Generate pseudo-Gaussian samples using Box-Muller transform
@@ -947,7 +947,7 @@ fn run_stats_test() -> bool {
         f64 u1 = random.f64();
         f64 u2 = random.f64();
         // Clamp u1 away from 0 to avoid log(0)
-        if (u1 <1.0e-15) {
+        if u1 <1.0e-15 {
             u1 = 1.0e-15;
         }
 
@@ -961,12 +961,12 @@ fn run_stats_test() -> bool {
     f64 g_std = arr_stddev(gaussian);
     // Gaussian should have mean ≈ 0, stddev ≈ 1
     total++;
-    if (math.abs(g_mean) <0.1) {
+    if math.abs(g_mean) <0.1 {
         pass++;
     }
 
     total++;
-    if (math.abs(g_std - 1.0) <0.1) {
+    if math.abs(g_std - 1.0) <0.1 {
         pass++;
     }
 
@@ -988,152 +988,152 @@ fn run_edge_case_test() -> bool {
     // NaN generation and propagation
     f64 nan = 0.0 / 0.0;
     total++;
-    if (nan != nan) {
+    if nan != nan {
         pass++;
     }
     // NaN != NaN is the canonical check
     // NaN propagates through math functions
     total++;
     f64 sn = math.sin(nan);
-    if (sn != sn) {
+    if sn != sn {
         pass++;
     }
 
     total++;
     f64 en = math.exp(nan);
-    if (en != en) {
+    if en != en {
         pass++;
     }
 
     total++;
     f64 ln = math.log(nan);
-    if (ln != ln) {
+    if ln != ln {
         pass++;
     }
     // Inf generation
     f64 inf = 1.0 / 0.0;
     f64 neg_inf = - 1.0 / 0.0;
     total++;
-    if (inf>1.0e308) {
+    if inf>1.0e308 {
         pass++;
     }
 
     total++;
-    if (neg_inf <- 1.0e308) {
+    if neg_inf <- 1.0e308 {
         pass++;
     }
     // Inf arithmetic
     total++;
-    if (inf + 1.0 == inf) {
+    if inf + 1.0 == inf {
         pass++;
     }
     // inf + finite = inf
     total++;
     f64 inf_sub = inf - inf;
-    if (inf_sub != inf_sub) {
+    if inf_sub != inf_sub {
         pass++;
     }
     // inf - inf = NaN
     // sqrt of negative = NaN
     total++;
     f64 sq = math.sqrt(- 1.0);
-    if (sq != sq) {
+    if sq != sq {
         pass++;
     }
     // log of negative = NaN
     total++;
     f64 lg = math.log(- 1.0);
-    if (lg != lg) {
+    if lg != lg {
         pass++;
     }
     // log(0) = -Inf
     total++;
     f64 lg0 = math.log(0.0);
-    if (lg0 <- 1.0e308) {
+    if lg0 <- 1.0e308 {
         pass++;
     }
     // exp overflow
     total++;
     f64 big_exp = math.exp(1000.0);
-    if (big_exp>1.0e308 || big_exp == inf) {
+    if big_exp>1.0e308 || big_exp == inf {
         pass++;
     }
     // exp underflow (should be 0 or denormal, not NaN)
     total++;
     f64 tiny_exp = math.exp(- 1000.0);
-    if (tiny_exp >= 0.0 && tiny_exp == tiny_exp) {
+    if tiny_exp >= 0.0 && tiny_exp == tiny_exp {
         pass++;
     }
     // pow edge cases
     total++;
-    if (math.pow(0.0, 0.0) == 1.0) {
+    if math.pow(0.0, 0.0) == 1.0 {
         pass++;
     }
     // 0^0 = 1 by convention
     total++;
     f64 p_inf = math.pow(2.0, 1024.0);
-    if (p_inf>1.0e308 || p_inf == inf) {
+    if p_inf>1.0e308 || p_inf == inf {
         pass++;
     }
     // Near-zero division (softening test from N-body)
     f64 epsilon = 1.0e-300;
     f64 near_zero_div = 1.0 / (epsilon * epsilon + SOFTENING() * SOFTENING());
     total++;
-    if (near_zero_div == near_zero_div && near_zero_div> 0.0) {
+    if near_zero_div == near_zero_div && near_zero_div> 0.0 {
         pass++;
     }
     // Denormal numbers (compute via successive division to avoid literal limit)
     f64 denorm = 1.0e-300;
     denorm = denorm * 1.0e-23;
     total++;
-    if (denorm >= 0.0 && denorm < 1.0e-300) {
+    if denorm >= 0.0 && denorm < 1.0e-300 {
         pass++;
     }
 
     total++;
     f64 denorm_sq = math.sqrt(math.abs(denorm) + 1.0e-307);
-    if (denorm_sq == denorm_sq && denorm_sq >= 0.0) {
+    if denorm_sq == denorm_sq && denorm_sq >= 0.0 {
         pass++;
     }
     // atan2 with zeros
     total++;
-    if (math.abs(math.atan2(0.0, 1.0)) < 1.0e-15) {
+    if math.abs(math.atan2(0.0, 1.0)) < 1.0e-15 {
         pass++;
     }
 
     total++;
-    if (math.abs(math.atan2(1.0, 0.0) - math.pi() / 2.0) < 1.0e-15) {
+    if math.abs(math.atan2(1.0, 0.0) - math.pi() / 2.0) < 1.0e-15 {
         pass++;
     }
     // hypot with extreme values (should not overflow)
     total++;
     f64 h = math.hypot(1.0e200, 1.0e200);
-    if (h > 1.0e200 && h == h) {
+    if h > 1.0e200 && h == h {
         pass++;
     }
     // fmod with negative
     total++;
     f64 fm = math.fmod(- 7.0, 3.0);
-    if (math.abs(fm - (- 1.0)) < 1.0e-15) {
+    if math.abs(fm - (- 1.0)) < 1.0e-15 {
         pass++;
     }
     // sign of NaN
     total++;
     f64 snan = math.sign(nan);
     // sign(NaN) should be 0 (neither positive nor negative)
-    if (snan == 0.0) {
+    if snan == 0.0 {
         pass++;
     }
     // min/max with NaN (C fmin/fmax behavior)
     total++;
     f64 mn = math.min(nan, 5.0);
-    if (mn == 5.0) {
+    if mn == 5.0 {
         pass++;
     }
 
     total++;
     f64 mx = math.max(nan, 5.0);
-    if (mx == 5.0) {
+    if mx == 5.0 {
         pass++;
     }
 
@@ -1150,27 +1150,27 @@ fn run_interp_test() -> bool {
     f64 tol = 1.0e-10;
     // lerp
     total++;
-    if (math.abs(math.lerp(0.0, 10.0, 0.5) - 5.0) < tol) {
+    if math.abs(math.lerp(0.0, 10.0, 0.5) - 5.0) < tol {
         pass++;
     }
 
     total++;
-    if (math.abs(math.lerp(0.0, 10.0, 0.0) - 0.0) < tol) {
+    if math.abs(math.lerp(0.0, 10.0, 0.0) - 0.0) < tol {
         pass++;
     }
 
     total++;
-    if (math.abs(math.lerp(0.0, 10.0, 1.0) - 10.0) < tol) {
+    if math.abs(math.lerp(0.0, 10.0, 1.0) - 10.0) < tol {
         pass++;
     }
     // inverseLerp
     total++;
-    if (math.abs(math.inverseLerp(0.0, 10.0, 5.0) - 0.5) < tol) {
+    if math.abs(math.inverseLerp(0.0, 10.0, 5.0) - 0.5) < tol {
         pass++;
     }
 
     total++;
-    if (math.abs(math.inverseLerp(0.0, 10.0, 0.0) - 0.0) < tol) {
+    if math.abs(math.inverseLerp(0.0, 10.0, 0.0) - 0.0) < tol {
         pass++;
     }
     // lerp and inverseLerp are inverses
@@ -1178,97 +1178,97 @@ fn run_interp_test() -> bool {
     f64 t = 0.37;
     f64 val = math.lerp(2.0, 8.0, t);
     f64 t_back = math.inverseLerp(2.0, 8.0, val);
-    if (math.abs(t_back - t) < tol) {
+    if math.abs(t_back - t) < tol {
         pass++;
     }
     // clamp
     total++;
-    if (math.clamp(5.0, 0.0, 10.0) == 5.0) {
+    if math.clamp(5.0, 0.0, 10.0) == 5.0 {
         pass++;
     }
 
     total++;
-    if (math.clamp(- 5.0, 0.0, 10.0) == 0.0) {
+    if math.clamp(- 5.0, 0.0, 10.0) == 0.0 {
         pass++;
     }
 
     total++;
-    if (math.clamp(15.0, 0.0, 10.0) == 10.0) {
+    if math.clamp(15.0, 0.0, 10.0) == 10.0 {
         pass++;
     }
     // smoothstep: should be 0 at edge0, 1 at edge1, 0.5 at midpoint
     total++;
-    if (math.abs(math.smoothstep(0.0, 1.0, 0.0) - 0.0) < tol) {
+    if math.abs(math.smoothstep(0.0, 1.0, 0.0) - 0.0) < tol {
         pass++;
     }
 
     total++;
-    if (math.abs(math.smoothstep(0.0, 1.0, 1.0) - 1.0) < tol) {
+    if math.abs(math.smoothstep(0.0, 1.0, 1.0) - 1.0) < tol {
         pass++;
     }
 
     total++;
-    if (math.abs(math.smoothstep(0.0, 1.0, 0.5) - 0.5) < tol) {
+    if math.abs(math.smoothstep(0.0, 1.0, 0.5) - 0.5) < tol {
         pass++;
     }
     // smoothstep clamping
     total++;
-    if (math.abs(math.smoothstep(0.0, 1.0, - 1.0) - 0.0) < tol) {
+    if math.abs(math.smoothstep(0.0, 1.0, - 1.0) - 0.0) < tol {
         pass++;
     }
 
     total++;
-    if (math.abs(math.smoothstep(0.0, 1.0, 2.0) - 1.0) < tol) {
+    if math.abs(math.smoothstep(0.0, 1.0, 2.0) - 1.0) < tol {
         pass++;
     }
     // normalize (maps value to [0,1] range)
     total++;
-    if (math.abs(math.normalize(5.0, 0.0, 10.0) - 0.5) < tol) {
+    if math.abs(math.normalize(5.0, 0.0, 10.0) - 0.5) < tol {
         pass++;
     }
 
     total++;
-    if (math.abs(math.normalize(0.0, 0.0, 10.0) - 0.0) < tol) {
+    if math.abs(math.normalize(0.0, 0.0, 10.0) - 0.0) < tol {
         pass++;
     }
     // wrap
     total++;
-    if (math.abs(math.wrap(15.0, 0.0, 10.0) - 5.0) < tol) {
+    if math.abs(math.wrap(15.0, 0.0, 10.0) - 5.0) < tol {
         pass++;
     }
 
     total++;
-    if (math.abs(math.wrap(- 3.0, 0.0, 10.0) - 7.0) < tol) {
+    if math.abs(math.wrap(- 3.0, 0.0, 10.0) - 7.0) < tol {
         pass++;
     }
 
     total++;
-    if (math.abs(math.wrap(370.0, 0.0, 360.0) - 10.0) < tol) {
+    if math.abs(math.wrap(370.0, 0.0, 360.0) - 10.0) < tol {
         pass++;
     }
     // remap
     total++;
-    if (math.abs(math.remap(5.0, 0.0, 10.0, 0.0, 100.0) - 50.0) < tol) {
+    if math.abs(math.remap(5.0, 0.0, 10.0, 0.0, 100.0) - 50.0) < tol {
         pass++;
     }
 
     total++;
-    if (math.abs(math.remap(0.0, 0.0, 10.0, 100.0, 200.0) - 100.0) < tol) {
+    if math.abs(math.remap(0.0, 0.0, 10.0, 100.0, 200.0) - 100.0) < tol {
         pass++;
     }
     // step
     total++;
-    if (math.step(5.0, 3.0) == 0.0) {
+    if math.step(5.0, 3.0) == 0.0 {
         pass++;
     }
 
     total++;
-    if (math.step(5.0, 5.0) == 1.0) {
+    if math.step(5.0, 5.0) == 1.0 {
         pass++;
     }
 
     total++;
-    if (math.step(5.0, 7.0) == 1.0) {
+    if math.step(5.0, 7.0) == 1.0 {
         pass++;
     }
 
@@ -1364,7 +1364,7 @@ fn run_transform_test() -> bool {
     math.Mat4 id = math.Mat4.identity();
     math.Vec3 tp = p.transform(id);
     total++;
-    if (math.abs(tp.x - 3.0) < tol && math.abs(tp.y - 4.0) < tol && math.abs(tp.z - 5.0) < tol) {
+    if math.abs(tp.x - 3.0) < tol && math.abs(tp.y - 4.0) < tol && math.abs(tp.z - 5.0) < tol {
         pass++;
     }
     // Transform by translation
@@ -1372,7 +1372,7 @@ fn run_transform_test() -> bool {
     math.Mat4 trans = id.translate(offset);
     math.Vec3 tp2 = p.transform(trans);
     total++;
-    if (math.abs(tp2.x - 13.0) < tol && math.abs(tp2.y - 24.0) < tol && math.abs(tp2.z - 35.0) < tol) {
+    if math.abs(tp2.x - 13.0) < tol && math.abs(tp2.y - 24.0) < tol && math.abs(tp2.z - 35.0) < tol {
         pass++;
     }
     // Rotate (1,0,0) by 90 degrees around Z -> (0,1,0)
@@ -1380,7 +1380,7 @@ fn run_transform_test() -> bool {
     math.Mat4 rz90 = id.rotateZ(math.pi() / 2.0);
     math.Vec3 rotated = xhat.transform(rz90);
     total++;
-    if (math.abs(rotated.x) < tol && math.abs(rotated.y - 1.0) < tol && math.abs(rotated.z) < tol) {
+    if math.abs(rotated.x) < tol && math.abs(rotated.y - 1.0) < tol && math.abs(rotated.z) < tol {
         pass++;
     }
     // Quaternion rotation: same 90-deg Z rotation
@@ -1388,14 +1388,14 @@ fn run_transform_test() -> bool {
     math.Quaternion qz = math.Quaternion.fromAxisAngle(zaxis, math.pi() / 2.0);
     math.Vec3 qrot = xhat.rotateByQuaternion(qz);
     total++;
-    if (math.abs(qrot.x) < tol && math.abs(qrot.y - 1.0) < tol && math.abs(qrot.z) < tol) {
+    if math.abs(qrot.x) < tol && math.abs(qrot.y - 1.0) < tol && math.abs(qrot.z) < tol {
         pass++;
     }
     // Quaternion toMat4 should produce same result as direct rotation
     math.Mat4 qmat = qz.toMat4();
     math.Vec3 mrot = xhat.transform(qmat);
     total++;
-    if (math.abs(mrot.x - qrot.x) < tol && math.abs(mrot.y - qrot.y) < tol) {
+    if math.abs(mrot.x - qrot.x) < tol && math.abs(mrot.y - qrot.y) < tol {
         pass++;
     }
     // Scale transform
@@ -1403,7 +1403,7 @@ fn run_transform_test() -> bool {
     math.Mat4 sm = id.scaleV(sv);
     math.Vec3 sp = p.transform(sm);
     total++;
-    if (math.abs(sp.x - 6.0) < tol && math.abs(sp.y - 12.0) < tol && math.abs(sp.z - 20.0) < tol) {
+    if math.abs(sp.x - 6.0) < tol && math.abs(sp.y - 12.0) < tol && math.abs(sp.z - 20.0) < tol {
         pass++;
     }
     // Combined: scale then translate
@@ -1411,19 +1411,19 @@ fn run_transform_test() -> bool {
     math.Mat4 combined = sm.translate(offset);
     math.Vec3 cp = p.transform(combined);
     total++;
-    if (math.abs(cp.x - 26.0) < tol && math.abs(cp.y - 72.0) < tol && math.abs(cp.z - 140.0) < tol) {
+    if math.abs(cp.x - 26.0) < tol && math.abs(cp.y - 72.0) < tol && math.abs(cp.z - 140.0) < tol {
         pass++;
     }
     // Ortho projection matrix
     math.Mat4 ortho = math.Mat4.ortho(- 1.0, 1.0, - 1.0, 1.0, 0.1, 100.0);
     total++;
-    if (math.abs(ortho.determinant()) > 0.0) {
+    if math.abs(ortho.determinant()) > 0.0 {
         pass++;
     }
     // Frustum
     math.Mat4 frust = math.Mat4.frustum(- 1.0, 1.0, - 1.0, 1.0, 0.1, 100.0);
     total++;
-    if (frust.get(3, 2) == - 1.0) {
+    if frust.get(3, 2) == - 1.0 {
         pass++;
     }
 
@@ -1440,72 +1440,72 @@ fn run_vec2_vec4_test() -> bool {
     // Vec2
     math.Vec2 a2 = math.Vec2(3.0, 4.0);
     total++;
-    if (math.abs(a2.length() - 5.0) < tol) {
+    if math.abs(a2.length() - 5.0) < tol {
         pass++;
     }
 
     total++;
-    if (math.abs(a2.lengthSqr() - 25.0) < tol) {
+    if math.abs(a2.lengthSqr() - 25.0) < tol {
         pass++;
     }
 
     math.Vec2 b2 = math.Vec2(1.0, 0.0);
     total++;
-    if (math.abs(a2.dot(b2) - 3.0) < tol) {
+    if math.abs(a2.dot(b2) - 3.0) < tol {
         pass++;
     }
 
     math.Vec2 n2 = a2.normalize();
     total++;
-    if (math.abs(n2.length() - 1.0) < tol) {
+    if math.abs(n2.length() - 1.0) < tol {
         pass++;
     }
 
     math.Vec2 sum2 = a2.add(b2);
     total++;
-    if (sum2.x == 4.0 && sum2.y == 4.0) {
+    if sum2.x == 4.0 && sum2.y == 4.0 {
         pass++;
     }
 
     math.Vec2 diff2 = a2.sub(b2);
     total++;
-    if (diff2.x == 2.0 && diff2.y == 4.0) {
+    if diff2.x == 2.0 && diff2.y == 4.0 {
         pass++;
     }
 
     math.Vec2 sc2 = a2.scale(2.0);
     total++;
-    if (sc2.x == 6.0 && sc2.y == 8.0) {
+    if sc2.x == 6.0 && sc2.y == 8.0 {
         pass++;
     }
 
     f64 dist2 = a2.distance(b2);
     total++;
-    if (math.abs(dist2 - math.sqrt(20.0)) < tol) {
+    if math.abs(dist2 - math.sqrt(20.0)) < tol {
         pass++;
     }
 
     math.Vec2 neg2 = a2.negate();
     total++;
-    if (neg2.x == - 3.0 && neg2.y == - 4.0) {
+    if neg2.x == - 3.0 && neg2.y == - 4.0 {
         pass++;
     }
 
     math.Vec2 lerp2 = a2.lerp(b2, 0.5);
     total++;
-    if (math.abs(lerp2.x - 2.0) < tol && math.abs(lerp2.y - 2.0) < tol) {
+    if math.abs(lerp2.x - 2.0) < tol && math.abs(lerp2.y - 2.0) < tol {
         pass++;
     }
     // Vec2 angle
     math.Vec2 right = math.Vec2(1.0, 0.0);
     total++;
-    if (math.abs(right.angle()) < tol) {
+    if math.abs(right.angle()) < tol {
         pass++;
     }
     // Vec2 rotate
     math.Vec2 rotated = right.rotate(math.pi() / 2.0);
     total++;
-    if (math.abs(rotated.x) < tol && math.abs(rotated.y - 1.0) < tol) {
+    if math.abs(rotated.x) < tol && math.abs(rotated.y - 1.0) < tol {
         pass++;
     }
     // Vec2 reflect
@@ -1513,85 +1513,85 @@ fn run_vec2_vec4_test() -> bool {
     math.Vec2 norm2 = math.Vec2(0.0, 1.0);
     math.Vec2 refl2 = v2.reflect(norm2);
     total++;
-    if (math.abs(refl2.x - 1.0) < tol && math.abs(refl2.y - 1.0) < tol) {
+    if math.abs(refl2.x - 1.0) < tol && math.abs(refl2.y - 1.0) < tol {
         pass++;
     }
     // Vec2 static factories
     math.Vec2 z2 = math.Vec2.zero();
     total++;
-    if (z2.x == 0.0 && z2.y == 0.0) {
+    if z2.x == 0.0 && z2.y == 0.0 {
         pass++;
     }
 
     math.Vec2 o2 = math.Vec2.one();
     total++;
-    if (o2.x == 1.0 && o2.y == 1.0) {
+    if o2.x == 1.0 && o2.y == 1.0 {
         pass++;
     }
     // Vec4
     math.Vec4 a4 = math.Vec4(1.0, 2.0, 3.0, 4.0);
     math.Vec4 b4 = math.Vec4(5.0, 6.0, 7.0, 8.0);
     total++;
-    if (math.abs(a4.dot(b4) - 70.0) < tol) {
+    if math.abs(a4.dot(b4) - 70.0) < tol {
         pass++;
     }
 
     total++;
-    if (math.abs(a4.length() - math.sqrt(30.0)) < tol) {
+    if math.abs(a4.length() - math.sqrt(30.0)) < tol {
         pass++;
     }
 
     math.Vec4 n4 = a4.normalize();
     total++;
-    if (math.abs(n4.length() - 1.0) < tol) {
+    if math.abs(n4.length() - 1.0) < tol {
         pass++;
     }
 
     math.Vec4 sum4 = a4.add(b4);
     total++;
-    if (sum4.x == 6.0 && sum4.w == 12.0) {
+    if sum4.x == 6.0 && sum4.w == 12.0 {
         pass++;
     }
 
     math.Vec4 diff4 = b4.sub(a4);
     total++;
-    if (diff4.x == 4.0 && diff4.w == 4.0) {
+    if diff4.x == 4.0 && diff4.w == 4.0 {
         pass++;
     }
 
     math.Vec4 sc4 = a4.scale(3.0);
     total++;
-    if (sc4.x == 3.0 && sc4.w == 12.0) {
+    if sc4.x == 3.0 && sc4.w == 12.0 {
         pass++;
     }
 
     f64 dist4 = a4.distance(b4);
     total++;
-    if (math.abs(dist4 - 8.0) < tol) {
+    if math.abs(dist4 - 8.0) < tol {
         pass++;
     }
 
     math.Vec4 neg4 = a4.negate();
     total++;
-    if (neg4.x == - 1.0 && neg4.w == - 4.0) {
+    if neg4.x == - 1.0 && neg4.w == - 4.0 {
         pass++;
     }
 
     math.Vec4 lerp4 = a4.lerp(b4, 0.5);
     total++;
-    if (math.abs(lerp4.x - 3.0) < tol && math.abs(lerp4.w - 6.0) < tol) {
+    if math.abs(lerp4.x - 3.0) < tol && math.abs(lerp4.w - 6.0) < tol {
         pass++;
     }
     // Vec4 static factories
     math.Vec4 z4 = math.Vec4.zero();
     total++;
-    if (z4.x == 0.0 && z4.w == 0.0) {
+    if z4.x == 0.0 && z4.w == 0.0 {
         pass++;
     }
 
     math.Vec4 o4 = math.Vec4.one();
     total++;
-    if (o4.x == 1.0 && o4.w == 1.0) {
+    if o4.x == 1.0 && o4.w == 1.0 {
         pass++;
     }
 
@@ -1608,91 +1608,91 @@ fn run_new_math_test() -> bool {
     f64 tol = 1.0e-10;
     // cbrt
     total++;
-    if (math.abs(math.cbrt(27.0) - 3.0) < tol) {
+    if math.abs(math.cbrt(27.0) - 3.0) < tol {
         pass++;
     }
 
     total++;
-    if (math.abs(math.cbrt(- 8.0) - (- 2.0)) < tol) {
+    if math.abs(math.cbrt(- 8.0) - (- 2.0)) < tol {
         pass++;
     }
 
     total++;
-    if (math.abs(math.cbrt(0.0)) < tol) {
+    if math.abs(math.cbrt(0.0)) < tol {
         pass++;
     }
     // tau = 2*pi
     total++;
-    if (math.abs(math.tau() - 2.0 * math.pi()) < tol) {
+    if math.abs(math.tau() - 2.0 * math.pi()) < tol {
         pass++;
     }
     // epsilon: 1.0 + epsilon > 1.0, but 1.0 + epsilon/2 == 1.0
     total++;
-    if (1.0 + math.epsilon() > 1.0) {
+    if 1.0 + math.epsilon() > 1.0 {
         pass++;
     }
 
     total++;
-    if (1.0 + math.epsilon() / 2.1 == 1.0) {
+    if 1.0 + math.epsilon() / 2.1 == 1.0 {
         pass++;
     }
     // isNaN
     f64 nan = 0.0 / 0.0;
     total++;
-    if (math.isNaN(nan)) {
+    if math.isNaN(nan) {
         pass++;
     }
 
     total++;
-    if (! math.isNaN(42.0)) {
+    if ! math.isNaN(42.0) {
         pass++;
     }
 
     total++;
-    if (math.isNaN(math.sqrt(- 1.0))) {
+    if math.isNaN(math.sqrt(- 1.0)) {
         pass++;
     }
     // isInf
     f64 inf = 1.0 / 0.0;
     total++;
-    if (math.isInf(inf)) {
+    if math.isInf(inf) {
         pass++;
     }
 
     total++;
-    if (math.isInf(- 1.0 / 0.0)) {
+    if math.isInf(- 1.0 / 0.0) {
         pass++;
     }
 
     total++;
-    if (! math.isInf(42.0)) {
+    if ! math.isInf(42.0) {
         pass++;
     }
     // isFinite
     total++;
-    if (math.isFinite(42.0)) {
+    if math.isFinite(42.0) {
         pass++;
     }
 
     total++;
-    if (! math.isFinite(inf)) {
+    if ! math.isFinite(inf) {
         pass++;
     }
 
     total++;
-    if (! math.isFinite(nan)) {
+    if ! math.isFinite(nan) {
         pass++;
     }
     // Float literals with extreme exponents (parser fix)
     f64 tiny = 1.0e-308;
     total++;
-    if (tiny > 0.0 && tiny < 1.0e-307) {
+    if tiny > 0.0 && tiny < 1.0e-307 {
         pass++;
     }
 
     f64 denorm = 5.0e-324;
     total++;
-    if (denorm >= 0.0) {
+    if denorm >= 0.0 {
         pass++;
     }
     // random.gaussian: generate 500 samples, check mean ≈ 0, stddev ≈ 1
@@ -1705,12 +1705,12 @@ fn run_new_math_test() -> bool {
     f64 g_mean = arr_mean(samples);
     f64 g_std = arr_stddev(samples);
     total++;
-    if (math.abs(g_mean) < 0.15) {
+    if math.abs(g_mean) < 0.15 {
         pass++;
     }
 
     total++;
-    if (math.abs(g_std - 1.0) < 0.15) {
+    if math.abs(g_std - 1.0) < 0.15 {
         pass++;
     }
 
@@ -1732,69 +1732,69 @@ fn main() -> i32 {
     i32 passed = 0;
     i32 total = 0;
     total++;
-    if (run_scalar_test()) {
+    if run_scalar_test() {
         passed++;
     }
 
     total++;
-    if (run_vec3_test()) {
+    if run_vec3_test() {
         passed++;
     }
 
     total++;
-    if (run_mat4_quat_test()) {
+    if run_mat4_quat_test() {
         passed++;
     }
 
     total++;
-    if (run_nbody_test()) {
+    if run_nbody_test() {
         passed++;
     }
 
     total++;
-    if (run_montecarlo_test()) {
+    if run_montecarlo_test() {
         passed++;
     }
 
     total++;
-    if (run_stats_test()) {
+    if run_stats_test() {
         passed++;
     }
 
     total++;
-    if (run_edge_case_test()) {
+    if run_edge_case_test() {
         passed++;
     }
 
     total++;
-    if (run_interp_test()) {
+    if run_interp_test() {
         passed++;
     }
 
     total++;
-    if (run_perf_test()) {
+    if run_perf_test() {
         passed++;
     }
 
     total++;
-    if (run_transform_test()) {
+    if run_transform_test() {
         passed++;
     }
 
     total++;
-    if (run_vec2_vec4_test()) {
+    if run_vec2_vec4_test() {
         passed++;
     }
 
     total++;
-    if (run_new_math_test()) {
+    if run_new_math_test() {
         passed++;
     }
 
     i64 t_total = time.now_ms() - t_start;
     fmt.println("\n══════════════════════════════════════════════════════════════");
     fmt.println(f"  Results: {passed} passed, {total - passed} failed");
-    if (passed == total) {
+    if passed == total {
         fmt.println("  STATUS: ALL PASS");
     } else {
         fmt.println("  STATUS: SOME FAILURES");
@@ -1802,7 +1802,7 @@ fn main() -> i32 {
 
     fmt.println(f"  Total time: {t_total}ms");
     fmt.println("══════════════════════════════════════════════════════════════");
-    if (passed == total) {
+    if passed == total {
         return 0;
     }
 

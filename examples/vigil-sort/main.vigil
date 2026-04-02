@@ -4,10 +4,10 @@ import "readline";
 fn sort_strings(array<string> arr) -> void {
     for (i32 i = 0; i < arr.len() - 1; i++) {
         for (i32 j = 0; j < arr.len() - 1 - i; j++) {
-            if (arr[j] > arr[j+1]) {
+            if arr[j] > arr[j + 1] {
                 string tmp = arr[j];
-                arr[j] = arr[j+1];
-                arr[j+1] = tmp;
+                arr[j] = arr[j + 1];
+                arr[j + 1] = tmp;
             }
         }
     }
@@ -15,15 +15,13 @@ fn sort_strings(array<string> arr) -> void {
 
 fn main() -> i32 {
     array<string> lines = [];
-
     string line = readline.input("");
-    while (!line.is_empty()) {
+    while ! line.is_empty() {
         lines.push(line);
         line = readline.input("");
     }
 
     sort_strings(lines);
-
     for (i32 i = 0; i < lines.len(); i++) {
         fmt.println(lines[i]);
     }

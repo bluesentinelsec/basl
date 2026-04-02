@@ -1,14 +1,16 @@
 fn fib(i32 n) -> i32 {
-    if (n < 2) {
+    if n < 2 {
         return n;
     }
+
     return fib(n - 1) + fib(n - 2);
 }
 
 fn main() -> i32 {
     i32 result = fib(32);
-    if (result == 2178309) {
+    if result == 2178309 {
         return 0;
     }
+
     return 1;
 }

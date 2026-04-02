@@ -1,43 +1,40 @@
 import "args";
-import "fs";
 import "fmt";
+import "fs";
 import "readline";
 
 fn main() -> i32 {
     bool append_mode = false;
     array<string> files = [];
-
     // Parse arguments
     for (i32 i = 0; i < args.count(); i++) {
         string arg = args.at(i);
-        if (arg == "-a" || arg == "--append") {
+        if arg == "-a" || arg == "--append" {
             append_mode = true;
         } else {
             files.push(arg);
         }
     }
-
     // Read stdin line by line and collect content
     string content = "";
     string line = readline.input("");
-    while (!line.is_empty()) {
+    while ! line.is_empty() {
         content += line + "\n";
         line = readline.input("");
     }
-
     // Write to stdout
     fmt.print(content);
-
     // Write to all files
     for (i32 i = 0; i < files.len(); i++) {
         string path = files[i];
         bool ok2 = false;
-        if (append_mode) {
+        if append_mode {
             ok2 = fs.append(path, content);
         } else {
             ok2 = fs.write(path, content);
         }
-        if (!ok2) {
+
+        if ! ok2 {
             fmt.eprintln(f"vigil-tee: {path}: write failed");
             return 1;
         }

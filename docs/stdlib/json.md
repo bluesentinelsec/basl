@@ -23,13 +23,13 @@ import "json";
 fn main() -> i32 {
     json.Value root, err parse_err =
         json.Value.parse("{\"name\":\"vigil\",\"flags\":[true,false],\"count\":3}");
-    if (parse_err != ok) { return 1; }
+    if parse_err != ok { return 1; }
 
     json.Value name, err name_err = root.get("name");
-    if (name_err != ok) { return 2; }
+    if name_err != ok { return 2; }
 
     string text, err text_err = name.as_string();
-    if (text_err != ok) { return 3; }
+    if text_err != ok { return 3; }
 
     return text == "vigil" ? 0 : 4;
 }
@@ -55,11 +55,11 @@ fn main() -> i32 {
     Person person = Person("vigil", [1, 2, 3], {"role": "tooling"}, Meta(3));
 
     string encoded, err encode_err = json.encode(person);
-    if (encode_err != ok) { return 1; }
+    if encode_err != ok { return 1; }
 
     Person decoded, err decode_err =
         json.decode(encoded, Person("", [0], {"": ""}, Meta(0)));
-    if (decode_err != ok) { return 2; }
+    if decode_err != ok { return 2; }
 
     return decoded.meta.count == 3 ? 0 : 3;
 }
@@ -81,7 +81,7 @@ Parse JSON text from a string.
 
 ```vigil
 json.Value root, err parse_err = json.Value.parse("{\"ok\":true}");
-if (parse_err != ok) {
+if parse_err != ok {
     // invalid JSON
 }
 ```
@@ -92,7 +92,7 @@ Read a file from disk and parse it as JSON.
 
 ```vigil
 json.Value config, err read_err = json.Value.read("config.json");
-if (read_err != ok) {
+if read_err != ok {
     // file I/O error or parse error
 }
 ```
@@ -120,7 +120,7 @@ Returns one of:
 These helpers are the safest way to branch before calling typed accessors.
 
 ```vigil
-if (root.is_object()) {
+if root.is_object() {
     // ...
 }
 ```
@@ -170,7 +170,7 @@ Returns `true` when an object contains the key.
 For non-object values it returns `false`.
 
 ```vigil
-if (root.has("name")) {
+if root.has("name") {
     // ...
 }
 ```
@@ -344,12 +344,12 @@ Examples:
 
 ```vigil
 json.Value root, err parse_err = json.Value.parse(text);
-if (parse_err != ok) {
+if parse_err != ok {
     return 1;
 }
 
 string encoded, err encode_err = json.encode(value);
-if (encode_err != ok) {
+if encode_err != ok {
     return 2;
 }
 ```
@@ -374,15 +374,15 @@ import "json";
 
 fn main() -> i32 {
     json.Value root, err parse_err = json.Value.parse("{\"items\":[1,2,3]}");
-    if (parse_err != ok) { return 1; }
+    if parse_err != ok { return 1; }
 
-    if (!root.is_object() || !root.has("items")) { return 2; }
+    if !root.is_object() || !root.has("items") { return 2; }
 
     json.Value items, err items_err = root.get("items");
-    if (items_err != ok || !items.is_array()) { return 3; }
+    if items_err != ok || !items.is_array() { return 3; }
 
     i32 count, err len_err = items.len();
-    if (len_err != ok) { return 4; }
+    if len_err != ok { return 4; }
 
     return count == 3 ? 0 : 5;
 }
@@ -400,11 +400,11 @@ class ServerConfig {
 
 fn main() -> i32 {
     json.Value raw, err read_err = json.Value.read("config.json");
-    if (read_err != ok) { return 1; }
+    if read_err != ok { return 1; }
 
     ServerConfig cfg, err decode_err =
         json.decode(raw.stringify(), ServerConfig("", 0));
-    if (decode_err != ok) { return 2; }
+    if decode_err != ok { return 2; }
 
     return cfg.port == 8080 ? 0 : 3;
 }
@@ -422,7 +422,7 @@ class BuildInfo {
 
 fn main() -> i32 {
     string text, err encode_err = json.encode(BuildInfo("0.2.2", 42));
-    if (encode_err != ok) { return 1; }
+    if encode_err != ok { return 1; }
 
     return text.len() > 0 ? 0 : 2;
 }

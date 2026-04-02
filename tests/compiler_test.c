@@ -234,7 +234,7 @@ TEST(VigilCompilerTest, CompilesAndExecutesFloatArithmeticAndComparison)
                                                 "}"
                                                 "fn main() -> i32 {"
                                                 "    f64 total = scale(2.5);"
-                                                "    if (total == 6.0 && total >= 5.5) {"
+                                                "    if total == 6.0 && total >= 5.5 {"
                                                 "        return 6;"
                                                 "    }"
                                                 "    return 0;"
@@ -248,7 +248,7 @@ TEST(VigilCompilerTest, CompilesAndExecutesConversionsConstLocalsAndBitwiseNot)
                                                 "    const f64 scaled = f64(4) / 2.0;"
                                                 "    const string label = string(5) + string(true);"
                                                 "    i32 truncated = i32(scaled + 3.8);"
-                                                "    if (label == \"5true\" && ~1 == -2) {"
+                                                "    if label == \"5true\" && ~1 == -2 {"
                                                 "        return truncated;"
                                                 "    }"
                                                 "    return 0;"
@@ -258,27 +258,27 @@ TEST(VigilCompilerTest, CompilesAndExecutesConversionsConstLocalsAndBitwiseNot)
 
 TEST(VigilCompilerTest, CompilesAndExecutesWiderIntegerTypesAndConversions)
 {
-    EXPECT_EQ(CompileAndRun(
-                  vigil_test_failed_,
-                  "const u8 LIMIT = u8(12);"
-                  "fn double_i64(i64 value) -> i64 {"
-                  "    return value * i64(2);"
-                  "}"
-                  "fn bump_u8(u8 value) -> u8 {"
-                  "    value += u8(5);"
-                  "    return value;"
-                  "}"
-                  "fn main() -> i32 {"
-                  "    i64 total = double_i64(i64(20));"
-                  "    u8 small = bump_u8(LIMIT);"
-                  "    u32 count = u32(100000) + u32(25);"
-                  "    u64 large = u64(2000000000) + u64(5);"
-                  "    if (total == i64(40) && small == u8(17) && count == u32(100025) && large == u64(2000000005)) {"
-                  "        return 9;"
-                  "    }"
-                  "    return 0;"
-                  "}"),
-              9);
+    EXPECT_EQ(
+        CompileAndRun(vigil_test_failed_,
+                      "const u8 LIMIT = u8(12);"
+                      "fn double_i64(i64 value) -> i64 {"
+                      "    return value * i64(2);"
+                      "}"
+                      "fn bump_u8(u8 value) -> u8 {"
+                      "    value += u8(5);"
+                      "    return value;"
+                      "}"
+                      "fn main() -> i32 {"
+                      "    i64 total = double_i64(i64(20));"
+                      "    u8 small = bump_u8(LIMIT);"
+                      "    u32 count = u32(100000) + u32(25);"
+                      "    u64 large = u64(2000000000) + u64(5);"
+                      "    if total == i64(40) && small == u8(17) && count == u32(100025) && large == u64(2000000005) {"
+                      "        return 9;"
+                      "    }"
+                      "    return 0;"
+                      "}"),
+        9);
 }
 
 TEST(VigilCompilerTest, CompilesAndExecutesI32ToI64ArithPromotion)
@@ -300,7 +300,7 @@ TEST(VigilCompilerTest, CompilesAndExecutesI32ToI64ArithPromotion)
                             "    i64 m = i64(m32 * 1);"
                             "    i64 q = i64(q32 / 1);"
                             "    i64 r = i64(r32 % 97);"
-                            "    if (s == i64(13) && d == i64(7) && m == i64(30) && q == i64(3) && r == i64(1)) {"
+                            "    if s == i64(13) && d == i64(7) && m == i64(30) && q == i64(3) && r == i64(1) {"
                             "        return 7;"
                             "    }"
                             "    return 0;"
@@ -326,7 +326,7 @@ TEST(VigilCompilerTest, CompilesAndExecutesFunctionValuesAndIndirectCalls)
                                                 "    fn any_cb = add;"
                                                 "    fn(i32, i32) -> i32 op = add;"
                                                 "    Holder holder = Holder(mul);"
-                                                "    if (any_cb == op) {"
+                                                "    if any_cb == op {"
                                                 "        return apply(op, 2, 3) + holder.op(2, 4);"
                                                 "    }"
                                                 "    return 0;"
@@ -355,7 +355,7 @@ TEST(VigilCompilerTest, CompilesAndExecutesAnonymousFunctionsClosuresAndLocalFun
 TEST(VigilCompilerTest, CompilesAndExecutesExplicitErrorValues)
 {
     EXPECT_EQ(CompileAndRun(vigil_test_failed_, "fn fail(bool bad) -> err {"
-                                                "    if (bad) {"
+                                                "    if bad {"
                                                 "        return err(\"boom\", err.arg);"
                                                 "    }"
                                                 "    return ok;"
@@ -363,14 +363,14 @@ TEST(VigilCompilerTest, CompilesAndExecutesExplicitErrorValues)
                                                 "fn main() -> i32 {"
                                                 "    err first = fail(false);"
                                                 "    err second = fail(true);"
-                                                "    if (first != ok) {"
+                                                "    if first != ok {"
                                                 "        return 0;"
                                                 "    }"
-                                                "    if (second == ok) {"
+                                                "    if second == ok {"
                                                 "        return 0;"
                                                 "    }"
-                                                "    if (second.kind() == err.arg && second.message() == \"boom\") {"
-                                                "        switch (second.kind()) {"
+                                                "    if second.kind() == err.arg && second.message() == \"boom\" {"
+                                                "        switch second.kind() {"
                                                 "            case err.arg:"
                                                 "                return 7;"
                                                 "            default:"
@@ -384,26 +384,25 @@ TEST(VigilCompilerTest, CompilesAndExecutesExplicitErrorValues)
 
 TEST(VigilCompilerTest, CompilesAndExecutesTupleBindingsAndGuard)
 {
-    EXPECT_EQ(
-        CompileAndRun(vigil_test_failed_,
-                      "fn divide(i32 a, i32 b) -> (i32, err) {"
-                      "    if (b == 0) {"
-                      "        return 0, err(\"division by zero\", err.arg);"
-                      "    }"
-                      "    return a / b, ok;"
-                      "}"
-                      "fn main() -> i32 {"
-                      "    i32 first, err first_err = divide(9, 3);"
-                      "    i32 _, err _ = divide(8, 2);"
-                      "    guard i32 second, err second_err = divide(5, 0) {"
-                      "        if (first_err == ok && first == 3 && second == 0 && second_err.kind() == err.arg) {"
-                      "            return 11;"
-                      "        }"
-                      "        return 0;"
-                      "    }"
-                      "    return 0;"
-                      "}"),
-        11);
+    EXPECT_EQ(CompileAndRun(vigil_test_failed_,
+                            "fn divide(i32 a, i32 b) -> (i32, err) {"
+                            "    if b == 0 {"
+                            "        return 0, err(\"division by zero\", err.arg);"
+                            "    }"
+                            "    return a / b, ok;"
+                            "}"
+                            "fn main() -> i32 {"
+                            "    i32 first, err first_err = divide(9, 3);"
+                            "    i32 _, err _ = divide(8, 2);"
+                            "    guard i32 second, err second_err = divide(5, 0) {"
+                            "        if first_err == ok && first == 3 && second == 0 && second_err.kind() == err.arg {"
+                            "            return 11;"
+                            "        }"
+                            "        return 0;"
+                            "    }"
+                            "    return 0;"
+                            "}"),
+              11);
 }
 
 TEST(VigilCompilerTest, CompilesAndExecutesIfElseAndWhile)
@@ -411,11 +410,11 @@ TEST(VigilCompilerTest, CompilesAndExecutesIfElseAndWhile)
     EXPECT_EQ(CompileAndRun(vigil_test_failed_, "fn main() -> i32 {"
                                                 "    i32 sum = 0;"
                                                 "    i32 i = 0;"
-                                                "    while (i < 5) {"
+                                                "    while i < 5 {"
                                                 "        sum = sum + i;"
                                                 "        i = i + 1;"
                                                 "    }"
-                                                "    if (sum > 9) {"
+                                                "    if sum > 9 {"
                                                 "        return sum;"
                                                 "    } else {"
                                                 "        return 0;"
@@ -434,7 +433,7 @@ TEST(VigilCompilerTest, CompilesAndExecutesTailCallInIfBranch)
                                                 "}"
                                                 "fn main() -> i32 {"
                                                 "    bool flag = false;"
-                                                "    if (flag) {"
+                                                "    if flag {"
                                                 "        return one();"
                                                 "    }"
                                                 "    return two();"
@@ -446,7 +445,7 @@ TEST(VigilCompilerTest, CompilesAndExecutesBoolLocalsAndEquality)
 {
     EXPECT_EQ(CompileAndRun(vigil_test_failed_, "fn main() -> i32 {"
                                                 "    bool ready = 1 + 1 == 2;"
-                                                "    if (ready != false) {"
+                                                "    if ready != false {"
                                                 "        return 7;"
                                                 "    }"
                                                 "    return 0;"
@@ -464,7 +463,7 @@ TEST(VigilCompilerTest, CompilesAndExecutesDirectFunctionCalls)
                                                 "}"
                                                 "fn main() -> i32 {"
                                                 "    i32 result = add(4, 6);"
-                                                "    if (is_ten(result)) {"
+                                                "    if is_ten(result) {"
                                                 "        return result;"
                                                 "    }"
                                                 "    return 0;"
@@ -475,7 +474,7 @@ TEST(VigilCompilerTest, CompilesAndExecutesDirectFunctionCalls)
 TEST(VigilCompilerTest, CompilesAndExecutesRecursiveFunctionCalls)
 {
     EXPECT_EQ(CompileAndRun(vigil_test_failed_, "fn sum_to(i32 value) -> i32 {"
-                                                "    if (value == 0) {"
+                                                "    if value == 0 {"
                                                 "        return 0;"
                                                 "    }"
                                                 "    return value + sum_to(value - 1);"
@@ -493,8 +492,8 @@ TEST(VigilCompilerTest, CompilesAndExecutesShortCircuitLogicalOperators)
                                                 "    return x == 0;"
                                                 "}"
                                                 "fn main() -> i32 {"
-                                                "    if (true || panic_bool()) {"
-                                                "        if (!(false && panic_bool())) {"
+                                                "    if true || panic_bool() {"
+                                                "        if !(false && panic_bool()) {"
                                                 "            return 7;"
                                                 "        }"
                                                 "    }"
@@ -519,14 +518,14 @@ TEST(VigilCompilerTest, CompilesAndExecutesBreakAndContinue)
     EXPECT_EQ(CompileAndRun(vigil_test_failed_, "fn main() -> i32 {"
                                                 "    i32 sum = 0;"
                                                 "    i32 i = 0;"
-                                                "    while (i < 8) {"
+                                                "    while i < 8 {"
                                                 "        i = i + 1;"
                                                 "        {"
                                                 "            i32 current = i;"
-                                                "            if (current == 3) {"
+                                                "            if current == 3 {"
                                                 "                continue;"
                                                 "            }"
-                                                "            if (current == 6) {"
+                                                "            if current == 6 {"
                                                 "                break;"
                                                 "            }"
                                                 "        }"
@@ -554,10 +553,10 @@ TEST(VigilCompilerTest, CompilesAndExecutesForLoopContinueAndBreak)
     EXPECT_EQ(CompileAndRun(vigil_test_failed_, "fn main() -> i32 {"
                                                 "    i32 sum = 0;"
                                                 "    for (i32 i = 0; i < 6; i++) {"
-                                                "        if (i == 2) {"
+                                                "        if i == 2 {"
                                                 "            continue;"
                                                 "        }"
-                                                "        if (i == 5) {"
+                                                "        if i == 5 {"
                                                 "            break;"
                                                 "        }"
                                                 "        sum += i;"
@@ -644,7 +643,7 @@ TEST(VigilCompilerTest, CompilesAndExecutesConstantExpressions)
                                                                    "pub const bool READY = BASE == 14;"},
                                          {"/project/main.vigil", "import \"config\";"
                                                                  "fn main() -> i32 {"
-                                                                 "    if (config.READY) {"
+                                                                 "    if config.READY {"
                                                                  "        return config.BASE;"
                                                                  "    }"
                                                                  "    return 0;"
@@ -725,7 +724,7 @@ TEST(VigilCompilerTest, CompilesAndExecutesFloatFieldsAndGlobals)
                                                 "fn main() -> i32 {"
                                                 "    Counter counter = Counter(4.0);"
                                                 "    counter.grow(1.0);"
-                                                "    if (counter.value > 6.5) {"
+                                                "    if counter.value > 6.5 {"
                                                 "        return 7;"
                                                 "    }"
                                                 "    return 0;"
@@ -756,7 +755,7 @@ TEST(VigilCompilerTest, CompilesAndExecutesFallibleInitConstructorsWithGuard)
                             "class Connection {"
                             "    pub i32 port;"
                             "    fn init(i32 port) -> err {"
-                            "        if (port < 0) {"
+                            "        if port < 0 {"
                             "            return err(\"bad port\", err.arg);"
                             "        }"
                             "        self.port = port;"
@@ -766,7 +765,7 @@ TEST(VigilCompilerTest, CompilesAndExecutesFallibleInitConstructorsWithGuard)
                             "fn main() -> i32 {"
                             "    Connection good, err good_err = Connection(9);"
                             "    guard Connection bad, err bad_err = Connection(-1) {"
-                            "        if (good_err == ok && good.port == 9 && bad_err.kind() == err.arg) {"
+                            "        if good_err == ok && good.port == 9 && bad_err.kind() == err.arg {"
                             "            return 13;"
                             "        }"
                             "        return 0;"
@@ -781,7 +780,7 @@ TEST(VigilCompilerTest, CompilesAndExecutesFallibleInitConstructorsReturningOk)
     EXPECT_EQ(CompileAndRun(vigil_test_failed_, "class SafeDiv {"
                                                 "    i32 result;"
                                                 "    fn init(i32 left, i32 right) -> err {"
-                                                "        if (right == 0) {"
+                                                "        if right == 0 {"
                                                 "            return err(\"division by zero\", err.arg);"
                                                 "        }"
                                                 "        self.result = left / right;"
@@ -790,7 +789,7 @@ TEST(VigilCompilerTest, CompilesAndExecutesFallibleInitConstructorsReturningOk)
                                                 "}"
                                                 "fn main() -> i32 {"
                                                 "    SafeDiv value, err status = SafeDiv(10, 2);"
-                                                "    if (value.result == 5 && status == ok) {"
+                                                "    if value.result == 5 && status == ok {"
                                                 "        return 42;"
                                                 "    }"
                                                 "    return 0;"
@@ -996,7 +995,7 @@ TEST(VigilCompilerTest, CompilesAndExecutesEnumsAndSwitch)
                                                 "}"
                                                 "fn main() -> i32 {"
                                                 "    Color color = Color.Blue;"
-                                                "    switch (color) {"
+                                                "    switch color {"
                                                 "        case Color.Red:"
                                                 "            return 1;"
                                                 "        case Color.Green, Color.Blue:"
@@ -1019,7 +1018,7 @@ TEST(VigilCompilerTest, CompilesAndExecutesStringsAndStringConstants)
                          "\n"
                          "fn main() -> i32 {\n"
                          "    string message = make_message();\n"
-                         "    if (message == \"hello\" && message != \"world\") {\n"
+                         "    if message == \"hello\" && message != \"world\" {\n"
                          "        return 12;\n"
                          "    }\n"
                          "    return 0;\n"
@@ -1043,7 +1042,7 @@ TEST(VigilCompilerTest, CompilesAndExecutesImportedStringConstantsAcrossFiles)
                                                         "\n"
                                                         "fn main() -> i32 {\n"
                                                         "    string value = labels.render(\" vm\");\n"
-                                                        "    if (value == \"vigil vm\") {\n"
+                                                        "    if value == \"vigil vm\" {\n"
                                                         "        return 15;\n"
                                                         "    }\n"
                                                         "    return 0;\n"
@@ -1069,7 +1068,7 @@ TEST(VigilCompilerTest, CompilesAndExecutesStringBuiltInMethods)
                          "    string missing, err missing_err = trimmed.char_at(99);\n"
                          "\n"
                          "    for part in parts {\n"
-                         "        if (part == \"b\" || part == \"c\") {\n"
+                         "        if part == \"b\" || part == \"c\" {\n"
                          "            split_hits++;\n"
                          "        }\n"
                          "    }\n"
@@ -1078,7 +1077,7 @@ TEST(VigilCompilerTest, CompilesAndExecutesStringBuiltInMethods)
                          "        byte_sum += i32(byte);\n"
                          "    }\n"
                          "\n"
-                         "    if (value.len() == 12 &&\n"
+                         "    if value.len() == 12 &&\n"
                          "        value.contains(\"gil\") &&\n"
                          "        value.starts_with(\"  v\") &&\n"
                          "        value.ends_with(\"  \") &&\n"
@@ -1095,7 +1094,7 @@ TEST(VigilCompilerTest, CompilesAndExecutesStringBuiltInMethods)
                          "        missing == \"\" &&\n"
                          "        missing_err != ok &&\n"
                          "        split_hits == 2 &&\n"
-                         "        byte_sum == 155) {\n"
+                         "        byte_sum == 155 {\n"
                          "        return 19;\n"
                          "    }\n"
                          "\n"
@@ -1112,10 +1111,10 @@ TEST(VigilCompilerTest, CompilesAndExecutesStringOrderingComparisons)
                          "fn main() -> i32 {\n"
                          "    string low = \"a\";\n"
                          "    string high = \"b\";\n"
-                         "    if (low < high &&\n"
+                         "    if low < high &&\n"
                          "        high > low &&\n"
                          "        low <= low &&\n"
-                         "        high >= high) {\n"
+                         "        high >= high {\n"
                          "        return 27;\n"
                          "    }\n"
                          "    return 0;\n"
@@ -1138,7 +1137,7 @@ TEST(VigilCompilerTest, CompilesAndExecutesArrayBuiltInMethods)
                          "    i32 popped, err pop_err = nums.pop();\n"
                          "    i32 missing, err missing_err = nums.get(99);\n"
                          "\n"
-                         "    if (nums.len() == 2 &&\n"
+                         "    if nums.len() == 2 &&\n"
                          "        hit == 2 &&\n"
                          "        hit_err == ok &&\n"
                          "        set_err == ok &&\n"
@@ -1150,7 +1149,7 @@ TEST(VigilCompilerTest, CompilesAndExecutesArrayBuiltInMethods)
                          "        popped == 3 &&\n"
                          "        pop_err == ok &&\n"
                          "        missing == 0 &&\n"
-                         "        missing_err != ok) {\n"
+                         "        missing_err != ok {\n"
                          "        return 23;\n"
                          "    }\n"
                          "\n"
@@ -1178,12 +1177,12 @@ TEST(VigilCompilerTest, CompilesAndExecutesMapBuiltInMethods)
                          "    }\n"
                          "\n"
                          "    for value in labels.values() {\n"
-                         "        if (value == \"a\" || value == \"c\") {\n"
+                         "        if value == \"a\" || value == \"c\" {\n"
                          "            value_hits++;\n"
                          "        }\n"
                          "    }\n"
                          "\n"
-                         "    if (labels.len() == 2 &&\n"
+                         "    if labels.len() == 2 &&\n"
                          "        first == \"a\" &&\n"
                          "        found_first == true &&\n"
                          "        set_err == ok &&\n"
@@ -1195,7 +1194,7 @@ TEST(VigilCompilerTest, CompilesAndExecutesMapBuiltInMethods)
                          "        labels.has(3) &&\n"
                          "        !labels.has(2) &&\n"
                          "        key_sum == 4 &&\n"
-                         "        value_hits == 2) {\n"
+                         "        value_hits == 2 {\n"
                          "        return 29;\n"
                          "    }\n"
                          "\n"
@@ -1226,7 +1225,7 @@ TEST(VigilCompilerTest, CompilesAndExecutesTypedEmptyCollectionLiterals)
                          "    nums = [];\n"
                          "    labels = {};\n"
                          "\n"
-                         "    if (nums.len() == 0 && labels.len() == 0) {\n"
+                         "    if nums.len() == 0 && labels.len() == 0 {\n"
                          "        return 17;\n"
                          "    }\n"
                          "\n"
@@ -1254,7 +1253,7 @@ TEST(VigilCompilerTest, CompilesAndExecutesVoidFunctionsAndMethods)
                          "}\n"
                          "\n"
                          "fn reset(bool flag) -> void {\n"
-                         "    if (flag) {\n"
+                         "    if flag {\n"
                          "        return;\n"
                          "    }\n"
                          "}\n"
@@ -1542,7 +1541,7 @@ TEST(VigilCompilerTest, CompilesAndExecutesFStringsWithInterpolationAndFormattin
                       "    i32 age = 30;"
                       "    f64 pi = 3.14159;"
                       "    string msg = f\"Name: {name}, Age: {age}, Next: {age + 1}, pi={pi:.2f}, braces={{ok}}\";"
-                      "    if (msg == \"Name: Alice, Age: 30, Next: 31, pi=3.14, braces={ok}\") {"
+                      "    if msg == \"Name: Alice, Age: 30, Next: 31, pi=3.14, braces={ok}\" {"
                       "        return 1;"
                       "    }"
                       "    return 0;"
@@ -1579,13 +1578,13 @@ TEST(VigilCompilerTest, CompilesAndExecutesFStringsWithAlignmentAndRadixFormatti
                       "    string zero_binary = f\"[{0:b}]\";"
                       "    string bool_text = f\"[{ready}]\";"
                       "    string empty_pad = f\"[{empty:>4}]\";"
-                      "    if (left == \"[Alice     ]\" && right == \"[     Alice]\" && center == \"[  Alice   ]\" &&"
+                      "    if left == \"[Alice     ]\" && right == \"[     Alice]\" && center == \"[  Alice   ]\" &&"
                       "        zero_pad == \"[00000030]\" && decimal == \"[30]\" && hex_lower == \"[1e]\" &&"
                       "        hex_upper == \"[1E]\" && binary == \"[11110]\" && octal == \"[36]\" &&"
                       "        grouped == \"[1,234,567]\" && negative_grouped == \"[-1,234,567]\" &&"
                       "        float_text == \"[3.1416]\" && neg_hex == \"[-1e]\" && neg_binary == \"[-11110]\" &&"
                       "        neg_octal == \"[-36]\" && zero_binary == \"[0]\" && bool_text == \"[true]\" &&"
-                      "        empty_pad == \"[    ]\") {"
+                      "        empty_pad == \"[    ]\" {"
                       "        return 2;"
                       "    }"
                       "    return 0;"
@@ -1718,7 +1717,7 @@ TEST(VigilCompilerTest, CompilesAndExecutesQualifiedImportedEnumsAcrossFiles)
                                          {"/project/main.vigil", "import \"colors\";"
                                                                  "fn main() -> i32 {"
                                                                  "    colors.Color color = colors.pick();"
-                                                                 "    switch (color) {"
+                                                                 "    switch color {"
                                                                  "        case colors.Color.Red:"
                                                                  "            return 1;"
                                                                  "        case colors.Color.Green:"
@@ -2444,7 +2443,7 @@ TEST(VigilCompilerTest, CompilesAndExecutesLargeIntegerLiteralInference)
                       "    u64 huge = 9223372036854775808;"
                       "    u64 max = 18446744073709551615;"
                       "    u64 previous = max - u64(1);"
-                      "    if (signed_large == i64(3000000000) && huge > u64(9223372036854775807) && previous < max) {"
+                      "    if signed_large == i64(3000000000) && huge > u64(9223372036854775807) && previous < max {"
                       "        return 11;"
                       "    }"
                       "    return 0;"
@@ -2481,7 +2480,7 @@ TEST(VigilCompilerTest, RejectsInvalidLocalsAndConditions)
 
     vigil_diagnostic_list_clear(&diagnostics);
     source_id = RegisterSource(vigil_test_failed_, &registry, "condition.vigil",
-                               "fn main() -> i32 { if (1) { return 1; } return 0; }", &error);
+                               "fn main() -> i32 { if 1 { return 1; } return 0; }", &error);
     EXPECT_EQ(vigil_compile_source(&registry, source_id, &function, &diagnostics, &error), VIGIL_STATUS_SYNTAX_ERROR);
     ASSERT_EQ(vigil_diagnostic_list_count(&diagnostics), 1U);
     EXPECT_STREQ(vigil_string_c_str(&vigil_diagnostic_list_get(&diagnostics, 0U)->message),
@@ -2536,7 +2535,7 @@ TEST(VigilCompilerTest, RejectsInvalidFunctionSignaturesAndCalls)
     vigil_diagnostic_list_clear(&diagnostics);
     source_id = RegisterSource(vigil_test_failed_, &registry, "arg_type.vigil",
                                "fn truthy(bool ready) -> i32 {"
-                               "    if (ready) { return 1; }"
+                               "    if ready { return 1; }"
                                "    return 0;"
                                "}"
                                "fn main() -> i32 { return truthy(1); }",
@@ -2558,6 +2557,31 @@ TEST(VigilCompilerTest, RejectsInvalidFunctionSignaturesAndCalls)
     vigil_runtime_close(&runtime);
 }
 
+TEST(VigilCompilerTest, RejectsWrappingConditionParentheses)
+{
+    vigil_runtime_t *runtime = NULL;
+    vigil_error_t error = {0};
+    vigil_source_registry_t registry;
+    vigil_diagnostic_list_t diagnostics;
+    vigil_object_t *function = NULL;
+    vigil_source_id_t source_id;
+
+    ASSERT_EQ(vigil_runtime_open(&runtime, NULL, &error), VIGIL_STATUS_OK);
+    vigil_source_registry_init(&registry, runtime);
+    vigil_diagnostic_list_init(&diagnostics, runtime);
+
+    source_id = RegisterSource(vigil_test_failed_, &registry, "wrapped_condition.vigil",
+                               "fn main() -> i32 { if (true) { return 1; } return 0; }", &error);
+    EXPECT_EQ(vigil_compile_source(&registry, source_id, &function, &diagnostics, &error), VIGIL_STATUS_SYNTAX_ERROR);
+    ASSERT_EQ(vigil_diagnostic_list_count(&diagnostics), 1U);
+    EXPECT_STREQ(vigil_string_c_str(&vigil_diagnostic_list_get(&diagnostics, 0U)->message),
+                 "unnecessary parentheses around condition (remove them)");
+
+    vigil_diagnostic_list_free(&diagnostics);
+    vigil_source_registry_free(&registry);
+    vigil_runtime_close(&runtime);
+}
+
 TEST(VigilCompilerTest, RejectsInvalidLogicalOperandsAndLoopControlOutsideLoops)
 {
     vigil_runtime_t *runtime = NULL;
@@ -2572,7 +2596,7 @@ TEST(VigilCompilerTest, RejectsInvalidLogicalOperandsAndLoopControlOutsideLoops)
     vigil_diagnostic_list_init(&diagnostics, runtime);
 
     source_id = RegisterSource(vigil_test_failed_, &registry, "logical_type.vigil",
-                               "fn main() -> i32 { if (1 && true) { return 1; } return 0; }", &error);
+                               "fn main() -> i32 { if 1 && true { return 1; } return 0; }", &error);
     EXPECT_EQ(vigil_compile_source(&registry, source_id, &function, &diagnostics, &error), VIGIL_STATUS_SYNTAX_ERROR);
     ASSERT_EQ(vigil_diagnostic_list_count(&diagnostics), 1U);
     EXPECT_STREQ(vigil_string_c_str(&vigil_diagnostic_list_get(&diagnostics, 0U)->message),
@@ -2614,7 +2638,7 @@ TEST(VigilCompilerTest, RequiresGuaranteedReturnAndPreservesNestedScopeShadowing
 
     source_id = RegisterSource(vigil_test_failed_, &registry, "missing_return.vigil",
                                "fn choose(bool ready) -> i32 {"
-                               "    if (ready) {"
+                               "    if ready {"
                                "        return 1;"
                                "    }"
                                "}"
@@ -2630,7 +2654,7 @@ TEST(VigilCompilerTest, RequiresGuaranteedReturnAndPreservesNestedScopeShadowing
     vigil_diagnostic_list_clear(&diagnostics);
     source_id = RegisterSource(vigil_test_failed_, &registry, "missing_main_return.vigil",
                                "fn main() -> i32 {"
-                               "    if (true) {"
+                               "    if true {"
                                "        return 1;"
                                "    }"
                                "}",
@@ -2643,7 +2667,7 @@ TEST(VigilCompilerTest, RequiresGuaranteedReturnAndPreservesNestedScopeShadowing
     vigil_diagnostic_list_clear(&diagnostics);
     source_id = RegisterSource(vigil_test_failed_, &registry, "void_missing_value.vigil",
                                "fn helper(bool ready) -> void {"
-                               "    if (ready) {"
+                               "    if ready {"
                                "        return;"
                                "    }"
                                "}"
@@ -2656,7 +2680,7 @@ TEST(VigilCompilerTest, RequiresGuaranteedReturnAndPreservesNestedScopeShadowing
 
     vigil_diagnostic_list_clear(&diagnostics);
     EXPECT_EQ(CompileAndRun(vigil_test_failed_, "fn choose(bool ready) -> i32 {"
-                                                "    if (ready) {"
+                                                "    if ready {"
                                                 "        return 1;"
                                                 "    } else {"
                                                 "        return 2;"
@@ -2821,16 +2845,16 @@ TEST(VigilCompilerTest, CompilesAndExecutesForInOverArraysAndMaps)
                                                 "    map<string, i32> scores = {\"a\": 1, \"b\": 3, \"c\": 5};"
                                                 "    i32 sum = 0;"
                                                 "    for value in nums {"
-                                                "        if (value == 6) {"
+                                                "        if value == 6 {"
                                                 "            continue;"
                                                 "        }"
-                                                "        if (value == 8) {"
+                                                "        if value == 8 {"
                                                 "            break;"
                                                 "        }"
                                                 "        sum += value;"
                                                 "    }"
                                                 "    for key, value in scores {"
-                                                "        if (key == \"b\") {"
+                                                "        if key == \"b\" {"
                                                 "            sum += value;"
                                                 "        }"
                                                 "    }"
@@ -3080,7 +3104,7 @@ TEST(VigilCompilerTest, RejectsInvalidGuardBindings)
 
     source_id = RegisterSource(vigil_test_failed_, &registry, "bad_guard.vigil",
                                "fn divide(i32 a, i32 b) -> (i32, err) {"
-                               "    if (b == 0) {"
+                               "    if b == 0 {"
                                "        return 0, err(\"division by zero\", err.arg);"
                                "    }"
                                "    return a / b, ok;"
@@ -3366,6 +3390,7 @@ void register_compiler_tests(void)
     REGISTER_TEST(VigilCompilerTest, CompilesAndExecutesLargeIntegerLiteralInference);
     REGISTER_TEST(VigilCompilerTest, RejectsInvalidLocalsAndConditions);
     REGISTER_TEST(VigilCompilerTest, RejectsInvalidFunctionSignaturesAndCalls);
+    REGISTER_TEST(VigilCompilerTest, RejectsWrappingConditionParentheses);
     REGISTER_TEST(VigilCompilerTest, RejectsInvalidLogicalOperandsAndLoopControlOutsideLoops);
     REGISTER_TEST(VigilCompilerTest, RequiresGuaranteedReturnAndPreservesNestedScopeShadowing);
     REGISTER_TEST(VigilCompilerTest, RejectsVoidInNonReturnTypePositions);

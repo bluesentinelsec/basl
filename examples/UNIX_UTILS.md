@@ -66,7 +66,7 @@ Merges lines from multiple files side-by-side.
 **Issue:** Previously had to rely on `string(err) == "err(\"EOF\")"` to detect EOF vs I/O errors  
 **Found in:** vigil-paste (needs to distinguish EOF from read failures)  
 **Resolution:** Typed error kinds: `e.kind() == err.eof` distinguishes EOF from other errors  
-**Usage:** `if (e.kind() == err.eof) { /* handle EOF */ }`
+**Usage:** `if e.kind() == err.eof { /* handle EOF */ }`
 
 ### 4. Type casting verbosity
 **Impact:** Low  

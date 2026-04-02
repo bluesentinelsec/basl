@@ -56,9 +56,9 @@ class StringMethodsTest(unittest.TestCase):
                     fn main() -> i32 {
                         string s = "  hello   world  ";
                         array<string> parts = s.fields();
-                        if (parts.len() != 2) { return 1; }
-                        if (parts[0] != "hello") { return 2; }
-                        if (parts[1] != "world") { return 3; }
+                        if parts.len() != 2 { return 1; }
+                        if parts[0] != "hello" { return 2; }
+                        if parts[1] != "world" { return 3; }
                         return 0;
                     }
                 """,
@@ -90,10 +90,10 @@ class StringMethodsTest(unittest.TestCase):
                     fn main() -> i32 {
                         array<string> parts = ["a", "b", "c"];
                         string joined = ",".join(parts);
-                        if (joined != "a,b,c") { return 1; }
+                        if joined != "a,b,c" { return 1; }
                         
                         string joined2 = "".join(parts);
-                        if (joined2 != "abc") { return 2; }
+                        if joined2 != "abc" { return 2; }
                         
                         return 0;
                     }
@@ -110,7 +110,7 @@ class StringMethodsTest(unittest.TestCase):
                     fn main() -> i32 {
                         array<string> empty = [];
                         string joined = ",".join(empty);
-                        if (joined != "") { return 1; }
+                        if joined != "" { return 1; }
                         return 0;
                     }
                 """,
@@ -126,9 +126,9 @@ class StringMethodsTest(unittest.TestCase):
                     fn main() -> i32 {
                         string s = "key=value";
                         string before, string after, bool found = s.cut("=");
-                        if (!found) { return 1; }
-                        if (before != "key") { return 2; }
-                        if (after != "value") { return 3; }
+                        if !found { return 1; }
+                        if before != "key" { return 2; }
+                        if after != "value" { return 3; }
                         return 0;
                     }
                 """,
@@ -144,9 +144,9 @@ class StringMethodsTest(unittest.TestCase):
                     fn main() -> i32 {
                         string s = "no separator here";
                         string before, string after, bool found = s.cut("=");
-                        if (found) { return 1; }
-                        if (before != "no separator here") { return 2; }
-                        if (after != "") { return 3; }
+                        if found { return 1; }
+                        if before != "no separator here" { return 2; }
+                        if after != "" { return 3; }
                         return 0;
                     }
                 """,
@@ -160,12 +160,12 @@ class StringMethodsTest(unittest.TestCase):
             write_sources(root, {
                 "main.vigil": """
                     fn main() -> i32 {
-                        if (!"Go".equal_fold("go")) { return 1; }
-                        if (!"HELLO".equal_fold("hello")) { return 2; }
-                        if (!"MixedCase".equal_fold("MIXEDCASE")) { return 3; }
-                        if ("abc".equal_fold("abcd")) { return 4; }
-                        if ("".equal_fold("x")) { return 5; }
-                        if (!"".equal_fold("")) { return 6; }
+                        if !"Go".equal_fold("go") { return 1; }
+                        if !"HELLO".equal_fold("hello") { return 2; }
+                        if !"MixedCase".equal_fold("MIXEDCASE") { return 3; }
+                        if "abc".equal_fold("abcd") { return 4; }
+                        if "".equal_fold("x") { return 5; }
+                        if !"".equal_fold("") { return 6; }
                         return 0;
                     }
                 """,

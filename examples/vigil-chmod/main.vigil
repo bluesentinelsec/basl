@@ -1,54 +1,84 @@
 import "args";
 import "ffi";
-import "unsafe";
 import "fmt";
+import "unsafe";
 
 fn parse_octal(string s) -> (i32, err) {
     i32 result = 0;
     for (i32 i = 0; i < s.len(); i++) {
         string c, err ec = s.char_at(i);
-        if (ec != ok) {
+        if ec != ok {
             return 0, ec;
         }
-        if (c < "0" || c > "7") {
+
+        if c < "0" || c > "7" {
             return 0, err("invalid octal digit", err.parse);
         }
+
         i32 digit = 0;
-        if (c == "0") { digit = 0; }
-        if (c == "1") { digit = 1; }
-        if (c == "2") { digit = 2; }
-        if (c == "3") { digit = 3; }
-        if (c == "4") { digit = 4; }
-        if (c == "5") { digit = 5; }
-        if (c == "6") { digit = 6; }
-        if (c == "7") { digit = 7; }
+        if c == "0" {
+            digit = 0;
+        }
+
+        if c == "1" {
+            digit = 1;
+        }
+
+        if c == "2" {
+            digit = 2;
+        }
+
+        if c == "3" {
+            digit = 3;
+        }
+
+        if c == "4" {
+            digit = 4;
+        }
+
+        if c == "5" {
+            digit = 5;
+        }
+
+        if c == "6" {
+            digit = 6;
+        }
+
+        if c == "7" {
+            digit = 7;
+        }
+
         result = result * 8 + digit;
     }
+
     return result, ok;
 }
 
 fn main() -> i32 {
-    if (args.count() < 2) {
+    if args.count() < 2 {
         fmt.eprintln("vigil-chmod: missing operand");
         fmt.eprintln("usage: vigil-chmod MODE FILE...");
         return 1;
     }
 
     string mode_str = args.at(0);
-
     // Parse octal mode
     i32 mode, err e1 = parse_octal(mode_str);
-    if (e1 != ok) {
+    if e1 != ok {
         fmt.eprintln(f"vigil-chmod: invalid mode: {mode_str}");
         return 1;
     }
-
     // Open libc
     i64 lib = ffi.open("libSystem.B.dylib");
-    if (lib == i64(0)) { lib = ffi.open("libc.so.6"); }
-    if (lib == i64(0)) { lib = ffi.open(""); }
-    i64 h_chmod = ffi.bind(lib, "chmod", "i32(ptr,i32)");
+    if lib == i64(0) {
+        lib = ffi.open("libc.so.6");
+    }
 
+    if lib == i64(0) {
+        lib = ffi.open("");
+    }
+
+    i64 h_chmod = ffi.bind(lib, "chmod", "i32(ptr,i32)");
     // Apply to all files
     for (i32 i = 1; i < args.count(); i++) {
         string path = args.at(i);
@@ -57,7 +87,7 @@ fn main() -> i32 {
         i64 ptr_val = unsafe.ptr(buf);
         i64 rc = ffi.call(h_chmod, ptr_val, i64(mode), i64(0), i64(0), i64(0), i64(0));
         unsafe.free(buf);
-        if (rc != i64(0)) {
+        if rc != i64(0) {
             fmt.eprintln(f"vigil-chmod: {path}: chmod failed");
             return 1;
         }

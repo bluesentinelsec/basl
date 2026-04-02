@@ -27,7 +27,7 @@ import "time";
 
 fn pad_right(string s, i32 width) -> string {
     i32 slen = s.len();
-    if (slen >= width) {
+    if slen >= width {
         return s;
     }
 
@@ -36,7 +36,7 @@ fn pad_right(string s, i32 width) -> string {
 /// Pad string on the left to width with spaces.
 fn pad_left(string s, i32 width) -> string {
     i32 slen = s.len();
-    if (slen >= width) {
+    if slen >= width {
         return s;
     }
 
@@ -45,7 +45,7 @@ fn pad_left(string s, i32 width) -> string {
 /// Center string within width.
 fn center(string s, i32 width) -> string {
     i32 slen = s.len();
-    if (slen >= width) {
+    if slen >= width {
         return s;
     }
 
@@ -56,7 +56,7 @@ fn center(string s, i32 width) -> string {
 /// Pad string on the left with custom fill character.
 fn pad_left_fill(string s, i32 width, string fill) -> string {
     i32 slen = s.len();
-    if (slen >= width) {
+    if slen >= width {
         return s;
     }
 
@@ -69,15 +69,15 @@ fn pad_num(i64 n, i32 width) -> string {
 /// Right-align a float with given precision in a field.
 fn pad_f64(f64 n, i32 prec, i32 width) -> string {
     string s = "";
-    if (prec == 0) {
+    if prec == 0 {
         s = f"{n:.0f}";
-    } else if (prec == 1) {
+    } else if prec == 1 {
         s = f"{n:.1f}";
-    } else if (prec == 2) {
+    } else if prec == 2 {
         s = f"{n:.2f}";
-    } else if (prec == 3) {
+    } else if prec == 3 {
         s = f"{n:.3f}";
-    } else if (prec == 4) {
+    } else if prec == 4 {
         s = f"{n:.4f}";
     } else {
         s = f"{n:.6f}";
@@ -181,16 +181,16 @@ fn run_log_test() -> bool {
 // f-string with conditional prefixes, deep string concatenation chains.
 fn tree_line(i32 depth, bool is_last, string name, string detail) -> string {
     string indent = "";
-    if (depth > 0) {
+    if depth > 0 {
         indent = "  ".repeat(depth - 1);
-        if (is_last) {
+        if is_last {
             indent = indent + "  └── ";
         } else {
             indent = indent + "  ├── ";
         }
     }
 
-    if (detail.len() > 0) {
+    if detail.len() > 0 {
         return f"{indent}{name} ({detail})";
     }
 
@@ -229,7 +229,7 @@ fn run_tree_test() -> bool {
 fn progress_bar(i32 current, i32 total, i32 bar_width) -> string {
     f64 ratio = f64(current) / f64(total);
     i32 filled = i32(ratio * f64(bar_width));
-    if (filled > bar_width) {
+    if filled > bar_width {
         filled = bar_width;
     }
 
@@ -261,7 +261,7 @@ fn fmt_thousands(i64 n) -> string {
 /// Format as currency (USD).
 fn fmt_currency(f64 amount) -> string {
     bool neg = amount < 0.0;
-    if (neg) {
+    if neg {
         amount = - amount;
     }
 
@@ -274,7 +274,7 @@ fn fmt_currency(f64 amount) -> string {
     i64 ww, err e3 = parse_i64_simple(whole);
     w = ww;
     string formatted = fmt_thousands(w) + "." + frac;
-    if (neg) {
+    if neg {
         return "-$" + formatted;
     }
 
@@ -285,28 +285,28 @@ fn parse_i64_simple(string s) -> (i64, err) {
     i64 result = i64(0);
     i32 i = 0;
     i32 slen = s.len();
-    while (i < slen) {
+    while i < slen {
         string ch, err e = s.char_at(i);
         i64 digit = i64(0);
-        if (ch == "0") {
+        if ch == "0" {
             digit = i64(0);
-        } else if (ch == "1") {
+        } else if ch == "1" {
             digit = i64(1);
-        } else if (ch == "2") {
+        } else if ch == "2" {
             digit = i64(2);
-        } else if (ch == "3") {
+        } else if ch == "3" {
             digit = i64(3);
-        } else if (ch == "4") {
+        } else if ch == "4" {
             digit = i64(4);
-        } else if (ch == "5") {
+        } else if ch == "5" {
             digit = i64(5);
-        } else if (ch == "6") {
+        } else if ch == "6" {
             digit = i64(6);
-        } else if (ch == "7") {
+        } else if ch == "7" {
             digit = i64(7);
-        } else if (ch == "8") {
+        } else if ch == "8" {
             digit = i64(8);
-        } else if (ch == "9") {
+        } else if ch == "9" {
             digit = i64(9);
         }
 
@@ -516,7 +516,7 @@ fn run_volume_test() -> bool {
     i32 i = 0;
     i64 total_len = i64(0);
     string zero_fill = "0";
-    while (i < count1) {
+    while i < count1 {
         string line = f"[{pad_left_fill(string(i), 6, zero_fill)}] level=INFO msg=request_processed latency_ms={f64(i % 1000):.2f} status=200";
         total_len = total_len + i64(line.len());
         i = i + 1;
@@ -529,7 +529,7 @@ fn run_volume_test() -> bool {
     i32 count2 = 50000;
     i = 0;
     i64 total_len2 = i64(0);
-    while (i < count2) {
+    while i < count2 {
         string item_name = "item_" + string(i);
         string row = f"| {pad_num(i64(i), 8)} | {pad_right(item_name, 20)} | {pad_f64(f64(i) * 0.01, 2, 10)} |";
         total_len2 = total_len2 + i64(row.len());
@@ -598,55 +598,55 @@ fn main() -> i32 {
     i64 t_start = time.now_ms();
     i32 pass_count = 0;
     i32 fail_count = 0;
-    if (run_table_test()) {
+    if run_table_test() {
         pass_count = pass_count + 1;
     } else {
         fail_count = fail_count + 1;
     }
 
-    if (run_log_test()) {
+    if run_log_test() {
         pass_count = pass_count + 1;
     } else {
         fail_count = fail_count + 1;
     }
 
-    if (run_tree_test()) {
+    if run_tree_test() {
         pass_count = pass_count + 1;
     } else {
         fail_count = fail_count + 1;
     }
 
-    if (run_progress_test()) {
+    if run_progress_test() {
         pass_count = pass_count + 1;
     } else {
         fail_count = fail_count + 1;
     }
 
-    if (run_number_format_test()) {
+    if run_number_format_test() {
         pass_count = pass_count + 1;
     } else {
         fail_count = fail_count + 1;
     }
 
-    if (run_unicode_test()) {
+    if run_unicode_test() {
         pass_count = pass_count + 1;
     } else {
         fail_count = fail_count + 1;
     }
 
-    if (run_fstring_edge_test()) {
+    if run_fstring_edge_test() {
         pass_count = pass_count + 1;
     } else {
         fail_count = fail_count + 1;
     }
 
-    if (run_volume_test()) {
+    if run_volume_test() {
         pass_count = pass_count + 1;
     } else {
         fail_count = fail_count + 1;
     }
 
-    if (run_new_features_test()) {
+    if run_new_features_test() {
         pass_count = pass_count + 1;
     } else {
         fail_count = fail_count + 1;
@@ -657,7 +657,7 @@ fn main() -> i32 {
     fmt.println(f"  Results: {pass_count} passed, {fail_count} failed");
     fmt.println(f"  Total time: {t_total}ms");
     fmt.println("══════════════════════════════════════════════════════════");
-    if (fail_count > 0) {
+    if fail_count > 0 {
         fmt.println("  STATUS: FAIL");
         return 1;
     }

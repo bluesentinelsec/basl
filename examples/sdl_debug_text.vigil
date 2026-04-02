@@ -3,32 +3,32 @@
 // Draws real-time FPS and renderer info using SDL's built-in debug font.
 // Press Escape to quit.
 
-import "sdl";
 import "fmt";
+import "sdl";
 
 fn main() -> i32 {
     bool init_ok, err ie = sdl.init(sdl.INIT_VIDEO());
-    if (ie != ok) {
+    if ie != ok {
         fmt.eprintln(f"SDL init failed: {ie.message()}");
         return 1;
     }
-    defer sdl.quit();
 
+    defer sdl.quit();
     sdl.Window win, err we = sdl.Window.create("Debug Text Demo", 640, 480, 0);
-    if (we != ok) {
+    if we != ok {
         fmt.eprintln(f"Window failed: {we.message()}");
         return 1;
     }
 
     sdl.Renderer ren, err re = sdl.Renderer.create(win, "");
-    if (re != ok) {
+    if re != ok {
         fmt.eprintln(f"Renderer failed: {re.message()}");
         win.destroy();
         return 1;
     }
 
     sdl.Event ev, err ee = sdl.Event.new();
-    if (ee != ok) {
+    if ee != ok {
         ren.destroy();
         win.destroy();
         return 1;
@@ -37,28 +37,26 @@ fn main() -> i32 {
     string ren_name = ren.get_name();
     i32 ow, i32 oh = ren.get_output_size();
     fmt.println(f"Renderer: {ren_name}, output: {ow}x{oh}");
-
     i64 freq = sdl.get_performance_frequency();
     i64 last = sdl.get_performance_counter();
     i32 frames = 0;
     i32 fps = 0;
     i64 fps_timer = sdl.get_ticks();
-
     bool running = true;
-    while (running) {
-        while (ev.poll()) {
-            if (ev.type() == sdl.EVENT_QUIT()) {
+    while running {
+        while ev.poll() {
+            if ev.type() == sdl.EVENT_QUIT() {
                 running = false;
             }
         }
-        if (sdl.is_key_pressed(sdl.SCANCODE_ESCAPE())) {
+
+        if sdl.is_key_pressed(sdl.SCANCODE_ESCAPE()) {
             running = false;
         }
-
         // FPS counter
         frames = frames + 1;
         i64 now_ticks = sdl.get_ticks();
-        if (now_ticks - fps_timer >= i64(1000)) {
+        if now_ticks - fps_timer >= i64(1000) {
             fps = frames;
             frames = 0;
             fps_timer = now_ticks;
@@ -66,24 +64,20 @@ fn main() -> i32 {
 
         bool c1, err e1 = ren.set_draw_color(30, 30, 30, 255);
         bool c2, err e2 = ren.clear();
-
         // Draw debug text — white
         bool c3, err e3 = ren.set_draw_color(255, 255, 255, 255);
         bool t1, err te1 = ren.render_debug_text(10.0, 10.0, f"FPS: {fps}");
         bool t2, err te2 = ren.render_debug_text(10.0, 26.0, f"Renderer: {ren_name}");
         bool t3, err te3 = ren.render_debug_text(10.0, 42.0, f"Output: {ow}x{oh}");
-
         // Draw colored text
         bool c4, err e4 = ren.set_draw_color(0, 255, 0, 255);
         bool t4, err te4 = ren.render_debug_text(10.0, 74.0, "Green text");
         bool c5, err e5 = ren.set_draw_color(255, 80, 80, 255);
         bool t5, err te5 = ren.render_debug_text(10.0, 90.0, "Red text");
-
         // Mouse position
         f64 mx, f64 my = sdl.get_mouse_state();
         bool c6, err e6 = ren.set_draw_color(200, 200, 0, 255);
         bool t6, err te6 = ren.render_debug_text(10.0, 122.0, f"Mouse: {mx}, {my}");
-
         bool c7, err e7 = ren.present();
         sdl.delay(16);
     }

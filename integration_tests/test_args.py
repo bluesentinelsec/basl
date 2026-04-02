@@ -28,7 +28,7 @@ class ArgsCountTest(unittest.TestCase):
         code = '''import "args";
 fn main() -> i32 {
     i32 c = args.count();
-    if (c == 0) { return 0; }
+    if c == 0 { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -38,7 +38,7 @@ fn main() -> i32 {
         code = '''import "args";
 fn main() -> i32 {
     i32 c = args.count();
-    if (c == 3) { return 0; }
+    if c == 3 { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code, ["one", "two", "three"])
@@ -50,7 +50,7 @@ class ArgsAtTest(unittest.TestCase):
         code = '''import "args";
 fn main() -> i32 {
     string a = args.at(0);
-    if (a == "hello") { return 0; }
+    if a == "hello" { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code, ["hello", "world"])
@@ -60,7 +60,7 @@ fn main() -> i32 {
         code = '''import "args";
 fn main() -> i32 {
     string a = args.at(1);
-    if (a == "world") { return 0; }
+    if a == "world" { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code, ["hello", "world"])
@@ -70,7 +70,7 @@ fn main() -> i32 {
         code = '''import "args";
 fn main() -> i32 {
     string a = args.at(99);
-    if (a == "") { return 0; }
+    if a == "" { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code, ["hello"])
@@ -80,7 +80,7 @@ fn main() -> i32 {
         code = '''import "args";
 fn main() -> i32 {
     string a = args.at(-1);
-    if (a == "") { return 0; }
+    if a == "" { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code, ["hello"])

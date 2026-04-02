@@ -47,7 +47,7 @@ class TcpListenTest(unittest.TestCase):
         code = '''import "net";
 fn main() -> i32 {
     i64 server = net.tcp_listen("127.0.0.1", 19001);
-    if (server >= i64(0)) {
+    if server >= i64(0) {
         net.close(server);
         return 0;
     }
@@ -65,7 +65,7 @@ class TcpConnectTest(unittest.TestCase):
         code = '''import "net";
 fn main() -> i32 {
     i64 sock = net.tcp_connect("127.0.0.1", 19999);
-    if (sock < i64(0)) {
+    if sock < i64(0) {
         return 0;  // Expected - no server
     }
     net.close(sock);
@@ -85,10 +85,10 @@ class TcpClientServerTest(unittest.TestCase):
 import "fmt";
 fn main() -> i32 {
     i64 server = net.tcp_listen("127.0.0.1", 19002);
-    if (server < i64(0)) { return 1; }
+    if server < i64(0) { return 1; }
     
     i64 client = net.tcp_accept(server);
-    if (client < i64(0)) { 
+    if client < i64(0) { 
         net.close(server);
         return 2; 
     }
@@ -99,7 +99,7 @@ fn main() -> i32 {
     net.close(client);
     net.close(server);
     
-    if (sent > 0) { return 0; }
+    if sent > 0 { return 0; }
     return 3;
 }'''
             client_code = '''import "net";
@@ -108,13 +108,13 @@ fn main() -> i32 {
     time.sleep(i64(100));
     
     i64 sock = net.tcp_connect("127.0.0.1", 19002);
-    if (sock < i64(0)) { return 1; }
+    if sock < i64(0) { return 1; }
     
     net.write(sock, "hello");
     string response = net.read(sock, 1024);
     net.close(sock);
     
-    if (response == "hello") { return 0; }
+    if response == "hello" { return 0; }
     return 2;
 }'''
             # Start server
@@ -166,12 +166,12 @@ import "time";
 fn main() -> i32 {
     time.sleep(i64(100));
     i64 sock = net.tcp_connect("127.0.0.1", 19003);
-    if (sock < i64(0)) { return 1; }
+    if sock < i64(0) { return 1; }
     
     i32 sent = net.write(sock, "test data");
     net.close(sock);
     
-    if (sent == 9) { return 0; }
+    if sent == 9 { return 0; }
     return 2;
 }'''
             server_path = Path(tmpdir) / "server.vigil"
@@ -206,7 +206,7 @@ class UdpBindTest(unittest.TestCase):
         code = '''import "net";
 fn main() -> i32 {
     i64 sock = net.udp_bind("127.0.0.1", 19004);
-    if (sock >= i64(0)) {
+    if sock >= i64(0) {
         net.close(sock);
         return 0;
     }
@@ -224,7 +224,7 @@ class UdpNewTest(unittest.TestCase):
         code = '''import "net";
 fn main() -> i32 {
     i64 sock = net.udp_new();
-    if (sock >= i64(0)) {
+    if sock >= i64(0) {
         net.close(sock);
         return 0;
     }
@@ -242,10 +242,10 @@ class UdpSendRecvTest(unittest.TestCase):
         code = '''import "net";
 fn main() -> i32 {
     i64 receiver = net.udp_bind("127.0.0.1", 19005);
-    if (receiver < i64(0)) { return 1; }
+    if receiver < i64(0) { return 1; }
     
     i64 sender = net.udp_new();
-    if (sender < i64(0)) { 
+    if sender < i64(0) { 
         net.close(receiver);
         return 2; 
     }
@@ -253,7 +253,7 @@ fn main() -> i32 {
     net.set_timeout(receiver, 1000);
     
     i32 sent = net.udp_send(sender, "127.0.0.1", 19005, "udp test");
-    if (sent <= 0) {
+    if sent <= 0 {
         net.close(sender);
         net.close(receiver);
         return 3;
@@ -264,7 +264,7 @@ fn main() -> i32 {
     net.close(sender);
     net.close(receiver);
     
-    if (data == "udp test") { return 0; }
+    if data == "udp test" { return 0; }
     return 4;
 }'''
         rc, out, err = run_vigil(code)
@@ -279,12 +279,12 @@ class SetTimeoutTest(unittest.TestCase):
         code = '''import "net";
 fn main() -> i32 {
     i64 sock = net.udp_new();
-    if (sock < i64(0)) { return 1; }
+    if sock < i64(0) { return 1; }
     
     bool ok = net.set_timeout(sock, 1000);
     net.close(sock);
     
-    if (ok) { return 0; }
+    if ok { return 0; }
     return 2;
 }'''
         rc, out, err = run_vigil(code)
@@ -295,7 +295,7 @@ fn main() -> i32 {
         code = '''import "net";
 fn main() -> i32 {
     bool ok = net.set_timeout(i64(999), 1000);
-    if (!ok) { return 0; }
+    if !ok { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -310,7 +310,7 @@ class CloseTest(unittest.TestCase):
         code = '''import "net";
 fn main() -> i32 {
     i64 sock = net.udp_new();
-    if (sock < i64(0)) { return 1; }
+    if sock < i64(0) { return 1; }
     net.close(sock);
     return 0;
 }'''

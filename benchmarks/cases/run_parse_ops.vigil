@@ -6,7 +6,7 @@ fn main() -> i32 {
         i32 whole, err whole_err = parse.i32("12345");
         f64 ratio, err ratio_err = parse.f64("98.125");
         bool flag, err flag_err = parse.bool("true");
-        if (whole_err != ok || ratio_err != ok || flag_err != ok || ! flag) {
+        if whole_err != ok || ratio_err != ok || flag_err != ok || ! flag {
             return 1;
         }
 
@@ -14,7 +14,7 @@ fn main() -> i32 {
         total = total + i64(ratio);
     }
 
-    if (total > i64(0)) {
+    if total > i64(0) {
         return 0;
     }
 

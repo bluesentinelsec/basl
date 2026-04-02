@@ -1,17 +1,15 @@
-import "test";
-import "os";
-import "file";
-
 // Note: Tests use sh for stdin redirection, which requires Unix-like shell.
 // Windows users should run tests in WSL, Git Bash, or similar environment.
 
+import "file";
+import "os";
+import "test";
+
 fn test_uniq_basic(test.T t) -> void {
     file.write_all("test_uniq_in.txt", "a\na\nb\nb\nb\nc\n");
-    
     string out, string errs, i32 exitCode, err e = os.exec("sh", "-c", "./vigil examples/vigil-uniq/main.vigil < test_uniq_in.txt");
     t.assert(string(e) == "ok", "uniq should exit 0");
     t.assert(out == "a\nb\nc\n", "should remove consecutive duplicates");
-    
     file.remove("test_uniq_in.txt");
 }
 

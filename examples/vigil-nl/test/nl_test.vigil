@@ -1,8 +1,8 @@
-import "test";
-import "os";
-
 // Note: Tests use sh and pipes, which require Unix-like shell.
 // Windows users should run tests in WSL, Git Bash, or similar environment.
+
+import "os";
+import "test";
 
 fn test_nl_basic(test.T t) -> void {
     string out, string errs, i32 exitCode, err e = os.exec("sh", "-c", "printf 'hello\\nworld\\n' | ./vigil examples/vigil-nl/main.vigil");

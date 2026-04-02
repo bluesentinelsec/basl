@@ -5,7 +5,7 @@ fn main() -> i32 {
     i64 total = i64(0);
     for (i32 i = 0; i < 4000; i++) {
         array<string> matches = regex.find_all("[a-z]+[0-9]+", text);
-        if (matches.len() != 7) {
+        if matches.len() != 7 {
             return 1;
         }
 
@@ -13,7 +13,7 @@ fn main() -> i32 {
         total = total + i64(regex.replace_all("[0-9]+", text, "XX").len());
     }
 
-    if (total > i64(0)) {
+    if total > i64(0) {
         return 0;
     }
 

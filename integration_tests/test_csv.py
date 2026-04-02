@@ -26,7 +26,7 @@ class CsvParseRowTest(unittest.TestCase):
         code = r'''import "csv";
 fn main() -> i32 {
     array<string> row = csv.parse_row("a,b,c");
-    if (row[0] == "a" && row[1] == "b" && row[2] == "c") { return 0; }
+    if row[0] == "a" && row[1] == "b" && row[2] == "c" { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -36,7 +36,7 @@ fn main() -> i32 {
         code = r'''import "csv";
 fn main() -> i32 {
     array<string> row = csv.parse_row("\"hello, world\",b");
-    if (row[0] == "hello, world") { return 0; }
+    if row[0] == "hello, world" { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -46,7 +46,7 @@ fn main() -> i32 {
         code = r'''import "csv";
 fn main() -> i32 {
     array<string> row = csv.parse_row("\"say \"\"hi\"\"\",b");
-    if (row[0] == "say \"hi\"") { return 0; }
+    if row[0] == "say \"hi\"" { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -59,7 +59,7 @@ class CsvStringifyRowTest(unittest.TestCase):
 fn main() -> i32 {
     array<string> row = ["x", "y", "z"];
     string out = csv.stringify_row(row);
-    if (out == "x,y,z") { return 0; }
+    if out == "x,y,z" { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -70,7 +70,7 @@ fn main() -> i32 {
 fn main() -> i32 {
     array<string> row = ["hello, world", "b"];
     string out = csv.stringify_row(row);
-    if (out == "\"hello, world\",b") { return 0; }
+    if out == "\"hello, world\",b" { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -81,7 +81,7 @@ fn main() -> i32 {
 fn main() -> i32 {
     array<string> row = ["say \"hi\"", "b"];
     string out = csv.stringify_row(row);
-    if (out == "\"say \"\"hi\"\"\",b") { return 0; }
+    if out == "\"say \"\"hi\"\"\",b" { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -95,7 +95,7 @@ fn main() -> i32 {
     array<string> row = ["a", "b", "c"];
     string line = csv.stringify_row(row);
     array<string> parsed = csv.parse_row(line);
-    if (parsed[0] == "a" && parsed[1] == "b" && parsed[2] == "c") { return 0; }
+    if parsed[0] == "a" && parsed[1] == "b" && parsed[2] == "c" { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)

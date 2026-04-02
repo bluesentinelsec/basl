@@ -4,7 +4,7 @@ import "http";
 fn main() -> i32 {
     fmt.println("Starting server on http://localhost:8080");
     i64 srv = http.listen("", 8080);
-    if (srv < i64(0)) {
+    if srv < i64(0) {
         fmt.println("Failed to start server");
         return 1;
     }

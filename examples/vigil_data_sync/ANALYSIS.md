@@ -165,7 +165,7 @@ C libraries define hundreds of constants (`SQLITE_OK`, `CURLE_OK`, `Z_OK`). Ther
 4. **Add error recovery for FFI calls** — Return `(result, err)` tuples:
    ```vigil
    i64 lib, err e = ffi.open("libfoo.so");
-   if (e) { fmt.println("library not found"); }
+   if e { fmt.println("library not found"); }
    ```
 
 5. **Add `extern fn` declarations** — Type-safe FFI at compile time:

@@ -1,61 +1,56 @@
-import "test";
 import "file";
 import "os";
 import "path";
+import "test";
 
 fn get_temp_path(string filename) -> string {
     string platform = os.platform();
-    if (platform == "windows") {
+    if platform == "windows" {
         return path.join("C:\\Windows\\Temp", filename);
     }
+
     return path.join("/tmp", filename);
 }
 
 fn find_vigil_and_main() -> (string, string) {
     // Try repo root first (when run from repo root)
-    if (file.exists("vigil") && file.exists("examples/vigil-cat/main.vigil")) {
+    if file.exists("vigil") && file.exists("examples/vigil-cat/main.vigil") {
         return "./vigil", "examples/vigil-cat/main.vigil";
     }
     // Try from examples/vigil-cat
-    if (file.exists("../../vigil") && file.exists("main.vigil")) {
+    if file.exists("../../vigil") && file.exists("main.vigil") {
         return "../../vigil", "main.vigil";
     }
+
     return "", "";
 }
 
 fn test_cat_single_file(test.T t) -> void {
     string vigil_bin, string main_script = find_vigil_and_main();
     t.assert(vigil_bin != "", "should find vigil binary");
-    
     string test_file = get_temp_path("vigil_cat_test1.txt");
     string test_content = "test content\n";
     err e = file.write_all(test_file, test_content);
     t.assert(e == ok, "should write test file");
-    
     string stdout, string stderr, i32 exitCode, err e2 = os.exec(vigil_bin, main_script, test_file);
     t.assert(e2 == ok, "vigil-cat should succeed");
     t.assert(stdout == test_content, "output should match file content");
     t.assert(stderr == "", "stderr should be empty on success");
-    
     file.remove(test_file);
 }
 
 fn test_cat_multiple_files(test.T t) -> void {
     string vigil_bin, string main_script = find_vigil_and_main();
     t.assert(vigil_bin != "", "should find vigil binary");
-    
     string file1 = get_temp_path("vigil_cat_test2a.txt");
     string file2 = get_temp_path("vigil_cat_test2b.txt");
-    
     err e1 = file.write_all(file1, "file1\n");
     err e2 = file.write_all(file2, "file2\n");
     t.assert(e1 == ok && e2 == ok, "should write test files");
-    
     string stdout, string stderr, i32 exitCode, err e3 = os.exec(vigil_bin, main_script, file1, file2);
     t.assert(e3 == ok, "vigil-cat should succeed");
     t.assert(stdout == "file1\nfile2\n", "output should concatenate both files");
     t.assert(stderr == "", "stderr should be empty on success");
-    
     file.remove(file1);
     file.remove(file2);
 }
@@ -63,9 +58,7 @@ fn test_cat_multiple_files(test.T t) -> void {
 fn test_cat_missing_file(test.T t) -> void {
     string vigil_bin, string main_script = find_vigil_and_main();
     t.assert(vigil_bin != "", "should find vigil binary");
-    
     string missing = get_temp_path("nonexistent_vigil_cat_test.txt");
-    
     string stdout, string stderr, i32 exitCode, err e = os.exec(vigil_bin, main_script, missing);
     t.assert(exitCode != 0, "vigil-cat should fail on missing file");
     t.assert(stderr.len() > 0, "stderr should contain error message");
@@ -75,63 +68,54 @@ fn test_cat_missing_file(test.T t) -> void {
 fn test_cat_empty_file(test.T t) -> void {
     string vigil_bin, string main_script = find_vigil_and_main();
     t.assert(vigil_bin != "", "should find vigil binary");
-    
     string test_file = get_temp_path("vigil_cat_test_empty.txt");
     err e = file.write_all(test_file, "");
     t.assert(e == ok, "should write empty file");
-    
     string stdout, string stderr, i32 exitCode, err e2 = os.exec(vigil_bin, main_script, test_file);
     t.assert(e2 == ok, "vigil-cat should succeed on empty file");
     t.assert(stdout == "", "output should be empty");
     t.assert(stderr == "", "stderr should be empty");
-    
     file.remove(test_file);
 }
 
 fn test_cat_stdin_dash(test.T t) -> void {
     string platform = os.platform();
-    if (platform == "windows") {
+    if platform == "windows" {
         // Skip: shell redirection requires sh which is not available on Windows
         return;
     }
-    
+
     string vigil_bin, string main_script = find_vigil_and_main();
     t.assert(vigil_bin != "", "should find vigil binary");
-    
     string test_file = get_temp_path("vigil_cat_stdin_test.txt");
     string test_content = "stdin test\n";
     err e = file.write_all(test_file, test_content);
     t.assert(e == ok, "should write test file");
-    
     // Test "-" reads from stdin by using shell redirection
     string sh_cmd = vigil_bin + " " + main_script + " - < " + test_file;
     string stdout, string stderr, i32 exitCode, err e2 = os.exec("sh", "-c", sh_cmd);
     t.assert(e2 == ok, "vigil-cat with - should succeed");
     t.assert(stdout == test_content, "output should match stdin");
-    
     file.remove(test_file);
 }
 
 fn test_cat_no_args_stdin(test.T t) -> void {
     string platform = os.platform();
-    if (platform == "windows") {
+    if platform == "windows" {
         // Skip: shell redirection requires sh which is not available on Windows
         return;
     }
-    
+
     string vigil_bin, string main_script = find_vigil_and_main();
     t.assert(vigil_bin != "", "should find vigil binary");
-    
     string test_file = get_temp_path("vigil_cat_noargs_test.txt");
     string test_content = "no args stdin\n";
     err e = file.write_all(test_file, test_content);
     t.assert(e == ok, "should write test file");
-    
     // Test no args reads from stdin
     string sh_cmd = vigil_bin + " " + main_script + " < " + test_file;
     string stdout, string stderr, i32 exitCode, err e2 = os.exec("sh", "-c", sh_cmd);
     t.assert(e2 == ok, "vigil-cat with no args should succeed");
     t.assert(stdout == test_content, "output should match stdin");
-    
     file.remove(test_file);
 }

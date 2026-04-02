@@ -1,112 +1,125 @@
 // data_pipeline.vigil — Data integration pipeline using Vigil stdlib.
+// Count top-level elements in a JSON array.
+// Uses the bytes() method to get raw byte access.
 
+import "compress";
 import "fmt";
 import "fs";
-import "compress";
 import "time";
 import "unsafe";
 
-// Count top-level elements in a JSON array.
-// Uses the bytes() method to get raw byte access.
 pub fn count_json_array(string data) -> i32 {
     i32 len = data.len();
-    if (len < 3) { return 0; }
-
+    if len < 3 {
+        return 0;
+    }
     // Use contains to check for array structure
-    if (!data.starts_with("[")) { return 0; }
-
+    if ! data.starts_with("[") {
+        return 0;
+    }
     // Count commas at bracket depth 1
     i64 buf = unsafe.alloc(len + 1);
     unsafe.write_str(buf, 0, data);
     i64 ptr = unsafe.ptr(buf);
-
     i32 count = 0;
     i32 depth = 0;
     i32 in_string = 0;
     i32 i = 0;
-    while (i < len) {
+    while i < len {
         i32 ch = unsafe.peek_u8(ptr, i);
         // Track string literals to avoid counting brackets/commas inside strings
-        if (ch == 34 && (i == 0 || unsafe.peek_u8(ptr, i - 1) != 92)) {
+        if ch == 34 && (i == 0 || unsafe.peek_u8(ptr, i - 1) != 92) {
             // " character (not escaped)
-            if (in_string == 0) { in_string = 1; }
-            else { in_string = 0; }
+            if in_string == 0 {
+                in_string = 1;
+            } else {
+                in_string = 0;
+            }
         }
-        if (in_string == 0) {
-            if (ch == 91 || ch == 123) { depth = depth + 1; }
-            if (ch == 93 || ch == 125) { depth = depth - 1; }
-            if (ch == 44 && depth == 1) { count = count + 1; }
+
+        if in_string == 0 {
+            if ch == 91 || ch == 123 {
+                depth = depth + 1;
+            }
+
+            if ch == 93 || ch == 125 {
+                depth = depth - 1;
+            }
+
+            if ch == 44 && depth == 1 {
+                count = count + 1;
+            }
         }
+
         i = i + 1;
     }
+
     unsafe.free(buf);
-    if (count > 0) { count = count + 1; }
+    if count > 0 {
+        count = count + 1;
+    }
+
     return count;
 }
-
 // Compress data and report compression ratio.
 pub fn compress_data(string data) -> string {
     string compressed = compress.gzip_compress(data);
     i32 orig_len = data.len();
     i32 comp_len = compressed.len();
     f64 ratio = 0.0;
-    if (orig_len > 0) {
+    if orig_len > 0 {
         ratio = f64(comp_len) / f64(orig_len) * 100.0;
     }
+
     fmt.println(f"  Compressed: {orig_len} -> {comp_len} bytes ({ratio}%)");
     return compressed;
 }
-
 // Decompress data.
 pub fn decompress_data(string data) -> string {
     return compress.gzip_decompress(data);
 }
-
 // Save data to a file.
 pub fn save_to_file(string path, string data) -> void {
     fs.write(path, data);
     fmt.println(f"  Saved to: {path}");
 }
-
 // Generate sample JSON data for testing.
 pub fn generate_sample_data(i32 count) -> string {
     string result = "[";
     i32 i = 0;
-    while (i < count) {
-        if (i > 0) { result = result + ","; }
+    while i < count {
+        if i > 0 {
+            result = result + ",";
+        }
+
         result = result + f"\n  {{\"id\": {i}, \"title\": \"Record {i}\", \"body\": \"Test record {i} with padding.\"}}";
         i = i + 1;
     }
+
     result = result + "\n]";
     return result;
 }
-
 // Run the full data pipeline.
 pub fn run_pipeline(string url, string output_path) -> i32 {
     fmt.println("════════════════════════════════════════");
     fmt.println("Data Integration Pipeline");
     fmt.println("════════════════════════════════════════");
-
     i64 start = time.now_ms();
-
     fmt.println("  Generating 100 sample records...");
     string data = generate_sample_data(100);
     fmt.println(f"  Generated {data.len()} bytes of JSON");
-
     i32 count = count_json_array(data);
     fmt.println(f"  Records found: {count}");
-
     string compressed = compress_data(data);
-
     string decompressed = decompress_data(compressed);
-    if (decompressed == data) {
+    if decompressed == data {
         fmt.println("  Compression round-trip: OK");
     } else {
         fmt.println("  Compression round-trip: MISMATCH");
         return 1;
     }
 
-    if (output_path != "") {
+    if output_path != "" {
         save_to_file(output_path, data);
     }
 

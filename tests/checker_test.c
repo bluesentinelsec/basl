@@ -58,9 +58,9 @@ TEST(VigilCheckerTest, ValidatesWellTypedProgramWithoutDiagnostics)
                                "}"
                                "fn main() -> i32 {"
                                "    i32 total = add(3, 4);"
-                               "    while (total > 4) {"
+                               "    while total > 4 {"
                                "        total = total - 1;"
-                               "        if (total == 5) {"
+                               "        if total == 5 {"
                                "            break;"
                                "        }"
                                "    }"
@@ -113,7 +113,7 @@ TEST(VigilCheckerTest, ReportsMissingReturnOnSomePaths)
 
     source_id = RegisterSource(vigil_test_failed_, &registry, "missing_return.vigil",
                                "fn choose(bool ready) -> i32 {"
-                               "    if (ready) {"
+                               "    if ready {"
                                "        return 1;"
                                "    }"
                                "}"
@@ -140,7 +140,7 @@ TEST(VigilCheckerTest, ReportsMissingReturnForSwitchWithoutDefault)
 
     source_id = RegisterSource(vigil_test_failed_, &registry, "missing_switch_return.vigil",
                                "fn choose(bool ready) -> i32 {"
-                               "    switch (ready) {"
+                               "    switch ready {"
                                "        case true:"
                                "            return 1;"
                                "    }"

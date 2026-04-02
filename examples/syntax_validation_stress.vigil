@@ -14,7 +14,7 @@ i32 pass_count = 0;
 i32 fail_count = 0;
 
 fn check(bool cond, string label) -> void {
-    if (cond) {
+    if cond {
         pass_count++;
     } else {
         fail_count++;
@@ -30,7 +30,7 @@ fn test_primitive_types() -> void {
     // 2a. bool
     bool t = true;
     bool f = false;
-    check(t && ! f, "bool true/false");
+    check(t &&! f, "bool true/false");
     // 2b. i32 decimal
     i32 dec = 255;
     check(dec == 255, "i32 decimal");
@@ -312,7 +312,7 @@ fn test_conversions() -> void {
 // ── 10. Multiple return values ─────────────────────────────────────────────
 // Doc: "Functions may return multiple values. Each binding is typed."
 fn divide(i32 a, i32 b) -> (i32, err) {
-    if (b == 0) {
+    if b == 0 {
         return 0, err("division by zero", err.arg);
     }
 
@@ -324,7 +324,7 @@ fn triple_return() -> (string, string, bool) {
 }
 
 fn validate(i32 age) -> err {
-    if (age <0) {
+    if age <0 {
         return err("negative", err.arg);
     }
 
@@ -395,9 +395,9 @@ fn test_control_flow() -> void {
     // Doc: "The condition must be bool — there is no truthiness"
     i32 x = 7;
     string branch = "";
-    if (x>10) {
+    if x>10 {
         branch = "big";
-    } else if (x> 5) {
+    } else if x> 5 {
         branch = "medium";
     } else {
         branch = "small";
@@ -406,7 +406,7 @@ fn test_control_flow() -> void {
     check(branch == "medium", "if/else if/else");
     // 12b. while
     i32 w = 0;
-    while (w < 5) {
+    while w < 5 {
         w++;
     }
 
@@ -438,7 +438,7 @@ fn test_control_flow() -> void {
     // Doc: "There is no fallthrough"
     i32 sw = 2;
     string sw_result = "";
-    switch (sw) {
+    switch sw {
         case 1: sw_result = "one";
         case 2, 3: sw_result = "two or three";
         default: sw_result = "other";
@@ -451,9 +451,9 @@ fn test_control_flow() -> void {
     // Using if/else chain for string matching instead:
     string color = "red";
     string sw_str = "";
-    if (color == "red") {
+    if color == "red" {
         sw_str = "found red";
-    } else if (color == "blue") {
+    } else if color == "blue" {
         sw_str = "found blue";
     } else {
         sw_str = "other";
@@ -463,11 +463,11 @@ fn test_control_flow() -> void {
     // 12h. break and continue
     i32 bsum = 0;
     for (i32 i = 0; i < 10; i++) {
-        if (i == 5) {
+        if i == 5 {
             break;
         }
 
-        if (i % 2 == 0) {
+        if i % 2 == 0 {
             continue;
         }
 
@@ -565,7 +565,7 @@ fn test_errors() -> void {
     // 15b. Error kind routing
     // Doc: switch on e.kind()
     string kind_str = "";
-    switch (e.kind()) {
+    switch e.kind() {
         case err.not_found: kind_str = "not_found";
         case err.arg: kind_str = "arg";
         default: kind_str = "other";
@@ -607,7 +607,7 @@ class Animal {
 class SafeDiv {
     pub i32 result;
     fn init(i32 a, i32 b) -> err {
-        if (b == 0) {
+        if b == 0 {
             return err("zero", err.arg);
         }
 
@@ -706,7 +706,7 @@ fn test_enums() -> void {
     check(d != Direction.South, "enum value inequality");
     // 18b. Switch on enum
     string dir = "";
-    switch (d) {
+    switch d {
         case Direction.North: dir = "north";
         case Direction.South: dir = "south";
         default: dir = "other";
@@ -879,7 +879,7 @@ fn main() -> i32 {
     test_parse();
     fmt.println(f"\n{'='.repeat(50)}");
     fmt.println(f"  Results: {pass_count} passed, {fail_count} failed");
-    if (fail_count == 0) {
+    if fail_count == 0 {
         fmt.println("  STATUS: ALL PASS");
     } else {
         fmt.println("  STATUS: FAILURES DETECTED");

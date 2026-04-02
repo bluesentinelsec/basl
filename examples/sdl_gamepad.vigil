@@ -3,32 +3,32 @@
 // Displays gamepad state: buttons, axes, and rumble on South button press.
 // Press Escape or close the window to quit.
 
-import "sdl";
 import "fmt";
+import "sdl";
 
 fn main() -> i32 {
     bool init_ok, err ie = sdl.init(sdl.INIT_VIDEO() | sdl.INIT_GAMEPAD());
-    if (ie != ok) {
+    if ie != ok {
         fmt.eprintln(f"SDL init failed: {ie.message()}");
         return 1;
     }
-    defer sdl.quit();
 
+    defer sdl.quit();
     sdl.Window win, err we = sdl.Window.create("Gamepad Demo", 640, 480, 0);
-    if (we != ok) {
+    if we != ok {
         fmt.eprintln(f"Window failed: {we.message()}");
         return 1;
     }
 
     sdl.Renderer ren, err re = sdl.Renderer.create(win, "");
-    if (re != ok) {
+    if re != ok {
         fmt.eprintln(f"Renderer failed: {re.message()}");
         win.destroy();
         return 1;
     }
 
     sdl.Event ev, err ee = sdl.Event.new();
-    if (ee != ok) {
+    if ee != ok {
         fmt.eprintln(f"Event alloc failed: {ee.message()}");
         ren.destroy();
         win.destroy();
@@ -36,40 +36,38 @@ fn main() -> i32 {
     }
 
     fmt.println("Waiting for gamepad... Press Escape to quit.");
-
     bool running = true;
     bool gp_open = false;
-    while (running) {
-        while (ev.poll()) {
+    while running {
+        while ev.poll() {
             i32 t = ev.type();
-            if (t == sdl.EVENT_QUIT()) {
+            if t == sdl.EVENT_QUIT() {
                 running = false;
-            } else if (t == sdl.EVENT_GAMEPAD_ADDED()) {
+            } else if t == sdl.EVENT_GAMEPAD_ADDED() {
                 fmt.println("Gamepad connected!");
-            } else if (t == sdl.EVENT_GAMEPAD_REMOVED()) {
+            } else if t == sdl.EVENT_GAMEPAD_REMOVED() {
                 fmt.println("Gamepad disconnected.");
-            } else if (t == sdl.EVENT_GAMEPAD_BUTTON_DOWN()) {
+            } else if t == sdl.EVENT_GAMEPAD_BUTTON_DOWN() {
                 fmt.println(f"Button {ev.gamepad_button()} pressed");
-            } else if (t == sdl.EVENT_GAMEPAD_AXIS_MOTION()) {
+            } else if t == sdl.EVENT_GAMEPAD_AXIS_MOTION() {
                 i32 axis = ev.gamepad_axis();
                 i32 val = ev.gamepad_axis_value();
-                if (val > 8000 || val < -8000) {
+                if val > 8000 || val < - 8000 {
                     fmt.println(f"Axis {axis} = {val}");
                 }
             }
         }
 
-        if (sdl.is_key_pressed(sdl.SCANCODE_ESCAPE())) {
+        if sdl.is_key_pressed(sdl.SCANCODE_ESCAPE()) {
             running = false;
         }
-
         // Try to open first gamepad if not yet open
-        if (!gp_open && sdl.has_gamepad()) {
+        if ! gp_open && sdl.has_gamepad() {
             i32 count = sdl.get_gamepad_count();
-            if (count > 0) {
+            if count > 0 {
                 i32 id = sdl.get_gamepad_id(0);
                 sdl.Gamepad gp, err ge = sdl.Gamepad.open(id);
-                if (ge == ok) {
+                if ge == ok {
                     string name = gp.get_name();
                     fmt.println(f"Opened gamepad: {name}");
                     gp_open = true;

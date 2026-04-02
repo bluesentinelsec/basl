@@ -1,47 +1,45 @@
 import "args";
-import "fs";
 import "fmt";
+import "fs";
 
 fn main() -> i32 {
     args.Parser parser = args.Parser.new("vigil-rm", "remove files or directories");
     parser.flag("recursive", "r", "remove directories and their contents recursively");
     parser.flag("force", "f", "ignore nonexistent files");
     parser.positional("file", "file to remove");
-
     err e = parser.parse(0);
-    if (e != ok) {
+    if e != ok {
         fmt.eprintln(f"vigil-rm: {e.message()}");
         return 1;
     }
 
     array<string> positionals = parser.get_positionals();
-    if (positionals.len() == 0) {
+    if positionals.len() == 0 {
         fmt.eprintln("vigil-rm: missing operand");
         return 1;
     }
 
     bool recursive = parser.get_bool("recursive");
     bool force = parser.get_bool("force");
-
     for (i32 i = 0; i < positionals.len(); i++) {
         string path = positionals[i];
-
-        if (!fs.exists(path)) {
-            if (!force) {
+        if ! fs.exists(path) {
+            if ! force {
                 fmt.eprintln(f"vigil-rm: {path}: No such file or directory");
                 return 1;
             }
+
             continue;
         }
 
         bool ok2 = false;
-        if (recursive) {
+        if recursive {
             ok2 = fs.remove_all(path);
         } else {
             ok2 = fs.remove(path);
         }
 
-        if (!ok2 && !force) {
+        if ! ok2 &&! force {
             fmt.eprintln(f"vigil-rm: {path}: cannot remove");
             return 1;
         }

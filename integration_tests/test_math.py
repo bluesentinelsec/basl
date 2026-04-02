@@ -26,7 +26,7 @@ class MathConstantsTest(unittest.TestCase):
         code = '''import "math";
 fn main() -> i32 {
     f64 pi = math.pi();
-    if (pi > 3.14 && pi < 3.15) { return 0; }
+    if pi > 3.14 && pi < 3.15 { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -36,7 +36,7 @@ fn main() -> i32 {
         code = '''import "math";
 fn main() -> i32 {
     f64 e = math.e();
-    if (e > 2.71 && e < 2.72) { return 0; }
+    if e > 2.71 && e < 2.72 { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -48,7 +48,7 @@ class MathRoundingTest(unittest.TestCase):
         code = '''import "math";
 fn main() -> i32 {
     f64 r = math.floor(3.7);
-    if (r == 3.0) { return 0; }
+    if r == 3.0 { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -58,7 +58,7 @@ fn main() -> i32 {
         code = '''import "math";
 fn main() -> i32 {
     f64 r = math.ceil(3.2);
-    if (r == 4.0) { return 0; }
+    if r == 4.0 { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -68,7 +68,7 @@ fn main() -> i32 {
         code = '''import "math";
 fn main() -> i32 {
     f64 r = math.round(3.5);
-    if (r == 4.0) { return 0; }
+    if r == 4.0 { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -78,7 +78,7 @@ fn main() -> i32 {
         code = '''import "math";
 fn main() -> i32 {
     f64 r = math.trunc(-3.7);
-    if (r == -3.0) { return 0; }
+    if r == -3.0 { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -90,7 +90,7 @@ class MathBasicTest(unittest.TestCase):
         code = '''import "math";
 fn main() -> i32 {
     f64 r = math.abs(-5.5);
-    if (r == 5.5) { return 0; }
+    if r == 5.5 { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -100,7 +100,7 @@ fn main() -> i32 {
         code = '''import "math";
 fn main() -> i32 {
     f64 r = math.sqrt(16.0);
-    if (r == 4.0) { return 0; }
+    if r == 4.0 { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -110,7 +110,7 @@ fn main() -> i32 {
         code = '''import "math";
 fn main() -> i32 {
     f64 r = math.pow(2.0, 3.0);
-    if (r == 8.0) { return 0; }
+    if r == 8.0 { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -122,7 +122,7 @@ class MathMinMaxTest(unittest.TestCase):
         code = '''import "math";
 fn main() -> i32 {
     f64 r = math.min(3.0, 7.0);
-    if (r == 3.0) { return 0; }
+    if r == 3.0 { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -132,7 +132,7 @@ fn main() -> i32 {
         code = '''import "math";
 fn main() -> i32 {
     f64 r = math.max(3.0, 7.0);
-    if (r == 7.0) { return 0; }
+    if r == 7.0 { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -144,7 +144,7 @@ class MathTrigTest(unittest.TestCase):
         code = '''import "math";
 fn main() -> i32 {
     f64 r = math.sin(0.0);
-    if (r == 0.0) { return 0; }
+    if r == 0.0 { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -154,7 +154,7 @@ fn main() -> i32 {
         code = '''import "math";
 fn main() -> i32 {
     f64 r = math.cos(0.0);
-    if (r == 1.0) { return 0; }
+    if r == 1.0 { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -166,7 +166,7 @@ class MathLogExpTest(unittest.TestCase):
         code = '''import "math";
 fn main() -> i32 {
     f64 r = math.log(math.e());
-    if (r > 0.99 && r < 1.01) { return 0; }
+    if r > 0.99 && r < 1.01 { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -177,7 +177,7 @@ fn main() -> i32 {
 fn main() -> i32 {
     f64 r = math.exp(1.0);
     f64 e = math.e();
-    if (r > e - 0.01 && r < e + 0.01) { return 0; }
+    if r > e - 0.01 && r < e + 0.01 { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -189,7 +189,7 @@ class MathSignTest(unittest.TestCase):
         code = '''import "math";
 fn main() -> i32 {
     f64 r = math.sign(5.0);
-    if (r == 1.0) { return 0; }
+    if r == 1.0 { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -199,7 +199,7 @@ fn main() -> i32 {
         code = '''import "math";
 fn main() -> i32 {
     f64 r = math.sign(-5.0);
-    if (r == -1.0) { return 0; }
+    if r == -1.0 { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)
@@ -209,7 +209,7 @@ fn main() -> i32 {
         code = '''import "math";
 fn main() -> i32 {
     f64 r = math.sign(0.0);
-    if (r == 0.0) { return 0; }
+    if r == 0.0 { return 0; }
     return 1;
 }'''
         rc, out, err = run_vigil(code)

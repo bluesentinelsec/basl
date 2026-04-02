@@ -5,7 +5,7 @@ fn main() -> i32 {
     i64 total = i64(0);
     for (i32 i = 0; i < 20000; i++) {
         array<string> row = csv.parse_row(line);
-        if (row.len() != 5) {
+        if row.len() != 5 {
             return 1;
         }
 
@@ -15,7 +15,7 @@ fn main() -> i32 {
         total = total + i64(row[2].len());
     }
 
-    if (total > i64(0)) {
+    if total > i64(0) {
         return 0;
     }
 

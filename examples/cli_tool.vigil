@@ -7,14 +7,14 @@ fn main() -> i32 {
     // Check for --help before parsing
     for (i32 i = 0; i < args.count(); i++) {
         string a = args.at(i);
-        if (a == "--help" || a == "-h") {
+        if a == "--help" || a == "-h" {
             fmt.println(parser.help());
             return 0;
         }
     }
     // Parse arguments
     err e = parser.parse(0);
-    if (e != ok) {
+    if e != ok {
         fmt.println(f"Error: {e.message()}");
         fmt.println(parser.help());
         return 1;
@@ -25,7 +25,7 @@ fn main() -> i32 {
     string countStr = parser.get("count");
     array<string> positionals = parser.get_positionals();
     string input = "";
-    if (positionals.len() > 0) {
+    if positionals.len() > 0 {
         input = positionals[0];
     }
     // Display parsed values
@@ -34,7 +34,7 @@ fn main() -> i32 {
     fmt.println(f"  Output: {output}");
     fmt.println(f"  Count: {countStr}");
     fmt.println(f"  Verbose: {verbose}");
-    if (verbose) {
+    if verbose {
         fmt.println("\nVerbose mode enabled!");
         fmt.println(f"Processing {input} {countStr} times...");
     }

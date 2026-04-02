@@ -20,7 +20,7 @@ i32 g_total = 0;
 
 fn check(bool cond, string label) -> void {
     g_total++;
-    if (cond) {
+    if cond {
         g_pass++;
     } else {
         g_fail++;
@@ -38,7 +38,7 @@ fn make_path(string base, string child) -> string {
 }
 
 fn ensure_dir(string path) -> bool {
-    if (! fs.is_dir(path)) {
+    if ! fs.is_dir(path) {
         return fs.mkdir_all(path);
     }
 
@@ -57,12 +57,12 @@ fn copy_tree(string src, string dst, bool dry_run) -> i32 {
     // Copy a directory tree recursively with conflict handling.
     // Returns number of files copied.
     i32 copied = 0;
-    if (! fs.is_dir(src)) {
+    if ! fs.is_dir(src) {
         fmt.eprintln("  copy_tree: source not a directory: " + src);
         return 0;
     }
 
-    if (! dry_run) {
+    if ! dry_run {
         ensure_dir(dst);
     }
 
@@ -70,19 +70,19 @@ fn copy_tree(string src, string dst, bool dry_run) -> i32 {
     for entry in entries {
         string src_path = fs.join(src, entry);
         string dst_path = fs.join(dst, entry);
-        if (fs.is_dir(src_path)) {
+        if fs.is_dir(src_path) {
             // Recurse into subdirectory
             copied += copy_tree(src_path, dst_path, dry_run);
-        } else if (fs.is_file(src_path)) {
+        } else if fs.is_file(src_path) {
             // Conflict resolution: if dest exists, create backup
-            if (fs.exists(dst_path)) {
+            if fs.exists(dst_path) {
                 string backup = dst_path + ".bak";
-                if (! dry_run) {
+                if ! dry_run {
                     fs.copy(dst_path, backup);
                 }
             }
 
-            if (! dry_run) {
+            if ! dry_run {
                 string content = fs.read(src_path);
                 fs.write(dst_path, content);
             }
@@ -179,9 +179,9 @@ fn search_files(string dir, string pattern) -> array<string> {
     array<string> matches = [];
     array<string> all_files = fs.walk(dir);
     for path in all_files {
-        if (fs.is_file(path)) {
+        if fs.is_file(path) {
             string content = fs.read(path);
-            if (content.contains(pattern)) {
+            if content.contains(pattern) {
                 matches.push(path);
             }
         }
@@ -195,7 +195,7 @@ fn search_by_extension(string dir, string ext) -> array<string> {
     array<string> matches = [];
     array<string> all_files = fs.walk(dir);
     for path in all_files {
-        if (fs.is_file(path) && fs.ext(path) == ext) {
+        if fs.is_file(path) && fs.ext(path) == ext {
             matches.push(path);
         }
     }
@@ -235,7 +235,7 @@ fn test_search(string root) -> void {
 // ─── Mode 4: Safe Delete (Trash Simulation) ────────────────────
 fn safe_delete(string path, string trash_dir) -> bool {
     // Move file/dir to trash instead of deleting.
-    if (! fs.exists(path)) {
+    if ! fs.exists(path) {
         return false;
     }
 
@@ -243,7 +243,7 @@ fn safe_delete(string path, string trash_dir) -> bool {
     string name = fs.base(path);
     string trash_path = fs.join(trash_dir, name);
     // Handle name collision in trash
-    if (fs.exists(trash_path)) {
+    if fs.exists(trash_path) {
         i64 ts = time.now();
         trash_path = fs.join(trash_dir, name + "." + string(ts));
     }
@@ -440,9 +440,9 @@ fn test_performance(string root) -> void {
     i64 t4 = time.now_ms();
     i32 read_count = 0;
     for path in all {
-        if (fs.is_file(path)) {
+        if fs.is_file(path) {
             string c = fs.read(path);
-            if (c.len() > 0) {
+            if c.len() > 0 {
                 read_count++;
             }
         }
@@ -488,11 +488,11 @@ fn test_performance(string root) -> void {
 // ─── Cleanup ────────────────────────────────────────────────────
 fn cleanup_recursive(string path) -> void {
     // Remove a directory tree. Remove files first, then dirs.
-    if (! fs.exists(path)) {
+    if ! fs.exists(path) {
         return;
     }
 
-    if (fs.is_file(path)) {
+    if fs.is_file(path) {
         fs.remove(path);
         return;
     }
@@ -500,7 +500,7 @@ fn cleanup_recursive(string path) -> void {
     array<string> entries = fs.list(path);
     for entry in entries {
         string child = fs.join(path, entry);
-        if (fs.is_dir(child)) {
+        if fs.is_dir(child) {
             cleanup_recursive(child);
         } else {
             fs.remove(child);
@@ -518,7 +518,7 @@ fn main() -> i32 {
     string tmp = fs.temp_dir();
     string root = fs.join(tmp, "vigil_fs_stress");
     // Clean any previous run
-    if (fs.exists(root)) {
+    if fs.exists(root) {
         cleanup_recursive(root);
     }
 
@@ -546,7 +546,7 @@ fn main() -> i32 {
     check(! fs.exists(root), "workspace fully cleaned up");
     fmt.println("  Cleaned up workspace");
     fmt.println("");
-    if (g_fail > 0) {
+    if g_fail > 0 {
         fmt.println("FAIL");
         return 1;
     }

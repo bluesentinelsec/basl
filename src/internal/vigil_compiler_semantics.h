@@ -51,10 +51,11 @@ void vigil_return_analysis_merge_switch_branch(int *all_branches_return, const v
 vigil_status_t parse_bool_condition_expression(vigil_parser_state_t *state, vigil_source_span_t span,
                                                const char *scalar_message, const char *type_message,
                                                vigil_expression_result_t *condition_result);
-vigil_status_t parse_parenthesized_bool_condition(vigil_parser_state_t *state, const vigil_token_t *keyword_token,
-                                                  const char *lparen_message, const char *rparen_message,
-                                                  const char *scalar_message, const char *type_message,
-                                                  vigil_expression_result_t *condition_result);
+vigil_status_t parse_unwrapped_bool_condition(vigil_parser_state_t *state, const vigil_token_t *keyword_token,
+                                              const char *scalar_message, const char *type_message,
+                                              vigil_expression_result_t *condition_result);
+int vigil_parser_expression_has_wrapping_parens(const vigil_parser_state_t *state, size_t start_index,
+                                                size_t end_index);
 vigil_status_t vigil_semantic_parse_statement_sequence(vigil_parser_state_t *state,
                                                        vigil_statement_result_t *out_result,
                                                        vigil_semantic_parse_step_t parse_step,
