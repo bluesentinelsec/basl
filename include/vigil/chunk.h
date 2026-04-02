@@ -330,6 +330,7 @@ extern "C"
     VIGIL_API const vigil_value_t *vigil_chunk_constant(const vigil_chunk_t *chunk, size_t index);
     VIGIL_API vigil_source_span_t vigil_chunk_span_at(const vigil_chunk_t *chunk, size_t offset);
     VIGIL_API const char *vigil_opcode_name(vigil_opcode_t opcode);
+    VIGIL_API uint8_t vigil_opcode_size(vigil_opcode_t opcode);
     VIGIL_API vigil_status_t vigil_chunk_write_byte(vigil_chunk_t *chunk, uint8_t value, vigil_source_span_t span,
                                                     vigil_error_t *error);
     VIGIL_API vigil_status_t vigil_chunk_write_opcode(vigil_chunk_t *chunk, vigil_opcode_t opcode,

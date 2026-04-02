@@ -40,6 +40,7 @@ EXEMPT_FILES = {
     "src/cli/main.c",
     "src/cli_frontend.c",
     "src/cli_test.c",
+    "src/coverage.c",
     # Platform layer — OS callbacks with fixed signatures.
     "src/platform/platform_posix.c",
     "src/platform/platform_win32.c",

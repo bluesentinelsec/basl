@@ -2211,6 +2211,16 @@ int vigil_function_object_get_global(const vigil_object_t *function, size_t inde
     return 1;
 }
 
+size_t vigil_function_object_global_count(const vigil_object_t *function)
+{
+    const vigil_function_object_t *function_object;
+
+    function_object = vigil_function_object_cast(function);
+    if (function_object == NULL)
+        return 0U;
+    return function_object->global_count;
+}
+
 vigil_status_t vigil_function_object_set_global(const vigil_object_t *function, size_t index,
                                                 const vigil_value_t *value, vigil_error_t *error)
 {
