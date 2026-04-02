@@ -201,6 +201,34 @@ TEST(VigilXmlTest, RejectsNullInput)
     EXPECT_EQ(vigil_xml_parse(NULL, 0, &doc, NULL), VIGIL_STATUS_INVALID_ARGUMENT);
 }
 
+TEST(VigilXmlTest, RejectsDeeplyNestedInput)
+{
+    /* Build a string with 300 levels of nesting — exceeds XML_MAX_DEPTH (256) */
+    char xml[4096];
+    size_t pos = 0U;
+    int i;
+    vigil_xml_document_t *doc = NULL;
+    vigil_xml_error_t err;
+
+    for (i = 0; i < 300 && pos + 4U < sizeof(xml); i++)
+    {
+        xml[pos++] = '<';
+        xml[pos++] = 'a';
+        xml[pos++] = '>';
+    }
+    for (i = 0; i < 300 && pos + 5U < sizeof(xml); i++)
+    {
+        xml[pos++] = '<';
+        xml[pos++] = '/';
+        xml[pos++] = 'a';
+        xml[pos++] = '>';
+    }
+    xml[pos] = '\0';
+    EXPECT_EQ(vigil_xml_parse(xml, pos, &doc, &err), VIGIL_STATUS_SYNTAX_ERROR);
+    EXPECT_EQ(doc, (void *)NULL);
+    EXPECT_NE(strstr(err.message, "depth"), (void *)NULL);
+}
+
 /* ── Query helpers ───────────────────────────────────────────────── */
 
 TEST(VigilXmlTest, ElementChildFindsFirstMatch)
@@ -291,6 +319,7 @@ void register_xml_tests(void)
     REGISTER_TEST(VigilXmlTest, RejectsUnclosedElement);
     REGISTER_TEST(VigilXmlTest, RejectsEmptyInput);
     REGISTER_TEST(VigilXmlTest, RejectsNullInput);
+    REGISTER_TEST(VigilXmlTest, RejectsDeeplyNestedInput);
     REGISTER_TEST(VigilXmlTest, ElementChildFindsFirstMatch);
     REGISTER_TEST(VigilXmlTest, ChildrenByTagCollectsMatches);
     REGISTER_TEST(VigilXmlTest, AllTextConcatenatesRecursively);

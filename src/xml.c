@@ -24,8 +24,11 @@ typedef struct
     size_t pos;
     size_t line;
     size_t column;
+    size_t depth;
     vigil_xml_error_t *error;
 } xml_parser_t;
+
+#define XML_MAX_DEPTH 256U
 
 /* ── Growable buffer ─────────────────────────────────────────────── */
 
@@ -583,21 +586,33 @@ static vigil_xml_element_t *xml_parse_element(xml_parser_t *p)
     char *tag;
     vigil_xml_element_t *el;
 
+    if (p->depth >= XML_MAX_DEPTH)
+    {
+        xml_set_error(p, "maximum nesting depth exceeded");
+        return NULL;
+    }
+    p->depth++;
+
     if (!xml_match_char(p, '<'))
     {
         xml_set_error(p, "expected '<'");
+        p->depth--;
         return NULL;
     }
     tag = xml_parse_name(p);
     if (tag == NULL)
     {
         xml_set_error(p, "expected element name");
+        p->depth--;
         return NULL;
     }
     el = xml_element_new(tag);
     free(tag);
     if (el == NULL)
+    {
+        p->depth--;
         return NULL;
+    }
 
     /* Parse attributes */
     while (!xml_eof(p))
@@ -613,6 +628,7 @@ static vigil_xml_element_t *xml_parse_element(xml_parser_t *p)
         {
             xml_set_error(p, "expected attribute name");
             xml_element_free(el);
+            p->depth--;
             return NULL;
         }
         xml_skip_whitespace(p);
@@ -621,6 +637,7 @@ static vigil_xml_element_t *xml_parse_element(xml_parser_t *p)
             xml_set_error(p, "expected '=' after attribute name");
             free(attr_name);
             xml_element_free(el);
+            p->depth--;
             return NULL;
         }
         xml_skip_whitespace(p);
@@ -629,6 +646,7 @@ static vigil_xml_element_t *xml_parse_element(xml_parser_t *p)
         {
             free(attr_name);
             xml_element_free(el);
+            p->depth--;
             return NULL;
         }
         if (!xml_element_add_attribute(el, attr_name, attr_value))
@@ -636,17 +654,22 @@ static vigil_xml_element_t *xml_parse_element(xml_parser_t *p)
             free(attr_name);
             free(attr_value);
             xml_element_free(el);
+            p->depth--;
             return NULL;
         }
     }
 
     /* Self-closing or open tag */
     if (xml_match_str(p, "/>"))
+    {
+        p->depth--;
         return el;
+    }
     if (!xml_match_char(p, '>'))
     {
         xml_set_error(p, "expected '>' or '/>'");
         xml_element_free(el);
+        p->depth--;
         return NULL;
     }
 
@@ -654,8 +677,10 @@ static vigil_xml_element_t *xml_parse_element(xml_parser_t *p)
     if (!xml_parse_children(p, el, el->tag))
     {
         xml_element_free(el);
+        p->depth--;
         return NULL;
     }
+    p->depth--;
     return el;
 }
 
