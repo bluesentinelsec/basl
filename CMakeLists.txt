@@ -435,6 +435,7 @@ if(VIGIL_BUILD_TESTS)
         tests/token_test.c
         tests/type_test.c
         tests/value_test.c
+        tests/vm_ops_collection_test.c
         tests/vm_ops_string_test.c
         tests/vm_test.c
         tests/plugin_test.c
