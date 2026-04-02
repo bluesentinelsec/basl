@@ -229,6 +229,26 @@ class DocsConformanceTest(unittest.TestCase):
             self.assertEqual(result.returncode, 42, msg=result.stderr)
             self.assertEqual(result.stderr, "")
 
+    def test_lambda_shorthand_in_assignment_and_call_context(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="vigil_syntax_") as tmpdir:
+            root = Path(tmpdir)
+            write_sources(root, {"main.vigil": """
+                fn apply(fn(i32) -> i32 f, i32 x) -> i32 {
+                    return f(x);
+                }
+
+                fn main() -> i32 {
+                    fn(i32, i32) -> i32 combine = |a, b| {
+                        i32 sum = a + b;
+                        return sum * 4;
+                    };
+                    return apply(|x| x + 2, 5) + combine(1, 2);
+                }
+            """})
+            result = run_vigil(root, "main.vigil")
+            self.assertEqual(result.returncode, 19, msg=result.stderr)
+            self.assertEqual(result.stderr, "")
+
     def test_local_named_function(self) -> None:
         with tempfile.TemporaryDirectory(prefix="vigil_syntax_") as tmpdir:
             root = Path(tmpdir)

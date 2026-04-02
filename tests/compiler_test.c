@@ -352,6 +352,41 @@ TEST(VigilCompilerTest, CompilesAndExecutesAnonymousFunctionsClosuresAndLocalFun
               41);
 }
 
+TEST(VigilCompilerTest, CompilesAndExecutesLambdaShorthandWithContextInference)
+{
+    EXPECT_EQ(CompileAndRun(vigil_test_failed_, "fn apply(fn(i32) -> i32 f, i32 x) -> i32 {"
+                                                "    return f(x);"
+                                                "}"
+                                                "fn main() -> i32 {"
+                                                "    fn(i32, i32) -> i32 op = |a, b| {"
+                                                "        i32 sum = a + b;"
+                                                "        return sum * 4;"
+                                                "    };"
+                                                "    return apply(|x| x * 3, 7) + op(2, 3);"
+                                                "}"),
+              41);
+}
+
+TEST(VigilCompilerTest, RejectsLambdaWithoutFunctionTypedContext)
+{
+    ExpectSingleCompilerDiagnostic(vigil_test_failed_,
+                                   "fn main() -> i32 {"
+                                   "    i32 value = |x| x;"
+                                   "    return value;"
+                                   "}",
+                                   "cannot infer lambda parameter types without context");
+}
+
+TEST(VigilCompilerTest, RejectsLambdaParameterCountMismatch)
+{
+    ExpectSingleCompilerDiagnostic(vigil_test_failed_,
+                                   "fn main() -> i32 {"
+                                   "    fn(i32) -> i32 bad = |x, y| x + y;"
+                                   "    return bad(1);"
+                                   "}",
+                                   "lambda parameter count does not match expected function type");
+}
+
 TEST(VigilCompilerTest, CompilesAndExecutesExplicitErrorValues)
 {
     EXPECT_EQ(CompileAndRun(vigil_test_failed_, "fn fail(bool bad) -> err {"
@@ -3291,6 +3326,7 @@ void register_compiler_tests(void)
     REGISTER_TEST(VigilCompilerTest, CompilesAndExecutesI32ToI64ArithPromotion);
     REGISTER_TEST(VigilCompilerTest, CompilesAndExecutesFunctionValuesAndIndirectCalls);
     REGISTER_TEST(VigilCompilerTest, CompilesAndExecutesAnonymousFunctionsClosuresAndLocalFunctions);
+    REGISTER_TEST(VigilCompilerTest, CompilesAndExecutesLambdaShorthandWithContextInference);
     REGISTER_TEST(VigilCompilerTest, CompilesAndExecutesExplicitErrorValues);
     REGISTER_TEST(VigilCompilerTest, CompilesAndExecutesTupleBindingsAndGuard);
     REGISTER_TEST(VigilCompilerTest, CompilesAndExecutesIfElseAndWhile);
@@ -3390,6 +3426,8 @@ void register_compiler_tests(void)
     REGISTER_TEST(VigilCompilerTest, CompilesAndExecutesLargeIntegerLiteralInference);
     REGISTER_TEST(VigilCompilerTest, RejectsInvalidLocalsAndConditions);
     REGISTER_TEST(VigilCompilerTest, RejectsInvalidFunctionSignaturesAndCalls);
+    REGISTER_TEST(VigilCompilerTest, RejectsLambdaWithoutFunctionTypedContext);
+    REGISTER_TEST(VigilCompilerTest, RejectsLambdaParameterCountMismatch);
     REGISTER_TEST(VigilCompilerTest, RejectsWrappingConditionParentheses);
     REGISTER_TEST(VigilCompilerTest, RejectsInvalidLogicalOperandsAndLoopControlOutsideLoops);
     REGISTER_TEST(VigilCompilerTest, RequiresGuaranteedReturnAndPreservesNestedScopeShadowing);

@@ -360,9 +360,8 @@ fn test_closures() -> void {
     i32 factor = 10;
     fn (i32) -> i32 scale = fn (i32 x) -> i32 {
         return x * factor;
-    }
+    };
 
-    ;
     check(scale(5) == 50, "closure captures variable");
     // 11b. Capture is by value — mutation to outer var NOT visible in closure
     // Doc says "by reference" but actual behavior is capture by value
@@ -386,6 +385,9 @@ fn test_closures() -> void {
     // Doc: "Indirect calls require a concrete function signature"
     fn (i32) -> i32 op = helper;
     check(op(3) == 6, "function type variable call");
+    // 11f. Lambda shorthand with inferred type
+    fn (i32, i32) -> i32 add = |a, b| a + b;
+    check(add(4, 5) == 9, "lambda shorthand infers param and return types");
 }
 // ── 12. Control flow ───────────────────────────────────────────────────────
 fn test_control_flow() -> void {

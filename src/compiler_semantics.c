@@ -356,6 +356,67 @@ static vigil_status_t finalize_function_body_return_analysis(vigil_program_state
                                                   vigil_statement_result_guarantees_return(body_result));
 }
 
+static vigil_status_t validate_lambda_expression_body_shape(vigil_program_state_t *program, vigil_parser_state_t *state,
+                                                            vigil_function_decl_t *decl,
+                                                            const vigil_expression_result_t *body_result)
+{
+    vigil_status_t status;
+    size_t return_index;
+
+    if (body_result->type_count != decl->return_count)
+    {
+        return vigil_compile_report(program, decl->name_span,
+                                    "lambda expression result does not match function return shape");
+    }
+
+    for (return_index = 0U; return_index < decl->return_count; return_index += 1U)
+    {
+        status = vigil_parser_require_type(state, decl->name_span,
+                                           vigil_expression_result_type_at(body_result, return_index),
+                                           vigil_function_return_type_at(decl, return_index),
+                                           "lambda expression result type does not match function return type");
+        if (status != VIGIL_STATUS_OK)
+            return status;
+    }
+
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t emit_lambda_expression_return(vigil_parser_state_t *state, vigil_function_decl_t *decl)
+{
+    if (decl->return_count == 1U && vigil_parser_type_is_void(decl->return_type))
+        return emit_opcode_u32(state, VIGIL_OPCODE_RETURN, 0U, decl->name_span);
+    return emit_opcode_u32(state, VIGIL_OPCODE_RETURN, (uint32_t)decl->return_count, decl->name_span);
+}
+
+static vigil_status_t analyze_lambda_expression_body(vigil_program_state_t *program, vigil_parser_state_t *state,
+                                                     vigil_function_decl_t *decl,
+                                                     vigil_statement_result_t *out_body_result)
+{
+    vigil_status_t status;
+    vigil_expression_result_t body_result;
+
+    vigil_expression_result_clear(&body_result);
+    status = vigil_parser_parse_expression_with_expected_type(
+        state, decl->return_count == 1U ? decl->return_type : vigil_binding_type_invalid(), &body_result);
+    if (status != VIGIL_STATUS_OK)
+        return status;
+    if (state->current != decl->body_end)
+    {
+        return vigil_compile_report(program, decl->name_span, "invalid lambda expression body");
+    }
+
+    status = validate_lambda_expression_body_shape(program, state, decl, &body_result);
+    if (status != VIGIL_STATUS_OK)
+        return status;
+    status = emit_lambda_expression_return(state, decl);
+    if (status != VIGIL_STATUS_OK)
+        return status;
+
+    vigil_statement_result_set_guaranteed_return(out_body_result, 1);
+    return VIGIL_STATUS_OK;
+}
+
 void vigil_lowered_instruction_clear(vigil_lowered_instruction_t *instruction)
 {
     if (instruction == NULL)
@@ -1170,10 +1231,18 @@ vigil_status_t vigil_semantic_analyze_function_body(vigil_program_state_t *progr
         if (status != VIGIL_STATUS_OK)
             return status;
     }
-
-    status = vigil_parser_parse_block_contents(state, out_body_result);
-    if (status != VIGIL_STATUS_OK)
-        return status;
+    if (decl->body_kind == VIGIL_BINDING_FUNCTION_BODY_EXPRESSION)
+    {
+        status = analyze_lambda_expression_body(program, state, decl, out_body_result);
+        if (status != VIGIL_STATUS_OK)
+            return status;
+    }
+    else
+    {
+        status = vigil_parser_parse_block_contents(state, out_body_result);
+        if (status != VIGIL_STATUS_OK)
+            return status;
+    }
 
     decl = &program->functions.functions[function_index];
     return finalize_function_body_return_analysis(program, state, decl, function_index, out_body_result);
