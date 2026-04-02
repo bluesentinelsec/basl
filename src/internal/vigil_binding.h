@@ -56,6 +56,12 @@ typedef struct vigil_binding_capture
     int source_is_capture;
 } vigil_binding_capture_t;
 
+typedef enum vigil_binding_function_body_kind
+{
+    VIGIL_BINDING_FUNCTION_BODY_BLOCK = 0,
+    VIGIL_BINDING_FUNCTION_BODY_EXPRESSION = 1
+} vigil_binding_function_body_kind_t;
+
 typedef struct vigil_binding_function
 {
     const char *name;
@@ -75,6 +81,7 @@ typedef struct vigil_binding_function
     size_t capture_capacity;
     size_t body_start;
     size_t body_end;
+    vigil_binding_function_body_kind_t body_kind;
     const vigil_source_file_t *source;
     const vigil_token_list_t *tokens;
     vigil_object_t *object;

@@ -273,6 +273,7 @@ typedef struct vigil_parser_state
     size_t current;
     size_t body_end;
     size_t function_index;
+    vigil_parser_type_t expected_expression_type;
     vigil_parser_type_t expected_return_type;
     const vigil_parser_type_t *expected_return_types;
     size_t expected_return_count;

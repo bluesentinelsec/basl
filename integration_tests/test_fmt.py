@@ -124,6 +124,13 @@ class TestVigilFmt(unittest.TestCase):
         self.assertIn("    while x > 0 {", got)
         self.assertIn("        x = x - 1;", got)
 
+    def test_lambda_shorthand_spacing(self):
+        src = ('fn apply(fn(i32) -> i32 f, i32 x) -> i32 {\nreturn f(x);\n}\n'
+               'fn main() -> i32 {\nfn(i32) -> i32 scale=|x|x*2;\nreturn apply(|x|x+1, 4);\n}\n')
+        got, _ = fmt(src)
+        self.assertIn("    fn (i32) -> i32 scale = |x| x * 2;", got)
+        self.assertIn("    return apply(|x| x + 1, 4);", got)
+
     def test_blank_line_between_decls(self):
         src = 'const i32 MAX = 100;\nfn main() -> i32 {\nreturn 0;\n}\n'
         got, _ = fmt(src)

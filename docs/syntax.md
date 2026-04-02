@@ -398,8 +398,11 @@ fn validate(i32 age) -> err {
 fn main() -> i32 {
     i32 factor = 10;
 
-    fn(i32) -> i32 scale = fn(i32 x) -> i32 {
-        return x * factor;
+    fn(i32) -> i32 scale = |x| x * factor;
+
+    fn(i32, i32) -> i32 combine = |a, b| {
+        i32 sum = a + b;
+        return sum * factor;
     };
 
     // Immediately invoked
@@ -407,9 +410,11 @@ fn main() -> i32 {
         fmt.println("iife");
     }();
 
-    return 0;
+    return combine(scale(2), 3);
 }
 ```
+
+Use `|params| expr` for single-expression lambdas and `|params| { ... }` for multi-statement bodies. Lambda parameter and return types are inferred from the surrounding `fn(...) -> ...` type.
 
 Anonymous functions capture surrounding variables by value.
 

@@ -88,6 +88,8 @@ typedef struct
     buf_t out;
     int indent;
     bool at_line_start;
+    size_t prev_emitted_index;
+    size_t current_index;
 } fmt_state_t;
 
 /* Per-token loop context. */
@@ -297,11 +299,82 @@ static bool is_control_condition_keyword(vigil_token_kind_t kind)
     return kind == VIGIL_TOKEN_IF || kind == VIGIL_TOKEN_WHILE || kind == VIGIL_TOKEN_SWITCH;
 }
 
+static bool fmt_is_lambda_open_pipe(const fmt_state_t *f, size_t index)
+{
+    size_t cursor;
+
+    if (f == NULL || index >= f->count)
+        return false;
+    if (vigil_token_list_get(f->tokens, index)->kind != VIGIL_TOKEN_PIPE)
+        return false;
+
+    cursor = index + 1U;
+    if (cursor < f->count && vigil_token_list_get(f->tokens, cursor)->kind == VIGIL_TOKEN_PIPE)
+        return true;
+
+    while (cursor < f->count)
+    {
+        vigil_token_kind_t kind = vigil_token_list_get(f->tokens, cursor)->kind;
+
+        if (kind == VIGIL_TOKEN_IDENTIFIER)
+        {
+            cursor += 1U;
+            continue;
+        }
+        if (kind == VIGIL_TOKEN_COMMA)
+        {
+            cursor += 1U;
+            continue;
+        }
+        return kind == VIGIL_TOKEN_PIPE;
+    }
+
+    return false;
+}
+
+static bool fmt_is_lambda_close_pipe(const fmt_state_t *f, size_t index)
+{
+    size_t cursor;
+
+    if (f == NULL || index >= f->count)
+        return false;
+    if (vigil_token_list_get(f->tokens, index)->kind != VIGIL_TOKEN_PIPE)
+        return false;
+    if (index == 0U)
+        return false;
+
+    cursor = index;
+    if (cursor > 0U && vigil_token_list_get(f->tokens, cursor - 1U)->kind == VIGIL_TOKEN_PIPE)
+        return true;
+
+    while (cursor > 0U)
+    {
+        vigil_token_kind_t kind = vigil_token_list_get(f->tokens, cursor - 1U)->kind;
+
+        if (kind == VIGIL_TOKEN_IDENTIFIER || kind == VIGIL_TOKEN_COMMA)
+        {
+            cursor -= 1U;
+            continue;
+        }
+        return kind == VIGIL_TOKEN_PIPE && fmt_is_lambda_open_pipe(f, cursor - 1U);
+    }
+
+    return false;
+}
+
 static bool need_space_before(const vigil_token_t *prev, const vigil_token_t *cur, const fmt_state_t *f)
 {
     vigil_token_kind_t pk = prev->kind;
     vigil_token_kind_t ck = cur->kind;
-    (void)f;
+
+    if (pk == VIGIL_TOKEN_PIPE && fmt_is_lambda_open_pipe(f, f->prev_emitted_index))
+    {
+        return false;
+    }
+    if (ck == VIGIL_TOKEN_PIPE && fmt_is_lambda_close_pipe(f, f->current_index))
+    {
+        return false;
+    }
 
     if (TOK_TEST(kNoSpaceAfterBits, pk))
         return false;
@@ -771,6 +844,8 @@ vigil_status_t vigil_fmt(const vigil_allocator_t *allocator, const char *source_
     buf_init(&f.out, allocator);
     f.indent = 0;
     f.at_line_start = true;
+    f.prev_emitted_index = SIZE_MAX;
+    f.current_index = SIZE_MAX;
 
     if (f.count == 0 || (f.count == 1 && vigil_token_list_get(tokens, 0)->kind == VIGIL_TOKEN_EOF))
     {
@@ -815,7 +890,11 @@ vigil_status_t vigil_fmt(const vigil_allocator_t *allocator, const char *source_
         fmt_adjust_indent_before(&f, &ctx, cur->kind);
 
         if (prev_emitted_idx != SIZE_MAX && !had_comment)
+        {
+            f.prev_emitted_index = prev_emitted_idx;
+            f.current_index = i;
             fmt_emit_spacing(&f, &ctx, vigil_token_list_get(tokens, prev_emitted_idx), cur);
+        }
 
         emit_str(&f, tok_text(&f, cur), tok_len(cur));
         fmt_update_state_after(&f, &ctx, cur, i);

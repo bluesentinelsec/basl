@@ -2892,8 +2892,8 @@ static int constant_cursor_check(const vigil_program_state_t *program, size_t cu
 static vigil_status_t parse_constant_identifier(vigil_program_state_t *program, size_t *cursor,
                                                 const vigil_token_t *token, vigil_constant_result_t *out_result)
 {
-    const char *name_text;
-    size_t name_length;
+    const char *name_text = NULL;
+    size_t name_length = 0U;
     vigil_source_id_t source_id;
     const vigil_global_constant_t *constant;
 
@@ -4068,8 +4068,8 @@ vigil_status_t vigil_program_parse_extern_fn(vigil_program_state_t *program, siz
     const vigil_token_t *lib_token = NULL;
     vigil_function_decl_t *decl;
     vigil_extern_fn_decl_t *ext;
-    const char *name_text;
-    size_t name_length;
+    const char *name_text = NULL;
+    size_t name_length = 0U;
 
     /* Skip 'extern'. */
     token = vigil_program_token_at(program, *cursor);
@@ -5425,7 +5425,9 @@ vigil_status_t vigil_parser_resolve_local_symbol(vigil_parser_state_t *state, co
     }
 
     if (state->parent == NULL)
+    {
         goto done;
+    }
 
     status = vigil_parser_resolve_local_symbol(state->parent, name_token, &parent_local_index, &parent_type,
                                                &parent_is_capture, NULL, &found);
@@ -5497,6 +5499,10 @@ int vigil_program_find_top_level_function_name_in_source(const vigil_program_sta
 
     for (i = 0U; i < program->functions.count; i += 1U)
     {
+        if (program->functions.functions[i].is_local)
+        {
+            continue;
+        }
         if (program->functions.functions[i].owner_class_index != VIGIL_BINDING_INVALID_CLASS_INDEX)
         {
             continue;
@@ -6165,6 +6171,11 @@ static vigil_status_t vigil_parser_parse_constructor_resolved(vigil_parser_state
                                                               const vigil_class_decl_t *decl,
                                                               vigil_expression_result_t *out_result);
 static size_t vigil_parser_effective_call_return_count(vigil_parser_type_t return_type, size_t return_count);
+static vigil_status_t vigil_parser_parse_argument_with_expected_type(vigil_parser_state_t *state,
+                                                                     vigil_source_span_t span,
+                                                                     vigil_parser_type_t expected_type,
+                                                                     const char *type_message,
+                                                                     vigil_expression_result_t *out_result);
 
 static vigil_status_t vigil_parser_parse_call(vigil_parser_state_t *state, const vigil_token_t *name_token,
                                               vigil_expression_result_t *out_result)
@@ -6183,6 +6194,23 @@ static vigil_status_t vigil_parser_parse_call(vigil_parser_state_t *state, const
     }
 
     return vigil_parser_parse_call_resolved(state, name_token->span, function_index, decl, out_result);
+}
+
+static vigil_status_t vigil_parser_parse_argument_with_expected_type(vigil_parser_state_t *state,
+                                                                     vigil_source_span_t span,
+                                                                     vigil_parser_type_t expected_type,
+                                                                     const char *type_message,
+                                                                     vigil_expression_result_t *out_result)
+{
+    vigil_status_t status;
+
+    status = vigil_parser_parse_expression_with_expected_type(state, expected_type, out_result);
+    if (status != VIGIL_STATUS_OK)
+        return status;
+    status = vigil_parser_require_scalar_expression(state, span, out_result, "call arguments must be single values");
+    if (status != VIGIL_STATUS_OK)
+        return status;
+    return vigil_parser_require_type(state, span, out_result->type, expected_type, type_message);
 }
 
 // NOLINTNEXTLINE(readability-function-cognitive-complexity)
@@ -6220,23 +6248,13 @@ static vigil_status_t vigil_parser_parse_value_call(vigil_parser_state_t *state,
     {
         while (1)
         {
-            status = vigil_parser_parse_expression(state, &arg_result);
-            if (status != VIGIL_STATUS_OK)
-            {
-                return status;
-            }
-            status = vigil_parser_require_scalar_expression(state, call_span, &arg_result,
-                                                            "call arguments must be single values");
-            if (status != VIGIL_STATUS_OK)
-            {
-                return status;
-            }
             if (arg_count >= function_type->param_count)
             {
                 return vigil_parser_report(state, call_span, "call argument count does not match function signature");
             }
-            status = vigil_parser_require_type(state, call_span, arg_result.type, function_type->param_types[arg_count],
-                                               "call argument type does not match parameter type");
+            status = vigil_parser_parse_argument_with_expected_type(
+                state, call_span, function_type->param_types[arg_count],
+                "call argument type does not match parameter type", &arg_result);
             if (status != VIGIL_STATUS_OK)
             {
                 return status;
@@ -6358,23 +6376,13 @@ static vigil_status_t vigil_parser_parse_call_resolved(vigil_parser_state_t *sta
     {
         while (1)
         {
-            status = vigil_parser_parse_expression(state, &arg_result);
-            if (status != VIGIL_STATUS_OK)
-            {
-                return status;
-            }
-            status = vigil_parser_require_scalar_expression(state, call_span, &arg_result,
-                                                            "call arguments must be single values");
-            if (status != VIGIL_STATUS_OK)
-            {
-                return status;
-            }
             if (arg_count >= decl->param_count)
             {
                 return vigil_parser_report(state, call_span, "call argument count does not match function signature");
             }
-            status = vigil_parser_require_type(state, call_span, arg_result.type, decl->params[arg_count].type,
-                                               "call argument type does not match parameter type");
+            status = vigil_parser_parse_argument_with_expected_type(state, call_span, decl->params[arg_count].type,
+                                                                    "call argument type does not match parameter type",
+                                                                    &arg_result);
             if (status != VIGIL_STATUS_OK)
             {
                 return status;
@@ -6396,6 +6404,9 @@ static vigil_status_t vigil_parser_parse_call_resolved(vigil_parser_state_t *sta
 
     if (arg_count != decl->param_count)
     {
+        fprintf(stderr, "call mismatch fn=%.*s got=%zu expected=%zu current=%zu next=%d\n", (int)decl->name_length,
+                decl->name, arg_count, decl->param_count, state->current,
+                vigil_parser_peek(state) == NULL ? -1 : (int)vigil_parser_peek(state)->kind);
         return vigil_parser_report(state, call_span, "call argument count does not match function signature");
     }
     if (function_index > UINT32_MAX || arg_count > UINT32_MAX)
@@ -6522,21 +6533,14 @@ static vigil_status_t vigil_parser_parse_constructor_resolved(vigil_parser_state
     {
         while (1)
         {
-            status = vigil_parser_parse_expression(state, &arg_result);
-            if (status != VIGIL_STATUS_OK)
-                return status;
-            status = vigil_parser_require_scalar_expression(state, call_span, &arg_result,
-                                                            "call arguments must be single values");
-            if (status != VIGIL_STATUS_OK)
-                return status;
             if (arg_count >= expected_arg_count)
                 return vigil_parser_report(state, call_span,
                                            "constructor argument count does not match class signature");
-            status = vigil_parser_require_type(state, call_span, arg_result.type,
-                                               use_ctor_fn ? ctor_decl->params[arg_count].type
-                                                           : decl->fields[arg_count].type,
-                                               use_ctor_fn ? "constructor argument type does not match parameter type"
-                                                           : "constructor argument type does not match field type");
+            status = vigil_parser_parse_argument_with_expected_type(
+                state, call_span, use_ctor_fn ? ctor_decl->params[arg_count].type : decl->fields[arg_count].type,
+                use_ctor_fn ? "constructor argument type does not match parameter type"
+                            : "constructor argument type does not match field type",
+                &arg_result);
             if (status != VIGIL_STATUS_OK)
                 return status;
             arg_count += 1U;
@@ -6655,13 +6659,28 @@ static vigil_status_t vigil_parser_parse_native_call_args(vigil_parser_state_t *
     while (1)
     {
         vigil_expression_result_clear(&arg_result);
-        status = vigil_parser_parse_expression(state, &arg_result);
-        if (status != VIGIL_STATUS_OK)
-        {
-            return status;
-        }
         if (arg_count < fn->param_count)
         {
+            vigil_binding_type_t expected_type = vigil_binding_type_invalid();
+
+            if (fn->param_types_ext != NULL)
+            {
+                status = vigil_native_type_to_binding_type(state, &fn->param_types_ext[arg_count], &expected_type);
+                if (status != VIGIL_STATUS_OK)
+                {
+                    return status;
+                }
+            }
+            else if (fn->param_types[arg_count] != VIGIL_TYPE_OBJECT)
+            {
+                expected_type = vigil_binding_type_primitive((vigil_type_kind_t)fn->param_types[arg_count]);
+            }
+
+            status = vigil_parser_parse_expression_with_expected_type(state, expected_type, &arg_result);
+            if (status != VIGIL_STATUS_OK)
+            {
+                return status;
+            }
             status = vigil_parser_require_scalar_expression(state, member_token->span, &arg_result,
                                                             "call arguments must be single values");
             if (status != VIGIL_STATUS_OK)
@@ -6677,6 +6696,14 @@ static vigil_status_t vigil_parser_parse_native_call_args(vigil_parser_state_t *
                 fn->return_same_as_param_1based - 1U == arg_count)
             {
                 *out_dynamic_return_type = arg_result.type;
+            }
+        }
+        else
+        {
+            status = vigil_parser_parse_expression(state, &arg_result);
+            if (status != VIGIL_STATUS_OK)
+            {
+                return status;
             }
         }
         arg_count += 1U;
@@ -7093,23 +7120,26 @@ static vigil_status_t vigil_parser_parse_native_static_method_call(vigil_parser_
     {
         while (1)
         {
-            status = vigil_parser_parse_expression(state, &arg_result);
-            if (status != VIGIL_STATUS_OK)
-            {
-                return status;
-            }
-            status = vigil_parser_require_scalar_expression(state, method_token->span, &arg_result,
-                                                            "call arguments must be single values");
-            if (status != VIGIL_STATUS_OK)
-            {
-                return status;
-            }
             if (arg_count < method->param_count && method->param_types[arg_count] != VIGIL_TYPE_OBJECT)
             {
-                status = vigil_parser_require_type(
-                    state, method_token->span, arg_result.type,
+                status = vigil_parser_parse_argument_with_expected_type(
+                    state, method_token->span,
                     vigil_binding_type_primitive((vigil_type_kind_t)method->param_types[arg_count]),
-                    "call argument type does not match parameter type");
+                    "call argument type does not match parameter type", &arg_result);
+                if (status != VIGIL_STATUS_OK)
+                {
+                    return status;
+                }
+            }
+            else
+            {
+                status = vigil_parser_parse_expression(state, &arg_result);
+                if (status != VIGIL_STATUS_OK)
+                {
+                    return status;
+                }
+                status = vigil_parser_require_scalar_expression(state, method_token->span, &arg_result,
+                                                                "call arguments must be single values");
                 if (status != VIGIL_STATUS_OK)
                 {
                     return status;
@@ -7207,23 +7237,26 @@ static vigil_status_t vigil_parser_parse_native_method_call(vigil_parser_state_t
     {
         while (1)
         {
-            status = vigil_parser_parse_expression(state, &arg_result);
-            if (status != VIGIL_STATUS_OK)
-            {
-                return status;
-            }
-            status = vigil_parser_require_scalar_expression(state, method_token->span, &arg_result,
-                                                            "call arguments must be single values");
-            if (status != VIGIL_STATUS_OK)
-            {
-                return status;
-            }
             if (arg_count < method->param_count && method->param_types[arg_count] != VIGIL_TYPE_OBJECT)
             {
-                status = vigil_parser_require_type(
-                    state, method_token->span, arg_result.type,
+                status = vigil_parser_parse_argument_with_expected_type(
+                    state, method_token->span,
                     vigil_binding_type_primitive((vigil_type_kind_t)method->param_types[arg_count]),
-                    "call argument type does not match parameter type");
+                    "call argument type does not match parameter type", &arg_result);
+                if (status != VIGIL_STATUS_OK)
+                {
+                    return status;
+                }
+            }
+            else
+            {
+                status = vigil_parser_parse_expression(state, &arg_result);
+                if (status != VIGIL_STATUS_OK)
+                {
+                    return status;
+                }
+                status = vigil_parser_require_scalar_expression(state, method_token->span, &arg_result,
+                                                                "call arguments must be single values");
                 if (status != VIGIL_STATUS_OK)
                 {
                     return status;
@@ -7540,24 +7573,14 @@ static vigil_status_t vigil_parser_parse_method_call(vigil_parser_state_t *state
     {
         while (1)
         {
-            status = vigil_parser_parse_expression(state, &arg_result);
-            if (status != VIGIL_STATUS_OK)
-            {
-                return status;
-            }
-            status = vigil_parser_require_scalar_expression(state, method_token->span, &arg_result,
-                                                            "call arguments must be single values");
-            if (status != VIGIL_STATUS_OK)
-            {
-                return status;
-            }
             if (arg_index >= decl->param_count)
             {
                 return vigil_parser_report(state, method_token->span,
                                            "call argument count does not match function signature");
             }
-            status = vigil_parser_require_type(state, method_token->span, arg_result.type, decl->params[arg_index].type,
-                                               "call argument type does not match parameter type");
+            status = vigil_parser_parse_argument_with_expected_type(
+                state, method_token->span, decl->params[arg_index].type,
+                "call argument type does not match parameter type", &arg_result);
             if (status != VIGIL_STATUS_OK)
             {
                 return status;
@@ -7649,25 +7672,14 @@ static vigil_status_t vigil_parser_parse_interface_method_call(vigil_parser_stat
     {
         while (1)
         {
-            status = vigil_parser_parse_expression(state, &arg_result);
-            if (status != VIGIL_STATUS_OK)
-            {
-                return status;
-            }
-            status = vigil_parser_require_scalar_expression(state, method_token->span, &arg_result,
-                                                            "call arguments must be single values");
-            if (status != VIGIL_STATUS_OK)
-            {
-                return status;
-            }
             if (arg_count >= method->param_count)
             {
                 return vigil_parser_report(state, method_token->span,
                                            "call argument count does not match function signature");
             }
-            status =
-                vigil_parser_require_type(state, method_token->span, arg_result.type, method->param_types[arg_count],
-                                          "call argument type does not match parameter type");
+            status = vigil_parser_parse_argument_with_expected_type(
+                state, method_token->span, method->param_types[arg_count],
+                "call argument type does not match parameter type", &arg_result);
             if (status != VIGIL_STATUS_OK)
             {
                 return status;
@@ -8010,6 +8022,267 @@ static vigil_status_t scan_nested_function_body(vigil_parser_state_t *state, vig
 }
 
 static vigil_status_t emit_closure_captures(vigil_parser_state_t *state, const vigil_function_decl_t *decl,
+                                            size_t function_index);
+
+static const vigil_function_type_decl_t *vigil_parser_expected_lambda_function_type(vigil_parser_state_t *state)
+{
+    const vigil_function_type_decl_t *function_type;
+
+    if (state == NULL || !vigil_binding_type_is_valid(state->expected_expression_type) ||
+        !vigil_parser_type_is_function(state->expected_expression_type))
+    {
+        return NULL;
+    }
+
+    function_type = vigil_program_function_type_decl(state->program, state->expected_expression_type);
+    if (function_type == NULL || function_type->is_any)
+        return NULL;
+    return function_type;
+}
+
+static vigil_status_t vigil_parser_add_function_type_returns(vigil_parser_state_t *state, vigil_function_decl_t *decl,
+                                                             const vigil_function_type_decl_t *function_type,
+                                                             vigil_source_span_t span)
+{
+    vigil_status_t status;
+    size_t return_index;
+
+    if (function_type->return_count == 0U)
+    {
+        return vigil_parser_report(state, span, "lambda requires a concrete function return type");
+    }
+
+    for (return_index = 0U; return_index < function_type->return_count; return_index += 1U)
+    {
+        status = vigil_binding_function_add_return_type(
+            state->program->registry->runtime, decl, function_type->return_types[return_index], state->program->error);
+        if (status != VIGIL_STATUS_OK)
+            return status;
+    }
+
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t parse_lambda_params(vigil_parser_state_t *state, const vigil_token_t *pipe_token,
+                                          vigil_function_decl_t *decl, const vigil_function_type_decl_t *function_type)
+{
+    vigil_status_t status;
+    const vigil_token_t *name_token;
+    size_t param_index;
+
+    param_index = 0U;
+    if (!vigil_parser_check(state, VIGIL_TOKEN_PIPE))
+    {
+        while (1)
+        {
+            status = vigil_parser_expect(state, VIGIL_TOKEN_IDENTIFIER, "expected lambda parameter name", &name_token);
+            if (status != VIGIL_STATUS_OK)
+                return status;
+            if (param_index >= function_type->param_count)
+            {
+                return vigil_parser_report(state, pipe_token->span,
+                                           "lambda parameter count does not match expected function type");
+            }
+            status = vigil_program_add_param((vigil_program_state_t *)state->program, decl,
+                                             function_type->param_types[param_index], name_token);
+            if (status != VIGIL_STATUS_OK)
+                return status;
+            param_index += 1U;
+            if (!vigil_parser_match(state, VIGIL_TOKEN_COMMA))
+                break;
+        }
+    }
+
+    status = vigil_parser_expect(state, VIGIL_TOKEN_PIPE, "expected '|' after lambda parameters", NULL);
+    if (status != VIGIL_STATUS_OK)
+        return status;
+    if (param_index != function_type->param_count)
+    {
+        return vigil_parser_report(state, pipe_token->span,
+                                   "lambda parameter count does not match expected function type");
+    }
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t scan_lambda_expression_body(vigil_parser_state_t *state, vigil_function_decl_t *decl,
+                                                  const vigil_token_t *pipe_token)
+{
+    const vigil_token_t *token;
+    size_t cursor;
+    size_t paren_depth;
+    size_t bracket_depth;
+    size_t brace_depth;
+    size_t ternary_depth;
+
+    cursor = state->current;
+    decl->body_start = cursor;
+    paren_depth = 0U;
+    bracket_depth = 0U;
+    brace_depth = 0U;
+    ternary_depth = 0U;
+
+    while (1)
+    {
+        token = vigil_program_token_at(state->program, cursor);
+        if (token == NULL)
+            break;
+
+        if (paren_depth == 0U && bracket_depth == 0U && brace_depth == 0U)
+        {
+            if (token->kind == VIGIL_TOKEN_EOF || token->kind == VIGIL_TOKEN_SEMICOLON ||
+                token->kind == VIGIL_TOKEN_COMMA || token->kind == VIGIL_TOKEN_RPAREN ||
+                token->kind == VIGIL_TOKEN_RBRACKET || token->kind == VIGIL_TOKEN_RBRACE ||
+                (token->kind == VIGIL_TOKEN_COLON && ternary_depth == 0U))
+            {
+                break;
+            }
+        }
+
+        switch (token->kind)
+        {
+        case VIGIL_TOKEN_LPAREN:
+            paren_depth += 1U;
+            break;
+        case VIGIL_TOKEN_RPAREN:
+            if (paren_depth == 0U)
+                goto done;
+            paren_depth -= 1U;
+            break;
+        case VIGIL_TOKEN_LBRACKET:
+            bracket_depth += 1U;
+            break;
+        case VIGIL_TOKEN_RBRACKET:
+            if (bracket_depth == 0U)
+                goto done;
+            bracket_depth -= 1U;
+            break;
+        case VIGIL_TOKEN_LBRACE:
+            brace_depth += 1U;
+            break;
+        case VIGIL_TOKEN_RBRACE:
+            if (brace_depth == 0U)
+                goto done;
+            brace_depth -= 1U;
+            break;
+        case VIGIL_TOKEN_QUESTION:
+            if (paren_depth == 0U && bracket_depth == 0U && brace_depth == 0U)
+                ternary_depth += 1U;
+            break;
+        case VIGIL_TOKEN_COLON:
+            if (paren_depth == 0U && bracket_depth == 0U && brace_depth == 0U && ternary_depth > 0U)
+                ternary_depth -= 1U;
+            break;
+        default:
+            break;
+        }
+        cursor += 1U;
+    }
+
+done:
+    if (cursor == decl->body_start)
+    {
+        return vigil_parser_report(state, pipe_token->span, "expected lambda body");
+    }
+
+    decl->body_end = cursor;
+    decl->body_kind = VIGIL_BINDING_FUNCTION_BODY_EXPRESSION;
+    state->current = cursor;
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t parse_lambda_body(vigil_parser_state_t *state, vigil_function_decl_t *decl,
+                                        const vigil_token_t *pipe_token)
+{
+    vigil_status_t status;
+
+    if (vigil_parser_match(state, VIGIL_TOKEN_LBRACE))
+    {
+        decl->body_kind = VIGIL_BINDING_FUNCTION_BODY_BLOCK;
+        status = scan_nested_function_body(state, decl);
+        if (status != VIGIL_STATUS_OK)
+            return status;
+        return VIGIL_STATUS_OK;
+    }
+
+    return scan_lambda_expression_body(state, decl, pipe_token);
+}
+
+static vigil_status_t vigil_parser_parse_lambda_value(vigil_parser_state_t *state, const vigil_token_t *pipe_token,
+                                                      vigil_parser_type_t *out_type, size_t *out_function_index)
+{
+    vigil_status_t status;
+    const vigil_function_type_decl_t *function_type;
+    vigil_function_decl_t *decl;
+    vigil_parser_type_t lambda_type;
+    size_t function_index;
+    int registered;
+
+    if (out_type != NULL)
+        *out_type = vigil_binding_type_invalid();
+    if (out_function_index != NULL)
+        *out_function_index = 0U;
+    registered = 0;
+
+    function_type = vigil_parser_expected_lambda_function_type(state);
+    if (function_type == NULL)
+    {
+        return vigil_parser_report(state, pipe_token->span, "cannot infer lambda parameter types without context");
+    }
+
+    status =
+        vigil_program_grow_functions((vigil_program_state_t *)state->program, state->program->functions.count + 1U);
+    if (status != VIGIL_STATUS_OK)
+        return status;
+
+    function_index = state->program->functions.count;
+    decl = &((vigil_program_state_t *)state->program)->functions.functions[function_index];
+    vigil_binding_function_init(decl);
+    decl->name = "<lambda>";
+    decl->name_length = 8U;
+    decl->name_span = pipe_token->span;
+    decl->source = state->program->source;
+    decl->tokens = state->program->tokens;
+    decl->is_local = 1;
+
+    status = vigil_parser_expect(state, VIGIL_TOKEN_PIPE, "expected '|'", NULL);
+    if (status != VIGIL_STATUS_OK)
+        goto fail;
+    status = parse_lambda_params(state, pipe_token, decl, function_type);
+    if (status != VIGIL_STATUS_OK)
+        goto fail;
+    status = vigil_parser_add_function_type_returns(state, decl, function_type, pipe_token->span);
+    if (status != VIGIL_STATUS_OK)
+        goto fail;
+    status = parse_lambda_body(state, decl, pipe_token);
+    if (status != VIGIL_STATUS_OK)
+        goto fail;
+
+    ((vigil_program_state_t *)state->program)->functions.count += 1U;
+    registered = 1;
+    status = vigil_compile_function_with_parent((vigil_program_state_t *)state->program, function_index, state);
+    if (status != VIGIL_STATUS_OK)
+        goto fail;
+    status = vigil_program_intern_function_type_from_decl((vigil_program_state_t *)state->program, decl, &lambda_type);
+    if (status != VIGIL_STATUS_OK)
+        goto fail;
+    status = emit_closure_captures(state, decl, function_index);
+    if (status != VIGIL_STATUS_OK)
+        goto fail;
+
+    if (out_type != NULL)
+        *out_type = lambda_type;
+    if (out_function_index != NULL)
+        *out_function_index = function_index;
+    return VIGIL_STATUS_OK;
+
+fail:
+    vigil_function_decl_free((vigil_program_state_t *)state->program, decl);
+    if (registered)
+        ((vigil_program_state_t *)state->program)->functions.count -= 1U;
+    return status;
+}
+
+static vigil_status_t emit_closure_captures(vigil_parser_state_t *state, const vigil_function_decl_t *decl,
                                             size_t function_index)
 {
     vigil_status_t status;
@@ -8089,11 +8362,13 @@ static vigil_status_t vigil_parser_parse_nested_function_value(vigil_parser_stat
     vigil_function_decl_t *decl;
     vigil_parser_type_t function_type;
     size_t function_index;
+    int registered;
 
     if (out_type != NULL)
         *out_type = vigil_binding_type_invalid();
     if (out_function_index != NULL)
         *out_function_index = 0U;
+    registered = 0;
 
     status = vigil_parser_expect(state, VIGIL_TOKEN_FN, "expected 'fn'", &fn_token);
     if (status != VIGIL_STATUS_OK)
@@ -8124,32 +8399,39 @@ static vigil_status_t vigil_parser_parse_nested_function_value(vigil_parser_stat
 
     status = parse_nested_fn_params(state, fn_token, decl);
     if (status != VIGIL_STATUS_OK)
-        return status;
+        goto fail;
     status = vigil_parser_expect(state, VIGIL_TOKEN_LBRACE, "expected '{' before function body", NULL);
     if (status != VIGIL_STATUS_OK)
-        return status;
+        goto fail;
     status = scan_nested_function_body(state, decl);
     if (status != VIGIL_STATUS_OK)
-        return status;
+        goto fail;
 
     ((vigil_program_state_t *)state->program)->functions.count += 1U;
+    registered = 1;
     status = vigil_compile_function_with_parent((vigil_program_state_t *)state->program, function_index, state);
     if (status != VIGIL_STATUS_OK)
-        return status;
+        goto fail;
     status =
         vigil_program_intern_function_type_from_decl((vigil_program_state_t *)state->program, decl, &function_type);
     if (status != VIGIL_STATUS_OK)
-        return status;
+        goto fail;
 
     status = emit_closure_captures(state, decl, function_index);
     if (status != VIGIL_STATUS_OK)
-        return status;
+        goto fail;
 
     if (out_type != NULL)
         *out_type = function_type;
     if (out_function_index != NULL)
         *out_function_index = function_index;
     return VIGIL_STATUS_OK;
+
+fail:
+    vigil_function_decl_free((vigil_program_state_t *)state->program, decl);
+    if (registered)
+        ((vigil_program_state_t *)state->program)->functions.count -= 1U;
+    return status;
 }
 
 static vigil_status_t vigil_parser_parse_local_function_declaration(vigil_parser_state_t *state,
@@ -8716,6 +8998,13 @@ static vigil_status_t vigil_parser_parse_primary_base(vigil_parser_state_t *stat
     case VIGIL_TOKEN_FN:
         local_type = vigil_binding_type_invalid();
         status = vigil_parser_parse_nested_function_value(state, 0, NULL, &local_type, NULL);
+        if (status != VIGIL_STATUS_OK)
+            return status;
+        vigil_expression_result_set_type(out_result, local_type);
+        return VIGIL_STATUS_OK;
+    case VIGIL_TOKEN_PIPE:
+        local_type = vigil_binding_type_invalid();
+        status = vigil_parser_parse_lambda_value(state, token, &local_type, NULL);
         if (status != VIGIL_STATUS_OK)
             return status;
         vigil_expression_result_set_type(out_result, local_type);
@@ -9805,6 +10094,7 @@ vigil_status_t vigil_parser_parse_expression_with_expected_type(vigil_parser_sta
     vigil_status_t status;
     const vigil_token_t *token;
     const vigil_token_t *next_token;
+    vigil_parser_type_t previous_expected_type;
 
     token = vigil_parser_peek(state);
     next_token = vigil_program_token_at(state->program, state->current + 1U);
@@ -9866,7 +10156,11 @@ vigil_status_t vigil_parser_parse_expression_with_expected_type(vigil_parser_sta
         return VIGIL_STATUS_OK;
     }
 
-    return vigil_parser_parse_expression(state, out_result);
+    previous_expected_type = state->expected_expression_type;
+    state->expected_expression_type = expected_type;
+    status = vigil_parser_parse_expression(state, out_result);
+    state->expected_expression_type = previous_expected_type;
+    return status;
 }
 
 vigil_status_t vigil_parser_parse_block_contents(vigil_parser_state_t *state, vigil_statement_result_t *out_result);
