@@ -1,5 +1,5 @@
-#include <inttypes.h>
 #include "internal/vigil_utf8.h"
+#include <inttypes.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>

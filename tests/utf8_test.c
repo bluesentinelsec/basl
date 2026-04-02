@@ -11,21 +11,21 @@ TEST(VigilUtf8Test, IsScalarAcceptsValidCodepoints)
     EXPECT_EQ(vigil_utf8_is_scalar(0x0000U), 1);
     EXPECT_EQ(vigil_utf8_is_scalar(0x0041U), 1);   /* A */
     EXPECT_EQ(vigil_utf8_is_scalar(0x00E9U), 1);   /* é */
-    EXPECT_EQ(vigil_utf8_is_scalar(0x20ACU), 1);    /* € */
-    EXPECT_EQ(vigil_utf8_is_scalar(0x4E2DU), 1);    /* 中 */
-    EXPECT_EQ(vigil_utf8_is_scalar(0x1F3AEU), 1);   /* 🎮 */
-    EXPECT_EQ(vigil_utf8_is_scalar(0x10FFFFU), 1);   /* max */
-    EXPECT_EQ(vigil_utf8_is_scalar(0xD7FFU), 1);    /* just before surrogates */
-    EXPECT_EQ(vigil_utf8_is_scalar(0xE000U), 1);    /* just after surrogates */
+    EXPECT_EQ(vigil_utf8_is_scalar(0x20ACU), 1);   /* € */
+    EXPECT_EQ(vigil_utf8_is_scalar(0x4E2DU), 1);   /* 中 */
+    EXPECT_EQ(vigil_utf8_is_scalar(0x1F3AEU), 1);  /* 🎮 */
+    EXPECT_EQ(vigil_utf8_is_scalar(0x10FFFFU), 1); /* max */
+    EXPECT_EQ(vigil_utf8_is_scalar(0xD7FFU), 1);   /* just before surrogates */
+    EXPECT_EQ(vigil_utf8_is_scalar(0xE000U), 1);   /* just after surrogates */
 }
 
 TEST(VigilUtf8Test, IsScalarRejectsSurrogatesAndOutOfRange)
 {
-    EXPECT_EQ(vigil_utf8_is_scalar(0xD800U), 0);    /* surrogate start */
-    EXPECT_EQ(vigil_utf8_is_scalar(0xDBFFU), 0);    /* high surrogate end */
-    EXPECT_EQ(vigil_utf8_is_scalar(0xDC00U), 0);    /* low surrogate start */
-    EXPECT_EQ(vigil_utf8_is_scalar(0xDFFFU), 0);    /* surrogate end */
-    EXPECT_EQ(vigil_utf8_is_scalar(0x110000U), 0);   /* above max */
+    EXPECT_EQ(vigil_utf8_is_scalar(0xD800U), 0);   /* surrogate start */
+    EXPECT_EQ(vigil_utf8_is_scalar(0xDBFFU), 0);   /* high surrogate end */
+    EXPECT_EQ(vigil_utf8_is_scalar(0xDC00U), 0);   /* low surrogate start */
+    EXPECT_EQ(vigil_utf8_is_scalar(0xDFFFU), 0);   /* surrogate end */
+    EXPECT_EQ(vigil_utf8_is_scalar(0x110000U), 0); /* above max */
     EXPECT_EQ(vigil_utf8_is_scalar(0xFFFFFFFFU), 0);
 }
 
@@ -96,8 +96,8 @@ TEST(VigilUtf8Test, EncodeRejectsInvalid)
     char buf[4];
     EXPECT_EQ(vigil_utf8_encode(0xD800U, buf), 0U);   /* surrogate */
     EXPECT_EQ(vigil_utf8_encode(0xDFFFU, buf), 0U);   /* surrogate */
-    EXPECT_EQ(vigil_utf8_encode(0x110000U, buf), 0U);  /* above max */
-    EXPECT_EQ(vigil_utf8_encode(0x41U, NULL), 0U);     /* null output */
+    EXPECT_EQ(vigil_utf8_encode(0x110000U, buf), 0U); /* above max */
+    EXPECT_EQ(vigil_utf8_encode(0x41U, NULL), 0U);    /* null output */
 }
 
 /* ── vigil_utf8_decode ───────────────────────────────────────────── */
@@ -235,11 +235,9 @@ TEST(VigilUtf8Test, DecodeHandlesNullInputs)
 
 TEST(VigilUtf8Test, EncodeDecodeRoundTrip)
 {
-    static const uint32_t codepoints[] = {
-        0x00U, 0x41U, 0x7FU, 0x80U, 0xFFU, 0x07FFU, 0x0800U,
-        0x00E9U, 0x20ACU, 0x4E2DU, 0xD7FFU, 0xE000U, 0xFFFDU,
-        0xFFFFU, 0x10000U, 0x1F3AEU, 0x10FFFFU
-    };
+    static const uint32_t codepoints[] = {0x00U,   0x41U,   0x7FU,    0x80U,    0xFFU,    0x07FFU,
+                                          0x0800U, 0x00E9U, 0x20ACU,  0x4E2DU,  0xD7FFU,  0xE000U,
+                                          0xFFFDU, 0xFFFFU, 0x10000U, 0x1F3AEU, 0x10FFFFU};
     size_t i;
     for (i = 0U; i < sizeof(codepoints) / sizeof(codepoints[0]); i++)
     {
@@ -305,7 +303,10 @@ TEST(VigilUtf8Test, CodepointCountMalformedCountsAsOne)
     /* Lone continuation byte counts as 1 */
     EXPECT_EQ(vigil_utf8_codepoint_count("\x80", 1), 1U);
     /* "A" + lone continuation + "B" = 3 */
-    EXPECT_EQ(vigil_utf8_codepoint_count("A\x80" "B", 3), 3U);
+    EXPECT_EQ(vigil_utf8_codepoint_count("A\x80"
+                                         "B",
+                                         3),
+              3U);
 }
 
 TEST(VigilUtf8Test, CodepointCountNullReturnsZero)

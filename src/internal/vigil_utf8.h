@@ -12,6 +12,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "vigil/export.h"
+
 /* Maximum bytes a single UTF-8 codepoint can occupy. */
 #define VIGIL_UTF8_MAX_BYTES 4U
 
@@ -24,7 +26,7 @@
  * Returns bytes written, or 0 if the codepoint is invalid (> U+10FFFF
  * or a surrogate U+D800..U+DFFF).
  */
-size_t vigil_utf8_encode(uint32_t codepoint, char *out);
+VIGIL_API size_t vigil_utf8_encode(uint32_t codepoint, char *out);
 
 /*
  * Decode one UTF-8 codepoint from `text` (up to `length` bytes).
@@ -34,20 +36,20 @@ size_t vigil_utf8_encode(uint32_t codepoint, char *out);
  *
  * Rejects overlong encodings, surrogates, and codepoints above U+10FFFF.
  */
-size_t vigil_utf8_decode(const char *text, size_t length, uint32_t *out_codepoint);
+VIGIL_API size_t vigil_utf8_decode(const char *text, size_t length, uint32_t *out_codepoint);
 
 /*
  * Return the expected byte width of the UTF-8 sequence starting at
  * `lead_byte`.  Returns 1–4 for valid lead bytes, 1 for invalid bytes
  * (so callers can always advance by at least 1).
  */
-size_t vigil_utf8_byte_width(unsigned char lead_byte);
+VIGIL_API size_t vigil_utf8_byte_width(unsigned char lead_byte);
 
 /*
  * Count the number of Unicode codepoints in a UTF-8 string.
  * Malformed sequences each count as one codepoint (replacement).
  */
-size_t vigil_utf8_codepoint_count(const char *text, size_t length);
+VIGIL_API size_t vigil_utf8_codepoint_count(const char *text, size_t length);
 
 /*
  * Validate that `text` is well-formed UTF-8.
@@ -55,12 +57,12 @@ size_t vigil_utf8_codepoint_count(const char *text, size_t length);
  * If `error_offset` is non-NULL, stores the byte offset of the first
  * error (unchanged if the string is valid).
  */
-int vigil_utf8_validate(const char *text, size_t length, size_t *error_offset);
+VIGIL_API int vigil_utf8_validate(const char *text, size_t length, size_t *error_offset);
 
 /*
  * Check whether a codepoint is a valid Unicode scalar value
  * (U+0000..U+D7FF, U+E000..U+10FFFF — excludes surrogates).
  */
-int vigil_utf8_is_scalar(uint32_t codepoint);
+VIGIL_API int vigil_utf8_is_scalar(uint32_t codepoint);
 
 #endif /* VIGIL_UTF8_H */

@@ -59,30 +59,13 @@ size_t vigil_utf8_byte_width(unsigned char lead_byte)
     return 1U;
 }
 
-size_t vigil_utf8_decode(const char *text, size_t length, uint32_t *out_codepoint)
+static size_t utf8_decode_multibyte(const char *text, size_t length, unsigned char lead, uint32_t *out_codepoint)
 {
     uint32_t cp;
     size_t width;
     size_t i;
-    unsigned char lead;
+    static const uint32_t minimums[] = {0U, 0U, 0x80U, 0x800U, 0x10000U};
 
-    if (text == NULL || length == 0U || out_codepoint == NULL)
-    {
-        if (out_codepoint != NULL)
-            *out_codepoint = VIGIL_UTF8_REPLACEMENT;
-        return 0U;
-    }
-
-    lead = (unsigned char)text[0];
-
-    /* Single-byte ASCII. */
-    if (lead < 0x80U)
-    {
-        *out_codepoint = lead;
-        return 1U;
-    }
-
-    /* Determine expected width and initial codepoint bits. */
     if ((lead & 0xE0U) == 0xC0U)
     {
         width = 2U;
@@ -100,19 +83,16 @@ size_t vigil_utf8_decode(const char *text, size_t length, uint32_t *out_codepoin
     }
     else
     {
-        /* Invalid lead byte (continuation byte or 0xFE/0xFF). */
         *out_codepoint = VIGIL_UTF8_REPLACEMENT;
         return 0U;
     }
 
-    /* Check that we have enough bytes. */
     if (width > length)
     {
         *out_codepoint = VIGIL_UTF8_REPLACEMENT;
         return 0U;
     }
 
-    /* Read and validate continuation bytes. */
     for (i = 1U; i < width; i++)
     {
         unsigned char cb = (unsigned char)text[i];
@@ -124,15 +104,7 @@ size_t vigil_utf8_decode(const char *text, size_t length, uint32_t *out_codepoin
         cp = (cp << 6U) | (cb & 0x3FU);
     }
 
-    /* Reject overlong encodings. */
-    if ((width == 2U && cp < 0x80U) || (width == 3U && cp < 0x800U) || (width == 4U && cp < 0x10000U))
-    {
-        *out_codepoint = VIGIL_UTF8_REPLACEMENT;
-        return 0U;
-    }
-
-    /* Reject surrogates and out-of-range codepoints. */
-    if (!vigil_utf8_is_scalar(cp))
+    if (cp < minimums[width] || !vigil_utf8_is_scalar(cp))
     {
         *out_codepoint = VIGIL_UTF8_REPLACEMENT;
         return 0U;
@@ -140,6 +112,27 @@ size_t vigil_utf8_decode(const char *text, size_t length, uint32_t *out_codepoin
 
     *out_codepoint = cp;
     return width;
+}
+
+size_t vigil_utf8_decode(const char *text, size_t length, uint32_t *out_codepoint)
+{
+    unsigned char lead;
+
+    if (text == NULL || length == 0U || out_codepoint == NULL)
+    {
+        if (out_codepoint != NULL)
+            *out_codepoint = VIGIL_UTF8_REPLACEMENT;
+        return 0U;
+    }
+
+    lead = (unsigned char)text[0];
+    if (lead < 0x80U)
+    {
+        *out_codepoint = lead;
+        return 1U;
+    }
+
+    return utf8_decode_multibyte(text, length, lead, out_codepoint);
 }
 
 size_t vigil_utf8_codepoint_count(const char *text, size_t length)
