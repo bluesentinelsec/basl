@@ -3680,6 +3680,9 @@ static void register_cli_commands(vigil_cli_t *cli, parsed_args_t *args)
     (void)vigil_cli_add_command(cli, "embed", "Embed files as VIGIL source code");
     (void)vigil_cli_add_command(cli, "test", "Run tests");
     (void)vigil_cli_add_command(cli, "get", "Manage dependencies");
+    (void)vigil_cli_add_command(cli, "editor", "Manage editor integrations");
+    (void)vigil_cli_add_command(cli, "profile", "Print compile/runtime timing and memory stats");
+    (void)vigil_cli_add_command(cli, "complexity", "Analyze cyclomatic complexity in Vigil code");
 
     cmd = vigil_cli_add_command(cli, "package", "Package a VIGIL program as a standalone binary");
     vigil_cli_add_positional(cmd, "entry", "Entry script or project directory", &args->pkg_entry);
