@@ -12,6 +12,7 @@ add_library(vigil_core OBJECT
     src/map.c
     src/string.c
     src/utf8.c
+    src/xml.c
 
     # ── Value representation and runtime ──
     src/binding.c

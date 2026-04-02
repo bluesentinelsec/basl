@@ -57,6 +57,8 @@ EXEMPT_FILES = {
     "src/easy.c",
     # Editor integration — writes config files with stdio, no runtime context.
     "src/editor.c",
+    # XML parser — standalone parser with no runtime context.
+    "src/xml.c",
     # Register VM translator uses raw malloc for internal temporary
     # data structures (code arrays, jump tables, offset maps) that
     # are freed within the same translation call.

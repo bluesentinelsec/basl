@@ -45,6 +45,7 @@ extern void register_token_tests(void);
 extern void register_toml_tests(void);
 extern void register_url_tests(void);
 extern void register_utf8_tests(void);
+extern void register_xml_tests(void);
 extern void register_yaml_tests(void);
 extern void register_semantic_tests(void);
 extern void register_lsp_tests(void);
@@ -104,6 +105,7 @@ int main(void)
     register_toml_tests();
     register_url_tests();
     register_utf8_tests();
+    register_xml_tests();
     register_yaml_tests();
     register_semantic_tests();
     register_lsp_tests();
