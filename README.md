@@ -5,11 +5,11 @@
 VIGIL is a statically typed, bytecode-compiled scripting language for building CLI tools, graphical programs, and libraries. It favors explicit behavior, batteries-included tooling, portability, and easy distribution.
 
 ```vigil
-import "fmt";
+import "fmt"
 
 fn main() -> i32 {
-    fmt.println("Hello, World!");
-    return 0;
+    fmt.println("Hello, World!")
+    return 0
 }
 ```
 

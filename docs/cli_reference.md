@@ -320,7 +320,7 @@ REPL special commands:
 - `:help`, `:h`: show REPL help
 - `:quit`, `:q`: exit the REPL
 - `exit()`: alternate REPL exit form
-- `:clear`: clear accumulated REPL state and reset to the default `import "fmt";`
+- `:clear`: clear accumulated REPL state and reset to the default `import "fmt"`
 - `:doc <name>`: render docs for a builtin or stdlib symbol/module
 
 Example:
