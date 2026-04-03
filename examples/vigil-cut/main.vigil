@@ -43,7 +43,7 @@ fn main() -> i32 {
 
     string delim = parser.get("d")
     string line = readline.input("")
-    while ! line.is_empty() {
+    while line.any() {
         array<string> fields = line.split(delim)
         if field <= fields.len() {
             fmt.println(fields[field - 1])

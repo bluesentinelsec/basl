@@ -7,7 +7,7 @@ fn main() -> i32 {
     // No args: read from stdin (classic cat behavior)
     if args.count() == 0 {
         string line = readline.input("")
-        while ! line.is_empty() {
+        while line.any() {
             fmt.println(line)
             line = readline.input("")
         }
@@ -21,7 +21,7 @@ fn main() -> i32 {
         // Support "-" for stdin
         if path == "-" {
             string line = readline.input("")
-            while ! line.is_empty() {
+            while line.any() {
                 fmt.println(line)
                 line = readline.input("")
             }

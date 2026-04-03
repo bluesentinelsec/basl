@@ -10,16 +10,22 @@ fn main() -> i32 {
     }
 
     // Register route handlers
-    http.handle(srv, "/", fn () -> void {
-        i64 conn = http.current_conn()
-        http.respond(conn, 200, "Hello from VIGIL HTTP server!", "text/plain")
-    }
+    http.handle(
+        srv,
+        "/",
+        fn () -> void {
+            i64 conn = http.current_conn()
+            http.respond(conn, 200, "Hello from VIGIL HTTP server!", "text/plain")
+        },
 
     )
-    http.handle(srv, "/json", fn () -> void {
-        i64 conn = http.current_conn()
-        http.respond(conn, 200, "{\"message\": \"Hello JSON\"}", "application/json")
-    }
+    http.handle(
+        srv,
+        "/json",
+        fn () -> void {
+            i64 conn = http.current_conn()
+            http.respond(conn, 200, "{\"message\": \"Hello JSON\"}", "application/json")
+        },
 
     )
     // Serve requests (blocks until server is closed)

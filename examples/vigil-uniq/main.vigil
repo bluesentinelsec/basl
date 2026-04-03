@@ -5,7 +5,7 @@ fn main() -> i32 {
     string prev = ""
     bool first = true
     string line = readline.input("")
-    while ! line.is_empty() {
+    while line.any() {
         if first || line != prev {
             fmt.println(line)
             prev = line

@@ -645,8 +645,8 @@ class DocsConformanceTest(unittest.TestCase):
                     if s.trim_left() != "Hello World  " { return 1 }
                     if s.trim_right() != "  Hello World" { return 2 }
                     if "abc".reverse() != "cba" { return 3 }
-                    if "".is_empty() != true { return 4 }
-                    if "hi".is_empty() != false { return 5 }
+                    if "".none() != true { return 4 }
+                    if "hi".none() != false { return 5 }
                     if "hello".char_count() != 5 { return 6 }
                     if "ab".repeat(3) != "ababab" { return 7 }
                     if "ababa".count("ab") != 2 { return 8 }

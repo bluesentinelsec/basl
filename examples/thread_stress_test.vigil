@@ -273,9 +273,10 @@ fn main() -> i32 {
     for (i64 i = i64(0); i < NUM_WORKERS; i = i + i64(1)) {
         i64 seed = i64(1000) + i * i64(7919)
         i64 iters = ITERS_PER_WORKER
-        i64 t = thread.spawn(fn () -> i64 {
-            return monte_carlo_worker(iters, seed)
-        }
+        i64 t = thread.spawn(
+            fn () -> i64 {
+                return monte_carlo_worker(iters, seed)
+            },
 
         )
         handles.push(t)
@@ -322,9 +323,10 @@ fn main() -> i32 {
         i64 pid = i
         i64 tasks = TASKS_PER_PRODUCER
         i64 pt = produced_total
-        i64 t = thread.spawn(fn () -> void {
-            producer_work(pid, tasks, q_mtx, q_not_full, q_not_empty, q_head, q_tail, q_count, q_base, pt)
-        }
+        i64 t = thread.spawn(
+            fn () -> void {
+                producer_work(pid, tasks, q_mtx, q_not_full, q_not_empty, q_head, q_tail, q_count, q_base, pt)
+            },
 
         )
         prod_handles.push(t)
@@ -333,9 +335,10 @@ fn main() -> i32 {
     // Spawn consumers
     array<i64> cons_handles = []
     for (i64 i = i64(0); i < NUM_CONSUMERS; i = i + i64(1)) {
-        i64 t = thread.spawn(fn () -> void {
-            consumer_work(q_mtx, q_not_full, q_not_empty, q_head, q_tail, q_count, q_base, done_flag, consumed_sum, consumed_count)
-        }
+        i64 t = thread.spawn(
+            fn () -> void {
+                consumer_work(q_mtx, q_not_full, q_not_empty, q_head, q_tail, q_count, q_base, done_flag, consumed_sum, consumed_count)
+            },
 
         )
         cons_handles.push(t)
@@ -389,9 +392,10 @@ fn main() -> i32 {
     array<i64> rw_handles = []
     for (i64 i = i64(0); i < RW_READERS; i = i + i64(1)) {
         i64 ops = RW_OPS_PER_THREAD
-        i64 t = thread.spawn(fn () -> void {
-            reader_work(rw, shared_val, read_sum, ops)
-        }
+        i64 t = thread.spawn(
+            fn () -> void {
+                reader_work(rw, shared_val, read_sum, ops)
+            },
 
         )
         rw_handles.push(t)
@@ -399,9 +403,10 @@ fn main() -> i32 {
 
     for (i64 i = i64(0); i < RW_WRITERS; i = i + i64(1)) {
         i64 ops = RW_OPS_PER_THREAD
-        i64 t = thread.spawn(fn () -> void {
-            writer_work(rw, shared_val, ops)
-        }
+        i64 t = thread.spawn(
+            fn () -> void {
+                writer_work(rw, shared_val, ops)
+            },
 
         )
         rw_handles.push(t)
@@ -432,9 +437,10 @@ fn main() -> i32 {
     array<i64> tl_handles = []
     for (i64 i = i64(0); i < TRYLOCK_THREADS; i = i + i64(1)) {
         i64 iters = TRYLOCK_ITERS
-        i64 t = thread.spawn(fn () -> void {
-            trylock_worker(tl_mtx, tl_counter, iters)
-        }
+        i64 t = thread.spawn(
+            fn () -> void {
+                trylock_worker(tl_mtx, tl_counter, iters)
+            },
 
         )
         tl_handles.push(t)
@@ -463,9 +469,10 @@ fn main() -> i32 {
     array<i64> cas_handles = []
     for (i64 i = i64(0); i < CAS_THREADS; i = i + i64(1)) {
         i64 iters = CAS_ITERS
-        i64 t = thread.spawn(fn () -> void {
-            cas_worker(cas_counter, iters)
-        }
+        i64 t = thread.spawn(
+            fn () -> void {
+                cas_worker(cas_counter, iters)
+            },
 
         )
         cas_handles.push(t)
@@ -495,9 +502,10 @@ fn main() -> i32 {
     i64 t12 = time.now_ms()
     array<i64> bar_handles = []
     for (i64 i = i64(0); i < BROADCAST_THREADS; i = i + i64(1)) {
-        i64 t = thread.spawn(fn () -> void {
-            barrier_worker(bar_mtx, bar_cond, bar_arrived, BROADCAST_THREADS, bar_result)
-        }
+        i64 t = thread.spawn(
+            fn () -> void {
+                barrier_worker(bar_mtx, bar_cond, bar_arrived, BROADCAST_THREADS, bar_result)
+            },
 
         )
         bar_handles.push(t)
@@ -524,9 +532,10 @@ fn main() -> i32 {
     i64 detach_counter = atomic.new(i64(0))
     i64 t14 = time.now_ms()
     for (i64 i = i64(0); i < DETACH_THREADS; i = i + i64(1)) {
-        i64 t = thread.spawn(fn () -> void {
-            detach_worker(detach_counter)
-        }
+        i64 t = thread.spawn(
+            fn () -> void {
+                detach_worker(detach_counter)
+            },
 
         )
         thread.detach(t)

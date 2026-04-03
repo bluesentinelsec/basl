@@ -20,7 +20,7 @@ fn main() -> i32 {
     // Read stdin line by line and collect content
     string content = ""
     string line = readline.input("")
-    while ! line.is_empty() {
+    while line.any() {
         content += line + "\n"
         line = readline.input("")
     }
