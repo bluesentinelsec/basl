@@ -7446,7 +7446,7 @@ static vigil_status_t parse_qualified_non_call(vigil_parser_state_t *state, cons
                         if (status != VIGIL_STATUS_OK)
                             return status;
                         vigil_expression_result_set_type(out_result,
-                                                        vigil_binding_type_primitive((vigil_type_kind_t)nc->type));
+                                                         vigil_binding_type_primitive((vigil_type_kind_t)nc->type));
                     }
                     return VIGIL_STATUS_OK;
                 }

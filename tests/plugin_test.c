@@ -258,6 +258,16 @@ TEST(PluginRegistry, PluginCoexistsWithStdlib)
     EXPECT_EQ(result, 1);
 }
 
+TEST(PluginRegistry, PluginConstantResolvesWithoutCall)
+{
+    int64_t result = RunWithPlugins(vigil_test_failed_, "import \"test_plugin\";\n"
+                                                        "fn main() -> i32 {\n"
+                                                        "    i32 val = test_plugin.ANSWER;\n"
+                                                        "    return val;\n"
+                                                        "}\n");
+    EXPECT_EQ(result, 42);
+}
+
 TEST(PluginRegistry, SdlExportsParityBatchOneFunctions)
 {
     vigil_native_registry_t natives;
@@ -461,6 +471,7 @@ void register_plugin_tests(void)
     REGISTER_TEST(PluginRegistry, PluginNegate);
     REGISTER_TEST(PluginRegistry, PluginStringReturn);
     REGISTER_TEST(PluginRegistry, PluginCoexistsWithStdlib);
+    REGISTER_TEST(PluginRegistry, PluginConstantResolvesWithoutCall);
     REGISTER_TEST(PluginRegistry, SdlExportsParityBatchOneFunctions);
     REGISTER_TEST(PluginRegistry, SdlExportsEnvironmentBatchFunctions);
     REGISTER_TEST(PluginRegistry, SdlExportsWindowAndMessageBoxBatchFunctions);
