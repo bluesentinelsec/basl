@@ -106,6 +106,9 @@ typedef struct
     int ternary_depth;
     bool in_enum_body;
     size_t skipped_control_rparen;
+    /* Multi-line list tracking for trailing comma enforcement. */
+    int list_depth;
+    bool list_multiline[32];
 } fmt_ctx_t;
 
 static void emit_indent(fmt_state_t *f)
@@ -150,6 +153,48 @@ static size_t tok_len(const vigil_token_t *t)
 }
 
 /* ── comment extraction ──────────────────────────────────────── */
+
+/* Check whether the source text between two offsets contains a newline. */
+static bool source_has_newline(const fmt_state_t *f, size_t from, size_t to)
+{
+    for (size_t i = from; i < to && i < f->src_len; i++)
+    {
+        if (f->src[i] == '\n')
+            return true;
+    }
+    return false;
+}
+
+/* Generic forward scan for a matching close delimiter. */
+static size_t fmt_find_matching_close(const fmt_state_t *f, size_t i, vigil_token_kind_t open_kind,
+                                      vigil_token_kind_t close_kind)
+{
+    size_t depth = 0U;
+
+    for (; i < f->count; i++)
+    {
+        const vigil_token_t *token = vigil_token_list_get(f->tokens, i);
+        if (token->kind == open_kind)
+            depth += 1U;
+        else if (token->kind == close_kind)
+        {
+            if (depth == 0U)
+                return SIZE_MAX;
+            depth -= 1U;
+            if (depth == 0U)
+                return i;
+        }
+    }
+
+    return SIZE_MAX;
+}
+
+/* Check if the current list nesting level is multi-line. */
+static bool fmt_in_multiline_list(const fmt_ctx_t *ctx)
+{
+    int ld = ctx->list_depth - 1;
+    return ld >= 0 && ld < 32 && ctx->list_multiline[ld];
+}
 
 static void emit_comment_text(fmt_state_t *f, size_t cstart, size_t cend)
 {
@@ -610,6 +655,9 @@ static bool fmt_should_suppress_newline(const fmt_ctx_t *ctx, vigil_token_kind_t
         return true;
     if (ctx->prev_was_literal_rbrace && pk == VIGIL_TOKEN_RBRACE)
         return true;
+    /* Don't suppress newlines inside multi-line lists. */
+    if (fmt_in_multiline_list(ctx))
+        return false;
     if (!fmt_in_literal_context(ctx, pk, ck))
         return false;
     return pk == VIGIL_TOKEN_LBRACE || ck == VIGIL_TOKEN_RBRACE || pk == VIGIL_TOKEN_SEMICOLON ||
@@ -659,6 +707,8 @@ static void fmt_emit_spacing(fmt_state_t *f, const fmt_ctx_t *ctx, const vigil_t
 {
     bool suppress = fmt_should_suppress_newline(ctx, prev->kind, cur->kind);
     bool force_nl = ctx->in_enum_body && prev->kind == VIGIL_TOKEN_COMMA;
+    if (!force_nl && prev->kind == VIGIL_TOKEN_COMMA && fmt_in_multiline_list(ctx))
+        force_nl = true;
     int nl = fmt_newline_level(f, prev, cur);
 
     if (suppress)
@@ -886,12 +936,35 @@ vigil_status_t vigil_fmt(const vigil_allocator_t *allocator, const char *source_
                                : initial_comment_end;
         bool had_comment = emit_comments_between(&f, gap_start, cur->span.start_offset);
 
-        fmt_adjust_indent_before(&f, &ctx, cur->kind);
+        /* For closing delimiters of multi-line lists, we handle
+           indent ourselves; skip the normal indent adjustment only
+           for ) and ] (braces still need brace_depth tracking). */
+        bool handled_multiline_close = false;
+        if ((cur->kind == VIGIL_TOKEN_RPAREN || cur->kind == VIGIL_TOKEN_RBRACKET) && fmt_in_multiline_list(&ctx))
+        {
+            handled_multiline_close = true;
+        }
+
+        if (!handled_multiline_close)
+            fmt_adjust_indent_before(&f, &ctx, cur->kind);
 
         if (prev_emitted_idx != SIZE_MAX && !had_comment)
         {
             f.prev_emitted_index = prev_emitted_idx;
             f.current_index = i;
+            /* Before spacing for a closing delimiter in a multi-line list,
+               insert trailing comma on the current line (before the newline). */
+            if (fmt_in_multiline_list(&ctx) &&
+                (cur->kind == VIGIL_TOKEN_RPAREN || cur->kind == VIGIL_TOKEN_RBRACKET ||
+                 (cur->kind == VIGIL_TOKEN_RBRACE && brace_lit_at(&ctx, ctx.brace_depth))))
+            {
+                vigil_token_kind_t pk = vigil_token_list_get(tokens, prev_emitted_idx)->kind;
+                if (pk != VIGIL_TOKEN_COMMA && pk != VIGIL_TOKEN_LBRACE && pk != VIGIL_TOKEN_LBRACKET &&
+                    pk != VIGIL_TOKEN_LPAREN)
+                {
+                    buf_push(&f.out, ',');
+                }
+            }
             fmt_emit_spacing(&f, &ctx, vigil_token_list_get(tokens, prev_emitted_idx), cur);
         }
 
@@ -903,11 +976,73 @@ vigil_status_t vigil_fmt(const vigil_allocator_t *allocator, const char *source_
             continue;
         }
 
-        /* ── Trailing comma enforcement ──────────────────────────── */
+        /* ── Multi-line list tracking & trailing comma enforcement ── */
 
-        /* Remove trailing comma on single-line lists (the formatter
-           collapses multi-line lists to single lines, so all output
-           lists are single-line). */
+        /* Enter list on ( or [ */
+        if (cur->kind == VIGIL_TOKEN_LPAREN || cur->kind == VIGIL_TOKEN_LBRACKET)
+        {
+            bool ml = false;
+            vigil_token_kind_t close_kind = cur->kind == VIGIL_TOKEN_LPAREN ? VIGIL_TOKEN_RPAREN : VIGIL_TOKEN_RBRACKET;
+            size_t ci = fmt_find_matching_close(&f, i, cur->kind, close_kind);
+            if (ci != SIZE_MAX)
+            {
+                const vigil_token_t *ct = vigil_token_list_get(tokens, ci);
+                ml = source_has_newline(&f, cur->span.end_offset, ct->span.start_offset);
+            }
+            if (ctx.list_depth < 32)
+                ctx.list_multiline[ctx.list_depth] = ml;
+            ctx.list_depth++;
+            if (ml)
+            {
+                f.indent++;
+                /* Emit the opening delimiter, then newline+indent for first element. */
+                emit_str(&f, tok_text(&f, cur), tok_len(cur));
+                fmt_update_state_after(&f, &ctx, cur, i);
+                emit_newline(&f);
+                prev_emitted_idx = i;
+                continue;
+            }
+        }
+
+        /* Strip trailing comma in single-line lists. */
+
+        /* Enter list on literal { (detect via preceding non-semicolon token). */
+        if (cur->kind == VIGIL_TOKEN_LBRACE)
+        {
+            bool is_lit = false;
+            for (size_t k = i; k > 0; k--)
+            {
+                vigil_token_kind_t pk = vigil_token_list_get(tokens, k - 1)->kind;
+                if (pk != VIGIL_TOKEN_SEMICOLON)
+                {
+                    is_lit = TOK_TEST(kLiteralBraceOpenerBits, pk);
+                    break;
+                }
+            }
+            if (is_lit)
+            {
+                bool ml = false;
+                size_t ci = fmt_find_matching_close(&f, i, VIGIL_TOKEN_LBRACE, VIGIL_TOKEN_RBRACE);
+                if (ci != SIZE_MAX)
+                {
+                    const vigil_token_t *ct = vigil_token_list_get(tokens, ci);
+                    ml = source_has_newline(&f, cur->span.end_offset, ct->span.start_offset);
+                }
+                if (ctx.list_depth < 32)
+                    ctx.list_multiline[ctx.list_depth] = ml;
+                ctx.list_depth++;
+                if (ml)
+                {
+                    f.indent++;
+                    emit_str(&f, tok_text(&f, cur), tok_len(cur));
+                    fmt_update_state_after(&f, &ctx, cur, i);
+                    emit_newline(&f);
+                    prev_emitted_idx = i;
+                    continue;
+                }
+            }
+        }
+        /* Strip trailing comma in single-line lists. */
         if (cur->kind == VIGIL_TOKEN_COMMA)
         {
             size_t nxt = i + 1U;
@@ -918,15 +1053,38 @@ vigil_status_t vigil_fmt(const vigil_allocator_t *allocator, const char *source_
                 vigil_token_kind_t nk = vigil_token_list_get(tokens, nxt)->kind;
                 if (nk == VIGIL_TOKEN_RPAREN || nk == VIGIL_TOKEN_RBRACKET || nk == VIGIL_TOKEN_RBRACE)
                 {
-                    fmt_update_state_after(&f, &ctx, cur, i);
-                    prev_emitted_idx = i;
-                    continue;
+                    if (!fmt_in_multiline_list(&ctx))
+                    {
+                        /* Single-line: suppress trailing comma. */
+                        fmt_update_state_after(&f, &ctx, cur, i);
+                        prev_emitted_idx = i;
+                        continue;
+                    }
+                    /* Multi-line: keep the trailing comma (emit it). */
                 }
             }
         }
 
+        /* Before closing delimiter of a multi-line list:
+           insert trailing comma if missing, dedent, newline. */
+        if (cur->kind == VIGIL_TOKEN_RPAREN || cur->kind == VIGIL_TOKEN_RBRACKET ||
+            (cur->kind == VIGIL_TOKEN_RBRACE && brace_lit_at(&ctx, ctx.brace_depth)))
+        {
+            if (fmt_in_multiline_list(&ctx))
+            {
+                f.indent--;
+                if (!f.at_line_start)
+                {
+                    emit_newline(&f);
+                }
+            }
+            if (ctx.list_depth > 0)
+                ctx.list_depth--;
+        }
+
         emit_str(&f, tok_text(&f, cur), tok_len(cur));
         fmt_update_state_after(&f, &ctx, cur, i);
+
         prev_emitted_idx = i;
     }
 
