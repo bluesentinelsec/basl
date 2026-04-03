@@ -20,7 +20,7 @@ fn sort_strings(array<string> arr) -> void {
 fn main() -> i32 {
     array<string> lines = []
     string line = readline.input("")
-    while ! line.is_empty() {
+    while line.any() {
         lines.push(line)
         line = readline.input("")
     }

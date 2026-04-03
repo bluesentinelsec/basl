@@ -770,8 +770,8 @@ fn test_string_methods() -> void {
     check(s.to_upper() == "HELLO WORLD", "string.to_upper()")
     check(s.to_lower() == "hello world", "string.to_lower()")
     check(s.reverse() == "dlrow olleh", "string.reverse()")
-    check(! s.is_empty(), "string.is_empty() false")
-    check("".is_empty(), "string.is_empty() true")
+    check(s.any(), "string.none() false")
+    check("".none(), "string.none() true")
     // 19b. Trim methods
     string padded = "  hi  "
     check(padded.trim() == "hi", "string.trim()")

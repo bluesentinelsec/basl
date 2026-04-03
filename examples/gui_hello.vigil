@@ -12,12 +12,12 @@ fn main() -> i32 {
     fmt.println("VIGIL GUI Demo (terminal fallback — no gui module available)")
     fmt.println("─────────────────────────────────────────────────────────────")
     string text = readline.input("Enter text (default: hello): ")
-    if text.is_empty() {
+    if text.none() {
         text = "hello"
     }
 
     string mode = readline.input("Select mode [Fast/Balanced/Safe] (default: Balanced): ")
-    if mode.is_empty() {
+    if mode.none() {
         mode = "Balanced"
     }
 

@@ -133,6 +133,30 @@ static vigil_status_t compile_string_require_arg_type(vigil_parser_state_t *stat
     return VIGIL_STATUS_OK;
 }
 
+/* ── Shared .any() / .none() helper ────────────────────────────────── */
+
+/* Emit opcodes for a collection .any() or .none() method.
+   For collections: GET_COLLECTION_SIZE + push 0 + EQUAL/NOT_EQUAL.
+   is_any=1 for .any(), is_any=0 for .none(). */
+static vigil_status_t compile_collection_any_none(vigil_parser_state_t *state, const vigil_token_t *method_token,
+                                                  int is_any, vigil_expression_result_t *out_result)
+{
+    vigil_status_t status;
+
+    status = vigil_parser_emit_opcode(state, VIGIL_OPCODE_GET_COLLECTION_SIZE, method_token->span);
+    if (status != VIGIL_STATUS_OK)
+        return status;
+    status = vigil_parser_emit_i32_constant(state, 0, method_token->span);
+    if (status != VIGIL_STATUS_OK)
+        return status;
+    status = vigil_parser_emit_opcode(state, is_any ? VIGIL_OPCODE_NOT_EQUAL_I32 : VIGIL_OPCODE_EQUAL_I32,
+                                      method_token->span);
+    if (status != VIGIL_STATUS_OK)
+        return status;
+    vigil_expression_result_set_type(out_result, vigil_binding_type_primitive(VIGIL_TYPE_BOOL));
+    return VIGIL_STATUS_OK;
+}
+
 /* ── Refactored string method dispatch ─────────────────────────────── */
 
 vigil_status_t vigil_parser_parse_string_method_call(vigil_parser_state_t *state, const vigil_token_t *method_token,
@@ -154,6 +178,29 @@ vigil_status_t vigil_parser_parse_string_method_call(vigil_parser_state_t *state
     if (status != VIGIL_STATUS_OK)
     {
         return status;
+    }
+
+    /* Deprecation warning for is_empty(). */
+    if (vigil_program_names_equal(method_name, method_length, "is_empty", 8U))
+    {
+        vigil_diagnostic_list_append_cstr(state->program->diagnostics, VIGIL_DIAGNOSTIC_WARNING, method_token->span,
+                                          "is_empty() is deprecated, use none() instead", state->program->error);
+    }
+
+    /* .any() — emit STRING_IS_EMPTY + NOT. */
+    if (vigil_program_names_equal(method_name, method_length, "any", 3U))
+    {
+        status = vigil_parser_expect(state, VIGIL_TOKEN_RPAREN, "string method does not accept arguments", NULL);
+        if (status != VIGIL_STATUS_OK)
+            return status;
+        status = vigil_parser_emit_opcode(state, VIGIL_OPCODE_STRING_IS_EMPTY, method_token->span);
+        if (status != VIGIL_STATUS_OK)
+            return status;
+        status = vigil_parser_emit_opcode(state, VIGIL_OPCODE_NOT, method_token->span);
+        if (status != VIGIL_STATUS_OK)
+            return status;
+        vigil_expression_result_set_type(out_result, vigil_binding_type_primitive(VIGIL_TYPE_BOOL));
+        return VIGIL_STATUS_OK;
     }
 
     if (descriptor == NULL)
@@ -449,6 +496,16 @@ vigil_status_t vigil_parser_parse_array_method_call(vigil_parser_state_t *state,
         return compile_array_pop(state, method_token, element_type, out_result);
     }
 
+    if (vigil_program_names_equal(method_name, method_length, "any", 3U) ||
+        vigil_program_names_equal(method_name, method_length, "none", 4U))
+    {
+        status = vigil_parser_expect(state, VIGIL_TOKEN_RPAREN, "array method does not accept arguments", NULL);
+        if (status != VIGIL_STATUS_OK)
+            return status;
+        return compile_collection_any_none(
+            state, method_token, vigil_program_names_equal(method_name, method_length, "any", 3U), out_result);
+    }
+
     if (vigil_program_names_equal(method_name, method_length, "push", 4U) ||
         vigil_program_names_equal(method_name, method_length, "get", 3U) ||
         vigil_program_names_equal(method_name, method_length, "contains", 8U))
@@ -638,7 +695,9 @@ vigil_status_t vigil_parser_parse_map_method_call(vigil_parser_state_t *state, v
 
     if (vigil_program_names_equal(method_name, method_length, "len", 3U) ||
         vigil_program_names_equal(method_name, method_length, "keys", 4U) ||
-        vigil_program_names_equal(method_name, method_length, "values", 6U))
+        vigil_program_names_equal(method_name, method_length, "values", 6U) ||
+        vigil_program_names_equal(method_name, method_length, "any", 3U) ||
+        vigil_program_names_equal(method_name, method_length, "none", 4U))
     {
         status = vigil_parser_expect(state, VIGIL_TOKEN_RPAREN, "map method does not accept arguments", NULL);
         if (status != VIGIL_STATUS_OK)
@@ -648,6 +707,12 @@ vigil_status_t vigil_parser_parse_map_method_call(vigil_parser_state_t *state, v
         if (vigil_program_names_equal(method_name, method_length, "len", 3U))
         {
             return compile_map_len(state, method_token, out_result);
+        }
+        if (vigil_program_names_equal(method_name, method_length, "any", 3U) ||
+            vigil_program_names_equal(method_name, method_length, "none", 4U))
+        {
+            return compile_collection_any_none(
+                state, method_token, vigil_program_names_equal(method_name, method_length, "any", 3U), out_result);
         }
         if (vigil_program_names_equal(method_name, method_length, "keys", 4U))
         {

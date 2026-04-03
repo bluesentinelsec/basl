@@ -1914,9 +1914,11 @@ TEST(VigilStdlibStringTest, IsEmpty)
 {
     EXPECT_EQ(RunWithStdlib(vigil_test_failed_, "\n"
                                                 "fn main() -> i32 {\n"
-                                                "    if \"\".is_empty() != true { return 1; }\n"
-                                                "    if \"x\".is_empty() != false { return 2; }\n"
-                                                "    if \" \".is_empty() != false { return 3; }\n"
+                                                "    if \"\".none() != true { return 1; }\n"
+                                                "    if \"x\".none() != false { return 2; }\n"
+                                                "    if \" \".none() != false { return 3; }\n"
+                                                "    if \"hello\".any() != true { return 4; }\n"
+                                                "    if \"\".any() != false { return 5; }\n"
                                                 "    return 0;\n"
                                                 "}\n"
                                                 "    "),

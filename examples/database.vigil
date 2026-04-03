@@ -39,7 +39,7 @@ fn main() -> i32 {
     for (i32 i = 1; i < lines.len(); i++) {
         // skip header
         string line = lines[i].trim()
-        if line.is_empty() {
+        if line.none() {
             continue
         }
 
@@ -57,7 +57,7 @@ fn main() -> i32 {
     fmt.println("\nUsers older than 28:")
     for (i32 i = 1; i < lines.len(); i++) {
         string line = lines[i].trim()
-        if line.is_empty() {
+        if line.none() {
             continue
         }
 

@@ -476,6 +476,7 @@ vigil_status_t vigil_parser_emit_integer_constant(vigil_parser_state_t *state, v
                                                   int64_t value, vigil_source_span_t span);
 vigil_status_t vigil_parser_emit_ok_constant(vigil_parser_state_t *state, vigil_source_span_t span);
 vigil_status_t vigil_parser_emit_opcode(vigil_parser_state_t *state, vigil_opcode_t opcode, vigil_source_span_t span);
+vigil_status_t vigil_parser_emit_i32_constant(vigil_parser_state_t *state, int64_t value, vigil_source_span_t span);
 vigil_status_t emit_opcode_u32(vigil_parser_state_t *state, vigil_opcode_t opcode, uint32_t operand,
                                vigil_source_span_t span);
 vigil_status_t vigil_parser_emit_string_constant_text(vigil_parser_state_t *state, vigil_source_span_t span,

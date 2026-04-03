@@ -3326,6 +3326,28 @@ TEST(VigilCompilerTest, ImplicitSemiBeforeClosingBrace)
     EXPECT_EQ(CompileAndRun(vigil_test_failed_, "fn main() -> i32 { if true { return 7 } return 0 }"), 7);
 }
 
+TEST(VigilCompilerTest, AnyNoneMethodsOnAllCollectionTypes)
+{
+    EXPECT_EQ(CompileAndRun(vigil_test_failed_, "fn main() -> i32 {\n"
+                                                "    string s = \"hi\";\n"
+                                                "    string e = \"\";\n"
+                                                "    if !s.any() { return 1; }\n"
+                                                "    if !e.none() { return 2; }\n"
+                                                "    if s.none() { return 3; }\n"
+                                                "    if e.any() { return 4; }\n"
+                                                "    array<i32> a = [1];\n"
+                                                "    array<i32> ea = [];\n"
+                                                "    if !a.any() { return 5; }\n"
+                                                "    if !ea.none() { return 6; }\n"
+                                                "    map<string, i32> m = {\"k\": 1};\n"
+                                                "    map<string, i32> em = {};\n"
+                                                "    if !m.any() { return 7; }\n"
+                                                "    if !em.none() { return 8; }\n"
+                                                "    return 0;\n"
+                                                "}\n"),
+              0);
+}
+
 static void register_compiler_defer_tests(void)
 {
     REGISTER_TEST(VigilCompilerTest, CompilesAndExecutesDeferredFunctionValues);
@@ -3463,4 +3485,5 @@ void register_compiler_tests(void)
     register_compiler_defer_tests();
     REGISTER_TEST(VigilCompilerTest, AcceptsTrailingCommasInCallsArraysAndMaps);
     REGISTER_TEST(VigilCompilerTest, ImplicitSemiBeforeClosingBrace);
+    REGISTER_TEST(VigilCompilerTest, AnyNoneMethodsOnAllCollectionTypes);
 }

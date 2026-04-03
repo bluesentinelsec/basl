@@ -254,6 +254,10 @@ static int cmd_check(const char *script_path)
             exit_code = 1;
         }
     }
+    else if (vigil_diagnostic_list_count(&diagnostics) != 0U)
+    {
+        print_diagnostics(&registry, &diagnostics);
+    }
 
 cleanup:
     vigil_diagnostic_list_free(&diagnostics);

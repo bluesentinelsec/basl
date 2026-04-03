@@ -33,7 +33,7 @@ fn main() -> i32 {
     }
 
     string line = readline.input("")
-    while ! line.is_empty() {
+    while line.any() {
         string output = ""
         for (i32 i = 0; i < line.len(); i++) {
             string ch, err e2 = line.char_at(i)

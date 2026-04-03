@@ -36,8 +36,7 @@ static vigil_status_t vigil_parser_parse_switch_statement(vigil_parser_state_t *
                                                           vigil_statement_result_t *out_result);
 vigil_status_t vigil_program_require_non_void_type(const vigil_program_state_t *program, vigil_source_span_t span,
                                                    vigil_parser_type_t type, const char *message);
-static vigil_status_t vigil_parser_emit_i32_constant(vigil_parser_state_t *state, int64_t value,
-                                                     vigil_source_span_t span);
+vigil_status_t vigil_parser_emit_i32_constant(vigil_parser_state_t *state, int64_t value, vigil_source_span_t span);
 vigil_status_t vigil_parser_emit_f64_constant(vigil_parser_state_t *state, double value, vigil_source_span_t span);
 vigil_status_t vigil_parser_emit_string_constant_text(vigil_parser_state_t *state, vigil_source_span_t span,
                                                       const char *text, size_t length);
@@ -11990,8 +11989,7 @@ static int vigil_parser_is_assignment_operator(vigil_token_kind_t kind)
            kind == VIGIL_TOKEN_PLUS_PLUS || kind == VIGIL_TOKEN_MINUS_MINUS;
 }
 
-static vigil_status_t vigil_parser_emit_i32_constant(vigil_parser_state_t *state, int64_t value,
-                                                     vigil_source_span_t span)
+vigil_status_t vigil_parser_emit_i32_constant(vigil_parser_state_t *state, int64_t value, vigil_source_span_t span)
 {
     vigil_status_t status;
     vigil_value_t constant;
