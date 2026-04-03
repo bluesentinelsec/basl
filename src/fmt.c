@@ -149,7 +149,7 @@ static size_t tok_len(const vigil_token_t *t)
     return t->span.end_offset - t->span.start_offset;
 }
 
-/* ── comment extraction ──────────────────────────────────────────── */
+/* ── comment extraction ──────────────────────────────────────── */
 
 static void emit_comment_text(fmt_state_t *f, size_t cstart, size_t cend)
 {
@@ -901,6 +901,28 @@ vigil_status_t vigil_fmt(const vigil_allocator_t *allocator, const char *source_
             fmt_update_state_after(&f, &ctx, cur, i);
             prev_emitted_idx = i;
             continue;
+        }
+
+        /* ── Trailing comma enforcement ──────────────────────────── */
+
+        /* Remove trailing comma on single-line lists (the formatter
+           collapses multi-line lists to single lines, so all output
+           lists are single-line). */
+        if (cur->kind == VIGIL_TOKEN_COMMA)
+        {
+            size_t nxt = i + 1U;
+            while (nxt < f.count && vigil_token_list_get(tokens, nxt)->kind == VIGIL_TOKEN_SEMICOLON)
+                nxt++;
+            if (nxt < f.count)
+            {
+                vigil_token_kind_t nk = vigil_token_list_get(tokens, nxt)->kind;
+                if (nk == VIGIL_TOKEN_RPAREN || nk == VIGIL_TOKEN_RBRACKET || nk == VIGIL_TOKEN_RBRACE)
+                {
+                    fmt_update_state_after(&f, &ctx, cur, i);
+                    prev_emitted_idx = i;
+                    continue;
+                }
+            }
         }
 
         emit_str(&f, tok_text(&f, cur), tok_len(cur));
