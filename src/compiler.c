@@ -7244,6 +7244,7 @@ static vigil_status_t vigil_parser_parse_native_method_call(vigil_parser_state_t
     }
     vigil_value_init_object(&native_val, &native_obj);
     {
+        int defer_call = state->defer_mode;
         size_t const_idx = 0U;
 
         status = vigil_chunk_add_constant(&state->chunk, &native_val, &const_idx, state->program->error);
@@ -7252,7 +7253,8 @@ static vigil_status_t vigil_parser_parse_native_method_call(vigil_parser_state_t
         {
             return status;
         }
-        status = vigil_parser_emit_opcode(state, VIGIL_OPCODE_CALL_NATIVE, method_token->span);
+        status = vigil_parser_emit_opcode(
+            state, defer_call ? VIGIL_OPCODE_DEFER_CALL_NATIVE : VIGIL_OPCODE_CALL_NATIVE, method_token->span);
         if (status != VIGIL_STATUS_OK)
         {
             return status;
@@ -7275,6 +7277,13 @@ static vigil_status_t vigil_parser_parse_native_method_call(vigil_parser_state_t
         if (status != VIGIL_STATUS_OK)
         {
             return status;
+        }
+
+        if (defer_call)
+        {
+            state->defer_emitted = 1;
+            vigil_expression_result_set_type(out_result, vigil_binding_type_primitive(VIGIL_TYPE_VOID));
+            return VIGIL_STATUS_OK;
         }
     }
 
