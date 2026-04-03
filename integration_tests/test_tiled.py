@@ -212,6 +212,25 @@ class TiledPluginTest(unittest.TestCase):
             }}
         """)
 
+    def test_parse_from_string(self) -> None:
+        map_json = json.dumps(SAMPLE_MAP)
+        # Escape for VIGIL string literal
+        escaped = map_json.replace("\\", "\\\\").replace('"', '\\"')
+        self._run(f"""
+            import "tiled";
+            fn main() -> i32 {{
+                string text = "{escaped}";
+                i32 h, err e = tiled.parse(text, "json");
+                if e != ok {{ return 1; }}
+                if tiled.map_width(h) != 4 {{ return 2; }}
+                if tiled.map_height(h) != 3 {{ return 3; }}
+                if tiled.map_layer_count(h) != 2 {{ return 4; }}
+                if tiled.tileset_name(h, 0) != "tiles" {{ return 5; }}
+                tiled.close(h);
+                return 0;
+            }}
+        """)
+
 
 if __name__ == "__main__":
     unittest.main()

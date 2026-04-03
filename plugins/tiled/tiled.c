@@ -714,6 +714,60 @@ static vigil_status_t tiled_push_ok_err(vigil_vm_t *vm, vigil_error_t *error)
     return vigil_runtime_push_ok_error(vigil_vm_runtime(vm), vm, error);
 }
 
+/* ── Core parse-from-text helper ──────────────────────────────────── */
+
+static tiled_map_t *tiled_parse_text(const char *text, size_t text_len, const char *format, char *err_msg,
+                                     size_t err_msg_size)
+{
+    int is_json = 0;
+
+    if (format != NULL && format[0] != '\0')
+        is_json = (strcmp(format, "json") == 0);
+    else
+        is_json = (text_len > 0U && text[0] == '{');
+
+    if (is_json)
+    {
+        vigil_json_value_t *json = NULL;
+        vigil_error_t parse_err = {0};
+        tiled_map_t *map;
+        if (vigil_json_parse(NULL, text, text_len, &json, &parse_err) != VIGIL_STATUS_OK || json == NULL)
+        {
+            snprintf(err_msg, err_msg_size, "failed to parse tiled JSON");
+            vigil_json_free(&json);
+            return NULL;
+        }
+        map = parse_json_map(json);
+        vigil_json_free(&json);
+        if (map == NULL)
+            snprintf(err_msg, err_msg_size, "failed to build tiled map from JSON");
+        return map;
+    }
+    else
+    {
+        snprintf(err_msg, err_msg_size, "XML Tiled map parsing is not yet implemented");
+        return NULL;
+    }
+}
+
+static vigil_status_t tiled_store_and_push(vigil_vm_t *vm, tiled_map_t *map, vigil_error_t *error)
+{
+    int32_t handle = tiled_store_map(map);
+    vigil_status_t status;
+    if (handle < 0)
+    {
+        tiled_map_free(map);
+        status = tiled_push_i32(vm, -1, error);
+        if (status != VIGIL_STATUS_OK)
+            return status;
+        return tiled_push_err(vm, "too many tiled maps open", error);
+    }
+    status = tiled_push_i32(vm, handle, error);
+    if (status != VIGIL_STATUS_OK)
+        return status;
+    return tiled_push_ok_err(vm, error);
+}
+
 /* ── tiled.load(path) -> (i32, err) ──────────────────────────────── */
 
 static vigil_status_t tiled_load_fn(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
@@ -726,8 +780,9 @@ static vigil_status_t tiled_load_fn(vigil_vm_t *vm, size_t arg_count, vigil_erro
     char *file_data = NULL;
     size_t file_len = 0U;
     vigil_status_t status;
-    tiled_map_t *map = NULL;
-    int32_t handle;
+    tiled_map_t *map;
+    char err_msg[128];
+    const char *format;
 
     if (path_obj == NULL || vigil_object_type(path_obj) != VIGIL_OBJECT_STRING)
     {
@@ -740,7 +795,6 @@ static vigil_status_t tiled_load_fn(vigil_vm_t *vm, size_t arg_count, vigil_erro
     path = vigil_string_object_c_str(path_obj);
     path_len = vigil_string_object_length(path_obj);
 
-    /* Read file */
     status = vigil_platform_read_file(NULL, path, &file_data, &file_len, error);
     if (status != VIGIL_STATUS_OK)
     {
@@ -751,73 +805,66 @@ static vigil_status_t tiled_load_fn(vigil_vm_t *vm, size_t arg_count, vigil_erro
         return tiled_push_err(vm, "failed to read tiled map file", error);
     }
 
-    /* Detect format and parse */
-    if (path_len >= 4U && (strcmp(path + path_len - 4U, ".tmj") == 0 || strcmp(path + path_len - 5U, ".json") == 0))
-    {
-        vigil_json_value_t *json = NULL;
-        status = vigil_json_parse(NULL, file_data, file_len, &json, error);
-        free(file_data);
-        if (status != VIGIL_STATUS_OK || json == NULL)
-        {
-            vigil_json_free(&json);
-            vigil_vm_stack_pop_n(vm, arg_count);
-            status = tiled_push_i32(vm, -1, error);
-            if (status != VIGIL_STATUS_OK)
-                return status;
-            return tiled_push_err(vm, "failed to parse tiled JSON", error);
-        }
-        map = parse_json_map(json);
-        vigil_json_free(&json);
-    }
-    else
-    {
-        /* XML (.tmx) */
-        vigil_xml_document_t *doc = NULL;
-        vigil_xml_error_t xml_err;
-        status = vigil_xml_parse(file_data, file_len, &doc, &xml_err);
-        free(file_data);
-        if (status != VIGIL_STATUS_OK || doc == NULL)
-        {
-            vigil_xml_document_free(doc);
-            vigil_vm_stack_pop_n(vm, arg_count);
-            status = tiled_push_i32(vm, -1, error);
-            if (status != VIGIL_STATUS_OK)
-                return status;
-            return tiled_push_err(vm, "XML parsing not yet implemented for Tiled maps", error);
-        }
-        vigil_xml_document_free(doc);
-        vigil_vm_stack_pop_n(vm, arg_count);
-        status = tiled_push_i32(vm, -1, error);
-        if (status != VIGIL_STATUS_OK)
-            return status;
-        return tiled_push_err(vm, "XML Tiled map parsing is not yet implemented", error);
-    }
+    format = "json";
+    if (path_len >= 4U && (strcmp(path + path_len - 4U, ".tmx") == 0))
+        format = "xml";
 
-    if (map == NULL)
-    {
-        vigil_vm_stack_pop_n(vm, arg_count);
-        status = tiled_push_i32(vm, -1, error);
-        if (status != VIGIL_STATUS_OK)
-            return status;
-        return tiled_push_err(vm, "failed to parse tiled map", error);
-    }
-
-    handle = tiled_store_map(map);
-    if (handle < 0)
-    {
-        tiled_map_free(map);
-        vigil_vm_stack_pop_n(vm, arg_count);
-        status = tiled_push_i32(vm, -1, error);
-        if (status != VIGIL_STATUS_OK)
-            return status;
-        return tiled_push_err(vm, "too many tiled maps open", error);
-    }
+    err_msg[0] = '\0';
+    map = tiled_parse_text(file_data, file_len, format, err_msg, sizeof(err_msg));
+    free(file_data);
 
     vigil_vm_stack_pop_n(vm, arg_count);
-    status = tiled_push_i32(vm, handle, error);
-    if (status != VIGIL_STATUS_OK)
-        return status;
-    return tiled_push_ok_err(vm, error);
+    if (map == NULL)
+    {
+        status = tiled_push_i32(vm, -1, error);
+        if (status != VIGIL_STATUS_OK)
+            return status;
+        return tiled_push_err(vm, err_msg[0] != '\0' ? err_msg : "failed to parse tiled map", error);
+    }
+    return tiled_store_and_push(vm, map, error);
+}
+
+/* ── tiled.parse(text, format) -> (i32, err) ─────────────────────── */
+
+static vigil_status_t tiled_parse_fn(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    vigil_value_t text_val = vigil_vm_stack_get(vm, base);
+    vigil_value_t fmt_val = vigil_vm_stack_get(vm, base + 1U);
+    vigil_object_t *text_obj = vigil_value_as_object(&text_val);
+    vigil_object_t *fmt_obj = vigil_value_as_object(&fmt_val);
+    const char *text;
+    size_t text_len;
+    const char *format;
+    tiled_map_t *map;
+    char err_msg[128];
+    vigil_status_t status;
+
+    if (text_obj == NULL || vigil_object_type(text_obj) != VIGIL_OBJECT_STRING || fmt_obj == NULL ||
+        vigil_object_type(fmt_obj) != VIGIL_OBJECT_STRING)
+    {
+        vigil_vm_stack_pop_n(vm, arg_count);
+        status = tiled_push_i32(vm, -1, error);
+        if (status != VIGIL_STATUS_OK)
+            return status;
+        return tiled_push_err(vm, "tiled.parse() requires (string text, string format)", error);
+    }
+    text = vigil_string_object_c_str(text_obj);
+    text_len = vigil_string_object_length(text_obj);
+    format = vigil_string_object_c_str(fmt_obj);
+
+    err_msg[0] = '\0';
+    map = tiled_parse_text(text, text_len, format, err_msg, sizeof(err_msg));
+
+    vigil_vm_stack_pop_n(vm, arg_count);
+    if (map == NULL)
+    {
+        status = tiled_push_i32(vm, -1, error);
+        if (status != VIGIL_STATUS_OK)
+            return status;
+        return tiled_push_err(vm, err_msg[0] != '\0' ? err_msg : "failed to parse tiled map", error);
+    }
+    return tiled_store_and_push(vm, map, error);
 }
 
 /* ── Map accessor functions ──────────────────────────────────────── */
@@ -1048,10 +1095,12 @@ static vigil_status_t tiled_close_fn(vigil_vm_t *vm, size_t arg_count, vigil_err
 
 static const int i32_param[] = {VIGIL_TYPE_I32};
 static const int str_param[] = {VIGIL_TYPE_STRING};
+static const int str_str_param[] = {VIGIL_TYPE_STRING, VIGIL_TYPE_STRING};
 static const int i32_i32_param[] = {VIGIL_TYPE_I32, VIGIL_TYPE_I32};
 static const int i32_err_returns[] = {VIGIL_TYPE_I32, VIGIL_TYPE_ERR};
 
 static const char *path_names[] = {"path"};
+static const char *text_format_names[] = {"text", "format"};
 static const char *handle_names[] = {"handle"};
 static const char *handle_index_names[] = {"handle", "index"};
 
@@ -1062,10 +1111,15 @@ static const vigil_native_symbol_doc_t tiled_module_doc = {
     "string name = tiled.layer_name(h, 0);\n"
     "tiled.close(h);"};
 static const vigil_native_symbol_doc_t tiled_load_doc = {
-    "Load a Tiled map.",
+    "Load a Tiled map from a file.",
     "Parses a .tmj (JSON) or .tmx (XML) file and returns a map handle. "
     "The format is detected from the file extension.",
     "i32 h, err e = tiled.load(\"level.tmj\");"};
+static const vigil_native_symbol_doc_t tiled_parse_doc = {
+    "Parse a Tiled map from a string.",
+    "Parses Tiled map data from a string in memory. The format argument must be \"json\" or \"xml\". "
+    "Use this when loading from archives, network, or embedded data.",
+    "i32 h, err e = tiled.parse(map_text, \"json\");"};
 static const vigil_native_symbol_doc_t tiled_close_doc = {
     "Close a Tiled map.", "Frees the parsed map data associated with the handle.", NULL};
 static const vigil_native_symbol_doc_t tiled_width_doc = {"Map width in tiles.",
@@ -1117,6 +1171,9 @@ static const vigil_native_module_function_t tiled_functions[] = {
     /* load(path) -> (i32, err) */
     {"load", 4U, tiled_load_fn, 1U, str_param, VIGIL_TYPE_I32, 2U, i32_err_returns, 0, NULL, NULL, 0U, path_names, NULL,
      NULL, &tiled_load_doc},
+    /* parse(text, format) -> (i32, err) */
+    {"parse", 5U, tiled_parse_fn, 2U, str_str_param, VIGIL_TYPE_I32, 2U, i32_err_returns, 0, NULL, NULL, 0U,
+     text_format_names, NULL, NULL, &tiled_parse_doc},
     /* close(handle) -> i32 */
     {"close", 5U, tiled_close_fn, 1U, i32_param, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, NULL, 0U, handle_names, NULL, NULL,
      &tiled_close_doc},
