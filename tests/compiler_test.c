@@ -2240,13 +2240,12 @@ TEST(VigilCompilerTest, RejectsInterfaceMethodsMissingParameterNames)
 
 TEST(VigilCompilerTest, AcceptsInterfaceMethodsWithoutSemicolons)
 {
-    EXPECT_EQ(CompileAndRun(vigil_test_failed_,
-                            "interface Reader {"
-                            "    fn read() -> i32"
-                            "}"
-                            "fn main() -> i32 {"
-                            "    return 0;"
-                            "}"),
+    EXPECT_EQ(CompileAndRun(vigil_test_failed_, "interface Reader {"
+                                                "    fn read() -> i32"
+                                                "}"
+                                                "fn main() -> i32 {"
+                                                "    return 0;"
+                                                "}"),
               0);
 }
 
@@ -3310,6 +3309,23 @@ static void register_compiler_import_tests(void)
     REGISTER_TEST(VigilCompilerTest, AllowsDiamondImportsWithoutCycle);
 }
 
+TEST(VigilCompilerTest, AcceptsTrailingCommasInCallsArraysAndMaps)
+{
+    EXPECT_EQ(CompileAndRun(vigil_test_failed_, "fn add(i32 a, i32 b) -> i32 { return a + b; }\n"
+                                                "fn main() -> i32 {\n"
+                                                "    i32 x = add(3, 4,);\n"
+                                                "    array<i32> a = [10, 20,];\n"
+                                                "    map<string, i32> m = {\"k\": 1,};\n"
+                                                "    return x + a.len() + m.len();\n"
+                                                "}\n"),
+              10);
+}
+
+TEST(VigilCompilerTest, ImplicitSemiBeforeClosingBrace)
+{
+    EXPECT_EQ(CompileAndRun(vigil_test_failed_, "fn main() -> i32 { if true { return 7 } return 0 }"), 7);
+}
+
 static void register_compiler_defer_tests(void)
 {
     REGISTER_TEST(VigilCompilerTest, CompilesAndExecutesDeferredFunctionValues);
@@ -3445,4 +3461,6 @@ void register_compiler_tests(void)
     REGISTER_TEST(VigilCompilerTest, ReportsSyntaxErrorsForUnsupportedShape);
     register_compiler_import_tests();
     register_compiler_defer_tests();
+    REGISTER_TEST(VigilCompilerTest, AcceptsTrailingCommasInCallsArraysAndMaps);
+    REGISTER_TEST(VigilCompilerTest, ImplicitSemiBeforeClosingBrace);
 }

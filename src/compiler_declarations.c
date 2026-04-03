@@ -1115,8 +1115,7 @@ static vigil_status_t vigil_program_parse_interface_method(vigil_program_state_t
         else if (semi_token != NULL && semi_token->kind == VIGIL_TOKEN_RBRACE)
             (void)0; /* don't consume — the interface body loop handles it */
         else
-            return vigil_compile_report(program, method_name_token->span,
-                                        "expected ';' after interface method");
+            return vigil_compile_report(program, method_name_token->span, "expected ';' after interface method");
     }
     return VIGIL_STATUS_OK;
 }

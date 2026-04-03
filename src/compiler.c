@@ -7279,8 +7279,8 @@ static vigil_status_t vigil_parser_parse_native_method_call(vigil_parser_state_t
         {
             return status;
         }
-        status = vigil_parser_emit_opcode(
-            state, defer_call ? VIGIL_OPCODE_DEFER_CALL_NATIVE : VIGIL_OPCODE_CALL_NATIVE, method_token->span);
+        status = vigil_parser_emit_opcode(state, defer_call ? VIGIL_OPCODE_DEFER_CALL_NATIVE : VIGIL_OPCODE_CALL_NATIVE,
+                                          method_token->span);
         if (status != VIGIL_STATUS_OK)
         {
             return status;
@@ -10555,9 +10555,8 @@ static vigil_status_t vigil_parser_parse_return_statement(vigil_parser_state_t *
     if (status != VIGIL_STATUS_OK)
         return status;
 
-    status =
-        vigil_parser_expect_semi(state,
-                            is_void_return ? "expected ';' after return" : "expected ';' after return value");
+    status = vigil_parser_expect_semi(state,
+                                      is_void_return ? "expected ';' after return" : "expected ';' after return value");
     if (status != VIGIL_STATUS_OK)
         return status;
     status = emit_return_statement(state, return_token->span, is_void_return);

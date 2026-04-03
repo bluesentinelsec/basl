@@ -487,9 +487,8 @@ static vigil_status_t vigil_lexer_scan_token(vigil_lexer_state_t *state)
             size_t peek = state->offset;
             for (;;)
             {
-                while (peek < state->length &&
-                       (state->text[peek] == ' ' || state->text[peek] == '\t' ||
-                        state->text[peek] == '\r' || state->text[peek] == '\n'))
+                while (peek < state->length && (state->text[peek] == ' ' || state->text[peek] == '\t' ||
+                                                state->text[peek] == '\r' || state->text[peek] == '\n'))
                     peek++;
                 if (peek + 1U < state->length && state->text[peek] == '/' && state->text[peek + 1U] == '/')
                 {
@@ -500,8 +499,7 @@ static vigil_status_t vigil_lexer_scan_token(vigil_lexer_state_t *state)
                 if (peek + 1U < state->length && state->text[peek] == '/' && state->text[peek + 1U] == '*')
                 {
                     peek += 2U;
-                    while (peek + 1U < state->length &&
-                           !(state->text[peek] == '*' && state->text[peek + 1U] == '/'))
+                    while (peek + 1U < state->length && !(state->text[peek] == '*' && state->text[peek + 1U] == '/'))
                         peek++;
                     if (peek + 1U < state->length)
                         peek += 2U;
