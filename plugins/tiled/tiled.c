@@ -1055,32 +1055,63 @@ static const char *path_names[] = {"path"};
 static const char *handle_names[] = {"handle"};
 static const char *handle_index_names[] = {"handle", "index"};
 
-static const vigil_native_symbol_doc_t tiled_module_doc = {"Tiled map parser.", "Parse Tiled .tmj/.tmx map files.",
-                                                           NULL};
-static const vigil_native_symbol_doc_t tiled_load_doc = {"Load a Tiled map.",
-                                                         "Parses a .tmj or .tmx file and returns a map handle.", NULL};
-static const vigil_native_symbol_doc_t tiled_close_doc = {"Close a Tiled map.", "Frees the parsed map data.", NULL};
-static const vigil_native_symbol_doc_t tiled_width_doc = {"Map width in tiles.", NULL, NULL};
-static const vigil_native_symbol_doc_t tiled_height_doc = {"Map height in tiles.", NULL, NULL};
-static const vigil_native_symbol_doc_t tiled_tw_doc = {"Tile width in pixels.", NULL, NULL};
-static const vigil_native_symbol_doc_t tiled_th_doc = {"Tile height in pixels.", NULL, NULL};
-static const vigil_native_symbol_doc_t tiled_orient_doc = {"Map orientation.", NULL, NULL};
-static const vigil_native_symbol_doc_t tiled_lc_doc = {"Number of layers.", NULL, NULL};
-static const vigil_native_symbol_doc_t tiled_tsc_doc = {"Number of tilesets.", NULL, NULL};
-static const vigil_native_symbol_doc_t tiled_inf_doc = {"Whether the map is infinite.", NULL, NULL};
-static const vigil_native_symbol_doc_t tiled_ln_doc = {"Layer name.", NULL, NULL};
-static const vigil_native_symbol_doc_t tiled_lt_doc = {"Layer type.", NULL, NULL};
-static const vigil_native_symbol_doc_t tiled_lw_doc = {"Layer width.", NULL, NULL};
-static const vigil_native_symbol_doc_t tiled_lh_doc = {"Layer height.", NULL, NULL};
-static const vigil_native_symbol_doc_t tiled_ld_doc = {"Tile layer GID data.", NULL, NULL};
-static const vigil_native_symbol_doc_t tiled_loc_doc = {"Object count in layer.", NULL, NULL};
-static const vigil_native_symbol_doc_t tiled_tsn_doc = {"Tileset name.", NULL, NULL};
-static const vigil_native_symbol_doc_t tiled_tsg_doc = {"Tileset first GID.", NULL, NULL};
-static const vigil_native_symbol_doc_t tiled_tsi_doc = {"Tileset image path.", NULL, NULL};
-static const vigil_native_symbol_doc_t tiled_tstw_doc = {"Tileset tile width.", NULL, NULL};
-static const vigil_native_symbol_doc_t tiled_tsth_doc = {"Tileset tile height.", NULL, NULL};
-static const vigil_native_symbol_doc_t tiled_tstc_doc = {"Tileset tile count.", NULL, NULL};
-static const vigil_native_symbol_doc_t tiled_tscol_doc = {"Tileset columns.", NULL, NULL};
+static const vigil_native_symbol_doc_t tiled_module_doc = {
+    "Tiled map parser.", "Parse Tiled .tmj/.tmx map files. Returns an integer handle used to query map data.",
+    "i32 h, err e = tiled.load(\"level.tmj\");\n"
+    "i32 w = tiled.map_width(h);\n"
+    "string name = tiled.layer_name(h, 0);\n"
+    "tiled.close(h);"};
+static const vigil_native_symbol_doc_t tiled_load_doc = {
+    "Load a Tiled map.",
+    "Parses a .tmj (JSON) or .tmx (XML) file and returns a map handle. "
+    "The format is detected from the file extension.",
+    "i32 h, err e = tiled.load(\"level.tmj\");"};
+static const vigil_native_symbol_doc_t tiled_close_doc = {
+    "Close a Tiled map.", "Frees the parsed map data associated with the handle.", NULL};
+static const vigil_native_symbol_doc_t tiled_width_doc = {"Map width in tiles.",
+                                                          "Returns the number of tile columns in the map.", NULL};
+static const vigil_native_symbol_doc_t tiled_height_doc = {"Map height in tiles.",
+                                                           "Returns the number of tile rows in the map.", NULL};
+static const vigil_native_symbol_doc_t tiled_tw_doc = {"Tile width in pixels.",
+                                                       "Returns the width of each tile in pixels.", NULL};
+static const vigil_native_symbol_doc_t tiled_th_doc = {"Tile height in pixels.",
+                                                       "Returns the height of each tile in pixels.", NULL};
+static const vigil_native_symbol_doc_t tiled_orient_doc = {
+    "Map orientation.", "Returns \"orthogonal\", \"isometric\", \"staggered\", or \"hexagonal\".", NULL};
+static const vigil_native_symbol_doc_t tiled_lc_doc = {"Number of top-level layers.",
+                                                       "Returns the count of layers at the root of the map.", NULL};
+static const vigil_native_symbol_doc_t tiled_tsc_doc = {"Number of tilesets.",
+                                                        "Returns the count of tilesets referenced by the map.", NULL};
+static const vigil_native_symbol_doc_t tiled_inf_doc = {
+    "Whether the map is infinite.", "Infinite maps use chunked tile data instead of a flat array.", NULL};
+static const vigil_native_symbol_doc_t tiled_ln_doc = {"Layer name.",
+                                                       "Returns the name of the layer at the given index.", NULL};
+static const vigil_native_symbol_doc_t tiled_lt_doc = {
+    "Layer type.", "Returns \"tilelayer\", \"objectgroup\", \"imagelayer\", or \"group\".", NULL};
+static const vigil_native_symbol_doc_t tiled_lw_doc = {"Layer width in tiles.", "Returns the width of the tile layer.",
+                                                       NULL};
+static const vigil_native_symbol_doc_t tiled_lh_doc = {"Layer height in tiles.",
+                                                       "Returns the height of the tile layer.", NULL};
+static const vigil_native_symbol_doc_t tiled_ld_doc = {
+    "Tile layer GID data.",
+    "Returns an array of tile GIDs for the layer. Flip flags are masked off. A GID of 0 means an empty tile.", NULL};
+static const vigil_native_symbol_doc_t tiled_loc_doc = {
+    "Object count in layer.", "Returns the number of objects in an object group layer.", NULL};
+static const vigil_native_symbol_doc_t tiled_tsn_doc = {"Tileset name.",
+                                                        "Returns the name of the tileset at the given index.", NULL};
+static const vigil_native_symbol_doc_t tiled_tsg_doc = {
+    "Tileset first GID.",
+    "Returns the first global tile ID for this tileset. Subtract from a tile GID to get the local tile index.", NULL};
+static const vigil_native_symbol_doc_t tiled_tsi_doc = {"Tileset image path.",
+                                                        "Returns the relative path to the tileset image file.", NULL};
+static const vigil_native_symbol_doc_t tiled_tstw_doc = {
+    "Tileset tile width.", "Returns the width of each tile in the tileset in pixels.", NULL};
+static const vigil_native_symbol_doc_t tiled_tsth_doc = {
+    "Tileset tile height.", "Returns the height of each tile in the tileset in pixels.", NULL};
+static const vigil_native_symbol_doc_t tiled_tstc_doc = {"Tileset tile count.",
+                                                         "Returns the total number of tiles in the tileset.", NULL};
+static const vigil_native_symbol_doc_t tiled_tscol_doc = {
+    "Tileset columns.", "Returns the number of tile columns in the tileset image.", NULL};
 
 static const vigil_native_module_function_t tiled_functions[] = {
     /* load(path) -> (i32, err) */
