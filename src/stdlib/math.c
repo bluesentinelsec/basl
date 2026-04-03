@@ -357,11 +357,11 @@ MATH_DOC(vigil_math_remap_doc, "Remap x from one range into another.");
     {n, nl, vigil_math_##id, 0U, NULL, VIGIL_TYPE_F64, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, &doc}
 
 #define MATH_FN1(id, n, nl, names, doc)                                                                                \
-    {n, nl, vigil_math_##id, 1U, vigil_math_f64_params, VIGIL_TYPE_F64, 1U, NULL, 0, NULL, NULL, 0U, names, NULL, NULL, \
-     &doc}
+    {n,    nl,  vigil_math_##id, 1U, vigil_math_f64_params, VIGIL_TYPE_F64, 1U, NULL, 0, NULL, NULL, 0U, names, NULL,  \
+     NULL, &doc}
 
 #define MATH_FN1_BOOL(id, n, nl, names, doc)                                                                           \
-    {n, nl, vigil_math_##id, 1U, vigil_math_f64_params, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U, names, NULL,      \
+    {n,    nl,  vigil_math_##id, 1U, vigil_math_f64_params, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U, names, NULL, \
      NULL, &doc}
 
 #define MATH_FN2(id, n, nl, names, doc)                                                                                \
@@ -402,8 +402,23 @@ MATH_DOC(vigil_math_remap_doc, "Remap x from one range into another.");
      &doc}
 
 #define MATH_FN5(id, n, nl, names, doc)                                                                                \
-    {n, nl, vigil_math_##id, 5U, vigil_math_f64x5_params, VIGIL_TYPE_F64, 1U, NULL, 0, NULL, NULL, 0U, names, NULL,    \
-     NULL, &doc}
+    {                                                                                                                  \
+        n,                                                                                                             \
+        nl,                                                                                                            \
+        vigil_math_##id,                                                                                               \
+        5U,                                                                                                            \
+        vigil_math_f64x5_params,                                                                                       \
+        VIGIL_TYPE_F64,                                                                                                \
+        1U,                                                                                                            \
+        NULL,                                                                                                          \
+        0,                                                                                                             \
+        NULL,                                                                                                          \
+        NULL,                                                                                                          \
+        0U,                                                                                                            \
+        names,                                                                                                         \
+        NULL,                                                                                                          \
+        NULL,                                                                                                          \
+        &doc}
 
 static const vigil_native_module_function_t vigil_math_functions[] = {
     MATH_FN0(pi, "pi", 2U, vigil_math_pi_doc),
@@ -630,19 +645,19 @@ static vigil_status_t vigil_vec2_reflect(vigil_vm_t *vm, size_t arg_count, vigil
 #define VIGIL_PFIELD_DOC(n, nl, t, doc) {n, nl, t, 0, NULL, 0U, 0, NULL, &doc}
 
 /* Helper: instance method descriptor (is_static=0). */
-#define VIGIL_METHOD_DOC(n, nl, fn, pc, pt, rt, rc, rts, names, types, ret_name, doc)                                 \
+#define VIGIL_METHOD_DOC(n, nl, fn, pc, pt, rt, rc, rts, names, types, ret_name, doc)                                  \
     {n, nl, fn, pc, pt, rt, rc, rts, 0, NULL, 0U, 0, names, types, ret_name, &doc}
 
 /* Helper: static method descriptor (is_static=1). */
-#define VIGIL_STATIC_DOC(n, nl, fn, pc, pt, rt, rc, rts, names, types, ret_name, doc)                                 \
+#define VIGIL_STATIC_DOC(n, nl, fn, pc, pt, rt, rc, rts, names, types, ret_name, doc)                                  \
     {n, nl, fn, pc, pt, rt, rc, rts, 1, NULL, 0U, 0, names, types, ret_name, &doc}
 
 /* Helper: instance method returning a different class. */
-#define VIGIL_METHOD_RET_DOC(n, nl, fn, pc, pt, rt, rc, rts, cn, cnl, names, types, ret_name, doc)                    \
+#define VIGIL_METHOD_RET_DOC(n, nl, fn, pc, pt, rt, rc, rts, cn, cnl, names, types, ret_name, doc)                     \
     {n, nl, fn, pc, pt, rt, rc, rts, 0, cn, cnl, 0, names, types, ret_name, &doc}
 
 /* Helper: static method returning a different class. */
-#define VIGIL_STATIC_RET_DOC(n, nl, fn, pc, pt, rt, rc, rts, cn, cnl, names, types, ret_name, doc)                    \
+#define VIGIL_STATIC_RET_DOC(n, nl, fn, pc, pt, rt, rc, rts, cn, cnl, names, types, ret_name, doc)                     \
     {n, nl, fn, pc, pt, rt, rc, rts, 1, cn, cnl, 0, names, types, ret_name, &doc}
 
 MATH_DOC(vigil_vec2_doc, "Two-dimensional floating-point vector.");
@@ -770,7 +785,8 @@ static const char *const math_pitch_yaw_roll_param_names[] = {"pitch", "yaw", "r
 static const char *const math_eye_target_up_param_names[] = {"eye", "target", "up"};
 static const char *const math_three_vec3_param_types[] = {"math.Vec3", "math.Vec3", "math.Vec3"};
 static const char *const math_fov_aspect_near_far_param_names[] = {"fov_y", "aspect", "near", "far"};
-static const char *const math_left_right_bottom_top_near_far_param_names[] = {"left", "right", "bottom", "top", "near", "far"};
+static const char *const math_left_right_bottom_top_near_far_param_names[] = {"left", "right", "bottom",
+                                                                              "top",  "near",  "far"};
 static const char *const math_row_col_param_names[] = {"row", "col"};
 static const char *const math_row_col_value_param_names[] = {"row", "col", "value"};
 static const char *const math_other_mat4_param_names[] = {"other"};
@@ -2328,7 +2344,12 @@ static const vigil_native_class_t vigil_math_classes[] = {
 
 #define VIGIL_MATH_CLASS_COUNT (sizeof(vigil_math_classes) / sizeof(vigil_math_classes[0]))
 
-VIGIL_API const vigil_native_module_t vigil_stdlib_math = {
-    "math", 4U, vigil_math_functions, VIGIL_MATH_FUNCTION_COUNT, vigil_math_classes, VIGIL_MATH_CLASS_COUNT,
-    &vigil_math_module_doc,
-    NULL, 0U};
+VIGIL_API const vigil_native_module_t vigil_stdlib_math = {"math",
+                                                           4U,
+                                                           vigil_math_functions,
+                                                           VIGIL_MATH_FUNCTION_COUNT,
+                                                           vigil_math_classes,
+                                                           VIGIL_MATH_CLASS_COUNT,
+                                                           &vigil_math_module_doc,
+                                                           NULL,
+                                                           0U};

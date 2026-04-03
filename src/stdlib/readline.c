@@ -283,6 +283,6 @@ static const vigil_native_module_function_t vigil_readline_functions[] = {
      NULL, 0U, readline_path_param_names, NULL, NULL, &vigil_readline_history_save_doc}};
 
 VIGIL_API const vigil_native_module_t vigil_stdlib_readline = {
-    "readline", 8, vigil_readline_functions,  sizeof(vigil_readline_functions) / sizeof(vigil_readline_functions[0]),
-    NULL,       0, &vigil_readline_module_doc,
-    NULL, 0U};
+    "readline", 8, vigil_readline_functions,   sizeof(vigil_readline_functions) / sizeof(vigil_readline_functions[0]),
+    NULL,       0, &vigil_readline_module_doc, NULL,
+    0U};

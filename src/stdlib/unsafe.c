@@ -932,37 +932,28 @@ static const vigil_native_symbol_doc_t vigil_unsafe_module_doc = {
     NULL,
 };
 
-static const vigil_native_symbol_doc_t vigil_unsafe_alloc_doc = {"Allocate a buffer.",
-                                                                 "Returns a handle to a zero-initialized buffer.",
-                                                                 "i64 buf = unsafe.alloc(256)"};
-static const vigil_native_symbol_doc_t vigil_unsafe_realloc_doc = {"Resize a buffer.",
-                                                                   "Returns the (possibly new) handle.",
-                                                                   "buf = unsafe.realloc(buf, 512)"};
+static const vigil_native_symbol_doc_t vigil_unsafe_alloc_doc = {
+    "Allocate a buffer.", "Returns a handle to a zero-initialized buffer.", "i64 buf = unsafe.alloc(256)"};
+static const vigil_native_symbol_doc_t vigil_unsafe_realloc_doc = {
+    "Resize a buffer.", "Returns the (possibly new) handle.", "buf = unsafe.realloc(buf, 512)"};
 static const vigil_native_symbol_doc_t vigil_unsafe_free_doc = {"Free a buffer.", "Releases the buffer memory.",
                                                                 "unsafe.free(buf)"};
-static const vigil_native_symbol_doc_t vigil_unsafe_ptr_doc = {"Get raw pointer.",
-                                                               "Returns the underlying C pointer for FFI use.",
-                                                               "i64 p = unsafe.ptr(buf)"};
-static const vigil_native_symbol_doc_t vigil_unsafe_len_doc = {"Get buffer length.",
-                                                               "Returns the allocated size in bytes.",
-                                                               "i32 n = unsafe.len(buf)"};
-static const vigil_native_symbol_doc_t vigil_unsafe_get_doc = {"Read a byte.",
-                                                               "Returns the byte value at the given offset.",
-                                                               "i32 b = unsafe.get(buf, 0)"};
+static const vigil_native_symbol_doc_t vigil_unsafe_ptr_doc = {
+    "Get raw pointer.", "Returns the underlying C pointer for FFI use.", "i64 p = unsafe.ptr(buf)"};
+static const vigil_native_symbol_doc_t vigil_unsafe_len_doc = {
+    "Get buffer length.", "Returns the allocated size in bytes.", "i32 n = unsafe.len(buf)"};
+static const vigil_native_symbol_doc_t vigil_unsafe_get_doc = {
+    "Read a byte.", "Returns the byte value at the given offset.", "i32 b = unsafe.get(buf, 0)"};
 static const vigil_native_symbol_doc_t vigil_unsafe_set_doc = {"Write a byte.", "Sets the byte at the given offset.",
                                                                "unsafe.set(buf, 0, 0xFF)"};
-static const vigil_native_symbol_doc_t vigil_unsafe_get_i32_doc = {"Read a 32-bit integer.",
-                                                                   "Reads a native-endian i32 at the given byte offset.",
-                                                                   "i32 v = unsafe.get_i32(buf, 0)"};
-static const vigil_native_symbol_doc_t vigil_unsafe_set_i32_doc = {"Write a 32-bit integer.",
-                                                                   "Writes a native-endian i32 at the given byte offset.",
-                                                                   "unsafe.set_i32(buf, 0, 42)"};
-static const vigil_native_symbol_doc_t vigil_unsafe_get_i64_doc = {"Read a 64-bit integer.",
-                                                                   "Reads a native-endian i64 at the given byte offset.",
-                                                                   "i64 v = unsafe.get_i64(buf, 0)"};
-static const vigil_native_symbol_doc_t vigil_unsafe_set_i64_doc = {"Write a 64-bit integer.",
-                                                                   "Writes a native-endian i64 at the given byte offset.",
-                                                                   "unsafe.set_i64(buf, 0, 100)"};
+static const vigil_native_symbol_doc_t vigil_unsafe_get_i32_doc = {
+    "Read a 32-bit integer.", "Reads a native-endian i32 at the given byte offset.", "i32 v = unsafe.get_i32(buf, 0)"};
+static const vigil_native_symbol_doc_t vigil_unsafe_set_i32_doc = {
+    "Write a 32-bit integer.", "Writes a native-endian i32 at the given byte offset.", "unsafe.set_i32(buf, 0, 42)"};
+static const vigil_native_symbol_doc_t vigil_unsafe_get_i64_doc = {
+    "Read a 64-bit integer.", "Reads a native-endian i64 at the given byte offset.", "i64 v = unsafe.get_i64(buf, 0)"};
+static const vigil_native_symbol_doc_t vigil_unsafe_set_i64_doc = {
+    "Write a 64-bit integer.", "Writes a native-endian i64 at the given byte offset.", "unsafe.set_i64(buf, 0, 100)"};
 static const vigil_native_symbol_doc_t vigil_unsafe_get_f32_doc = {
     "Read a 32-bit float.",
     "Reads a native-endian f32 at the given byte offset and returns it as f64.",
@@ -973,12 +964,10 @@ static const vigil_native_symbol_doc_t vigil_unsafe_set_f32_doc = {
     "Writes a native-endian f32 value at the given byte offset.",
     "unsafe.set_f32(buf, 0, 3.5)",
 };
-static const vigil_native_symbol_doc_t vigil_unsafe_get_f64_doc = {"Read a 64-bit float.",
-                                                                   "Reads a native-endian f64 at the given byte offset.",
-                                                                   "f64 v = unsafe.get_f64(buf, 0)"};
-static const vigil_native_symbol_doc_t vigil_unsafe_set_f64_doc = {"Write a 64-bit float.",
-                                                                   "Writes a native-endian f64 at the given byte offset.",
-                                                                   "unsafe.set_f64(buf, 0, 3.14)"};
+static const vigil_native_symbol_doc_t vigil_unsafe_get_f64_doc = {
+    "Read a 64-bit float.", "Reads a native-endian f64 at the given byte offset.", "f64 v = unsafe.get_f64(buf, 0)"};
+static const vigil_native_symbol_doc_t vigil_unsafe_set_f64_doc = {
+    "Write a 64-bit float.", "Writes a native-endian f64 at the given byte offset.", "unsafe.set_f64(buf, 0, 3.14)"};
 static const vigil_native_symbol_doc_t vigil_unsafe_write_str_doc = {
     "Write a string into a buffer.",
     "Copies the string bytes into the buffer starting at the given byte offset.",
@@ -987,9 +976,8 @@ static const vigil_native_symbol_doc_t vigil_unsafe_write_str_doc = {
 static const vigil_native_symbol_doc_t vigil_unsafe_copy_doc = {"Copy bytes between buffers.",
                                                                 "Copies len bytes from src+src_off to dst+dst_off.",
                                                                 "unsafe.copy(dst, 0, src, 0, 64)"};
-static const vigil_native_symbol_doc_t vigil_unsafe_peek_u8_doc = {"Read a byte from a raw pointer.",
-                                                                   "Reads an unchecked u8 from ptr + offset.",
-                                                                   "i32 b = unsafe.peek_u8(ptr, 0)"};
+static const vigil_native_symbol_doc_t vigil_unsafe_peek_u8_doc = {
+    "Read a byte from a raw pointer.", "Reads an unchecked u8 from ptr + offset.", "i32 b = unsafe.peek_u8(ptr, 0)"};
 static const vigil_native_symbol_doc_t vigil_unsafe_peek_i32_doc = {
     "Read a 32-bit integer from a raw pointer.",
     "Reads an unchecked native-endian i32 from ptr + offset.",
@@ -1015,9 +1003,8 @@ static const vigil_native_symbol_doc_t vigil_unsafe_peek_ptr_doc = {
     "Reads an unchecked pointer-sized value from ptr + offset.",
     "i64 p = unsafe.peek_ptr(ptr, 0)",
 };
-static const vigil_native_symbol_doc_t vigil_unsafe_poke_u8_doc = {"Write a byte to a raw pointer.",
-                                                                   "Writes an unchecked u8 value to ptr + offset.",
-                                                                   "unsafe.poke_u8(ptr, 0, 0xff)"};
+static const vigil_native_symbol_doc_t vigil_unsafe_poke_u8_doc = {
+    "Write a byte to a raw pointer.", "Writes an unchecked u8 value to ptr + offset.", "unsafe.poke_u8(ptr, 0, 0xff)"};
 static const vigil_native_symbol_doc_t vigil_unsafe_poke_i32_doc = {
     "Write a 32-bit integer to a raw pointer.",
     "Writes an unchecked native-endian i32 to ptr + offset.",
@@ -1043,12 +1030,10 @@ static const vigil_native_symbol_doc_t vigil_unsafe_poke_ptr_doc = {
     "Writes an unchecked pointer-sized value to ptr + offset.",
     "unsafe.poke_ptr(ptr, 0, other_ptr)",
 };
-static const vigil_native_symbol_doc_t vigil_unsafe_null_doc = {"Get null pointer.",
-                                                                "Returns 0 (null pointer constant).",
-                                                                "i64 p = unsafe.null()"};
-static const vigil_native_symbol_doc_t vigil_unsafe_sizeof_doc = {"Get type size.",
-                                                                  "Returns the size in bytes of a C type name.",
-                                                                  "i32 n = unsafe.sizeof(\"int\")"};
+static const vigil_native_symbol_doc_t vigil_unsafe_null_doc = {
+    "Get null pointer.", "Returns 0 (null pointer constant).", "i64 p = unsafe.null()"};
+static const vigil_native_symbol_doc_t vigil_unsafe_sizeof_doc = {
+    "Get type size.", "Returns the size in bytes of a C type name.", "i32 n = unsafe.sizeof(\"int\")"};
 static const vigil_native_symbol_doc_t vigil_unsafe_sizeof_ptr_doc = {
     "Get pointer size.",
     "Returns the size of a pointer on this platform (4 or 8).",
@@ -1073,9 +1058,8 @@ static const vigil_native_symbol_doc_t vigil_unsafe_errno_doc = {"Get errno.", "
                                                                  "i32 e = unsafe.errno()"};
 static const vigil_native_symbol_doc_t vigil_unsafe_set_errno_doc = {"Set errno.", "Sets the C errno value.",
                                                                      "unsafe.set_errno(0)"};
-static const vigil_native_symbol_doc_t vigil_unsafe_str_doc = {"Read C string.",
-                                                               "Reads a null-terminated string from a raw pointer.",
-                                                               "string s = unsafe.str(ptr)"};
+static const vigil_native_symbol_doc_t vigil_unsafe_str_doc = {
+    "Read C string.", "Reads a null-terminated string from a raw pointer.", "string s = unsafe.str(ptr)"};
 static const vigil_native_symbol_doc_t vigil_unsafe_cb_alloc_doc = {
     "Allocate a callback slot.",
     "Returns an FFI callback slot handle for advanced unsafe callback plumbing.",
@@ -1170,8 +1154,8 @@ static const vigil_native_module_function_t vigil_unsafe_functions[] = {
      &vigil_unsafe_errno_doc},
     {"set_errno", 9U, vigil_unsafe_set_errno, 1U, p_i32, VIGIL_TYPE_VOID, 0, NULL, 0, NULL, NULL, 0U,
      unsafe_errno_param_names, NULL, NULL, &vigil_unsafe_set_errno_doc},
-    {"str", 3U, vigil_unsafe_str, 1U, p_i64, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U, unsafe_ptr_offset_param_names,
-     NULL, NULL, &vigil_unsafe_str_doc},
+    {"str", 3U, vigil_unsafe_str, 1U, p_i64, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U,
+     unsafe_ptr_offset_param_names, NULL, NULL, &vigil_unsafe_str_doc},
     {"cb_alloc", 8U, vigil_unsafe_cb_alloc, 0U, NULL, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL,
      &vigil_unsafe_cb_alloc_doc},
     {"cb_free", 7U, vigil_unsafe_cb_free, 1U, p_i32, VIGIL_TYPE_VOID, 0, NULL, 0, NULL, NULL, 0U,
@@ -1182,6 +1166,6 @@ static const vigil_native_module_function_t vigil_unsafe_functions[] = {
 #undef FV
 
 VIGIL_API const vigil_native_module_t vigil_stdlib_unsafe = {
-    "unsafe", 6U,  vigil_unsafe_functions, sizeof(vigil_unsafe_functions) / sizeof(vigil_unsafe_functions[0]), NULL,
-    0U,       &vigil_unsafe_module_doc,
-    NULL, 0U};
+    "unsafe", 6U, vigil_unsafe_functions,   sizeof(vigil_unsafe_functions) / sizeof(vigil_unsafe_functions[0]),
+    NULL,     0U, &vigil_unsafe_module_doc, NULL,
+    0U};

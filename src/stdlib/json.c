@@ -1767,12 +1767,18 @@ static const vigil_native_symbol_doc_t vigil_json_value_kind_doc = {
     NULL,
 };
 
-static const vigil_native_symbol_doc_t vigil_json_value_is_null_doc = {"Check for null.", "Returns true when the value is null.", NULL};
-static const vigil_native_symbol_doc_t vigil_json_value_is_bool_doc = {"Check for bool.", "Returns true when the value is a JSON boolean.", NULL};
-static const vigil_native_symbol_doc_t vigil_json_value_is_number_doc = {"Check for number.", "Returns true when the value is a JSON number.", NULL};
-static const vigil_native_symbol_doc_t vigil_json_value_is_string_doc = {"Check for string.", "Returns true when the value is a JSON string.", NULL};
-static const vigil_native_symbol_doc_t vigil_json_value_is_array_doc = {"Check for array.", "Returns true when the value is a JSON array.", NULL};
-static const vigil_native_symbol_doc_t vigil_json_value_is_object_doc = {"Check for object.", "Returns true when the value is a JSON object.", NULL};
+static const vigil_native_symbol_doc_t vigil_json_value_is_null_doc = {"Check for null.",
+                                                                       "Returns true when the value is null.", NULL};
+static const vigil_native_symbol_doc_t vigil_json_value_is_bool_doc = {
+    "Check for bool.", "Returns true when the value is a JSON boolean.", NULL};
+static const vigil_native_symbol_doc_t vigil_json_value_is_number_doc = {
+    "Check for number.", "Returns true when the value is a JSON number.", NULL};
+static const vigil_native_symbol_doc_t vigil_json_value_is_string_doc = {
+    "Check for string.", "Returns true when the value is a JSON string.", NULL};
+static const vigil_native_symbol_doc_t vigil_json_value_is_array_doc = {
+    "Check for array.", "Returns true when the value is a JSON array.", NULL};
+static const vigil_native_symbol_doc_t vigil_json_value_is_object_doc = {
+    "Check for object.", "Returns true when the value is a JSON object.", NULL};
 
 static const vigil_native_symbol_doc_t vigil_json_value_len_doc = {
     "Get object or array length.",
@@ -1863,8 +1869,8 @@ static const vigil_native_class_method_t json_value_methods[] = {
      &vigil_json_value_len_doc},
     {"as_bool", 7U, json_value_as_bool, 0U, NULL, VIGIL_TYPE_BOOL, 2U, bool_err_returns, 0, NULL, 0U, 0, NULL, NULL,
      NULL, &vigil_json_value_as_bool_doc},
-    {"as_number", 9U, json_value_as_number, 0U, NULL, VIGIL_TYPE_F64, 2U, f64_err_returns, 0, NULL, 0U, 0, NULL,
-     NULL, NULL, &vigil_json_value_as_number_doc},
+    {"as_number", 9U, json_value_as_number, 0U, NULL, VIGIL_TYPE_F64, 2U, f64_err_returns, 0, NULL, 0U, 0, NULL, NULL,
+     NULL, &vigil_json_value_as_number_doc},
     {"as_string", 9U, json_value_as_string, 0U, NULL, VIGIL_TYPE_STRING, 2U, str_err_returns, 0, NULL, 0U, 0, NULL,
      NULL, NULL, &vigil_json_value_as_string_doc},
     {"at", 2U, json_value_at, 1U, i32_param, VIGIL_TYPE_OBJECT, 2U, obj_err_returns, 0, NULL, 0U, 0,
@@ -1893,4 +1899,5 @@ VIGIL_API const vigil_native_module_t vigil_stdlib_json = {"json",
                                                            json_classes,
                                                            sizeof(json_classes) / sizeof(json_classes[0]),
                                                            &vigil_json_module_doc,
-    NULL, 0U};
+                                                           NULL,
+                                                           0U};

@@ -533,7 +533,8 @@ static const char *const csv_array_string_type_names[] = {"array<string>"};
 
 static const vigil_native_symbol_doc_t vigil_csv_module_doc = {
     "CSV parsing and generation.",
-    "The csv module provides RFC 4180 compliant CSV parsing and generation. It handles quoted fields, escaped quotes, and CRLF line endings.",
+    "The csv module provides RFC 4180 compliant CSV parsing and generation. It handles quoted fields, escaped quotes, "
+    "and CRLF line endings.",
     NULL,
 };
 
@@ -566,14 +567,13 @@ static const vigil_native_module_function_t csv_functions[] = {
      csv_data_param_names, NULL, "array<array<string>>", &vigil_csv_parse_doc},
     {"parse_row", 9U, csv_parse_row, 1U, str_param, VIGIL_TYPE_OBJECT, 1U, NULL, 0, NULL, &array_string_ret, 0U,
      csv_line_param_names, NULL, "array<string>", &vigil_csv_parse_row_doc},
-    {"stringify", 9U, csv_stringify, 1U, arr_param, VIGIL_TYPE_STRING, 1U, NULL, 0, &array_array_string_param, NULL,
-     0U, csv_rows_param_names, csv_array_array_string_type_names, NULL, &vigil_csv_stringify_doc},
+    {"stringify", 9U, csv_stringify, 1U, arr_param, VIGIL_TYPE_STRING, 1U, NULL, 0, &array_array_string_param, NULL, 0U,
+     csv_rows_param_names, csv_array_array_string_type_names, NULL, &vigil_csv_stringify_doc},
     {"stringify_row", 13U, csv_stringify_row, 1U, arr_param, VIGIL_TYPE_STRING, 1U, NULL, 0, &array_string_param, NULL,
      0U, csv_row_param_names, csv_array_string_type_names, NULL, &vigil_csv_stringify_row_doc},
 };
 
 #define CSV_FUNCTION_COUNT (sizeof(csv_functions) / sizeof(csv_functions[0]))
 
-VIGIL_API const vigil_native_module_t vigil_stdlib_csv = {"csv", 3U, csv_functions, CSV_FUNCTION_COUNT, NULL, 0U,
-                                                          &vigil_csv_module_doc,
-    NULL, 0U};
+VIGIL_API const vigil_native_module_t vigil_stdlib_csv = {
+    "csv", 3U, csv_functions, CSV_FUNCTION_COUNT, NULL, 0U, &vigil_csv_module_doc, NULL, 0U};

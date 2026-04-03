@@ -527,7 +527,8 @@ static const char *const regex_pattern_input_replacement_param_names[] = {"patte
 
 static const vigil_native_symbol_doc_t vigil_regex_module_doc = {
     "Regular expression matching (RE2-style).",
-    "The regex module provides pattern matching with linear time guarantees using a Thompson NFA implementation without catastrophic backtracking.",
+    "The regex module provides pattern matching with linear time guarantees using a Thompson NFA implementation "
+    "without catastrophic backtracking.",
     NULL,
 };
 
@@ -576,8 +577,8 @@ static const vigil_native_module_function_t vigil_regex_functions[] = {
      NULL, 0U, regex_pattern_input_param_names, NULL, "array<string>", &vigil_regex_find_all_doc},
     {"replace", 7U, vigil_regex_replace_fn, 3U, replace_params, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U,
      regex_pattern_input_replacement_param_names, NULL, NULL, &vigil_regex_replace_doc},
-    {"replace_all", 11U, vigil_regex_replace_all_fn, 3U, replace_params, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL,
-     0U, regex_pattern_input_replacement_param_names, NULL, NULL, &vigil_regex_replace_all_doc},
+    {"replace_all", 11U, vigil_regex_replace_all_fn, 3U, replace_params, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U,
+     regex_pattern_input_replacement_param_names, NULL, NULL, &vigil_regex_replace_all_doc},
     {"split", 5U, vigil_regex_split_fn, 2U, split_params, VIGIL_TYPE_OBJECT, 1U, NULL, VIGIL_TYPE_STRING, NULL, NULL,
      0U, regex_pattern_input_param_names, NULL, "array<string>", &vigil_regex_split_doc},
 };
@@ -585,5 +586,4 @@ static const vigil_native_module_function_t vigil_regex_functions[] = {
 #define VIGIL_REGEX_FUNCTION_COUNT (sizeof(vigil_regex_functions) / sizeof(vigil_regex_functions[0]))
 
 VIGIL_API const vigil_native_module_t vigil_stdlib_regex = {
-    "regex", 5U, vigil_regex_functions, VIGIL_REGEX_FUNCTION_COUNT, NULL, 0U, &vigil_regex_module_doc,
-    NULL, 0U};
+    "regex", 5U, vigil_regex_functions, VIGIL_REGEX_FUNCTION_COUNT, NULL, 0U, &vigil_regex_module_doc, NULL, 0U};

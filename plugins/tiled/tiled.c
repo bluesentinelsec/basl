@@ -1226,4 +1226,4 @@ static const vigil_native_module_function_t tiled_functions[] = {
 
 VIGIL_API const vigil_native_module_t vigil_plugin_tiled = {
     "tiled", 5U, tiled_functions, sizeof(tiled_functions) / sizeof(tiled_functions[0]), NULL, 0U, &tiled_module_doc,
-    NULL, 0U};
+    NULL,    0U};

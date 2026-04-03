@@ -592,9 +592,7 @@ static vigil_status_t sdl_fn_get_revision(vigil_vm_t *vm, size_t arg_count, vigi
 
 /* ── Init flag constants ─────────────────────────────────────────── */
 
-
 /* ── Window flag constants ───────────────────────────────────────── */
-
 
 /* ── Window handle registry ──────────────────────────────────────── */
 
@@ -1945,7 +1943,6 @@ static vigil_status_t sdl_event_gamepad_button(vigil_vm_t *vm, size_t arg_count,
 }
 
 /* Gamepad axis/button constants */
-
 
 /* Gamepad event type constants */
 
@@ -3374,7 +3371,6 @@ static vigil_status_t sdl_texture_get_scale_mode(vigil_vm_t *vm, size_t arg_coun
     return sdl_push_i32(vm, (int32_t)mode, error);
 }
 
-
 /* ── Slice 19: System Info ────────────────────────────────────────── */
 
 static vigil_status_t sdl_fn_get_current_time(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
@@ -3429,7 +3425,6 @@ static vigil_status_t sdl_fn_get_current_video_driver(vigil_vm_t *vm, size_t arg
     vigil_vm_stack_pop_n(vm, arg_count);
     return sdl_push_string(vm, SDL_GetCurrentVideoDriver(), error);
 }
-
 
 /* ── Slice 20: Surface Operations ─────────────────────────────────── */
 
@@ -4692,7 +4687,6 @@ static vigil_status_t sdl_fn_get_path_size(vigil_vm_t *vm, size_t arg_count, vig
         return sdl_push_i64(vm, (int64_t)info.size, error);
     return sdl_push_i64(vm, 0, error);
 }
-
 
 /* ── Slice 34: Remaining Window/Surface ───────────────────────────── */
 
@@ -7176,7 +7170,6 @@ static vigil_status_t sdl_fn_s_wcslen(vigil_vm_t *vm, size_t arg_count, vigil_er
     vigil_vm_stack_pop_n(vm, arg_count); /* Convert to wchar for length count — approximate with utf8strlen */
     return sdl_push_i32(vm, (int32_t)SDL_utf8strlen(a), error);
 }
-
 
 /* ── Window Complete ──────────────────────────────────────────────── */
 
@@ -17095,5 +17088,5 @@ static const vigil_native_module_constant_t sdl_constants[] = {
 #define SDL_CONSTANT_COUNT (sizeof(sdl_constants) / sizeof(sdl_constants[0]))
 
 VIGIL_API const vigil_native_module_t vigil_plugin_sdl = {
-    "sdl", 3U, sdl_functions, SDL_FUNCTION_COUNT, sdl_classes, SDL_CLASS_COUNT, NULL,
-    sdl_constants, SDL_CONSTANT_COUNT};
+    "sdl",           3U,   sdl_functions, SDL_FUNCTION_COUNT, sdl_classes,
+    SDL_CLASS_COUNT, NULL, sdl_constants, SDL_CONSTANT_COUNT};

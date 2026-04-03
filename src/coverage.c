@@ -1242,7 +1242,7 @@ static void coverage_print_json_uncovered_lines(const vigil_coverage_session_t *
 }
 
 static void coverage_print_json_missed_branch(const vigil_coverage_branch_t *branch, FILE *stream, int fallthrough,
-                                               int *first)
+                                              int *first)
 {
     const char *kind;
 
@@ -1259,7 +1259,7 @@ static void coverage_print_json_missed_branch(const vigil_coverage_branch_t *bra
 }
 
 static void coverage_print_json_missed_branches(const vigil_coverage_session_t *session, size_t file_index,
-                                                 FILE *stream)
+                                                FILE *stream)
 {
     size_t branch_index;
     int first;

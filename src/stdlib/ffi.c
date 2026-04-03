@@ -1027,8 +1027,8 @@ static const vigil_native_module_function_t vigil_ffi_functions[] = {
      ffi_lib_name_sig_param_names, NULL, NULL, &vigil_ffi_bind_doc},
     {"call", 4U, vigil_ffi_call, 7U, p_call, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U, ffi_call_param_names, NULL,
      NULL, &vigil_ffi_call_doc},
-    {"call_f", 6U, vigil_ffi_call_f, 3U, p_call_f, VIGIL_TYPE_F64, 1U, NULL, 0, NULL, NULL, 0U,
-     ffi_call_f_param_names, NULL, NULL, &vigil_ffi_call_f_doc},
+    {"call_f", 6U, vigil_ffi_call_f, 3U, p_call_f, VIGIL_TYPE_F64, 1U, NULL, 0, NULL, NULL, 0U, ffi_call_f_param_names,
+     NULL, NULL, &vigil_ffi_call_f_doc},
     {"call_s", 6U, vigil_ffi_call_s, 3U, p_call_s, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U,
      ffi_call_s_param_names, NULL, NULL, &vigil_ffi_call_s_doc},
     {"callback", 8U, vigil_ffi_callback, 2U, p_obj_str, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U,
@@ -1041,6 +1041,6 @@ static const vigil_native_module_function_t vigil_ffi_functions[] = {
 #undef FV
 
 VIGIL_API const vigil_native_module_t vigil_stdlib_ffi = {
-    "ffi", 3U, vigil_ffi_functions, sizeof(vigil_ffi_functions) / sizeof(vigil_ffi_functions[0]), NULL, 0U,
-    &vigil_ffi_module_doc,
-    NULL, 0U};
+    "ffi", 3U, vigil_ffi_functions,   sizeof(vigil_ffi_functions) / sizeof(vigil_ffi_functions[0]),
+    NULL,  0U, &vigil_ffi_module_doc, NULL,
+    0U};

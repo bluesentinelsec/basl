@@ -219,7 +219,8 @@ static const char *const yaml_get_param_names[] = {"yaml", "path"};
 
 static const vigil_native_symbol_doc_t vigil_yaml_module_doc = {
     "YAML parsing.",
-    "The yaml module parses a subset of YAML 1.2 covering scalars, block mappings, block sequences, comments, and quoted strings.",
+    "The yaml module parses a subset of YAML 1.2 covering scalars, block mappings, block sequences, comments, and "
+    "quoted strings.",
     NULL,
 };
 
@@ -244,6 +245,5 @@ static const vigil_native_module_function_t vigil_yaml_functions[] = {
 
 #define YAML_FUNCTION_COUNT (sizeof(vigil_yaml_functions) / sizeof(vigil_yaml_functions[0]))
 
-VIGIL_API const vigil_native_module_t vigil_stdlib_yaml = {"yaml", 4U,  vigil_yaml_functions, YAML_FUNCTION_COUNT, NULL,
-                                                           0U,     &vigil_yaml_module_doc,
-    NULL, 0U};
+VIGIL_API const vigil_native_module_t vigil_stdlib_yaml = {
+    "yaml", 4U, vigil_yaml_functions, YAML_FUNCTION_COUNT, NULL, 0U, &vigil_yaml_module_doc, NULL, 0U};

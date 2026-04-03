@@ -630,7 +630,8 @@ static const char *const log_with_param_names[] = {"key", "value"};
 
 static const vigil_native_symbol_doc_t vigil_log_module_doc = {
     "Structured logging with levels and formats.",
-    "The log module provides structured logging similar to Go's slog package. It supports debug/info/warn/error levels, text and JSON output, and custom handlers for embedders.",
+    "The log module provides structured logging similar to Go's slog package. It supports debug/info/warn/error "
+    "levels, text and JSON output, and custom handlers for embedders.",
     NULL,
 };
 
@@ -715,10 +716,10 @@ static const vigil_native_symbol_doc_t vigil_log_with_doc = {
 static const vigil_native_module_function_t log_functions[] = {
     {"debug", 5U, log_debug, 1U, str_param, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, NULL, 0U, log_msg_param_names, NULL,
      NULL, &vigil_log_debug_doc},
-    {"info", 4U, log_info, 1U, str_param, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, NULL, 0U, log_msg_param_names, NULL,
-     NULL, &vigil_log_info_doc},
-    {"warn", 4U, log_warn, 1U, str_param, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, NULL, 0U, log_msg_param_names, NULL,
-     NULL, &vigil_log_warn_doc},
+    {"info", 4U, log_info, 1U, str_param, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, NULL, 0U, log_msg_param_names, NULL, NULL,
+     &vigil_log_info_doc},
+    {"warn", 4U, log_warn, 1U, str_param, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, NULL, 0U, log_msg_param_names, NULL, NULL,
+     &vigil_log_warn_doc},
     {"error", 5U, log_error_fn, 1U, str_param, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, NULL, 0U, log_msg_param_names, NULL,
      NULL, &vigil_log_error_doc},
     {"debug_l", 7U, log_debug_l, 2U, i64_str_params, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, NULL, 0U,
@@ -729,8 +730,8 @@ static const vigil_native_module_function_t log_functions[] = {
      log_logger_msg_param_names, NULL, NULL, &vigil_log_warn_l_doc},
     {"error_l", 7U, log_error_l, 2U, i64_str_params, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, NULL, 0U,
      log_logger_msg_param_names, NULL, NULL, &vigil_log_error_l_doc},
-    {"set_level", 9U, log_set_level, 1U, str_param, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, NULL, 0U,
-     log_level_param_names, NULL, NULL, &vigil_log_set_level_doc},
+    {"set_level", 9U, log_set_level, 1U, str_param, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, NULL, 0U, log_level_param_names,
+     NULL, NULL, &vigil_log_set_level_doc},
     {"set_format", 10U, log_set_format, 1U, str_param, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, NULL, 0U,
      log_format_param_names, NULL, NULL, &vigil_log_set_format_doc},
     {"set_output", 10U, log_set_output, 1U, str_param, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, NULL, 0U,
@@ -743,6 +744,5 @@ static const vigil_native_module_function_t log_functions[] = {
 
 #define LOG_FUNCTION_COUNT (sizeof(log_functions) / sizeof(log_functions[0]))
 
-VIGIL_API const vigil_native_module_t vigil_stdlib_log = {"log", 3U, log_functions, LOG_FUNCTION_COUNT, NULL, 0U,
-                                                          &vigil_log_module_doc,
-    NULL, 0U};
+VIGIL_API const vigil_native_module_t vigil_stdlib_log = {
+    "log", 3U, log_functions, LOG_FUNCTION_COUNT, NULL, 0U, &vigil_log_module_doc, NULL, 0U};
