@@ -276,8 +276,9 @@ fn main() -> i32 {
         i64 t = thread.spawn(
             fn () -> i64 {
                 return monte_carlo_worker(iters, seed)
-            },
+            }
 
+            ,
         )
         handles.push(t)
     }
@@ -326,8 +327,9 @@ fn main() -> i32 {
         i64 t = thread.spawn(
             fn () -> void {
                 producer_work(pid, tasks, q_mtx, q_not_full, q_not_empty, q_head, q_tail, q_count, q_base, pt)
-            },
+            }
 
+            ,
         )
         prod_handles.push(t)
     }
@@ -338,8 +340,9 @@ fn main() -> i32 {
         i64 t = thread.spawn(
             fn () -> void {
                 consumer_work(q_mtx, q_not_full, q_not_empty, q_head, q_tail, q_count, q_base, done_flag, consumed_sum, consumed_count)
-            },
+            }
 
+            ,
         )
         cons_handles.push(t)
     }
@@ -395,8 +398,9 @@ fn main() -> i32 {
         i64 t = thread.spawn(
             fn () -> void {
                 reader_work(rw, shared_val, read_sum, ops)
-            },
+            }
 
+            ,
         )
         rw_handles.push(t)
     }
@@ -406,8 +410,9 @@ fn main() -> i32 {
         i64 t = thread.spawn(
             fn () -> void {
                 writer_work(rw, shared_val, ops)
-            },
+            }
 
+            ,
         )
         rw_handles.push(t)
     }
@@ -440,8 +445,9 @@ fn main() -> i32 {
         i64 t = thread.spawn(
             fn () -> void {
                 trylock_worker(tl_mtx, tl_counter, iters)
-            },
+            }
 
+            ,
         )
         tl_handles.push(t)
     }
@@ -472,8 +478,9 @@ fn main() -> i32 {
         i64 t = thread.spawn(
             fn () -> void {
                 cas_worker(cas_counter, iters)
-            },
+            }
 
+            ,
         )
         cas_handles.push(t)
     }
@@ -505,8 +512,9 @@ fn main() -> i32 {
         i64 t = thread.spawn(
             fn () -> void {
                 barrier_worker(bar_mtx, bar_cond, bar_arrived, BROADCAST_THREADS, bar_result)
-            },
+            }
 
+            ,
         )
         bar_handles.push(t)
     }
@@ -535,8 +543,9 @@ fn main() -> i32 {
         i64 t = thread.spawn(
             fn () -> void {
                 detach_worker(detach_counter)
-            },
+            }
 
+            ,
         )
         thread.detach(t)
     }

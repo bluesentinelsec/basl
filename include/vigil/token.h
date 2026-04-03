@@ -87,7 +87,8 @@ extern "C"
         VIGIL_TOKEN_TILDE = 69,
         VIGIL_TOKEN_SHIFT_LEFT = 70,
         VIGIL_TOKEN_SHIFT_RIGHT = 71,
-        VIGIL_TOKEN_EXTERN = 72
+        VIGIL_TOKEN_EXTERN = 72,
+        VIGIL_TOKEN_WALRUS = 73
     } vigil_token_kind_t;
 
     typedef struct vigil_token

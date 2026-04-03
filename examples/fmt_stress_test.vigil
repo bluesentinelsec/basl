@@ -278,11 +278,12 @@ fn fmt_thousands(i64 n) -> string {
 /// Format as currency (USD).
 fn fmt_currency(f64 amount) -> string {
     bool neg = amount < 0.0
+    f64 abs_amount = amount
     if neg {
-        amount = - amount
+        abs_amount = - amount
     }
 
-    string cents = f"{amount:.2f}"
+    string cents = f"{abs_amount:.2f}"
     // Split on decimal
     array<string> parts = cents.split(".")
     string whole, err e1 = parts.get(0)

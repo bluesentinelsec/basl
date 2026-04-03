@@ -588,6 +588,9 @@ vigil_status_t vigil_parser_require_binding_initializer_shape(vigil_parser_state
 vigil_status_t vigil_parser_parse_variable_declaration(vigil_parser_state_t *state,
                                                        vigil_statement_result_t *out_result);
 vigil_status_t vigil_parser_parse_const_declaration(vigil_parser_state_t *state, vigil_statement_result_t *out_result);
+vigil_status_t vigil_parser_parse_walrus_declaration(vigil_parser_state_t *state, vigil_statement_result_t *out_result);
+vigil_status_t vigil_parser_parse_const_walrus_declaration(vigil_parser_state_t *state,
+                                                           vigil_statement_result_t *out_result);
 vigil_status_t vigil_parser_declare_local_symbol(vigil_parser_state_t *state, const vigil_token_t *name_token,
                                                  vigil_parser_type_t type, int is_const, size_t *out_index);
 vigil_status_t vigil_parser_parse_block_contents(vigil_parser_state_t *state, vigil_statement_result_t *out_result);

@@ -253,6 +253,25 @@ string name = "vigil"
 bool ready = true
 ```
 
+### Type Inference with `:=`
+
+The walrus operator `:=` infers the type from the initializer:
+
+```
+x := 42              // inferred i32
+name := "vigil"      // inferred string
+pi := 3.14           // inferred f64
+ready := true        // inferred bool
+items := [1, 2, 3]   // inferred array<i32>
+result := add(10, 20) // inferred from return type
+```
+
+Multi-return inference:
+
+```
+val, e := divide(10, 2)   // types inferred from function signature
+```
+
 ### Constants
 
 ```
@@ -260,7 +279,26 @@ const i32 MAX = 100
 const string VERSION = "1.0"
 ```
 
+Constants with inferred types:
+
+```
+const MAX := 100
+const GREETING := "hello"
+```
+
 Constants can appear at top level or inside functions.
+
+### Immutable Parameters
+
+Function parameters are immutable. To modify a value, copy it to a local:
+
+```
+fn process(i32 x) -> i32 {
+    i32 local = x
+    local += 10
+    return local
+}
+```
 
 ### Multiple Return Bindings
 

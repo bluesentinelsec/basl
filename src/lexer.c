@@ -543,6 +543,8 @@ static vigil_status_t vigil_lexer_scan_token(vigil_lexer_state_t *state)
     case ';':
         return vigil_lexer_emit(state, VIGIL_TOKEN_SEMICOLON, start, state->offset);
     case ':':
+        if (vigil_lexer_match(state, '='))
+            return vigil_lexer_emit(state, VIGIL_TOKEN_WALRUS, start, state->offset);
         return vigil_lexer_emit(state, VIGIL_TOKEN_COLON, start, state->offset);
     case '?':
         return vigil_lexer_emit(state, VIGIL_TOKEN_QUESTION, start, state->offset);

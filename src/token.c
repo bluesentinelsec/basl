@@ -3,7 +3,7 @@
 #include "internal/vigil_internal.h"
 #include "vigil/token.h"
 
-static const char *const kVigilTokenNames[VIGIL_TOKEN_EXTERN + 1] = {
+static const char *const kVigilTokenNames[VIGIL_TOKEN_WALRUS + 1] = {
     [VIGIL_TOKEN_EOF] = "eof",
     [VIGIL_TOKEN_IDENTIFIER] = "identifier",
     [VIGIL_TOKEN_INT_LITERAL] = "int_literal",
@@ -77,6 +77,7 @@ static const char *const kVigilTokenNames[VIGIL_TOKEN_EXTERN + 1] = {
     [VIGIL_TOKEN_SHIFT_LEFT] = "shift_left",
     [VIGIL_TOKEN_SHIFT_RIGHT] = "shift_right",
     [VIGIL_TOKEN_EXTERN] = "extern",
+    [VIGIL_TOKEN_WALRUS] = "walrus",
 };
 
 static int vigil_token_list_validate_mutable(const vigil_token_list_t *list, vigil_error_t *error)
@@ -241,7 +242,7 @@ vigil_status_t vigil_token_list_append(vigil_token_list_t *list, vigil_token_kin
 
 const char *vigil_token_kind_name(vigil_token_kind_t kind)
 {
-    if (kind > VIGIL_TOKEN_EXTERN)
+    if (kind > VIGIL_TOKEN_WALRUS)
     {
         return "unknown";
     }

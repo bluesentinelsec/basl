@@ -230,3 +230,121 @@ vigil_status_t vigil_parser_parse_const_declaration(vigil_parser_state_t *state,
     vigil_statement_result_set_guaranteed_return(out_result, 0);
     return VIGIL_STATUS_OK;
 }
+
+/* ── Walrus (:=) inferred declarations ─────────────────────────────── */
+
+vigil_status_t vigil_parser_parse_walrus_declaration(vigil_parser_state_t *state, vigil_statement_result_t *out_result)
+{
+    vigil_status_t status;
+    vigil_expression_result_t initializer_result;
+    const vigil_token_t *name_tokens[8];
+    size_t name_count = 0U;
+
+    vigil_expression_result_clear(&initializer_result);
+
+    /* Collect comma-separated identifiers before := */
+    while (1)
+    {
+        const vigil_token_t *name_token = NULL;
+        status = vigil_parser_expect(state, VIGIL_TOKEN_IDENTIFIER, "expected variable name", &name_token);
+        if (status != VIGIL_STATUS_OK)
+            return status;
+        if (name_count >= 8U)
+            return vigil_parser_report(state, name_token->span, "too many bindings in walrus declaration");
+        name_tokens[name_count++] = name_token;
+        if (!vigil_parser_match(state, VIGIL_TOKEN_COMMA))
+            break;
+    }
+
+    status = vigil_parser_expect(state, VIGIL_TOKEN_WALRUS, "expected ':='", NULL);
+    if (status != VIGIL_STATUS_OK)
+        return status;
+
+    /* Parse the initializer expression. */
+    status = vigil_parser_parse_expression(state, &initializer_result);
+    if (status != VIGIL_STATUS_OK)
+        return status;
+
+    status = vigil_parser_expect_semi(state, "expected ';' after walrus declaration");
+    if (status != VIGIL_STATUS_OK)
+        return status;
+
+    /* Single binding: infer type from expression. */
+    if (name_count == 1U)
+    {
+        status = vigil_parser_require_scalar_expression(state, name_tokens[0]->span, &initializer_result,
+                                                        "walrus initializer must be a single value");
+        if (status != VIGIL_STATUS_OK)
+            return status;
+        if (vigil_parser_type_is_void(initializer_result.type))
+            return vigil_parser_report(state, name_tokens[0]->span, "cannot infer type from void expression");
+        status = vigil_parser_declare_local_symbol(state, name_tokens[0], initializer_result.type, 0, NULL);
+        if (status != VIGIL_STATUS_OK)
+            return status;
+        vigil_statement_result_set_guaranteed_return(out_result, 0);
+        return VIGIL_STATUS_OK;
+    }
+
+    /* Multi-binding: infer types from multi-return expression. */
+    if (initializer_result.type_count != name_count)
+        return vigil_parser_report(state, name_tokens[0]->span,
+                                   "walrus binding count does not match return value count");
+
+    for (size_t i = 0U; i < name_count; i++)
+    {
+        vigil_parser_type_t inferred = vigil_expression_result_type_at(&initializer_result, i);
+        if (vigil_parser_type_is_void(inferred))
+            return vigil_parser_report(state, name_tokens[i]->span, "cannot infer type from void return value");
+        status = vigil_parser_declare_local_symbol(state, name_tokens[i], inferred, 0, NULL);
+        if (status != VIGIL_STATUS_OK)
+            return status;
+    }
+    vigil_statement_result_set_guaranteed_return(out_result, 0);
+    return VIGIL_STATUS_OK;
+}
+
+vigil_status_t vigil_parser_parse_const_walrus_declaration(vigil_parser_state_t *state,
+                                                           vigil_statement_result_t *out_result)
+{
+    vigil_status_t status;
+    const vigil_token_t *const_token = NULL;
+    const vigil_token_t *name_token = NULL;
+    vigil_expression_result_t initializer_result;
+
+    vigil_expression_result_clear(&initializer_result);
+
+    status = vigil_parser_expect(state, VIGIL_TOKEN_CONST, "expected 'const'", &const_token);
+    if (status != VIGIL_STATUS_OK)
+        return status;
+
+    status = vigil_parser_expect(state, VIGIL_TOKEN_IDENTIFIER, "expected constant name", &name_token);
+    if (status != VIGIL_STATUS_OK)
+        return status;
+
+    status = vigil_parser_expect(state, VIGIL_TOKEN_WALRUS, "expected ':='", NULL);
+    if (status != VIGIL_STATUS_OK)
+        return status;
+
+    status = vigil_parser_parse_expression(state, &initializer_result);
+    if (status != VIGIL_STATUS_OK)
+        return status;
+
+    status = vigil_parser_require_scalar_expression(state, name_token->span, &initializer_result,
+                                                    "constant initializer must be a single value");
+    if (status != VIGIL_STATUS_OK)
+        return status;
+
+    if (vigil_parser_type_is_void(initializer_result.type))
+        return vigil_parser_report(state, name_token->span, "cannot infer type from void expression");
+
+    status = vigil_parser_expect_semi(state, "expected ';' after constant declaration");
+    if (status != VIGIL_STATUS_OK)
+        return status;
+
+    status = vigil_parser_declare_local_symbol(state, name_token, initializer_result.type, 1, NULL);
+    if (status != VIGIL_STATUS_OK)
+        return status;
+
+    vigil_statement_result_set_guaranteed_return(out_result, 0);
+    return VIGIL_STATUS_OK;
+}

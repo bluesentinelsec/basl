@@ -261,6 +261,32 @@ TEST(VigilLexerTest, TokenizesNilKeyword)
     vigil_runtime_close(&runtime);
 }
 
+TEST(VigilLexerTest, TokenizesWalrusOperator)
+{
+    vigil_runtime_t *runtime = NULL;
+    vigil_error_t error = {0};
+    vigil_source_registry_t registry;
+    vigil_diagnostic_list_t diagnostics;
+    vigil_token_list_t tokens;
+    vigil_source_id_t source_id;
+
+    ASSERT_EQ(vigil_runtime_open(&runtime, NULL, &error), VIGIL_STATUS_OK);
+    vigil_source_registry_init(&registry, runtime);
+    vigil_diagnostic_list_init(&diagnostics, runtime);
+    vigil_token_list_init(&tokens, runtime);
+    source_id = RegisterSource(vigil_test_failed_, &registry, "walrus.vigil", "x := 1", &error);
+
+    ASSERT_EQ(vigil_lex_source(&registry, source_id, &tokens, &diagnostics, &error), VIGIL_STATUS_OK);
+    EXPECT_EQ(TokenAt(vigil_test_failed_, &tokens, 0)->kind, VIGIL_TOKEN_IDENTIFIER);
+    EXPECT_EQ(TokenAt(vigil_test_failed_, &tokens, 1)->kind, VIGIL_TOKEN_WALRUS);
+    EXPECT_EQ(TokenAt(vigil_test_failed_, &tokens, 2)->kind, VIGIL_TOKEN_INT_LITERAL);
+
+    vigil_token_list_free(&tokens);
+    vigil_diagnostic_list_free(&diagnostics);
+    vigil_source_registry_free(&registry);
+    vigil_runtime_close(&runtime);
+}
+
 void register_lexer_tests(void)
 {
     REGISTER_TEST(VigilLexerTest, TokenizesSimpleFunction);
@@ -270,4 +296,5 @@ void register_lexer_tests(void)
     REGISTER_TEST(VigilLexerTest, ReportsUnterminatedStringAndBlockComment);
     REGISTER_TEST(VigilLexerTest, ReportsInvalidPrefixedNumericLiterals);
     REGISTER_TEST(VigilLexerTest, TokenizesNilKeyword);
+    REGISTER_TEST(VigilLexerTest, TokenizesWalrusOperator);
 }
