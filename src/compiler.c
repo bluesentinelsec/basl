@@ -6226,6 +6226,10 @@ static vigil_status_t vigil_parser_parse_value_call(vigil_parser_state_t *state,
             {
                 break;
             }
+            if (vigil_parser_check(state, VIGIL_TOKEN_RPAREN))
+            {
+                break; /* trailing comma */
+            }
         }
     }
 
@@ -6353,6 +6357,10 @@ static vigil_status_t vigil_parser_parse_call_resolved(vigil_parser_state_t *sta
             if (!vigil_parser_match(state, VIGIL_TOKEN_COMMA))
             {
                 break;
+            }
+            if (vigil_parser_check(state, VIGIL_TOKEN_RPAREN))
+            {
+                break; /* trailing comma */
             }
         }
     }
@@ -6507,6 +6515,8 @@ static vigil_status_t vigil_parser_parse_constructor_resolved(vigil_parser_state
             arg_count += 1U;
             if (!vigil_parser_match(state, VIGIL_TOKEN_COMMA))
                 break;
+            if (vigil_parser_check(state, VIGIL_TOKEN_RPAREN))
+                break; /* trailing comma */
         }
     }
 
@@ -7111,6 +7121,10 @@ static vigil_status_t vigil_parser_parse_native_static_method_call(vigil_parser_
             {
                 break;
             }
+            if (vigil_parser_check(state, VIGIL_TOKEN_RPAREN))
+            {
+                break; /* trailing comma */
+            }
         }
     }
     status = vigil_parser_expect(state, VIGIL_TOKEN_RPAREN, "expected ')' after argument list", NULL);
@@ -7227,6 +7241,10 @@ static vigil_status_t vigil_parser_parse_native_method_call(vigil_parser_state_t
             if (!vigil_parser_match(state, VIGIL_TOKEN_COMMA))
             {
                 break;
+            }
+            if (vigil_parser_check(state, VIGIL_TOKEN_RPAREN))
+            {
+                break; /* trailing comma */
             }
         }
     }
@@ -7595,6 +7613,10 @@ static vigil_status_t vigil_parser_parse_method_call(vigil_parser_state_t *state
             {
                 break;
             }
+            if (vigil_parser_check(state, VIGIL_TOKEN_RPAREN))
+            {
+                break; /* trailing comma */
+            }
         }
     }
 
@@ -7693,6 +7715,10 @@ static vigil_status_t vigil_parser_parse_interface_method_call(vigil_parser_stat
             if (!vigil_parser_match(state, VIGIL_TOKEN_COMMA))
             {
                 break;
+            }
+            if (vigil_parser_check(state, VIGIL_TOKEN_RPAREN))
+            {
+                break; /* trailing comma */
             }
         }
     }
@@ -8743,6 +8769,8 @@ static vigil_status_t parse_array_literal_elements(vigil_parser_state_t *state, 
         item_count += 1U;
         if (!vigil_parser_match(state, VIGIL_TOKEN_COMMA))
             break;
+        if (vigil_parser_check(state, VIGIL_TOKEN_RBRACKET))
+            break; /* trailing comma */
     }
     *out_count = item_count;
     return VIGIL_STATUS_OK;
@@ -8871,6 +8899,8 @@ static vigil_status_t parse_map_literal_entries(vigil_parser_state_t *state, con
         pair_count += 1U;
         if (!vigil_parser_match(state, VIGIL_TOKEN_COMMA))
             break;
+        if (vigil_parser_check(state, VIGIL_TOKEN_RBRACE))
+            break; /* trailing comma */
     }
     *out_count = pair_count;
     return VIGIL_STATUS_OK;

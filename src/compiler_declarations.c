@@ -1573,6 +1573,10 @@ static vigil_status_t class_parse_field(vigil_program_state_t *program, size_t *
     const vigil_token_t *semi = vigil_program_cursor_peek(program, *cursor);
     if (semi != NULL && semi->kind == VIGIL_TOKEN_SEMICOLON)
         vigil_program_cursor_advance(program, cursor);
+    /* NOTE: This list of tokens that implicitly terminate a class field
+       must be updated if new member-introducing keywords are added.
+       ASI covers the common case (newline after field name), but single-line
+       class bodies need this fallback. */
     else if (semi == NULL || (semi->kind != VIGIL_TOKEN_RBRACE && semi->kind != VIGIL_TOKEN_FN &&
                               semi->kind != VIGIL_TOKEN_PUB && semi->kind != VIGIL_TOKEN_IDENTIFIER))
         return vigil_compile_report(program, field_name_token->span, "expected ';' after class field");
