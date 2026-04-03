@@ -110,7 +110,7 @@ class TiledPluginTest(unittest.TestCase):
         path = os.path.join(self.tmpdir, name)
         with open(path, "w") as f:
             json.dump(SAMPLE_MAP, f)
-        return path
+        return path.replace("\\", "/")
 
     def _run(self, code: str, expected: int = 0) -> None:
         write_sources(Path(self.tmpdir), {"main.vigil": code})
@@ -200,7 +200,7 @@ class TiledPluginTest(unittest.TestCase):
         """)
 
     def test_load_invalid_json_returns_error(self) -> None:
-        bad_path = os.path.join(self.tmpdir, "bad.tmj")
+        bad_path = os.path.join(self.tmpdir, "bad.tmj").replace("\\", "/")
         with open(bad_path, "w") as f:
             f.write("{invalid json")
         self._run(f"""
