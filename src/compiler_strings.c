@@ -244,6 +244,13 @@ vigil_status_t vigil_parser_parse_embedded_expression(vigil_parser_state_t *stat
         nested.body_end = vigil_token_list_count(&tokens);
         vigil_expression_result_clear(&nested_result);
         status = vigil_parser_parse_expression(&nested, &nested_result);
+        if (status == VIGIL_STATUS_OK)
+        {
+            /* Skip trailing semicolons from automatic semicolon insertion. */
+            while (vigil_parser_match(&nested, VIGIL_TOKEN_SEMICOLON))
+            {
+            }
+        }
         if (status == VIGIL_STATUS_OK && !vigil_parser_check(&nested, VIGIL_TOKEN_EOF))
         {
             status = vigil_parser_report(

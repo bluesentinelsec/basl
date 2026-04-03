@@ -1,17 +1,17 @@
 fn main() -> i32 {
-    i64 sum = i64(0);
+    i64 sum = i64(0)
     for (i32 i = 0; i < 5000; i++) {
-        i64 row = i64(0);
+        i64 row = i64(0)
         for (i32 j = 0; j < 200; j++) {
-            row = row + i64((i * 7 + j * 13) % 97);
+            row = row + i64((i * 7 + j * 13) % 97)
         }
 
-        sum = sum + row;
+        sum = sum + row
     }
 
     if sum > i64(0) {
-        return 0;
+        return 0
     }
 
-    return 1;
+    return 1
 }

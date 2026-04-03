@@ -18,6 +18,7 @@ typedef struct vigil_lexer_state
     vigil_error_t *error;
     int had_error;
     vigil_error_t last_error;
+    vigil_token_kind_t last_token_kind;
 } vigil_lexer_state_t;
 
 static vigil_source_span_t vigil_lexer_span(const vigil_lexer_state_t *state, size_t start, size_t end)
@@ -81,6 +82,7 @@ static int vigil_lexer_match(vigil_lexer_state_t *state, char expected)
 
 static vigil_status_t vigil_lexer_emit(vigil_lexer_state_t *state, vigil_token_kind_t kind, size_t start, size_t end)
 {
+    state->last_token_kind = kind;
     return vigil_token_list_append(state->tokens, kind, vigil_lexer_span(state, start, end), state->error);
 }
 
@@ -431,6 +433,34 @@ static vigil_status_t vigil_lexer_scan_operator(vigil_lexer_state_t *state, size
     }
 }
 
+static int vigil_lexer_asi_trigger(vigil_token_kind_t kind)
+{
+    switch (kind)
+    {
+    case VIGIL_TOKEN_IDENTIFIER:
+    case VIGIL_TOKEN_INT_LITERAL:
+    case VIGIL_TOKEN_FLOAT_LITERAL:
+    case VIGIL_TOKEN_STRING_LITERAL:
+    case VIGIL_TOKEN_RAW_STRING_LITERAL:
+    case VIGIL_TOKEN_FSTRING_LITERAL:
+    case VIGIL_TOKEN_CHAR_LITERAL:
+    case VIGIL_TOKEN_NIL:
+    case VIGIL_TOKEN_TRUE:
+    case VIGIL_TOKEN_FALSE:
+    case VIGIL_TOKEN_BREAK:
+    case VIGIL_TOKEN_CONTINUE:
+    case VIGIL_TOKEN_RETURN:
+    case VIGIL_TOKEN_PLUS_PLUS:
+    case VIGIL_TOKEN_MINUS_MINUS:
+    case VIGIL_TOKEN_RPAREN:
+    case VIGIL_TOKEN_RBRACE:
+    case VIGIL_TOKEN_RBRACKET:
+        return 1;
+    default:
+        return 0;
+    }
+}
+
 static vigil_status_t vigil_lexer_scan_token(vigil_lexer_state_t *state)
 {
     vigil_status_t status;
@@ -444,7 +474,55 @@ static vigil_status_t vigil_lexer_scan_token(vigil_lexer_state_t *state)
     case ' ':
     case '\r':
     case '\t':
+        return VIGIL_STATUS_OK;
     case '\n':
+        if (vigil_lexer_asi_trigger(state->last_token_kind))
+        {
+            /* Peek past whitespace and comments on subsequent lines.
+               Suppress ASI when the first non-blank, non-comment
+               character would start a continuation:
+               - '{' : opening brace for function/block body
+               - binary operators that continue an expression
+               - '.' : method chain continuation */
+            size_t peek = state->offset;
+            for (;;)
+            {
+                while (peek < state->length && (state->text[peek] == ' ' || state->text[peek] == '\t' ||
+                                                state->text[peek] == '\r' || state->text[peek] == '\n'))
+                    peek++;
+                if (peek + 1U < state->length && state->text[peek] == '/' && state->text[peek + 1U] == '/')
+                {
+                    while (peek < state->length && state->text[peek] != '\n')
+                        peek++;
+                    continue;
+                }
+                if (peek + 1U < state->length && state->text[peek] == '/' && state->text[peek + 1U] == '*')
+                {
+                    peek += 2U;
+                    while (peek + 1U < state->length && !(state->text[peek] == '*' && state->text[peek + 1U] == '/'))
+                        peek++;
+                    if (peek + 1U < state->length)
+                        peek += 2U;
+                    continue;
+                }
+                break;
+            }
+            if (peek < state->length)
+            {
+                char nc = state->text[peek];
+                if (nc == '{')
+                    return VIGIL_STATUS_OK;
+                char nc2 = (peek + 1U < state->length) ? state->text[peek + 1U] : '\0';
+                if ((nc == '&' && nc2 == '&') || (nc == '|' && nc2 == '|'))
+                    return VIGIL_STATUS_OK;
+                if (nc == '.')
+                    return VIGIL_STATUS_OK;
+                /* Closing delimiters continue an expression */
+                if (nc == ')' || nc == ']')
+                    return VIGIL_STATUS_OK;
+            }
+            return vigil_lexer_emit(state, VIGIL_TOKEN_SEMICOLON, start, start);
+        }
         return VIGIL_STATUS_OK;
     case '(':
         return vigil_lexer_emit(state, VIGIL_TOKEN_LPAREN, start, state->offset);
@@ -564,6 +642,7 @@ vigil_status_t vigil_lex_source(const vigil_source_registry_t *registry, vigil_s
     state.tokens = tokens;
     state.diagnostics = diagnostics;
     state.error = error;
+    state.last_token_kind = VIGIL_TOKEN_EOF;
 
     while (!vigil_lexer_is_at_end(&state))
     {
@@ -583,6 +662,15 @@ vigil_status_t vigil_lex_source(const vigil_source_registry_t *registry, vigil_s
         }
         *error = state.last_error;
         return VIGIL_STATUS_SYNTAX_ERROR;
+    }
+
+    if (vigil_lexer_asi_trigger(state.last_token_kind))
+    {
+        status = vigil_lexer_emit(&state, VIGIL_TOKEN_SEMICOLON, state.offset, state.offset);
+        if (status != VIGIL_STATUS_OK)
+        {
+            return status;
+        }
     }
 
     status = vigil_lexer_emit(&state, VIGIL_TOKEN_EOF, state.offset, state.offset);

@@ -54,11 +54,11 @@ vigil get github.com/user/repo@main    # install branch
 Dependencies are cloned to `deps/` and can be imported by their full path:
 
 ```vigil
-import "github.com/user/json";
+import "github.com/user/json"
 
 fn main() -> i32 {
-    json.parse("{}");
-    return 0;
+    json.parse("{}")
+    return 0
 }
 ```
 
@@ -85,11 +85,11 @@ created myapp
 
 `main.vigil`:
 ```c
-import "fmt";
+import "fmt"
 
 fn main() -> i32 {
-    fmt.println("hello, world!");
-    return 0;
+    fmt.println("hello, world!")
+    return 0
 }
 ```
 
@@ -109,17 +109,17 @@ created mylib
 /// mylib library module.
 
 pub fn hello() -> string {
-    return "hello from mylib";
+    return "hello from mylib"
 }
 ```
 
 `test/mylib_test.vigil`:
 ```c
-import "test";
-import "mylib";
+import "test"
+import "mylib"
 
 fn test_hello(test.T t) -> void {
-    t.assert(mylib.hello() == "hello from mylib", "hello should match");
+    t.assert(mylib.hello() == "hello from mylib", "hello should match")
 }
 ```
 

@@ -5,30 +5,30 @@
 // This example renders the same interaction model in the terminal so the
 // program is runnable without any additional dependencies.
 
-import "fmt";
-import "readline";
+import "fmt"
+import "readline"
 
 fn main() -> i32 {
-    fmt.println("VIGIL GUI Demo (terminal fallback — no gui module available)");
-    fmt.println("─────────────────────────────────────────────────────────────");
-    string text = readline.input("Enter text (default: hello): ");
+    fmt.println("VIGIL GUI Demo (terminal fallback — no gui module available)")
+    fmt.println("─────────────────────────────────────────────────────────────")
+    string text = readline.input("Enter text (default: hello): ")
     if text.is_empty() {
-        text = "hello";
+        text = "hello"
     }
 
-    string mode = readline.input("Select mode [Fast/Balanced/Safe] (default: Balanced): ");
+    string mode = readline.input("Select mode [Fast/Balanced/Safe] (default: Balanced): ")
     if mode.is_empty() {
-        mode = "Balanced";
+        mode = "Balanced"
     }
 
-    string verbose_in = readline.input("Enable verbose logging? [y/N]: ");
-    bool verbose = verbose_in == "y" || verbose_in == "Y";
-    fmt.println("─────────────────────────────────────────────────────────────");
-    fmt.println(f"Applied: {text} [{mode}]");
-    fmt.println(f"Verbose: {verbose}");
+    string verbose_in = readline.input("Enable verbose logging? [y/N]: ")
+    bool verbose = verbose_in == "y" || verbose_in == "Y"
+    fmt.println("─────────────────────────────────────────────────────────────")
+    fmt.println(f"Applied: {text} [{mode}]")
+    fmt.println(f"Verbose: {verbose}")
     if verbose {
-        fmt.println(f"echo -> text={text}, mode={mode}");
+        fmt.println(f"echo -> text={text}, mode={mode}")
     }
 
-    return 0;
+    return 0
 }

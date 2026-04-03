@@ -29,14 +29,14 @@ class RandomSeedTest(unittest.TestCase):
 
     def test_seed_reproducible(self):
         """Same seed produces same sequence."""
-        code = '''import "random";
+        code = '''import "random"
 fn main() -> i32 {
-    random.seed(12345);
-    i32 a = random.i32();
-    random.seed(12345);
-    i32 b = random.i32();
-    if a == b { return 0; }
-    return 1;
+    random.seed(12345)
+    i32 a = random.i32()
+    random.seed(12345)
+    i32 b = random.i32()
+    if a == b { return 0 }
+    return 1
 }'''
         rc, out, err = run_vigil(code)
         self.assertEqual(rc, 0, f"stderr: {err}")
@@ -46,11 +46,11 @@ class RandomI32Test(unittest.TestCase):
     """Tests for random.i32()"""
 
     def test_i32_returns_value(self):
-        code = '''import "random";
+        code = '''import "random"
 fn main() -> i32 {
-    random.seed(42);
-    i32 n = random.i32();
-    return 0;
+    random.seed(42)
+    i32 n = random.i32()
+    return 0
 }'''
         rc, out, err = run_vigil(code)
         self.assertEqual(rc, 0, f"stderr: {err}")
@@ -61,12 +61,12 @@ class RandomF64Test(unittest.TestCase):
 
     def test_f64_in_range(self):
         """f64 returns value in [0, 1)."""
-        code = '''import "random";
+        code = '''import "random"
 fn main() -> i32 {
-    random.seed(42);
-    f64 x = random.f64();
-    if x >= 0.0 && x < 1.0 { return 0; }
-    return 1;
+    random.seed(42)
+    f64 x = random.f64()
+    if x >= 0.0 && x < 1.0 { return 0 }
+    return 1
 }'''
         rc, out, err = run_vigil(code)
         self.assertEqual(rc, 0, f"stderr: {err}")
@@ -77,24 +77,24 @@ class RandomRangeTest(unittest.TestCase):
 
     def test_range_basic(self):
         """range returns value in [min, max)."""
-        code = '''import "random";
+        code = '''import "random"
 fn main() -> i32 {
-    random.seed(42);
-    i32 r = random.range(10, 20);
-    if r >= 10 && r < 20 { return 0; }
-    return 1;
+    random.seed(42)
+    i32 r = random.range(10, 20)
+    if r >= 10 && r < 20 { return 0 }
+    return 1
 }'''
         rc, out, err = run_vigil(code)
         self.assertEqual(rc, 0, f"stderr: {err}")
 
     def test_range_single_value(self):
         """range with min == max returns min."""
-        code = '''import "random";
+        code = '''import "random"
 fn main() -> i32 {
-    random.seed(42);
-    i32 r = random.range(5, 5);
-    if r == 5 { return 0; }
-    return 1;
+    random.seed(42)
+    i32 r = random.range(5, 5)
+    if r == 5 { return 0 }
+    return 1
 }'''
         rc, out, err = run_vigil(code)
         self.assertEqual(rc, 0, f"stderr: {err}")

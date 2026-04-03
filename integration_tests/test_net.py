@@ -44,14 +44,14 @@ class TcpListenTest(unittest.TestCase):
 
     def test_tcp_listen_returns_handle(self):
         """tcp_listen returns non-negative handle on success."""
-        code = '''import "net";
+        code = '''import "net"
 fn main() -> i32 {
-    i64 server = net.tcp_listen("127.0.0.1", 19001);
+    i64 server = net.tcp_listen("127.0.0.1", 19001)
     if server >= i64(0) {
-        net.close(server);
-        return 0;
+        net.close(server)
+        return 0
     }
-    return 1;
+    return 1
 }'''
         rc, out, err = run_vigil(code)
         self.assertEqual(rc, 0, f"stderr: {err}")
@@ -62,14 +62,14 @@ class TcpConnectTest(unittest.TestCase):
 
     def test_tcp_connect_refused(self):
         """tcp_connect to closed port returns -1."""
-        code = '''import "net";
+        code = '''import "net"
 fn main() -> i32 {
-    i64 sock = net.tcp_connect("127.0.0.1", 19999);
+    i64 sock = net.tcp_connect("127.0.0.1", 19999)
     if sock < i64(0) {
         return 0;  // Expected - no server
     }
-    net.close(sock);
-    return 1;
+    net.close(sock)
+    return 1
 }'''
         rc, out, err = run_vigil(code)
         self.assertEqual(rc, 0, f"stderr: {err}")
@@ -81,41 +81,41 @@ class TcpClientServerTest(unittest.TestCase):
     def test_tcp_echo(self):
         """TCP server can accept connection and echo data."""
         with tempfile.TemporaryDirectory(prefix="vigil_tcp_") as tmpdir:
-            server_code = '''import "net";
-import "fmt";
+            server_code = '''import "net"
+import "fmt"
 fn main() -> i32 {
-    i64 server = net.tcp_listen("127.0.0.1", 19002);
-    if server < i64(0) { return 1; }
+    i64 server = net.tcp_listen("127.0.0.1", 19002)
+    if server < i64(0) { return 1 }
     
-    i64 client = net.tcp_accept(server);
+    i64 client = net.tcp_accept(server)
     if client < i64(0) { 
-        net.close(server);
-        return 2; 
+        net.close(server)
+        return 2 
     }
     
-    string data = net.read(client, 1024);
-    i32 sent = net.write(client, data);
+    string data = net.read(client, 1024)
+    i32 sent = net.write(client, data)
     
-    net.close(client);
-    net.close(server);
+    net.close(client)
+    net.close(server)
     
-    if sent > 0 { return 0; }
-    return 3;
+    if sent > 0 { return 0 }
+    return 3
 }'''
-            client_code = '''import "net";
-import "time";
+            client_code = '''import "net"
+import "time"
 fn main() -> i32 {
-    time.sleep(i64(100));
+    time.sleep(i64(100))
     
-    i64 sock = net.tcp_connect("127.0.0.1", 19002);
-    if sock < i64(0) { return 1; }
+    i64 sock = net.tcp_connect("127.0.0.1", 19002)
+    if sock < i64(0) { return 1 }
     
-    net.write(sock, "hello");
-    string response = net.read(sock, 1024);
-    net.close(sock);
+    net.write(sock, "hello")
+    string response = net.read(sock, 1024)
+    net.close(sock)
     
-    if response == "hello" { return 0; }
-    return 2;
+    if response == "hello" { return 0 }
+    return 2
 }'''
             # Start server
             server_path = Path(tmpdir) / "server.vigil"
@@ -152,27 +152,27 @@ class TcpReadWriteTest(unittest.TestCase):
     def test_write_returns_bytes_sent(self):
         """write returns number of bytes sent."""
         with tempfile.TemporaryDirectory(prefix="vigil_rw_") as tmpdir:
-            server_code = '''import "net";
+            server_code = '''import "net"
 fn main() -> i32 {
-    i64 server = net.tcp_listen("127.0.0.1", 19003);
-    i64 client = net.tcp_accept(server);
-    string data = net.read(client, 1024);
-    net.close(client);
-    net.close(server);
-    return 0;
+    i64 server = net.tcp_listen("127.0.0.1", 19003)
+    i64 client = net.tcp_accept(server)
+    string data = net.read(client, 1024)
+    net.close(client)
+    net.close(server)
+    return 0
 }'''
-            client_code = '''import "net";
-import "time";
+            client_code = '''import "net"
+import "time"
 fn main() -> i32 {
-    time.sleep(i64(100));
-    i64 sock = net.tcp_connect("127.0.0.1", 19003);
-    if sock < i64(0) { return 1; }
+    time.sleep(i64(100))
+    i64 sock = net.tcp_connect("127.0.0.1", 19003)
+    if sock < i64(0) { return 1 }
     
-    i32 sent = net.write(sock, "test data");
-    net.close(sock);
+    i32 sent = net.write(sock, "test data")
+    net.close(sock)
     
-    if sent == 9 { return 0; }
-    return 2;
+    if sent == 9 { return 0 }
+    return 2
 }'''
             server_path = Path(tmpdir) / "server.vigil"
             server_path.write_text(server_code)
@@ -203,14 +203,14 @@ class UdpBindTest(unittest.TestCase):
 
     def test_udp_bind_returns_handle(self):
         """udp_bind returns non-negative handle."""
-        code = '''import "net";
+        code = '''import "net"
 fn main() -> i32 {
-    i64 sock = net.udp_bind("127.0.0.1", 19004);
+    i64 sock = net.udp_bind("127.0.0.1", 19004)
     if sock >= i64(0) {
-        net.close(sock);
-        return 0;
+        net.close(sock)
+        return 0
     }
-    return 1;
+    return 1
 }'''
         rc, out, err = run_vigil(code)
         self.assertEqual(rc, 0, f"stderr: {err}")
@@ -221,14 +221,14 @@ class UdpNewTest(unittest.TestCase):
 
     def test_udp_new_returns_handle(self):
         """udp_new returns non-negative handle."""
-        code = '''import "net";
+        code = '''import "net"
 fn main() -> i32 {
-    i64 sock = net.udp_new();
+    i64 sock = net.udp_new()
     if sock >= i64(0) {
-        net.close(sock);
-        return 0;
+        net.close(sock)
+        return 0
     }
-    return 1;
+    return 1
 }'''
         rc, out, err = run_vigil(code)
         self.assertEqual(rc, 0, f"stderr: {err}")
@@ -239,33 +239,33 @@ class UdpSendRecvTest(unittest.TestCase):
 
     def test_udp_loopback(self):
         """UDP can send and receive on loopback."""
-        code = '''import "net";
+        code = '''import "net"
 fn main() -> i32 {
-    i64 receiver = net.udp_bind("127.0.0.1", 19005);
-    if receiver < i64(0) { return 1; }
+    i64 receiver = net.udp_bind("127.0.0.1", 19005)
+    if receiver < i64(0) { return 1 }
     
-    i64 sender = net.udp_new();
+    i64 sender = net.udp_new()
     if sender < i64(0) { 
-        net.close(receiver);
-        return 2; 
+        net.close(receiver)
+        return 2 
     }
     
-    net.set_timeout(receiver, 1000);
+    net.set_timeout(receiver, 1000)
     
-    i32 sent = net.udp_send(sender, "127.0.0.1", 19005, "udp test");
+    i32 sent = net.udp_send(sender, "127.0.0.1", 19005, "udp test")
     if sent <= 0 {
-        net.close(sender);
-        net.close(receiver);
-        return 3;
+        net.close(sender)
+        net.close(receiver)
+        return 3
     }
     
-    string data = net.udp_recv(receiver, 1024);
+    string data = net.udp_recv(receiver, 1024)
     
-    net.close(sender);
-    net.close(receiver);
+    net.close(sender)
+    net.close(receiver)
     
-    if data == "udp test" { return 0; }
-    return 4;
+    if data == "udp test" { return 0 }
+    return 4
 }'''
         rc, out, err = run_vigil(code)
         self.assertEqual(rc, 0, f"stderr: {err}")
@@ -276,27 +276,27 @@ class SetTimeoutTest(unittest.TestCase):
 
     def test_set_timeout_returns_true(self):
         """set_timeout returns true on valid socket."""
-        code = '''import "net";
+        code = '''import "net"
 fn main() -> i32 {
-    i64 sock = net.udp_new();
-    if sock < i64(0) { return 1; }
+    i64 sock = net.udp_new()
+    if sock < i64(0) { return 1 }
     
-    bool ok = net.set_timeout(sock, 1000);
-    net.close(sock);
+    bool ok = net.set_timeout(sock, 1000)
+    net.close(sock)
     
-    if ok { return 0; }
-    return 2;
+    if ok { return 0 }
+    return 2
 }'''
         rc, out, err = run_vigil(code)
         self.assertEqual(rc, 0, f"stderr: {err}")
 
     def test_set_timeout_invalid_socket(self):
         """set_timeout returns false on invalid socket."""
-        code = '''import "net";
+        code = '''import "net"
 fn main() -> i32 {
-    bool ok = net.set_timeout(i64(999), 1000);
-    if !ok { return 0; }
-    return 1;
+    bool ok = net.set_timeout(i64(999), 1000)
+    if !ok { return 0 }
+    return 1
 }'''
         rc, out, err = run_vigil(code)
         self.assertEqual(rc, 0, f"stderr: {err}")
@@ -307,34 +307,34 @@ class CloseTest(unittest.TestCase):
 
     def test_close_valid_socket(self):
         """close works on valid socket."""
-        code = '''import "net";
+        code = '''import "net"
 fn main() -> i32 {
-    i64 sock = net.udp_new();
-    if sock < i64(0) { return 1; }
-    net.close(sock);
-    return 0;
+    i64 sock = net.udp_new()
+    if sock < i64(0) { return 1 }
+    net.close(sock)
+    return 0
 }'''
         rc, out, err = run_vigil(code)
         self.assertEqual(rc, 0, f"stderr: {err}")
 
     def test_close_invalid_socket(self):
         """close on invalid socket doesn't crash."""
-        code = '''import "net";
+        code = '''import "net"
 fn main() -> i32 {
-    net.close(i64(999));
-    return 0;
+    net.close(i64(999))
+    return 0
 }'''
         rc, out, err = run_vigil(code)
         self.assertEqual(rc, 0, f"stderr: {err}")
 
     def test_double_close(self):
         """Double close doesn't crash."""
-        code = '''import "net";
+        code = '''import "net"
 fn main() -> i32 {
-    i64 sock = net.udp_new();
-    net.close(sock);
-    net.close(sock);
-    return 0;
+    i64 sock = net.udp_new()
+    net.close(sock)
+    net.close(sock)
+    return 0
 }'''
         rc, out, err = run_vigil(code)
         self.assertEqual(rc, 0, f"stderr: {err}")

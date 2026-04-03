@@ -1,59 +1,62 @@
-import "args";
-import "fmt";
-import "fs";
+import "args"
+import "fmt"
+import "fs"
 
 fn copy_recursive(string src, string dst) -> bool {
     if ! fs.is_dir(src) {
-        return fs.copy(src, dst);
+        return fs.copy(src, dst)
     }
+
     // Directory - create destination and copy contents
     if ! fs.mkdir(dst) {
-        return false;
+        return false
     }
 
-    array<string> entries = fs.list(src);
+    array<string> entries = fs.list(src)
     for (i32 i = 0; i < entries.len(); i++) {
-        string src_child = fs.join(src, entries[i]);
-        string dst_child = fs.join(dst, entries[i]);
+        string src_child = fs.join(src, entries[i])
+        string dst_child = fs.join(dst, entries[i])
         if ! copy_recursive(src_child, dst_child) {
-            return false;
+            return false
         }
+
     }
 
-    return true;
+    return true
 }
 
+
 fn main() -> i32 {
-    args.Parser parser = args.Parser.new("vigil-cp", "copy files and directories");
-    parser.flag("recursive", "r", "copy directories recursively");
-    parser.positional("src", "source file");
-    parser.positional("dst", "destination file");
-    err e = parser.parse(0);
+    args.Parser parser = args.Parser.new("vigil-cp", "copy files and directories")
+    parser.flag("recursive", "r", "copy directories recursively")
+    parser.positional("src", "source file")
+    parser.positional("dst", "destination file")
+    err e = parser.parse(0)
     if e != ok {
-        fmt.eprintln(f"vigil-cp: {e.message()}");
-        return 1;
+        fmt.eprintln(f"vigil-cp: {e.message()}")
+        return 1
     }
 
-    array<string> positionals = parser.get_positionals();
+    array<string> positionals = parser.get_positionals()
     if positionals.len() < 2 {
-        fmt.eprintln("vigil-cp: missing file operand");
-        return 1;
+        fmt.eprintln("vigil-cp: missing file operand")
+        return 1
     }
 
-    string src = positionals[0];
-    string dst = positionals[1];
-    bool recursive = parser.get_bool("recursive");
-    bool ok2 = false;
+    string src = positionals[0]
+    string dst = positionals[1]
+    bool recursive = parser.get_bool("recursive")
+    bool ok2 = false
     if recursive {
-        ok2 = copy_recursive(src, dst);
+        ok2 = copy_recursive(src, dst)
     } else {
-        ok2 = fs.copy(src, dst);
+        ok2 = fs.copy(src, dst)
     }
 
     if ! ok2 {
-        fmt.eprintln(f"vigil-cp: failed to copy {src} to {dst}");
-        return 1;
+        fmt.eprintln(f"vigil-cp: failed to copy {src} to {dst}")
+        return 1
     }
 
-    return 0;
+    return 0
 }

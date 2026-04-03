@@ -264,6 +264,12 @@ static vigil_status_t parse_one_declaration(vigil_program_state_t *program, size
         *done = 1;
         return VIGIL_STATUS_OK;
     }
+    /* Skip stray semicolons produced by automatic semicolon insertion. */
+    if (token->kind == VIGIL_TOKEN_SEMICOLON)
+    {
+        (*cursor)++;
+        return VIGIL_STATUS_OK;
+    }
     is_public = vigil_program_parse_optional_pub(program, cursor);
     token = vigil_program_token_at(program, *cursor);
     if (token == NULL || token->kind == VIGIL_TOKEN_EOF)
@@ -1033,6 +1039,10 @@ vigil_status_t vigil_semantic_parse_statement_sequence(vigil_parser_state_t *sta
 
     while (!vigil_parser_is_at_end(state) && !should_stop(state))
     {
+        /* Skip stray semicolons produced by automatic semicolon insertion
+           (e.g. after a closing brace that precedes another closing brace). */
+        if (vigil_parser_match(state, VIGIL_TOKEN_SEMICOLON))
+            continue;
         status = parse_step(state, &step_result);
         if (status != VIGIL_STATUS_OK)
             return status;
@@ -1080,13 +1090,8 @@ vigil_status_t vigil_program_parse_import(vigil_program_state_t *program, size_t
         goto cleanup;
 
     token = vigil_program_token_at(program, *cursor);
-    if (token == NULL || token->kind != VIGIL_TOKEN_SEMICOLON)
-    {
-        status = vigil_compile_report(program, token == NULL ? vigil_program_eof_span(program) : token->span,
-                                      "expected ';' after import");
-        goto cleanup;
-    }
-    *cursor += 1U;
+    if (token != NULL && token->kind == VIGIL_TOKEN_SEMICOLON)
+        *cursor += 1U;
 
     status =
         resolve_import_source(program, native_found, import_target_token, token, &import_path, &imported_source_id);

@@ -5,13 +5,13 @@ VIGIL is a statically typed, C-style scripting language with explicit control fl
 ## Source Files
 
 - Source files use the `.vigil` extension.
-- Statements end with `;`.
+- Statements are terminated automatically by newlines (Go-style automatic semicolon insertion). Explicit semicolons are only required inside C-style `for` loop headers.
 - Blocks use `{ }`.
 - Every runnable program must define a `main` function. It returns `i32` (the exit code):
 
 ```
 fn main() -> i32 {
-    return 0;
+    return 0
 }
 ```
 
@@ -19,10 +19,10 @@ fn main() -> i32 {
 
 ```
 // mylib.vigil
-pub const string VERSION = "1.0";
+pub const string VERSION = "1.0"
 
 pub fn double(i32 x) -> i32 {
-    return x * 2;
+    return x * 2
 }
 ```
 
@@ -41,17 +41,17 @@ Comments placed directly above a declaration are extracted by `vigil doc`:
 ```
 // Compute the area of a circle with the given radius.
 pub fn area(f64 radius) -> f64 {
-    return math.pi() * radius * radius;
+    return math.pi() * radius * radius
 }
 ```
 
 ## Imports
 
 ```
-import "fmt";                    // stdlib module
-import "fmt" as f;               // stdlib with alias
-import "utils";                  // resolved relative to this file, or from lib/
-import "sub/deep";               // subdirectory relative to this file
+import "fmt"                     // stdlib module
+import "fmt" as f                // stdlib with alias
+import "utils"                   // resolved relative to this file, or from lib/
+import "sub/deep"                // subdirectory relative to this file
 ```
 
 - `as` sets the local alias. Without it, the alias is the last path component.
@@ -82,8 +82,8 @@ pub fn greet() -> void {}
 pub class Person {}
 pub interface Greeter {}
 pub enum Status { Ok, Err }
-pub const string VERSION = "1.0";
-pub i32 answer = 42;
+pub const string VERSION = "1.0"
+pub i32 answer = 42
 ```
 
 ## Types
@@ -108,9 +108,9 @@ There is no `null`. The `nil` literal exists as the internal void value but is n
 ### Composite Types
 
 ```
-array<i32> nums = [1, 2, 3];
-map<string, i32> scores = {"alice": 95, "bob": 87};
-array<array<string>> table = [["a"], ["b"]];
+array<i32> nums = [1, 2, 3]
+map<string, i32> scores = {"alice": 95, "bob": 87}
+array<array<string>> table = [["a"], ["b"]]
 ```
 
 Nesting is supported to arbitrary depth: `array<array<f64>>`, `map<string, array<i32>>`.
@@ -120,22 +120,22 @@ Nesting is supported to arbitrary depth: `array<array<f64>>`, `map<string, array
 Functions can be stored in variables with an explicit signature:
 
 ```
-fn add(i32 a, i32 b) -> i32 { return a + b; }
+fn add(i32 a, i32 b) -> i32 { return a + b }
 
-fn(i32, i32) -> i32 op = add;
-i32 result = op(2, 3);
+fn(i32, i32) -> i32 op = add
+i32 result = op(2, 3)
 ```
 
-Indirect calls require a concrete function signature. The shorthand `fn name = func;` stores a reference but cannot be called without a typed binding.
+Indirect calls require a concrete function signature. The shorthand `fn name = func` stores a reference but cannot be called without a typed binding.
 
 ### Module-Qualified Types
 
 Types from other modules use dot-qualified names:
 
 ```
-import "models";
+import "models"
 
-models.Point p = models.Point(3, 4);
+models.Point p = models.Point(3, 4)
 ```
 
 ## Literals
@@ -143,13 +143,13 @@ models.Point p = models.Point(3, 4);
 ### Numeric Literals
 
 ```
-i32 dec = 255;
-i32 hex = 0xFF;
-i32 bin = 0b11111111;
-i32 oct = 0o377;
-f64 pi = 3.14159;
-f64 large = 1e6;
-f64 small = 5.0e-324;
+i32 dec = 255
+i32 hex = 0xFF
+i32 bin = 0b11111111
+i32 oct = 0o377
+f64 pi = 3.14159
+f64 large = 1e6
+f64 small = 5.0e-324
 ```
 
 Integer literals support decimal, hexadecimal (`0x`), binary (`0b`), and octal (`0o`) bases. Float literals support scientific notation including subnormal values.
@@ -157,9 +157,9 @@ Integer literals support decimal, hexadecimal (`0x`), binary (`0b`), and octal (
 ### String Literals
 
 ```
-string normal = "hello\nworld";
-string raw = `no escapes here`;
-string msg = f"hello {name}";
+string normal = "hello\nworld"
+string raw = `no escapes here`
+string msg = f"hello {name}"
 ```
 
 Escape sequences in double-quoted strings:
@@ -182,9 +182,9 @@ Raw strings (backtick-delimited) perform no escape processing.
 Single-quoted character literals produce a one-character `string`:
 
 ```
-string ch = 'a';
-string newline = '\n';
-string euro = '€';
+string ch = 'a'
+string newline = '\n'
+string euro = '€'
 ```
 
 They are syntax sugar for `string`, not a separate type.
@@ -194,14 +194,14 @@ They are syntax sugar for `string`, not a separate type.
 F-strings support interpolation and optional format specifiers:
 
 ```
-string name = "Alice";
-i32 age = 30;
-f64 pi = 3.14159;
+string name = "Alice"
+i32 age = 30
+f64 pi = 3.14159
 
-fmt.println(f"Name: {name}, Age: {age}");
-fmt.println(f"Next year: {age + 1}");
-fmt.println(f"pi={pi:.2f}");
-fmt.println(f"literal braces: {{ok}}");
+fmt.println(f"Name: {name}, Age: {age}")
+fmt.println(f"Next year: {age + 1}")
+fmt.println(f"pi={pi:.2f}")
+fmt.println(f"literal braces: {{ok}}")
 ```
 
 Format specifiers follow `{expr:[[fill]align][width][,][.precision][type]}`:
@@ -222,14 +222,14 @@ Format specifiers follow `{expr:[[fill]align][width][,][.precision][type]}`:
 Expressions including method calls are allowed inside interpolations:
 
 ```
-fmt.println(f"{"hello".to_upper()}");
+fmt.println(f"{"hello".to_upper()}")
 ```
 
 ### Array and Map Literals
 
 ```
-array<string> names = ["alice", "bob"];
-map<string, i32> counts = {"a": 1, "b": 2};
+array<string> names = ["alice", "bob"]
+map<string, i32> counts = {"a": 1, "b": 2}
 ```
 
 Trailing commas are not permitted in array or map literals.
@@ -237,8 +237,8 @@ Trailing commas are not permitted in array or map literals.
 Empty collections require a type annotation:
 
 ```
-array<i32> empty = [];
-map<string, string> m = {};
+array<i32> empty = []
+map<string, string> m = {}
 ```
 
 ## Variables and Constants
@@ -248,16 +248,16 @@ map<string, string> m = {};
 All variables are typed and initialized at declaration:
 
 ```
-i32 x = 10;
-string name = "vigil";
-bool ready = true;
+i32 x = 10
+string name = "vigil"
+bool ready = true
 ```
 
 ### Constants
 
 ```
-const i32 MAX = 100;
-const string VERSION = "1.0";
+const i32 MAX = 100
+const string VERSION = "1.0"
 ```
 
 Constants can appear at top level or inside functions.
@@ -267,30 +267,30 @@ Constants can appear at top level or inside functions.
 Functions may return multiple values. Each binding is typed:
 
 ```
-i32 result, err e = divide(10, 2);
-string a, string b, bool c = multi();
+i32 result, err e = divide(10, 2)
+string a, string b, bool c = multi()
 ```
 
 Use `_` to discard a value:
 
 ```
-i32 value, err _ = divide(10, 2);
+i32 value, err _ = divide(10, 2)
 ```
 
 ## Assignment
 
 ```
-x = 42;
-x += 5;
-x -= 1;
-x *= 2;
-x /= 3;
-x %= 2;
-x++;
-x--;
-arr[0] = 99;
-m["key"] = 1;
-obj.field = 7;
+x = 42
+x += 5
+x -= 1
+x *= 2
+x /= 3
+x %= 2
+x++
+x--
+arr[0] = 99
+m["key"] = 1
+obj.field = 7
 ```
 
 `++` and `--` are statements, not expressions.
@@ -320,13 +320,13 @@ Logical operators short-circuit.
 ### Ternary
 
 ```
-i32 max = a > b ? a : b;
+i32 max = a > b ? a : b
 ```
 
 The condition must be `bool`. The ternary is right-associative and has the lowest precedence. Parenthesize when used inside larger expressions:
 
 ```
-i32 delta = 10 + (flag ? 1 : 2);
+i32 delta = 10 + (flag ? 1 : 2)
 ```
 
 ### Type Conversions
@@ -334,26 +334,26 @@ i32 delta = 10 + (flag ? 1 : 2);
 Conversions are explicit function-call syntax:
 
 ```
-i32 x = 42;
-f64 y = f64(x);
-string s = string(x);
-i64 big = i64(x);
-i32 back = i32(big);
+i32 x = 42
+f64 y = f64(x)
+string s = string(x)
+i64 big = i64(x)
+i32 back = i32(big)
 ```
 
 VIGIL performs no implicit numeric coercion. Mixed-type operations require explicit casts:
 
 ```
-i32 a = 10;
-i64 b = i64(20);
+i32 a = 10
+i64 b = i64(20)
 if i64(a) < b { }
 ```
 
 For parsing strings to numbers, use the `parse` module:
 
 ```
-import "parse";
-i32 n, err e = parse.i32("42");
+import "parse"
+i32 n, err e = parse.i32("42")
 ```
 
 ## Functions
@@ -362,11 +362,11 @@ i32 n, err e = parse.i32("42");
 
 ```
 fn add(i32 a, i32 b) -> i32 {
-    return a + b;
+    return a + b
 }
 
 fn greet(string name) -> void {
-    fmt.println("hello " + name);
+    fmt.println("hello " + name)
 }
 ```
 
@@ -375,9 +375,9 @@ fn greet(string name) -> void {
 ```
 fn divide(i32 a, i32 b) -> (i32, err) {
     if b == 0 {
-        return 0, err("division by zero", err.arg);
+        return 0, err("division by zero", err.arg)
     }
-    return a / b, ok;
+    return a / b, ok
 }
 ```
 
@@ -386,9 +386,9 @@ A function returning only `err` uses `-> err`:
 ```
 fn validate(i32 age) -> err {
     if age < 0 {
-        return err("negative age", err.arg);
+        return err("negative age", err.arg)
     }
-    return ok;
+    return ok
 }
 ```
 
@@ -396,21 +396,21 @@ fn validate(i32 age) -> err {
 
 ```
 fn main() -> i32 {
-    i32 factor = 10;
+    i32 factor = 10
 
-    fn(i32) -> i32 scale = |x| x * factor;
+    fn(i32) -> i32 scale = |x| x * factor
 
     fn(i32, i32) -> i32 combine = |a, b| {
-        i32 sum = a + b;
-        return sum * factor;
-    };
+        i32 sum = a + b
+        return sum * factor
+    }
 
     // Immediately invoked
     fn() -> void {
-        fmt.println("iife");
-    }();
+        fmt.println("iife")
+    }()
 
-    return combine(scale(2), 3);
+    return combine(scale(2), 3)
 }
 ```
 
@@ -423,9 +423,9 @@ Anonymous functions capture surrounding variables by value.
 ```
 fn main() -> i32 {
     fn helper(i32 x) -> i32 {
-        return x * 2;
+        return x * 2
     }
-    return helper(5);
+    return helper(5)
 }
 ```
 
@@ -435,11 +435,11 @@ fn main() -> i32 {
 
 ```
 if x > 10 {
-    fmt.println("big");
+    fmt.println("big")
 } else if x > 5 {
-    fmt.println("medium");
+    fmt.println("medium")
 } else {
-    fmt.println("small");
+    fmt.println("small")
 }
 ```
 
@@ -449,7 +449,7 @@ Parentheses around the condition are required. The condition must be `bool` — 
 
 ```
 while running {
-    tick();
+    tick()
 }
 ```
 
@@ -457,7 +457,7 @@ while running {
 
 ```
 for (i32 i = 0; i < 10; i++) {
-    fmt.println(string(i));
+    fmt.println(string(i))
 }
 ```
 
@@ -467,15 +467,15 @@ Iterates over arrays (single binding), maps (key-value pair), and strings (singl
 
 ```
 for val in arr {
-    fmt.println(val);
+    fmt.println(val)
 }
 
 for key, val in m {
-    fmt.println(key + "=" + string(val));
+    fmt.println(key + "=" + string(val))
 }
 
 for ch in "hello" {
-    fmt.println(ch);
+    fmt.println(ch)
 }
 ```
 
@@ -492,11 +492,11 @@ for b in "hello".bytes() {
 ```
 switch x {
     case 1:
-        fmt.println("one");
+        fmt.println("one")
     case 2, 3:
-        fmt.println("two or three");
+        fmt.println("two or three")
     default:
-        fmt.println("other");
+        fmt.println("other")
 }
 ```
 
@@ -508,8 +508,8 @@ switch x {
 
 ```
 for (i32 i = 0; i < 100; i++) {
-    if i == 50 { break; }
-    if i % 2 == 0 { continue; }
+    if i == 50 { break }
+    if i % 2 == 0 { continue }
 }
 ```
 
@@ -519,10 +519,10 @@ for (i32 i = 0; i < 100; i++) {
 
 ```
 fn process() -> i32 {
-    defer cleanup();
-    defer close_file();
+    defer cleanup()
+    defer close_file()
     // ...
-    return 0;
+    return 0
 }
 ```
 
@@ -536,8 +536,8 @@ fn process() -> i32 {
 
 ```
 guard string data, err e = file.read_all("config.txt") {
-    fmt.eprintln(f"read failed: {e.message()}");
-    return 1;
+    fmt.eprintln(f"read failed: {e.message()}")
+    return 1
 }
 // data is available here
 ```
@@ -549,10 +549,10 @@ Rules:
 Equivalent expanded form:
 
 ```
-string data, err e = file.read_all("config.txt");
+string data, err e = file.read_all("config.txt")
 if e != ok {
-    fmt.eprintln(f"read failed: {e.message()}");
-    return 1;
+    fmt.eprintln(f"read failed: {e.message()}")
+    return 1
 }
 ```
 
@@ -563,8 +563,8 @@ VIGIL has no exceptions. Errors are values of type `err`.
 ### Success and Failure
 
 ```
-return ok;
-return err("file not found", err.not_found);
+return ok
+return err("file not found", err.not_found)
 ```
 
 `ok` represents success. `err(message, kind)` constructs an error.
@@ -573,8 +573,8 @@ return err("file not found", err.not_found);
 
 ```
 if e != ok {
-    fmt.eprintln(e.message());
-    fmt.eprintln(e.kind());
+    fmt.eprintln(e.message())
+    fmt.eprintln(e.kind())
 }
 ```
 
@@ -589,11 +589,11 @@ Built-in error kinds:
 ```
 switch e.kind() {
     case err.not_found:
-        fmt.println("missing");
+        fmt.println("missing")
     case err.permission:
-        fmt.println("denied");
+        fmt.println("denied")
     default:
-        fmt.eprintln(f"error: {e.message()}");
+        fmt.eprintln(f"error: {e.message()}")
 }
 ```
 
@@ -601,16 +601,16 @@ switch e.kind() {
 
 ```
 class Person {
-    pub string name;
-    pub i32 age;
+    pub string name
+    pub i32 age
 
     fn init(string name, i32 age) -> void {
-        self.name = name;
-        self.age = age;
+        self.name = name
+        self.age = age
     }
 
     pub fn greet() -> void {
-        fmt.println(f"Hello, I'm {self.name}");
+        fmt.println(f"Hello, I'm {self.name}")
     }
 }
 ```
@@ -618,8 +618,8 @@ class Person {
 ### Construction
 
 ```
-Person p = Person("Alice", 30);
-p.greet();
+Person p = Person("Alice", 30)
+p.greet()
 ```
 
 ### Fallible Construction
@@ -628,18 +628,18 @@ If `init` returns `err`, construction becomes fallible:
 
 ```
 class Connection {
-    pub string host;
+    pub string host
 
     fn init(string host) -> err {
         if host == "" {
-            return err("empty host", err.arg);
+            return err("empty host", err.arg)
         }
-        self.host = host;
-        return ok;
+        self.host = host
+        return ok
     }
 }
 
-Connection c, err e = Connection("localhost");
+Connection c, err e = Connection("localhost")
 ```
 
 ### Notes
@@ -653,8 +653,8 @@ Connection c, err e = Connection("localhost");
 
 ```
 interface Drawable {
-    fn draw() -> void;
-    fn name() -> string;
+    fn draw() -> void
+    fn name() -> string
 }
 ```
 
@@ -662,18 +662,18 @@ Classes implement interfaces explicitly:
 
 ```
 class Circle implements Drawable {
-    pub string label;
+    pub string label
 
     fn init(string label) -> void {
-        self.label = label;
+        self.label = label
     }
 
     fn draw() -> void {
-        fmt.println("drawing circle");
+        fmt.println("drawing circle")
     }
 
     fn name() -> string {
-        return self.label;
+        return self.label
     }
 }
 ```
@@ -690,11 +690,11 @@ Interface types can be used as parameter types for polymorphic dispatch:
 
 ```
 fn describe(Named n) -> string {
-    return n.name();
+    return n.name()
 }
 
-Box b = Box("test", 42);
-string s = describe(b);
+Box b = Box("test", 42)
+string s = describe(b)
 ```
 
 ## Enums
@@ -716,13 +716,13 @@ enum HttpStatus {
 Enum values are `i32`-backed. Access members with dot syntax:
 
 ```
-Color c = Color.Red;
+Color c = Color.Red
 
 switch c {
     case Color.Red:
-        fmt.println("red");
+        fmt.println("red")
     default:
-        fmt.println("other");
+        fmt.println("other")
 }
 ```
 
@@ -787,10 +787,10 @@ switch c {
 Index syntax is also supported:
 
 ```
-arr[0];
-m["key"];
-arr[0] = 1;
-m["key"] = 2;
+arr[0]
+m["key"]
+arr[0] = 1
+m["key"] = 2
 ```
 
 ## Projects
@@ -833,15 +833,15 @@ Dependencies are cloned into `deps/`.
 Test files are named `*_test.vigil` and use the `test` module:
 
 ```
-import "test";
+import "test"
 
 fn test_addition(test.T t) -> void {
-    i32 result = 1 + 1;
-    t.assert(result == 2, "1 + 1 should equal 2");
+    i32 result = 1 + 1
+    t.assert(result == 2, "1 + 1 should equal 2")
 }
 
 fn test_failure(test.T t) -> void {
-    t.fail("explicit failure");
+    t.fail("explicit failure")
 }
 ```
 

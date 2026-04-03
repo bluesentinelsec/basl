@@ -482,6 +482,7 @@ vigil_status_t vigil_parser_emit_string_constant_text(vigil_parser_state_t *stat
                                                       const char *text, size_t length);
 vigil_status_t vigil_parser_expect(vigil_parser_state_t *state, vigil_token_kind_t kind, const char *message,
                                    const vigil_token_t **out_token);
+vigil_status_t vigil_parser_expect_semi(vigil_parser_state_t *state, const char *message);
 const char *vigil_parser_token_text(const vigil_parser_state_t *state, const vigil_token_t *token, size_t *out_length);
 int vigil_program_names_equal(const char *left, size_t left_length, const char *right, size_t right_length);
 void vigil_expression_result_set_pair(vigil_expression_result_t *result, vigil_parser_type_t first_type,

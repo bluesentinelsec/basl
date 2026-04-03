@@ -9,146 +9,163 @@
 //   - unsafe.sizeof/sizeof_ptr for platform introspection
 // ── libc ────────────────────────────────────────────────────────────
 
-import "ffi";
-import "fmt";
-import "unsafe";
+import "ffi"
+import "fmt"
+import "unsafe"
 
-i64 g_libc = i64(0);
-i64 h_malloc = i64(- 1);
-i64 h_free = i64(- 1);
-i64 h_strlen = i64(- 1);
-i64 h_strerror = i64(- 1);
+i64 g_libc = i64(0)
+i64 h_malloc = i64(- 1)
+i64 h_free = i64(- 1)
+i64 h_strlen = i64(- 1)
+i64 h_strerror = i64(- 1)
 
 fn ensure_libc() -> void {
     if g_libc != i64(0) {
-        return;
+        return
     }
 
-    g_libc = ffi.open("libSystem.B.dylib");
+    g_libc = ffi.open("libSystem.B.dylib")
     if g_libc == i64(0) {
-        g_libc = ffi.open("libc.so.6");
-    }
-
-    if g_libc == i64(0) {
-        g_libc = ffi.open("");
+        g_libc = ffi.open("libc.so.6")
     }
 
     if g_libc == i64(0) {
-        fmt.println("ERROR: could not open libc");
-        return;
+        g_libc = ffi.open("")
     }
 
-    h_malloc = ffi.bind(g_libc, "malloc", "ptr(i64)");
-    h_free = ffi.bind(g_libc, "free", "void(ptr)");
-    h_strlen = ffi.bind(g_libc, "strlen", "i64(ptr)");
-    h_strerror = ffi.bind(g_libc, "strerror", "ptr(i32)");
+    if g_libc == i64(0) {
+        fmt.println("ERROR: could not open libc")
+        return
+    }
+
+    h_malloc = ffi.bind(g_libc, "malloc", "ptr(i64)")
+    h_free = ffi.bind(g_libc, "free", "void(ptr)")
+    h_strlen = ffi.bind(g_libc, "strlen", "i64(ptr)")
+    h_strerror = ffi.bind(g_libc, "strerror", "ptr(i32)")
 }
+
 
 pub fn c_malloc(i64 size) -> i64 {
-    ensure_libc();
-    return ffi.call(h_malloc, size, i64(0), i64(0), i64(0), i64(0), i64(0));
+    ensure_libc()
+    return ffi.call(h_malloc, size, i64(0), i64(0), i64(0), i64(0), i64(0))
 }
+
 
 pub fn c_free(i64 ptr) -> void {
-    ensure_libc();
-    ffi.call(h_free, ptr, i64(0), i64(0), i64(0), i64(0), i64(0));
+    ensure_libc()
+    ffi.call(h_free, ptr, i64(0), i64(0), i64(0), i64(0), i64(0))
 }
 
+
 pub fn c_strlen(i64 ptr) -> i64 {
-    ensure_libc();
-    return ffi.call(h_strlen, ptr, i64(0), i64(0), i64(0), i64(0), i64(0));
+    ensure_libc()
+    return ffi.call(h_strlen, ptr, i64(0), i64(0), i64(0), i64(0), i64(0))
 }
+
 
 pub fn c_str_read(i64 ptr) -> string {
     if ptr == i64(0) {
-        return "";
+        return ""
     }
 
-    return unsafe.str(ptr);
+    return unsafe.str(ptr)
 }
+
 
 pub fn c_errno() -> i32 {
-    return unsafe.errno();
+    return unsafe.errno()
 }
+
 
 pub fn c_strerror(i32 errnum) -> string {
-    ensure_libc();
-    i64 ptr = ffi.call(h_strerror, i64(errnum), i64(0), i64(0), i64(0), i64(0), i64(0));
-    return c_str_read(ptr);
+    ensure_libc()
+    i64 ptr = ffi.call(h_strerror, i64(errnum), i64(0), i64(0), i64(0), i64(0), i64(0))
+    return c_str_read(ptr)
 }
+
 // ── libm ────────────────────────────────────────────────────────────
-i64 h_sin = i64(- 1);
-i64 h_cos = i64(- 1);
-i64 h_sqrt = i64(- 1);
-i64 h_pow = i64(- 1);
-i64 h_fabs = i64(- 1);
+i64 h_sin = i64(- 1)
+i64 h_cos = i64(- 1)
+i64 h_sqrt = i64(- 1)
+i64 h_pow = i64(- 1)
+i64 h_fabs = i64(- 1)
 
 fn bind_libm() -> void {
-    ensure_libc();
+    ensure_libc()
     // libm is part of libc on most platforms
-    i64 lib = g_libc;
-    h_sin = ffi.bind(lib, "sin", "f64(f64)");
-    h_cos = ffi.bind(lib, "cos", "f64(f64)");
-    h_sqrt = ffi.bind(lib, "sqrt", "f64(f64)");
-    h_pow = ffi.bind(lib, "pow", "f64(f64,f64)");
-    h_fabs = ffi.bind(lib, "fabs", "f64(f64)");
+    i64 lib = g_libc
+    h_sin = ffi.bind(lib, "sin", "f64(f64)")
+    h_cos = ffi.bind(lib, "cos", "f64(f64)")
+    h_sqrt = ffi.bind(lib, "sqrt", "f64(f64)")
+    h_pow = ffi.bind(lib, "pow", "f64(f64,f64)")
+    h_fabs = ffi.bind(lib, "fabs", "f64(f64)")
 }
+
 
 pub fn ffi_sin(f64 x) -> f64 {
     if h_sin == i64(- 1) {
-        bind_libm();
+        bind_libm()
     }
 
-    return ffi.call_f(h_sin, x, 0.0);
+    return ffi.call_f(h_sin, x, 0.0)
 }
+
 
 pub fn ffi_cos(f64 x) -> f64 {
     if h_cos == i64(- 1) {
-        bind_libm();
+        bind_libm()
     }
 
-    return ffi.call_f(h_cos, x, 0.0);
+    return ffi.call_f(h_cos, x, 0.0)
 }
+
 
 pub fn ffi_sqrt(f64 x) -> f64 {
     if h_sqrt == i64(- 1) {
-        bind_libm();
+        bind_libm()
     }
 
-    return ffi.call_f(h_sqrt, x, 0.0);
+    return ffi.call_f(h_sqrt, x, 0.0)
 }
+
 
 pub fn ffi_pow(f64 base, f64 exp) -> f64 {
     if h_pow == i64(- 1) {
-        bind_libm();
+        bind_libm()
     }
 
-    return ffi.call_f(h_pow, base, exp);
+    return ffi.call_f(h_pow, base, exp)
 }
+
 
 pub fn ffi_fabs(f64 x) -> f64 {
     if h_fabs == i64(- 1) {
-        bind_libm();
+        bind_libm()
     }
 
-    return ffi.call_f(h_fabs, x, 0.0);
+    return ffi.call_f(h_fabs, x, 0.0)
 }
+
 // ── Helpers ─────────────────────────────────────────────────────────
 pub fn ptr_size() -> i32 {
-    return unsafe.sizeof_ptr();
+    return unsafe.sizeof_ptr()
 }
+
 
 pub fn sizeof_type(string t) -> i32 {
-    return unsafe.sizeof(t);
+    return unsafe.sizeof(t)
 }
 
+
 pub fn null_ptr() -> i64 {
-    return unsafe.null();
+    return unsafe.null()
 }
+
 
 pub fn cleanup() -> void {
     if g_libc != i64(0) {
-        ffi.close(g_libc);
-        g_libc = i64(0);
+        ffi.close(g_libc)
+        g_libc = i64(0)
     }
+
 }

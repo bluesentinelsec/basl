@@ -3,76 +3,79 @@
 // Runs a 60fps loop displaying frame time via performance counters.
 // Press Escape or close the window to quit.
 
-import "fmt";
-import "sdl";
+import "fmt"
+import "sdl"
 
 fn main() -> i32 {
-    bool init_ok, err ie = sdl.init(sdl.INIT_VIDEO);
+    bool init_ok, err ie = sdl.init(sdl.INIT_VIDEO)
     if ie != ok {
-        fmt.eprintln(f"SDL init failed: {ie.message()}");
-        return 1;
+        fmt.eprintln(f"SDL init failed: {ie.message()}")
+        return 1
     }
 
-    defer sdl.quit();
-    sdl.Window win, err we = sdl.Window.create("Timer Demo", 640, 480, 0);
+    defer sdl.quit()
+    sdl.Window win, err we = sdl.Window.create("Timer Demo", 640, 480, 0)
     if we != ok {
-        fmt.eprintln(f"Window failed: {we.message()}");
-        return 1;
+        fmt.eprintln(f"Window failed: {we.message()}")
+        return 1
     }
 
-    sdl.Renderer ren, err re = sdl.Renderer.create(win, "");
+    sdl.Renderer ren, err re = sdl.Renderer.create(win, "")
     if re != ok {
-        fmt.eprintln(f"Renderer failed: {re.message()}");
-        win.destroy();
-        return 1;
+        fmt.eprintln(f"Renderer failed: {re.message()}")
+        win.destroy()
+        return 1
     }
 
-    sdl.Event ev, err ee = sdl.Event.new();
+    sdl.Event ev, err ee = sdl.Event.new()
     if ee != ok {
-        fmt.eprintln(f"Event alloc failed: {ee.message()}");
-        ren.destroy();
-        win.destroy();
-        return 1;
+        fmt.eprintln(f"Event alloc failed: {ee.message()}")
+        ren.destroy()
+        win.destroy()
+        return 1
     }
 
-    i64 freq = sdl.get_performance_frequency();
-    i64 last = sdl.get_performance_counter();
-    i32 frame_count = 0;
-    i64 fps_timer = sdl.get_ticks();
-    fmt.println(f"Performance counter frequency: {freq} Hz");
-    fmt.println("Running at ~60fps. Press Escape to quit.");
-    bool running = true;
+    i64 freq = sdl.get_performance_frequency()
+    i64 last = sdl.get_performance_counter()
+    i32 frame_count = 0
+    i64 fps_timer = sdl.get_ticks()
+    fmt.println(f"Performance counter frequency: {freq} Hz")
+    fmt.println("Running at ~60fps. Press Escape to quit.")
+    bool running = true
     while running {
         while ev.poll() {
             if ev.type() == sdl.EVENT_QUIT {
-                running = false;
+                running = false
             }
+
         }
 
         if sdl.is_key_pressed(sdl.SCANCODE_ESCAPE) {
-            running = false;
+            running = false
         }
+
         // Compute delta time
-        i64 now = sdl.get_performance_counter();
-        i64 elapsed = now - last;
-        last = now;
+        i64 now = sdl.get_performance_counter()
+        i64 elapsed = now - last
+        last = now
         // Print FPS every second
-        frame_count = frame_count + 1;
-        i64 ticks_now = sdl.get_ticks();
+        frame_count = frame_count + 1
+        i64 ticks_now = sdl.get_ticks()
         if ticks_now - fps_timer >= i64(1000) {
-            fmt.println(f"FPS: {frame_count}  elapsed_ticks: {elapsed}");
-            frame_count = 0;
-            fps_timer = ticks_now;
+            fmt.println(f"FPS: {frame_count}  elapsed_ticks: {elapsed}")
+            frame_count = 0
+            fps_timer = ticks_now
         }
+
         // Render
-        bool c1, err e1 = ren.set_draw_color(30, 30, 30, 255);
-        bool c2, err e2 = ren.clear();
-        bool c3, err e3 = ren.present();
+        bool c1, err e1 = ren.set_draw_color(30, 30, 30, 255)
+        bool c2, err e2 = ren.clear()
+        bool c3, err e3 = ren.present()
         // Target ~60fps
-        sdl.delay(16);
+        sdl.delay(16)
     }
 
-    ren.destroy();
-    win.destroy();
-    return 0;
+    ren.destroy()
+    win.destroy()
+    return 0
 }

@@ -1,35 +1,35 @@
-import "fmt";
-import "yaml";
+import "fmt"
+import "yaml"
 
 fn main() -> i32 {
     // Parse a YAML document (JSON is valid YAML)
-    string doc = "name: Alice\nage: 30\nactive: true\n";
-    string name = yaml.get(doc, "name");
-    string age_str = yaml.get(doc, "age");
-    string active_str = yaml.get(doc, "active");
-    fmt.println(f"Name: {name}");
-    fmt.println(f"Age: {age_str}");
-    fmt.println(f"Active: {active_str}");
+    string doc = "name: Alice\nage: 30\nactive: true\n"
+    string name = yaml.get(doc, "name")
+    string age_str = yaml.get(doc, "age")
+    string active_str = yaml.get(doc, "active")
+    fmt.println(f"Name: {name}")
+    fmt.println(f"Age: {age_str}")
+    fmt.println(f"Active: {active_str}")
     // Parse a YAML list
-    string list_doc = "items:\n  - apple\n  - banana\n  - cherry\n";
-    string item0 = yaml.get(list_doc, "items[0]");
-    string item1 = yaml.get(list_doc, "items[1]");
-    string item2 = yaml.get(list_doc, "items[2]");
-    fmt.println("\nFruit list:");
-    fmt.println(f"  [0] = {item0}");
-    fmt.println(f"  [1] = {item1}");
-    fmt.println(f"  [2] = {item2}");
+    string list_doc = "items:\n  - apple\n  - banana\n  - cherry\n"
+    string item0 = yaml.get(list_doc, "items[0]")
+    string item1 = yaml.get(list_doc, "items[1]")
+    string item2 = yaml.get(list_doc, "items[2]")
+    fmt.println("\nFruit list:")
+    fmt.println(f"  [0] = {item0}")
+    fmt.println(f"  [1] = {item1}")
+    fmt.println(f"  [2] = {item2}")
     // Access nested fields
-    string config = "server:\n  host: localhost\n  port: 8080\ndebug: false\n";
-    string host = yaml.get(config, "server.host");
-    string port = yaml.get(config, "server.port");
-    string debug_val = yaml.get(config, "debug");
-    fmt.println(f"\nServer config:");
-    fmt.println(f"  host: {host}");
-    fmt.println(f"  port: {port}");
-    fmt.println(f"  debug: {debug_val}");
+    string config = "server:\n  host: localhost\n  port: 8080\ndebug: false\n"
+    string host = yaml.get(config, "server.host")
+    string port = yaml.get(config, "server.port")
+    string debug_val = yaml.get(config, "debug")
+    fmt.println(f"\nServer config:")
+    fmt.println(f"  host: {host}")
+    fmt.println(f"  port: {port}")
+    fmt.println(f"  debug: {debug_val}")
     // yaml.parse converts YAML to a JSON string
-    string as_json = yaml.parse(config);
-    fmt.println(f"\nAs JSON: {as_json}");
-    return 0;
+    string as_json = yaml.parse(config)
+    fmt.println(f"\nAs JSON: {as_json}")
+    return 0
 }

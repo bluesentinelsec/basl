@@ -1,75 +1,77 @@
-import "./lib/processor";
-import "args";
-import "fmt";
+import "./lib/processor"
+import "args"
+import "fmt"
 
 fn main() -> i32 {
-    bool show_lines = false;
-    bool show_words = false;
-    bool show_bytes = false;
-    array<string> files = [];
+    bool show_lines = false
+    bool show_words = false
+    bool show_bytes = false
+    array<string> files = []
     for (i32 i = 0; i < args.count(); i++) {
-        string arg = args.at(i);
+        string arg = args.at(i)
         if arg == "-l" || arg == "--lines" {
-            show_lines = true;
+            show_lines = true
         } else if arg == "-w" || arg == "--words" {
-            show_words = true;
+            show_words = true
         } else if arg == "-c" || arg == "--bytes" {
-            show_bytes = true;
+            show_bytes = true
         } else {
-            files.push(arg);
+            files.push(arg)
         }
+
     }
 
     if ! show_lines &&! show_words &&! show_bytes {
-        show_lines = true;
-        show_words = true;
-        show_bytes = true;
+        show_lines = true
+        show_words = true
+        show_bytes = true
     }
 
     if files.len() == 0 {
-        i32 l, i32 w, i32 b, err e = processor.process_stdin(show_lines, show_words, show_bytes, "");
+        i32 l, i32 w, i32 b, err e = processor.process_stdin(show_lines, show_words, show_bytes, "")
         if e != ok {
-            fmt.eprintln(f"vigil-wc: stdin: {e.message()}");
-            return 1;
+            fmt.eprintln(f"vigil-wc: stdin: {e.message()}")
+            return 1
         }
 
-        return 0;
+        return 0
     }
 
-    i32 total_lines = 0;
-    i32 total_words = 0;
-    i32 total_bytes = 0;
-    i32 file_count = 0;
+    i32 total_lines = 0
+    i32 total_words = 0
+    i32 total_bytes = 0
+    i32 file_count = 0
     for (i32 i = 0; i < files.len(); i++) {
-        string path = files[i];
+        string path = files[i]
         if path == "-" {
-            i32 l, i32 w, i32 b, err e = processor.process_stdin(show_lines, show_words, show_bytes, "-");
+            i32 l, i32 w, i32 b, err e = processor.process_stdin(show_lines, show_words, show_bytes, "-")
             if e != ok {
-                fmt.eprintln(f"vigil-wc: stdin: {e.message()}");
-                return 1;
+                fmt.eprintln(f"vigil-wc: stdin: {e.message()}")
+                return 1
             }
 
-            total_lines += l;
-            total_words += w;
-            total_bytes += b;
-            file_count++;
+            total_lines += l
+            total_words += w
+            total_bytes += b
+            file_count++
         } else {
-            i32 l, i32 w, i32 b, err e = processor.process_file(path, show_lines, show_words, show_bytes);
+            i32 l, i32 w, i32 b, err e = processor.process_file(path, show_lines, show_words, show_bytes)
             if e != ok {
-                fmt.eprintln(f"vigil-wc: {path}: {e.message()}");
-                return 1;
+                fmt.eprintln(f"vigil-wc: {path}: {e.message()}")
+                return 1
             }
 
-            total_lines += l;
-            total_words += w;
-            total_bytes += b;
-            file_count++;
+            total_lines += l
+            total_words += w
+            total_bytes += b
+            file_count++
         }
+
     }
 
     if file_count > 1 {
-        processor.print_counts(total_lines, total_words, total_bytes, "total", show_lines, show_words, show_bytes);
+        processor.print_counts(total_lines, total_words, total_bytes, "total", show_lines, show_words, show_bytes)
     }
 
-    return 0;
+    return 0
 }

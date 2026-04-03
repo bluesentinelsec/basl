@@ -1,41 +1,42 @@
-import "fmt";
-import "sdl";
+import "fmt"
+import "sdl"
 
 fn main() -> i32 {
-    bool init_ok, err ie = sdl.init(sdl.INIT_VIDEO);
+    bool init_ok, err ie = sdl.init(sdl.INIT_VIDEO)
     if ie != ok {
-        fmt.eprintln(f"SDL init failed: {ie.message()}");
-        return 1;
+        fmt.eprintln(f"SDL init failed: {ie.message()}")
+        return 1
     }
 
-    defer sdl.quit();
-    sdl.Window win, err we = sdl.Window.create("Vigil SDL Draw", 640, 480, 0);
+    defer sdl.quit()
+    sdl.Window win, err we = sdl.Window.create("Vigil SDL Draw", 640, 480, 0)
     if we != ok {
-        fmt.eprintln(f"Window failed: {we.message()}");
-        return 1;
+        fmt.eprintln(f"Window failed: {we.message()}")
+        return 1
     }
 
-    sdl.Renderer ren, err re = sdl.Renderer.create(win, "");
+    sdl.Renderer ren, err re = sdl.Renderer.create(win, "")
     if re != ok {
-        fmt.eprintln(f"Renderer failed: {re.message()}");
-        win.destroy();
-        return 1;
+        fmt.eprintln(f"Renderer failed: {re.message()}")
+        win.destroy()
+        return 1
     }
+
     // Clear to dark gray
-    bool c1, err _ = ren.set_draw_color(25, 25, 25, 255);
-    bool c2, err _2 = ren.clear();
+    bool c1, err _ = ren.set_draw_color(25, 25, 25, 255)
+    bool c2, err _2 = ren.clear()
     // Draw a red filled rectangle
-    bool c3, err _3 = ren.set_draw_color(255, 0, 0, 255);
-    bool c4, err _4 = ren.fill_rect(50.0, 50.0, 200.0, 150.0);
+    bool c3, err _3 = ren.set_draw_color(255, 0, 0, 255)
+    bool c4, err _4 = ren.fill_rect(50.0, 50.0, 200.0, 150.0)
     // Draw a green outline rectangle
-    bool c5, err _5 = ren.set_draw_color(0, 255, 0, 255);
-    bool c6, err _6 = ren.draw_rect(300.0, 50.0, 200.0, 150.0);
+    bool c5, err _5 = ren.set_draw_color(0, 255, 0, 255)
+    bool c6, err _6 = ren.draw_rect(300.0, 50.0, 200.0, 150.0)
     // Draw a blue line
-    bool c7, err _7 = ren.set_draw_color(0, 0, 255, 255);
-    bool c8, err _8 = ren.draw_line(50.0, 300.0, 550.0, 400.0);
-    bool c9, err _9 = ren.present();
-    fmt.println("Drew shapes. Closing.");
-    ren.destroy();
-    win.destroy();
-    return 0;
+    bool c7, err _7 = ren.set_draw_color(0, 0, 255, 255)
+    bool c8, err _8 = ren.draw_line(50.0, 300.0, 550.0, 400.0)
+    bool c9, err _9 = ren.present()
+    fmt.println("Drew shapes. Closing.")
+    ren.destroy()
+    win.destroy()
+    return 0
 }

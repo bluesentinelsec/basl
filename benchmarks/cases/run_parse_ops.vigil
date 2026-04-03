@@ -1,22 +1,22 @@
-import "parse";
+import "parse"
 
 fn main() -> i32 {
-    i64 total = i64(0);
+    i64 total = i64(0)
     for (i32 i = 0; i < 6000; i++) {
-        i32 whole, err whole_err = parse.i32("12345");
-        f64 ratio, err ratio_err = parse.f64("98.125");
-        bool flag, err flag_err = parse.bool("true");
+        i32 whole, err whole_err = parse.i32("12345")
+        f64 ratio, err ratio_err = parse.f64("98.125")
+        bool flag, err flag_err = parse.bool("true")
         if whole_err != ok || ratio_err != ok || flag_err != ok || ! flag {
-            return 1;
+            return 1
         }
 
-        total = total + i64(whole);
-        total = total + i64(ratio);
+        total = total + i64(whole)
+        total = total + i64(ratio)
     }
 
     if total > i64(0) {
-        return 0;
+        return 0
     }
 
-    return 1;
+    return 1
 }

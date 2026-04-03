@@ -513,7 +513,6 @@ static void fmt_emit_single_import(fmt_state_t *f, const import_info_t *imp)
             buf_write(&f->out, tok_text(f, alias), tok_len(alias));
         }
     }
-    buf_push(&f->out, ';');
     emit_newline(f);
 }
 
@@ -894,6 +893,14 @@ vigil_status_t vigil_fmt(const vigil_allocator_t *allocator, const char *source_
             f.prev_emitted_index = prev_emitted_idx;
             f.current_index = i;
             fmt_emit_spacing(&f, &ctx, vigil_token_list_get(tokens, prev_emitted_idx), cur);
+        }
+
+        /* Suppress semicolons except inside C-style for headers. */
+        if (cur->kind == VIGIL_TOKEN_SEMICOLON && !ctx.in_for_header)
+        {
+            fmt_update_state_after(&f, &ctx, cur, i);
+            prev_emitted_idx = i;
+            continue;
         }
 
         emit_str(&f, tok_text(&f, cur), tok_len(cur));

@@ -37,9 +37,9 @@ class StdlibAvailabilityTest(unittest.TestCase):
 
         for module in modules:
             with self.subTest(module=module):
-                code = f'''import "{module}";
+                code = f'''import "{module}"
 fn main() -> i32 {{
-    return 0;
+    return 0
 }}'''
                 rc, out, err = run_vigil(code)
                 self.assertNotEqual(rc, 0, out)

@@ -2,71 +2,79 @@
 // VIGIL has no built-in SQLite module; this example shows how to persist
 // structured data with the csv and fs stdlib modules.
 
-import "csv";
-import "fmt";
-import "fs";
-import "parse";
+import "csv"
+import "fmt"
+import "fs"
+import "parse"
 
-string DB_FILE = "users.csv";
+string DB_FILE = "users.csv"
 
 fn db_init() -> void {
     if ! fs.exists(DB_FILE) {
-        fs.write(DB_FILE, "id,name,age\n");
+        fs.write(DB_FILE, "id,name,age\n")
     }
+
 }
 
+
 fn db_insert(string id, string name, string age) -> void {
-    array<string> row = [id, name, age];
-    string line = csv.stringify_row(row);
-    fs.append(DB_FILE, line + "\n");
+    array<string> row = [id, name, age]
+    string line = csv.stringify_row(row)
+    fs.append(DB_FILE, line + "\n")
 }
+
 
 fn main() -> i32 {
     // Initialise (create file with header if needed)
-    db_init();
+    db_init()
     // Insert records
-    db_insert("1", "Alice", "30");
-    db_insert("2", "Bob", "25");
-    db_insert("3", "Charlie", "35");
-    fmt.println("Data inserted successfully");
+    db_insert("1", "Alice", "30")
+    db_insert("2", "Bob", "25")
+    db_insert("3", "Charlie", "35")
+    fmt.println("Data inserted successfully")
     // Read all rows (split file by newlines, parse each line)
-    string raw = fs.read(DB_FILE);
-    array<string> lines = raw.split("\n");
-    fmt.println("\nUsers in database:");
+    string raw = fs.read(DB_FILE)
+    array<string> lines = raw.split("\n")
+    fmt.println("\nUsers in database:")
     for (i32 i = 1; i < lines.len(); i++) {
         // skip header
-        string line = lines[i].trim();
+        string line = lines[i].trim()
         if line.is_empty() {
-            continue;
+            continue
         }
 
-        array<string> row = csv.parse_row(line);
+        array<string> row = csv.parse_row(line)
         if row.len() >= 3 {
-            string id = row[0];
-            string name = row[1];
-            string age = row[2];
-            fmt.println(f"  ID: {id}, Name: {name}, Age: {age}");
+            string id = row[0]
+            string name = row[1]
+            string age = row[2]
+            fmt.println(f"  ID: {id}, Name: {name}, Age: {age}")
         }
+
     }
+
     // Simple filtered query: users older than 28
-    fmt.println("\nUsers older than 28:");
+    fmt.println("\nUsers older than 28:")
     for (i32 i = 1; i < lines.len(); i++) {
-        string line = lines[i].trim();
+        string line = lines[i].trim()
         if line.is_empty() {
-            continue;
+            continue
         }
 
-        array<string> row = csv.parse_row(line);
+        array<string> row = csv.parse_row(line)
         if row.len() >= 3 {
-            string name = row[1];
-            string age_str = row[2];
-            i32 age, err parse_err = parse.i32(age_str);
+            string name = row[1]
+            string age_str = row[2]
+            i32 age, err parse_err = parse.i32(age_str)
             if parse_err == ok && age > 28 {
-                fmt.println(f"  - {name}");
+                fmt.println(f"  - {name}")
             }
+
         }
+
     }
+
     // Clean up
-    fs.remove(DB_FILE);
-    return 0;
+    fs.remove(DB_FILE)
+    return 0
 }

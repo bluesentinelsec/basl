@@ -23,21 +23,21 @@ def run_vigil(code: str) -> tuple[int, str, str]:
 
 class Sha256Test(unittest.TestCase):
     def test_sha256_empty(self):
-        code = '''import "crypto";
+        code = '''import "crypto"
 fn main() -> i32 {
-    string h = crypto.sha256("");
-    if h == "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" { return 0; }
-    return 1;
+    string h = crypto.sha256("")
+    if h == "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" { return 0 }
+    return 1
 }'''
         rc, out, err = run_vigil(code)
         self.assertEqual(rc, 0, f"stderr: {err}")
 
     def test_sha256_hello(self):
-        code = '''import "crypto";
+        code = '''import "crypto"
 fn main() -> i32 {
-    string h = crypto.sha256("hello");
-    if h == "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824" { return 0; }
-    return 1;
+    string h = crypto.sha256("hello")
+    if h == "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824" { return 0 }
+    return 1
 }'''
         rc, out, err = run_vigil(code)
         self.assertEqual(rc, 0, f"stderr: {err}")
@@ -45,12 +45,12 @@ fn main() -> i32 {
 
 class Sha512Test(unittest.TestCase):
     def test_sha512_hello(self):
-        code = '''import "crypto";
+        code = '''import "crypto"
 fn main() -> i32 {
-    string h = crypto.sha512("hello");
+    string h = crypto.sha512("hello")
     // SHA-512 of "hello" starts with "9b71d224"
-    if h.starts_with("9b71d224bd62f3785d96d46ad3ea3d73") { return 0; }
-    return 1;
+    if h.starts_with("9b71d224bd62f3785d96d46ad3ea3d73") { return 0 }
+    return 1
 }'''
         rc, out, err = run_vigil(code)
         self.assertEqual(rc, 0, f"stderr: {err}")
@@ -58,11 +58,11 @@ fn main() -> i32 {
 
 class HmacTest(unittest.TestCase):
     def test_hmac_sha256(self):
-        code = '''import "crypto";
+        code = '''import "crypto"
 fn main() -> i32 {
-    string h = crypto.hmac_sha256("key", "message");
-    if h == "6e9ef29b75fffc5b7abae527d58fdadb2fe42e7219011976917343065f58ed4a" { return 0; }
-    return 1;
+    string h = crypto.hmac_sha256("key", "message")
+    if h == "6e9ef29b75fffc5b7abae527d58fdadb2fe42e7219011976917343065f58ed4a" { return 0 }
+    return 1
 }'''
         rc, out, err = run_vigil(code)
         self.assertEqual(rc, 0, f"stderr: {err}")
@@ -70,33 +70,33 @@ fn main() -> i32 {
 
 class HexTest(unittest.TestCase):
     def test_hex_encode(self):
-        code = '''import "crypto";
+        code = '''import "crypto"
 fn main() -> i32 {
-    string h = crypto.hex_encode("hello");
-    if h == "68656c6c6f" { return 0; }
-    return 1;
+    string h = crypto.hex_encode("hello")
+    if h == "68656c6c6f" { return 0 }
+    return 1
 }'''
         rc, out, err = run_vigil(code)
         self.assertEqual(rc, 0, f"stderr: {err}")
 
     def test_hex_decode(self):
-        code = '''import "crypto";
+        code = '''import "crypto"
 fn main() -> i32 {
-    string d = crypto.hex_decode("68656c6c6f");
-    if d == "hello" { return 0; }
-    return 1;
+    string d = crypto.hex_decode("68656c6c6f")
+    if d == "hello" { return 0 }
+    return 1
 }'''
         rc, out, err = run_vigil(code)
         self.assertEqual(rc, 0, f"stderr: {err}")
 
     def test_hex_roundtrip(self):
-        code = '''import "crypto";
+        code = '''import "crypto"
 fn main() -> i32 {
-    string orig = "test data";
-    string hex = crypto.hex_encode(orig);
-    string back = crypto.hex_decode(hex);
-    if back == orig { return 0; }
-    return 1;
+    string orig = "test data"
+    string hex = crypto.hex_encode(orig)
+    string back = crypto.hex_decode(hex)
+    if back == orig { return 0 }
+    return 1
 }'''
         rc, out, err = run_vigil(code)
         self.assertEqual(rc, 0, f"stderr: {err}")
@@ -104,33 +104,33 @@ fn main() -> i32 {
 
 class Base64Test(unittest.TestCase):
     def test_base64_encode(self):
-        code = '''import "crypto";
+        code = '''import "crypto"
 fn main() -> i32 {
-    string b = crypto.base64_encode("hello");
-    if b == "aGVsbG8=" { return 0; }
-    return 1;
+    string b = crypto.base64_encode("hello")
+    if b == "aGVsbG8=" { return 0 }
+    return 1
 }'''
         rc, out, err = run_vigil(code)
         self.assertEqual(rc, 0, f"stderr: {err}")
 
     def test_base64_decode(self):
-        code = '''import "crypto";
+        code = '''import "crypto"
 fn main() -> i32 {
-    string d = crypto.base64_decode("aGVsbG8=");
-    if d == "hello" { return 0; }
-    return 1;
+    string d = crypto.base64_decode("aGVsbG8=")
+    if d == "hello" { return 0 }
+    return 1
 }'''
         rc, out, err = run_vigil(code)
         self.assertEqual(rc, 0, f"stderr: {err}")
 
     def test_base64_roundtrip(self):
-        code = '''import "crypto";
+        code = '''import "crypto"
 fn main() -> i32 {
-    string orig = "test data 123";
-    string b64 = crypto.base64_encode(orig);
-    string back = crypto.base64_decode(b64);
-    if back == orig { return 0; }
-    return 1;
+    string orig = "test data 123"
+    string b64 = crypto.base64_encode(orig)
+    string back = crypto.base64_decode(b64)
+    if back == orig { return 0 }
+    return 1
 }'''
         rc, out, err = run_vigil(code)
         self.assertEqual(rc, 0, f"stderr: {err}")
@@ -138,24 +138,24 @@ fn main() -> i32 {
 
 class RandomBytesTest(unittest.TestCase):
     def test_random_bytes_length(self):
-        code = '''import "crypto";
+        code = '''import "crypto"
 fn main() -> i32 {
-    string r = crypto.random_bytes(32);
-    string hex = crypto.hex_encode(r);
+    string r = crypto.random_bytes(32)
+    string hex = crypto.hex_encode(r)
     // 32 bytes = 64 hex chars
-    if hex.len() == 64 { return 0; }
-    return 1;
+    if hex.len() == 64 { return 0 }
+    return 1
 }'''
         rc, out, err = run_vigil(code)
         self.assertEqual(rc, 0, f"stderr: {err}")
 
     def test_random_bytes_different(self):
-        code = '''import "crypto";
+        code = '''import "crypto"
 fn main() -> i32 {
-    string r1 = crypto.random_bytes(16);
-    string r2 = crypto.random_bytes(16);
-    if r1 != r2 { return 0; }
-    return 1;
+    string r1 = crypto.random_bytes(16)
+    string r2 = crypto.random_bytes(16)
+    if r1 != r2 { return 0 }
+    return 1
 }'''
         rc, out, err = run_vigil(code)
         self.assertEqual(rc, 0, f"stderr: {err}")
@@ -163,19 +163,19 @@ fn main() -> i32 {
 
 class ConstantTimeEqTest(unittest.TestCase):
     def test_equal(self):
-        code = '''import "crypto";
+        code = '''import "crypto"
 fn main() -> i32 {
-    if crypto.constant_time_eq("hello", "hello") { return 0; }
-    return 1;
+    if crypto.constant_time_eq("hello", "hello") { return 0 }
+    return 1
 }'''
         rc, out, err = run_vigil(code)
         self.assertEqual(rc, 0, f"stderr: {err}")
 
     def test_not_equal(self):
-        code = '''import "crypto";
+        code = '''import "crypto"
 fn main() -> i32 {
-    if !crypto.constant_time_eq("hello", "world") { return 0; }
-    return 1;
+    if !crypto.constant_time_eq("hello", "world") { return 0 }
+    return 1
 }'''
         rc, out, err = run_vigil(code)
         self.assertEqual(rc, 0, f"stderr: {err}")
@@ -183,29 +183,29 @@ fn main() -> i32 {
 
 class EncryptDecryptTest(unittest.TestCase):
     def test_roundtrip(self):
-        code = '''import "crypto";
+        code = '''import "crypto"
 fn main() -> i32 {
-    string key = crypto.random_bytes(32);
-    string nonce = crypto.random_bytes(12);
-    string plaintext = "secret message";
-    string encrypted = crypto.encrypt(key, nonce, plaintext);
-    string decrypted = crypto.decrypt(key, encrypted);
-    if decrypted == plaintext { return 0; }
-    return 1;
+    string key = crypto.random_bytes(32)
+    string nonce = crypto.random_bytes(12)
+    string plaintext = "secret message"
+    string encrypted = crypto.encrypt(key, nonce, plaintext)
+    string decrypted = crypto.decrypt(key, encrypted)
+    if decrypted == plaintext { return 0 }
+    return 1
 }'''
         rc, out, err = run_vigil(code)
         self.assertEqual(rc, 0, f"stderr: {err}")
 
     def test_wrong_key_fails(self):
-        code = '''import "crypto";
+        code = '''import "crypto"
 fn main() -> i32 {
-    string key1 = crypto.random_bytes(32);
-    string key2 = crypto.random_bytes(32);
-    string nonce = crypto.random_bytes(12);
-    string encrypted = crypto.encrypt(key1, nonce, "secret");
-    string decrypted = crypto.decrypt(key2, encrypted);
-    if decrypted == "" { return 0; }  // Should fail auth
-    return 1;
+    string key1 = crypto.random_bytes(32)
+    string key2 = crypto.random_bytes(32)
+    string nonce = crypto.random_bytes(12)
+    string encrypted = crypto.encrypt(key1, nonce, "secret")
+    string decrypted = crypto.decrypt(key2, encrypted)
+    if decrypted == "" { return 0 }  // Should fail auth
+    return 1
 }'''
         rc, out, err = run_vigil(code)
         self.assertEqual(rc, 0, f"stderr: {err}")
@@ -213,12 +213,12 @@ fn main() -> i32 {
 
 class Pbkdf2Test(unittest.TestCase):
     def test_pbkdf2_known_vector(self):
-        code = '''import "crypto";
+        code = '''import "crypto"
 fn main() -> i32 {
-    string key = crypto.pbkdf2("password", "salt", 1, 20);
+    string key = crypto.pbkdf2("password", "salt", 1, 20)
     // Known test vector for PBKDF2-SHA256
-    if key.starts_with("120fb6cf") { return 0; }
-    return 1;
+    if key.starts_with("120fb6cf") { return 0 }
+    return 1
 }'''
         rc, out, err = run_vigil(code)
         self.assertEqual(rc, 0, f"stderr: {err}")
@@ -226,24 +226,24 @@ fn main() -> i32 {
 
 class PasswordEncryptTest(unittest.TestCase):
     def test_password_roundtrip(self):
-        code = '''import "crypto";
+        code = '''import "crypto"
 fn main() -> i32 {
-    string plaintext = "hello world";
-    string encrypted = crypto.password_encrypt("my secret password", plaintext);
-    string decrypted = crypto.password_decrypt("my secret password", encrypted);
-    if decrypted != plaintext { return 1; }
-    return 0;
+    string plaintext = "hello world"
+    string encrypted = crypto.password_encrypt("my secret password", plaintext)
+    string decrypted = crypto.password_decrypt("my secret password", encrypted)
+    if decrypted != plaintext { return 1 }
+    return 0
 }'''
         rc, out, err = run_vigil(code)
         self.assertEqual(rc, 0, f"stderr: {err}")
 
     def test_wrong_password_fails(self):
-        code = '''import "crypto";
+        code = '''import "crypto"
 fn main() -> i32 {
-    string encrypted = crypto.password_encrypt("correct password", "secret");
-    string decrypted = crypto.password_decrypt("wrong password", encrypted);
-    if decrypted == "" { return 0; }
-    return 1;
+    string encrypted = crypto.password_encrypt("correct password", "secret")
+    string decrypted = crypto.password_decrypt("wrong password", encrypted)
+    if decrypted == "" { return 0 }
+    return 1
 }'''
         rc, out, err = run_vigil(code)
         self.assertEqual(rc, 0, f"stderr: {err}")

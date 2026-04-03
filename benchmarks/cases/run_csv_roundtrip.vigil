@@ -1,23 +1,23 @@
-import "csv";
+import "csv"
 
 fn main() -> i32 {
-    string line = "\"alpha,one\",42,\"say \"\"hi\"\"\",delta,999";
-    i64 total = i64(0);
+    string line = "\"alpha,one\",42,\"say \"\"hi\"\"\",delta,999"
+    i64 total = i64(0)
     for (i32 i = 0; i < 20000; i++) {
-        array<string> row = csv.parse_row(line);
+        array<string> row = csv.parse_row(line)
         if row.len() != 5 {
-            return 1;
+            return 1
         }
 
-        string out = csv.stringify_row(row);
-        total = total + i64(out.len());
-        total = total + i64(row[0].len());
-        total = total + i64(row[2].len());
+        string out = csv.stringify_row(row)
+        total = total + i64(out.len())
+        total = total + i64(row[0].len())
+        total = total + i64(row[2].len())
     }
 
     if total > i64(0) {
-        return 0;
+        return 0
     }
 
-    return 1;
+    return 1
 }

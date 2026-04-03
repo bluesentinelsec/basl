@@ -1,27 +1,28 @@
-import "fmt";
-import "http";
+import "fmt"
+import "http"
 
 fn main() -> i32 {
-    fmt.println("Starting server on http://localhost:8080");
-    i64 srv = http.listen("", 8080);
+    fmt.println("Starting server on http://localhost:8080")
+    i64 srv = http.listen("", 8080)
     if srv < i64(0) {
-        fmt.println("Failed to start server");
-        return 1;
+        fmt.println("Failed to start server")
+        return 1
     }
+
     // Register route handlers
     http.handle(srv, "/", fn () -> void {
-        i64 conn = http.current_conn();
-        http.respond(conn, 200, "Hello from VIGIL HTTP server!", "text/plain");
+        i64 conn = http.current_conn()
+        http.respond(conn, 200, "Hello from VIGIL HTTP server!", "text/plain")
     }
 
-    );
+    )
     http.handle(srv, "/json", fn () -> void {
-        i64 conn = http.current_conn();
-        http.respond(conn, 200, "{\"message\": \"Hello JSON\"}", "application/json");
+        i64 conn = http.current_conn()
+        http.respond(conn, 200, "{\"message\": \"Hello JSON\"}", "application/json")
     }
 
-    );
+    )
     // Serve requests (blocks until server is closed)
-    http.serve(srv);
-    return 0;
+    http.serve(srv)
+    return 0
 }

@@ -2525,15 +2525,6 @@ static int repl_handle_special_command(const char *input_data, repl_decl_list_t 
     return 0;
 }
 
-/* Check if input needs a trailing semicolon. */
-static int repl_input_needs_semi(const repl_buf_t *input)
-{
-    const char *tail = input->data + input->length;
-    while (tail > input->data && (tail[-1] == ' ' || tail[-1] == '\t' || tail[-1] == '\n'))
-        tail--;
-    return tail > input->data && tail[-1] != ';' && tail[-1] != '}';
-}
-
 /* Bundled REPL session state to reduce parameter counts. */
 typedef struct
 {
@@ -2627,10 +2618,8 @@ static void repl_try_bare_code(repl_state_t *s, int needs_semi)
 /* Evaluate a single REPL input line (expression or bare code). */
 static void repl_eval_input(repl_state_t *s)
 {
-    int needs_semi = repl_input_needs_semi(s->input);
-
     if (!repl_try_expression(s))
-        repl_try_bare_code(s, needs_semi);
+        repl_try_bare_code(s, 0);
 
     repl_rebuild_preamble(s->preamble, s->decls);
 }

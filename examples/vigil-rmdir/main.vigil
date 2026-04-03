@@ -1,32 +1,34 @@
-import "args";
-import "fmt";
-import "fs";
+import "args"
+import "fmt"
+import "fs"
 
 fn main() -> i32 {
     if args.count() < 1 {
-        fmt.eprintln("vigil-rmdir: missing operand");
-        fmt.eprintln("usage: vigil-rmdir DIR...");
-        return 1;
+        fmt.eprintln("vigil-rmdir: missing operand")
+        fmt.eprintln("usage: vigil-rmdir DIR...")
+        return 1
     }
 
     for (i32 i = 0; i < args.count(); i++) {
-        string path = args.at(i);
+        string path = args.at(i)
         if ! fs.exists(path) {
-            fmt.eprintln(f"vigil-rmdir: {path}: No such file or directory");
-            return 1;
+            fmt.eprintln(f"vigil-rmdir: {path}: No such file or directory")
+            return 1
         }
 
         if ! fs.is_dir(path) {
-            fmt.eprintln(f"vigil-rmdir: {path}: Not a directory");
-            return 1;
+            fmt.eprintln(f"vigil-rmdir: {path}: Not a directory")
+            return 1
         }
+
         // Remove (only works on empty directories)
-        bool ok2 = fs.remove(path);
+        bool ok2 = fs.remove(path)
         if ! ok2 {
-            fmt.eprintln(f"vigil-rmdir: {path}: Directory not empty or cannot remove");
-            return 1;
+            fmt.eprintln(f"vigil-rmdir: {path}: Directory not empty or cannot remove")
+            return 1
         }
+
     }
 
-    return 0;
+    return 0
 }

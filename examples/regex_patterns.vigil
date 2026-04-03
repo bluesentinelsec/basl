@@ -1,35 +1,38 @@
-import "fmt";
-import "regex";
+import "fmt"
+import "regex"
 
 fn main() -> i32 {
-    string text = "Contact us at support@example.com or sales@example.com";
+    string text = "Contact us at support@example.com or sales@example.com"
     // Match pattern — returns bool directly
-    bool matches = regex.match("example\\.com", text);
-    fmt.println(f"Contains 'example.com': {matches}");
+    bool matches = regex.match("example\\.com", text)
+    fmt.println(f"Contains 'example.com': {matches}")
     // Find first match — returns (string, bool)
-    string email, bool found = regex.find("[a-z]+@[a-z]+\\.[a-z]+", text);
+    string email, bool found = regex.find("[a-z]+@[a-z]+\\.[a-z]+", text)
     if found {
-        fmt.println(f"First email found: {email}");
+        fmt.println(f"First email found: {email}")
     }
+
     // Find all matches — returns array<string> directly
-    array<string> emails = regex.find_all("[a-z]+@[a-z]+\\.[a-z]+", text);
-    fmt.println(f"All emails found ({emails.len()}):");
+    array<string> emails = regex.find_all("[a-z]+@[a-z]+\\.[a-z]+", text)
+    fmt.println(f"All emails found ({emails.len()}):")
     for addr in emails {
-        fmt.println(f"  - {addr}");
+        fmt.println(f"  - {addr}")
     }
+
     // Replace pattern — returns string directly; args are (pattern, input, replacement)
-    string replaced = regex.replace("@example\\.com", text, "@newdomain.com");
-    fmt.println(f"After replacement: {replaced}");
+    string replaced = regex.replace("@example\\.com", text, "@newdomain.com")
+    fmt.println(f"After replacement: {replaced}")
     // Split by pattern — returns array<string>; args are (pattern, input)
-    string csv = "apple,banana,cherry,date";
-    array<string> fruits = regex.split(",", csv);
-    fmt.println(f"\nSplit CSV ({fruits.len()} items):");
+    string csv = "apple,banana,cherry,date"
+    array<string> fruits = regex.split(",", csv)
+    fmt.println(f"\nSplit CSV ({fruits.len()} items):")
     for fruit in fruits {
-        fmt.println(f"  - {fruit}");
+        fmt.println(f"  - {fruit}")
     }
+
     // Validate phone number
-    string phone = "555-123-4567";
-    bool valid = regex.match("^\\d{3}-\\d{3}-\\d{4}$", phone);
-    fmt.println(f"\nPhone '{phone}' is valid: {valid}");
-    return 0;
+    string phone = "555-123-4567"
+    bool valid = regex.match("^\\d{3}-\\d{3}-\\d{4}$", phone)
+    fmt.println(f"\nPhone '{phone}' is valid: {valid}")
+    return 0
 }

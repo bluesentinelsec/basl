@@ -1,31 +1,34 @@
-import "args";
-import "fmt";
-import "fs";
+import "args"
+import "fmt"
+import "fs"
 
 fn main() -> i32 {
     if args.count() < 1 {
-        fmt.eprintln("vigil-touch: missing file operand");
-        fmt.eprintln("usage: vigil-touch FILE...");
-        return 1;
+        fmt.eprintln("vigil-touch: missing file operand")
+        fmt.eprintln("usage: vigil-touch FILE...")
+        return 1
     }
 
     for (i32 i = 0; i < args.count(); i++) {
-        string path = args.at(i);
+        string path = args.at(i)
         if ! fs.exists(path) {
-            bool ok2 = fs.write(path, "");
+            bool ok2 = fs.write(path, "")
             if ! ok2 {
-                fmt.eprintln(f"vigil-touch: {path}: cannot create file");
-                return 1;
+                fmt.eprintln(f"vigil-touch: {path}: cannot create file")
+                return 1
             }
+
         } else {
             // Update modification time by appending empty string
-            bool ok2 = fs.append(path, "");
+            bool ok2 = fs.append(path, "")
             if ! ok2 {
-                fmt.eprintln(f"vigil-touch: {path}: cannot update file");
-                return 1;
+                fmt.eprintln(f"vigil-touch: {path}: cannot update file")
+                return 1
             }
+
         }
+
     }
 
-    return 0;
+    return 0
 }

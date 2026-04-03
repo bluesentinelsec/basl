@@ -52,7 +52,8 @@ TEST(VigilLexerTest, TokenizesSimpleFunction)
     EXPECT_EQ(TokenAt(vigil_test_failed_, &tokens, 8)->kind, VIGIL_TOKEN_INT_LITERAL);
     EXPECT_EQ(TokenAt(vigil_test_failed_, &tokens, 9)->kind, VIGIL_TOKEN_SEMICOLON);
     EXPECT_EQ(TokenAt(vigil_test_failed_, &tokens, 10)->kind, VIGIL_TOKEN_RBRACE);
-    EXPECT_EQ(TokenAt(vigil_test_failed_, &tokens, 11)->kind, VIGIL_TOKEN_EOF);
+    EXPECT_EQ(TokenAt(vigil_test_failed_, &tokens, 11)->kind, VIGIL_TOKEN_SEMICOLON); /* ASI after } at EOF */
+    EXPECT_EQ(TokenAt(vigil_test_failed_, &tokens, 12)->kind, VIGIL_TOKEN_EOF);
 
     vigil_token_list_free(&tokens);
     vigil_diagnostic_list_free(&diagnostics);
@@ -117,7 +118,8 @@ TEST(VigilLexerTest, TokenizesNumericAndStringLiteralForms)
     EXPECT_EQ(TokenAt(vigil_test_failed_, &tokens, 7)->kind, VIGIL_TOKEN_RAW_STRING_LITERAL);
     EXPECT_EQ(TokenAt(vigil_test_failed_, &tokens, 8)->kind, VIGIL_TOKEN_CHAR_LITERAL);
     EXPECT_EQ(TokenAt(vigil_test_failed_, &tokens, 9)->kind, VIGIL_TOKEN_FSTRING_LITERAL);
-    EXPECT_EQ(TokenAt(vigil_test_failed_, &tokens, 10)->kind, VIGIL_TOKEN_EOF);
+    EXPECT_EQ(TokenAt(vigil_test_failed_, &tokens, 10)->kind, VIGIL_TOKEN_SEMICOLON); /* ASI at EOF */
+    EXPECT_EQ(TokenAt(vigil_test_failed_, &tokens, 11)->kind, VIGIL_TOKEN_EOF);
 
     vigil_token_list_free(&tokens);
     vigil_diagnostic_list_free(&diagnostics);
@@ -250,7 +252,8 @@ TEST(VigilLexerTest, TokenizesNilKeyword)
 
     ASSERT_EQ(vigil_lex_source(&registry, source_id, &tokens, &diagnostics, &error), VIGIL_STATUS_OK);
     EXPECT_EQ(TokenAt(vigil_test_failed_, &tokens, 0)->kind, VIGIL_TOKEN_NIL);
-    EXPECT_EQ(TokenAt(vigil_test_failed_, &tokens, 1)->kind, VIGIL_TOKEN_EOF);
+    EXPECT_EQ(TokenAt(vigil_test_failed_, &tokens, 1)->kind, VIGIL_TOKEN_SEMICOLON); /* ASI at EOF */
+    EXPECT_EQ(TokenAt(vigil_test_failed_, &tokens, 2)->kind, VIGIL_TOKEN_EOF);
 
     vigil_token_list_free(&tokens);
     vigil_diagnostic_list_free(&diagnostics);

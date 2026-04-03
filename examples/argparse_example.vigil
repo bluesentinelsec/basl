@@ -5,52 +5,55 @@
 //   vigil examples/argparse_example.vigil -v --input data.txt -f "*.csv" -f "*.json" -j 8 myfile.txt
 //   vigil examples/argparse_example.vigil --input=data.txt --jobs=16 -- extra1 extra2
 
-import "args";
-import "fmt";
+import "args"
+import "fmt"
 
 fn main() -> i32 {
     // Build a parser using the builder pattern
-    args.Parser p = args.Parser.new("example", "Demonstrates the args.Parser API").flag("verbose", "v", "Enable verbose output").flag("dry-run", "n", "Show what would be done").option("input", "i", "Input file path", "").mark_required().option("output", "o", "Output file path", "out.txt").option_int("jobs", "j", "Number of parallel jobs", "4").option_multi("filter", "f", "Filter pattern (repeatable)").positional("FILE", "File to process");
+    args.Parser p = args.Parser.new("example", "Demonstrates the args.Parser API").flag("verbose", "v", "Enable verbose output").flag("dry-run", "n", "Show what would be done").option("input", "i", "Input file path", "").mark_required().option("output", "o", "Output file path", "out.txt").option_int("jobs", "j", "Number of parallel jobs", "4").option_multi("filter", "f", "Filter pattern (repeatable)").positional("FILE", "File to process")
     // Check for --help before parsing
     for (i32 i = 0; i < args.count(); i++) {
-        string a = args.at(i);
+        string a = args.at(i)
         if a == "--help" || a == "-h" {
-            fmt.println(p.help());
-            return 0;
+            fmt.println(p.help())
+            return 0
         }
+
     }
+
     // Parse arguments
-    err e = p.parse(0);
+    err e = p.parse(0)
     if e != ok {
-        fmt.eprintln("Error: parse failed");
-        fmt.eprintln(p.help());
-        return 1;
+        fmt.eprintln("Error: parse failed")
+        fmt.eprintln(p.help())
+        return 1
     }
+
     // Retrieve parsed values
-    bool verbose = p.get_bool("verbose");
-    bool dry_run = p.get_bool("dry-run");
-    string input = p.get("input");
-    string output = p.get("output");
-    string jobs = p.get("jobs");
-    array<string> filters = p.get_multi("filter");
-    array<string> positionals = p.get_positionals();
+    bool verbose = p.get_bool("verbose")
+    bool dry_run = p.get_bool("dry-run")
+    string input = p.get("input")
+    string output = p.get("output")
+    string jobs = p.get("jobs")
+    array<string> filters = p.get_multi("filter")
+    array<string> positionals = p.get_positionals()
     // Display results
-    fmt.println(f"verbose:     {verbose}");
-    fmt.println(f"dry-run:     {dry_run}");
-    fmt.println(f"input:       {input}");
-    fmt.println(f"output:      {output}");
-    fmt.println(f"jobs:        {jobs}");
-    fmt.println(f"filters:     {filters.len()}");
+    fmt.println(f"verbose:     {verbose}")
+    fmt.println(f"dry-run:     {dry_run}")
+    fmt.println(f"input:       {input}")
+    fmt.println(f"output:      {output}")
+    fmt.println(f"jobs:        {jobs}")
+    fmt.println(f"filters:     {filters.len()}")
     for (i32 i = 0; i < filters.len(); i++) {
-        string fv = filters[i];
-        fmt.println(f"  filter[{i}]: {fv}");
+        string fv = filters[i]
+        fmt.println(f"  filter[{i}]: {fv}")
     }
 
-    fmt.println(f"positionals: {positionals.len()}");
+    fmt.println(f"positionals: {positionals.len()}")
     for (i32 i = 0; i < positionals.len(); i++) {
-        string pv = positionals[i];
-        fmt.println(f"  pos[{i}]:    {pv}");
+        string pv = positionals[i]
+        fmt.println(f"  pos[{i}]:    {pv}")
     }
 
-    return 0;
+    return 0
 }
