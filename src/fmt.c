@@ -655,9 +655,13 @@ static bool fmt_should_suppress_newline(const fmt_ctx_t *ctx, vigil_token_kind_t
         return true;
     if (ctx->prev_was_literal_rbrace && pk == VIGIL_TOKEN_RBRACE)
         return true;
-    /* Don't suppress newlines inside multi-line lists. */
+    /* Inside multi-line lists, suppress newline between } and , (lambda end). */
     if (fmt_in_multiline_list(ctx))
+    {
+        if (pk == VIGIL_TOKEN_RBRACE && ck == VIGIL_TOKEN_COMMA)
+            return true;
         return false;
+    }
     if (!fmt_in_literal_context(ctx, pk, ck))
         return false;
     return pk == VIGIL_TOKEN_LBRACE || ck == VIGIL_TOKEN_RBRACE || pk == VIGIL_TOKEN_SEMICOLON ||
@@ -710,6 +714,9 @@ static void fmt_emit_spacing(fmt_state_t *f, const fmt_ctx_t *ctx, const vigil_t
     if (!force_nl && prev->kind == VIGIL_TOKEN_COMMA && fmt_in_multiline_list(ctx))
         force_nl = true;
     int nl = fmt_newline_level(f, prev, cur);
+    /* Inside multi-line lists, cap at single newline (no blank lines). */
+    if (nl > 1 && fmt_in_multiline_list(ctx))
+        nl = 1;
 
     if (suppress)
     {

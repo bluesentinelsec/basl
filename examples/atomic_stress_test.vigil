@@ -548,19 +548,15 @@ fn run_new_ops_test() -> bool {
                         if was == i64(0) {
                             break
                         }
-
                         thread.yield()
                     }
-
                     i64 v = atomic.load(xchg_counter)
                     atomic.store(xchg_counter, v + i64(1))
                     // Release
                     atomic.store(xchg_lock, i64(0))
                 }
-
                 return i64(0)
             },
-
         )
         threads.push(tid)
     }
@@ -586,17 +582,14 @@ fn run_new_ops_test() -> bool {
                 if bit < i64(0) {
                     bit = bit * i64(- 1)
                 }
-
                 bit = bit % i64(16)
                 i64 mask = i64(1)
                 for (i64 s = i64(0); s < bit; s++) {
                     mask = mask * i64(2)
                 }
-
                 atomic.fetch_or(bitmap_atom, mask)
                 return i64(0)
             },
-
         )
         threads2.push(tid)
     }
@@ -617,10 +610,8 @@ fn run_new_ops_test() -> bool {
                     atomic.fetch_xor(xor_atom, i64(1))
                     atomic.fetch_xor(xor_atom, i64(1))
                 }
-
                 return i64(0)
             },
-
         )
         threads3.push(tid)
     }
@@ -643,10 +634,8 @@ fn run_new_ops_test() -> bool {
                 for (i64 i = i64(0); i < i64(100); i++) {
                     atomic.fence()
                 }
-
                 return i64(0)
             },
-
         )
         threads4.push(tid)
     }
@@ -688,10 +677,8 @@ fn run_ring_buffer_test() -> bool {
                     rb_enqueue(i)
                     atomic.inc(produced_total)
                 }
-
                 return i64(0)
             },
-
         )
         prod_threads.push(tid)
     }
@@ -708,16 +695,13 @@ fn run_ring_buffer_test() -> bool {
                     if val == POISON_PILL {
                         break
                     }
-
                     local_count = local_count + i64(1)
                     local_sum = local_sum + val
                 }
-
                 atomic.add(consumed_total, local_count)
                 atomic.add(consumed_sum, local_sum)
                 return local_count
             },
-
         )
         cons_threads.push(tid)
     }
@@ -772,7 +756,6 @@ fn run_metrics_test() -> bool {
                 if shard < i64(0) {
                     shard = shard * i64(- 1)
                 }
-
                 shard = shard % METRICS_SHARDS
                 for (i64 i = i64(0); i < METRICS_OPS; i++) {
                     // Increment counter
@@ -782,15 +765,12 @@ fn run_metrics_test() -> bool {
                     if val < i64(0) {
                         val = val * i64(- 1)
                     }
-
                     metrics_update_max(shard, val)
                     metrics_update_min(shard, val)
                     atomic.inc(metrics_op_count)
                 }
-
                 return i64(0)
             },
-
         )
         threads.push(tid)
     }
@@ -838,10 +818,8 @@ fn run_spinlock_test() -> bool {
                     atomic.store(spinlock_counter, val + i64(1))
                     spinlock_release()
                 }
-
                 return i64(0)
             },
-
         )
         threads.push(tid)
     }
@@ -886,13 +864,10 @@ fn run_stack_test() -> bool {
                     if stack_push(i) {
                         local_sum = local_sum + i
                     }
-
                 }
-
                 atomic.add(push_sum, local_sum)
                 return i64(0)
             },
-
         )
         push_threads.push(tid)
     }
@@ -913,14 +888,11 @@ fn run_stack_test() -> bool {
                     if val == i64(- 1) {
                         break
                     }
-
                     local_sum = local_sum + val
                 }
-
                 atomic.add(pop_sum, local_sum)
                 return i64(0)
             },
-
         )
         pop_threads.push(tid)
     }
@@ -968,10 +940,8 @@ fn run_barrier_test() -> bool {
                     return i64(1)
                     // error: saw partial state
                 }
-
                 return i64(0)
             },
-
         )
         threads.push(tid)
     }
@@ -1014,10 +984,8 @@ fn run_mutex_reference_test() -> bool {
                     atomic.store(mutex_counter, val + i64(1))
                     thread.unlock(mutex_handle)
                 }
-
                 return i64(0)
             },
-
         )
         threads.push(tid)
     }

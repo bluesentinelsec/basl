@@ -14,10 +14,8 @@ fn main() -> i32 {
                 counter++
                 thread.unlock(m)
             }
-
             fmt.println("Thread 1 finished")
         },
-
     )
     i64 t2 = thread.spawn(
         fn () -> void {
@@ -26,10 +24,8 @@ fn main() -> i32 {
                 counter++
                 thread.unlock(m)
             }
-
             fmt.println("Thread 2 finished")
         },
-
     )
     i64 t3 = thread.spawn(
         fn () -> void {
@@ -38,10 +34,8 @@ fn main() -> i32 {
                 counter++
                 thread.unlock(m)
             }
-
             fmt.println("Thread 3 finished")
         },
-
     )
     i64 t4 = thread.spawn(
         fn () -> void {
@@ -50,10 +44,8 @@ fn main() -> i32 {
                 counter++
                 thread.unlock(m)
             }
-
             fmt.println("Thread 4 finished")
         },
-
     )
     i64 t5 = thread.spawn(
         fn () -> void {
@@ -62,10 +54,8 @@ fn main() -> i32 {
                 counter++
                 thread.unlock(m)
             }
-
             fmt.println("Thread 5 finished")
         },
-
     )
     // Wait for all threads to complete
     thread.join(t1)
