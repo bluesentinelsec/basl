@@ -1066,7 +1066,8 @@ vigil_status_t vigil_fmt(const vigil_allocator_t *allocator, const char *source_
         }
 
         /* Before closing delimiter of a multi-line list:
-           insert trailing comma if missing, dedent, newline. */
+           dedent and ensure we're on a fresh line. Skip normal spacing
+           to avoid extra blank lines after lambda bodies. */
         if (cur->kind == VIGIL_TOKEN_RPAREN || cur->kind == VIGIL_TOKEN_RBRACKET ||
             (cur->kind == VIGIL_TOKEN_RBRACE && brace_lit_at(&ctx, ctx.brace_depth)))
         {
@@ -1077,6 +1078,12 @@ vigil_status_t vigil_fmt(const vigil_allocator_t *allocator, const char *source_
                 {
                     emit_newline(&f);
                 }
+                emit_str(&f, tok_text(&f, cur), tok_len(cur));
+                fmt_update_state_after(&f, &ctx, cur, i);
+                if (ctx.list_depth > 0)
+                    ctx.list_depth--;
+                prev_emitted_idx = i;
+                continue;
             }
             if (ctx.list_depth > 0)
                 ctx.list_depth--;

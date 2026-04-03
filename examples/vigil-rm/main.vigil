@@ -7,8 +7,7 @@ fn main() -> i32 {
     parser.flag("recursive", "r", "remove directories and their contents recursively")
     parser.flag("force", "f", "ignore nonexistent files")
     parser.positional("file", "file to remove")
-    err e = parser.parse(0)
-    if e != ok {
+    guard err e = parser.parse(0) {
         fmt.eprintln(f"vigil-rm: {e.message()}")
         return 1
     }

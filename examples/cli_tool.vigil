@@ -15,8 +15,7 @@ fn main() -> i32 {
     }
 
     // Parse arguments
-    err e = parser.parse(0)
-    if e != ok {
+    guard err e = parser.parse(0) {
         fmt.println(f"Error: {e.message()}")
         fmt.println(parser.help())
         return 1

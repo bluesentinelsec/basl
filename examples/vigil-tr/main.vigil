@@ -36,15 +36,13 @@ fn main() -> i32 {
     while ! line.is_empty() {
         string output = ""
         for (i32 i = 0; i < line.len(); i++) {
-            string ch, err e2 = line.char_at(i)
-            if e2 != ok {
+            guard string ch, err e2 = line.char_at(i) {
                 continue
             }
 
             bool found = false
             for (i32 j = 0; j < set1.len(); j++) {
-                string s1, err e3 = set1.char_at(j)
-                if e3 != ok {
+                guard string s1, err e3 = set1.char_at(j) {
                     continue
                 }
 

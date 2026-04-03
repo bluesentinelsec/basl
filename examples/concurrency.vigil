@@ -7,59 +7,64 @@ fn main() -> i32 {
     fmt.println("Starting concurrent counter example")
     i64 m = thread.mutex()
     // Spawn 5 threads that each increment counter 1000 times
-    i64 t1 = thread.spawn(fn () -> void {
-        for (i32 i = 0; i < 1000; i++) {
-            thread.lock(m)
-            counter++
-            thread.unlock(m)
-        }
+    i64 t1 = thread.spawn(
+        fn () -> void {
+            for (i32 i = 0; i < 1000; i++) {
+                thread.lock(m)
+                counter++
+                thread.unlock(m)
+            }
 
-        fmt.println("Thread 1 finished")
-    }
-
-    )
-    i64 t2 = thread.spawn(fn () -> void {
-        for (i32 i = 0; i < 1000; i++) {
-            thread.lock(m)
-            counter++
-            thread.unlock(m)
-        }
-
-        fmt.println("Thread 2 finished")
-    }
+            fmt.println("Thread 1 finished")
+        },
 
     )
-    i64 t3 = thread.spawn(fn () -> void {
-        for (i32 i = 0; i < 1000; i++) {
-            thread.lock(m)
-            counter++
-            thread.unlock(m)
-        }
+    i64 t2 = thread.spawn(
+        fn () -> void {
+            for (i32 i = 0; i < 1000; i++) {
+                thread.lock(m)
+                counter++
+                thread.unlock(m)
+            }
 
-        fmt.println("Thread 3 finished")
-    }
-
-    )
-    i64 t4 = thread.spawn(fn () -> void {
-        for (i32 i = 0; i < 1000; i++) {
-            thread.lock(m)
-            counter++
-            thread.unlock(m)
-        }
-
-        fmt.println("Thread 4 finished")
-    }
+            fmt.println("Thread 2 finished")
+        },
 
     )
-    i64 t5 = thread.spawn(fn () -> void {
-        for (i32 i = 0; i < 1000; i++) {
-            thread.lock(m)
-            counter++
-            thread.unlock(m)
-        }
+    i64 t3 = thread.spawn(
+        fn () -> void {
+            for (i32 i = 0; i < 1000; i++) {
+                thread.lock(m)
+                counter++
+                thread.unlock(m)
+            }
 
-        fmt.println("Thread 5 finished")
-    }
+            fmt.println("Thread 3 finished")
+        },
+
+    )
+    i64 t4 = thread.spawn(
+        fn () -> void {
+            for (i32 i = 0; i < 1000; i++) {
+                thread.lock(m)
+                counter++
+                thread.unlock(m)
+            }
+
+            fmt.println("Thread 4 finished")
+        },
+
+    )
+    i64 t5 = thread.spawn(
+        fn () -> void {
+            for (i32 i = 0; i < 1000; i++) {
+                thread.lock(m)
+                counter++
+                thread.unlock(m)
+            }
+
+            fmt.println("Thread 5 finished")
+        },
 
     )
     // Wait for all threads to complete

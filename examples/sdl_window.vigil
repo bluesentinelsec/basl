@@ -2,15 +2,13 @@ import "fmt"
 import "sdl"
 
 fn main() -> i32 {
-    bool init_ok, err ie = sdl.init(sdl.INIT_VIDEO)
-    if ie != ok {
+    guard bool init_ok, err ie = sdl.init(sdl.INIT_VIDEO) {
         fmt.eprintln(f"SDL init failed: {ie.message()}")
         return 1
     }
 
     defer sdl.quit()
-    sdl.Window win, err we = sdl.Window.create("Vigil SDL Window", 800, 600, sdl.WINDOW_RESIZABLE)
-    if we != ok {
+    guard sdl.Window win, err we = sdl.Window.create("Vigil SDL Window", 800, 600, sdl.WINDOW_RESIZABLE) {
         fmt.eprintln(f"Window create failed: {we.message()}")
         return 1
     }
@@ -19,8 +17,7 @@ fn main() -> i32 {
     fmt.println(f"Title: {win.get_title()}")
     i32 w, i32 h = win.get_size()
     fmt.println(f"Size: {w}x{h}")
-    bool title_ok, err te = win.set_title("Vigil SDL - Updated Title")
-    if te != ok {
+    guard bool title_ok, err te = win.set_title("Vigil SDL - Updated Title") {
         fmt.eprintln(f"set_title failed: {te.message()}")
     }
 

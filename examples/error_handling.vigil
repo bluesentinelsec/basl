@@ -26,8 +26,7 @@ fn validate_age(i32 age) -> err {
 
 fn main() -> i32 {
     // Example 1: Handle division error
-    i32 result, err e = divide(10, 2)
-    if e != ok {
+    guard i32 result, err e = divide(10, 2) {
         fmt.println(f"Error: {e.message()}")
         return 1
     }
@@ -47,13 +46,11 @@ fn main() -> i32 {
         fmt.println("Age 25 is valid")
     }
 
-    err e4 = validate_age(- 5)
-    if e4 != ok {
+    guard err e4 = validate_age(- 5) {
         fmt.println(f"Invalid age: {e4.message()}")
     }
 
-    err e5 = validate_age(200)
-    if e5 != ok {
+    guard err e5 = validate_age(200) {
         fmt.println(f"Invalid age: {e5.message()}")
     }
 

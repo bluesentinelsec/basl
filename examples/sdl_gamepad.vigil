@@ -7,28 +7,24 @@ import "fmt"
 import "sdl"
 
 fn main() -> i32 {
-    bool init_ok, err ie = sdl.init(sdl.INIT_VIDEO | sdl.INIT_GAMEPAD)
-    if ie != ok {
+    guard bool init_ok, err ie = sdl.init(sdl.INIT_VIDEO | sdl.INIT_GAMEPAD) {
         fmt.eprintln(f"SDL init failed: {ie.message()}")
         return 1
     }
 
     defer sdl.quit()
-    sdl.Window win, err we = sdl.Window.create("Gamepad Demo", 640, 480, 0)
-    if we != ok {
+    guard sdl.Window win, err we = sdl.Window.create("Gamepad Demo", 640, 480, 0) {
         fmt.eprintln(f"Window failed: {we.message()}")
         return 1
     }
 
-    sdl.Renderer ren, err re = sdl.Renderer.create(win, "")
-    if re != ok {
+    guard sdl.Renderer ren, err re = sdl.Renderer.create(win, "") {
         fmt.eprintln(f"Renderer failed: {re.message()}")
         win.destroy()
         return 1
     }
 
-    sdl.Event ev, err ee = sdl.Event.new()
-    if ee != ok {
+    guard sdl.Event ev, err ee = sdl.Event.new() {
         fmt.eprintln(f"Event alloc failed: {ee.message()}")
         ren.destroy()
         win.destroy()

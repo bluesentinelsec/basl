@@ -7,8 +7,7 @@ import "fmt"
 import "sdl"
 
 fn main() -> i32 {
-    bool init_ok, err ie = sdl.init(sdl.INIT_VIDEO)
-    if ie != ok {
+    guard bool init_ok, err ie = sdl.init(sdl.INIT_VIDEO) {
         fmt.eprintln(f"SDL init failed: {ie.message()}")
         return 1
     }
@@ -25,22 +24,19 @@ fn main() -> i32 {
         di = di + 1
     }
 
-    sdl.Window win, err we = sdl.Window.create("Render Target Demo", 640, 480, 0)
-    if we != ok {
+    guard sdl.Window win, err we = sdl.Window.create("Render Target Demo", 640, 480, 0) {
         fmt.eprintln(f"Window failed: {we.message()}")
         return 1
     }
 
-    sdl.Renderer ren, err re = sdl.Renderer.create(win, "")
-    if re != ok {
+    guard sdl.Renderer ren, err re = sdl.Renderer.create(win, "") {
         fmt.eprintln(f"Renderer failed: {re.message()}")
         win.destroy()
         return 1
     }
 
     // Create a 128x128 render-target texture
-    sdl.Texture tex, err te = sdl.Texture.create(ren, 0, sdl.TEXTUREACCESS_TARGET, 128, 128)
-    if te != ok {
+    guard sdl.Texture tex, err te = sdl.Texture.create(ren, 0, sdl.TEXTUREACCESS_TARGET, 128, 128) {
         fmt.eprintln(f"Texture failed: {te.message()}")
         ren.destroy()
         win.destroy()
@@ -61,8 +57,7 @@ fn main() -> i32 {
     bool c8, err e8 = ren.draw_line(128.0, 0.0, 0.0, 128.0)
     // Reset to default render target (the window)
     bool st2, err ste2 = ren.set_target(i64(- 1))
-    sdl.Event ev, err ee = sdl.Event.new()
-    if ee != ok {
+    guard sdl.Event ev, err ee = sdl.Event.new() {
         tex.destroy()
         ren.destroy()
         win.destroy()

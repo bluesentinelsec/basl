@@ -3,16 +3,14 @@ import "fs"
 
 fn main() -> i32 {
     // ── Write a file line by line with fs.Writer ──────────────────
-    fs.Writer w, err open_err = fs.Writer.open("greetings.txt")
-    if open_err != ok {
+    guard fs.Writer w, err open_err = fs.Writer.open("greetings.txt") {
         fmt.println(f"open writer: {open_err.message()}")
         return 1
     }
 
     array<string> names = ["Alice", "Bob", "Carol"]
     for name in names {
-        i32 n, err write_err = w.write_line(f"Hello, {name}!")
-        if write_err != ok {
+        guard i32 n, err write_err = w.write_line(f"Hello, {name}!") {
             fmt.println(f"write: {write_err.message()}")
             w.close()
             return 1
@@ -22,8 +20,7 @@ fn main() -> i32 {
 
     w.close()
     // ── Read it back line by line with fs.Reader ──────────────────
-    fs.Reader r, err read_open_err = fs.Reader.open("greetings.txt")
-    if read_open_err != ok {
+    guard fs.Reader r, err read_open_err = fs.Reader.open("greetings.txt") {
         fmt.println(f"open reader: {read_open_err.message()}")
         return 1
     }
@@ -46,22 +43,19 @@ fn main() -> i32 {
 
     r.close()
     // ── Append a footer and read the whole file ───────────────────
-    fs.Writer wa, err append_err = fs.Writer.open_append("greetings.txt")
-    if append_err != ok {
+    guard fs.Writer wa, err append_err = fs.Writer.open_append("greetings.txt") {
         fmt.println(f"open_append: {append_err.message()}")
         return 1
     }
 
-    i32 footer_bytes, err footer_err = wa.write_line("--- end of greetings ---")
-    if footer_err != ok {
+    guard i32 footer_bytes, err footer_err = wa.write_line("--- end of greetings ---") {
         fmt.println(f"write footer: {footer_err.message()}")
         wa.close()
         return 1
     }
 
     wa.close()
-    fs.Reader r2, err r2_err = fs.Reader.open("greetings.txt")
-    if r2_err != ok {
+    guard fs.Reader r2, err r2_err = fs.Reader.open("greetings.txt") {
         fmt.println(f"open reader2: {r2_err.message()}")
         return 1
     }

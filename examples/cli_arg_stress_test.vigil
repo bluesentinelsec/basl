@@ -196,8 +196,7 @@ fn parse_opts(i32 start, array<string> names, array<string> shorts, array<string
 
             // Type validation for int
             if typ == "int" {
-                i32 _, err parse_err = parse.i32(val)
-                if parse_err != ok {
+                guard i32 _, err parse_err = parse.i32(val) {
                     return f"option --{name} requires an integer, got: {val}"
                 }
 

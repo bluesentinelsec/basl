@@ -117,8 +117,7 @@ fn main() -> i32 {
     parser.flag("files-with-matches", "l", "Only print filenames")
     parser.flag("recursive", "r", "Recursively search directories")
     parser.positional("pattern", "Pattern to search for")
-    err e = parser.parse(0)
-    if e != ok {
+    guard err e = parser.parse(0) {
         fmt.eprintln(f"grep: {e.message()}")
         return 2
     }

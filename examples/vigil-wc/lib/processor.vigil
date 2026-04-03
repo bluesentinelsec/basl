@@ -28,8 +28,7 @@ pub fn process_file(string path, bool show_lines, bool show_words, bool show_byt
     }
 
     string content = fs.read(path)
-    i32 lines, i32 words, i32 bytes, err e2 = counter.count_content(content)
-    if e2 != ok {
+    guard i32 lines, i32 words, i32 bytes, err e2 = counter.count_content(content) {
         return 0, 0, 0, e2
     }
 
@@ -46,8 +45,7 @@ pub fn process_stdin(bool show_lines, bool show_words, bool show_bytes, string l
         line = readline.input("")
     }
 
-    i32 lines, i32 words, i32 bytes, err e2 = counter.count_content(content)
-    if e2 != ok {
+    guard i32 lines, i32 words, i32 bytes, err e2 = counter.count_content(content) {
         return 0, 0, 0, e2
     }
 

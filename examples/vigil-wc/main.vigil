@@ -28,8 +28,7 @@ fn main() -> i32 {
     }
 
     if files.len() == 0 {
-        i32 l, i32 w, i32 b, err e = processor.process_stdin(show_lines, show_words, show_bytes, "")
-        if e != ok {
+        guard i32 l, i32 w, i32 b, err e = processor.process_stdin(show_lines, show_words, show_bytes, "") {
             fmt.eprintln(f"vigil-wc: stdin: {e.message()}")
             return 1
         }
@@ -44,8 +43,7 @@ fn main() -> i32 {
     for (i32 i = 0; i < files.len(); i++) {
         string path = files[i]
         if path == "-" {
-            i32 l, i32 w, i32 b, err e = processor.process_stdin(show_lines, show_words, show_bytes, "-")
-            if e != ok {
+            guard i32 l, i32 w, i32 b, err e = processor.process_stdin(show_lines, show_words, show_bytes, "-") {
                 fmt.eprintln(f"vigil-wc: stdin: {e.message()}")
                 return 1
             }
@@ -55,8 +53,7 @@ fn main() -> i32 {
             total_bytes += b
             file_count++
         } else {
-            i32 l, i32 w, i32 b, err e = processor.process_file(path, show_lines, show_words, show_bytes)
-            if e != ok {
+            guard i32 l, i32 w, i32 b, err e = processor.process_file(path, show_lines, show_words, show_bytes) {
                 fmt.eprintln(f"vigil-wc: {path}: {e.message()}")
                 return 1
             }

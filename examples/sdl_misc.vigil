@@ -6,8 +6,7 @@ import "fmt"
 import "sdl"
 
 fn main() -> i32 {
-    bool init_ok, err ie = sdl.init(sdl.INIT_VIDEO)
-    if ie != ok {
+    guard bool init_ok, err ie = sdl.init(sdl.INIT_VIDEO) {
         fmt.eprintln(f"SDL init failed: {ie.message()}")
         return 1
     }
