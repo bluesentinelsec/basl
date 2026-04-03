@@ -586,6 +586,20 @@ class ErrorFlowTest(unittest.TestCase):
             }
         """, 42)
 
+    def test_discard_multi_return_bare_call(self) -> None:
+        self._run("""
+            fn two() -> (i32, i32) { return 1, 2; }
+            fn three() -> (i32, i32, i32) { return 10, 20, 30; }
+            fn main() -> i32 {
+                two();
+                three();
+                i32 a, i32 b = two();
+                if a != 1 { return 1; }
+                if b != 2 { return 2; }
+                return 0;
+            }
+        """, 0)
+
     def test_standalone_err_variable(self) -> None:
         self._run("""
             fn main() -> i32 {
