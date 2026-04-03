@@ -186,8 +186,8 @@ typedef struct tiled_map
 {
     int32_t width, height;
     int32_t tile_width, tile_height;
-    char *orientation;   /* orthogonal, isometric, staggered, hexagonal */
-    char *render_order;  /* right-down, right-up, left-down, left-up */
+    char *orientation;  /* orthogonal, isometric, staggered, hexagonal */
+    char *render_order; /* right-down, right-up, left-down, left-up */
     char *background_color;
     int infinite;
     char *stagger_axis;  /* x or y */
@@ -398,18 +398,15 @@ static tiled_object_t *parse_json_objects(const vigil_json_value_t *arr, size_t 
         objs[i].gid = json_int(o, "gid", 0);
         objs[i].is_ellipse = json_bool(o, "ellipse", 0);
         objs[i].is_point = json_bool(o, "point", 0);
-        objs[i].points =
-            parse_json_points(vigil_json_object_get(o, "polygon"), &objs[i].point_count);
+        objs[i].points = parse_json_points(vigil_json_object_get(o, "polygon"), &objs[i].point_count);
         if (objs[i].points == NULL)
-            objs[i].points =
-                parse_json_points(vigil_json_object_get(o, "polyline"), &objs[i].point_count);
+            objs[i].points = parse_json_points(vigil_json_object_get(o, "polyline"), &objs[i].point_count);
         {
             const vigil_json_value_t *txt = vigil_json_object_get(o, "text");
             if (txt != NULL)
                 objs[i].text_string = tiled_strdup(json_str(txt, "text"));
         }
-        objs[i].properties =
-            parse_json_properties(vigil_json_object_get(o, "properties"), &objs[i].property_count);
+        objs[i].properties = parse_json_properties(vigil_json_object_get(o, "properties"), &objs[i].property_count);
     }
     *out_count = count;
     return objs;
@@ -1058,12 +1055,11 @@ static const char *path_names[] = {"path"};
 static const char *handle_names[] = {"handle"};
 static const char *handle_index_names[] = {"handle", "index"};
 
-static const vigil_native_symbol_doc_t tiled_module_doc = {
-    "Tiled map parser.", "Parse Tiled .tmj/.tmx map files.", NULL};
-static const vigil_native_symbol_doc_t tiled_load_doc = {
-    "Load a Tiled map.", "Parses a .tmj or .tmx file and returns a map handle.", NULL};
-static const vigil_native_symbol_doc_t tiled_close_doc = {
-    "Close a Tiled map.", "Frees the parsed map data.", NULL};
+static const vigil_native_symbol_doc_t tiled_module_doc = {"Tiled map parser.", "Parse Tiled .tmj/.tmx map files.",
+                                                           NULL};
+static const vigil_native_symbol_doc_t tiled_load_doc = {"Load a Tiled map.",
+                                                         "Parses a .tmj or .tmx file and returns a map handle.", NULL};
+static const vigil_native_symbol_doc_t tiled_close_doc = {"Close a Tiled map.", "Frees the parsed map data.", NULL};
 static const vigil_native_symbol_doc_t tiled_width_doc = {"Map width in tiles.", NULL, NULL};
 static const vigil_native_symbol_doc_t tiled_height_doc = {"Map height in tiles.", NULL, NULL};
 static const vigil_native_symbol_doc_t tiled_tw_doc = {"Tile width in pixels.", NULL, NULL};
@@ -1088,11 +1084,11 @@ static const vigil_native_symbol_doc_t tiled_tscol_doc = {"Tileset columns.", NU
 
 static const vigil_native_module_function_t tiled_functions[] = {
     /* load(path) -> (i32, err) */
-    {"load", 4U, tiled_load_fn, 1U, str_param, VIGIL_TYPE_I32, 2U, i32_err_returns, 0, NULL, NULL, 0U, path_names,
-     NULL, NULL, &tiled_load_doc},
+    {"load", 4U, tiled_load_fn, 1U, str_param, VIGIL_TYPE_I32, 2U, i32_err_returns, 0, NULL, NULL, 0U, path_names, NULL,
+     NULL, &tiled_load_doc},
     /* close(handle) -> i32 */
-    {"close", 5U, tiled_close_fn, 1U, i32_param, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, NULL, 0U, handle_names, NULL,
-     NULL, &tiled_close_doc},
+    {"close", 5U, tiled_close_fn, 1U, i32_param, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, NULL, 0U, handle_names, NULL, NULL,
+     &tiled_close_doc},
     /* Map accessors: map_width(handle) -> i32 */
     {"map_width", 9U, tiled_map_width_fn, 1U, i32_param, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, NULL, 0U, handle_names,
      NULL, NULL, &tiled_width_doc},
@@ -1121,8 +1117,8 @@ static const vigil_native_module_function_t tiled_functions[] = {
      handle_index_names, NULL, NULL, &tiled_lh_doc},
     {"layer_data", 10U, tiled_layer_data_fn, 2U, i32_i32_param, VIGIL_TYPE_OBJECT, 1U, NULL, 0, NULL, NULL,
      VIGIL_TYPE_I32, handle_index_names, NULL, NULL, &tiled_ld_doc},
-    {"layer_object_count", 18U, tiled_layer_object_count_fn, 2U, i32_i32_param, VIGIL_TYPE_I32, 1U, NULL, 0, NULL,
-     NULL, 0U, handle_index_names, NULL, NULL, &tiled_loc_doc},
+    {"layer_object_count", 18U, tiled_layer_object_count_fn, 2U, i32_i32_param, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, NULL,
+     0U, handle_index_names, NULL, NULL, &tiled_loc_doc},
     /* Tileset accessors: tileset_name(handle, index) -> string */
     {"tileset_name", 12U, tiled_tileset_name_fn, 2U, i32_i32_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U,
      handle_index_names, NULL, NULL, &tiled_tsn_doc},
@@ -1130,22 +1126,16 @@ static const vigil_native_module_function_t tiled_functions[] = {
      0U, handle_index_names, NULL, NULL, &tiled_tsg_doc},
     {"tileset_image", 13U, tiled_tileset_image_fn, 2U, i32_i32_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U,
      handle_index_names, NULL, NULL, &tiled_tsi_doc},
-    {"tileset_tile_width", 18U, tiled_tileset_tile_width_fn, 2U, i32_i32_param, VIGIL_TYPE_I32, 1U, NULL, 0, NULL,
-     NULL, 0U, handle_index_names, NULL, NULL, &tiled_tstw_doc},
+    {"tileset_tile_width", 18U, tiled_tileset_tile_width_fn, 2U, i32_i32_param, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, NULL,
+     0U, handle_index_names, NULL, NULL, &tiled_tstw_doc},
     {"tileset_tile_height", 19U, tiled_tileset_tile_height_fn, 2U, i32_i32_param, VIGIL_TYPE_I32, 1U, NULL, 0, NULL,
      NULL, 0U, handle_index_names, NULL, NULL, &tiled_tsth_doc},
-    {"tileset_tile_count", 18U, tiled_tileset_tile_count_fn, 2U, i32_i32_param, VIGIL_TYPE_I32, 1U, NULL, 0, NULL,
-     NULL, 0U, handle_index_names, NULL, NULL, &tiled_tstc_doc},
+    {"tileset_tile_count", 18U, tiled_tileset_tile_count_fn, 2U, i32_i32_param, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, NULL,
+     0U, handle_index_names, NULL, NULL, &tiled_tstc_doc},
     {"tileset_columns", 15U, tiled_tileset_columns_fn, 2U, i32_i32_param, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, NULL, 0U,
      handle_index_names, NULL, NULL, &tiled_tscol_doc},
 };
 
 VIGIL_API const vigil_native_module_t vigil_plugin_tiled = {
-    "tiled",
-    5U,
-    tiled_functions,
-    sizeof(tiled_functions) / sizeof(tiled_functions[0]),
-    NULL,
-    0U,
-    &tiled_module_doc,
+    "tiled", 5U, tiled_functions, sizeof(tiled_functions) / sizeof(tiled_functions[0]), NULL, 0U, &tiled_module_doc,
 };
