@@ -10,6 +10,18 @@ from pathlib import Path
 VIGIL_BIN = os.environ.get("VIGIL_BIN", "vigil")
 
 
+def _tiled_plugin_available() -> bool:
+    """Check if the vigil binary has the tiled plugin compiled in."""
+    try:
+        r = subprocess.run(
+            [VIGIL_BIN, "doc", "tiled"],
+            capture_output=True, text=True, timeout=5,
+        )
+        return r.returncode == 0 and "tiled" in r.stdout.lower()
+    except Exception:
+        return False
+
+
 def run_vigil(root: Path, script: str) -> subprocess.CompletedProcess:
     return subprocess.run(
         [VIGIL_BIN, "run", str(root / script)],
@@ -89,6 +101,7 @@ SAMPLE_MAP = {
 }
 
 
+@unittest.skipUnless(_tiled_plugin_available(), "tiled plugin not compiled in")
 class TiledPluginTest(unittest.TestCase):
     def setUp(self) -> None:
         self.tmpdir = tempfile.mkdtemp(prefix="vigil_tiled_")
