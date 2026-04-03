@@ -1892,4 +1892,5 @@ VIGIL_API const vigil_native_module_t vigil_stdlib_json = {"json",
                                                            sizeof(json_functions) / sizeof(json_functions[0]),
                                                            json_classes,
                                                            sizeof(json_classes) / sizeof(json_classes[0]),
-                                                           &vigil_json_module_doc};
+                                                           &vigil_json_module_doc,
+    NULL, 0U};

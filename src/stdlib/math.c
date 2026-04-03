@@ -2330,4 +2330,5 @@ static const vigil_native_class_t vigil_math_classes[] = {
 
 VIGIL_API const vigil_native_module_t vigil_stdlib_math = {
     "math", 4U, vigil_math_functions, VIGIL_MATH_FUNCTION_COUNT, vigil_math_classes, VIGIL_MATH_CLASS_COUNT,
-    &vigil_math_module_doc};
+    &vigil_math_module_doc,
+    NULL, 0U};

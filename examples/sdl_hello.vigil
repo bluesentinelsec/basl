@@ -10,7 +10,7 @@ fn main() -> i32 {
     fmt.println(f"SDL version: {major}.{minor}.{patch}");
     fmt.println(f"SDL revision: {sdl.get_revision()}");
     // Initialize video subsystem.
-    bool init_ok, err e = sdl.init(sdl.INIT_VIDEO());
+    bool init_ok, err e = sdl.init(sdl.INIT_VIDEO);
     if e != ok {
         fmt.eprintln(f"SDL init failed: {e.message()}");
         return 1;
@@ -18,7 +18,7 @@ fn main() -> i32 {
 
     defer sdl.quit();
     // Verify it's initialized.
-    i32 active = sdl.was_init(sdl.INIT_VIDEO());
+    i32 active = sdl.was_init(sdl.INIT_VIDEO);
     if active != 0 {
         fmt.println("Video subsystem initialized.");
     }

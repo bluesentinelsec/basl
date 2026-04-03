@@ -1042,4 +1042,5 @@ static const vigil_native_module_function_t vigil_ffi_functions[] = {
 
 VIGIL_API const vigil_native_module_t vigil_stdlib_ffi = {
     "ffi", 3U, vigil_ffi_functions, sizeof(vigil_ffi_functions) / sizeof(vigil_ffi_functions[0]), NULL, 0U,
-    &vigil_ffi_module_doc};
+    &vigil_ffi_module_doc,
+    NULL, 0U};

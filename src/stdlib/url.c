@@ -401,4 +401,5 @@ static const vigil_native_module_function_t vigil_url_functions[] = {
 #define URL_FUNCTION_COUNT (sizeof(vigil_url_functions) / sizeof(vigil_url_functions[0]))
 
 VIGIL_API const vigil_native_module_t vigil_stdlib_url = {"url", 3U,  vigil_url_functions, URL_FUNCTION_COUNT, NULL,
-                                                          0U,    &vigil_url_module_doc};
+                                                          0U,    &vigil_url_module_doc,
+    NULL, 0U};

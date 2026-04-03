@@ -245,4 +245,5 @@ static const vigil_native_module_function_t vigil_yaml_functions[] = {
 #define YAML_FUNCTION_COUNT (sizeof(vigil_yaml_functions) / sizeof(vigil_yaml_functions[0]))
 
 VIGIL_API const vigil_native_module_t vigil_stdlib_yaml = {"yaml", 4U,  vigil_yaml_functions, YAML_FUNCTION_COUNT, NULL,
-                                                           0U,     &vigil_yaml_module_doc};
+                                                           0U,     &vigil_yaml_module_doc,
+    NULL, 0U};

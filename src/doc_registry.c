@@ -84,7 +84,7 @@ static int native_doc_module_has_docs(const vigil_native_module_t *module)
 
 static int native_doc_module_has_any_symbols(const vigil_native_module_t *module)
 {
-    return module != NULL && (module->function_count > 0U || module->class_count > 0U);
+    return module != NULL && (module->function_count > 0U || module->class_count > 0U || module->constant_count > 0U);
 }
 
 static void native_doc_buf_init(native_doc_buf_t *buf)
@@ -458,6 +458,8 @@ static size_t native_doc_count_module_entries(const vigil_native_module_t *modul
 
     for (i = 0U; i < module->function_count; i++)
         count += 1U;
+    for (i = 0U; i < module->constant_count; i++)
+        count += 1U;
     for (i = 0U; i < module->class_count; i++)
         count += native_doc_count_class_entries(&module->classes[i]);
     return count;
@@ -501,6 +503,19 @@ static void native_doc_fill_class_entries(native_doc_cache_t *cache, size_t *ind
     }
 }
 
+static void native_doc_fill_constant_entry(native_doc_cache_t *cache, size_t *index,
+                                           const vigil_native_module_t *module,
+                                           const vigil_native_module_constant_t *nc)
+{
+    cache->entries[*index].name = native_doc_printf("%s.%s", module->name, nc->name);
+    cache->entries[*index].signature =
+        native_doc_printf("%s.%s = %lld", module->name, nc->name, (long long)nc->int_value);
+    cache->entries[*index].summary = nc->doc != NULL ? nc->doc->summary : NULL;
+    cache->entries[*index].description = nc->doc != NULL ? nc->doc->description : NULL;
+    cache->entries[*index].example = nc->doc != NULL ? nc->doc->example : NULL;
+    *index += 1U;
+}
+
 static native_doc_cache_t *native_doc_build_module_cache(const vigil_native_module_t *module)
 {
     native_doc_cache_t *cache;
@@ -542,6 +557,9 @@ static native_doc_cache_t *native_doc_build_module_cache(const vigil_native_modu
         cache->entries[index].example = function->doc != NULL ? function->doc->example : NULL;
         index += 1U;
     }
+
+    for (i = 0U; i < module->constant_count; i++)
+        native_doc_fill_constant_entry(cache, &index, module, &module->constants[i]);
 
     for (i = 0U; i < module->class_count; i++)
         native_doc_fill_class_entries(cache, &index, module, &module->classes[i]);

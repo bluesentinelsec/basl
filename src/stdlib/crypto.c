@@ -794,4 +794,5 @@ static const vigil_native_module_function_t crypto_functions[] = {
 
 VIGIL_API const vigil_native_module_t vigil_stdlib_crypto = {
     "crypto", 6, crypto_functions, sizeof(crypto_functions) / sizeof(crypto_functions[0]), NULL, 0,
-    &vigil_crypto_module_doc};
+    &vigil_crypto_module_doc,
+    NULL, 0U};

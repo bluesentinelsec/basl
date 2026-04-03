@@ -744,4 +744,5 @@ static const vigil_native_module_function_t log_functions[] = {
 #define LOG_FUNCTION_COUNT (sizeof(log_functions) / sizeof(log_functions[0]))
 
 VIGIL_API const vigil_native_module_t vigil_stdlib_log = {"log", 3U, log_functions, LOG_FUNCTION_COUNT, NULL, 0U,
-                                                          &vigil_log_module_doc};
+                                                          &vigil_log_module_doc,
+    NULL, 0U};

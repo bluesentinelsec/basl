@@ -219,4 +219,5 @@ static const vigil_native_module_function_t vigil_random_functions[] = {
 #define RANDOM_FUNCTION_COUNT (sizeof(vigil_random_functions) / sizeof(vigil_random_functions[0]))
 
 VIGIL_API const vigil_native_module_t vigil_stdlib_random = {
-    "random", 6U, vigil_random_functions, RANDOM_FUNCTION_COUNT, NULL, 0U, &vigil_random_module_doc};
+    "random", 6U, vigil_random_functions, RANDOM_FUNCTION_COUNT, NULL, 0U, &vigil_random_module_doc,
+    NULL, 0U};

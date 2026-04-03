@@ -7,7 +7,7 @@ import "fmt";
 import "sdl";
 
 fn main() -> i32 {
-    bool init_ok, err ie = sdl.init(sdl.INIT_VIDEO());
+    bool init_ok, err ie = sdl.init(sdl.INIT_VIDEO);
     if ie != ok {
         fmt.eprintln(f"SDL init failed: {ie.message()}");
         return 1;
@@ -38,7 +38,7 @@ fn main() -> i32 {
         return 1;
     }
     // Create a 128x128 render-target texture
-    sdl.Texture tex, err te = sdl.Texture.create(ren, 0, sdl.TEXTUREACCESS_TARGET(), 128, 128);
+    sdl.Texture tex, err te = sdl.Texture.create(ren, 0, sdl.TEXTUREACCESS_TARGET, 128, 128);
     if te != ok {
         fmt.eprintln(f"Texture failed: {te.message()}");
         ren.destroy();
@@ -72,12 +72,12 @@ fn main() -> i32 {
     bool running = true;
     while running {
         while ev.poll() {
-            if ev.type() == sdl.EVENT_QUIT() {
+            if ev.type() == sdl.EVENT_QUIT {
                 running = false;
             }
         }
 
-        if sdl.is_key_pressed(sdl.SCANCODE_ESCAPE()) {
+        if sdl.is_key_pressed(sdl.SCANCODE_ESCAPE) {
             running = false;
         }
 
@@ -89,7 +89,7 @@ fn main() -> i32 {
         bool d4, err de4 = ren.render_texture(tex, 0.0, 0.0, 0.0, 0.0, 160.0, 10.0, 256.0, 256.0);
         // Render it rotating
         angle = angle + 1.0;
-        bool d5, err de5 = ren.render_texture_rotated(tex, 0.0, 0.0, 0.0, 0.0, 480.0, 150.0, 128.0, 128.0, angle, 64.0, 64.0, sdl.FLIP_NONE());
+        bool d5, err de5 = ren.render_texture_rotated(tex, 0.0, 0.0, 0.0, 0.0, 480.0, 150.0, 128.0, 128.0, angle, 64.0, 64.0, sdl.FLIP_NONE);
         bool d6, err de6 = ren.present();
         sdl.delay(16);
     }

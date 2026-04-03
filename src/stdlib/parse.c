@@ -245,4 +245,5 @@ static const vigil_native_module_function_t parse_funcs[] = {
 };
 
 VIGIL_API const vigil_native_module_t vigil_stdlib_parse = {
-    "parse", 5U, parse_funcs, sizeof(parse_funcs) / sizeof(parse_funcs[0]), NULL, 0U, &vigil_parse_module_doc};
+    "parse", 5U, parse_funcs, sizeof(parse_funcs) / sizeof(parse_funcs[0]), NULL, 0U, &vigil_parse_module_doc,
+    NULL, 0U};

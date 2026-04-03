@@ -2,14 +2,14 @@ import "fmt";
 import "sdl";
 
 fn main() -> i32 {
-    bool init_ok, err ie = sdl.init(sdl.INIT_VIDEO());
+    bool init_ok, err ie = sdl.init(sdl.INIT_VIDEO);
     if ie != ok {
         fmt.eprintln(f"SDL init failed: {ie.message()}");
         return 1;
     }
 
     defer sdl.quit();
-    sdl.Window win, err we = sdl.Window.create("Vigil SDL Window", 800, 600, sdl.WINDOW_RESIZABLE());
+    sdl.Window win, err we = sdl.Window.create("Vigil SDL Window", 800, 600, sdl.WINDOW_RESIZABLE);
     if we != ok {
         fmt.eprintln(f"Window create failed: {we.message()}");
         return 1;

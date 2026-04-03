@@ -585,4 +585,5 @@ static const vigil_native_module_function_t vigil_regex_functions[] = {
 #define VIGIL_REGEX_FUNCTION_COUNT (sizeof(vigil_regex_functions) / sizeof(vigil_regex_functions[0]))
 
 VIGIL_API const vigil_native_module_t vigil_stdlib_regex = {
-    "regex", 5U, vigil_regex_functions, VIGIL_REGEX_FUNCTION_COUNT, NULL, 0U, &vigil_regex_module_doc};
+    "regex", 5U, vigil_regex_functions, VIGIL_REGEX_FUNCTION_COUNT, NULL, 0U, &vigil_regex_module_doc,
+    NULL, 0U};

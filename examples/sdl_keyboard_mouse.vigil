@@ -7,7 +7,7 @@ import "fmt";
 import "sdl";
 
 fn main() -> i32 {
-    bool init_ok, err ie = sdl.init(sdl.INIT_VIDEO());
+    bool init_ok, err ie = sdl.init(sdl.INIT_VIDEO);
     if ie != ok {
         fmt.eprintln(f"SDL init failed: {ie.message()}");
         return 1;
@@ -39,19 +39,19 @@ fn main() -> i32 {
     bool running = true;
     while running {
         while ev.poll() {
-            if ev.type() == sdl.EVENT_QUIT() {
+            if ev.type() == sdl.EVENT_QUIT {
                 running = false;
             }
         }
 
-        if sdl.is_key_pressed(sdl.SCANCODE_ESCAPE()) {
+        if sdl.is_key_pressed(sdl.SCANCODE_ESCAPE) {
             running = false;
         }
         // Clear
         bool c1, err e1 = ren.set_draw_color(30, 30, 30, 255);
         bool c2, err e2 = ren.clear();
         // W key
-        if sdl.is_key_pressed(sdl.SCANCODE_W()) {
+        if sdl.is_key_pressed(sdl.SCANCODE_W) {
             bool t1, err t2 = ren.set_draw_color(0, 200, 0, 255);
         } else {
             bool t3, err t4 = ren.set_draw_color(60, 60, 60, 255);
@@ -59,7 +59,7 @@ fn main() -> i32 {
 
         bool c3, err e3 = ren.fill_rect(270.0, 160.0, 60.0, 60.0);
         // A key
-        if sdl.is_key_pressed(sdl.SCANCODE_A()) {
+        if sdl.is_key_pressed(sdl.SCANCODE_A) {
             bool t5, err t6 = ren.set_draw_color(0, 200, 0, 255);
         } else {
             bool t7, err t8 = ren.set_draw_color(60, 60, 60, 255);
@@ -67,7 +67,7 @@ fn main() -> i32 {
 
         bool c4, err e4 = ren.fill_rect(200.0, 230.0, 60.0, 60.0);
         // S key
-        if sdl.is_key_pressed(sdl.SCANCODE_S()) {
+        if sdl.is_key_pressed(sdl.SCANCODE_S) {
             bool t9, err t10 = ren.set_draw_color(0, 200, 0, 255);
         } else {
             bool t11, err t12 = ren.set_draw_color(60, 60, 60, 255);
@@ -75,7 +75,7 @@ fn main() -> i32 {
 
         bool c5, err e5 = ren.fill_rect(270.0, 230.0, 60.0, 60.0);
         // D key
-        if sdl.is_key_pressed(sdl.SCANCODE_D()) {
+        if sdl.is_key_pressed(sdl.SCANCODE_D) {
             bool t13, err t14 = ren.set_draw_color(0, 200, 0, 255);
         } else {
             bool t15, err t16 = ren.set_draw_color(60, 60, 60, 255);

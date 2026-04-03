@@ -86,7 +86,15 @@ static const vigil_native_module_function_t tp_functions[] = {
 
 #define TP_FUNCTION_COUNT (sizeof(tp_functions) / sizeof(tp_functions[0]))
 
+/* ── constants ────────────────────────────────────────────────────── */
+
+static const vigil_native_module_constant_t tp_constants[] = {
+    {"ANSWER", 6U, VIGIL_TYPE_I32, 42, 0.0, NULL},
+};
+
+#define TP_CONSTANT_COUNT (sizeof(tp_constants) / sizeof(tp_constants[0]))
+
 /* ── module export ───────────────────────────────────────────────── */
 
-VIGIL_API const vigil_native_module_t vigil_plugin_test_plugin = {"test_plugin", 11U, tp_functions, TP_FUNCTION_COUNT,
-                                                                  NULL,          0U,  NULL};
+VIGIL_API const vigil_native_module_t vigil_plugin_test_plugin = {
+    "test_plugin", 11U, tp_functions, TP_FUNCTION_COUNT, NULL, 0U, NULL, tp_constants, TP_CONSTANT_COUNT};

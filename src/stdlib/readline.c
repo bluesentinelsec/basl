@@ -284,4 +284,5 @@ static const vigil_native_module_function_t vigil_readline_functions[] = {
 
 VIGIL_API const vigil_native_module_t vigil_stdlib_readline = {
     "readline", 8, vigil_readline_functions,  sizeof(vigil_readline_functions) / sizeof(vigil_readline_functions[0]),
-    NULL,       0, &vigil_readline_module_doc};
+    NULL,       0, &vigil_readline_module_doc,
+    NULL, 0U};
