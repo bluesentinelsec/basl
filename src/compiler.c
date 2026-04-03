@@ -12915,14 +12915,6 @@ static vigil_status_t vigil_parser_parse_expression_statement_internal(vigil_par
     {
         return status;
     }
-    if (expression_result.type_count > 1U)
-    {
-        return vigil_parser_report(state,
-                                   vigil_parser_previous(state) == NULL ? vigil_parser_fallback_span(state)
-                                                                        : vigil_parser_previous(state)->span,
-                                   "multi-value expressions must be bound explicitly");
-    }
-
     last_token = vigil_parser_previous(state);
     if (expect_semicolon)
     {
@@ -12933,7 +12925,19 @@ static vigil_status_t vigil_parser_parse_expression_statement_internal(vigil_par
         }
     }
 
-    if (!vigil_parser_type_is_void(expression_result.type))
+    if (expression_result.type_count > 1U)
+    {
+        vigil_source_span_t span = last_token == NULL ? vigil_parser_fallback_span(state) : last_token->span;
+        for (size_t i = 0; i < expression_result.type_count; i++)
+        {
+            status = vigil_parser_emit_opcode(state, VIGIL_OPCODE_POP, span);
+            if (status != VIGIL_STATUS_OK)
+            {
+                return status;
+            }
+        }
+    }
+    else if (!vigil_parser_type_is_void(expression_result.type))
     {
         status = vigil_parser_emit_opcode(state, VIGIL_OPCODE_POP,
                                           last_token == NULL ? vigil_parser_fallback_span(state) : last_token->span);
