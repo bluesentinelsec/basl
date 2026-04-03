@@ -4004,11 +4004,8 @@ static vigil_status_t parse_extern_from_clause(vigil_program_state_t *program, s
 
     {
         const vigil_token_t *semi = vigil_program_token_at(program, *cursor);
-        if (semi == NULL || semi->kind != VIGIL_TOKEN_SEMICOLON)
-            return vigil_program_fail_partial_decl(
-                program, decl,
-                vigil_compile_report(program, decl->name_span, "expected ';' after extern fn declaration"));
-        (*cursor)++;
+        if (semi != NULL && semi->kind == VIGIL_TOKEN_SEMICOLON)
+            (*cursor)++;
     }
     return VIGIL_STATUS_OK;
 }
@@ -4549,6 +4546,17 @@ vigil_status_t vigil_parser_expect(vigil_parser_state_t *state, vigil_token_kind
         *out_token = token;
     }
     return VIGIL_STATUS_OK;
+}
+
+/* Expect a semicolon, but also accept '}' or EOF as implicit terminators
+   (the closing brace ends the enclosing block, so the semicolon is optional). */
+vigil_status_t vigil_parser_expect_semi(vigil_parser_state_t *state, const char *message)
+{
+    if (vigil_parser_match(state, VIGIL_TOKEN_SEMICOLON))
+        return VIGIL_STATUS_OK;
+    if (vigil_parser_check(state, VIGIL_TOKEN_RBRACE) || vigil_parser_is_at_end(state))
+        return VIGIL_STATUS_OK;
+    return vigil_parser_report(state, vigil_parser_peek(state)->span, message);
 }
 
 const char *vigil_parser_token_text(const vigil_parser_state_t *state, const vigil_token_t *token, size_t *out_length)
@@ -10518,8 +10526,8 @@ static vigil_status_t vigil_parser_parse_return_statement(vigil_parser_state_t *
         return status;
 
     status =
-        vigil_parser_expect(state, VIGIL_TOKEN_SEMICOLON,
-                            is_void_return ? "expected ';' after return" : "expected ';' after return value", NULL);
+        vigil_parser_expect_semi(state,
+                            is_void_return ? "expected ';' after return" : "expected ';' after return value");
     if (status != VIGIL_STATUS_OK)
         return status;
     status = emit_return_statement(state, return_token->span, is_void_return);
@@ -10557,7 +10565,7 @@ static vigil_status_t vigil_parser_parse_defer_statement(vigil_parser_state_t *s
     }
     state->defer_emitted = 0;
 
-    status = vigil_parser_expect(state, VIGIL_TOKEN_SEMICOLON, "expected ';' after defer call", NULL);
+    status = vigil_parser_expect_semi(state, "expected ';' after defer call");
     if (status != VIGIL_STATUS_OK)
     {
         return status;
@@ -11874,7 +11882,7 @@ static vigil_status_t vigil_parser_parse_break_statement(vigil_parser_state_t *s
         return vigil_parser_report(state, break_token->span, "'break' is only valid inside a loop");
     }
 
-    status = vigil_parser_expect(state, VIGIL_TOKEN_SEMICOLON, "expected ';' after break", NULL);
+    status = vigil_parser_expect_semi(state, "expected ';' after break");
     if (status != VIGIL_STATUS_OK)
     {
         return status;
@@ -11925,7 +11933,7 @@ static vigil_status_t vigil_parser_parse_continue_statement(vigil_parser_state_t
         return vigil_parser_report(state, continue_token->span, "'continue' is only valid inside a loop");
     }
 
-    status = vigil_parser_expect(state, VIGIL_TOKEN_SEMICOLON, "expected ';' after continue", NULL);
+    status = vigil_parser_expect_semi(state, "expected ';' after continue");
     if (status != VIGIL_STATUS_OK)
     {
         return status;
@@ -12872,7 +12880,7 @@ static vigil_status_t vigil_parser_parse_assignment_statement_internal(vigil_par
 
     if (expect_semicolon)
     {
-        status = vigil_parser_expect(state, VIGIL_TOKEN_SEMICOLON, "expected ';' after assignment", NULL);
+        status = vigil_parser_expect_semi(state, "expected ';' after assignment");
         if (status != VIGIL_STATUS_OK)
             return status;
     }
@@ -12918,7 +12926,7 @@ static vigil_status_t vigil_parser_parse_expression_statement_internal(vigil_par
     last_token = vigil_parser_previous(state);
     if (expect_semicolon)
     {
-        status = vigil_parser_expect(state, VIGIL_TOKEN_SEMICOLON, "expected ';' after expression", NULL);
+        status = vigil_parser_expect_semi(state, "expected ';' after expression");
         if (status != VIGIL_STATUS_OK)
         {
             return status;

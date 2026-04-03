@@ -158,7 +158,7 @@ class TestVigilDebug(unittest.TestCase):
         if sys.platform == "win32":
             self.skipTest("DAP stdio tests unreliable on Windows CI pipes")
         client, _ = self._start_debug(
-            'import "fmt";\nfn main() -> i32 {\n    return 0;\n}\n'
+            'import "fmt"\nfn main() -> i32 {\n    return 0\n}\n'
         )
 
         # Initialize.
@@ -187,7 +187,7 @@ class TestVigilDebug(unittest.TestCase):
         if sys.platform == "win32":
             self.skipTest("DAP stdio tests unreliable on Windows CI pipes")
         client, script_path = self._start_debug(
-            'import "fmt";\nfn main() -> i32 {\n    fmt.println("debug test");\n    return 0;\n}\n'
+            'import "fmt"\nfn main() -> i32 {\n    fmt.println("debug test")\n    return 0\n}\n'
         )
 
         # Initialize.
@@ -221,7 +221,7 @@ class TestVigilDebug(unittest.TestCase):
             self.skipTest("interactive debug stdin piping is unreliable on Windows CI")
         self.tmpdir = tempfile.mkdtemp(prefix="vigil_debug_interactive_")
         script_path = Path(self.tmpdir) / "test.vigil"
-        script_path.write_text("fn main() -> i32 {\n    return 0;\n}\n")
+        script_path.write_text("fn main() -> i32 {\n    return 0\n}\n")
 
         cmd = [*resolve_vigil_command(), "debug", "--interactive", str(script_path)]
         result = subprocess.run(cmd, input="quit\n", capture_output=True, text=True, timeout=10)

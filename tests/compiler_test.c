@@ -2238,16 +2238,16 @@ TEST(VigilCompilerTest, RejectsInterfaceMethodsMissingParameterNames)
                                    "expected parameter name");
 }
 
-TEST(VigilCompilerTest, RejectsInterfaceMethodsMissingSemicolons)
+TEST(VigilCompilerTest, AcceptsInterfaceMethodsWithoutSemicolons)
 {
-    ExpectSingleCompilerDiagnostic(vigil_test_failed_,
-                                   "interface Reader {"
-                                   "    fn read() -> i32"
-                                   "}"
-                                   "fn main() -> i32 {"
-                                   "    return 0;"
-                                   "}",
-                                   "expected ';' after interface method");
+    EXPECT_EQ(CompileAndRun(vigil_test_failed_,
+                            "interface Reader {"
+                            "    fn read() -> i32"
+                            "}"
+                            "fn main() -> i32 {"
+                            "    return 0;"
+                            "}"),
+              0);
 }
 
 TEST(VigilCompilerTest, RejectsInterfaceNameConflictsWithGlobalConstant)
@@ -3412,7 +3412,7 @@ void register_compiler_tests(void)
     REGISTER_TEST(VigilCompilerTest, RejectsMissingInterfaceBodyStart);
     REGISTER_TEST(VigilCompilerTest, RejectsDuplicateInterfaceMethods);
     REGISTER_TEST(VigilCompilerTest, RejectsInterfaceMethodsMissingParameterNames);
-    REGISTER_TEST(VigilCompilerTest, RejectsInterfaceMethodsMissingSemicolons);
+    REGISTER_TEST(VigilCompilerTest, AcceptsInterfaceMethodsWithoutSemicolons);
     REGISTER_TEST(VigilCompilerTest, RejectsInterfaceNameConflictsWithGlobalConstant);
     REGISTER_TEST(VigilCompilerTest, RejectsInvalidInterfaceBodyMembers);
     REGISTER_TEST(VigilCompilerTest, RejectsInterfaceMethodsMissingNames);

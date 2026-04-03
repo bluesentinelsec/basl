@@ -478,17 +478,28 @@ static vigil_status_t vigil_lexer_scan_token(vigil_lexer_state_t *state)
     case '\n':
         if (vigil_lexer_asi_trigger(state->last_token_kind))
         {
-            /* Peek past whitespace on the next line.  If the first
-               non-blank character is '{', suppress ASI so that
-               opening braces can appear on the next line after
-               function signatures, if/for/while headers, etc. */
+            /* Peek past whitespace on the next line.  Suppress ASI when
+               the first non-blank character would start a continuation:
+               - '{' : opening brace for function/block body
+               - binary operators that continue an expression */
             size_t peek = state->offset;
             while (peek < state->length &&
                    (state->text[peek] == ' ' || state->text[peek] == '\t' ||
                     state->text[peek] == '\r' || state->text[peek] == '\n'))
                 peek++;
-            if (peek < state->length && state->text[peek] == '{')
-                return VIGIL_STATUS_OK;
+            if (peek < state->length)
+            {
+                char nc = state->text[peek];
+                if (nc == '{')
+                    return VIGIL_STATUS_OK;
+                /* Two-character operators that continue an expression */
+                char nc2 = (peek + 1U < state->length) ? state->text[peek + 1U] : '\0';
+                if ((nc == '&' && nc2 == '&') || (nc == '|' && nc2 == '|'))
+                    return VIGIL_STATUS_OK;
+                /* Dot accessor continues a method chain */
+                if (nc == '.')
+                    return VIGIL_STATUS_OK;
+            }
             return vigil_lexer_emit(state, VIGIL_TOKEN_SEMICOLON, start, start);
         }
         return VIGIL_STATUS_OK;

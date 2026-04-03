@@ -422,13 +422,13 @@ class TestReplInteractive(unittest.TestCase):
         """Test function redefinition works in REPL."""
         child = self.spawn_repl()
         # Define function
-        child.send("fn foo() -> i32 { return 42; }\r")
+        child.send("fn foo() -> i32 { return 42 }\r")
         child.expect(r"\r\n\r>>> ")  # Newline after command, then prompt
         # Call function
         child.send("foo()\r")
         child.expect(r"\r\n\r>>> ")  # Result + newline + prompt
         # Redefine function
-        child.send("fn foo() -> i32 { return 99; }\r")
+        child.send("fn foo() -> i32 { return 99 }\r")
         child.expect(r"\r\n\r>>> ")
         # Call again
         child.send("foo()\r")

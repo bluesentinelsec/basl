@@ -123,79 +123,79 @@ class TiledPluginTest(unittest.TestCase):
     def test_load_and_map_dimensions(self) -> None:
         map_path = self._write_map()
         self._run(f"""
-            import "tiled";
+            import "tiled"
             fn main() -> i32 {{
-                i32 h, err e = tiled.load("{map_path}");
-                if e != ok {{ return 1; }}
-                if tiled.map_width(h) != 4 {{ return 2; }}
-                if tiled.map_height(h) != 3 {{ return 3; }}
-                if tiled.map_tile_width(h) != 16 {{ return 4; }}
-                if tiled.map_tile_height(h) != 16 {{ return 5; }}
-                tiled.close(h);
-                return 0;
+                i32 h, err e = tiled.load("{map_path}")
+                if e != ok {{ return 1 }}
+                if tiled.map_width(h) != 4 {{ return 2 }}
+                if tiled.map_height(h) != 3 {{ return 3 }}
+                if tiled.map_tile_width(h) != 16 {{ return 4 }}
+                if tiled.map_tile_height(h) != 16 {{ return 5 }}
+                tiled.close(h)
+                return 0
             }}
         """)
 
     def test_map_orientation_and_infinite(self) -> None:
         map_path = self._write_map()
         self._run(f"""
-            import "tiled";
+            import "tiled"
             fn main() -> i32 {{
-                i32 h, err e = tiled.load("{map_path}");
-                if e != ok {{ return 1; }}
-                if tiled.map_orientation(h) != "orthogonal" {{ return 2; }}
-                if tiled.map_infinite(h) {{ return 3; }}
-                tiled.close(h);
-                return 0;
+                i32 h, err e = tiled.load("{map_path}")
+                if e != ok {{ return 1 }}
+                if tiled.map_orientation(h) != "orthogonal" {{ return 2 }}
+                if tiled.map_infinite(h) {{ return 3 }}
+                tiled.close(h)
+                return 0
             }}
         """)
 
     def test_layer_access(self) -> None:
         map_path = self._write_map()
         self._run(f"""
-            import "tiled";
+            import "tiled"
             fn main() -> i32 {{
-                i32 h, err e = tiled.load("{map_path}");
-                if e != ok {{ return 1; }}
-                if tiled.map_layer_count(h) != 2 {{ return 2; }}
-                if tiled.layer_name(h, 0) != "Ground" {{ return 3; }}
-                if tiled.layer_type(h, 0) != "tilelayer" {{ return 4; }}
-                if tiled.layer_width(h, 0) != 4 {{ return 5; }}
-                if tiled.layer_height(h, 0) != 3 {{ return 6; }}
-                if tiled.layer_name(h, 1) != "Entities" {{ return 7; }}
-                if tiled.layer_type(h, 1) != "objectgroup" {{ return 8; }}
-                if tiled.layer_object_count(h, 1) != 2 {{ return 9; }}
-                tiled.close(h);
-                return 0;
+                i32 h, err e = tiled.load("{map_path}")
+                if e != ok {{ return 1 }}
+                if tiled.map_layer_count(h) != 2 {{ return 2 }}
+                if tiled.layer_name(h, 0) != "Ground" {{ return 3 }}
+                if tiled.layer_type(h, 0) != "tilelayer" {{ return 4 }}
+                if tiled.layer_width(h, 0) != 4 {{ return 5 }}
+                if tiled.layer_height(h, 0) != 3 {{ return 6 }}
+                if tiled.layer_name(h, 1) != "Entities" {{ return 7 }}
+                if tiled.layer_type(h, 1) != "objectgroup" {{ return 8 }}
+                if tiled.layer_object_count(h, 1) != 2 {{ return 9 }}
+                tiled.close(h)
+                return 0
             }}
         """)
 
     def test_tileset_access(self) -> None:
         map_path = self._write_map()
         self._run(f"""
-            import "tiled";
+            import "tiled"
             fn main() -> i32 {{
-                i32 h, err e = tiled.load("{map_path}");
-                if e != ok {{ return 1; }}
-                if tiled.map_tileset_count(h) != 1 {{ return 2; }}
-                if tiled.tileset_name(h, 0) != "tiles" {{ return 3; }}
-                if tiled.tileset_first_gid(h, 0) != 1 {{ return 4; }}
-                if tiled.tileset_image(h, 0) != "tiles.png" {{ return 5; }}
-                if tiled.tileset_tile_width(h, 0) != 16 {{ return 6; }}
-                if tiled.tileset_tile_count(h, 0) != 12 {{ return 7; }}
-                if tiled.tileset_columns(h, 0) != 4 {{ return 8; }}
-                tiled.close(h);
-                return 0;
+                i32 h, err e = tiled.load("{map_path}")
+                if e != ok {{ return 1 }}
+                if tiled.map_tileset_count(h) != 1 {{ return 2 }}
+                if tiled.tileset_name(h, 0) != "tiles" {{ return 3 }}
+                if tiled.tileset_first_gid(h, 0) != 1 {{ return 4 }}
+                if tiled.tileset_image(h, 0) != "tiles.png" {{ return 5 }}
+                if tiled.tileset_tile_width(h, 0) != 16 {{ return 6 }}
+                if tiled.tileset_tile_count(h, 0) != 12 {{ return 7 }}
+                if tiled.tileset_columns(h, 0) != 4 {{ return 8 }}
+                tiled.close(h)
+                return 0
             }}
         """)
 
     def test_load_nonexistent_file_returns_error(self) -> None:
         self._run("""
-            import "tiled";
+            import "tiled"
             fn main() -> i32 {
-                i32 h, err e = tiled.load("/nonexistent/map.tmj");
-                if e == ok { return 1; }
-                return 0;
+                i32 h, err e = tiled.load("/nonexistent/map.tmj")
+                if e == ok { return 1 }
+                return 0
             }
         """)
 
@@ -204,11 +204,11 @@ class TiledPluginTest(unittest.TestCase):
         with open(bad_path, "w") as f:
             f.write("{invalid json")
         self._run(f"""
-            import "tiled";
+            import "tiled"
             fn main() -> i32 {{
-                i32 h, err e = tiled.load("{bad_path}");
-                if e == ok {{ return 1; }}
-                return 0;
+                i32 h, err e = tiled.load("{bad_path}")
+                if e == ok {{ return 1 }}
+                return 0
             }}
         """)
 
@@ -217,17 +217,17 @@ class TiledPluginTest(unittest.TestCase):
         # Escape for VIGIL string literal
         escaped = map_json.replace("\\", "\\\\").replace('"', '\\"')
         self._run(f"""
-            import "tiled";
+            import "tiled"
             fn main() -> i32 {{
-                string text = "{escaped}";
-                i32 h, err e = tiled.parse(text, "json");
-                if e != ok {{ return 1; }}
-                if tiled.map_width(h) != 4 {{ return 2; }}
-                if tiled.map_height(h) != 3 {{ return 3; }}
-                if tiled.map_layer_count(h) != 2 {{ return 4; }}
-                if tiled.tileset_name(h, 0) != "tiles" {{ return 5; }}
-                tiled.close(h);
-                return 0;
+                string text = "{escaped}"
+                i32 h, err e = tiled.parse(text, "json")
+                if e != ok {{ return 1 }}
+                if tiled.map_width(h) != 4 {{ return 2 }}
+                if tiled.map_height(h) != 3 {{ return 3 }}
+                if tiled.map_layer_count(h) != 2 {{ return 4 }}
+                if tiled.tileset_name(h, 0) != "tiles" {{ return 5 }}
+                tiled.close(h)
+                return 0
             }}
         """)
 

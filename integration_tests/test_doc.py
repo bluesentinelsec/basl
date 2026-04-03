@@ -96,7 +96,7 @@ class TestVigilDoc(unittest.TestCase):
             "\n"
             "// Adds two numbers.\n"
             "pub fn add(i32 a, i32 b) -> i32 {\n"
-            "    return a + b;\n"
+            "    return a + b\n"
             "}\n"
             "\n"
             "fn private_fn() -> void {\n"
@@ -114,7 +114,7 @@ class TestVigilDoc(unittest.TestCase):
         path = self._write_file("lookup.vigil",
             "// Adds two numbers.\n"
             "pub fn add(i32 a, i32 b) -> i32 {\n"
-            "    return a + b;\n"
+            "    return a + b\n"
             "}\n"
         )
         result = self._run_doc(path, "add")

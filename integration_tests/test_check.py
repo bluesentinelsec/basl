@@ -26,12 +26,12 @@ class TestVigilCheck(unittest.TestCase):
 
     def test_check_succeeds_for_project_imports(self):
         self._write("vigil.toml", '[project]\nname = "checkproj"\n')
-        self._write("lib/helper.vigil", "pub fn value() -> i32 { return 7; }\n")
+        self._write("lib/helper.vigil", "pub fn value() -> i32 { return 7 }\n")
         script = self._write(
             "main.vigil",
-            'import "helper";\n'
+            'import "helper"\n'
             "fn main() -> i32 {\n"
-            "    return helper.value();\n"
+            "    return helper.value()\n"
             "}\n",
         )
 
@@ -70,15 +70,15 @@ class TestVigilCheck(unittest.TestCase):
         self._write("vigil.toml", '[project]\nname = "circproj"\n')
         self._write(
             "lib/a.vigil",
-            'import "b";\npub fn val() -> i32 { return b.get(); }\n',
+            'import "b"\npub fn val() -> i32 { return b.get() }\n',
         )
         self._write(
             "lib/b.vigil",
-            'import "a";\npub fn get() -> i32 { return 1; }\n',
+            'import "a"\npub fn get() -> i32 { return 1 }\n',
         )
         script = self._write(
             "main.vigil",
-            'import "a";\nfn main() -> i32 { return a.val(); }\n',
+            'import "a"\nfn main() -> i32 { return a.val() }\n',
         )
 
         result = subprocess.run(

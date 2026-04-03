@@ -23,10 +23,10 @@ def run_vigil(code: str) -> tuple[int, str, str]:
 
 class LogLevelTest(unittest.TestCase):
     def test_set_level_info(self):
-        code = '''import "log";
+        code = '''import "log"
 fn main() -> i32 {
-    log.set_level("info");
-    return 0;
+    log.set_level("info")
+    return 0
 }'''
         rc, out, err = run_vigil(code)
         self.assertEqual(rc, 0, f"stderr: {err}")
@@ -34,55 +34,55 @@ fn main() -> i32 {
 
 class LogOutputTest(unittest.TestCase):
     def test_info(self):
-        code = '''import "log";
+        code = '''import "log"
 fn main() -> i32 {
-    log.set_level("info");
-    log.info("test message");
-    return 0;
+    log.set_level("info")
+    log.info("test message")
+    return 0
 }'''
         rc, out, err = run_vigil(code)
         self.assertEqual(rc, 0, f"stderr: {err}")
         self.assertIn("test message", err)
 
     def test_warn(self):
-        code = '''import "log";
+        code = '''import "log"
 fn main() -> i32 {
-    log.set_level("warn");
-    log.warn("warning message");
-    return 0;
+    log.set_level("warn")
+    log.warn("warning message")
+    return 0
 }'''
         rc, out, err = run_vigil(code)
         self.assertEqual(rc, 0, f"stderr: {err}")
         self.assertIn("warning message", err)
 
     def test_error(self):
-        code = '''import "log";
+        code = '''import "log"
 fn main() -> i32 {
-    log.set_level("error");
-    log.error("error message");
-    return 0;
+    log.set_level("error")
+    log.error("error message")
+    return 0
 }'''
         rc, out, err = run_vigil(code)
         self.assertEqual(rc, 0, f"stderr: {err}")
         self.assertIn("error message", err)
 
     def test_debug_filtered(self):
-        code = '''import "log";
+        code = '''import "log"
 fn main() -> i32 {
-    log.set_level("info");
-    log.debug("debug message");
-    return 0;
+    log.set_level("info")
+    log.debug("debug message")
+    return 0
 }'''
         rc, out, err = run_vigil(code)
         self.assertEqual(rc, 0, f"stderr: {err}")
         self.assertNotIn("debug message", err)
 
     def test_debug_shown(self):
-        code = '''import "log";
+        code = '''import "log"
 fn main() -> i32 {
-    log.set_level("debug");
-    log.debug("debug message");
-    return 0;
+    log.set_level("debug")
+    log.debug("debug message")
+    return 0
 }'''
         rc, out, err = run_vigil(code)
         self.assertEqual(rc, 0, f"stderr: {err}")

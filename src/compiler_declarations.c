@@ -498,13 +498,9 @@ static vigil_status_t vigil_program_parse_constant_initializer(vigil_program_sta
     }
 
     token = vigil_program_cursor_peek(program, *cursor);
-    if (token == NULL || token->kind != VIGIL_TOKEN_SEMICOLON)
-    {
-        return vigil_compile_report(program, token == NULL ? vigil_program_eof_span(program) : token->span,
-                                    "expected ';' after global constant declaration");
-    }
+    if (token != NULL && token->kind == VIGIL_TOKEN_SEMICOLON)
+        vigil_program_cursor_advance(program, cursor);
 
-    vigil_program_cursor_advance(program, cursor);
     return VIGIL_STATUS_OK;
 }
 
@@ -1111,8 +1107,18 @@ static vigil_status_t vigil_program_parse_interface_method(vigil_program_state_t
         return status;
     }
 
-    return vigil_program_expect_interface_method_token(program, cursor, VIGIL_TOKEN_SEMICOLON, method_name_token->span,
-                                                       "expected ';' after interface method");
+    /* Accept ';' or '}' (implicit terminator) after interface method. */
+    {
+        const vigil_token_t *semi_token = vigil_program_cursor_peek(program, *cursor);
+        if (semi_token != NULL && semi_token->kind == VIGIL_TOKEN_SEMICOLON)
+            vigil_program_cursor_advance(program, cursor);
+        else if (semi_token != NULL && semi_token->kind == VIGIL_TOKEN_RBRACE)
+            (void)0; /* don't consume — the interface body loop handles it */
+        else
+            return vigil_compile_report(program, method_name_token->span,
+                                        "expected ';' after interface method");
+    }
+    return VIGIL_STATUS_OK;
 }
 
 vigil_status_t vigil_program_parse_interface_declaration(vigil_program_state_t *program, size_t *cursor, int is_public)
@@ -1565,9 +1571,11 @@ static vigil_status_t class_parse_field(vigil_program_state_t *program, size_t *
     vigil_program_cursor_advance(program, cursor);
 
     const vigil_token_t *semi = vigil_program_cursor_peek(program, *cursor);
-    if (semi == NULL || semi->kind != VIGIL_TOKEN_SEMICOLON)
+    if (semi != NULL && semi->kind == VIGIL_TOKEN_SEMICOLON)
+        vigil_program_cursor_advance(program, cursor);
+    else if (semi == NULL || (semi->kind != VIGIL_TOKEN_RBRACE && semi->kind != VIGIL_TOKEN_FN &&
+                              semi->kind != VIGIL_TOKEN_PUB && semi->kind != VIGIL_TOKEN_IDENTIFIER))
         return vigil_compile_report(program, field_name_token->span, "expected ';' after class field");
-    vigil_program_cursor_advance(program, cursor);
 
     status = vigil_class_decl_grow_fields(program, decl, decl->field_count + 1U);
     if (status != VIGIL_STATUS_OK)

@@ -37,8 +37,8 @@ class TestVigilDebug(unittest.TestCase):
         if source is None:
             source = (
                 "fn main() -> i32 {\n"
-                "    i32 value = 1;\n"
-                "    return value;\n"
+                "    i32 value = 1\n"
+                "    return value\n"
                 "}\n"
             )
 
@@ -67,13 +67,13 @@ class TestVigilDebug(unittest.TestCase):
     def test_debug_interactive_command_routing(self):
         source = (
             "fn helper(i32 x) -> i32 {\n"
-            "    i32 inner = x + 1;\n"
-            "    return inner;\n"
+            "    i32 inner = x + 1\n"
+            "    return inner\n"
             "}\n"
             "\n"
             "fn main() -> i32 {\n"
-            "    i32 value = helper(1);\n"
-            "    return value;\n"
+            "    i32 value = helper(1)\n"
+            "    return value\n"
             "}\n"
         )
         result = self._run_debug(
@@ -102,13 +102,13 @@ class TestVigilDebug(unittest.TestCase):
     def test_debug_interactive_invalid_commands(self):
         source = (
             "fn helper(i32 x) -> i32 {\n"
-            "    i32 inner = x + 1;\n"
-            "    return inner;\n"
+            "    i32 inner = x + 1\n"
+            "    return inner\n"
             "}\n"
             "\n"
             "fn main() -> i32 {\n"
-            "    i32 value = helper(1);\n"
-            "    return value;\n"
+            "    i32 value = helper(1)\n"
+            "    return value\n"
             "}\n"
         )
         result = self._run_debug("b missing\nb \np \nd 99\nq\n", source)
@@ -122,13 +122,13 @@ class TestVigilDebug(unittest.TestCase):
     def test_debug_interactive_resume_commands_finish_program(self):
         source = (
             "fn helper(i32 x) -> i32 {\n"
-            "    i32 inner = x + 1;\n"
-            "    return inner;\n"
+            "    i32 inner = x + 1\n"
+            "    return inner\n"
             "}\n"
             "\n"
             "fn main() -> i32 {\n"
-            "    i32 value = helper(1);\n"
-            "    return value;\n"
+            "    i32 value = helper(1)\n"
+            "    return value\n"
             "}\n"
         )
 

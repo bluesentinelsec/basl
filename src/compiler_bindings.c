@@ -143,7 +143,7 @@ vigil_status_t vigil_parser_parse_variable_declaration(vigil_parser_state_t *sta
         return status;
     }
 
-    status = vigil_parser_expect(state, VIGIL_TOKEN_SEMICOLON, "expected ';' after local declaration", NULL);
+    status = vigil_parser_expect_semi(state, "expected ';' after local declaration");
     if (status != VIGIL_STATUS_OK)
     {
         vigil_binding_target_list_free((vigil_program_state_t *)state->program, &targets);
@@ -216,7 +216,7 @@ vigil_status_t vigil_parser_parse_const_declaration(vigil_parser_state_t *state,
     {
         return status;
     }
-    status = vigil_parser_expect(state, VIGIL_TOKEN_SEMICOLON, "expected ';' after local constant declaration", NULL);
+    status = vigil_parser_expect_semi(state, "expected ';' after local constant declaration");
     if (status != VIGIL_STATUS_OK)
     {
         return status;

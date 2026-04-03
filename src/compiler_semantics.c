@@ -1090,13 +1090,8 @@ vigil_status_t vigil_program_parse_import(vigil_program_state_t *program, size_t
         goto cleanup;
 
     token = vigil_program_token_at(program, *cursor);
-    if (token == NULL || token->kind != VIGIL_TOKEN_SEMICOLON)
-    {
-        status = vigil_compile_report(program, token == NULL ? vigil_program_eof_span(program) : token->span,
-                                      "expected ';' after import");
-        goto cleanup;
-    }
-    *cursor += 1U;
+    if (token != NULL && token->kind == VIGIL_TOKEN_SEMICOLON)
+        *cursor += 1U;
 
     status =
         resolve_import_source(program, native_found, import_target_token, token, &import_path, &imported_source_id);

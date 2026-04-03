@@ -21,7 +21,7 @@ def run_profile(script_content):
 
 class ProfileOutputTest(unittest.TestCase):
     def test_profile_shows_timing(self):
-        rc, out, _ = run_profile("fn main() -> i32 { return 0; }")
+        rc, out, _ = run_profile("fn main() -> i32 { return 0 }")
         self.assertEqual(rc, 0)
         self.assertIn("Timing", out)
         self.assertIn("Total:", out)
@@ -29,7 +29,7 @@ class ProfileOutputTest(unittest.TestCase):
         self.assertIn("Execute:", out)
 
     def test_profile_shows_memory(self):
-        rc, out, _ = run_profile("fn main() -> i32 { return 0; }")
+        rc, out, _ = run_profile("fn main() -> i32 { return 0 }")
         self.assertEqual(rc, 0)
         self.assertIn("Memory", out)
         self.assertIn("Peak RSS:", out)

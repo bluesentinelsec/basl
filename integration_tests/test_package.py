@@ -27,11 +27,11 @@ class TestVigilArgs(unittest.TestCase):
         """args.count() and args.at() return script arguments."""
         script = Path(self.tmpdir) / "test.vigil"
         script.write_text(
-            'import "args";\n'
-            'import "fmt";\n'
+            'import "args"\n'
+            'import "fmt"\n'
             'fn main() -> i32 {\n'
-            '    fmt.println(f"{args.count()}");\n'
-            '    return args.count();\n'
+            '    fmt.println(f"{args.count()}")\n'
+            '    return args.count()\n'
             '}\n'
         )
         result = subprocess.run(
@@ -45,9 +45,9 @@ class TestVigilArgs(unittest.TestCase):
         """args.count() returns 0 when no script args."""
         script = Path(self.tmpdir) / "test.vigil"
         script.write_text(
-            'import "args";\n'
+            'import "args"\n'
             'fn main() -> i32 {\n'
-            '    return args.count();\n'
+            '    return args.count()\n'
             '}\n'
         )
         result = subprocess.run(
@@ -71,10 +71,10 @@ class TestVigilPackage(unittest.TestCase):
         """Package a script and run the standalone binary."""
         script = Path(self.tmpdir) / "hello.vigil"
         script.write_text(
-            'import "fmt";\n'
+            'import "fmt"\n'
             'fn main() -> i32 {\n'
-            '    fmt.println("packaged!");\n'
-            '    return 42;\n'
+            '    fmt.println("packaged!")\n'
+            '    return 42\n'
             '}\n'
         )
         out_bin = Path(self.tmpdir) / "hello_app"
@@ -98,9 +98,9 @@ class TestVigilPackage(unittest.TestCase):
         """Packaged binary passes CLI args to script."""
         script = Path(self.tmpdir) / "argtest.vigil"
         script.write_text(
-            'import "args";\n'
+            'import "args"\n'
             'fn main() -> i32 {\n'
-            '    return args.count();\n'
+            '    return args.count()\n'
             '}\n'
         )
         out_bin = Path(self.tmpdir) / "argtest_app"
@@ -117,7 +117,7 @@ class TestVigilPackage(unittest.TestCase):
     def test_package_inspect(self):
         """vigil package --inspect shows bundled files."""
         script = Path(self.tmpdir) / "inspect.vigil"
-        script.write_text('fn main() -> i32 { return 0; }\n')
+        script.write_text('fn main() -> i32 { return 0 }\n')
         out_bin = Path(self.tmpdir) / "inspect_app"
         subprocess.run(
             [*resolve_vigil_command(), "package", str(script), "-o", str(out_bin)],
@@ -144,7 +144,7 @@ class TestVigilPackage(unittest.TestCase):
             self.skipTest("Packaged binary execution unreliable on Windows CI")
         """vigil package without -o should derive output name from the script path."""
         script = Path(self.tmpdir) / "default_name.vigil"
-        script.write_text('fn main() -> i32 { return 0; }\n')
+        script.write_text('fn main() -> i32 { return 0 }\n')
         result = subprocess.run(
             [*resolve_vigil_command(), "package", str(script)],
             capture_output=True, text=True, timeout=10, cwd=self.tmpdir
@@ -158,11 +158,11 @@ class TestVigilPackage(unittest.TestCase):
         helper = Path(self.tmpdir) / "helper.vigil"
         out_bin = Path(self.tmpdir) / "with_imports"
 
-        helper.write_text('pub fn value() -> i32 { return 7; }\n')
+        helper.write_text('pub fn value() -> i32 { return 7 }\n')
         script.write_text(
-            'import "helper";\n'
+            'import "helper"\n'
             'fn main() -> i32 {\n'
-            '    return helper.value();\n'
+            '    return helper.value()\n'
             '}\n'
         )
 
@@ -185,10 +185,10 @@ class TestVigilPackage(unittest.TestCase):
         """Encrypted package runs correctly."""
         script = Path(self.tmpdir) / "secret.vigil"
         script.write_text(
-            'import "fmt";\n'
+            'import "fmt"\n'
             'fn main() -> i32 {\n'
-            '    fmt.println("secret!");\n'
-            '    return 7;\n'
+            '    fmt.println("secret!")\n'
+            '    return 7\n'
             '}\n'
         )
         out_bin = Path(self.tmpdir) / "secret_app"
