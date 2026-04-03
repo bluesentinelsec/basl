@@ -663,6 +663,11 @@ static vigil_status_t vigil_program_parse_enum_member_separator(vigil_program_st
         vigil_program_cursor_advance(program, cursor);
         return VIGIL_STATUS_OK;
     }
+    if (token->kind == VIGIL_TOKEN_SEMICOLON)
+    {
+        vigil_program_cursor_advance(program, cursor);
+        return VIGIL_STATUS_OK;
+    }
     if (token->kind == VIGIL_TOKEN_RBRACE)
     {
         return VIGIL_STATUS_OK;
@@ -825,6 +830,11 @@ vigil_status_t vigil_program_parse_enum_declaration(vigil_program_state_t *progr
         {
             vigil_program_cursor_advance(program, cursor);
             break;
+        }
+        if (token->kind == VIGIL_TOKEN_SEMICOLON)
+        {
+            vigil_program_cursor_advance(program, cursor);
+            continue;
         }
         status = vigil_program_parse_enum_member(program, cursor, decl, &value_result, &next_value);
         if (status != VIGIL_STATUS_OK)
@@ -1137,6 +1147,11 @@ vigil_status_t vigil_program_parse_interface_declaration(vigil_program_state_t *
         {
             vigil_program_cursor_advance(program, cursor);
             break;
+        }
+        if (token->kind == VIGIL_TOKEN_SEMICOLON)
+        {
+            vigil_program_cursor_advance(program, cursor);
+            continue;
         }
         status = vigil_program_parse_interface_method(program, cursor, decl);
         if (status != VIGIL_STATUS_OK)
@@ -1630,6 +1645,12 @@ vigil_status_t vigil_program_parse_class_declaration(vigil_program_state_t *prog
         {
             vigil_program_cursor_advance(program, cursor);
             break;
+        }
+        /* Skip stray semicolons from automatic semicolon insertion. */
+        if (type_token->kind == VIGIL_TOKEN_SEMICOLON)
+        {
+            vigil_program_cursor_advance(program, cursor);
+            continue;
         }
 
         int member_is_public = vigil_program_parse_optional_pub(program, cursor);
