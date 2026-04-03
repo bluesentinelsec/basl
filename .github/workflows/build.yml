@@ -173,6 +173,7 @@ jobs:
           cmake -S . -B build
           -DVIGIL_BUILD_TESTS=OFF
           -DVIGIL_PLUGIN_SDL=ON
+          -DVIGIL_PLUGIN_TILED=ON
           -DVIGIL_STDLIB_FFI=ON
           -DVIGIL_STDLIB_FS=ON
           -DVIGIL_STDLIB_HTTP=ON

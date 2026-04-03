@@ -7,10 +7,10 @@ COMPLEXITY_BUILD_DIR ?= build-complexity
 all: build
 
 configure-dev:
-	cmake -S . -B $(BUILD_DIR) -DCMAKE_BUILD_TYPE=Debug -DVIGIL_BUILD_TESTS=ON
+	cmake -S . -B $(BUILD_DIR) -DCMAKE_BUILD_TYPE=Debug -DVIGIL_BUILD_TESTS=ON -DVIGIL_PLUGIN_TILED=ON
 
 configure-release:
-	cmake -S . -B $(BUILD_DIR) -DCMAKE_BUILD_TYPE=Release -DVIGIL_BUILD_TESTS=ON
+	cmake -S . -B $(BUILD_DIR) -DCMAKE_BUILD_TYPE=Release -DVIGIL_BUILD_TESTS=ON -DVIGIL_PLUGIN_TILED=ON
 
 build: configure-dev
 	cmake --build $(BUILD_DIR)
