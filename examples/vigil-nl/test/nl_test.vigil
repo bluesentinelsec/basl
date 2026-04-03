@@ -1,15 +1,16 @@
 // Note: Tests use sh and pipes, which require Unix-like shell.
 // Windows users should run tests in WSL, Git Bash, or similar environment.
 
-import "os";
-import "test";
+import "os"
+import "test"
 
 fn test_nl_basic(test.T t) -> void {
-    string out, string errs, i32 exitCode, err e = os.exec("sh", "-c", "printf 'hello\\nworld\\n' | ./vigil examples/vigil-nl/main.vigil");
-    t.assert(string(e) == "ok", "nl should exit 0");
-    t.assert(out == "     1\thello\n     2\tworld\n", "should number lines with formatting");
+    string out, string errs, i32 exitCode, err e = os.exec("sh", "-c", "printf 'hello\\nworld\\n' | ./vigil examples/vigil-nl/main.vigil")
+    t.assert(string(e) == "ok", "nl should exit 0")
+    t.assert(out == "     1\thello\n     2\tworld\n", "should number lines with formatting")
 }
 
+
 fn main() -> i32 {
-    return 0;
+    return 0
 }

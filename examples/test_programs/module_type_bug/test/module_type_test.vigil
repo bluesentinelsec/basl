@@ -1,23 +1,25 @@
-import "mymodule";
-import "test";
+import "mymodule"
+import "test"
 
 fn test_module_class_type_annotation(test.T t) -> void {
     // This should work: module-qualified type annotation
-    mymodule.MyClass obj = mymodule.MyClass();
-    t.assert(obj.value == "hello", "Object should be initialized");
+    mymodule.MyClass obj = mymodule.MyClass()
+    t.assert(obj.value == "hello", "Object should be initialized")
 }
+
 
 fn test_module_class_field_access(test.T t) -> void {
-    mymodule.MyClass obj = mymodule.MyClass();
-    obj.value = "world";
-    t.assert(obj.value == "world", "Field should be mutable");
+    mymodule.MyClass obj = mymodule.MyClass()
+    obj.value = "world"
+    t.assert(obj.value == "world", "Field should be mutable")
 }
 
+
 fn test_module_class_multiple_instances(test.T t) -> void {
-    mymodule.MyClass obj1 = mymodule.MyClass();
-    mymodule.MyClass obj2 = mymodule.MyClass();
-    obj1.value = "first";
-    obj2.value = "second";
-    t.assert(obj1.value == "first", "First instance should be independent");
-    t.assert(obj2.value == "second", "Second instance should be independent");
+    mymodule.MyClass obj1 = mymodule.MyClass()
+    mymodule.MyClass obj2 = mymodule.MyClass()
+    obj1.value = "first"
+    obj2.value = "second"
+    t.assert(obj1.value == "first", "First instance should be independent")
+    t.assert(obj2.value == "second", "Second instance should be independent")
 }

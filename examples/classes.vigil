@@ -1,67 +1,71 @@
-import "fmt";
-import "math";
+import "fmt"
+import "math"
 
 class Person {
-    pub string name;
-    pub i32 age;
+    pub string name
+    pub i32 age
     fn init(string name, i32 age) -> void {
-        self.name = name;
-        self.age = age;
+        self.name = name
+        self.age = age
     }
 
     pub fn greet() -> void {
-        fmt.println(f"Hello, I'm {self.name} and I'm {self.age} years old");
+        fmt.println(f"Hello, I'm {self.name} and I'm {self.age} years old")
     }
 
     pub fn birthday() -> void {
-        self.age++;
-        fmt.println(f"Happy birthday! {self.name} is now {self.age}");
+        self.age++
+        fmt.println(f"Happy birthday! {self.name} is now {self.age}")
     }
+
 }
 
+
 class Rectangle {
-    pub f64 width;
-    pub f64 height;
+    pub f64 width
+    pub f64 height
     fn init(f64 width, f64 height) -> void {
-        self.width = width;
-        self.height = height;
+        self.width = width
+        self.height = height
     }
 
     pub fn area() -> f64 {
-        return self.width * self.height;
+        return self.width * self.height
     }
 
     pub fn perimeter() -> f64 {
-        return 2.0 * (self.width + self.height);
+        return 2.0 * (self.width + self.height)
     }
 
     pub fn scale(f64 factor) -> void {
-        self.width = self.width * factor;
-        self.height = self.height * factor;
+        self.width = self.width * factor
+        self.height = self.height * factor
     }
+
 }
+
 
 fn main() -> i32 {
     // Create a Person instance
-    Person alice = Person("Alice", 30);
-    alice.greet();
-    alice.birthday();
-    fmt.println("");
+    Person alice = Person("Alice", 30)
+    alice.greet()
+    alice.birthday()
+    fmt.println("")
     // Create another Person
-    Person bob = Person("Bob", 25);
-    bob.greet();
-    fmt.println("");
+    Person bob = Person("Bob", 25)
+    bob.greet()
+    fmt.println("")
     // Create a Rectangle
-    Rectangle rect = Rectangle(10.0, 5.0);
-    f64 area = rect.area();
-    f64 perim = rect.perimeter();
-    fmt.println(f"Rectangle: {rect.width} x {rect.height}");
-    fmt.println(f"Area: {area}");
-    fmt.println(f"Perimeter: {perim}");
+    Rectangle rect = Rectangle(10.0, 5.0)
+    f64 area = rect.area()
+    f64 perim = rect.perimeter()
+    fmt.println(f"Rectangle: {rect.width} x {rect.height}")
+    fmt.println(f"Area: {area}")
+    fmt.println(f"Perimeter: {perim}")
     // Scale the rectangle
-    rect.scale(2.0);
-    fmt.println(f"\nAfter scaling by 2:");
-    fmt.println(f"Rectangle: {rect.width} x {rect.height}");
-    fmt.println(f"Area: {rect.area()}");
-    return 0;
+    rect.scale(2.0)
+    fmt.println(f"\nAfter scaling by 2:")
+    fmt.println(f"Rectangle: {rect.width} x {rect.height}")
+    fmt.println(f"Area: {rect.area()}")
+    return 0
 }

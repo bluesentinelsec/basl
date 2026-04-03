@@ -3,335 +3,352 @@
 // Safety & Edge Case Tests
 // ══════════════════════════════════════════════════════════════════════
 
-import "ffi";
-import "ffi_bindings";
-import "fmt";
-import "time";
-import "unsafe";
+import "ffi"
+import "ffi_bindings"
+import "fmt"
+import "time"
+import "unsafe"
 
 fn test_null_ptr_read() -> bool {
-    fmt.println("  [1] Read from null pointer via unsafe.str...");
-    string s = unsafe.str(unsafe.null());
+    fmt.println("  [1] Read from null pointer via unsafe.str...")
+    string s = unsafe.str(unsafe.null())
     if s == "" {
-        fmt.println("    PASS: null ptr returns empty string");
-        return true;
+        fmt.println("    PASS: null ptr returns empty string")
+        return true
     }
 
-    fmt.println("    FAIL");
-    return false;
+    fmt.println("    FAIL")
+    return false
 }
 
+
 fn test_buffer_bounds() -> bool {
-    fmt.println("  [2] Buffer bounds checking...");
-    i64 buf = unsafe.alloc(8);
-    unsafe.set(buf, 0, 42);
-    i32 v = unsafe.get(buf, 0);
-    unsafe.free(buf);
+    fmt.println("  [2] Buffer bounds checking...")
+    i64 buf = unsafe.alloc(8)
+    unsafe.set(buf, 0, 42)
+    i32 v = unsafe.get(buf, 0)
+    unsafe.free(buf)
     if v == 42 {
         // NOTE: Out-of-bounds access causes a runtime error (not silent).
         // This is GOOD — the unsafe module enforces bounds on managed buffers.
         // We can't test OOB without try/catch (would terminate the program).
-        fmt.println("    PASS: in-bounds=42, OOB would error (good!)");
-        return true;
+        fmt.println("    PASS: in-bounds=42, OOB would error (good!)")
+        return true
     }
 
-    fmt.println(f"    FAIL: v={v}");
-    return false;
+    fmt.println(f"    FAIL: v={v}")
+    return false
 }
+
 
 fn test_double_free() -> bool {
-    fmt.println("  [3] Double free of managed buffer...");
-    i64 buf = unsafe.alloc(16);
-    unsafe.free(buf);
-    unsafe.free(buf);
-    fmt.println("    PASS: double free did not crash");
-    return true;
+    fmt.println("  [3] Double free of managed buffer...")
+    i64 buf = unsafe.alloc(16)
+    unsafe.free(buf)
+    unsafe.free(buf)
+    fmt.println("    PASS: double free did not crash")
+    return true
 }
 
+
 fn test_use_after_free() -> bool {
-    fmt.println("  [4] Use after free...");
-    i64 buf = unsafe.alloc(16);
-    unsafe.set(buf, 0, 99);
-    unsafe.free(buf);
+    fmt.println("  [4] Use after free...")
+    i64 buf = unsafe.alloc(16)
+    unsafe.set(buf, 0, 99)
+    unsafe.free(buf)
     // NOTE: Reading from a freed buffer causes a runtime error.
     // This is GOOD — the unsafe module invalidates the slot on free.
     // We can't test this without try/catch.
-    fmt.println("    PASS: use-after-free would error (good!)");
-    return true;
+    fmt.println("    PASS: use-after-free would error (good!)")
+    return true
 }
+
 
 fn test_errno() -> bool {
-    fmt.println("  [5] C errno access...");
-    i32 e = unsafe.errno();
-    string msg = ffi_bindings.c_strerror(e);
-    fmt.println(f"    PASS: errno={e}, strerror=\"{msg}\"");
-    return true;
+    fmt.println("  [5] C errno access...")
+    i32 e = unsafe.errno()
+    string msg = ffi_bindings.c_strerror(e)
+    fmt.println(f"    PASS: errno={e}, strerror=\"{msg}\"")
+    return true
 }
+
 
 fn test_sizeof() -> bool {
-    fmt.println("  [6] sizeof introspection...");
-    i32 i32_sz = unsafe.sizeof("i32");
-    i32 i64_sz = unsafe.sizeof("i64");
-    i32 f64_sz = unsafe.sizeof("f64");
-    i32 ptr_sz = unsafe.sizeof_ptr();
-    fmt.println(f"    i32={i32_sz} i64={i64_sz} f64={f64_sz} ptr={ptr_sz}");
+    fmt.println("  [6] sizeof introspection...")
+    i32 i32_sz = unsafe.sizeof("i32")
+    i32 i64_sz = unsafe.sizeof("i64")
+    i32 f64_sz = unsafe.sizeof("f64")
+    i32 ptr_sz = unsafe.sizeof_ptr()
+    fmt.println(f"    i32={i32_sz} i64={i64_sz} f64={f64_sz} ptr={ptr_sz}")
     if i32_sz == 4 && i64_sz == 8 && f64_sz == 8 && ptr_sz > 0 {
-        fmt.println("    PASS");
-        return true;
+        fmt.println("    PASS")
+        return true
     }
 
-    fmt.println("    FAIL");
-    return false;
+    fmt.println("    FAIL")
+    return false
 }
+
 
 fn test_callback_slot() -> bool {
-    fmt.println("  [7] Callback slot alloc/free...");
-    i64 slot = unsafe.cb_alloc();
+    fmt.println("  [7] Callback slot alloc/free...")
+    i64 slot = unsafe.cb_alloc()
     if slot == i64(0) {
-        fmt.println("    FAIL: cb_alloc returned null");
-        return false;
+        fmt.println("    FAIL: cb_alloc returned null")
+        return false
     }
 
-    unsafe.cb_free(i32(0));
-    fmt.println("    PASS");
-    return true;
+    unsafe.cb_free(i32(0))
+    fmt.println("    PASS")
+    return true
 }
+
 
 fn test_large_buffer() -> bool {
-    fmt.println("  [8] Large buffer (1MB)...");
-    i64 buf = unsafe.alloc(1048576);
-    unsafe.set(buf, 0, 170);
-    unsafe.set(buf, 1048575, 187);
-    i32 first = unsafe.get(buf, 0);
-    i32 last = unsafe.get(buf, 1048575);
-    unsafe.free(buf);
+    fmt.println("  [8] Large buffer (1MB)...")
+    i64 buf = unsafe.alloc(1048576)
+    unsafe.set(buf, 0, 170)
+    unsafe.set(buf, 1048575, 187)
+    i32 first = unsafe.get(buf, 0)
+    i32 last = unsafe.get(buf, 1048575)
+    unsafe.free(buf)
     if first == 170 && last == 187 {
-        fmt.println("    PASS");
-        return true;
+        fmt.println("    PASS")
+        return true
     }
 
-    fmt.println(f"    FAIL: {first}, {last}");
-    return false;
+    fmt.println(f"    FAIL: {first}, {last}")
+    return false
 }
+
 
 fn test_peek_poke() -> bool {
-    fmt.println("  [9] Peek/poke all types...");
-    i64 buf = unsafe.alloc(64);
-    i64 ptr = unsafe.ptr(buf);
-    unsafe.poke_u8(ptr, 0, 255);
-    i32 u8v = unsafe.peek_u8(ptr, 0);
-    unsafe.poke_i32(ptr, 4, - 12345);
-    i32 i32v = unsafe.peek_i32(ptr, 4);
-    unsafe.poke_i64(ptr, 8, i64(9876543210));
-    i64 i64v = unsafe.peek_i64(ptr, 8);
-    unsafe.poke_f64(ptr, 16, 3.14159);
-    f64 f64v = unsafe.peek_f64(ptr, 16);
-    unsafe.poke_ptr(ptr, 24, ptr);
-    i64 ptrv = unsafe.peek_ptr(ptr, 24);
-    unsafe.free(buf);
-    bool ok = u8v == 255 && i32v == - 12345 && i64v == i64(9876543210) && ptrv == ptr;
-    f64 diff = f64v - 3.14159;
+    fmt.println("  [9] Peek/poke all types...")
+    i64 buf = unsafe.alloc(64)
+    i64 ptr = unsafe.ptr(buf)
+    unsafe.poke_u8(ptr, 0, 255)
+    i32 u8v = unsafe.peek_u8(ptr, 0)
+    unsafe.poke_i32(ptr, 4, - 12345)
+    i32 i32v = unsafe.peek_i32(ptr, 4)
+    unsafe.poke_i64(ptr, 8, i64(9876543210))
+    i64 i64v = unsafe.peek_i64(ptr, 8)
+    unsafe.poke_f64(ptr, 16, 3.14159)
+    f64 f64v = unsafe.peek_f64(ptr, 16)
+    unsafe.poke_ptr(ptr, 24, ptr)
+    i64 ptrv = unsafe.peek_ptr(ptr, 24)
+    unsafe.free(buf)
+    bool ok = u8v == 255 && i32v == - 12345 && i64v == i64(9876543210) && ptrv == ptr
+    f64 diff = f64v - 3.14159
     if diff < 0.0 {
-        diff = 0.0 - diff;
+        diff = 0.0 - diff
     }
 
-    ok = ok && diff < 0.0001;
+    ok = ok && diff < 0.0001
     if ok {
-        fmt.println("    PASS");
-        return true;
+        fmt.println("    PASS")
+        return true
     }
 
-    fmt.println("    FAIL");
-    return false;
+    fmt.println("    FAIL")
+    return false
 }
+
 
 fn test_c_malloc_free() -> bool {
-    fmt.println("  [10] C malloc/free via FFI...");
-    i64 ptr = ffi_bindings.c_malloc(i64(256));
+    fmt.println("  [10] C malloc/free via FFI...")
+    i64 ptr = ffi_bindings.c_malloc(i64(256))
     if ptr == i64(0) {
-        fmt.println("    FAIL: malloc returned null");
-        return false;
-    }
-    // Write and read via peek/poke on the raw C pointer
-    unsafe.poke_i32(ptr, 0, 42);
-    i32 v = unsafe.peek_i32(ptr, 0);
-    ffi_bindings.c_free(ptr);
-    if v == 42 {
-        fmt.println("    PASS");
-        return true;
+        fmt.println("    FAIL: malloc returned null")
+        return false
     }
 
-    fmt.println(f"    FAIL: v={v}");
-    return false;
+    // Write and read via peek/poke on the raw C pointer
+    unsafe.poke_i32(ptr, 0, 42)
+    i32 v = unsafe.peek_i32(ptr, 0)
+    ffi_bindings.c_free(ptr)
+    if v == 42 {
+        fmt.println("    PASS")
+        return true
+    }
+
+    fmt.println(f"    FAIL: v={v}")
+    return false
 }
 
+
 pub fn run_safety_tests() -> i32 {
-    fmt.println("════════════════════════════════════════");
-    fmt.println("FFI Safety & Edge Case Tests");
-    fmt.println("════════════════════════════════════════");
-    i32 passed = 0;
-    i32 total = 10;
+    fmt.println("════════════════════════════════════════")
+    fmt.println("FFI Safety & Edge Case Tests")
+    fmt.println("════════════════════════════════════════")
+    i32 passed = 0
+    i32 total = 10
     if test_null_ptr_read() {
-        passed = passed + 1;
+        passed = passed + 1
     }
 
     if test_buffer_bounds() {
-        passed = passed + 1;
+        passed = passed + 1
     }
 
     if test_double_free() {
-        passed = passed + 1;
+        passed = passed + 1
     }
 
     if test_use_after_free() {
-        passed = passed + 1;
+        passed = passed + 1
     }
 
     if test_errno() {
-        passed = passed + 1;
+        passed = passed + 1
     }
 
     if test_sizeof() {
-        passed = passed + 1;
+        passed = passed + 1
     }
 
     if test_callback_slot() {
-        passed = passed + 1;
+        passed = passed + 1
     }
 
     if test_large_buffer() {
-        passed = passed + 1;
+        passed = passed + 1
     }
 
     if test_peek_poke() {
-        passed = passed + 1;
+        passed = passed + 1
     }
 
     if test_c_malloc_free() {
-        passed = passed + 1;
+        passed = passed + 1
     }
 
-    fmt.println("════════════════════════════════════════");
-    fmt.println(f"Safety tests: {passed}/{total} passed");
-    return total - passed;
+    fmt.println("════════════════════════════════════════")
+    fmt.println(f"Safety tests: {passed}/{total} passed")
+    return total - passed
 }
+
 // ══════════════════════════════════════════════════════════════════════
 // Performance Benchmarks
 // ══════════════════════════════════════════════════════════════════════
 fn bench_ffi_sin(i32 n) -> void {
-    fmt.println(f"  FFI sin() x {n}...");
-    i64 start = time.now_ms();
-    f64 acc = 0.0;
-    i32 i = 0;
+    fmt.println(f"  FFI sin() x {n}...")
+    i64 start = time.now_ms()
+    f64 acc = 0.0
+    i32 i = 0
     while i < n {
-        acc = acc + ffi_bindings.ffi_sin(f64(i) * 0.001);
-        i = i + 1;
+        acc = acc + ffi_bindings.ffi_sin(f64(i) * 0.001)
+        i = i + 1
     }
 
-    i64 elapsed = time.now_ms() - start;
-    f64 ops = 0.0;
+    i64 elapsed = time.now_ms() - start
+    f64 ops = 0.0
     if elapsed > i64(0) {
-        ops = f64(n) / (f64(elapsed) / 1000.0);
+        ops = f64(n) / (f64(elapsed) / 1000.0)
     }
 
-    fmt.println(f"    {elapsed}ms, {ops} ops/sec");
+    fmt.println(f"    {elapsed}ms, {ops} ops/sec")
 }
+
 
 fn bench_buf_alloc(i32 n) -> void {
-    fmt.println(f"  Buffer alloc/free x {n}...");
-    i64 start = time.now_ms();
-    i32 i = 0;
+    fmt.println(f"  Buffer alloc/free x {n}...")
+    i64 start = time.now_ms()
+    i32 i = 0
     while i < n {
-        i64 buf = unsafe.alloc(256);
-        unsafe.set(buf, 0, 42);
-        unsafe.free(buf);
-        i = i + 1;
+        i64 buf = unsafe.alloc(256)
+        unsafe.set(buf, 0, 42)
+        unsafe.free(buf)
+        i = i + 1
     }
 
-    i64 elapsed = time.now_ms() - start;
-    f64 ops = 0.0;
+    i64 elapsed = time.now_ms() - start
+    f64 ops = 0.0
     if elapsed > i64(0) {
-        ops = f64(n) / (f64(elapsed) / 1000.0);
+        ops = f64(n) / (f64(elapsed) / 1000.0)
     }
 
-    fmt.println(f"    {elapsed}ms, {ops} ops/sec");
+    fmt.println(f"    {elapsed}ms, {ops} ops/sec")
 }
+
 
 fn bench_string_roundtrip(i32 n) -> void {
-    fmt.println(f"  String C roundtrip x {n}...");
-    i64 start = time.now_ms();
-    i32 i = 0;
+    fmt.println(f"  String C roundtrip x {n}...")
+    i64 start = time.now_ms()
+    i32 i = 0
     while i < n {
-        i64 buf = unsafe.alloc(64);
-        unsafe.write_str(buf, 0, "hello world");
-        i64 ptr = unsafe.ptr(buf);
-        string s = unsafe.str(ptr);
-        unsafe.free(buf);
-        i = i + 1;
+        i64 buf = unsafe.alloc(64)
+        unsafe.write_str(buf, 0, "hello world")
+        i64 ptr = unsafe.ptr(buf)
+        string s = unsafe.str(ptr)
+        unsafe.free(buf)
+        i = i + 1
     }
 
-    i64 elapsed = time.now_ms() - start;
-    f64 ops = 0.0;
+    i64 elapsed = time.now_ms() - start
+    f64 ops = 0.0
     if elapsed > i64(0) {
-        ops = f64(n) / (f64(elapsed) / 1000.0);
+        ops = f64(n) / (f64(elapsed) / 1000.0)
     }
 
-    fmt.println(f"    {elapsed}ms, {ops} ops/sec");
+    fmt.println(f"    {elapsed}ms, {ops} ops/sec")
 }
+
 
 fn bench_peek_poke(i32 n) -> void {
-    fmt.println(f"  Peek/poke i32 x {n}...");
-    i64 buf = unsafe.alloc(1024);
-    i64 ptr = unsafe.ptr(buf);
-    i64 start = time.now_ms();
-    i32 i = 0;
+    fmt.println(f"  Peek/poke i32 x {n}...")
+    i64 buf = unsafe.alloc(1024)
+    i64 ptr = unsafe.ptr(buf)
+    i64 start = time.now_ms()
+    i32 i = 0
     while i < n {
-        unsafe.poke_i32(ptr, 0, i);
-        i32 v = unsafe.peek_i32(ptr, 0);
-        i = i + 1;
+        unsafe.poke_i32(ptr, 0, i)
+        i32 v = unsafe.peek_i32(ptr, 0)
+        i = i + 1
     }
 
-    i64 elapsed = time.now_ms() - start;
-    unsafe.free(buf);
-    f64 ops = 0.0;
+    i64 elapsed = time.now_ms() - start
+    unsafe.free(buf)
+    f64 ops = 0.0
     if elapsed > i64(0) {
-        ops = f64(n) / (f64(elapsed) / 1000.0);
+        ops = f64(n) / (f64(elapsed) / 1000.0)
     }
 
-    fmt.println(f"    {elapsed}ms, {ops} ops/sec");
+    fmt.println(f"    {elapsed}ms, {ops} ops/sec")
 }
+
 
 fn bench_c_malloc(i32 n) -> void {
-    fmt.println(f"  C malloc/free x {n}...");
-    i64 start = time.now_ms();
-    i32 i = 0;
+    fmt.println(f"  C malloc/free x {n}...")
+    i64 start = time.now_ms()
+    i32 i = 0
     while i < n {
-        i64 ptr = ffi_bindings.c_malloc(i64(256));
+        i64 ptr = ffi_bindings.c_malloc(i64(256))
         if ptr != i64(0) {
-            ffi_bindings.c_free(ptr);
+            ffi_bindings.c_free(ptr)
         }
 
-        i = i + 1;
+        i = i + 1
     }
 
-    i64 elapsed = time.now_ms() - start;
-    f64 ops = 0.0;
+    i64 elapsed = time.now_ms() - start
+    f64 ops = 0.0
     if elapsed > i64(0) {
-        ops = f64(n) / (f64(elapsed) / 1000.0);
+        ops = f64(n) / (f64(elapsed) / 1000.0)
     }
 
-    fmt.println(f"    {elapsed}ms, {ops} ops/sec");
+    fmt.println(f"    {elapsed}ms, {ops} ops/sec")
 }
 
+
 pub fn run_benchmarks() -> void {
-    fmt.println("════════════════════════════════════════");
-    fmt.println("FFI Performance Benchmarks");
-    fmt.println("════════════════════════════════════════");
-    i32 n = 100000;
-    bench_ffi_sin(n);
-    bench_buf_alloc(n);
-    bench_string_roundtrip(n);
-    bench_peek_poke(n);
-    bench_c_malloc(n);
-    fmt.println("════════════════════════════════════════");
+    fmt.println("════════════════════════════════════════")
+    fmt.println("FFI Performance Benchmarks")
+    fmt.println("════════════════════════════════════════")
+    i32 n = 100000
+    bench_ffi_sin(n)
+    bench_buf_alloc(n)
+    bench_string_roundtrip(n)
+    bench_peek_poke(n)
+    bench_c_malloc(n)
+    fmt.println("════════════════════════════════════════")
 }

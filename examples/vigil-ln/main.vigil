@@ -1,37 +1,38 @@
-import "args";
-import "fmt";
-import "fs";
+import "args"
+import "fmt"
+import "fs"
 
 fn main() -> i32 {
-    args.Parser parser = args.Parser.new("vigil-ln", "create links between files");
-    parser.flag("symbolic", "s", "make symbolic links instead of hard links");
-    parser.positional("target", "link target");
-    parser.positional("link", "link name");
-    err e = parser.parse(0);
+    args.Parser parser = args.Parser.new("vigil-ln", "create links between files")
+    parser.flag("symbolic", "s", "make symbolic links instead of hard links")
+    parser.positional("target", "link target")
+    parser.positional("link", "link name")
+    err e = parser.parse(0)
     if e != ok {
-        fmt.eprintln(f"vigil-ln: {e.message()}");
-        return 1;
+        fmt.eprintln(f"vigil-ln: {e.message()}")
+        return 1
     }
 
-    array<string> positionals = parser.get_positionals();
+    array<string> positionals = parser.get_positionals()
     if positionals.len() < 2 {
-        fmt.eprintln("vigil-ln: missing file operand");
-        return 1;
+        fmt.eprintln("vigil-ln: missing file operand")
+        return 1
     }
 
-    string target = positionals[0];
-    string link = positionals[1];
-    bool symbolic = parser.get_bool("symbolic");
+    string target = positionals[0]
+    string link = positionals[1]
+    bool symbolic = parser.get_bool("symbolic")
     if symbolic {
-        bool ok2 = fs.symlink(target, link);
+        bool ok2 = fs.symlink(target, link)
         if ! ok2 {
-            fmt.eprintln(f"vigil-ln: failed to create symlink {link} -> {target}");
-            return 1;
+            fmt.eprintln(f"vigil-ln: failed to create symlink {link} -> {target}")
+            return 1
         }
+
     } else {
-        fmt.eprintln("vigil-ln: hard links are not supported; use -s for symbolic links");
-        return 1;
+        fmt.eprintln("vigil-ln: hard links are not supported; use -s for symbolic links")
+        return 1
     }
 
-    return 0;
+    return 0
 }

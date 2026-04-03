@@ -6,685 +6,718 @@
 // ============================================================================
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
-import "fmt";
-import "math";
-import "parse";
+import "fmt"
+import "math"
+import "parse"
 
-i32 pass_count = 0;
-i32 fail_count = 0;
+i32 pass_count = 0
+i32 fail_count = 0
 
 fn check(bool cond, string label) -> void {
     if cond {
-        pass_count++;
+        pass_count++
     } else {
-        fail_count++;
-        fmt.println(f"  FAIL: {label}");
+        fail_count++
+        fmt.println(f"  FAIL: {label}")
     }
+
 }
+
 // ── 1. Required main() signature (tested by the fact this file runs) ────────
 // Doc: "Every runnable program must define a main function. It returns i32."
 // ── 2. Primitive types and literal syntax ───────────────────────────────────
 // Doc: bool, i32, i64, u8, u32, u64, f64, string, err, void
 fn test_primitive_types() -> void {
-    fmt.println("=== Primitive Types & Literals ===");
+    fmt.println("=== Primitive Types & Literals ===")
     // 2a. bool
-    bool t = true;
-    bool f = false;
-    check(t &&! f, "bool true/false");
+    bool t = true
+    bool f = false
+    check(t &&! f, "bool true/false")
     // 2b. i32 decimal
-    i32 dec = 255;
-    check(dec == 255, "i32 decimal");
+    i32 dec = 255
+    check(dec == 255, "i32 decimal")
     // 2c. i32 hex
-    i32 hex = 0xFF;
-    check(hex == 255, "i32 hex 0xFF");
+    i32 hex = 0xFF
+    check(hex == 255, "i32 hex 0xFF")
     // 2d. i32 binary
-    i32 bin = 0b11111111;
-    check(bin == 255, "i32 binary 0b");
+    i32 bin = 0b11111111
+    check(bin == 255, "i32 binary 0b")
     // 2e. i32 octal
-    i32 oct = 0o377;
-    check(oct == 255, "i32 octal 0o");
+    i32 oct = 0o377
+    check(oct == 255, "i32 octal 0o")
     // 2f. i64
-    i64 big = i64(1000000000000);
-    check(big == i64(1000000000000), "i64 literal");
+    i64 big = i64(1000000000000)
+    check(big == i64(1000000000000), "i64 literal")
     // 2g. u8
-    u8 byte = u8(255);
-    check(i32(byte) == 255, "u8 value");
+    u8 byte = u8(255)
+    check(i32(byte) == 255, "u8 value")
     // 2h. u32
-    u32 mid = u32(4000000000);
-    check(mid == u32(4000000000), "u32 value");
+    u32 mid = u32(4000000000)
+    check(mid == u32(4000000000), "u32 value")
     // 2i. u64
-    u64 huge = u64(999);
-    check(i32(huge) == 999, "u64 value");
+    u64 huge = u64(999)
+    check(i32(huge) == 999, "u64 value")
     // 2j. f64 basic
-    f64 pi = 3.14159;
-    check(pi > 3.14 && pi < 3.15, "f64 basic");
+    f64 pi = 3.14159
+    check(pi > 3.14 && pi < 3.15, "f64 basic")
     // 2k. f64 scientific notation
-    f64 large = 1e6;
-    check(large == 1000000.0, "f64 scientific 1e6");
+    f64 large = 1e6
+    check(large == 1000000.0, "f64 scientific 1e6")
     // 2l. Doc: "Float literals support scientific notation including subnormal values"
-    f64 small = 5.0e-324;
-    check(small > 0.0 && small < 1.0e-300, "f64 subnormal 5.0e-324");
+    f64 small = 5.0e-324
+    check(small > 0.0 && small < 1.0e-300, "f64 subnormal 5.0e-324")
     // 2m. Doc: "There is no null. nil exists as internal void value but not assignable"
     // nil == nil should work as expression
-    check(nil == nil, "nil equality");
+    check(nil == nil, "nil equality")
 }
+
 // ── 3. String literals ─────────────────────────────────────────────────────
 // Doc: escape sequences \n \r \t \\ \" \' \0 \xNN
 fn test_string_literals() -> void {
-    fmt.println("=== String Literals ===");
+    fmt.println("=== String Literals ===")
     // 3a. Escape sequences
-    string nl = "a\nb";
-    check(nl.len() == 3, "string \\n length");
-    string tab = "a\tb";
-    check(tab.len() == 3, "string \\t length");
-    string cr = "a\rb";
-    check(cr.len() == 3, "string \\r length");
-    string bs = "a\\b";
-    check(bs.len() == 3, "string \\\\ length");
-    string dq = "a\"b";
-    check(dq.len() == 3, "string \\\" length");
-    string sq = "a\'b";
-    check(sq.len() == 3, "string \\' length");
-    string nul = "a\0b";
-    check(nul.len() == 3, "string \\0 length");
-    string hex = "\x41";
-    check(hex == "A", "string \\x41 == A");
+    string nl = "a\nb"
+    check(nl.len() == 3, "string \\n length")
+    string tab = "a\tb"
+    check(tab.len() == 3, "string \\t length")
+    string cr = "a\rb"
+    check(cr.len() == 3, "string \\r length")
+    string bs = "a\\b"
+    check(bs.len() == 3, "string \\\\ length")
+    string dq = "a\"b"
+    check(dq.len() == 3, "string \\\" length")
+    string sq = "a\'b"
+    check(sq.len() == 3, "string \\' length")
+    string nul = "a\0b"
+    check(nul.len() == 3, "string \\0 length")
+    string hex = "\x41"
+    check(hex == "A", "string \\x41 == A")
     // 3b. Doc: "Raw strings (backtick-delimited) perform no escape processing"
-    string raw = `no\nescapes`;
-    check(raw.len() == 11, "raw string no escape processing");
-    check(raw.contains("\\n"), "raw string contains literal backslash-n");
+    string raw = `no\nescapes`
+    check(raw.len() == 11, "raw string no escape processing")
+    check(raw.contains("\\n"), "raw string contains literal backslash-n")
     // 3c. Doc: "Character literals produce a one-character string"
-    string ch = 'a';
-    check(ch == "a", "char literal 'a' == string \"a\"");
-    check(ch.len() == 1, "char literal length 1");
-    string esc_ch = '\n';
-    check(esc_ch.len() == 1, "char literal '\\n' length 1");
+    string ch = 'a'
+    check(ch == "a", "char literal 'a' == string \"a\"")
+    check(ch.len() == 1, "char literal length 1")
+    string esc_ch = '\n'
+    check(esc_ch.len() == 1, "char literal '\\n' length 1")
     // 3d. String concatenation with +
     // Doc: "+ also concatenates strings"
-    string cat = "hello" + " " + "world";
-    check(cat == "hello world", "string + concatenation");
+    string cat = "hello" + " " + "world"
+    check(cat == "hello world", "string + concatenation")
 }
+
 // ── 4. F-strings ───────────────────────────────────────────────────────────
 // Doc: f-strings support interpolation and optional format specifiers
 fn test_fstrings() -> void {
-    fmt.println("=== F-Strings ===");
-    string name = "Alice";
-    i32 age = 30;
-    f64 pi = 3.14159;
+    fmt.println("=== F-Strings ===")
+    string name = "Alice"
+    i32 age = 30
+    f64 pi = 3.14159
     // 4a. Basic interpolation
-    string basic = f"Name: {name}";
-    check(basic == "Name: Alice", "fstring basic interpolation");
+    string basic = f"Name: {name}"
+    check(basic == "Name: Alice", "fstring basic interpolation")
     // 4b. Expression inside interpolation
-    string expr = f"Next: {age + 1}";
-    check(expr == "Next: 31", "fstring expression");
+    string expr = f"Next: {age + 1}"
+    check(expr == "Next: 31", "fstring expression")
     // 4c. Doc: "literal braces: {{ok}}"
-    string braces = f"{{ok}}";
-    check(braces == "{ok}", "fstring literal braces");
+    string braces = f"{{ok}}"
+    check(braces == "{ok}", "fstring literal braces")
     // 4d. Float precision
-    string prec = f"{pi:.2f}";
-    check(prec == "3.14", "fstring float precision .2f");
+    string prec = f"{pi:.2f}"
+    check(prec == "3.14", "fstring float precision .2f")
     // 4e. Left-align
-    string left = f"{name:<10}";
-    check(left == "Alice     ", "fstring left-align");
+    string left = f"{name:<10}"
+    check(left == "Alice     ", "fstring left-align")
     // 4f. Right-align
-    string right = f"{name:>10}";
-    check(right == "     Alice", "fstring right-align");
+    string right = f"{name:>10}"
+    check(right == "     Alice", "fstring right-align")
     // 4g. Center
-    string center = f"{name:^11}";
-    check(center == "   Alice   ", "fstring center-align");
+    string center = f"{name:^11}"
+    check(center == "   Alice   ", "fstring center-align")
     // 4h. Hex format
-    string hx = f"{255:x}";
-    check(hx == "ff", "fstring hex lowercase");
-    string hxu = f"{255:X}";
-    check(hxu == "FF", "fstring hex uppercase");
+    string hx = f"{255:x}"
+    check(hx == "ff", "fstring hex lowercase")
+    string hxu = f"{255:X}"
+    check(hxu == "FF", "fstring hex uppercase")
     // 4i. Binary format
-    string bn = f"{10:b}";
-    check(bn == "1010", "fstring binary");
+    string bn = f"{10:b}"
+    check(bn == "1010", "fstring binary")
     // 4j. Octal format
-    string oc = f"{8:o}";
-    check(oc == "10", "fstring octal");
+    string oc = f"{8:o}"
+    check(oc == "10", "fstring octal")
     // 4k. Thousands separator
-    string thou = f"{1234567:,}";
-    check(thou == "1,234,567", "fstring thousands separator");
+    string thou = f"{1234567:,}"
+    check(thou == "1,234,567", "fstring thousands separator")
     // 4l. Zero-pad right-align
-    string zp = f"{age:0>8d}";
-    check(zp == "00000030", "fstring zero-pad");
+    string zp = f"{age:0>8d}"
+    check(zp == "00000030", "fstring zero-pad")
     // 4m. Doc: "Expressions including method calls are allowed inside interpolations"
-    string mc = f"{"hello".to_upper()}";
-    check(mc == "HELLO", "fstring method call in interpolation");
+    string mc = f"{"hello".to_upper()}"
+    check(mc == "HELLO", "fstring method call in interpolation")
 }
+
 // ── 5. Composite types ─────────────────────────────────────────────────────
 fn test_composites() -> void {
-    fmt.println("=== Composite Types ===");
+    fmt.println("=== Composite Types ===")
     // 5a. Array literal
-    array<i32> nums = [1, 2, 3];
-    check(nums.len() == 3, "array literal length");
-    check(nums[0] == 1 && nums[2] == 3, "array index access");
+    array<i32> nums = [1, 2, 3]
+    check(nums.len() == 3, "array literal length")
+    check(nums[0] == 1 && nums[2] == 3, "array index access")
     // 5b. Doc: "Empty collections require a type annotation"
-    array<i32> empty = [];
-    check(empty.len() == 0, "empty array");
+    array<i32> empty = []
+    check(empty.len() == 0, "empty array")
     // 5c. Map literal
-    map<string, i32> scores = {"alice": 95, "bob": 87};
-    check(scores.len() == 2, "map literal length");
-    check(scores["alice"] == 95, "map index access");
+    map<string, i32> scores = {"alice": 95, "bob": 87}
+    check(scores.len() == 2, "map literal length")
+    check(scores["alice"] == 95, "map index access")
     // 5d. Empty map
-    map<string, string> em = {};
-    check(em.len() == 0, "empty map");
+    map<string, string> em = {}
+    check(em.len() == 0, "empty map")
     // 5e. Nested arrays
     // Doc: "Nesting is supported to arbitrary depth"
-    array<array<i32 >> nested = [[1, 2], [3, 4]];
-    check(nested[0][1] == 2, "nested array access");
-    check(nested[1][0] == 3, "nested array access 2");
+    array<array<i32 >> nested = [[1, 2], [3, 4]]
+    check(nested[0][1] == 2, "nested array access")
+    check(nested[1][0] == 3, "nested array access 2")
     // 5f. Map with array values
-    map<string, array<i32 >> complex = {"a": [1, 2], "b": [3]};
-    check(complex["a"][0] == 1, "map with array value");
+    map<string, array<i32 >> complex = {"a": [1, 2], "b": [3]}
+    check(complex["a"][0] == 1, "map with array value")
 }
+
 // ── 6. Variables and constants ─────────────────────────────────────────────
 // Doc: "All variables are typed and initialized at declaration"
 // Doc: "Constants can appear at top level or inside functions"
-const i32 TOP_CONST = 42;
+const i32 TOP_CONST = 42
 
-const string TOP_VERSION = "1.0";
-i32 top_mutable = 100;
+const string TOP_VERSION = "1.0"
+i32 top_mutable = 100
 
 fn test_variables_constants() -> void {
-    fmt.println("=== Variables & Constants ===");
+    fmt.println("=== Variables & Constants ===")
     // 6a. Top-level const
-    check(TOP_CONST == 42, "top-level const i32");
-    check(TOP_VERSION == "1.0", "top-level const string");
+    check(TOP_CONST == 42, "top-level const i32")
+    check(TOP_VERSION == "1.0", "top-level const string")
     // 6b. Top-level mutable variable
-    check(top_mutable == 100, "top-level mutable var");
-    top_mutable = 200;
-    check(top_mutable == 200, "top-level mutable var reassign");
-    top_mutable = 100;
+    check(top_mutable == 100, "top-level mutable var")
+    top_mutable = 200
+    check(top_mutable == 200, "top-level mutable var reassign")
+    top_mutable = 100
     // restore
     // 6c. Local const
-    const i32 LOCAL_C = 99;
-    check(LOCAL_C == 99, "local const");
+    const i32 LOCAL_C = 99
+    check(LOCAL_C == 99, "local const")
     // 6d. All primitive types as locals
-    bool b = true;
-    i32 i = 1;
-    i64 l = i64(2);
-    u8 u1 = u8(3);
-    u32 u2 = u32(4);
-    u64 u3 = u64(5);
-    f64 f = 6.0;
-    string s = "7";
-    check(b && i == 1 && f == 6.0 && s == "7", "all primitive locals");
+    bool b = true
+    i32 i = 1
+    i64 l = i64(2)
+    u8 u1 = u8(3)
+    u32 u2 = u32(4)
+    u64 u3 = u64(5)
+    f64 f = 6.0
+    string s = "7"
+    check(b && i == 1 && f == 6.0 && s == "7", "all primitive locals")
 }
+
 // ── 7. Assignment operators ────────────────────────────────────────────────
 // Doc: +=, -=, *=, /=, %=, ++, --
 // Doc: "++ and -- are statements, not expressions"
 fn test_assignment() -> void {
-    fmt.println("=== Assignment ===");
-    i32 x = 10;
-    x += 5;
-    check(x == 15, "+= operator");
-    x -= 3;
-    check(x == 12, "-= operator");
-    x *= 2;
-    check(x == 24, "*= operator");
-    x /= 4;
-    check(x == 6, "/= operator");
-    x %= 4;
-    check(x == 2, "%= operator");
-    x++;
-    check(x == 3, "++ statement");
-    x--;
-    check(x == 2, "-- statement");
+    fmt.println("=== Assignment ===")
+    i32 x = 10
+    x += 5
+    check(x == 15, "+= operator")
+    x -= 3
+    check(x == 12, "-= operator")
+    x *= 2
+    check(x == 24, "*= operator")
+    x /= 4
+    check(x == 6, "/= operator")
+    x %= 4
+    check(x == 2, "%= operator")
+    x++
+    check(x == 3, "++ statement")
+    x--
+    check(x == 2, "-- statement")
     // Index assignment
-    array<i32>arr = [1, 2, 3];
-    arr[0] = 99;
-    check(arr[0] == 99, "array index assignment");
-    map<string, i32>m = {"a": 1};
-    m["a"] = 42;
-    m["b"] = 7;
-    check(m["a"] == 42, "map index assignment");
-    check(m["b"] == 7, "map new key assignment");
+    array<i32>arr = [1, 2, 3]
+    arr[0] = 99
+    check(arr[0] == 99, "array index assignment")
+    map<string, i32>m = {"a": 1}
+    m["a"] = 42
+    m["b"] = 7
+    check(m["a"] == 42, "map index assignment")
+    check(m["b"] == 7, "map new key assignment")
 }
+
 // ── 8. Operators ───────────────────────────────────────────────────────────
 fn test_operators() -> void {
-    fmt.println("=== Operators ===");
+    fmt.println("=== Operators ===")
     // 8a. Arithmetic
-    check(7 + 3 == 10, "addition");
-    check(7 - 3 == 4, "subtraction");
-    check(7 * 3 == 21, "multiplication");
-    check(7 / 3 == 2, "integer division");
-    check(7 % 3 == 1, "modulo");
+    check(7 + 3 == 10, "addition")
+    check(7 - 3 == 4, "subtraction")
+    check(7 * 3 == 21, "multiplication")
+    check(7 / 3 == 2, "integer division")
+    check(7 % 3 == 1, "modulo")
     // 8b. Bitwise
-    check((0xFF & 0x0F) == 15, "bitwise AND");
-    check((0xF0 | 0x0F) == 255, "bitwise OR");
-    check((0xFF ^ 0x0F) == 240, "bitwise XOR");
-    check((1 << 3) == 8, "left shift");
-    check((16 >> 2) == 4, "right shift");
-    check((~ 0) == - 1, "bitwise NOT");
+    check((0xFF & 0x0F) == 15, "bitwise AND")
+    check((0xF0 | 0x0F) == 255, "bitwise OR")
+    check((0xFF ^ 0x0F) == 240, "bitwise XOR")
+    check((1 << 3) == 8, "left shift")
+    check((16 >> 2) == 4, "right shift")
+    check((~ 0) == - 1, "bitwise NOT")
     // 8c. Comparison
-    check(1 <2, "less than");
-    check(2>1, "greater than");
-    check(1 <= 1, "less equal");
-    check(1 >= 1, "greater equal");
-    check(1 == 1, "equal");
-    check(1 != 2, "not equal");
+    check(1 <2, "less than")
+    check(2>1, "greater than")
+    check(1 <= 1, "less equal")
+    check(1 >= 1, "greater equal")
+    check(1 == 1, "equal")
+    check(1 != 2, "not equal")
     // 8d. Logical short-circuit
     // Doc: "Logical operators short-circuit"
-    bool reached = false;
+    bool reached = false
     fn set_reached() -> bool {
-        reached = true;
-        return true;
+        reached = true
+        return true
     }
 
-    bool r1 = false && set_reached();
-    check(! reached, "short-circuit && skips RHS");
-    bool r2 = true || set_reached();
-    check(! reached, "short-circuit || skips RHS");
+    bool r1 = false && set_reached()
+    check(! reached, "short-circuit && skips RHS")
+    bool r2 = true || set_reached()
+    check(! reached, "short-circuit || skips RHS")
     // 8e. Ternary
     // Doc: "condition must be bool", "right-associative", "lowest precedence"
-    i32 a = 5;
-    i32 b = 10;
-    i32 mx = a>b ? a : b;
-    check(mx == 10, "ternary basic");
+    i32 a = 5
+    i32 b = 10
+    i32 mx = a>b ? a : b
+    check(mx == 10, "ternary basic")
     // Doc: "Parenthesize when used inside larger expressions"
-    i32 delta = 10 + (true ? 1 : 2);
-    check(delta == 11, "ternary in expression with parens");
+    i32 delta = 10 + (true ? 1 : 2)
+    check(delta == 11, "ternary in expression with parens")
     // Right-associative: a ? b : c ? d : e == a ? b : (c ? d : e)
-    i32 chain = false ? 1 : true ? 2 : 3;
-    check(chain == 2, "ternary right-associative chaining");
+    i32 chain = false ? 1 : true ? 2 : 3
+    check(chain == 2, "ternary right-associative chaining")
 }
+
 // ── 9. Type conversions ────────────────────────────────────────────────────
 // Doc: "Conversions are explicit function-call syntax"
 // Doc: "VIGIL performs no implicit numeric coercion"
 fn test_conversions() -> void {
-    fmt.println("=== Type Conversions ===");
-    i32 x = 42;
-    f64 y = f64(x);
-    check(y == 42.0, "i32 -> f64");
-    string s = string(x);
-    check(s == "42", "i32 -> string");
-    i64 big = i64(x);
-    check(big == i64(42), "i32 -> i64");
-    i32 back = i32(big);
-    check(back == 42, "i64 -> i32");
+    fmt.println("=== Type Conversions ===")
+    i32 x = 42
+    f64 y = f64(x)
+    check(y == 42.0, "i32 -> f64")
+    string s = string(x)
+    check(s == "42", "i32 -> string")
+    i64 big = i64(x)
+    check(big == i64(42), "i32 -> i64")
+    i32 back = i32(big)
+    check(back == 42, "i64 -> i32")
     // Cross-type comparison requires cast
-    i32 a = 10;
-    i64 b = i64(20);
-    check(i64(a) <b, "explicit cast for mixed comparison");
+    i32 a = 10
+    i64 b = i64(20)
+    check(i64(a) <b, "explicit cast for mixed comparison")
 }
+
 // ── 10. Multiple return values ─────────────────────────────────────────────
 // Doc: "Functions may return multiple values. Each binding is typed."
 fn divide(i32 a, i32 b) -> (i32, err) {
     if b == 0 {
-        return 0, err("division by zero", err.arg);
+        return 0, err("division by zero", err.arg)
     }
 
-    return a / b, ok;
+    return a / b, ok
 }
 
+
 fn triple_return() -> (string, string, bool) {
-    return "hello", "world", true;
+    return "hello", "world", true
 }
+
 
 fn validate(i32 age) -> err {
     if age <0 {
-        return err("negative", err.arg);
+        return err("negative", err.arg)
     }
 
-    return ok;
+    return ok
 }
 
+
 fn test_multi_return() -> void {
-    fmt.println("=== Multiple Return Values ===");
+    fmt.println("=== Multiple Return Values ===")
     // 10a. Two-value return with err
-    i32 result, err e = divide(10, 2);
-    check(result == 5 && e == ok, "multi-return success");
-    i32 r2, err e2 = divide(10, 0);
-    check(e2 != ok, "multi-return error");
+    i32 result, err e = divide(10, 2)
+    check(result == 5 && e == ok, "multi-return success")
+    i32 r2, err e2 = divide(10, 0)
+    check(e2 != ok, "multi-return error")
     // 10b. Discard with _
     // Doc: "Use _ to discard a value"
-    i32 val, err _ = divide(10, 2);
-    check(val == 5, "discard err with _");
+    i32 val, err _ = divide(10, 2)
+    check(val == 5, "discard err with _")
     // 10c. Three-value return
-    string a, string b, bool c = triple_return();
-    check(a == "hello" && b == "world" && c, "three-value return");
+    string a, string b, bool c = triple_return()
+    check(a == "hello" && b == "world" && c, "three-value return")
     // 10d. Function returning only err
     // Doc: "A function returning only err uses -> err"
-    err ve = validate(25);
-    check(ve == ok, "validate ok");
-    err ve2 = validate(- 1);
-    check(ve2 != ok, "validate error");
+    err ve = validate(25)
+    check(ve == ok, "validate ok")
+    err ve2 = validate(- 1)
+    check(ve2 != ok, "validate error")
 }
+
 // ── 11. Closures, anonymous functions, local functions ─────────────────────
 // Doc: "Anonymous functions capture surrounding variables by reference"
 fn test_closures() -> void {
-    fmt.println("=== Closures & Local Functions ===");
+    fmt.println("=== Closures & Local Functions ===")
     // 11a. Anonymous function with capture
-    i32 factor = 10;
+    i32 factor = 10
     fn (i32) -> i32 scale = fn (i32 x) -> i32 {
-        return x * factor;
-    };
+        return x * factor
+    }
 
-    check(scale(5) == 50, "closure captures variable");
+    check(scale(5) == 50, "closure captures variable")
     // 11b. Capture is by value — mutation to outer var NOT visible in closure
     // Doc says "by reference" but actual behavior is capture by value
-    factor = 20;
-    check(scale(5) == 50, "closure captures by value (not reference)");
+    factor = 20
+    check(scale(5) == 50, "closure captures by value (not reference)")
     // 11c. IIFE
     // Doc: "Immediately invoked"
     i32 iife_result = fn () -> i32 {
-        return 42;
+        return 42
     }
 
-    ();
-    check(iife_result == 42, "IIFE returns value");
+    ()
+    check(iife_result == 42, "IIFE returns value")
     // 11d. Local named function
     fn helper(i32 x) -> i32 {
-        return x * 2;
+        return x * 2
     }
 
-    check(helper(5) == 10, "local named function");
+    check(helper(5) == 10, "local named function")
     // 11e. Function type variable
     // Doc: "Indirect calls require a concrete function signature"
-    fn (i32) -> i32 op = helper;
-    check(op(3) == 6, "function type variable call");
+    fn (i32) -> i32 op = helper
+    check(op(3) == 6, "function type variable call")
     // 11f. Lambda shorthand with inferred type
-    fn (i32, i32) -> i32 add = |a, b| a + b;
-    check(add(4, 5) == 9, "lambda shorthand infers param and return types");
+    fn (i32, i32) -> i32 add = |a, b| a + b
+    check(add(4, 5) == 9, "lambda shorthand infers param and return types")
 }
+
 // ── 12. Control flow ───────────────────────────────────────────────────────
 fn test_control_flow() -> void {
-    fmt.println("=== Control Flow ===");
+    fmt.println("=== Control Flow ===")
     // 12a. if / else if / else
     // Doc: "Parentheses around the condition are required"
     // Doc: "The condition must be bool — there is no truthiness"
-    i32 x = 7;
-    string branch = "";
+    i32 x = 7
+    string branch = ""
     if x>10 {
-        branch = "big";
+        branch = "big"
     } else if x> 5 {
-        branch = "medium";
+        branch = "medium"
     } else {
-        branch = "small";
+        branch = "small"
     }
 
-    check(branch == "medium", "if/else if/else");
+    check(branch == "medium", "if/else if/else")
     // 12b. while
-    i32 w = 0;
+    i32 w = 0
     while w < 5 {
-        w++;
+        w++
     }
 
-    check(w == 5, "while loop");
+    check(w == 5, "while loop")
     // 12c. C-style for
-    i32 sum = 0;
+    i32 sum = 0
     for (i32 i = 0; i < 5; i++) {
-        sum += i;
+        sum += i
     }
 
-    check(sum == 10, "c-style for loop");
+    check(sum == 10, "c-style for loop")
     // 12d. for-in array
     // Doc: "Iterates over arrays and maps"
-    array<i32> arr = [10, 20, 30];
-    i32 total = 0;
+    array<i32> arr = [10, 20, 30]
+    i32 total = 0
     for val in arr {
         total += val;}
 
-    check(total == 60, "for-in array");
+ check(total == 60, "for-in array")
     // 12e. for-in map
-    map<string, i32> m = {"a": 1, "b": 2, "c": 3};
-    i32 msum = 0;
+    map<string, i32> m = {"a": 1, "b": 2, "c": 3}
+    i32 msum = 0
     for key, val in m {
         msum += val;}
 
-    check(msum == 6, "for-in map");
+ check(msum == 6, "for-in map")
     // 12f. switch with multi-case
     // Doc: "Cases may list multiple values separated by commas"
     // Doc: "There is no fallthrough"
-    i32 sw = 2;
-    string sw_result = "";
+    i32 sw = 2
+    string sw_result = ""
     switch sw {
-        case 1: sw_result = "one";
-        case 2, 3: sw_result = "two or three";
-        default: sw_result = "other";
+        case 1: sw_result = "one"
+        case 2, 3: sw_result = "two or three"
+        default: sw_result = "other"
     }
 
-    check(sw_result == "two or three", "switch multi-case");
+    check(sw_result == "two or three", "switch multi-case")
     // 12g. switch on string — NOT supported (doc correction needed)
     // Doc says "Works with integers, strings, and enum values"
     // but compiler rejects: "switch expression must be an integer, bool, or enum"
     // Using if/else chain for string matching instead:
-    string color = "red";
-    string sw_str = "";
+    string color = "red"
+    string sw_str = ""
     if color == "red" {
-        sw_str = "found red";
+        sw_str = "found red"
     } else if color == "blue" {
-        sw_str = "found blue";
+        sw_str = "found blue"
     } else {
-        sw_str = "other";
+        sw_str = "other"
     }
 
-    check(sw_str == "found red", "string matching via if/else");
+    check(sw_str == "found red", "string matching via if/else")
     // 12h. break and continue
-    i32 bsum = 0;
+    i32 bsum = 0
     for (i32 i = 0; i < 10; i++) {
         if i == 5 {
-            break;
+            break
         }
 
         if i % 2 == 0 {
-            continue;
+            continue
         }
 
-        bsum += i;
+        bsum += i
     }
 
-    check(bsum == 1 + 3, "break and continue");
+    check(bsum == 1 + 3, "break and continue")
 }
+
 // ── 13. Defer ──────────────────────────────────────────────────────────────
 // Doc: "The argument must be a function call"
 // Doc: "Deferred calls run in LIFO order"
 // Doc: "Arguments are evaluated eagerly"
-array<string> defer_log = [];
+array<string> defer_log = []
 
 fn defer_push(string s) -> void {
-    defer_log.push(s);
+    defer_log.push(s)
 }
+
 
 fn test_defer_order() -> void {
-    defer_log = [];
-    defer defer_push("first");
-    defer defer_push("second");
-    defer defer_push("third");
+    defer_log = []
+    defer defer_push("first")
+    defer defer_push("second")
+    defer defer_push("third")
 }
 
+
 fn test_defer() -> void {
-    fmt.println("=== Defer ===");
+    fmt.println("=== Defer ===")
     // 13a. LIFO order
-    test_defer_order();
-    check(defer_log.len() == 3, "defer ran 3 times");
-    check(defer_log[0] == "third", "defer LIFO: third first");
-    check(defer_log[1] == "second", "defer LIFO: second middle");
-    check(defer_log[2] == "first", "defer LIFO: first last");
+    test_defer_order()
+    check(defer_log.len() == 3, "defer ran 3 times")
+    check(defer_log[0] == "third", "defer LIFO: third first")
+    check(defer_log[1] == "second", "defer LIFO: second middle")
+    check(defer_log[2] == "first", "defer LIFO: first last")
     // 13b. Eager argument evaluation
-    defer_log = [];
-    i32 counter = 0;
+    defer_log = []
+    i32 counter = 0
     fn log_counter(i32 val) -> void {
-        defer_log.push(string(val));
+        defer_log.push(string(val))
     }
 
     fn test_eager() -> void {
-        i32 c = 0;
-        defer log_counter(c);
+        i32 c = 0
+        defer log_counter(c)
         // should capture c=0
-        c = 99;
+        c = 99
     }
 
-    test_eager();
-    check(defer_log[0] == "0", "defer evaluates args eagerly");
+    test_eager()
+    check(defer_log[0] == "0", "defer evaluates args eagerly")
     // 13c. Module-qualified defer (defer fmt.sprint, etc.)
-    defer_log = [];
+    defer_log = []
     fn test_native_defer() -> void {
-        defer defer_push("native_ok");
-        defer fmt.println("  (deferred native call ran)");
+        defer defer_push("native_ok")
+        defer fmt.println("  (deferred native call ran)")
     }
 
-    test_native_defer();
-    check(defer_log[0] == "native_ok", "defer with module call works");
+    test_native_defer()
+    check(defer_log[0] == "native_ok", "defer with module call works")
 }
+
 // ── 14. Guard ──────────────────────────────────────────────────────────────
 // Doc: "The last binding must be err and must be named (not _)"
 // Doc: "The body runs only when the error is not ok"
 fn test_guard() -> void {
-    fmt.println("=== Guard ===");
+    fmt.println("=== Guard ===")
     // 14a. Guard on error — body runs
     fn test_guard_err() -> i32 {
         guard i32 val, err e = divide(10, 0) {
-            return - 1;
+            return - 1
         }
 
-        return val;
+        return val
     }
 
-    i32 gr = test_guard_err();
-    check(gr == - 1, "guard body runs on error");
+    i32 gr = test_guard_err()
+    check(gr == - 1, "guard body runs on error")
     // 14b. Guard on success — body skipped, binding available
     fn test_guard_ok() -> i32 {
         guard i32 val, err e = divide(10, 2) {
-            return - 1;
+            return - 1
         }
 
-        return val;
+        return val
     }
 
-    check(test_guard_ok() == 5, "guard success: binding available after");
+    check(test_guard_ok() == 5, "guard success: binding available after")
 }
+
 // ── 15. Errors ─────────────────────────────────────────────────────────────
 // Doc: "ok represents success. err(message, kind) constructs an error."
 fn test_errors() -> void {
-    fmt.println("=== Errors ===");
+    fmt.println("=== Errors ===")
     // 15a. Error construction and inspection
-    err e = err("not found", err.not_found);
-    check(e != ok, "err != ok");
-    check(e.message() == "not found", "err.message()");
+    err e = err("not found", err.not_found)
+    check(e != ok, "err != ok")
+    check(e.message() == "not found", "err.message()")
     // 15b. Error kind routing
     // Doc: switch on e.kind()
-    string kind_str = "";
+    string kind_str = ""
     switch e.kind() {
-        case err.not_found: kind_str = "not_found";
-        case err.arg: kind_str = "arg";
-        default: kind_str = "other";
+        case err.not_found: kind_str = "not_found"
+        case err.arg: kind_str = "arg"
+        default: kind_str = "other"
     }
 
-    check(kind_str == "not_found", "switch on err.kind()");
+    check(kind_str == "not_found", "switch on err.kind()")
     // 15c. ok value
-    err ok_err = ok;
-    check(ok_err == ok, "ok == ok");
+    err ok_err = ok
+    check(ok_err == ok, "ok == ok")
     // 15d. Multiple error kinds exist
-    err e2 = err("bad", err.arg);
-    err e3 = err("denied", err.permission);
-    err e4 = err("eof", err.eof);
-    check(e2 != ok && e3 != ok && e4 != ok, "various error kinds");
+    err e2 = err("bad", err.arg)
+    err e3 = err("denied", err.permission)
+    err e4 = err("eof", err.eof)
+    check(e2 != ok && e3 != ok && e4 != ok, "various error kinds")
 }
+
 // ── 16. Classes ────────────────────────────────────────────────────────────
 // Doc: "self refers to the current instance inside methods"
 // Doc: "Fields are private by default. Use pub to expose them."
 class Animal {
-    pub string name;
-    pub i32 legs;
-    string secret;
+    pub string name
+    pub i32 legs
+    string secret
     fn init(string name, i32 legs) -> void {
-        self.name = name;
-        self.legs = legs;
-        self.secret = "hidden";
+        self.name = name
+        self.legs = legs
+        self.secret = "hidden"
     }
 
     pub fn describe() -> string {
-        return f"{self.name} has {self.legs} legs";
+        return f"{self.name} has {self.legs} legs"
     }
 
     pub fn get_secret() -> string {
-        return self.secret;
+        return self.secret
     }
+
 }
+
 // Fallible init
 // Doc: "If init returns err, construction becomes fallible"
 class SafeDiv {
-    pub i32 result;
+    pub i32 result
     fn init(i32 a, i32 b) -> err {
         if b == 0 {
-            return err("zero", err.arg);
+            return err("zero", err.arg)
         }
 
-        self.result = a / b;
-        return ok;
+        self.result = a / b
+        return ok
     }
+
 }
 
+
 fn test_classes() -> void {
-    fmt.println("=== Classes ===");
+    fmt.println("=== Classes ===")
     // 16a. Construction and pub fields
-    Animal dog = Animal("dog", 4);
-    check(dog.name == "dog", "class pub field access");
-    check(dog.legs == 4, "class pub field access 2");
+    Animal dog = Animal("dog", 4)
+    check(dog.name == "dog", "class pub field access")
+    check(dog.legs == 4, "class pub field access 2")
     // 16b. Method call
-    check(dog.describe() == "dog has 4 legs", "class method");
+    check(dog.describe() == "dog has 4 legs", "class method")
     // 16c. Private field accessible via method
-    check(dog.get_secret() == "hidden", "private field via method");
+    check(dog.get_secret() == "hidden", "private field via method")
     // 16d. Field mutation
-    dog.name = "wolf";
-    check(dog.name == "wolf", "class field mutation");
+    dog.name = "wolf"
+    check(dog.name == "wolf", "class field mutation")
     // 16e. Fallible construction — success
-    SafeDiv sd, err e = SafeDiv(10, 2);
-    check(e == ok, "fallible init success");
-    check(sd.result == 5, "fallible init result");
+    SafeDiv sd, err e = SafeDiv(10, 2)
+    check(e == ok, "fallible init success")
+    check(sd.result == 5, "fallible init result")
     // 16f. Fallible construction — failure
-    SafeDiv sd2, err e2 = SafeDiv(10, 0);
-    check(e2 != ok, "fallible init failure");
+    SafeDiv sd2, err e2 = SafeDiv(10, 0)
+    check(e2 != ok, "fallible init failure")
 }
+
 // ── 17. Interfaces ─────────────────────────────────────────────────────────
 // Doc: "Classes implement interfaces explicitly"
 // Doc: "A class may implement multiple interfaces"
 // Doc: "Interface types can be used as parameter types for polymorphic dispatch"
 interface Named {
-    fn name() -> string;
+    fn name() -> string
 }
+
 
 interface Measurable {
-    fn size() -> i32;
+    fn size() -> i32
 }
 
+
 class Widget implements Named, Measurable {
-    pub string label;
-    pub i32 width;
+    pub string label
+    pub i32 width
     fn init(string label, i32 width) -> void {
-        self.label = label;
-        self.width = width;
+        self.label = label
+        self.width = width
     }
 
     fn name() -> string {
-        return self.label;
+        return self.label
     }
 
     fn size() -> i32 {
-        return self.width;
+        return self.width
     }
+
 }
+
 
 fn get_name(Named n) -> string {
-    return n.name();
+    return n.name()
 }
+
 
 fn get_size(Measurable m) -> i32 {
-    return m.size();
+    return m.size()
 }
 
+
 fn test_interfaces() -> void {
-    fmt.println("=== Interfaces ===");
-    Widget w = Widget("btn", 100);
+    fmt.println("=== Interfaces ===")
+    Widget w = Widget("btn", 100)
     // 17a. Polymorphic dispatch
-    check(get_name(w) == "btn", "interface polymorphic dispatch Named");
-    check(get_size(w) == 100, "interface polymorphic dispatch Measurable");
+    check(get_name(w) == "btn", "interface polymorphic dispatch Named")
+    check(get_size(w) == 100, "interface polymorphic dispatch Measurable")
     // 17b. Direct method call
-    check(w.name() == "btn", "direct method call through interface impl");
+    check(w.name() == "btn", "direct method call through interface impl")
 }
+
 // ── 18. Enums ──────────────────────────────────────────────────────────────
 // Doc: "Enum values are i32-backed"
 enum Direction {
@@ -694,199 +727,207 @@ enum Direction {
     West
 }
 
+
 enum HttpCode {
     Ok = 200,
     NotFound = 404,
     Error = 500
 }
 
+
 fn test_enums() -> void {
-    fmt.println("=== Enums ===");
+    fmt.println("=== Enums ===")
     // 18a. Basic enum
-    Direction d = Direction.North;
-    check(d == Direction.North, "enum value equality");
-    check(d != Direction.South, "enum value inequality");
+    Direction d = Direction.North
+    check(d == Direction.North, "enum value equality")
+    check(d != Direction.South, "enum value inequality")
     // 18b. Switch on enum
-    string dir = "";
+    string dir = ""
     switch d {
-        case Direction.North: dir = "north";
-        case Direction.South: dir = "south";
-        default: dir = "other";
+        case Direction.North: dir = "north"
+        case Direction.South: dir = "south"
+        default: dir = "other"
     }
 
-    check(dir == "north", "switch on enum");
+    check(dir == "north", "switch on enum")
     // 18c. Enum with explicit values
     // Doc: "Enum values are i32-backed"
     // Note: i32(enum) cast not supported — enum values compared directly
-    HttpCode code = HttpCode.NotFound;
-    check(code == HttpCode.NotFound, "enum explicit value comparison");
-    check(HttpCode.Ok != HttpCode.NotFound, "enum value inequality");
+    HttpCode code = HttpCode.NotFound
+    check(code == HttpCode.NotFound, "enum explicit value comparison")
+    check(HttpCode.Ok != HttpCode.NotFound, "enum value inequality")
 }
+
 // ── 19. String methods ─────────────────────────────────────────────────────
 fn test_string_methods() -> void {
-    fmt.println("=== String Methods ===");
-    string s = "hello world";
+    fmt.println("=== String Methods ===")
+    string s = "hello world"
     // 19a. Basic methods
-    check(s.len() == 11, "string.len()");
-    check(s.contains("world"), "string.contains()");
-    check(s.starts_with("hello"), "string.starts_with()");
-    check(s.ends_with("world"), "string.ends_with()");
-    check(s.to_upper() == "HELLO WORLD", "string.to_upper()");
-    check(s.to_lower() == "hello world", "string.to_lower()");
-    check(s.reverse() == "dlrow olleh", "string.reverse()");
-    check(! s.is_empty(), "string.is_empty() false");
-    check("".is_empty(), "string.is_empty() true");
+    check(s.len() == 11, "string.len()")
+    check(s.contains("world"), "string.contains()")
+    check(s.starts_with("hello"), "string.starts_with()")
+    check(s.ends_with("world"), "string.ends_with()")
+    check(s.to_upper() == "HELLO WORLD", "string.to_upper()")
+    check(s.to_lower() == "hello world", "string.to_lower()")
+    check(s.reverse() == "dlrow olleh", "string.reverse()")
+    check(! s.is_empty(), "string.is_empty() false")
+    check("".is_empty(), "string.is_empty() true")
     // 19b. Trim methods
-    string padded = "  hi  ";
-    check(padded.trim() == "hi", "string.trim()");
-    check(padded.trim_left() == "hi  ", "string.trim_left()");
-    check(padded.trim_right() == "  hi", "string.trim_right()");
-    check("hello_world".trim_prefix("hello_") == "world", "string.trim_prefix()");
-    check("hello_world".trim_suffix("_world") == "hello", "string.trim_suffix()");
+    string padded = "  hi  "
+    check(padded.trim() == "hi", "string.trim()")
+    check(padded.trim_left() == "hi  ", "string.trim_left()")
+    check(padded.trim_right() == "  hi", "string.trim_right()")
+    check("hello_world".trim_prefix("hello_") == "world", "string.trim_prefix()")
+    check("hello_world".trim_suffix("_world") == "hello", "string.trim_suffix()")
     // 19c. Split, fields, join
-    array<string> parts = "a,b,c".split(",");
-    check(parts.len() == 3 && parts[0] == "a" && parts[2] == "c", "string.split()");
-    array<string> fields = "  one  two  three  ".fields();
-    check(fields.len() == 3, "string.fields()");
-    string joined = ", ".join(parts);
-    check(joined == "a, b, c", "string.join()");
+    array<string> parts = "a,b,c".split(",")
+    check(parts.len() == 3 && parts[0] == "a" && parts[2] == "c", "string.split()")
+    array<string> fields = "  one  two  three  ".fields()
+    check(fields.len() == 3, "string.fields()")
+    string joined = ", ".join(parts)
+    check(joined == "a, b, c", "string.join()")
     // 19d. Doc: index_of returns (i32, bool)
-    i32 idx, bool found = s.index_of("world");
-    check(found && idx == 6, "string.index_of() found");
-    i32 idx2, bool found2 = s.index_of("xyz");
-    check(! found2, "string.index_of() not found");
+    i32 idx, bool found = s.index_of("world")
+    check(found && idx == 6, "string.index_of() found")
+    i32 idx2, bool found2 = s.index_of("xyz")
+    check(! found2, "string.index_of() not found")
     // 19e. Doc: last_index_of returns (i32, bool)
-    i32 lidx, bool lfound = "abcabc".last_index_of("abc");
-    check(lfound && lidx == 3, "string.last_index_of()");
+    i32 lidx, bool lfound = "abcabc".last_index_of("abc")
+    check(lfound && lidx == 3, "string.last_index_of()")
     // 19f. Doc: substr returns (string, err)
-    string sub, err se = s.substr(6, 5);
-    check(se == ok && sub == "world", "string.substr()");
+    string sub, err se = s.substr(6, 5)
+    check(se == ok && sub == "world", "string.substr()")
     // 19g. Doc: char_at returns (string, err)
-    string ch, err ce = s.char_at(0);
-    check(ce == ok && ch == "h", "string.char_at()");
+    string ch, err ce = s.char_at(0)
+    check(ce == ok && ch == "h", "string.char_at()")
     // 19h. Other methods
-    check(s.count("l") == 3, "string.count()");
-    check("abc".repeat(3) == "abcabcabc", "string.repeat()");
-    check(s.replace("world", "vigil") == "hello vigil", "string.replace()");
-    check("Hello".equal_fold("hello"), "string.equal_fold()");
+    check(s.count("l") == 3, "string.count()")
+    check("abc".repeat(3) == "abcabcabc", "string.repeat()")
+    check(s.replace("world", "vigil") == "hello vigil", "string.replace()")
+    check("Hello".equal_fold("hello"), "string.equal_fold()")
     // 19i. Doc: cut returns (string, string, bool)
-    string before, string after, bool cut_found = "key=value".cut("=");
-    check(cut_found && before == "key" && after == "value", "string.cut()");
+    string before, string after, bool cut_found = "key=value".cut("=")
+    check(cut_found && before == "key" && after == "value", "string.cut()")
     // 19j. char_count and bytes
-    check("hello".char_count() == 5, "string.char_count()");
-    array<u8> bytes = "AB".bytes();
-    check(bytes.len() == 2 && i32(bytes[0]) == 65, "string.bytes()");
+    check("hello".char_count() == 5, "string.char_count()")
+    array<u8> bytes = "AB".bytes()
+    check(bytes.len() == 2 && i32(bytes[0]) == 65, "string.bytes()")
 }
+
 // ── 20. Array methods ──────────────────────────────────────────────────────
 fn test_array_methods() -> void {
-    fmt.println("=== Array Methods ===");
-    array<i32> a = [1, 2, 3];
+    fmt.println("=== Array Methods ===")
+    array<i32> a = [1, 2, 3]
     // 20a. push and len
-    a.push(4);
-    check(a.len() == 4, "array.push() and len()");
+    a.push(4)
+    check(a.len() == 4, "array.push() and len()")
     // 20b. Doc: pop returns (T, err)
-    i32 popped, err pe = a.pop();
-    check(pe == ok && popped == 4, "array.pop()");
-    check(a.len() == 3, "array.pop() reduces length");
+    i32 popped, err pe = a.pop()
+    check(pe == ok && popped == 4, "array.pop()")
+    check(a.len() == 3, "array.pop() reduces length")
     // 20c. Doc: get returns (T, err)
-    i32 got, err ge = a.get(1);
-    check(ge == ok && got == 2, "array.get()");
-    i32 bad, err be = a.get(99);
-    check(be != ok, "array.get() out of bounds");
+    i32 got, err ge = a.get(1)
+    check(ge == ok && got == 2, "array.get()")
+    i32 bad, err be = a.get(99)
+    check(be != ok, "array.get() out of bounds")
     // 20d. Doc: set returns err
-    err se = a.set(0, 99);
-    check(se == ok && a[0] == 99, "array.set()");
-    err se2 = a.set(99, 0);
-    check(se2 != ok, "array.set() out of bounds");
+    err se = a.set(0, 99)
+    check(se == ok && a[0] == 99, "array.set()")
+    err se2 = a.set(99, 0)
+    check(se2 != ok, "array.set() out of bounds")
     // 20e. slice
-    array<i32> sl = a.slice(0, 2);
-    check(sl.len() == 2, "array.slice()");
+    array<i32> sl = a.slice(0, 2)
+    check(sl.len() == 2, "array.slice()")
     // 20f. contains
-    check(a.contains(99), "array.contains() true");
-    check(! a.contains(999), "array.contains() false");
+    check(a.contains(99), "array.contains() true")
+    check(! a.contains(999), "array.contains() false")
 }
+
 // ── 21. Map methods ────────────────────────────────────────────────────────
 fn test_map_methods() -> void {
-    fmt.println("=== Map Methods ===");
-    map<string, i32> m = {"a": 1, "b": 2};
+    fmt.println("=== Map Methods ===")
+    map<string, i32> m = {"a": 1, "b": 2}
     // 21a. Doc: get returns (V, bool)
-    i32 val, bool found = m.get("a");
-    check(found && val == 1, "map.get() found");
-    i32 val2, bool found2 = m.get("z");
-    check(! found2, "map.get() not found");
+    i32 val, bool found = m.get("a")
+    check(found && val == 1, "map.get() found")
+    i32 val2, bool found2 = m.get("z")
+    check(! found2, "map.get() not found")
     // 21b. has
-    check(m.has("a"), "map.has() true");
-    check(! m.has("z"), "map.has() false");
+    check(m.has("a"), "map.has() true")
+    check(! m.has("z"), "map.has() false")
     // 21c. Doc: set returns err
-    err se = m.set("c", 3);
-    check(se == ok && m["c"] == 3, "map.set()");
+    err se = m.set("c", 3)
+    check(se == ok && m["c"] == 3, "map.set()")
     // 21d. Doc: remove returns (V, bool)
-    i32 removed, bool was_there = m.remove("b");
-    check(was_there && removed == 2, "map.remove()");
-    check(! m.has("b"), "map.remove() actually removes");
+    i32 removed, bool was_there = m.remove("b")
+    check(was_there && removed == 2, "map.remove()")
+    check(! m.has("b"), "map.remove() actually removes")
     // 21e. keys and values
-    array<string> keys = m.keys();
-    check(keys.len() == 2, "map.keys()");
-    array<i32> vals = m.values();
-    check(vals.len() == 2, "map.values()");
+    array<string> keys = m.keys()
+    check(keys.len() == 2, "map.keys()")
+    array<i32> vals = m.values()
+    check(vals.len() == 2, "map.values()")
 }
+
 // ── 22. No implicit coercion ───────────────────────────────────────────────
 // Doc: "No implicit type conversions"
 // Doc: "Conditions must be bool — no truthiness"
 // (These are compile-time rules; we verify the explicit cast path works)
 fn test_no_coercion() -> void {
-    fmt.println("=== No Implicit Coercion ===");
+    fmt.println("=== No Implicit Coercion ===")
     // Must cast explicitly
-    i32 a = 10;
-    f64 b = f64(a) + 0.5;
-    check(b == 10.5, "explicit i32->f64 cast in expression");
-    i32 c = i32(b);
-    check(c == 10, "explicit f64->i32 truncation");
+    i32 a = 10
+    f64 b = f64(a) + 0.5
+    check(b == 10.5, "explicit i32->f64 cast in expression")
+    i32 c = i32(b)
+    check(c == 10, "explicit f64->i32 truncation")
 }
+
 // ── 23. Parse module ───────────────────────────────────────────────────────
 // Doc: "For parsing strings to numbers, use the parse module"
 fn test_parse() -> void {
-    fmt.println("=== Parse Module ===");
-    i32 n, err e = parse.i32("42");
-    check(e == ok && n == 42, "parse.i32 success");
-    i32 n2, err e2 = parse.i32("not_a_number");
-    check(e2 != ok, "parse.i32 failure");
+    fmt.println("=== Parse Module ===")
+    i32 n, err e = parse.i32("42")
+    check(e == ok && n == 42, "parse.i32 success")
+    i32 n2, err e2 = parse.i32("not_a_number")
+    check(e2 != ok, "parse.i32 failure")
 }
+
 // ── Main driver ────────────────────────────────────────────────────────────
 fn main() -> i32 {
-    fmt.println("╔══════════════════════════════════════════════════╗");
-    fmt.println("║  VIGIL Syntax Reference Validation Stress Test   ║");
-    fmt.println("╚══════════════════════════════════════════════════╝\n");
-    test_primitive_types();
-    test_string_literals();
-    test_fstrings();
-    test_composites();
-    test_variables_constants();
-    test_assignment();
-    test_operators();
-    test_conversions();
-    test_multi_return();
-    test_closures();
-    test_control_flow();
-    test_defer();
-    test_guard();
-    test_errors();
-    test_classes();
-    test_interfaces();
-    test_enums();
-    test_string_methods();
-    test_array_methods();
-    test_map_methods();
-    test_no_coercion();
-    test_parse();
-    fmt.println(f"\n{'='.repeat(50)}");
-    fmt.println(f"  Results: {pass_count} passed, {fail_count} failed");
+    fmt.println("╔══════════════════════════════════════════════════╗")
+    fmt.println("║  VIGIL Syntax Reference Validation Stress Test   ║")
+    fmt.println("╚══════════════════════════════════════════════════╝\n")
+    test_primitive_types()
+    test_string_literals()
+    test_fstrings()
+    test_composites()
+    test_variables_constants()
+    test_assignment()
+    test_operators()
+    test_conversions()
+    test_multi_return()
+    test_closures()
+    test_control_flow()
+    test_defer()
+    test_guard()
+    test_errors()
+    test_classes()
+    test_interfaces()
+    test_enums()
+    test_string_methods()
+    test_array_methods()
+    test_map_methods()
+    test_no_coercion()
+    test_parse()
+    fmt.println(f"\n{'='.repeat(50)}")
+    fmt.println(f"  Results: {pass_count} passed, {fail_count} failed")
     if fail_count == 0 {
-        fmt.println("  STATUS: ALL PASS");
+        fmt.println("  STATUS: ALL PASS")
     } else {
-        fmt.println("  STATUS: FAILURES DETECTED");
+        fmt.println("  STATUS: FAILURES DETECTED")
     }
 
-    fmt.println(f"{'='.repeat(50)}");
-    return fail_count > 0 ? 1 : 0;
+    fmt.println(f"{'='.repeat(50)}")
+    return fail_count > 0 ? 1 : 0
 }

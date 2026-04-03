@@ -1,39 +1,42 @@
-import "args";
-import "fmt";
-import "fs";
-import "readline";
+import "args"
+import "fmt"
+import "fs"
+import "readline"
 
 fn main() -> i32 {
     // No args: read from stdin (classic cat behavior)
     if args.count() == 0 {
-        string line = readline.input("");
+        string line = readline.input("")
         while ! line.is_empty() {
-            fmt.println(line);
-            line = readline.input("");
+            fmt.println(line)
+            line = readline.input("")
         }
 
-        return 0;
+        return 0
     }
+
     // Process each file argument
     for (i32 i = 0; i < args.count(); i++) {
-        string path = args.at(i);
+        string path = args.at(i)
         // Support "-" for stdin
         if path == "-" {
-            string line = readline.input("");
+            string line = readline.input("")
             while ! line.is_empty() {
-                fmt.println(line);
-                line = readline.input("");
+                fmt.println(line)
+                line = readline.input("")
             }
+
         } else {
             if ! fs.exists(path) {
-                fmt.eprintln(f"vigil-cat: {path}: No such file or directory");
-                return 1;
+                fmt.eprintln(f"vigil-cat: {path}: No such file or directory")
+                return 1
             }
 
-            string content = fs.read(path);
-            fmt.print(content);
+            string content = fs.read(path)
+            fmt.print(content)
         }
+
     }
 
-    return 0;
+    return 0
 }

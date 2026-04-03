@@ -1,125 +1,130 @@
-import "file";
-import "os";
-import "test";
+import "file"
+import "os"
+import "test"
 
 fn get_temp_path(string filename) -> string {
-    string platform = os.platform();
+    string platform = os.platform()
     if platform == "windows" {
-        return "C:\\Windows\\Temp\\" + filename;
+        return "C:\\Windows\\Temp\\" + filename
     }
 
-    return "/tmp/" + filename;
+    return "/tmp/" + filename
 }
+
 
 fn find_vigil_and_main() -> (string, string) {
     if file.exists("vigil") && file.exists("examples/vigil-tee/main.vigil") {
-        return "./vigil", "examples/vigil-tee/main.vigil";
+        return "./vigil", "examples/vigil-tee/main.vigil"
     }
 
     if file.exists("../../vigil") && file.exists("main.vigil") {
-        return "../../vigil", "main.vigil";
+        return "../../vigil", "main.vigil"
     }
 
-    return "", "";
+    return "", ""
 }
+
 
 fn test_tee_single_file(test.T t) -> void {
-    string platform = os.platform();
+    string platform = os.platform()
     if platform == "windows" {
-        return;
+        return
     }
 
-    string vigil_bin, string main_script = find_vigil_and_main();
-    t.assert(vigil_bin != "", "should find vigil binary");
-    string test_file = get_temp_path("vigil_tee_test1.txt");
-    string input_file = get_temp_path("vigil_tee_input1.txt");
-    string test_content = "test content\n";
-    err e = file.write_all(input_file, test_content);
-    t.assert(e == ok, "should write input file");
-    string sh_cmd = vigil_bin + " " + main_script + " " + test_file + " < " + input_file;
-    string stdout, string stderr, i32 exitCode, err e2 = os.exec("sh", "-c", sh_cmd);
-    t.assert(e2 == ok, "vigil-tee should succeed");
-    t.assert(stdout == test_content, "stdout should match input");
-    string file_content, err e3 = file.read_all(test_file);
-    t.assert(e3 == ok, "should read output file");
-    t.assert(file_content == test_content, "file content should match input");
-    file.remove(test_file);
-    file.remove(input_file);
+    string vigil_bin, string main_script = find_vigil_and_main()
+    t.assert(vigil_bin != "", "should find vigil binary")
+    string test_file = get_temp_path("vigil_tee_test1.txt")
+    string input_file = get_temp_path("vigil_tee_input1.txt")
+    string test_content = "test content\n"
+    err e = file.write_all(input_file, test_content)
+    t.assert(e == ok, "should write input file")
+    string sh_cmd = vigil_bin + " " + main_script + " " + test_file + " < " + input_file
+    string stdout, string stderr, i32 exitCode, err e2 = os.exec("sh", "-c", sh_cmd)
+    t.assert(e2 == ok, "vigil-tee should succeed")
+    t.assert(stdout == test_content, "stdout should match input")
+    string file_content, err e3 = file.read_all(test_file)
+    t.assert(e3 == ok, "should read output file")
+    t.assert(file_content == test_content, "file content should match input")
+    file.remove(test_file)
+    file.remove(input_file)
 }
+
 
 fn test_tee_multiple_files(test.T t) -> void {
-    string platform = os.platform();
+    string platform = os.platform()
     if platform == "windows" {
-        return;
+        return
     }
 
-    string vigil_bin, string main_script = find_vigil_and_main();
-    t.assert(vigil_bin != "", "should find vigil binary");
-    string file1 = get_temp_path("vigil_tee_test2a.txt");
-    string file2 = get_temp_path("vigil_tee_test2b.txt");
-    string input_file = get_temp_path("vigil_tee_input2.txt");
-    string test_content = "multi file test\n";
-    err e = file.write_all(input_file, test_content);
-    t.assert(e == ok, "should write input file");
-    string sh_cmd = vigil_bin + " " + main_script + " " + file1 + " " + file2 + " < " + input_file;
-    string stdout, string stderr, i32 exitCode, err e2 = os.exec("sh", "-c", sh_cmd);
-    t.assert(e2 == ok, "vigil-tee should succeed");
-    t.assert(stdout == test_content, "stdout should match input");
-    string content1, err e3 = file.read_all(file1);
-    string content2, err e4 = file.read_all(file2);
-    t.assert(e3 == ok && e4 == ok, "should read output files");
-    t.assert(content1 == test_content, "file1 content should match");
-    t.assert(content2 == test_content, "file2 content should match");
-    file.remove(file1);
-    file.remove(file2);
-    file.remove(input_file);
+    string vigil_bin, string main_script = find_vigil_and_main()
+    t.assert(vigil_bin != "", "should find vigil binary")
+    string file1 = get_temp_path("vigil_tee_test2a.txt")
+    string file2 = get_temp_path("vigil_tee_test2b.txt")
+    string input_file = get_temp_path("vigil_tee_input2.txt")
+    string test_content = "multi file test\n"
+    err e = file.write_all(input_file, test_content)
+    t.assert(e == ok, "should write input file")
+    string sh_cmd = vigil_bin + " " + main_script + " " + file1 + " " + file2 + " < " + input_file
+    string stdout, string stderr, i32 exitCode, err e2 = os.exec("sh", "-c", sh_cmd)
+    t.assert(e2 == ok, "vigil-tee should succeed")
+    t.assert(stdout == test_content, "stdout should match input")
+    string content1, err e3 = file.read_all(file1)
+    string content2, err e4 = file.read_all(file2)
+    t.assert(e3 == ok && e4 == ok, "should read output files")
+    t.assert(content1 == test_content, "file1 content should match")
+    t.assert(content2 == test_content, "file2 content should match")
+    file.remove(file1)
+    file.remove(file2)
+    file.remove(input_file)
 }
+
 
 fn test_tee_append_mode(test.T t) -> void {
-    string platform = os.platform();
+    string platform = os.platform()
     if platform == "windows" {
-        return;
+        return
     }
 
-    string vigil_bin, string main_script = find_vigil_and_main();
-    t.assert(vigil_bin != "", "should find vigil binary");
-    string test_file = get_temp_path("vigil_tee_append.txt");
-    string input_file = get_temp_path("vigil_tee_input_append.txt");
+    string vigil_bin, string main_script = find_vigil_and_main()
+    t.assert(vigil_bin != "", "should find vigil binary")
+    string test_file = get_temp_path("vigil_tee_append.txt")
+    string input_file = get_temp_path("vigil_tee_input_append.txt")
     // Write initial content
-    err e1 = file.write_all(test_file, "initial\n");
-    t.assert(e1 == ok, "should write initial content");
+    err e1 = file.write_all(test_file, "initial\n")
+    t.assert(e1 == ok, "should write initial content")
     // Append with tee -a
-    err e2 = file.write_all(input_file, "appended\n");
-    t.assert(e2 == ok, "should write input file");
-    string sh_cmd = vigil_bin + " " + main_script + " -a " + test_file + " < " + input_file;
-    string stdout, string stderr, i32 exitCode, err e3 = os.exec("sh", "-c", sh_cmd);
-    t.assert(e3 == ok, "vigil-tee -a should succeed");
-    string content, err e4 = file.read_all(test_file);
-    t.assert(e4 == ok, "should read output file");
-    t.assert(content == "initial\nappended\n", "should have both contents");
-    file.remove(test_file);
-    file.remove(input_file);
+    err e2 = file.write_all(input_file, "appended\n")
+    t.assert(e2 == ok, "should write input file")
+    string sh_cmd = vigil_bin + " " + main_script + " -a " + test_file + " < " + input_file
+    string stdout, string stderr, i32 exitCode, err e3 = os.exec("sh", "-c", sh_cmd)
+    t.assert(e3 == ok, "vigil-tee -a should succeed")
+    string content, err e4 = file.read_all(test_file)
+    t.assert(e4 == ok, "should read output file")
+    t.assert(content == "initial\nappended\n", "should have both contents")
+    file.remove(test_file)
+    file.remove(input_file)
 }
 
+
 fn test_tee_empty_input(test.T t) -> void {
-    string platform = os.platform();
+    string platform = os.platform()
     if platform == "windows" {
-        return;
+        return
     }
 
-    string vigil_bin, string main_script = find_vigil_and_main();
-    t.assert(vigil_bin != "", "should find vigil binary");
-    string test_file = get_temp_path("vigil_tee_empty.txt");
-    string input_file = get_temp_path("vigil_tee_input_empty.txt");
-    err e = file.write_all(input_file, "");
-    t.assert(e == ok, "should write empty input");
-    string sh_cmd = vigil_bin + " " + main_script + " " + test_file + " < " + input_file;
-    string stdout, string stderr, i32 exitCode, err e2 = os.exec("sh", "-c", sh_cmd);
-    t.assert(e2 == ok, "vigil-tee should succeed on empty input");
-    t.assert(stdout == "", "stdout should be empty");
-    string content, err e3 = file.read_all(test_file);
-    t.assert(e3 == ok, "should read output file");
-    t.assert(content == "", "file should be empty");
-    file.remove(test_file);
-    file.remove(input_file);
+    string vigil_bin, string main_script = find_vigil_and_main()
+    t.assert(vigil_bin != "", "should find vigil binary")
+    string test_file = get_temp_path("vigil_tee_empty.txt")
+    string input_file = get_temp_path("vigil_tee_input_empty.txt")
+    err e = file.write_all(input_file, "")
+    t.assert(e == ok, "should write empty input")
+    string sh_cmd = vigil_bin + " " + main_script + " " + test_file + " < " + input_file
+    string stdout, string stderr, i32 exitCode, err e2 = os.exec("sh", "-c", sh_cmd)
+    t.assert(e2 == ok, "vigil-tee should succeed on empty input")
+    t.assert(stdout == "", "stdout should be empty")
+    string content, err e3 = file.read_all(test_file)
+    t.assert(e3 == ok, "should read output file")
+    t.assert(content == "", "file should be empty")
+    file.remove(test_file)
+    file.remove(input_file)
 }

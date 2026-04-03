@@ -1,60 +1,64 @@
 // Function that returns an error
 
-import "fmt";
+import "fmt"
 
 fn divide(i32 a, i32 b) -> (i32, err) {
     if b == 0 {
-        return 0, err("division by zero", err.arg);
+        return 0, err("division by zero", err.arg)
     }
 
-    return a / b, ok;
+    return a / b, ok
 }
+
 // Function that validates input
 fn validate_age(i32 age) -> err {
     if age < 0 {
-        return err("age cannot be negative", err.arg);
+        return err("age cannot be negative", err.arg)
     }
 
     if age > 150 {
-        return err("age is unrealistic", err.arg);
+        return err("age is unrealistic", err.arg)
     }
 
-    return ok;
+    return ok
 }
+
 
 fn main() -> i32 {
     // Example 1: Handle division error
-    i32 result, err e = divide(10, 2);
+    i32 result, err e = divide(10, 2)
     if e != ok {
-        fmt.println(f"Error: {e.message()}");
-        return 1;
+        fmt.println(f"Error: {e.message()}")
+        return 1
     }
 
-    fmt.println(f"10 / 2 = {result}");
+    fmt.println(f"10 / 2 = {result}")
     // Example 2: Division by zero
-    i32 result2, err e2 = divide(10, 0);
+    i32 result2, err e2 = divide(10, 0)
     if e2 != ok {
-        fmt.println(f"Error: {e2.message()}");
+        fmt.println(f"Error: {e2.message()}")
     } else {
-        fmt.println(f"Result: {result2}");
+        fmt.println(f"Result: {result2}")
     }
+
     // Example 3: Validate age
-    err e3 = validate_age(25);
+    err e3 = validate_age(25)
     if e3 == ok {
-        fmt.println("Age 25 is valid");
+        fmt.println("Age 25 is valid")
     }
 
-    err e4 = validate_age(- 5);
+    err e4 = validate_age(- 5)
     if e4 != ok {
-        fmt.println(f"Invalid age: {e4.message()}");
+        fmt.println(f"Invalid age: {e4.message()}")
     }
 
-    err e5 = validate_age(200);
+    err e5 = validate_age(200)
     if e5 != ok {
-        fmt.println(f"Invalid age: {e5.message()}");
+        fmt.println(f"Invalid age: {e5.message()}")
     }
+
     // Example 4: Discard error with _
-    i32 result3, err _ = divide(20, 4);
-    fmt.println(f"20 / 4 = {result3}");
-    return 0;
+    i32 result3, err _ = divide(20, 4)
+    fmt.println(f"20 / 4 = {result3}")
+    return 0
 }

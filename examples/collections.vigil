@@ -1,67 +1,69 @@
-import "fmt";
+import "fmt"
 
 fn main() -> i32 {
     // Arrays
-    array<i32> numbers = [1, 2, 3, 4, 5];
-    fmt.println("Array operations:");
-    fmt.println(f"  Length: {numbers.len()}");
-    fmt.println(f"  First element: {numbers[0]}");
-    fmt.println(f"  Last element: {numbers[4]}");
+    array<i32> numbers = [1, 2, 3, 4, 5]
+    fmt.println("Array operations:")
+    fmt.println(f"  Length: {numbers.len()}")
+    fmt.println(f"  First element: {numbers[0]}")
+    fmt.println(f"  Last element: {numbers[4]}")
     // Add elements
-    numbers.push(6);
-    numbers.push(7);
-    fmt.print("  After push: [");
+    numbers.push(6)
+    numbers.push(7)
+    fmt.print("  After push: [")
     for (i32 i = 0; i < numbers.len(); i++) {
         if i > 0 {
-            fmt.print(", ");
+            fmt.print(", ")
         }
 
-        fmt.print(f"{numbers[i]}");
+        fmt.print(f"{numbers[i]}")
     }
 
-    fmt.println("]");
+    fmt.println("]")
     // Iterate over array
-    fmt.println("  Elements:");
+    fmt.println("  Elements:")
     for num in numbers {
-        fmt.println(f"    {num}");
+        fmt.println(f"    {num}")
     }
+
     // Maps
-    fmt.println("\nMap operations:");
-    map<string, i32> scores = {"alice": 95, "bob": 87, "charlie": 92};
-    i32 alice_score = scores["alice"];
-    fmt.println(f"  Alice's score: {alice_score}");
+    fmt.println("\nMap operations:")
+    map<string, i32> scores = {"alice": 95, "bob": 87, "charlie": 92}
+    i32 alice_score = scores["alice"]
+    fmt.println(f"  Alice's score: {alice_score}")
     // Add new entry
-    scores["david"] = 88;
+    scores["david"] = 88
     // Check if key exists
-    bool has_alice = scores.has("alice");
-    bool has_eve = scores.has("eve");
-    fmt.println(f"  Has alice: {has_alice}");
-    fmt.println(f"  Has eve: {has_eve}");
+    bool has_alice = scores.has("alice")
+    bool has_eve = scores.has("eve")
+    fmt.println(f"  Has alice: {has_alice}")
+    fmt.println(f"  Has eve: {has_eve}")
     // Iterate over map
-    fmt.println("  All scores:");
+    fmt.println("  All scores:")
     for name, score in scores {
-        fmt.println(f"    {name}: {score}");
+        fmt.println(f"    {name}: {score}")
     }
+
     // Remove key
-    i32 removed_score, bool removed = scores.remove("bob");
-    fmt.println(f"  Removed bob: {removed}");
-    fmt.println(f"  After removing bob: {scores.len()} entries");
+    i32 removed_score, bool removed = scores.remove("bob")
+    fmt.println(f"  Removed bob: {removed}")
+    fmt.println(f"  After removing bob: {scores.len()} entries")
     // Nested structures
-    fmt.println("\nNested structures:");
-    array<array<i32 >> matrix = [[1, 2, 3], [4, 5, 6], [7, 8, 9]];
-    fmt.println("  Matrix:");
+    fmt.println("\nNested structures:")
+    array<array<i32 >> matrix = [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
+    fmt.println("  Matrix:")
     for row in matrix {
-        fmt.print("    [");
+        fmt.print("    [")
         for (i32 i = 0; i <row.len(); i++) {
             if i>0 {
-                fmt.print(", ");
+                fmt.print(", ")
             }
 
-            fmt.print(f"{row[i]}");
+            fmt.print(f"{row[i]}")
         }
 
-        fmt.println("]");
+        fmt.println("]")
     }
 
-    return 0;
+    return 0
 }

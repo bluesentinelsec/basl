@@ -1,55 +1,61 @@
-import "args";
-import "fmt";
-import "fs";
+import "args"
+import "fmt"
+import "fs"
 
 fn main() -> i32 {
     if args.count() < 1 {
-        fmt.eprintln("usage: paste FILE1 [FILE2 ...]");
-        return 1;
+        fmt.eprintln("usage: paste FILE1 [FILE2 ...]")
+        return 1
     }
+
     // Read all files and split into line arrays
-    array<array<string >> file_lines = [];
+    array<array<string >> file_lines = []
     for (i32 i = 0; i <args.count(); i++) {
-        string path = args.at(i);
+        string path = args.at(i)
         if ! fs.exists(path) {
-            fmt.eprintln(f"paste: cannot open {path}");
-            return 1;
+            fmt.eprintln(f"paste: cannot open {path}")
+            return 1
         }
 
-        string content = fs.read(path);
-        array<string>lines = content.split("\n");
+        string content = fs.read(path)
+        array<string>lines = content.split("\n")
         if lines.len()>0 && lines[lines.len() - 1].is_empty() {
-            string dropped, err pop_err = lines.pop();
+            string dropped, err pop_err = lines.pop()
             if pop_err != ok {
-                fmt.eprintln(f"paste: cannot read {path}");
-                return 1;
+                fmt.eprintln(f"paste: cannot read {path}")
+                return 1
             }
+
         }
 
-        file_lines.push(lines);
+        file_lines.push(lines)
     }
+
     // Find max line count
-    i32 max_lines = 0;
+    i32 max_lines = 0
     for (i32 i = 0; i <file_lines.len(); i++) {
         if file_lines[i].len()> max_lines {
-            max_lines = file_lines[i].len();
+            max_lines = file_lines[i].len()
         }
+
     }
+
     // Zip lines with tabs
     for (i32 row = 0; row < max_lines; row++) {
-        string output = "";
+        string output = ""
         for (i32 col = 0; col < file_lines.len(); col++) {
             if col > 0 {
-                output += "\t";
+                output += "\t"
             }
 
             if row < file_lines[col].len() {
-                output += file_lines[col][row];
+                output += file_lines[col][row]
             }
+
         }
 
-        fmt.println(output);
+        fmt.println(output)
     }
 
-    return 0;
+    return 0
 }

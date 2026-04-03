@@ -1,21 +1,21 @@
-import "args";
-import "fmt";
-import "fs";
+import "args"
+import "fmt"
+import "fs"
 
 fn main() -> i32 {
     if args.count() < 2 {
-        fmt.eprintln("vigil-mv: missing file operand");
-        fmt.eprintln("usage: vigil-mv SOURCE DEST");
-        return 1;
+        fmt.eprintln("vigil-mv: missing file operand")
+        fmt.eprintln("usage: vigil-mv SOURCE DEST")
+        return 1
     }
 
-    string src = args.at(0);
-    string dst = args.at(1);
-    bool ok2 = fs.move(src, dst);
+    string src = args.at(0)
+    string dst = args.at(1)
+    bool ok2 = fs.move(src, dst)
     if ! ok2 {
-        fmt.eprintln(f"vigil-mv: cannot move '{src}' to '{dst}'");
-        return 1;
+        fmt.eprintln(f"vigil-mv: cannot move '{src}' to '{dst}'")
+        return 1
     }
 
-    return 0;
+    return 0
 }

@@ -1,19 +1,19 @@
-import "math";
+import "math"
 
 fn main() -> i32 {
-    f64 acc = 0.0;
+    f64 acc = 0.0
     for (i32 i = 0; i < 60000; i++) {
-        f64 x = f64(i) * 0.001 + 1.0;
-        acc = acc + math.sin(x);
-        acc = acc + math.cos(x);
-        acc = acc + math.sqrt(x);
-        acc = acc + math.log(x);
-        acc = acc + math.pow(x, 0.25);
+        f64 x = f64(i) * 0.001 + 1.0
+        acc = acc + math.sin(x)
+        acc = acc + math.cos(x)
+        acc = acc + math.sqrt(x)
+        acc = acc + math.log(x)
+        acc = acc + math.pow(x, 0.25)
     }
 
     if acc != 0.0 {
-        return 0;
+        return 0
     }
 
-    return 1;
+    return 1
 }

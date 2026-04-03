@@ -10,547 +10,576 @@
 //   Mode 7: Performance stress (1000+ files, deep nesting)
 // ─── Counters ───────────────────────────────────────────────────
 
-import "fmt";
-import "fs";
-import "time";
+import "fmt"
+import "fs"
+import "time"
 
-i32 g_pass = 0;
-i32 g_fail = 0;
-i32 g_total = 0;
+i32 g_pass = 0
+i32 g_fail = 0
+i32 g_total = 0
 
 fn check(bool cond, string label) -> void {
-    g_total++;
+    g_total++
     if cond {
-        g_pass++;
+        g_pass++
     } else {
-        g_fail++;
-        fmt.eprintln("  FAIL: " + label);
+        g_fail++
+        fmt.eprintln("  FAIL: " + label)
     }
+
 }
 
+
 fn section(string name) -> void {
-    fmt.println("");
-    fmt.println("══ " + name + " ══");
+    fmt.println("")
+    fmt.println("══ " + name + " ══")
 }
+
 // ─── Path Utility Helpers ───────────────────────────────────────
 fn make_path(string base, string child) -> string {
-    return fs.join(base, child);
+    return fs.join(base, child)
 }
+
 
 fn ensure_dir(string path) -> bool {
     if ! fs.is_dir(path) {
-        return fs.mkdir_all(path);
+        return fs.mkdir_all(path)
     }
 
-    return true;
+    return true
 }
+
 
 fn write_file(string path, string content) -> bool {
-    return fs.write(path, content);
+    return fs.write(path, content)
 }
 
+
 fn read_file(string path) -> string {
-    return fs.read(path);
+    return fs.read(path)
 }
+
 // ─── Mode 1: Recursive Directory Copy ──────────────────────────
 fn copy_tree(string src, string dst, bool dry_run) -> i32 {
     // Copy a directory tree recursively with conflict handling.
     // Returns number of files copied.
-    i32 copied = 0;
+    i32 copied = 0
     if ! fs.is_dir(src) {
-        fmt.eprintln("  copy_tree: source not a directory: " + src);
-        return 0;
+        fmt.eprintln("  copy_tree: source not a directory: " + src)
+        return 0
     }
 
     if ! dry_run {
-        ensure_dir(dst);
+        ensure_dir(dst)
     }
 
-    array<string> entries = fs.list(src);
+    array<string> entries = fs.list(src)
     for entry in entries {
-        string src_path = fs.join(src, entry);
-        string dst_path = fs.join(dst, entry);
+        string src_path = fs.join(src, entry)
+        string dst_path = fs.join(dst, entry)
         if fs.is_dir(src_path) {
             // Recurse into subdirectory
-            copied += copy_tree(src_path, dst_path, dry_run);
+            copied += copy_tree(src_path, dst_path, dry_run)
         } else if fs.is_file(src_path) {
             // Conflict resolution: if dest exists, create backup
             if fs.exists(dst_path) {
-                string backup = dst_path + ".bak";
+                string backup = dst_path + ".bak"
                 if ! dry_run {
-                    fs.copy(dst_path, backup);
+                    fs.copy(dst_path, backup)
                 }
+
             }
 
             if ! dry_run {
-                string content = fs.read(src_path);
-                fs.write(dst_path, content);
+                string content = fs.read(src_path)
+                fs.write(dst_path, content)
             }
 
-            copied++;
+            copied++
         }
+
     }
 
-    return copied;
+    return copied
 }
 
+
 fn test_recursive_copy(string root) -> void {
-    section("Mode 1: Recursive Directory Copy");
-    string src = fs.join(root, "copy_src");
-    string dst = fs.join(root, "copy_dst");
+    section("Mode 1: Recursive Directory Copy")
+    string src = fs.join(root, "copy_src")
+    string dst = fs.join(root, "copy_dst")
     // Build source tree: src/{a,b,c/d/e}/file.txt
-    ensure_dir(fs.join(src, "a"));
-    ensure_dir(fs.join(src, "b"));
-    ensure_dir(fs.join(src, "c/d/e"));
-    write_file(fs.join(src, "root.txt"), "root content");
-    write_file(fs.join(src, "a/alpha.txt"), "alpha");
-    write_file(fs.join(src, "b/beta.txt"), "beta data here");
-    write_file(fs.join(src, "c/d/e/deep.txt"), "deeply nested");
-    write_file(fs.join(src, "c/d/mid.txt"), "mid level");
+    ensure_dir(fs.join(src, "a"))
+    ensure_dir(fs.join(src, "b"))
+    ensure_dir(fs.join(src, "c/d/e"))
+    write_file(fs.join(src, "root.txt"), "root content")
+    write_file(fs.join(src, "a/alpha.txt"), "alpha")
+    write_file(fs.join(src, "b/beta.txt"), "beta data here")
+    write_file(fs.join(src, "c/d/e/deep.txt"), "deeply nested")
+    write_file(fs.join(src, "c/d/mid.txt"), "mid level")
     // Copy tree
-    i32 count = copy_tree(src, dst, false);
-    check(count == 5, "copied 5 files");
+    i32 count = copy_tree(src, dst, false)
+    check(count == 5, "copied 5 files")
     // Verify copied content
-    check(fs.read(fs.join(dst, "root.txt")) == "root content", "root.txt content matches");
-    check(fs.read(fs.join(dst, "a/alpha.txt")) == "alpha", "alpha.txt content matches");
-    check(fs.read(fs.join(dst, "c/d/e/deep.txt")) == "deeply nested", "deep.txt content matches");
-    check(fs.is_dir(fs.join(dst, "c/d/e")), "deep dir structure preserved");
+    check(fs.read(fs.join(dst, "root.txt")) == "root content", "root.txt content matches")
+    check(fs.read(fs.join(dst, "a/alpha.txt")) == "alpha", "alpha.txt content matches")
+    check(fs.read(fs.join(dst, "c/d/e/deep.txt")) == "deeply nested", "deep.txt content matches")
+    check(fs.is_dir(fs.join(dst, "c/d/e")), "deep dir structure preserved")
     // Test conflict resolution: modify source, re-copy
-    write_file(fs.join(src, "root.txt"), "updated root");
-    copy_tree(src, dst, false);
-    check(fs.exists(fs.join(dst, "root.txt.bak")), "backup created on conflict");
-    check(fs.read(fs.join(dst, "root.txt")) == "updated root", "overwritten with new content");
-    check(fs.read(fs.join(dst, "root.txt.bak")) == "root content", "backup has old content");
+    write_file(fs.join(src, "root.txt"), "updated root")
+    copy_tree(src, dst, false)
+    check(fs.exists(fs.join(dst, "root.txt.bak")), "backup created on conflict")
+    check(fs.read(fs.join(dst, "root.txt")) == "updated root", "overwritten with new content")
+    check(fs.read(fs.join(dst, "root.txt.bak")) == "root content", "backup has old content")
     // Dry run: count without writing
-    string dst2 = fs.join(root, "copy_dry");
-    i32 dry_count = copy_tree(src, dst2, true);
-    check(dry_count == 5, "dry run counted 5 files");
-    check(! fs.exists(dst2), "dry run created no directories");
-    fmt.println("  Copy tests done");
+    string dst2 = fs.join(root, "copy_dry")
+    i32 dry_count = copy_tree(src, dst2, true)
+    check(dry_count == 5, "dry run counted 5 files")
+    check(! fs.exists(dst2), "dry run created no directories")
+    fmt.println("  Copy tests done")
 }
+
 // ─── Mode 2: Project Scaffolding ───────────────────────────────
 fn scaffold_project(string root, string project_name) -> void {
     // Create a project directory structure with template files.
-    string base = fs.join(root, project_name);
-    ensure_dir(fs.join(base, "src"));
-    ensure_dir(fs.join(base, "test"));
-    ensure_dir(fs.join(base, "lib"));
-    ensure_dir(fs.join(base, "docs"));
+    string base = fs.join(root, project_name)
+    ensure_dir(fs.join(base, "src"))
+    ensure_dir(fs.join(base, "test"))
+    ensure_dir(fs.join(base, "lib"))
+    ensure_dir(fs.join(base, "docs"))
     // Template expansion: replace {{NAME}} with project name
-    string main_tpl = "// {{NAME}} - main entry point\nimport \"fmt\";\nfn main() -> i32 {\n    fmt.println(\"Hello from {{NAME}}\");\n    return 0;\n}\n";
-    string readme_tpl = "# {{NAME}}\n\nA VIGIL project.\n";
-    string toml_tpl = "[project]\nname = \"{{NAME}}\"\nversion = \"0.1.0\"\n";
+    string main_tpl = "// {{NAME}} - main entry point\nimport \"fmt\";\nfn main() -> i32 {\n    fmt.println(\"Hello from {{NAME}}\");\n    return 0;\n}\n"
+    string readme_tpl = "# {{NAME}}\n\nA VIGIL project.\n"
+    string toml_tpl = "[project]\nname = \"{{NAME}}\"\nversion = \"0.1.0\"\n"
     // Simple template expansion
-    string main_src = main_tpl.replace("{{NAME}}", project_name);
-    string readme = readme_tpl.replace("{{NAME}}", project_name);
-    string toml = toml_tpl.replace("{{NAME}}", project_name);
-    write_file(fs.join(base, "src/main.vigil"), main_src);
-    write_file(fs.join(base, "README.md"), readme);
-    write_file(fs.join(base, "vigil.toml"), toml);
-    write_file(fs.join(base, "test/main_test.vigil"), "// tests for " + project_name + "\n");
-    write_file(fs.join(base, "lib/utils.vigil"), "// utility module\n");
+    string main_src = main_tpl.replace("{{NAME}}", project_name)
+    string readme = readme_tpl.replace("{{NAME}}", project_name)
+    string toml = toml_tpl.replace("{{NAME}}", project_name)
+    write_file(fs.join(base, "src/main.vigil"), main_src)
+    write_file(fs.join(base, "README.md"), readme)
+    write_file(fs.join(base, "vigil.toml"), toml)
+    write_file(fs.join(base, "test/main_test.vigil"), "// tests for " + project_name + "\n")
+    write_file(fs.join(base, "lib/utils.vigil"), "// utility module\n")
 }
 
+
 fn test_scaffolding(string root) -> void {
-    section("Mode 2: Project Scaffolding");
-    scaffold_project(root, "myapp");
-    string base = fs.join(root, "myapp");
-    check(fs.is_dir(base), "project dir created");
-    check(fs.is_dir(fs.join(base, "src")), "src/ created");
-    check(fs.is_dir(fs.join(base, "test")), "test/ created");
-    check(fs.is_dir(fs.join(base, "lib")), "lib/ created");
-    check(fs.is_dir(fs.join(base, "docs")), "docs/ created");
+    section("Mode 2: Project Scaffolding")
+    scaffold_project(root, "myapp")
+    string base = fs.join(root, "myapp")
+    check(fs.is_dir(base), "project dir created")
+    check(fs.is_dir(fs.join(base, "src")), "src/ created")
+    check(fs.is_dir(fs.join(base, "test")), "test/ created")
+    check(fs.is_dir(fs.join(base, "lib")), "lib/ created")
+    check(fs.is_dir(fs.join(base, "docs")), "docs/ created")
     // Verify template expansion
-    string main_content = fs.read(fs.join(base, "src/main.vigil"));
-    check(main_content.contains("myapp"), "template expanded project name in main");
-    check(! main_content.contains("{{NAME}}"), "no unexpanded placeholders");
-    string toml_content = fs.read(fs.join(base, "vigil.toml"));
-    check(toml_content.contains("name = \"myapp\""), "toml has project name");
+    string main_content = fs.read(fs.join(base, "src/main.vigil"))
+    check(main_content.contains("myapp"), "template expanded project name in main")
+    check(! main_content.contains("{{NAME}}"), "no unexpanded placeholders")
+    string toml_content = fs.read(fs.join(base, "vigil.toml"))
+    check(toml_content.contains("name = \"myapp\""), "toml has project name")
     // Verify file sizes are reasonable
-    i64 main_size = fs.size(fs.join(base, "src/main.vigil"));
-    check(main_size > i64(0), "main.vigil has content (size=" + string(main_size) + ")");
-    i64 mtime = fs.mtime(fs.join(base, "vigil.toml"));
-    check(mtime > i64(0), "vigil.toml has valid mtime");
-    fmt.println("  Scaffold tests done");
+    i64 main_size = fs.size(fs.join(base, "src/main.vigil"))
+    check(main_size > i64(0), "main.vigil has content (size=" + string(main_size) + ")")
+    i64 mtime = fs.mtime(fs.join(base, "vigil.toml"))
+    check(mtime > i64(0), "vigil.toml has valid mtime")
+    fmt.println("  Scaffold tests done")
 }
+
 // ─── Mode 3: File Search + Content Grep ────────────────────────
 fn search_files(string dir, string pattern) -> array<string> {
     // Walk directory tree and return paths of files containing pattern.
-    array<string> matches = [];
-    array<string> all_files = fs.walk(dir);
+    array<string> matches = []
+    array<string> all_files = fs.walk(dir)
     for path in all_files {
         if fs.is_file(path) {
-            string content = fs.read(path);
+            string content = fs.read(path)
             if content.contains(pattern) {
-                matches.push(path);
+                matches.push(path)
             }
+
         }
+
     }
 
-    return matches;
+    return matches
 }
+
 
 fn search_by_extension(string dir, string ext) -> array<string> {
     // Find all files with a given extension.
-    array<string> matches = [];
-    array<string> all_files = fs.walk(dir);
+    array<string> matches = []
+    array<string> all_files = fs.walk(dir)
     for path in all_files {
         if fs.is_file(path) && fs.ext(path) == ext {
-            matches.push(path);
+            matches.push(path)
         }
+
     }
 
-    return matches;
+    return matches
 }
 
+
 fn test_search(string root) -> void {
-    section("Mode 3: File Search + Content Grep");
+    section("Mode 3: File Search + Content Grep")
     // Create searchable files
-    string search_dir = fs.join(root, "search");
-    ensure_dir(fs.join(search_dir, "sub1"));
-    ensure_dir(fs.join(search_dir, "sub2/deep"));
-    write_file(fs.join(search_dir, "readme.md"), "# Project\nThis is a VIGIL project.\n");
-    write_file(fs.join(search_dir, "sub1/code.vigil"), "import \"fmt\";\nfn hello() { fmt.println(\"hi\"); }\n");
-    write_file(fs.join(search_dir, "sub1/data.txt"), "no code here\n");
-    write_file(fs.join(search_dir, "sub2/code2.vigil"), "import \"fs\";\nfn read_stuff() { fs.read(\"x\"); }\n");
-    write_file(fs.join(search_dir, "sub2/deep/nested.vigil"), "import \"fmt\";\nfn deep() { fmt.println(\"deep\"); }\n");
+    string search_dir = fs.join(root, "search")
+    ensure_dir(fs.join(search_dir, "sub1"))
+    ensure_dir(fs.join(search_dir, "sub2/deep"))
+    write_file(fs.join(search_dir, "readme.md"), "# Project\nThis is a VIGIL project.\n")
+    write_file(fs.join(search_dir, "sub1/code.vigil"), "import \"fmt\";\nfn hello() { fmt.println(\"hi\"); }\n")
+    write_file(fs.join(search_dir, "sub1/data.txt"), "no code here\n")
+    write_file(fs.join(search_dir, "sub2/code2.vigil"), "import \"fs\";\nfn read_stuff() { fs.read(\"x\"); }\n")
+    write_file(fs.join(search_dir, "sub2/deep/nested.vigil"), "import \"fmt\";\nfn deep() { fmt.println(\"deep\"); }\n")
     // Search for content
-    array<string> fmt_files = search_files(search_dir, "fmt");
-    check(fmt_files.len() == 2, "found 2 files containing 'fmt'");
-    array<string> fs_files = search_files(search_dir, "fs.read");
-    check(fs_files.len() == 1, "found 1 file containing 'fs.read'");
+    array<string> fmt_files = search_files(search_dir, "fmt")
+    check(fmt_files.len() == 2, "found 2 files containing 'fmt'")
+    array<string> fs_files = search_files(search_dir, "fs.read")
+    check(fs_files.len() == 1, "found 1 file containing 'fs.read'")
     // Search by extension
-    array<string> vigil_files = search_by_extension(search_dir, ".vigil");
-    check(vigil_files.len() == 3, "found 3 .vigil files");
-    array<string> md_files = search_by_extension(search_dir, ".md");
-    check(md_files.len() == 1, "found 1 .md file");
+    array<string> vigil_files = search_by_extension(search_dir, ".vigil")
+    check(vigil_files.len() == 3, "found 3 .vigil files")
+    array<string> md_files = search_by_extension(search_dir, ".md")
+    check(md_files.len() == 1, "found 1 .md file")
     // Walk returns both files and dirs
-    array<string> all = fs.walk(search_dir);
-    check(all.len() >= 8, "walk found at least 8 entries (dirs+files)");
+    array<string> all = fs.walk(search_dir)
+    check(all.len() >= 8, "walk found at least 8 entries (dirs+files)")
     // List returns only immediate children
-    array<string> top = fs.list(search_dir);
-    check(top.len() == 3, "list found 3 top-level entries");
-    fmt.println("  Search tests done");
+    array<string> top = fs.list(search_dir)
+    check(top.len() == 3, "list found 3 top-level entries")
+    fmt.println("  Search tests done")
 }
+
 // ─── Mode 4: Safe Delete (Trash Simulation) ────────────────────
 fn safe_delete(string path, string trash_dir) -> bool {
     // Move file/dir to trash instead of deleting.
     if ! fs.exists(path) {
-        return false;
+        return false
     }
 
-    ensure_dir(trash_dir);
-    string name = fs.base(path);
-    string trash_path = fs.join(trash_dir, name);
+    ensure_dir(trash_dir)
+    string name = fs.base(path)
+    string trash_path = fs.join(trash_dir, name)
     // Handle name collision in trash
     if fs.exists(trash_path) {
-        i64 ts = time.now();
-        trash_path = fs.join(trash_dir, name + "." + string(ts));
+        i64 ts = time.now()
+        trash_path = fs.join(trash_dir, name + "." + string(ts))
     }
 
-    return fs.move(path, trash_path);
+    return fs.move(path, trash_path)
 }
 
+
 fn test_safe_delete(string root) -> void {
-    section("Mode 4: Safe Delete (Trash)");
-    string trash = fs.join(root, ".trash");
-    string work = fs.join(root, "work");
-    ensure_dir(work);
+    section("Mode 4: Safe Delete (Trash)")
+    string trash = fs.join(root, ".trash")
+    string work = fs.join(root, "work")
+    ensure_dir(work)
     // Create files to delete
-    write_file(fs.join(work, "temp1.txt"), "temporary 1");
-    write_file(fs.join(work, "temp2.txt"), "temporary 2");
-    check(fs.exists(fs.join(work, "temp1.txt")), "temp1 exists before delete");
-    bool ok1 = safe_delete(fs.join(work, "temp1.txt"), trash);
-    check(ok1, "safe_delete succeeded");
-    check(! fs.exists(fs.join(work, "temp1.txt")), "temp1 gone from work dir");
-    check(fs.exists(fs.join(trash, "temp1.txt")), "temp1 in trash");
+    write_file(fs.join(work, "temp1.txt"), "temporary 1")
+    write_file(fs.join(work, "temp2.txt"), "temporary 2")
+    check(fs.exists(fs.join(work, "temp1.txt")), "temp1 exists before delete")
+    bool ok1 = safe_delete(fs.join(work, "temp1.txt"), trash)
+    check(ok1, "safe_delete succeeded")
+    check(! fs.exists(fs.join(work, "temp1.txt")), "temp1 gone from work dir")
+    check(fs.exists(fs.join(trash, "temp1.txt")), "temp1 in trash")
     // Verify content preserved in trash
-    check(fs.read(fs.join(trash, "temp1.txt")) == "temporary 1", "trash content intact");
+    check(fs.read(fs.join(trash, "temp1.txt")) == "temporary 1", "trash content intact")
     // Delete second file
-    safe_delete(fs.join(work, "temp2.txt"), trash);
-    check(fs.exists(fs.join(trash, "temp2.txt")), "temp2 in trash");
+    safe_delete(fs.join(work, "temp2.txt"), trash)
+    check(fs.exists(fs.join(trash, "temp2.txt")), "temp2 in trash")
     // Delete non-existent file
-    bool ok3 = safe_delete(fs.join(work, "nope.txt"), trash);
-    check(! ok3, "safe_delete returns false for missing file");
-    fmt.println("  Safe delete tests done");
+    bool ok3 = safe_delete(fs.join(work, "nope.txt"), trash)
+    check(! ok3, "safe_delete returns false for missing file")
+    fmt.println("  Safe delete tests done")
 }
+
 // ─── Mode 5: Metadata Inspection ───────────────────────────────
 fn test_metadata(string root) -> void {
-    section("Mode 5: Metadata Inspection");
-    string meta_dir = fs.join(root, "meta");
-    ensure_dir(meta_dir);
+    section("Mode 5: Metadata Inspection")
+    string meta_dir = fs.join(root, "meta")
+    ensure_dir(meta_dir)
     // Create files of known sizes
-    write_file(fs.join(meta_dir, "empty.txt"), "");
-    write_file(fs.join(meta_dir, "small.txt"), "hello");
-    write_file(fs.join(meta_dir, "medium.txt"), "abcdefghij");
+    write_file(fs.join(meta_dir, "empty.txt"), "")
+    write_file(fs.join(meta_dir, "small.txt"), "hello")
+    write_file(fs.join(meta_dir, "medium.txt"), "abcdefghij")
     // 10 bytes
     // Build a larger file
-    string big = "";
-    i32 i = 0;
+    string big = ""
+    i32 i = 0
     for (i = 0; i < 100; i++) {
-        big += "0123456789";
+        big += "0123456789"
         // 1000 bytes total
     }
 
-    write_file(fs.join(meta_dir, "large.txt"), big);
+    write_file(fs.join(meta_dir, "large.txt"), big)
     // Size checks
-    i64 empty_size = fs.size(fs.join(meta_dir, "empty.txt"));
-    check(empty_size == i64(0), "empty file size is 0");
-    i64 small_size = fs.size(fs.join(meta_dir, "small.txt"));
-    check(small_size == i64(5), "small file size is 5");
-    i64 medium_size = fs.size(fs.join(meta_dir, "medium.txt"));
-    check(medium_size == i64(10), "medium file size is 10");
-    i64 large_size = fs.size(fs.join(meta_dir, "large.txt"));
-    check(large_size == i64(1000), "large file size is 1000");
+    i64 empty_size = fs.size(fs.join(meta_dir, "empty.txt"))
+    check(empty_size == i64(0), "empty file size is 0")
+    i64 small_size = fs.size(fs.join(meta_dir, "small.txt"))
+    check(small_size == i64(5), "small file size is 5")
+    i64 medium_size = fs.size(fs.join(meta_dir, "medium.txt"))
+    check(medium_size == i64(10), "medium file size is 10")
+    i64 large_size = fs.size(fs.join(meta_dir, "large.txt"))
+    check(large_size == i64(1000), "large file size is 1000")
     // Modification time
-    i64 now = time.now();
-    i64 mtime = fs.mtime(fs.join(meta_dir, "small.txt"));
-    check(mtime > i64(0), "mtime is positive");
+    i64 now = time.now()
+    i64 mtime = fs.mtime(fs.join(meta_dir, "small.txt"))
+    check(mtime > i64(0), "mtime is positive")
     // mtime should be within last 60 seconds
-    i64 diff = now - mtime;
-    check(diff >= i64(0) && diff < i64(60), "mtime is recent (within 60s)");
+    i64 diff = now - mtime
+    check(diff >= i64(0) && diff < i64(60), "mtime is recent (within 60s)")
     // Size of non-existent file
-    i64 missing_size = fs.size(fs.join(meta_dir, "nope.txt"));
-    check(missing_size == i64(- 1), "missing file size is -1");
+    i64 missing_size = fs.size(fs.join(meta_dir, "nope.txt"))
+    check(missing_size == i64(- 1), "missing file size is -1")
     // Append and verify size grows
-    fs.append(fs.join(meta_dir, "small.txt"), " world");
-    i64 appended_size = fs.size(fs.join(meta_dir, "small.txt"));
-    check(appended_size == i64(11), "appended file size is 11");
-    check(fs.read(fs.join(meta_dir, "small.txt")) == "hello world", "append content correct");
-    fmt.println("  Metadata tests done");
+    fs.append(fs.join(meta_dir, "small.txt"), " world")
+    i64 appended_size = fs.size(fs.join(meta_dir, "small.txt"))
+    check(appended_size == i64(11), "appended file size is 11")
+    check(fs.read(fs.join(meta_dir, "small.txt")) == "hello world", "append content correct")
+    fmt.println("  Metadata tests done")
 }
+
 // ─── Mode 6: Path Operations + Edge Cases + Error Handling ─────
 fn test_path_ops(string root) -> void {
-    section("Mode 6: Path Operations + Edge Cases");
+    section("Mode 6: Path Operations + Edge Cases")
     // ── Path construction and decomposition ──
-    check(fs.join("a", "b") == "a/b", "join basic");
-    check(fs.join("/usr", "local/bin") == "/usr/local/bin", "join multi parts");
-    check(fs.join("", "b") == "b", "join empty first");
-    check(fs.dir("/foo/bar.txt") == "/foo", "dir of absolute path");
-    check(fs.dir("bar.txt") == ".", "dir of bare filename");
-    check(fs.dir("/") == "/", "dir of root");
-    check(fs.base("/foo/bar.txt") == "bar.txt", "base of path");
-    check(fs.base("/foo/") == "", "base of trailing-slash path");
-    check(fs.base("single") == "single", "base of single component");
-    check(fs.ext("file.txt") == ".txt", "ext basic");
-    check(fs.ext("file.tar.gz") == ".gz", "ext double extension");
-    check(fs.ext("noext") == "", "ext no extension");
-    check(fs.ext(".hidden") == ".hidden", "ext dotfile treated as extension");
-    check(fs.is_abs("/usr/bin") == true, "is_abs absolute");
-    check(fs.is_abs("relative/path") == false, "is_abs relative");
+    check(fs.join("a", "b") == "a/b", "join basic")
+    check(fs.join("/usr", "local/bin") == "/usr/local/bin", "join multi parts")
+    check(fs.join("", "b") == "b", "join empty first")
+    check(fs.dir("/foo/bar.txt") == "/foo", "dir of absolute path")
+    check(fs.dir("bar.txt") == ".", "dir of bare filename")
+    check(fs.dir("/") == "/", "dir of root")
+    check(fs.base("/foo/bar.txt") == "bar.txt", "base of path")
+    check(fs.base("/foo/") == "", "base of trailing-slash path")
+    check(fs.base("single") == "single", "base of single component")
+    check(fs.ext("file.txt") == ".txt", "ext basic")
+    check(fs.ext("file.tar.gz") == ".gz", "ext double extension")
+    check(fs.ext("noext") == "", "ext no extension")
+    check(fs.ext(".hidden") == ".hidden", "ext dotfile treated as extension")
+    check(fs.is_abs("/usr/bin") == true, "is_abs absolute")
+    check(fs.is_abs("relative/path") == false, "is_abs relative")
     // ── Path normalization ──
-    check(fs.clean("a/./b") == "a/b", "clean dot");
-    check(fs.clean("a/../b") == "b", "clean dotdot");
-    check(fs.clean("a/b/../../c") == "c", "clean multiple dotdot");
-    check(fs.clean("///a///b") == "/a/b", "clean multiple slashes");
-    check(fs.clean("") == ".", "clean empty");
-    check(fs.clean(".") == ".", "clean dot only");
+    check(fs.clean("a/./b") == "a/b", "clean dot")
+    check(fs.clean("a/../b") == "b", "clean dotdot")
+    check(fs.clean("a/b/../../c") == "c", "clean multiple dotdot")
+    check(fs.clean("///a///b") == "/a/b", "clean multiple slashes")
+    check(fs.clean("") == ".", "clean empty")
+    check(fs.clean(".") == ".", "clean dot only")
     // ── Existence and type checks ──
-    string test_dir = fs.join(root, "pathtest");
-    ensure_dir(test_dir);
-    write_file(fs.join(test_dir, "file.txt"), "x");
-    check(fs.exists(test_dir), "dir exists");
-    check(fs.exists(fs.join(test_dir, "file.txt")), "file exists");
-    check(! fs.exists(fs.join(test_dir, "nope")), "nonexistent does not exist");
-    check(fs.is_dir(test_dir), "is_dir on dir");
-    check(! fs.is_dir(fs.join(test_dir, "file.txt")), "is_dir on file");
-    check(! fs.is_dir(fs.join(test_dir, "nope")), "is_dir on nonexistent");
-    check(fs.is_file(fs.join(test_dir, "file.txt")), "is_file on file");
-    check(! fs.is_file(test_dir), "is_file on dir");
-    check(! fs.is_file(fs.join(test_dir, "nope")), "is_file on nonexistent");
+    string test_dir = fs.join(root, "pathtest")
+    ensure_dir(test_dir)
+    write_file(fs.join(test_dir, "file.txt"), "x")
+    check(fs.exists(test_dir), "dir exists")
+    check(fs.exists(fs.join(test_dir, "file.txt")), "file exists")
+    check(! fs.exists(fs.join(test_dir, "nope")), "nonexistent does not exist")
+    check(fs.is_dir(test_dir), "is_dir on dir")
+    check(! fs.is_dir(fs.join(test_dir, "file.txt")), "is_dir on file")
+    check(! fs.is_dir(fs.join(test_dir, "nope")), "is_dir on nonexistent")
+    check(fs.is_file(fs.join(test_dir, "file.txt")), "is_file on file")
+    check(! fs.is_file(test_dir), "is_file on dir")
+    check(! fs.is_file(fs.join(test_dir, "nope")), "is_file on nonexistent")
     // ── Error handling: operations on missing paths ──
-    string missing = fs.join(root, "does_not_exist_at_all");
-    string content = fs.read(missing);
-    check(content == "", "read missing file returns empty string");
-    bool write_ok = fs.write(fs.join(missing, "sub/file.txt"), "x");
-    check(! write_ok, "write to nonexistent parent dir fails");
-    bool copy_ok = fs.copy(missing, fs.join(root, "dest.txt"));
-    check(! copy_ok, "copy from missing source fails");
-    bool move_ok = fs.move(missing, fs.join(root, "dest.txt"));
-    check(! move_ok, "move from missing source fails");
-    bool rm_ok = fs.remove(missing);
+    string missing = fs.join(root, "does_not_exist_at_all")
+    string content = fs.read(missing)
+    check(content == "", "read missing file returns empty string")
+    bool write_ok = fs.write(fs.join(missing, "sub/file.txt"), "x")
+    check(! write_ok, "write to nonexistent parent dir fails")
+    bool copy_ok = fs.copy(missing, fs.join(root, "dest.txt"))
+    check(! copy_ok, "copy from missing source fails")
+    bool move_ok = fs.move(missing, fs.join(root, "dest.txt"))
+    check(! move_ok, "move from missing source fails")
+    bool rm_ok = fs.remove(missing)
     // remove of nonexistent may return true or false depending on impl
     // just verify it doesn't crash
     // ── mkdir_all with deep path ──
-    string deep = fs.join(root, "a/b/c/d/e/f/g");
-    ensure_dir(deep);
-    check(fs.is_dir(deep), "mkdir_all created deep path");
+    string deep = fs.join(root, "a/b/c/d/e/f/g")
+    ensure_dir(deep)
+    check(fs.is_dir(deep), "mkdir_all created deep path")
     // ── File operations: copy, move, rename ──
-    string orig = fs.join(test_dir, "orig.txt");
-    string copied = fs.join(test_dir, "copied.txt");
-    string moved = fs.join(test_dir, "moved.txt");
-    write_file(orig, "original data");
-    fs.copy(orig, copied);
-    check(fs.read(copied) == "original data", "copy preserves content");
-    check(fs.exists(orig), "copy leaves source intact");
-    fs.move(copied, moved);
-    check(fs.read(moved) == "original data", "move preserves content");
-    check(! fs.exists(copied), "move removes source");
-    fs.remove(moved);
-    check(! fs.exists(moved), "remove deletes file");
+    string orig = fs.join(test_dir, "orig.txt")
+    string copied = fs.join(test_dir, "copied.txt")
+    string moved = fs.join(test_dir, "moved.txt")
+    write_file(orig, "original data")
+    fs.copy(orig, copied)
+    check(fs.read(copied) == "original data", "copy preserves content")
+    check(fs.exists(orig), "copy leaves source intact")
+    fs.move(copied, moved)
+    check(fs.read(moved) == "original data", "move preserves content")
+    check(! fs.exists(copied), "move removes source")
+    fs.remove(moved)
+    check(! fs.exists(moved), "remove deletes file")
     // ── Standard locations ──
-    string home = fs.home_dir();
-    check(home.len() > 0, "home_dir is non-empty");
-    string tmp = fs.temp_dir();
-    check(tmp.len() > 0, "temp_dir is non-empty");
-    check(fs.is_dir(tmp), "temp_dir exists");
-    string cwd = fs.cwd();
-    check(cwd.len() > 0, "cwd is non-empty");
-    check(fs.is_abs(cwd), "cwd is absolute");
-    string config = fs.config_dir();
-    check(config.len() > 0, "config_dir is non-empty");
-    string cache = fs.cache_dir();
-    check(cache.len() > 0, "cache_dir is non-empty");
-    string data = fs.data_dir();
-    check(data.len() > 0, "data_dir is non-empty");
+    string home = fs.home_dir()
+    check(home.len() > 0, "home_dir is non-empty")
+    string tmp = fs.temp_dir()
+    check(tmp.len() > 0, "temp_dir is non-empty")
+    check(fs.is_dir(tmp), "temp_dir exists")
+    string cwd = fs.cwd()
+    check(cwd.len() > 0, "cwd is non-empty")
+    check(fs.is_abs(cwd), "cwd is absolute")
+    string config = fs.config_dir()
+    check(config.len() > 0, "config_dir is non-empty")
+    string cache = fs.cache_dir()
+    check(cache.len() > 0, "cache_dir is non-empty")
+    string data = fs.data_dir()
+    check(data.len() > 0, "data_dir is non-empty")
     // ── Temp file creation ──
-    string tf = fs.temp_file("vigil_stress_");
-    check(tf.len() > 0, "temp_file returns path");
-    check(fs.exists(tf), "temp_file creates file");
-    fs.remove(tf);
-    fmt.println("  Path + edge case tests done");
+    string tf = fs.temp_file("vigil_stress_")
+    check(tf.len() > 0, "temp_file returns path")
+    check(fs.exists(tf), "temp_file creates file")
+    fs.remove(tf)
+    fmt.println("  Path + edge case tests done")
 }
+
 // ─── Mode 7: Performance Stress ────────────────────────────────
 fn test_performance(string root) -> void {
-    section("Mode 7: Performance Stress");
-    string perf_dir = fs.join(root, "perf");
-    ensure_dir(perf_dir);
+    section("Mode 7: Performance Stress")
+    string perf_dir = fs.join(root, "perf")
+    ensure_dir(perf_dir)
     // ── Create 500 files across 10 directories ──
-    i64 t0 = time.now_ms();
-    i32 i = 0;
+    i64 t0 = time.now_ms()
+    i32 i = 0
     for (i = 0; i < 10; i++) {
-        string subdir = fs.join(perf_dir, "dir_" + string(i));
-        ensure_dir(subdir);
-        i32 j = 0;
+        string subdir = fs.join(perf_dir, "dir_" + string(i))
+        ensure_dir(subdir)
+        i32 j = 0
         for (j = 0; j < 50; j++) {
-            string fname = "file_" + string(j) + ".txt";
-            write_file(fs.join(subdir, fname), "content of " + fname + " in dir_" + string(i));
+            string fname = "file_" + string(j) + ".txt"
+            write_file(fs.join(subdir, fname), "content of " + fname + " in dir_" + string(i))
         }
+
     }
 
-    i64 t1 = time.now_ms();
-    fmt.println("  Created 500 files in " + string(t1 - t0) + "ms");
+    i64 t1 = time.now_ms()
+    fmt.println("  Created 500 files in " + string(t1 - t0) + "ms")
     // ── Walk all files ──
-    i64 t2 = time.now_ms();
-    array<string> all = fs.walk(perf_dir);
-    i64 t3 = time.now_ms();
-    fmt.println("  Walked " + string(all.len()) + " entries in " + string(t3 - t2) + "ms");
-    check(all.len() >= 510, "walk found 500+ files + 10 dirs");
+    i64 t2 = time.now_ms()
+    array<string> all = fs.walk(perf_dir)
+    i64 t3 = time.now_ms()
+    fmt.println("  Walked " + string(all.len()) + " entries in " + string(t3 - t2) + "ms")
+    check(all.len() >= 510, "walk found 500+ files + 10 dirs")
     // ── Read all files ──
-    i64 t4 = time.now_ms();
-    i32 read_count = 0;
+    i64 t4 = time.now_ms()
+    i32 read_count = 0
     for path in all {
         if fs.is_file(path) {
-            string c = fs.read(path);
+            string c = fs.read(path)
             if c.len() > 0 {
-                read_count++;
+                read_count++
             }
+
         }
+
     }
 
-    i64 t5 = time.now_ms();
-    fmt.println("  Read " + string(read_count) + " files in " + string(t5 - t4) + "ms");
-    check(read_count == 500, "read all 500 files");
+    i64 t5 = time.now_ms()
+    fmt.println("  Read " + string(read_count) + " files in " + string(t5 - t4) + "ms")
+    check(read_count == 500, "read all 500 files")
     // ── Copy entire tree ──
-    string perf_copy = fs.join(root, "perf_copy");
-    i64 t6 = time.now_ms();
-    i32 copied = copy_tree(perf_dir, perf_copy, false);
-    i64 t7 = time.now_ms();
-    fmt.println("  Copied " + string(copied) + " files in " + string(t7 - t6) + "ms");
-    check(copied == 500, "copied 500 files");
+    string perf_copy = fs.join(root, "perf_copy")
+    i64 t6 = time.now_ms()
+    i32 copied = copy_tree(perf_dir, perf_copy, false)
+    i64 t7 = time.now_ms()
+    fmt.println("  Copied " + string(copied) + " files in " + string(t7 - t6) + "ms")
+    check(copied == 500, "copied 500 files")
     // ── Deep nesting stress ──
-    i64 t8 = time.now_ms();
-    string deep = fs.join(root, "deep");
-    string current = deep;
-    i32 depth = 0;
+    i64 t8 = time.now_ms()
+    string deep = fs.join(root, "deep")
+    string current = deep
+    i32 depth = 0
     for (depth = 0; depth < 50; depth++) {
-        current = fs.join(current, "d" + string(depth));
+        current = fs.join(current, "d" + string(depth))
     }
 
-    ensure_dir(current);
-    write_file(fs.join(current, "leaf.txt"), "at depth 50");
-    i64 t9 = time.now_ms();
-    fmt.println("  Created 50-deep nested dir in " + string(t9 - t8) + "ms");
-    check(fs.is_dir(current), "50-deep dir exists");
-    check(fs.read(fs.join(current, "leaf.txt")) == "at depth 50", "leaf file at depth 50 readable");
+    ensure_dir(current)
+    write_file(fs.join(current, "leaf.txt"), "at depth 50")
+    i64 t9 = time.now_ms()
+    fmt.println("  Created 50-deep nested dir in " + string(t9 - t8) + "ms")
+    check(fs.is_dir(current), "50-deep dir exists")
+    check(fs.read(fs.join(current, "leaf.txt")) == "at depth 50", "leaf file at depth 50 readable")
     // ── List performance on large directory ──
-    i64 t10 = time.now_ms();
-    i32 k = 0;
+    i64 t10 = time.now_ms()
+    i32 k = 0
     for (k = 0; k < 10; k++) {
-        array<string> entries = fs.list(fs.join(perf_dir, "dir_0"));
+        array<string> entries = fs.list(fs.join(perf_dir, "dir_0"))
         // just exercise the listing
     }
 
-    i64 t11 = time.now_ms();
-    fmt.println("  Listed dir_0 (50 entries) x10 in " + string(t11 - t10) + "ms");
-    fmt.println("  Performance tests done");
+    i64 t11 = time.now_ms()
+    fmt.println("  Listed dir_0 (50 entries) x10 in " + string(t11 - t10) + "ms")
+    fmt.println("  Performance tests done")
 }
+
 // ─── Cleanup ────────────────────────────────────────────────────
 fn cleanup_recursive(string path) -> void {
     // Remove a directory tree. Remove files first, then dirs.
     if ! fs.exists(path) {
-        return;
+        return
     }
 
     if fs.is_file(path) {
-        fs.remove(path);
-        return;
+        fs.remove(path)
+        return
     }
 
-    array<string> entries = fs.list(path);
+    array<string> entries = fs.list(path)
     for entry in entries {
-        string child = fs.join(path, entry);
+        string child = fs.join(path, entry)
         if fs.is_dir(child) {
-            cleanup_recursive(child);
+            cleanup_recursive(child)
         } else {
-            fs.remove(child);
+            fs.remove(child)
         }
+
     }
 
-    fs.remove(path);
+    fs.remove(path)
 }
+
 // ─── Main Driver ────────────────────────────────────────────────
 fn main() -> i32 {
-    fmt.println("╔══════════════════════════════════════════╗");
-    fmt.println("║  VIGIL fs Module Stress Test             ║");
-    fmt.println("╚══════════════════════════════════════════╝");
+    fmt.println("╔══════════════════════════════════════════╗")
+    fmt.println("║  VIGIL fs Module Stress Test             ║")
+    fmt.println("╚══════════════════════════════════════════╝")
     // Create workspace in temp directory
-    string tmp = fs.temp_dir();
-    string root = fs.join(tmp, "vigil_fs_stress");
+    string tmp = fs.temp_dir()
+    string root = fs.join(tmp, "vigil_fs_stress")
     // Clean any previous run
     if fs.exists(root) {
-        cleanup_recursive(root);
+        cleanup_recursive(root)
     }
 
-    ensure_dir(root);
-    fmt.println("Workspace: " + root);
-    i64 start = time.now_ms();
+    ensure_dir(root)
+    fmt.println("Workspace: " + root)
+    i64 start = time.now_ms()
     // Run all test modes
-    test_path_ops(root);
-    test_recursive_copy(root);
-    test_scaffolding(root);
-    test_search(root);
-    test_safe_delete(root);
-    test_metadata(root);
-    test_performance(root);
-    i64 elapsed = time.now_ms() - start;
+    test_path_ops(root)
+    test_recursive_copy(root)
+    test_scaffolding(root)
+    test_search(root)
+    test_safe_delete(root)
+    test_metadata(root)
+    test_performance(root)
+    i64 elapsed = time.now_ms() - start
     // Summary
-    section("Results");
-    fmt.println("  Total:  " + string(g_total));
-    fmt.println("  Passed: " + string(g_pass));
-    fmt.println("  Failed: " + string(g_fail));
-    fmt.println("  Time:   " + string(elapsed) + "ms");
+    section("Results")
+    fmt.println("  Total:  " + string(g_total))
+    fmt.println("  Passed: " + string(g_pass))
+    fmt.println("  Failed: " + string(g_fail))
+    fmt.println("  Time:   " + string(elapsed) + "ms")
     // Cleanup
-    section("Cleanup");
-    cleanup_recursive(root);
-    check(! fs.exists(root), "workspace fully cleaned up");
-    fmt.println("  Cleaned up workspace");
-    fmt.println("");
+    section("Cleanup")
+    cleanup_recursive(root)
+    check(! fs.exists(root), "workspace fully cleaned up")
+    fmt.println("  Cleaned up workspace")
+    fmt.println("")
     if g_fail > 0 {
-        fmt.println("FAIL");
-        return 1;
+        fmt.println("FAIL")
+        return 1
     }
 
-    fmt.println("ALL PASS");
-    return 0;
+    fmt.println("ALL PASS")
+    return 0
 }

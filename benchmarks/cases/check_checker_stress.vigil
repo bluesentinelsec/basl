@@ -1,79 +1,87 @@
-import "csv";
-import "math";
-import "parse";
-import "regex";
+import "csv"
+import "math"
+import "parse"
+import "regex"
 
 interface Describable {
-    fn describe() -> string;
+    fn describe() -> string
 }
 
+
 class Sample {
-    pub string name;
-    pub f64 weight;
+    pub string name
+    pub f64 weight
     fn init(string name, f64 weight) -> void {
-        self.name = name;
-        self.weight = weight;
+        self.name = name
+        self.weight = weight
     }
 
     fn describe() -> string {
-        return f"{self.name}:{self.weight}";
+        return f"{self.name}:{self.weight}"
     }
 
     fn scaled(f64 value) -> f64 {
-        return value * self.weight;
+        return value * self.weight
     }
+
 }
+
 
 fn parse_numbers(array<string> raw) -> array<i32> {
-    array<i32> out = [];
+    array<i32> out = []
     for (i32 i = 0; i < raw.len(); i++) {
-        i32 value, err e = parse.i32(raw[i]);
+        i32 value, err e = parse.i32(raw[i])
         if e == ok {
-            out.push(value);
+            out.push(value)
         }
+
     }
 
-    return out;
+    return out
 }
+
 
 fn fold_values(array<i32> values) -> i32 {
-    i32 sum = 0;
+    i32 sum = 0
     for (i32 i = 0; i < values.len(); i++) {
-        sum = sum + values[i];
+        sum = sum + values[i]
     }
 
-    return sum;
+    return sum
 }
+
 
 fn score_line(string line) -> i32 {
-    array<string> row = csv.parse_row(line);
-    array<i32> nums = parse_numbers(row);
-    i32 total = fold_values(nums);
+    array<string> row = csv.parse_row(line)
+    array<i32> nums = parse_numbers(row)
+    i32 total = fold_values(nums)
     if regex.match(".*critical.*", line) {
-        total = total + 10;
+        total = total + 10
     }
 
-    return total;
+    return total
 }
+
 
 fn project(array<Sample> samples) -> f64 {
-    f64 total = 0.0;
+    f64 total = 0.0
     for (i32 i = 0; i < samples.len(); i++) {
-        total = total + samples[i].scaled(f64(i + 1));
+        total = total + samples[i].scaled(f64(i + 1))
     }
 
-    return total;
+    return total
 }
 
+
 fn main() -> i32 {
-    array<Sample> samples = [Sample("alpha", 1.25), Sample("beta", 2.0), Sample("gamma", 0.5), Sample("delta", 3.75)];
-    i32 line_score = score_line("12,7,8,critical,21");
-    f64 projection = project(samples);
-    f64 magnitude = math.hypot(projection, f64(line_score));
-    array<string> labels = [samples[0].describe(), samples[1].describe(), samples[2].describe(), samples[3].describe()];
+    array<Sample> samples = [Sample("alpha", 1.25), Sample("beta", 2.0), Sample("gamma", 0.5), Sample("delta", 3.75)]
+    i32 line_score = score_line("12,7,8,critical,21")
+    f64 projection = project(samples)
+    f64 magnitude = math.hypot(projection, f64(line_score))
+    array<string> labels = [samples[0].describe(), samples[1].describe(), samples[2].describe(), samples[3].describe()]
     if labels.len() == 4 && magnitude > 0.0 {
-        return 0;
+        return 0
     }
 
-    return 1;
+    return 1
 }

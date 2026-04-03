@@ -22,78 +22,85 @@
 //   descs[i]     = help description
 //   required[i]  = "true" or "false"
 
-import "args";
-import "fmt";
-import "parse";
+import "args"
+import "fmt"
+import "parse"
 
 fn print_usage(string prog, string subcmd, string desc, array<string> names, array<string> shorts, array<string> types, array<string> defaults, array<string> descs, array<string> required, array<string> pos_names, array<string> pos_descs) -> void {
     if subcmd != "" {
-        fmt.println(f"Usage: {prog} {subcmd} [options]");
+        fmt.println(f"Usage: {prog} {subcmd} [options]")
     } else {
-        fmt.println(f"Usage: {prog} <command> [options]");
+        fmt.println(f"Usage: {prog} <command> [options]")
     }
 
-    fmt.println("");
-    fmt.println(desc);
-    fmt.println("");
+    fmt.println("")
+    fmt.println(desc)
+    fmt.println("")
     if names.len() > 0 {
-        fmt.println("Options:");
+        fmt.println("Options:")
         for (i32 i = 0; i < names.len(); i++) {
-            string name = names[i];
-            string short_name = shorts[i];
-            string typ = types[i];
-            string def = defaults[i];
-            string description = descs[i];
-            string req = required[i];
-            string flag_str = "  --" + name;
+            string name = names[i]
+            string short_name = shorts[i]
+            string typ = types[i]
+            string def = defaults[i]
+            string description = descs[i]
+            string req = required[i]
+            string flag_str = "  --" + name
             if short_name != "" {
-                flag_str = flag_str + ", -" + short_name;
+                flag_str = flag_str + ", -" + short_name
             }
 
             if typ == "string" || typ == "int" || typ == "multi" {
-                flag_str = flag_str + " VALUE";
+                flag_str = flag_str + " VALUE"
             }
+
             // Pad to 30 chars
             for (; flag_str.len() < 30;) {
-                flag_str = flag_str + " ";
+                flag_str = flag_str + " "
             }
 
-            flag_str = flag_str + description;
+            flag_str = flag_str + description
             if req == "true" {
-                flag_str = flag_str + " (required)";
+                flag_str = flag_str + " (required)"
             } else if def != "" && typ != "bool" {
-                flag_str = flag_str + f" [default: {def}]";
+                flag_str = flag_str + f" [default: {def}]"
             }
 
-            fmt.println(flag_str);
+            fmt.println(flag_str)
         }
+
     }
 
     if pos_names.len() > 0 {
-        fmt.println("");
-        fmt.println("Arguments:");
+        fmt.println("")
+        fmt.println("Arguments:")
         for (i32 i = 0; i < pos_names.len(); i++) {
-            string pn = pos_names[i];
-            string pd = pos_descs[i];
-            string line = "  " + pn;
+            string pn = pos_names[i]
+            string pd = pos_descs[i]
+            string line = "  " + pn
             for (; line.len() < 30;) {
-                line = line + " ";
+                line = line + " "
             }
 
-            fmt.println(line + pd);
+            fmt.println(line + pd)
         }
+
     }
+
 }
+
 
 fn find_opt(string key, array<string> names, array<string> shorts) -> i32 {
     for (i32 i = 0; i < names.len(); i++) {
         if names[i] == key || shorts[i] == key {
-            return i;
+            return i
         }
+
     }
 
-    return - 1;
+    return - 1
 }
+
 // Parse args starting at position `start`. Returns values in `out` map.
 // Positionals collected into `positionals` array.
 // Returns empty string on success, error message on failure.
@@ -101,182 +108,206 @@ fn parse_opts(i32 start, array<string> names, array<string> shorts, array<string
     // Set defaults
     for (i32 i = 0; i < names.len(); i++) {
         if types[i] == "bool" {
-            out[names[i]] = "false";
+            out[names[i]] = "false"
         } else if types[i] == "multi" {
             // multi values tracked separately
-            out[names[i]] = "";
+            out[names[i]] = ""
         } else {
-            out[names[i]] = defaults[i];
+            out[names[i]] = defaults[i]
         }
+
     }
 
-    i32 argc = args.count();
-    i32 pos = start;
-    bool past_double_dash = false;
+    i32 argc = args.count()
+    i32 pos = start
+    bool past_double_dash = false
     for (; pos < argc;) {
-        string arg = args.at(pos);
+        string arg = args.at(pos)
         // -- means end of options
         if arg == "--" &&! past_double_dash {
-            past_double_dash = true;
-            pos++;
-            continue;
+            past_double_dash = true
+            pos++
+            continue
         }
+
         // Positional if past -- or doesn't start with -
         if past_double_dash || ! arg.starts_with("-") {
-            positionals.push(arg);
-            pos++;
-            continue;
+            positionals.push(arg)
+            pos++
+            continue
         }
+
         // Handle --key=value syntax
-        string key = "";
-        string inline_val = "";
-        bool has_inline = false;
+        string key = ""
+        string inline_val = ""
+        bool has_inline = false
         if arg.starts_with("--") {
-            string rest, err e = arg.substr(2, arg.len() - 2);
+            string rest, err e = arg.substr(2, arg.len() - 2)
             if rest.contains("=") {
-                array<string> kv = rest.split("=");
-                key = kv[0];
+                array<string> kv = rest.split("=")
+                key = kv[0]
                 if kv.len() > 1 {
                     // Rejoin in case value contains =
-                    string val = "";
+                    string val = ""
                     for (i32 j = 1; j < kv.len(); j++) {
                         if j > 1 {
-                            val = val + "=";
+                            val = val + "="
                         }
 
-                        val = val + kv[j];
+                        val = val + kv[j]
                     }
 
-                    inline_val = val;
-                    has_inline = true;
+                    inline_val = val
+                    has_inline = true
                 }
+
             } else {
-                key = rest;
+                key = rest
             }
+
         } else if arg.starts_with("-") {
-            string rest, err e = arg.substr(1, arg.len() - 1);
-            key = rest;
-        }
-        // Look up option
-        i32 idx = find_opt(key, names, shorts);
-        if idx < 0 {
-            return f"unknown option: {arg}";
+            string rest, err e = arg.substr(1, arg.len() - 1)
+            key = rest
         }
 
-        string name = names[idx];
-        string typ = types[idx];
+        // Look up option
+        i32 idx = find_opt(key, names, shorts)
+        if idx < 0 {
+            return f"unknown option: {arg}"
+        }
+
+        string name = names[idx]
+        string typ = types[idx]
         if typ == "bool" {
-            out[name] = "true";
-            pos++;
+            out[name] = "true"
+            pos++
         } else if typ == "string" || typ == "int" {
-            string val = "";
+            string val = ""
             if has_inline {
-                val = inline_val;
+                val = inline_val
             } else {
-                pos++;
+                pos++
                 if pos >= argc {
-                    return f"option --{name} requires a value";
+                    return f"option --{name} requires a value"
                 }
 
-                val = args.at(pos);
+                val = args.at(pos)
             }
+
             // Type validation for int
             if typ == "int" {
-                i32 _, err parse_err = parse.i32(val);
+                i32 _, err parse_err = parse.i32(val)
                 if parse_err != ok {
-                    return f"option --{name} requires an integer, got: {val}";
+                    return f"option --{name} requires an integer, got: {val}"
                 }
+
             }
 
-            out[name] = val;
-            pos++;
+            out[name] = val
+            pos++
         } else if typ == "multi" {
-            string val = "";
+            string val = ""
             if has_inline {
-                val = inline_val;
+                val = inline_val
             } else {
-                pos++;
+                pos++
                 if pos >= argc {
-                    return f"option --{name} requires a value";
+                    return f"option --{name} requires a value"
                 }
 
-                val = args.at(pos);
+                val = args.at(pos)
             }
 
-            multi_values.push(name + "=" + val);
-            pos++;
+            multi_values.push(name + "=" + val)
+            pos++
         }
+
     }
+
     // Check required
     for (i32 i = 0; i < names.len(); i++) {
         if required_flags[i] == "true" {
-            string name = names[i];
-            string typ = types[i];
+            string name = names[i]
+            string typ = types[i]
             if typ == "bool" {
-                continue;
+                continue
             }
 
             if typ == "multi" {
-                bool found = false;
+                bool found = false
                 for (i32 j = 0; j < multi_values.len(); j++) {
                     if multi_values[j].starts_with(name + "=") {
-                        found = true;
+                        found = true
                     }
+
                 }
 
                 if ! found {
-                    return f"required option --{name} not provided";
+                    return f"required option --{name} not provided"
                 }
+
             } else {
-                string val = out[name];
+                string val = out[name]
                 if val == "" {
-                    return f"required option --{name} not provided";
+                    return f"required option --{name} not provided"
                 }
+
             }
+
         }
+
     }
 
-    return "";
+    return ""
 }
+
 // Get multi-option values for a given name
 fn get_multi(string name, array<string> multi_values) -> array<string> {
-    array<string> result = [];
-    string prefix = name + "=";
+    array<string> result = []
+    string prefix = name + "="
     for (i32 i = 0; i < multi_values.len(); i++) {
         if multi_values[i].starts_with(prefix) {
-            string val, err e = multi_values[i].substr(prefix.len(), multi_values[i].len() - prefix.len());
-            result.push(val);
+            string val, err e = multi_values[i].substr(prefix.len(), multi_values[i].len() - prefix.len())
+            result.push(val)
         }
+
     }
 
-    return result;
+    return result
 }
+
 // ============================================================================
 // Global option definitions
 // ============================================================================
 fn make_global_names() -> array<string> {
-    return ["verbose", "no-color", "config", "help"];
+    return ["verbose", "no-color", "config", "help"]
 }
+
 
 fn make_global_shorts() -> array<string> {
-    return ["v", "", "", "h"];
+    return ["v", "", "", "h"]
 }
+
 
 fn make_global_types() -> array<string> {
-    return ["bool", "bool", "string", "bool"];
+    return ["bool", "bool", "string", "bool"]
 }
+
 
 fn make_global_defaults() -> array<string> {
-    return ["false", "false", "", "false"];
+    return ["false", "false", "", "false"]
 }
+
 
 fn make_global_descs() -> array<string> {
-    return ["Enable verbose output", "Disable colored output", "Path to config file", "Show help"];
+    return ["Enable verbose output", "Disable colored output", "Path to config file", "Show help"]
 }
 
+
 fn make_global_required() -> array<string> {
-    return ["false", "false", "false", "false"];
+    return ["false", "false", "false", "false"]
 }
+
 // ============================================================================
 // Subcommand: transform
 //   Options: --input/-i FILE (required), --output/-o FILE, --uppercase/-u,
@@ -284,187 +315,192 @@ fn make_global_required() -> array<string> {
 //            --suffix STR, --filter PATTERN (multi)
 // ============================================================================
 fn cmd_transform(i32 start, bool verbose, bool no_color) -> i32 {
-    array<string> names = ["input", "output", "uppercase", "lowercase", "trim", "prefix", "suffix", "filter", "dry-run"];
-    array<string> shorts = ["i", "o", "u", "l", "", "", "", "f", "n"];
-    array<string> types = ["string", "string", "bool", "bool", "bool", "string", "string", "multi", "bool"];
-    array<string> defaults = ["", "", "false", "false", "false", "", "", "", "false"];
-    array<string> descs = ["Input file path", "Output file path (default: stdout)", "Convert to uppercase", "Convert to lowercase", "Trim whitespace", "Add prefix to each line", "Add suffix to each line", "Filter pattern (repeatable)", "Show what would be done without doing it"];
-    array<string> required_flags = ["true", "false", "false", "false", "false", "false", "false", "false", "false"];
-    map<string, string> opts = {};
-    array<string> multi = [];
-    array<string> positionals = [];
-    string err_msg = parse_opts(start, names, shorts, types, defaults, required_flags, opts, multi, positionals);
+    array<string> names = ["input", "output", "uppercase", "lowercase", "trim", "prefix", "suffix", "filter", "dry-run"]
+    array<string> shorts = ["i", "o", "u", "l", "", "", "", "f", "n"]
+    array<string> types = ["string", "string", "bool", "bool", "bool", "string", "string", "multi", "bool"]
+    array<string> defaults = ["", "", "false", "false", "false", "", "", "", "false"]
+    array<string> descs = ["Input file path", "Output file path (default: stdout)", "Convert to uppercase", "Convert to lowercase", "Trim whitespace", "Add prefix to each line", "Add suffix to each line", "Filter pattern (repeatable)", "Show what would be done without doing it"]
+    array<string> required_flags = ["true", "false", "false", "false", "false", "false", "false", "false", "false"]
+    map<string, string> opts = {}
+    array<string> multi = []
+    array<string> positionals = []
+    string err_msg = parse_opts(start, names, shorts, types, defaults, required_flags, opts, multi, positionals)
     if err_msg != "" {
-        fmt.eprintln(f"Error: {err_msg}");
-        print_usage("dtool", "transform", "Transform text data with various operations.", names, shorts, types, defaults, descs, required_flags, positionals, positionals);
-        return 1;
+        fmt.eprintln(f"Error: {err_msg}")
+        print_usage("dtool", "transform", "Transform text data with various operations.", names, shorts, types, defaults, descs, required_flags, positionals, positionals)
+        return 1
     }
 
-    string input = opts["input"];
-    string output = opts["output"];
-    bool upper = opts["uppercase"] == "true";
-    bool lower = opts["lowercase"] == "true";
-    bool do_trim = opts["trim"] == "true";
-    string prefix = opts["prefix"];
-    string suffix = opts["suffix"];
-    bool dry_run = opts["dry-run"] == "true";
-    array<string> filters = get_multi("filter", multi);
+    string input = opts["input"]
+    string output = opts["output"]
+    bool upper = opts["uppercase"] == "true"
+    bool lower = opts["lowercase"] == "true"
+    bool do_trim = opts["trim"] == "true"
+    string prefix = opts["prefix"]
+    string suffix = opts["suffix"]
+    bool dry_run = opts["dry-run"] == "true"
+    array<string> filters = get_multi("filter", multi)
     if verbose {
-        fmt.println(f"[transform] input={input} output={output}");
-        fmt.println(f"[transform] uppercase={upper} lowercase={lower} trim={do_trim}");
-        fmt.println(f"[transform] prefix='{prefix}' suffix='{suffix}'");
-        fmt.println(f"[transform] filters: {filters.len()}");
+        fmt.println(f"[transform] input={input} output={output}")
+        fmt.println(f"[transform] uppercase={upper} lowercase={lower} trim={do_trim}")
+        fmt.println(f"[transform] prefix='{prefix}' suffix='{suffix}'")
+        fmt.println(f"[transform] filters: {filters.len()}")
         for (i32 i = 0; i < filters.len(); i++) {
-            string fv = filters[i];
-            fmt.println(f"  filter[{i}]: {fv}");
+            string fv = filters[i]
+            fmt.println(f"  filter[{i}]: {fv}")
         }
 
         if dry_run {
-            fmt.println("[transform] DRY RUN — no changes will be made");
+            fmt.println("[transform] DRY RUN — no changes will be made")
         }
+
     }
+
     // Simulate processing
-    string sample = "  Hello World  ";
+    string sample = "  Hello World  "
     if do_trim {
-        sample = sample.trim();
+        sample = sample.trim()
     }
 
     if upper {
-        sample = sample.to_upper();
+        sample = sample.to_upper()
     }
 
     if lower {
-        sample = sample.to_lower();
+        sample = sample.to_lower()
     }
 
     if prefix != "" {
-        sample = prefix + sample;
+        sample = prefix + sample
     }
 
     if suffix != "" {
-        sample = sample + suffix;
+        sample = sample + suffix
     }
 
     if dry_run {
-        fmt.println(f"Would write to: {output}");
-        fmt.println(f"Sample output: {sample}");
+        fmt.println(f"Would write to: {output}")
+        fmt.println(f"Sample output: {sample}")
     } else {
-        fmt.println(sample);
+        fmt.println(sample)
     }
 
-    return 0;
+    return 0
 }
+
 // ============================================================================
 // Subcommand: validate
 //   Options: --schema/-s FILE (required), --strict, --max-errors INT
 //   Positionals: FILES...
 // ============================================================================
 fn cmd_validate(i32 start, bool verbose, bool no_color) -> i32 {
-    array<string> names = ["schema", "strict", "max-errors"];
-    array<string> shorts = ["s", "", ""];
-    array<string> types = ["string", "bool", "int"];
-    array<string> defaults = ["", "false", "10"];
-    array<string> descs = ["Schema file for validation", "Enable strict mode", "Maximum errors before stopping"];
-    array<string> required_flags = ["true", "false", "false"];
-    map<string, string> opts = {};
-    array<string> multi = [];
-    array<string> positionals = [];
-    string err_msg = parse_opts(start, names, shorts, types, defaults, required_flags, opts, multi, positionals);
+    array<string> names = ["schema", "strict", "max-errors"]
+    array<string> shorts = ["s", "", ""]
+    array<string> types = ["string", "bool", "int"]
+    array<string> defaults = ["", "false", "10"]
+    array<string> descs = ["Schema file for validation", "Enable strict mode", "Maximum errors before stopping"]
+    array<string> required_flags = ["true", "false", "false"]
+    map<string, string> opts = {}
+    array<string> multi = []
+    array<string> positionals = []
+    string err_msg = parse_opts(start, names, shorts, types, defaults, required_flags, opts, multi, positionals)
     if err_msg != "" {
-        fmt.eprintln(f"Error: {err_msg}");
-        print_usage("dtool", "validate", "Validate files against a schema.", names, shorts, types, defaults, descs, required_flags, ["FILES..."], ["Files to validate"]);
-        return 1;
+        fmt.eprintln(f"Error: {err_msg}")
+        print_usage("dtool", "validate", "Validate files against a schema.", names, shorts, types, defaults, descs, required_flags, ["FILES..."], ["Files to validate"])
+        return 1
     }
 
     if positionals.len() == 0 {
-        fmt.eprintln("Error: at least one file is required");
-        return 1;
+        fmt.eprintln("Error: at least one file is required")
+        return 1
     }
 
-    string schema = opts["schema"];
-    bool strict = opts["strict"] == "true";
-    string max_err = opts["max-errors"];
+    string schema = opts["schema"]
+    bool strict = opts["strict"] == "true"
+    string max_err = opts["max-errors"]
     if verbose {
-        fmt.println(f"[validate] schema={schema} strict={strict} max-errors={max_err}");
-        fmt.println(f"[validate] files: {positionals.len()}");
+        fmt.println(f"[validate] schema={schema} strict={strict} max-errors={max_err}")
+        fmt.println(f"[validate] files: {positionals.len()}")
     }
 
     for (i32 i = 0; i < positionals.len(); i++) {
-        string file = positionals[i];
-        fmt.println(f"Validating {file} against {schema}...");
+        string file = positionals[i]
+        fmt.println(f"Validating {file} against {schema}...")
         if strict {
-            fmt.println(f"  (strict mode)");
+            fmt.println(f"  (strict mode)")
         }
 
-        fmt.println(f"  OK — 0 errors (max: {max_err})");
+        fmt.println(f"  OK — 0 errors (max: {max_err})")
     }
 
-    return 0;
+    return 0
 }
+
 // ============================================================================
 // Subcommand: stats
 //   Options: --format/-f (enum: text/json/csv), --sort-by (enum: name/size/count)
 //   Positionals: FILE
 // ============================================================================
 fn cmd_stats(i32 start, bool verbose, bool no_color) -> i32 {
-    array<string> names = ["format", "sort-by"];
-    array<string> shorts = ["f", ""];
-    array<string> types = ["string", "string"];
-    array<string> defaults = ["text", "name"];
-    array<string> descs = ["Output format (text, json, csv)", "Sort results by (name, size, count)"];
-    array<string> required_flags = ["false", "false"];
-    map<string, string> opts = {};
-    array<string> multi = [];
-    array<string> positionals = [];
-    string err_msg = parse_opts(start, names, shorts, types, defaults, required_flags, opts, multi, positionals);
+    array<string> names = ["format", "sort-by"]
+    array<string> shorts = ["f", ""]
+    array<string> types = ["string", "string"]
+    array<string> defaults = ["text", "name"]
+    array<string> descs = ["Output format (text, json, csv)", "Sort results by (name, size, count)"]
+    array<string> required_flags = ["false", "false"]
+    map<string, string> opts = {}
+    array<string> multi = []
+    array<string> positionals = []
+    string err_msg = parse_opts(start, names, shorts, types, defaults, required_flags, opts, multi, positionals)
     if err_msg != "" {
-        fmt.eprintln(f"Error: {err_msg}");
-        print_usage("dtool", "stats", "Show statistics for data files.", names, shorts, types, defaults, descs, required_flags, ["FILE"], ["Data file to analyze"]);
-        return 1;
+        fmt.eprintln(f"Error: {err_msg}")
+        print_usage("dtool", "stats", "Show statistics for data files.", names, shorts, types, defaults, descs, required_flags, ["FILE"], ["Data file to analyze"])
+        return 1
     }
 
-    string format = opts["format"];
-    string sort_by = opts["sort-by"];
+    string format = opts["format"]
+    string sort_by = opts["sort-by"]
     // Validate enum values
     if format != "text" && format != "json" && format != "csv" {
-        fmt.eprintln(f"Error: --format must be text, json, or csv (got: {format})");
-        return 1;
+        fmt.eprintln(f"Error: --format must be text, json, or csv (got: {format})")
+        return 1
     }
 
     if sort_by != "name" && sort_by != "size" && sort_by != "count" {
-        fmt.eprintln(f"Error: --sort-by must be name, size, or count (got: {sort_by})");
-        return 1;
+        fmt.eprintln(f"Error: --sort-by must be name, size, or count (got: {sort_by})")
+        return 1
     }
 
     if positionals.len() == 0 {
-        fmt.eprintln("Error: FILE argument required");
-        return 1;
+        fmt.eprintln("Error: FILE argument required")
+        return 1
     }
 
-    string file = positionals[0];
+    string file = positionals[0]
     if verbose {
-        fmt.println(f"[stats] file={file} format={format} sort-by={sort_by}");
+        fmt.println(f"[stats] file={file} format={format} sort-by={sort_by}")
     }
 
     if format == "json" {
-        fmt.println("{");
-        fmt.println(f"  \"file\": \"{file}\",");
-        fmt.println("  \"lines\": 1024,");
-        fmt.println("  \"words\": 8192,");
-        fmt.println("  \"bytes\": 65536");
-        fmt.println("}");
+        fmt.println("{")
+        fmt.println(f"  \"file\": \"{file}\",")
+        fmt.println("  \"lines\": 1024,")
+        fmt.println("  \"words\": 8192,")
+        fmt.println("  \"bytes\": 65536")
+        fmt.println("}")
     } else if format == "csv" {
-        fmt.println("file,lines,words,bytes");
-        fmt.println(f"{file},1024,8192,65536");
+        fmt.println("file,lines,words,bytes")
+        fmt.println(f"{file},1024,8192,65536")
     } else {
-        fmt.println(f"File:  {file}");
-        fmt.println("Lines: 1024");
-        fmt.println("Words: 8192");
-        fmt.println("Bytes: 65536");
+        fmt.println(f"File:  {file}")
+        fmt.println("Lines: 1024")
+        fmt.println("Words: 8192")
+        fmt.println("Bytes: 65536")
     }
 
-    return 0;
+    return 0
 }
+
 // ============================================================================
 // Subcommand: convert
 //   Options: --from/-F FORMAT (required), --to/-T FORMAT (required),
@@ -472,49 +508,50 @@ fn cmd_stats(i32 start, bool verbose, bool no_color) -> i32 {
 //   Positionals: INPUT OUTPUT
 // ============================================================================
 fn cmd_convert(i32 start, bool verbose, bool no_color) -> i32 {
-    array<string> names = ["from", "to", "encoding", "overwrite"];
-    array<string> shorts = ["F", "T", "e", ""];
-    array<string> types = ["string", "string", "string", "bool"];
-    array<string> defaults = ["", "", "utf-8", "false"];
-    array<string> descs = ["Source format (json, csv, yaml, xml)", "Target format (json, csv, yaml, xml)", "Character encoding", "Overwrite output if it exists"];
-    array<string> required_flags = ["true", "true", "false", "false"];
-    map<string, string> opts = {};
-    array<string> multi = [];
-    array<string> positionals = [];
-    string err_msg = parse_opts(start, names, shorts, types, defaults, required_flags, opts, multi, positionals);
+    array<string> names = ["from", "to", "encoding", "overwrite"]
+    array<string> shorts = ["F", "T", "e", ""]
+    array<string> types = ["string", "string", "string", "bool"]
+    array<string> defaults = ["", "", "utf-8", "false"]
+    array<string> descs = ["Source format (json, csv, yaml, xml)", "Target format (json, csv, yaml, xml)", "Character encoding", "Overwrite output if it exists"]
+    array<string> required_flags = ["true", "true", "false", "false"]
+    map<string, string> opts = {}
+    array<string> multi = []
+    array<string> positionals = []
+    string err_msg = parse_opts(start, names, shorts, types, defaults, required_flags, opts, multi, positionals)
     if err_msg != "" {
-        fmt.eprintln(f"Error: {err_msg}");
-        print_usage("dtool", "convert", "Convert between data formats.", names, shorts, types, defaults, descs, required_flags, ["INPUT", "OUTPUT"], ["Input file", "Output file"]);
-        return 1;
+        fmt.eprintln(f"Error: {err_msg}")
+        print_usage("dtool", "convert", "Convert between data formats.", names, shorts, types, defaults, descs, required_flags, ["INPUT", "OUTPUT"], ["Input file", "Output file"])
+        return 1
     }
 
     if positionals.len() < 2 {
-        fmt.eprintln("Error: INPUT and OUTPUT arguments required");
-        return 1;
+        fmt.eprintln("Error: INPUT and OUTPUT arguments required")
+        return 1
     }
 
-    string from_fmt = opts["from"];
-    string to_fmt = opts["to"];
-    string encoding = opts["encoding"];
-    bool overwrite = opts["overwrite"] == "true";
-    string input = positionals[0];
-    string output = positionals[1];
+    string from_fmt = opts["from"]
+    string to_fmt = opts["to"]
+    string encoding = opts["encoding"]
+    bool overwrite = opts["overwrite"] == "true"
+    string input = positionals[0]
+    string output = positionals[1]
     if verbose {
-        fmt.println(f"[convert] {from_fmt} -> {to_fmt}");
-        fmt.println(f"[convert] encoding={encoding} overwrite={overwrite}");
-        fmt.println(f"[convert] {input} -> {output}");
+        fmt.println(f"[convert] {from_fmt} -> {to_fmt}")
+        fmt.println(f"[convert] encoding={encoding} overwrite={overwrite}")
+        fmt.println(f"[convert] {input} -> {output}")
     }
 
-    fmt.println(f"Converting {input} from {from_fmt} to {to_fmt}...");
-    fmt.println(f"  Encoding: {encoding}");
-    fmt.println(f"  Output: {output}");
+    fmt.println(f"Converting {input} from {from_fmt} to {to_fmt}...")
+    fmt.println(f"  Encoding: {encoding}")
+    fmt.println(f"  Output: {output}")
     if overwrite {
-        fmt.println("  (overwriting existing file)");
+        fmt.println("  (overwriting existing file)")
     }
 
-    fmt.println("  Done.");
-    return 0;
+    fmt.println("  Done.")
+    return 0
 }
+
 // ============================================================================
 // Subcommand: batch
 //   Options: --jobs/-j INT, --pattern/-p GLOB, --command/-c CMD (multi),
@@ -522,174 +559,183 @@ fn cmd_convert(i32 start, bool verbose, bool no_color) -> i32 {
 //   Positionals: DIR
 // ============================================================================
 fn cmd_batch(i32 start, bool verbose, bool no_color) -> i32 {
-    array<string> names = ["jobs", "pattern", "command", "continue-on-error", "timeout"];
-    array<string> shorts = ["j", "p", "c", "", ""];
-    array<string> types = ["int", "string", "multi", "bool", "int"];
-    array<string> defaults = ["4", "*", "", "false", "30"];
-    array<string> descs = ["Number of parallel jobs", "File glob pattern", "Command to run (repeatable)", "Continue on error", "Timeout per job in seconds"];
-    array<string> required_flags = ["false", "false", "true", "false", "false"];
-    map<string, string> opts = {};
-    array<string> multi = [];
-    array<string> positionals = [];
-    string err_msg = parse_opts(start, names, shorts, types, defaults, required_flags, opts, multi, positionals);
+    array<string> names = ["jobs", "pattern", "command", "continue-on-error", "timeout"]
+    array<string> shorts = ["j", "p", "c", "", ""]
+    array<string> types = ["int", "string", "multi", "bool", "int"]
+    array<string> defaults = ["4", "*", "", "false", "30"]
+    array<string> descs = ["Number of parallel jobs", "File glob pattern", "Command to run (repeatable)", "Continue on error", "Timeout per job in seconds"]
+    array<string> required_flags = ["false", "false", "true", "false", "false"]
+    map<string, string> opts = {}
+    array<string> multi = []
+    array<string> positionals = []
+    string err_msg = parse_opts(start, names, shorts, types, defaults, required_flags, opts, multi, positionals)
     if err_msg != "" {
-        fmt.eprintln(f"Error: {err_msg}");
-        print_usage("dtool", "batch", "Run batch operations on files.", names, shorts, types, defaults, descs, required_flags, ["DIR"], ["Directory to process"]);
-        return 1;
+        fmt.eprintln(f"Error: {err_msg}")
+        print_usage("dtool", "batch", "Run batch operations on files.", names, shorts, types, defaults, descs, required_flags, ["DIR"], ["Directory to process"])
+        return 1
     }
 
-    string jobs = opts["jobs"];
-    string pattern = opts["pattern"];
-    bool cont_err = opts["continue-on-error"] == "true";
-    string timeout = opts["timeout"];
-    array<string> commands = get_multi("command", multi);
+    string jobs = opts["jobs"]
+    string pattern = opts["pattern"]
+    bool cont_err = opts["continue-on-error"] == "true"
+    string timeout = opts["timeout"]
+    array<string> commands = get_multi("command", multi)
     if positionals.len() == 0 {
-        fmt.eprintln("Error: DIR argument required");
-        return 1;
+        fmt.eprintln("Error: DIR argument required")
+        return 1
     }
 
-    string dir = positionals[0];
+    string dir = positionals[0]
     if verbose {
-        fmt.println(f"[batch] dir={dir} jobs={jobs} pattern={pattern} timeout={timeout}s");
-        fmt.println(f"[batch] continue-on-error={cont_err}");
-        fmt.println(f"[batch] commands: {commands.len()}");
+        fmt.println(f"[batch] dir={dir} jobs={jobs} pattern={pattern} timeout={timeout}s")
+        fmt.println(f"[batch] continue-on-error={cont_err}")
+        fmt.println(f"[batch] commands: {commands.len()}")
         for (i32 i = 0; i < commands.len(); i++) {
-            string cv = commands[i];
-            fmt.println(f"  cmd[{i}]: {cv}");
+            string cv = commands[i]
+            fmt.println(f"  cmd[{i}]: {cv}")
         }
+
     }
 
-    fmt.println(f"Batch processing {dir}/ with pattern '{pattern}'");
-    fmt.println(f"  Jobs: {jobs}, Timeout: {timeout}s");
+    fmt.println(f"Batch processing {dir}/ with pattern '{pattern}'")
+    fmt.println(f"  Jobs: {jobs}, Timeout: {timeout}s")
     for (i32 i = 0; i < commands.len(); i++) {
-        string cv = commands[i];
-        fmt.println(f"  Running: {cv}");
+        string cv = commands[i]
+        fmt.println(f"  Running: {cv}")
     }
 
-    fmt.println("  Done.");
-    return 0;
+    fmt.println("  Done.")
+    return 0
 }
+
 // ============================================================================
 // Top-level help
 // ============================================================================
 fn print_top_help() -> void {
-    fmt.println("dtool — A multi-purpose data processing tool");
-    fmt.println("");
-    fmt.println("Usage: dtool [global-options] <command> [command-options]");
-    fmt.println("");
-    fmt.println("Commands:");
-    fmt.println("  transform    Transform text data (uppercase, lowercase, trim, filter)");
-    fmt.println("  validate     Validate files against a schema");
-    fmt.println("  stats        Show statistics for data files");
-    fmt.println("  convert      Convert between data formats");
-    fmt.println("  batch        Run batch operations on files");
-    fmt.println("  version      Print version information");
-    fmt.println("");
-    fmt.println("Global Options:");
-    fmt.println("  -v, --verbose        Enable verbose output");
-    fmt.println("  --no-color           Disable colored output");
-    fmt.println("  --config FILE        Path to config file");
-    fmt.println("  -h, --help           Show this help");
-    fmt.println("");
-    fmt.println("Run 'dtool <command> --help' for subcommand help.");
+    fmt.println("dtool — A multi-purpose data processing tool")
+    fmt.println("")
+    fmt.println("Usage: dtool [global-options] <command> [command-options]")
+    fmt.println("")
+    fmt.println("Commands:")
+    fmt.println("  transform    Transform text data (uppercase, lowercase, trim, filter)")
+    fmt.println("  validate     Validate files against a schema")
+    fmt.println("  stats        Show statistics for data files")
+    fmt.println("  convert      Convert between data formats")
+    fmt.println("  batch        Run batch operations on files")
+    fmt.println("  version      Print version information")
+    fmt.println("")
+    fmt.println("Global Options:")
+    fmt.println("  -v, --verbose        Enable verbose output")
+    fmt.println("  --no-color           Disable colored output")
+    fmt.println("  --config FILE        Path to config file")
+    fmt.println("  -h, --help           Show this help")
+    fmt.println("")
+    fmt.println("Run 'dtool <command> --help' for subcommand help.")
 }
+
 // ============================================================================
 // Main dispatch
 // ============================================================================
 fn main() -> i32 {
-    i32 argc = args.count();
+    i32 argc = args.count()
     if argc == 0 {
-        print_top_help();
-        return 0;
+        print_top_help()
+        return 0
     }
+
     // Phase 1: scan for global options before the subcommand
-    bool verbose = false;
-    bool no_color = false;
-    string config = "";
-    bool show_help = false;
-    string subcmd = "";
-    i32 subcmd_pos = - 1;
+    bool verbose = false
+    bool no_color = false
+    string config = ""
+    bool show_help = false
+    string subcmd = ""
+    i32 subcmd_pos = - 1
     // Known subcommands
-    array<string> subcmds = ["transform", "validate", "stats", "convert", "batch", "version"];
+    array<string> subcmds = ["transform", "validate", "stats", "convert", "batch", "version"]
     for (i32 i = 0; i < argc; i++) {
-        string arg = args.at(i);
+        string arg = args.at(i)
         // Check if this is a subcommand
-        bool is_subcmd = false;
+        bool is_subcmd = false
         for (i32 j = 0; j < subcmds.len(); j++) {
             if arg == subcmds[j] {
-                is_subcmd = true;
+                is_subcmd = true
             }
+
         }
 
         if is_subcmd {
-            subcmd = arg;
-            subcmd_pos = i + 1;
+            subcmd = arg
+            subcmd_pos = i + 1
             // args after the subcommand
-            break;
+            break
         }
+
         // Global options
         if arg == "--verbose" || arg == "-v" {
-            verbose = true;
+            verbose = true
         } else if arg == "--no-color" {
-            no_color = true;
+            no_color = true
         } else if arg == "--config" {
-            i++;
+            i++
             if i < argc {
-                config = args.at(i);
+                config = args.at(i)
             } else {
-                fmt.eprintln("Error: --config requires a value");
-                return 1;
+                fmt.eprintln("Error: --config requires a value")
+                return 1
             }
+
         } else if arg == "--help" || arg == "-h" {
-            show_help = true;
+            show_help = true
         } else if arg == "--version" || arg == "-V" {
-            fmt.println("dtool version 1.0.0");
-            return 0;
+            fmt.println("dtool version 1.0.0")
+            return 0
         } else if arg.starts_with("-") {
-            fmt.eprintln(f"Error: unknown global option: {arg}");
-            fmt.eprintln("Run 'dtool --help' for usage.");
-            return 1;
+            fmt.eprintln(f"Error: unknown global option: {arg}")
+            fmt.eprintln("Run 'dtool --help' for usage.")
+            return 1
         } else {
-            fmt.eprintln(f"Error: unknown command: {arg}");
-            fmt.eprintln("Run 'dtool --help' for available commands.");
-            return 1;
+            fmt.eprintln(f"Error: unknown command: {arg}")
+            fmt.eprintln("Run 'dtool --help' for available commands.")
+            return 1
         }
+
     }
 
     if show_help || subcmd == "" {
-        print_top_help();
-        return 0;
+        print_top_help()
+        return 0
     }
 
     if verbose && config != "" {
-        fmt.println(f"[global] config={config}");
+        fmt.println(f"[global] config={config}")
     }
+
     // Phase 2: dispatch to subcommand
     if subcmd == "transform" {
-        return cmd_transform(subcmd_pos, verbose, no_color);
+        return cmd_transform(subcmd_pos, verbose, no_color)
     }
 
     if subcmd == "validate" {
-        return cmd_validate(subcmd_pos, verbose, no_color);
+        return cmd_validate(subcmd_pos, verbose, no_color)
     }
 
     if subcmd == "stats" {
-        return cmd_stats(subcmd_pos, verbose, no_color);
+        return cmd_stats(subcmd_pos, verbose, no_color)
     }
 
     if subcmd == "convert" {
-        return cmd_convert(subcmd_pos, verbose, no_color);
+        return cmd_convert(subcmd_pos, verbose, no_color)
     }
 
     if subcmd == "batch" {
-        return cmd_batch(subcmd_pos, verbose, no_color);
+        return cmd_batch(subcmd_pos, verbose, no_color)
     }
 
     if subcmd == "version" {
-        fmt.println("dtool version 1.0.0");
-        return 0;
+        fmt.println("dtool version 1.0.0")
+        return 0
     }
 
-    fmt.eprintln(f"Error: unknown command: {subcmd}");
-    return 1;
+    fmt.eprintln(f"Error: unknown command: {subcmd}")
+    return 1
 }
