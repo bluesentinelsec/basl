@@ -134,6 +134,16 @@ extern "C"
         const vigil_native_symbol_doc_t *doc;
     } vigil_native_class_t;
 
+    typedef struct vigil_native_module_constant
+    {
+        const char *name;
+        size_t name_length;
+        int type;           /* vigil_type_kind_t */
+        int64_t int_value;  /* for i32/i64/u8/u32/u64 */
+        double float_value; /* for f64 */
+        const vigil_native_symbol_doc_t *doc;
+    } vigil_native_module_constant_t;
+
     typedef struct vigil_native_module
     {
         const char *name;
@@ -143,6 +153,8 @@ extern "C"
         const vigil_native_class_t *classes;
         size_t class_count;
         const vigil_native_symbol_doc_t *doc;
+        const vigil_native_module_constant_t *constants;
+        size_t constant_count;
     } vigil_native_module_t;
 
     /**

@@ -1146,4 +1146,5 @@ VIGIL_API const vigil_native_module_t vigil_stdlib_args = {"args",
                                                                sizeof(vigil_args_functions[0]),
                                                            vigil_args_classes,
                                                            1U,
-                                                           &vigil_args_module_doc};
+                                                           &vigil_args_module_doc,
+    NULL, 0U};

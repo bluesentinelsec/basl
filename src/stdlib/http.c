@@ -2506,4 +2506,5 @@ static const vigil_native_module_function_t http_functions[] = {
 };
 
 VIGIL_API const vigil_native_module_t vigil_stdlib_http = {
-    "http", 4, http_functions, sizeof(http_functions) / sizeof(http_functions[0]), NULL, 0, &vigil_http_module_doc};
+    "http", 4, http_functions, sizeof(http_functions) / sizeof(http_functions[0]), NULL, 0, &vigil_http_module_doc,
+    NULL, 0U};

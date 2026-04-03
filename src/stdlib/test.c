@@ -125,4 +125,5 @@ static const vigil_native_class_t vigil_test_classes[] = {
 };
 
 VIGIL_API const vigil_native_module_t vigil_stdlib_test = {
-    "test", 4U, NULL, 0U, vigil_test_classes, 1U, &vigil_test_module_doc};
+    "test", 4U, NULL, 0U, vigil_test_classes, 1U, &vigil_test_module_doc,
+    NULL, 0U};

@@ -7,7 +7,7 @@ import "fmt";
 import "sdl";
 
 fn main() -> i32 {
-    bool init_ok, err ie = sdl.init(sdl.INIT_VIDEO());
+    bool init_ok, err ie = sdl.init(sdl.INIT_VIDEO);
     if ie != ok {
         fmt.eprintln(f"SDL init failed: {ie.message()}");
         return 1;
@@ -45,12 +45,12 @@ fn main() -> i32 {
     bool running = true;
     while running {
         while ev.poll() {
-            if ev.type() == sdl.EVENT_QUIT() {
+            if ev.type() == sdl.EVENT_QUIT {
                 running = false;
             }
         }
 
-        if sdl.is_key_pressed(sdl.SCANCODE_ESCAPE()) {
+        if sdl.is_key_pressed(sdl.SCANCODE_ESCAPE) {
             running = false;
         }
         // FPS counter

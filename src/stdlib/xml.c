@@ -537,4 +537,5 @@ static const vigil_native_class_t xml_classes[] = {
 };
 
 VIGIL_API const vigil_native_module_t vigil_stdlib_xml = {
-    "xml", 3U, NULL, 0U, xml_classes, sizeof(xml_classes) / sizeof(xml_classes[0]), &xml_module_doc};
+    "xml", 3U, NULL, 0U, xml_classes, sizeof(xml_classes) / sizeof(xml_classes[0]), &xml_module_doc,
+    NULL, 0U};

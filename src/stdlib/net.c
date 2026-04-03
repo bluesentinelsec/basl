@@ -593,4 +593,5 @@ static const vigil_native_module_function_t net_functions[] = {
 #define NET_FUNCTION_COUNT (sizeof(net_functions) / sizeof(net_functions[0]))
 
 VIGIL_API const vigil_native_module_t vigil_stdlib_net = {"net", 3U, net_functions, NET_FUNCTION_COUNT, NULL, 0U,
-                                                          &vigil_net_module_doc};
+                                                          &vigil_net_module_doc,
+    NULL, 0U};

@@ -2,7 +2,7 @@ import "fmt";
 import "sdl";
 
 fn main() -> i32 {
-    bool init_ok, err ie = sdl.init(sdl.INIT_VIDEO());
+    bool init_ok, err ie = sdl.init(sdl.INIT_VIDEO);
     if ie != ok {
         fmt.eprintln(f"SDL init failed: {ie.message()}");
         return 1;
@@ -28,12 +28,12 @@ fn main() -> i32 {
     while running && count < 100 {
         while ev.poll() {
             i32 t = ev.type();
-            if t == sdl.EVENT_QUIT() {
+            if t == sdl.EVENT_QUIT {
                 fmt.println("Quit event received.");
                 running = false;
-            } else if t == sdl.EVENT_KEY_DOWN() {
+            } else if t == sdl.EVENT_KEY_DOWN {
                 fmt.println(f"Key down: scancode={ev.key_scancode()} keycode={ev.key_keycode()}");
-            } else if t == sdl.EVENT_MOUSE_MOTION() {
+            } else if t == sdl.EVENT_MOUSE_MOTION {
                 f64 mx = ev.mouse_x();
                 f64 my = ev.mouse_y();
                 fmt.println(f"Mouse: {mx}, {my}");

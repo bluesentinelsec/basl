@@ -7420,6 +7420,40 @@ static vigil_status_t parse_qualified_non_call(vigil_parser_state_t *state, cons
         return VIGIL_STATUS_OK;
     }
 
+    /* Native module constant. */
+    if (VIGIL_IS_NATIVE_SOURCE_ID(source_id) && state->program->natives != NULL)
+    {
+        size_t nmod_idx = VIGIL_NATIVE_SOURCE_INDEX(source_id);
+        if (nmod_idx < state->program->natives->module_count)
+        {
+            const vigil_native_module_t *nmod = state->program->natives->modules[nmod_idx];
+            size_t ci;
+            for (ci = 0U; ci < nmod->constant_count; ci++)
+            {
+                const vigil_native_module_constant_t *nc = &nmod->constants[ci];
+                if (nc->name_length == member_name_length && memcmp(nc->name, member_name, member_name_length) == 0)
+                {
+                    if (nc->type == VIGIL_TYPE_F64)
+                    {
+                        status = vigil_parser_emit_f64_constant(state, nc->float_value, member_token->span);
+                        if (status != VIGIL_STATUS_OK)
+                            return status;
+                        vigil_expression_result_set_type(out_result, vigil_binding_type_primitive(VIGIL_TYPE_F64));
+                    }
+                    else
+                    {
+                        status = vigil_parser_emit_i32_constant(state, (int32_t)nc->int_value, member_token->span);
+                        if (status != VIGIL_STATUS_OK)
+                            return status;
+                        vigil_expression_result_set_type(out_result,
+                                                        vigil_binding_type_primitive((vigil_type_kind_t)nc->type));
+                    }
+                    return VIGIL_STATUS_OK;
+                }
+            }
+        }
+    }
+
     return vigil_parser_report(state, member_token->span, "unknown module member");
 }
 

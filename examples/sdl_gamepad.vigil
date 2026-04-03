@@ -7,7 +7,7 @@ import "fmt";
 import "sdl";
 
 fn main() -> i32 {
-    bool init_ok, err ie = sdl.init(sdl.INIT_VIDEO() | sdl.INIT_GAMEPAD());
+    bool init_ok, err ie = sdl.init(sdl.INIT_VIDEO | sdl.INIT_GAMEPAD);
     if ie != ok {
         fmt.eprintln(f"SDL init failed: {ie.message()}");
         return 1;
@@ -41,15 +41,15 @@ fn main() -> i32 {
     while running {
         while ev.poll() {
             i32 t = ev.type();
-            if t == sdl.EVENT_QUIT() {
+            if t == sdl.EVENT_QUIT {
                 running = false;
-            } else if t == sdl.EVENT_GAMEPAD_ADDED() {
+            } else if t == sdl.EVENT_GAMEPAD_ADDED {
                 fmt.println("Gamepad connected!");
-            } else if t == sdl.EVENT_GAMEPAD_REMOVED() {
+            } else if t == sdl.EVENT_GAMEPAD_REMOVED {
                 fmt.println("Gamepad disconnected.");
-            } else if t == sdl.EVENT_GAMEPAD_BUTTON_DOWN() {
+            } else if t == sdl.EVENT_GAMEPAD_BUTTON_DOWN {
                 fmt.println(f"Button {ev.gamepad_button()} pressed");
-            } else if t == sdl.EVENT_GAMEPAD_AXIS_MOTION() {
+            } else if t == sdl.EVENT_GAMEPAD_AXIS_MOTION {
                 i32 axis = ev.gamepad_axis();
                 i32 val = ev.gamepad_axis_value();
                 if val > 8000 || val < - 8000 {
@@ -58,7 +58,7 @@ fn main() -> i32 {
             }
         }
 
-        if sdl.is_key_pressed(sdl.SCANCODE_ESCAPE()) {
+        if sdl.is_key_pressed(sdl.SCANCODE_ESCAPE) {
             running = false;
         }
         // Try to open first gamepad if not yet open

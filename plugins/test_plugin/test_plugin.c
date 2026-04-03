@@ -89,4 +89,5 @@ static const vigil_native_module_function_t tp_functions[] = {
 /* ── module export ───────────────────────────────────────────────── */
 
 VIGIL_API const vigil_native_module_t vigil_plugin_test_plugin = {"test_plugin", 11U, tp_functions, TP_FUNCTION_COUNT,
-                                                                  NULL,          0U,  NULL};
+                                                                  NULL,          0U,  NULL,
+    NULL, 0U};

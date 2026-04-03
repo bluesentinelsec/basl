@@ -423,4 +423,5 @@ static const vigil_native_module_function_t atomic_funcs[] = {
 };
 
 VIGIL_API const vigil_native_module_t vigil_stdlib_atomic = {
-    "atomic", 6U, atomic_funcs, sizeof(atomic_funcs) / sizeof(atomic_funcs[0]), NULL, 0U, &vigil_atomic_module_doc};
+    "atomic", 6U, atomic_funcs, sizeof(atomic_funcs) / sizeof(atomic_funcs[0]), NULL, 0U, &vigil_atomic_module_doc,
+    NULL, 0U};

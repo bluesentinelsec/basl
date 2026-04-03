@@ -22,7 +22,7 @@ fn main() -> i32 {
     }
 
     string wav_path = positionals[0];
-    bool init_ok, err ie = sdl.init(sdl.INIT_AUDIO());
+    bool init_ok, err ie = sdl.init(sdl.INIT_AUDIO);
     if ie != ok {
         fmt.eprintln(f"SDL init failed: {ie.message()}");
         return 1;

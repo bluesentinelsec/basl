@@ -958,4 +958,5 @@ static const vigil_native_module_function_t thread_funcs[] = {
 };
 
 VIGIL_API const vigil_native_module_t vigil_stdlib_thread = {
-    "thread", 6U, thread_funcs, sizeof(thread_funcs) / sizeof(thread_funcs[0]), NULL, 0U, &vigil_thread_module_doc};
+    "thread", 6U, thread_funcs, sizeof(thread_funcs) / sizeof(thread_funcs[0]), NULL, 0U, &vigil_thread_module_doc,
+    NULL, 0U};

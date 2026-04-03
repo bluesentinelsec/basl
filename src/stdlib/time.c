@@ -695,4 +695,5 @@ static const vigil_native_module_function_t time_functions[] = {
 #define TIME_FUNCTION_COUNT (sizeof(time_functions) / sizeof(time_functions[0]))
 
 VIGIL_API const vigil_native_module_t vigil_stdlib_time = {"time", 4U,  time_functions, TIME_FUNCTION_COUNT, NULL,
-                                                           0U,     &vigil_time_module_doc};
+                                                           0U,     &vigil_time_module_doc,
+    NULL, 0U};

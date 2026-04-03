@@ -1708,4 +1708,5 @@ static const vigil_native_module_function_t compress_functions[] = {
 #define COMPRESS_FUNCTION_COUNT (sizeof(compress_functions) / sizeof(compress_functions[0]))
 
 VIGIL_API const vigil_native_module_t vigil_stdlib_compress = {
-    "compress", 8U, compress_functions, COMPRESS_FUNCTION_COUNT, NULL, 0U, &vigil_compress_module_doc};
+    "compress", 8U, compress_functions, COMPRESS_FUNCTION_COUNT, NULL, 0U, &vigil_compress_module_doc,
+    NULL, 0U};

@@ -575,4 +575,5 @@ static const vigil_native_module_function_t csv_functions[] = {
 #define CSV_FUNCTION_COUNT (sizeof(csv_functions) / sizeof(csv_functions[0]))
 
 VIGIL_API const vigil_native_module_t vigil_stdlib_csv = {"csv", 3U, csv_functions, CSV_FUNCTION_COUNT, NULL, 0U,
-                                                          &vigil_csv_module_doc};
+                                                          &vigil_csv_module_doc,
+    NULL, 0U};
