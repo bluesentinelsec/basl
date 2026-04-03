@@ -156,6 +156,5 @@ static const vigil_native_module_function_t vigil_fmt_functions[] = {
 
 #define VIGIL_FMT_FUNCTION_COUNT (sizeof(vigil_fmt_functions) / sizeof(vigil_fmt_functions[0]))
 
-VIGIL_API const vigil_native_module_t vigil_stdlib_fmt = {"fmt", 3U, vigil_fmt_functions,  VIGIL_FMT_FUNCTION_COUNT,
-                                                          NULL,  0U, &vigil_fmt_module_doc,
-    NULL, 0U};
+VIGIL_API const vigil_native_module_t vigil_stdlib_fmt = {
+    "fmt", 3U, vigil_fmt_functions, VIGIL_FMT_FUNCTION_COUNT, NULL, 0U, &vigil_fmt_module_doc, NULL, 0U};

@@ -654,22 +654,22 @@ static const vigil_native_module_function_t time_functions[] = {
      &vigil_time_now_ns_doc},
     {"sleep", 5U, time_sleep, 1U, i64_param, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, NULL, 0U, time_ms_param_names, NULL,
      NULL, &vigil_time_sleep_doc},
-    {"year", 4U, time_year, 1U, i64_param, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, NULL, 0U, time_ts_param_names, NULL,
-     NULL, &vigil_time_year_doc},
+    {"year", 4U, time_year, 1U, i64_param, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, NULL, 0U, time_ts_param_names, NULL, NULL,
+     &vigil_time_year_doc},
     {"month", 5U, time_month, 1U, i64_param, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, NULL, 0U, time_ts_param_names, NULL,
      NULL, &vigil_time_month_doc},
     {"day", 3U, time_day, 1U, i64_param, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, NULL, 0U, time_ts_param_names, NULL, NULL,
      &vigil_time_day_doc},
-    {"hour", 4U, time_hour, 1U, i64_param, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, NULL, 0U, time_ts_param_names, NULL,
-     NULL, &vigil_time_hour_doc},
+    {"hour", 4U, time_hour, 1U, i64_param, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, NULL, 0U, time_ts_param_names, NULL, NULL,
+     &vigil_time_hour_doc},
     {"minute", 6U, time_minute, 1U, i64_param, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, NULL, 0U, time_ts_param_names, NULL,
      NULL, &vigil_time_minute_doc},
     {"second", 6U, time_second, 1U, i64_param, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, NULL, 0U, time_ts_param_names, NULL,
      NULL, &vigil_time_second_doc},
-    {"weekday", 7U, time_weekday, 1U, i64_param, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, NULL, 0U, time_ts_param_names,
-     NULL, NULL, &vigil_time_weekday_doc},
-    {"yearday", 7U, time_yearday, 1U, i64_param, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, NULL, 0U, time_ts_param_names,
-     NULL, NULL, &vigil_time_yearday_doc},
+    {"weekday", 7U, time_weekday, 1U, i64_param, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, NULL, 0U, time_ts_param_names, NULL,
+     NULL, &vigil_time_weekday_doc},
+    {"yearday", 7U, time_yearday, 1U, i64_param, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, NULL, 0U, time_ts_param_names, NULL,
+     NULL, &vigil_time_yearday_doc},
     {"is_dst", 6U, time_is_dst, 1U, i64_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U, time_ts_param_names, NULL,
      NULL, &vigil_time_is_dst_doc},
     {"utc_offset", 10U, time_utc_offset, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL,
@@ -694,6 +694,5 @@ static const vigil_native_module_function_t time_functions[] = {
 
 #define TIME_FUNCTION_COUNT (sizeof(time_functions) / sizeof(time_functions[0]))
 
-VIGIL_API const vigil_native_module_t vigil_stdlib_time = {"time", 4U,  time_functions, TIME_FUNCTION_COUNT, NULL,
-                                                           0U,     &vigil_time_module_doc,
-    NULL, 0U};
+VIGIL_API const vigil_native_module_t vigil_stdlib_time = {
+    "time", 4U, time_functions, TIME_FUNCTION_COUNT, NULL, 0U, &vigil_time_module_doc, NULL, 0U};

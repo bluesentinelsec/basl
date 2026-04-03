@@ -909,8 +909,8 @@ static const vigil_native_module_function_t thread_funcs[] = {
      NULL, NULL, &vigil_thread_spawn_doc},
     {"join", 4U, thread_join, 1U, i64_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U, thread_handle_param_names,
      NULL, NULL, &vigil_thread_join_doc},
-    {"detach", 6U, thread_detach, 1U, i64_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U, thread_handle_param_names,
-     NULL, NULL, &vigil_thread_detach_doc},
+    {"detach", 6U, thread_detach, 1U, i64_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U,
+     thread_handle_param_names, NULL, NULL, &vigil_thread_detach_doc},
     {"current_id", 10U, thread_current_id, 0U, NULL, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL,
      &vigil_thread_current_id_doc},
     {"yield", 5U, thread_yield, 0U, NULL, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL,
@@ -959,4 +959,4 @@ static const vigil_native_module_function_t thread_funcs[] = {
 
 VIGIL_API const vigil_native_module_t vigil_stdlib_thread = {
     "thread", 6U, thread_funcs, sizeof(thread_funcs) / sizeof(thread_funcs[0]), NULL, 0U, &vigil_thread_module_doc,
-    NULL, 0U};
+    NULL,     0U};

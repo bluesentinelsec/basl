@@ -2028,5 +2028,4 @@ static const vigil_native_class_t vigil_fs_classes[] = {
 #define FS_CLASS_COUNT (sizeof(vigil_fs_classes) / sizeof(vigil_fs_classes[0]))
 
 VIGIL_API const vigil_native_module_t vigil_stdlib_fs = {
-    "fs", 2U, vigil_fs_functions, FS_FUNCTION_COUNT, vigil_fs_classes, FS_CLASS_COUNT, &vigil_fs_module_doc,
-    NULL, 0U};
+    "fs", 2U, vigil_fs_functions, FS_FUNCTION_COUNT, vigil_fs_classes, FS_CLASS_COUNT, &vigil_fs_module_doc, NULL, 0U};

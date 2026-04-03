@@ -48,19 +48,20 @@ typedef struct vigil_coverage_summary
 VIGIL_API void vigil_coverage_session_init(vigil_coverage_session_t *session);
 VIGIL_API void vigil_coverage_session_free(vigil_coverage_session_t *session);
 VIGIL_API vigil_status_t vigil_coverage_session_track_registry(vigil_coverage_session_t *session,
-                                                     const vigil_source_registry_t *registry, const char *scope_root,
-                                                     const char *wrapper_path, int include_deps, vigil_error_t *error);
+                                                               const vigil_source_registry_t *registry,
+                                                               const char *scope_root, const char *wrapper_path,
+                                                               int include_deps, vigil_error_t *error);
 VIGIL_API vigil_status_t vigil_coverage_session_register_function(vigil_coverage_session_t *session,
-                                                        const vigil_source_registry_t *registry,
-                                                        const vigil_object_t *function, vigil_error_t *error);
+                                                                  const vigil_source_registry_t *registry,
+                                                                  const vigil_object_t *function, vigil_error_t *error);
 VIGIL_API void vigil_coverage_session_attach_vm(vigil_coverage_session_t *session, vigil_vm_t *vm,
-                                      const vigil_source_registry_t *registry);
+                                                const vigil_source_registry_t *registry);
 VIGIL_API void vigil_coverage_session_detach_vm(vigil_coverage_session_t *session, vigil_vm_t *vm);
 VIGIL_API size_t vigil_coverage_session_file_count(const vigil_coverage_session_t *session);
 VIGIL_API vigil_coverage_summary_t vigil_coverage_session_total_line_summary(const vigil_coverage_session_t *session);
 VIGIL_API void vigil_coverage_session_print_text(const vigil_coverage_session_t *session, FILE *stream, int verbose,
-                                       size_t test_file_count);
+                                                 size_t test_file_count);
 VIGIL_API vigil_status_t vigil_coverage_session_print_json(const vigil_coverage_session_t *session, FILE *stream,
-                                                 vigil_error_t *error);
+                                                           vigil_error_t *error);
 
 #endif

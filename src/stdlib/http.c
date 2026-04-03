@@ -2455,8 +2455,8 @@ static const vigil_native_symbol_doc_t vigil_http_set_idle_timeout_doc = {
 static const vigil_native_module_function_t http_functions[] = {
     {"get", 3, http_get, 1, http_1str, VIGIL_TYPE_I32, 3, http_ret_get, 0, NULL, NULL, 0U, http_url_param_names, NULL,
      NULL, &vigil_http_get_doc},
-    {"post", 4, http_post, 2, http_2str, VIGIL_TYPE_I32, 3, http_ret_get, 0, NULL, NULL, 0U,
-     http_url_body_param_names, NULL, NULL, &vigil_http_post_doc},
+    {"post", 4, http_post, 2, http_2str, VIGIL_TYPE_I32, 3, http_ret_get, 0, NULL, NULL, 0U, http_url_body_param_names,
+     NULL, NULL, &vigil_http_post_doc},
     {"request", 7, http_request, 2, http_2str, VIGIL_TYPE_I32, 3, http_ret_get, 0, NULL, NULL, 0U,
      http_request_param_names, NULL, NULL, &vigil_http_request_doc},
     {"listen", 6, http_listen, 2, http_str_i32, VIGIL_TYPE_I64, 1, NULL, 0, NULL, NULL, 0U, http_listen_param_names,
@@ -2473,8 +2473,8 @@ static const vigil_native_module_function_t http_functions[] = {
      http_conn_status_param_names, NULL, NULL, &vigil_http_write_header_doc},
     {"write", 5, http_write, 2, http_i64_str, VIGIL_TYPE_I32, 1, NULL, 0, NULL, NULL, 0U, http_conn_data_param_names,
      NULL, NULL, &vigil_http_write_doc},
-    {"flush", 5, http_flush, 1, http_i64, VIGIL_TYPE_I32, 1, NULL, 0, NULL, NULL, 0U, http_conn_param_names, NULL,
-     NULL, &vigil_http_flush_doc},
+    {"flush", 5, http_flush, 1, http_i64, VIGIL_TYPE_I32, 1, NULL, 0, NULL, NULL, 0U, http_conn_param_names, NULL, NULL,
+     &vigil_http_flush_doc},
     {"req_method", 10, http_req_method, 1, http_i64, VIGIL_TYPE_STRING, 1, NULL, 0, NULL, NULL, 0U,
      http_conn_param_names, NULL, NULL, &vigil_http_req_method_doc},
     {"req_path", 8, http_req_path, 1, http_i64, VIGIL_TYPE_STRING, 1, NULL, 0, NULL, NULL, 0U, http_conn_param_names,
@@ -2507,4 +2507,4 @@ static const vigil_native_module_function_t http_functions[] = {
 
 VIGIL_API const vigil_native_module_t vigil_stdlib_http = {
     "http", 4, http_functions, sizeof(http_functions) / sizeof(http_functions[0]), NULL, 0, &vigil_http_module_doc,
-    NULL, 0U};
+    NULL,   0U};

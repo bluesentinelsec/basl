@@ -574,8 +574,8 @@ static const vigil_native_module_function_t net_functions[] = {
      net_host_port_param_names, NULL, NULL, &vigil_net_tcp_connect_doc},
     {"read", 4U, net_read, 2U, i64_i32_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U,
      net_sock_max_bytes_param_names, NULL, NULL, &vigil_net_read_doc},
-    {"write", 5U, net_write, 2U, i64_str_param, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, NULL, 0U,
-     net_sock_data_param_names, NULL, NULL, &vigil_net_write_doc},
+    {"write", 5U, net_write, 2U, i64_str_param, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, NULL, 0U, net_sock_data_param_names,
+     NULL, NULL, &vigil_net_write_doc},
     {"close", 5U, net_close, 1U, i64_param, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, NULL, 0U, net_sock_param_names, NULL,
      NULL, &vigil_net_close_doc},
     {"udp_bind", 8U, net_udp_bind, 2U, str_i32_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U,
@@ -592,6 +592,5 @@ static const vigil_native_module_function_t net_functions[] = {
 
 #define NET_FUNCTION_COUNT (sizeof(net_functions) / sizeof(net_functions[0]))
 
-VIGIL_API const vigil_native_module_t vigil_stdlib_net = {"net", 3U, net_functions, NET_FUNCTION_COUNT, NULL, 0U,
-                                                          &vigil_net_module_doc,
-    NULL, 0U};
+VIGIL_API const vigil_native_module_t vigil_stdlib_net = {
+    "net", 3U, net_functions, NET_FUNCTION_COUNT, NULL, 0U, &vigil_net_module_doc, NULL, 0U};
