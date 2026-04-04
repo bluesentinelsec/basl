@@ -37,5 +37,11 @@ vigil_status_t vigil_vm_op_string_join(vigil_vm_t *vm, vigil_vm_frame_t *frame, 
 vigil_status_t vigil_vm_op_string_next_char(vigil_vm_t *vm, vigil_vm_frame_t *frame, vigil_error_t *error);
 vigil_status_t vigil_vm_op_string_pad_left(vigil_vm_t *vm, vigil_vm_frame_t *frame, vigil_error_t *error);
 vigil_status_t vigil_vm_op_string_pad_right(vigil_vm_t *vm, vigil_vm_frame_t *frame, vigil_error_t *error);
+vigil_status_t vigil_vm_op_string_is_digit(vigil_vm_t *vm, vigil_vm_frame_t *frame, vigil_error_t *error);
+vigil_status_t vigil_vm_op_string_is_alpha(vigil_vm_t *vm, vigil_vm_frame_t *frame, vigil_error_t *error);
+vigil_status_t vigil_vm_op_string_is_alnum(vigil_vm_t *vm, vigil_vm_frame_t *frame, vigil_error_t *error);
+vigil_status_t vigil_vm_op_string_is_space(vigil_vm_t *vm, vigil_vm_frame_t *frame, vigil_error_t *error);
+vigil_status_t vigil_vm_op_string_is_upper(vigil_vm_t *vm, vigil_vm_frame_t *frame, vigil_error_t *error);
+vigil_status_t vigil_vm_op_string_is_lower(vigil_vm_t *vm, vigil_vm_frame_t *frame, vigil_error_t *error);
 
 #endif /* VIGIL_VM_OPS_STRING_H */

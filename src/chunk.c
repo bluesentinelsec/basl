@@ -13,7 +13,7 @@
 #define VIGIL_REG_CACHE_STATE_BUILDING 1LL
 #define VIGIL_REG_CACHE_STATE_READY 2LL
 
-static const char *const kVigilOpcodeNames[VIGIL_OPCODE_STRING_PAD_RIGHT + 1] = {
+static const char *const kVigilOpcodeNames[VIGIL_OPCODE_STRING_IS_LOWER + 1] = {
     [VIGIL_OPCODE_CONSTANT] = "CONSTANT",
     [VIGIL_OPCODE_NIL] = "NIL",
     [VIGIL_OPCODE_TRUE] = "TRUE",
@@ -214,6 +214,12 @@ static const char *const kVigilOpcodeNames[VIGIL_OPCODE_STRING_PAD_RIGHT + 1] = 
     [VIGIL_OPCODE_MAP_CLEAR] = "MAP_CLEAR",
     [VIGIL_OPCODE_STRING_PAD_LEFT] = "STRING_PAD_LEFT",
     [VIGIL_OPCODE_STRING_PAD_RIGHT] = "STRING_PAD_RIGHT",
+    [VIGIL_OPCODE_STRING_IS_DIGIT] = "STRING_IS_DIGIT",
+    [VIGIL_OPCODE_STRING_IS_ALPHA] = "STRING_IS_ALPHA",
+    [VIGIL_OPCODE_STRING_IS_ALNUM] = "STRING_IS_ALNUM",
+    [VIGIL_OPCODE_STRING_IS_SPACE] = "STRING_IS_SPACE",
+    [VIGIL_OPCODE_STRING_IS_UPPER] = "STRING_IS_UPPER",
+    [VIGIL_OPCODE_STRING_IS_LOWER] = "STRING_IS_LOWER",
 };
 
 static vigil_status_t vigil_chunk_append_text(vigil_string_t *output, const char *text, vigil_error_t *error);
@@ -677,7 +683,7 @@ static int vigil_chunk_is_forloop_opcode(vigil_opcode_t opcode)
 static int vigil_chunk_is_u32_operand_opcode(vigil_opcode_t opcode)
 {
     /* Lookup table avoids a long OR-chain that inflates cyclomatic complexity. */
-    static const uint8_t table[VIGIL_OPCODE_STRING_PAD_RIGHT + 1] = {
+    static const uint8_t table[VIGIL_OPCODE_STRING_IS_LOWER + 1] = {
         [VIGIL_OPCODE_CONSTANT] = 1,
         [VIGIL_OPCODE_GET_LOCAL] = 1,
         [VIGIL_OPCODE_SET_LOCAL] = 1,

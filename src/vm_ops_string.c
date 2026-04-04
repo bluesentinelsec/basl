@@ -1434,3 +1434,85 @@ vigil_status_t vigil_vm_op_string_pad_right(vigil_vm_t *vm, vigil_vm_frame_t *fr
 {
     return vigil_vm_op_string_pad(vm, frame, 0, error);
 }
+
+/* ── Character classification methods ──────────────────────────── */
+
+typedef int (*char_predicate_fn)(int);
+
+static vigil_status_t string_classify(vigil_vm_t *vm, vigil_vm_frame_t *frame, char_predicate_fn pred,
+                                      vigil_error_t *error)
+{
+    vigil_value_t left, value;
+    const char *text;
+    size_t length;
+
+    frame->ip += 1U;
+    left = vigil_vm_pop_or_nil(vm);
+
+    if (!vigil_vm_get_string_parts(&left, &text, &length))
+    {
+        VIGIL_VM_VALUE_RELEASE(&left);
+        return vigil_vm_fail_at_ip(vm, VIGIL_STATUS_INVALID_ARGUMENT, "string method requires a string receiver",
+                                   error);
+    }
+
+    int result = length > 0;
+    for (size_t i = 0; i < length && result; i++)
+        result = pred((unsigned char)text[i]);
+
+    VIGIL_VM_VALUE_RELEASE(&left);
+    vigil_value_init_bool(&value, result);
+    vigil_status_t status = vigil_vm_push(vm, &value, error);
+    VIGIL_VM_VALUE_RELEASE(&value);
+    return status;
+}
+
+static int is_digit_pred(int c)
+{
+    return c >= '0' && c <= '9';
+}
+static int is_alpha_pred(int c)
+{
+    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
+}
+static int is_alnum_pred(int c)
+{
+    return is_digit_pred(c) || is_alpha_pred(c);
+}
+static int is_space_pred(int c)
+{
+    return c == ' ' || c == '\t' || c == '\n' || c == '\r';
+}
+static int is_upper_pred(int c)
+{
+    return c >= 'A' && c <= 'Z';
+}
+static int is_lower_pred(int c)
+{
+    return c >= 'a' && c <= 'z';
+}
+
+vigil_status_t vigil_vm_op_string_is_digit(vigil_vm_t *vm, vigil_vm_frame_t *frame, vigil_error_t *error)
+{
+    return string_classify(vm, frame, is_digit_pred, error);
+}
+vigil_status_t vigil_vm_op_string_is_alpha(vigil_vm_t *vm, vigil_vm_frame_t *frame, vigil_error_t *error)
+{
+    return string_classify(vm, frame, is_alpha_pred, error);
+}
+vigil_status_t vigil_vm_op_string_is_alnum(vigil_vm_t *vm, vigil_vm_frame_t *frame, vigil_error_t *error)
+{
+    return string_classify(vm, frame, is_alnum_pred, error);
+}
+vigil_status_t vigil_vm_op_string_is_space(vigil_vm_t *vm, vigil_vm_frame_t *frame, vigil_error_t *error)
+{
+    return string_classify(vm, frame, is_space_pred, error);
+}
+vigil_status_t vigil_vm_op_string_is_upper(vigil_vm_t *vm, vigil_vm_frame_t *frame, vigil_error_t *error)
+{
+    return string_classify(vm, frame, is_upper_pred, error);
+}
+vigil_status_t vigil_vm_op_string_is_lower(vigil_vm_t *vm, vigil_vm_frame_t *frame, vigil_error_t *error)
+{
+    return string_classify(vm, frame, is_lower_pred, error);
+}

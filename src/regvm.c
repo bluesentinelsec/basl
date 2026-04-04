@@ -614,6 +614,12 @@ static size_t stack_op_size(const uint8_t *code, size_t ip, size_t code_size)
     case VIGIL_OPCODE_STRING_CUT:
     case VIGIL_OPCODE_STRING_PAD_LEFT:
     case VIGIL_OPCODE_STRING_PAD_RIGHT:
+    case VIGIL_OPCODE_STRING_IS_DIGIT:
+    case VIGIL_OPCODE_STRING_IS_ALPHA:
+    case VIGIL_OPCODE_STRING_IS_ALNUM:
+    case VIGIL_OPCODE_STRING_IS_SPACE:
+    case VIGIL_OPCODE_STRING_IS_UPPER:
+    case VIGIL_OPCODE_STRING_IS_LOWER:
     case VIGIL_OPCODE_STRING_FIELDS:
     case VIGIL_OPCODE_STRING_EQUAL_FOLD:
     case VIGIL_OPCODE_GET_INDEX:
@@ -2552,6 +2558,12 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
         case VIGIL_OPCODE_STRING_TO_LOWER:
         case VIGIL_OPCODE_STRING_REVERSE:
         case VIGIL_OPCODE_STRING_IS_EMPTY:
+        case VIGIL_OPCODE_STRING_IS_DIGIT:
+        case VIGIL_OPCODE_STRING_IS_ALPHA:
+        case VIGIL_OPCODE_STRING_IS_ALNUM:
+        case VIGIL_OPCODE_STRING_IS_SPACE:
+        case VIGIL_OPCODE_STRING_IS_UPPER:
+        case VIGIL_OPCODE_STRING_IS_LOWER:
         case VIGIL_OPCODE_STRING_BYTES:
         case VIGIL_OPCODE_STRING_CHAR_COUNT:
         case VIGIL_OPCODE_STRING_FIELDS: {
@@ -5139,9 +5151,41 @@ r_dispatch_switch_check:
             status = vigil_vm_op_string_reverse(vm, frame, error);
             break;
         case VIGIL_OPCODE_STRING_IS_EMPTY:
+        case VIGIL_OPCODE_STRING_IS_DIGIT:
+        case VIGIL_OPCODE_STRING_IS_ALPHA:
+        case VIGIL_OPCODE_STRING_IS_ALNUM:
+        case VIGIL_OPCODE_STRING_IS_SPACE:
+        case VIGIL_OPCODE_STRING_IS_UPPER:
+        case VIGIL_OPCODE_STRING_IS_LOWER:
             pop_count = 1;
             helper_ret_count = 1;
-            status = vigil_vm_op_string_is_empty(vm, frame, error);
+            switch (sub_op)
+            {
+            case VIGIL_OPCODE_STRING_IS_EMPTY:
+                status = vigil_vm_op_string_is_empty(vm, frame, error);
+                break;
+            case VIGIL_OPCODE_STRING_IS_DIGIT:
+                status = vigil_vm_op_string_is_digit(vm, frame, error);
+                break;
+            case VIGIL_OPCODE_STRING_IS_ALPHA:
+                status = vigil_vm_op_string_is_alpha(vm, frame, error);
+                break;
+            case VIGIL_OPCODE_STRING_IS_ALNUM:
+                status = vigil_vm_op_string_is_alnum(vm, frame, error);
+                break;
+            case VIGIL_OPCODE_STRING_IS_SPACE:
+                status = vigil_vm_op_string_is_space(vm, frame, error);
+                break;
+            case VIGIL_OPCODE_STRING_IS_UPPER:
+                status = vigil_vm_op_string_is_upper(vm, frame, error);
+                break;
+            case VIGIL_OPCODE_STRING_IS_LOWER:
+                status = vigil_vm_op_string_is_lower(vm, frame, error);
+                break;
+            default:
+                status = VIGIL_STATUS_UNSUPPORTED;
+                break;
+            }
             break;
         case VIGIL_OPCODE_STRING_CHAR_COUNT:
             pop_count = 1;

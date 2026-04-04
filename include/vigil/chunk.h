@@ -305,7 +305,13 @@ extern "C"
         VIGIL_OPCODE_ARRAY_CLEAR = 196,
         VIGIL_OPCODE_MAP_CLEAR = 197,
         VIGIL_OPCODE_STRING_PAD_LEFT = 198,
-        VIGIL_OPCODE_STRING_PAD_RIGHT = 199
+        VIGIL_OPCODE_STRING_PAD_RIGHT = 199,
+        VIGIL_OPCODE_STRING_IS_DIGIT = 200,
+        VIGIL_OPCODE_STRING_IS_ALPHA = 201,
+        VIGIL_OPCODE_STRING_IS_ALNUM = 202,
+        VIGIL_OPCODE_STRING_IS_SPACE = 203,
+        VIGIL_OPCODE_STRING_IS_UPPER = 204,
+        VIGIL_OPCODE_STRING_IS_LOWER = 205
     } vigil_opcode_t;
 
     /* Forward-declare the register chunk for the translation cache. */
