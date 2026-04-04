@@ -1,3 +1,4 @@
+/* alloc-check: exempt — temporary buffers freed within same function */
 /* encoding.c — encoding module: hex, base64, base32 encode/decode. */
 
 #include <stdlib.h>

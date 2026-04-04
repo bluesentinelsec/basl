@@ -1391,7 +1391,9 @@ static vigil_status_t vigil_vm_op_string_pad(vigil_vm_t *vm, vigil_vm_frame_t *f
     size_t target = (size_t)width;
     size_t pad_count = target - text_len;
     size_t total = target;
-    char *buf = (char *)malloc(total + 1U);
+    void *buf_mem = NULL;
+    vigil_runtime_alloc(vm->runtime, total + 1U, &buf_mem, error);
+    char *buf = (char *)buf_mem;
     if (buf == NULL)
     {
         VIGIL_VM_VALUE_RELEASE(&str_val);
@@ -1417,7 +1419,7 @@ static vigil_status_t vigil_vm_op_string_pad(vigil_vm_t *vm, vigil_vm_frame_t *f
     VIGIL_VM_VALUE_RELEASE(&fill_val);
 
     status = vigil_vm_new_string_value(vm, buf, total, &result, error);
-    free(buf);
+    vigil_runtime_free(vm->runtime, &buf_mem);
     if (status != VIGIL_STATUS_OK)
         return status;
     status = vigil_vm_push(vm, &result, error);

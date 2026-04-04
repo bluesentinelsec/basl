@@ -78,7 +78,6 @@ static vigil_status_t os_exit_fn(vigil_vm_t *vm, size_t arg_count, vigil_error_t
     int code = (int)vigil_value_as_int(&code_val);
     vigil_value_release(&code_val);
     exit(code);
-    return VIGIL_STATUS_OK;
 }
 
 /* os.platform() -> string */
