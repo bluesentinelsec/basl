@@ -17,6 +17,7 @@ set(VIGIL_STDLIB_ALWAYS_SOURCES
     src/stdlib/json.c
     src/stdlib/log.c
     src/stdlib/math.c
+    src/stdlib/os.c
     src/stdlib/parse.c
     src/stdlib/random.c
     src/stdlib/regex.c

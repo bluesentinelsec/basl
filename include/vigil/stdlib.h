@@ -64,6 +64,7 @@ extern "C"
 #endif
     extern VIGIL_API const vigil_native_module_t vigil_stdlib_unsafe;
     extern VIGIL_API const vigil_native_module_t vigil_stdlib_url;
+    extern VIGIL_API const vigil_native_module_t vigil_stdlib_os;
     extern VIGIL_API const vigil_native_module_t vigil_stdlib_xml;
     extern VIGIL_API const vigil_native_module_t vigil_stdlib_yaml;
 
@@ -94,6 +95,7 @@ extern "C"
             {"log",      3U, &vigil_stdlib_log},                                                                       \
             {"math",     4U, &vigil_stdlib_math},                                                                      \
             VIGIL_STDLIB_NET_ENTRY                                                                                     \
+            {"os",       2U, &vigil_stdlib_os},                                                                        \
             {"parse",    5U, &vigil_stdlib_parse},                                                                     \
             {"random",   6U, &vigil_stdlib_random},                                                                    \
             VIGIL_STDLIB_READLINE_ENTRY                                                                                \
