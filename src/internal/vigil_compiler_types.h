@@ -616,6 +616,7 @@ vigil_status_t vigil_program_parse_constant_declaration(vigil_program_state_t *p
 vigil_status_t vigil_program_parse_enum_declaration(vigil_program_state_t *program, size_t *cursor, int is_public);
 vigil_status_t vigil_program_parse_interface_declaration(vigil_program_state_t *program, size_t *cursor, int is_public);
 vigil_status_t vigil_program_parse_class_declaration(vigil_program_state_t *program, size_t *cursor, int is_public);
+vigil_status_t vigil_program_parse_struct_declaration(vigil_program_state_t *program, size_t *cursor, int is_public);
 vigil_status_t vigil_program_parse_extern_fn(vigil_program_state_t *program, size_t *cursor, int is_public);
 vigil_status_t parse_fn_declaration(vigil_program_state_t *program, size_t *cursor, int is_public);
 

@@ -289,6 +289,8 @@ static vigil_status_t parse_one_declaration(vigil_program_state_t *program, size
         return vigil_program_parse_interface_declaration(program, cursor, is_public);
     if (token->kind == VIGIL_TOKEN_CLASS)
         return vigil_program_parse_class_declaration(program, cursor, is_public);
+    if (token->kind == VIGIL_TOKEN_STRUCT)
+        return vigil_program_parse_struct_declaration(program, cursor, is_public);
     if (vigil_program_is_global_variable_declaration_start(program, *cursor))
         return vigil_program_parse_global_variable_declaration(program, cursor, is_public);
     if (token->kind == VIGIL_TOKEN_EXTERN)
@@ -304,8 +306,8 @@ static vigil_status_t parse_one_declaration(vigil_program_state_t *program, size
     }
 
     return vigil_compile_report(program, token->span,
-                                "expected top-level 'import', 'const', 'enum', 'interface', 'class', variable "
-                                "declaration, 'extern fn', or 'fn'");
+                                "expected top-level 'import', 'const', 'enum', 'interface', 'class', 'struct', "
+                                "variable declaration, 'extern fn', or 'fn'");
 }
 
 static vigil_status_t emit_implicit_void_return(vigil_parser_state_t *state, vigil_source_span_t span)
