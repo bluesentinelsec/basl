@@ -24,5 +24,13 @@ vigil_status_t vigil_vm_op_map_keys_values(vigil_vm_t *vm, vigil_vm_frame_t *fra
 vigil_status_t vigil_vm_op_get_map_key_at(vigil_vm_t *vm, vigil_vm_frame_t *frame, vigil_error_t *error);
 vigil_status_t vigil_vm_op_get_map_value_at(vigil_vm_t *vm, vigil_vm_frame_t *frame, vigil_error_t *error);
 vigil_status_t vigil_vm_op_set_index(vigil_vm_t *vm, vigil_vm_frame_t *frame, vigil_error_t *error);
+vigil_status_t vigil_vm_op_array_sort(vigil_vm_t *vm, vigil_vm_frame_t *frame, vigil_error_t *error);
+vigil_status_t vigil_vm_op_array_sort_desc(vigil_vm_t *vm, vigil_vm_frame_t *frame, vigil_error_t *error);
+vigil_status_t vigil_vm_op_array_reverse(vigil_vm_t *vm, vigil_vm_frame_t *frame, vigil_error_t *error);
+vigil_status_t vigil_vm_op_array_index_of(vigil_vm_t *vm, vigil_vm_frame_t *frame, vigil_error_t *error);
+vigil_status_t vigil_vm_op_array_remove_at(vigil_vm_t *vm, vigil_vm_frame_t *frame, vigil_error_t *error);
+vigil_status_t vigil_vm_op_array_insert_at(vigil_vm_t *vm, vigil_vm_frame_t *frame, vigil_error_t *error);
+vigil_status_t vigil_vm_op_array_clear(vigil_vm_t *vm, vigil_vm_frame_t *frame, vigil_error_t *error);
+vigil_status_t vigil_vm_op_map_clear(vigil_vm_t *vm, vigil_vm_frame_t *frame, vigil_error_t *error);
 
 #endif /* VIGIL_VM_OPS_COLLECTION_H */

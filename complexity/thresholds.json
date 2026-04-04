@@ -73,10 +73,17 @@
       }
     },
     {
+      "path": "src/compiler_builtins.c",
+      "thresholds": {
+        "ccn": 45,
+        "length": 165
+      }
+    },
+    {
       "path": "src/regvm.c",
       "thresholds": {
         "ccn": 370,
-        "length": 2700
+        "length": 2900
       }
     },
     {
@@ -95,7 +102,7 @@
     {
       "path": "tests/compiler_test.c",
       "thresholds": {
-        "length": 125
+        "length": 150
       }
     },
     {

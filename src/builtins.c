@@ -113,8 +113,28 @@ static const vigil_doc_entry_t string_method_docs[] = {
     {"strings.equal_fold", "s.equal_fold(t: string) -> bool",
      "Return true if s equals t under case-insensitive comparison.", "Compares ASCII letters case-insensitively.",
      "\"Go\".equal_fold(\"go\")  // true"},
+    {"strings.pad_left", "s.pad_left(width: i32, fill: string) -> string",
+     "Pad s on the left to the given width using the fill string.", NULL, "\"42\".pad_left(5, \"0\")  // \"00042\""},
+    {"strings.pad_right", "s.pad_right(width: i32, fill: string) -> string",
+     "Pad s on the right to the given width using the fill string.", NULL, "\"hi\".pad_right(5, \" \")  // \"hi   \""},
+    {"strings.is_digit", "s.is_digit() -> bool", "Return true if all characters are digits and s is non-empty.", NULL,
+     "\"123\".is_digit()  // true"},
+    {"strings.is_alpha", "s.is_alpha() -> bool", "Return true if all characters are ASCII letters and s is non-empty.",
+     NULL, "\"abc\".is_alpha()  // true"},
+    {"strings.is_alnum", "s.is_alnum() -> bool",
+     "Return true if all characters are ASCII letters or digits and s is non-empty.", NULL,
+     "\"abc123\".is_alnum()  // true"},
+    {"strings.is_space", "s.is_space() -> bool", "Return true if all characters are whitespace and s is non-empty.",
+     NULL, "\" \\t\".is_space()  // true"},
+    {"strings.is_upper", "s.is_upper() -> bool",
+     "Return true if all characters are uppercase ASCII letters and s is non-empty.", NULL,
+     "\"ABC\".is_upper()  // true"},
+    {"strings.is_lower", "s.is_lower() -> bool",
+     "Return true if all characters are lowercase ASCII letters and s is non-empty.", NULL,
+     "\"abc\".is_lower()  // true"},
 };
 
+// clang-format off
 static const vigil_string_method_descriptor_t string_method_descriptors_[] = {
 #define STRING_METHOD_DESCRIPTOR(name_, opcode_, arg_count_, arg0_type_, arg0_object_kind_, arg0_element_type_,        \
                                  arg1_type_, arg1_object_kind_, arg1_element_type_, return_type_, return_object_kind_, \
@@ -215,8 +235,33 @@ static const vigil_string_method_descriptor_t string_method_descriptors_[] = {
     STRING_METHOD_DESCRIPTOR("equal_fold", VIGIL_OPCODE_STRING_EQUAL_FOLD, 1U, VIGIL_TYPE_STRING, 0, 0,
                              VIGIL_TYPE_INVALID, 0, 0, VIGIL_TYPE_BOOL, 0, 0, 0U, VIGIL_TYPE_INVALID,
                              VIGIL_TYPE_INVALID, VIGIL_TYPE_INVALID, 27),
+    STRING_METHOD_DESCRIPTOR("pad_left", VIGIL_OPCODE_STRING_PAD_LEFT, 2U, VIGIL_TYPE_I32, 0, 0, VIGIL_TYPE_STRING, 0,
+                             0, VIGIL_TYPE_STRING, 0, 0, 0U, VIGIL_TYPE_INVALID, VIGIL_TYPE_INVALID, VIGIL_TYPE_INVALID,
+                             29),
+    STRING_METHOD_DESCRIPTOR("pad_right", VIGIL_OPCODE_STRING_PAD_RIGHT, 2U, VIGIL_TYPE_I32, 0, 0, VIGIL_TYPE_STRING, 0,
+                             0, VIGIL_TYPE_STRING, 0, 0, 0U, VIGIL_TYPE_INVALID, VIGIL_TYPE_INVALID, VIGIL_TYPE_INVALID,
+                             30),
+    STRING_METHOD_DESCRIPTOR("is_digit", VIGIL_OPCODE_STRING_IS_DIGIT, 0U, VIGIL_TYPE_INVALID, 0, 0, VIGIL_TYPE_INVALID,
+                             0, 0, VIGIL_TYPE_BOOL, 0, 0, 0U, VIGIL_TYPE_INVALID, VIGIL_TYPE_INVALID,
+                             VIGIL_TYPE_INVALID, 31),
+    STRING_METHOD_DESCRIPTOR("is_alpha", VIGIL_OPCODE_STRING_IS_ALPHA, 0U, VIGIL_TYPE_INVALID, 0, 0, VIGIL_TYPE_INVALID,
+                             0, 0, VIGIL_TYPE_BOOL, 0, 0, 0U, VIGIL_TYPE_INVALID, VIGIL_TYPE_INVALID,
+                             VIGIL_TYPE_INVALID, 32),
+    STRING_METHOD_DESCRIPTOR("is_alnum", VIGIL_OPCODE_STRING_IS_ALNUM, 0U, VIGIL_TYPE_INVALID, 0, 0, VIGIL_TYPE_INVALID,
+                             0, 0, VIGIL_TYPE_BOOL, 0, 0, 0U, VIGIL_TYPE_INVALID, VIGIL_TYPE_INVALID,
+                             VIGIL_TYPE_INVALID, 33),
+    STRING_METHOD_DESCRIPTOR("is_space", VIGIL_OPCODE_STRING_IS_SPACE, 0U, VIGIL_TYPE_INVALID, 0, 0, VIGIL_TYPE_INVALID,
+                             0, 0, VIGIL_TYPE_BOOL, 0, 0, 0U, VIGIL_TYPE_INVALID, VIGIL_TYPE_INVALID,
+                             VIGIL_TYPE_INVALID, 34),
+    STRING_METHOD_DESCRIPTOR("is_upper", VIGIL_OPCODE_STRING_IS_UPPER, 0U, VIGIL_TYPE_INVALID, 0, 0, VIGIL_TYPE_INVALID,
+                             0, 0, VIGIL_TYPE_BOOL, 0, 0, 0U, VIGIL_TYPE_INVALID, VIGIL_TYPE_INVALID,
+                             VIGIL_TYPE_INVALID, 35),
+    STRING_METHOD_DESCRIPTOR("is_lower", VIGIL_OPCODE_STRING_IS_LOWER, 0U, VIGIL_TYPE_INVALID, 0, 0, VIGIL_TYPE_INVALID,
+                             0, 0, VIGIL_TYPE_BOOL, 0, 0, 0U, VIGIL_TYPE_INVALID, VIGIL_TYPE_INVALID,
+                             VIGIL_TYPE_INVALID, 36),
 #undef STRING_METHOD_DESCRIPTOR
 };
+// clang-format on
 
 static vigil_doc_entry_t builtin_module_entries[1U + sizeof(builtin_descriptors_) / sizeof(builtin_descriptors_[0])];
 static vigil_doc_entry_t

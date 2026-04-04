@@ -612,6 +612,14 @@ static size_t stack_op_size(const uint8_t *code, size_t ip, size_t code_size)
     case VIGIL_OPCODE_STRING_JOIN:
     case VIGIL_OPCODE_STRING_NEXT_CHAR:
     case VIGIL_OPCODE_STRING_CUT:
+    case VIGIL_OPCODE_STRING_PAD_LEFT:
+    case VIGIL_OPCODE_STRING_PAD_RIGHT:
+    case VIGIL_OPCODE_STRING_IS_DIGIT:
+    case VIGIL_OPCODE_STRING_IS_ALPHA:
+    case VIGIL_OPCODE_STRING_IS_ALNUM:
+    case VIGIL_OPCODE_STRING_IS_SPACE:
+    case VIGIL_OPCODE_STRING_IS_UPPER:
+    case VIGIL_OPCODE_STRING_IS_LOWER:
     case VIGIL_OPCODE_STRING_FIELDS:
     case VIGIL_OPCODE_STRING_EQUAL_FOLD:
     case VIGIL_OPCODE_GET_INDEX:
@@ -630,6 +638,14 @@ static size_t stack_op_size(const uint8_t *code, size_t ip, size_t code_size)
     case VIGIL_OPCODE_MAP_VALUES:
     case VIGIL_OPCODE_GET_MAP_KEY_AT:
     case VIGIL_OPCODE_GET_MAP_VALUE_AT:
+    case VIGIL_OPCODE_ARRAY_SORT:
+    case VIGIL_OPCODE_ARRAY_SORT_DESC:
+    case VIGIL_OPCODE_ARRAY_REVERSE:
+    case VIGIL_OPCODE_ARRAY_INDEX_OF:
+    case VIGIL_OPCODE_ARRAY_REMOVE_AT:
+    case VIGIL_OPCODE_ARRAY_INSERT_AT:
+    case VIGIL_OPCODE_ARRAY_CLEAR:
+    case VIGIL_OPCODE_MAP_CLEAR:
     case VIGIL_OPCODE_PARSE_I32:
     case VIGIL_OPCODE_PARSE_F64:
     case VIGIL_OPCODE_PARSE_BOOL:
@@ -2542,6 +2558,12 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
         case VIGIL_OPCODE_STRING_TO_LOWER:
         case VIGIL_OPCODE_STRING_REVERSE:
         case VIGIL_OPCODE_STRING_IS_EMPTY:
+        case VIGIL_OPCODE_STRING_IS_DIGIT:
+        case VIGIL_OPCODE_STRING_IS_ALPHA:
+        case VIGIL_OPCODE_STRING_IS_ALNUM:
+        case VIGIL_OPCODE_STRING_IS_SPACE:
+        case VIGIL_OPCODE_STRING_IS_UPPER:
+        case VIGIL_OPCODE_STRING_IS_LOWER:
         case VIGIL_OPCODE_STRING_BYTES:
         case VIGIL_OPCODE_STRING_CHAR_COUNT:
         case VIGIL_OPCODE_STRING_FIELDS: {
@@ -2585,6 +2607,18 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
             uint8_t result_base;
             PUSH_RESULT_REGS(str, 3, result_base);
             TR_EMIT(vigil_reg_abc(VREG_STRING_OP, result_base, arg, op));
+            ip += 1;
+            break;
+        }
+        case VIGIL_OPCODE_STRING_PAD_LEFT:
+        case VIGIL_OPCODE_STRING_PAD_RIGHT: {
+            SYNC_PACK(3);
+            uint8_t arg2 = vs_pop(&vs);
+            uint8_t arg1 = vs_pop(&vs);
+            (void)arg1;
+            uint8_t str = vs_pop(&vs);
+            uint8_t r = vs_push_result(&vs, str);
+            TR_EMIT(vigil_reg_abc(VREG_STRING_OP, r, arg2, op));
             ip += 1;
             break;
         }
@@ -2731,6 +2765,67 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
             uint8_t r = vs_push_result(&vs, map);
             uint8_t rop = (op == VIGIL_OPCODE_MAP_KEYS) ? VREG_MAP_KEYS : VREG_MAP_VALUES;
             TR_EMIT(vigil_reg_abc(rop, r, map, 0));
+            ip += 1;
+            break;
+        }
+
+        /* ── New collection ops ────────────────────────────────── */
+        case VIGIL_OPCODE_ARRAY_SORT: {
+            uint8_t arr = vs_pop(&vs);
+            TR_EMIT(vigil_reg_abc(VREG_ARRAY_SORT, arr, 0, 0));
+            ip += 1;
+            break;
+        }
+        case VIGIL_OPCODE_ARRAY_SORT_DESC: {
+            uint8_t arr = vs_pop(&vs);
+            TR_EMIT(vigil_reg_abc(VREG_ARRAY_SORT_DESC, arr, 0, 0));
+            ip += 1;
+            break;
+        }
+        case VIGIL_OPCODE_ARRAY_REVERSE: {
+            uint8_t arr = vs_pop(&vs);
+            TR_EMIT(vigil_reg_abc(VREG_ARRAY_REVERSE, arr, 0, 0));
+            ip += 1;
+            break;
+        }
+        case VIGIL_OPCODE_ARRAY_INDEX_OF: {
+            uint8_t needle = vs_pop(&vs);
+            uint8_t arr = vs_pop(&vs);
+            uint8_t r = vs_push_result(&vs, arr);
+            TR_EMIT(vigil_reg_abc(VREG_ARRAY_INDEX_OF, r, arr, needle));
+            ip += 1;
+            break;
+        }
+        case VIGIL_OPCODE_ARRAY_REMOVE_AT: {
+            SYNC_PACK(2);
+            uint8_t idx = vs_pop(&vs);
+            uint8_t arr = vs_pop(&vs);
+            uint8_t result_base;
+            PUSH_RESULT_REGS(arr, 2, result_base);
+            TR_EMIT(vigil_reg_abc(VREG_ARRAY_REMOVE_AT, result_base, arr, idx));
+            ip += 1;
+            break;
+        }
+        case VIGIL_OPCODE_ARRAY_INSERT_AT: {
+            SYNC_PACK(3);
+            uint8_t elem = vs_pop(&vs);
+            uint8_t idx = vs_pop(&vs);
+            uint8_t arr = vs_pop(&vs);
+            uint8_t r = vs_push_result(&vs, arr);
+            TR_EMIT(vigil_reg_abc(VREG_ARRAY_INSERT_AT, r, arr, elem));
+            (void)idx;
+            ip += 1;
+            break;
+        }
+        case VIGIL_OPCODE_ARRAY_CLEAR: {
+            uint8_t arr = vs_pop(&vs);
+            TR_EMIT(vigil_reg_abc(VREG_ARRAY_CLEAR, arr, 0, 0));
+            ip += 1;
+            break;
+        }
+        case VIGIL_OPCODE_MAP_CLEAR: {
+            uint8_t map = vs_pop(&vs);
+            TR_EMIT(vigil_reg_abc(VREG_MAP_CLEAR, map, 0, 0));
             ip += 1;
             break;
         }
@@ -3319,6 +3414,14 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
             [VREG_MAP_HAS] = &&r_MAP_HAS,
             [VREG_MAP_KEYS] = &&r_MAP_KEYS,
             [VREG_MAP_VALUES] = &&r_MAP_VALUES,
+            [VREG_ARRAY_SORT] = &&r_ARRAY_SORT,
+            [VREG_ARRAY_SORT_DESC] = &&r_ARRAY_SORT_DESC,
+            [VREG_ARRAY_REVERSE] = &&r_ARRAY_REVERSE,
+            [VREG_ARRAY_INDEX_OF] = &&r_ARRAY_INDEX_OF,
+            [VREG_ARRAY_REMOVE_AT] = &&r_ARRAY_REMOVE_AT,
+            [VREG_ARRAY_INSERT_AT] = &&r_ARRAY_INSERT_AT,
+            [VREG_ARRAY_CLEAR] = &&r_ARRAY_CLEAR,
+            [VREG_MAP_CLEAR] = &&r_MAP_CLEAR,
             [VREG_CHAR_FROM_INT] = &&r_CHAR_FROM_INT,
         };
 
@@ -5048,9 +5151,41 @@ r_dispatch_switch_check:
             status = vigil_vm_op_string_reverse(vm, frame, error);
             break;
         case VIGIL_OPCODE_STRING_IS_EMPTY:
+        case VIGIL_OPCODE_STRING_IS_DIGIT:
+        case VIGIL_OPCODE_STRING_IS_ALPHA:
+        case VIGIL_OPCODE_STRING_IS_ALNUM:
+        case VIGIL_OPCODE_STRING_IS_SPACE:
+        case VIGIL_OPCODE_STRING_IS_UPPER:
+        case VIGIL_OPCODE_STRING_IS_LOWER:
             pop_count = 1;
             helper_ret_count = 1;
-            status = vigil_vm_op_string_is_empty(vm, frame, error);
+            switch (sub_op)
+            {
+            case VIGIL_OPCODE_STRING_IS_EMPTY:
+                status = vigil_vm_op_string_is_empty(vm, frame, error);
+                break;
+            case VIGIL_OPCODE_STRING_IS_DIGIT:
+                status = vigil_vm_op_string_is_digit(vm, frame, error);
+                break;
+            case VIGIL_OPCODE_STRING_IS_ALPHA:
+                status = vigil_vm_op_string_is_alpha(vm, frame, error);
+                break;
+            case VIGIL_OPCODE_STRING_IS_ALNUM:
+                status = vigil_vm_op_string_is_alnum(vm, frame, error);
+                break;
+            case VIGIL_OPCODE_STRING_IS_SPACE:
+                status = vigil_vm_op_string_is_space(vm, frame, error);
+                break;
+            case VIGIL_OPCODE_STRING_IS_UPPER:
+                status = vigil_vm_op_string_is_upper(vm, frame, error);
+                break;
+            case VIGIL_OPCODE_STRING_IS_LOWER:
+                status = vigil_vm_op_string_is_lower(vm, frame, error);
+                break;
+            default:
+                status = VIGIL_STATUS_UNSUPPORTED;
+                break;
+            }
             break;
         case VIGIL_OPCODE_STRING_CHAR_COUNT:
             pop_count = 1;
@@ -5097,6 +5232,16 @@ r_dispatch_switch_check:
             pop_count = 2;
             helper_ret_count = 3;
             status = vigil_vm_op_string_cut(vm, frame, error);
+            break;
+        case VIGIL_OPCODE_STRING_PAD_LEFT:
+            pop_count = 3;
+            helper_ret_count = 1;
+            status = vigil_vm_op_string_pad_left(vm, frame, error);
+            break;
+        case VIGIL_OPCODE_STRING_PAD_RIGHT:
+            pop_count = 3;
+            helper_ret_count = 1;
+            status = vigil_vm_op_string_pad_right(vm, frame, error);
             break;
         case VIGIL_OPCODE_STRING_JOIN:
             pop_count = 2;
@@ -5687,6 +5832,48 @@ r_dispatch_switch_check:
     {
         vigil_reg_instr_t i = code[ip];
         REGVM_STACK_HELPER(VREG_GET_C(i), 2, VREG_GET_A(i), 1, vigil_vm_op_get_map_value_at(vm, frame, error));
+    }
+
+    /* ── New collection ops ────────────────────────────────────── */
+    RCASE(ARRAY_SORT)
+    {
+        vigil_reg_instr_t i = code[ip];
+        REGVM_STACK_HELPER(VREG_GET_A(i), 1, VREG_GET_A(i), 0, vigil_vm_op_array_sort(vm, frame, error));
+    }
+    RCASE(ARRAY_SORT_DESC)
+    {
+        vigil_reg_instr_t i = code[ip];
+        REGVM_STACK_HELPER(VREG_GET_A(i), 1, VREG_GET_A(i), 0, vigil_vm_op_array_sort_desc(vm, frame, error));
+    }
+    RCASE(ARRAY_REVERSE)
+    {
+        vigil_reg_instr_t i = code[ip];
+        REGVM_STACK_HELPER(VREG_GET_A(i), 1, VREG_GET_A(i), 0, vigil_vm_op_array_reverse(vm, frame, error));
+    }
+    RCASE(ARRAY_INDEX_OF)
+    {
+        vigil_reg_instr_t i = code[ip];
+        REGVM_STACK_HELPER(VREG_GET_C(i), 2, VREG_GET_A(i), 1, vigil_vm_op_array_index_of(vm, frame, error));
+    }
+    RCASE(ARRAY_REMOVE_AT)
+    {
+        vigil_reg_instr_t i = code[ip];
+        REGVM_STACK_HELPER(VREG_GET_C(i), 2, VREG_GET_A(i), 2, vigil_vm_op_array_remove_at(vm, frame, error));
+    }
+    RCASE(ARRAY_INSERT_AT)
+    {
+        vigil_reg_instr_t i = code[ip];
+        REGVM_STACK_HELPER(VREG_GET_C(i), 3, VREG_GET_A(i), 1, vigil_vm_op_array_insert_at(vm, frame, error));
+    }
+    RCASE(ARRAY_CLEAR)
+    {
+        vigil_reg_instr_t i = code[ip];
+        REGVM_STACK_HELPER(VREG_GET_A(i), 1, VREG_GET_A(i), 0, vigil_vm_op_array_clear(vm, frame, error));
+    }
+    RCASE(MAP_CLEAR)
+    {
+        vigil_reg_instr_t i = code[ip];
+        REGVM_STACK_HELPER(VREG_GET_A(i), 1, VREG_GET_A(i), 0, vigil_vm_op_map_clear(vm, frame, error));
     }
 
     /* ── Char from int ─────────────────────────────────────────── */

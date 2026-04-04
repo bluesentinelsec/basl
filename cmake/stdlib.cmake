@@ -13,17 +13,22 @@ set(VIGIL_STDLIB_ALWAYS_SOURCES
     src/stdlib/compress.c
     src/stdlib/crypto.c
     src/stdlib/csv.c
+    src/stdlib/encoding.c
     src/stdlib/fmt.c
+    src/stdlib/hash.c
     src/stdlib/json.c
     src/stdlib/log.c
     src/stdlib/math.c
+    src/stdlib/os.c
     src/stdlib/parse.c
     src/stdlib/random.c
     src/stdlib/regex.c
     src/stdlib/regex_engine.c
+    src/stdlib/strings.c
     src/stdlib/test.c
     src/stdlib/unsafe.c
     src/stdlib/url.c
+    src/stdlib/uuid.c
     src/stdlib/xml.c
     src/stdlib/yaml.c
 )

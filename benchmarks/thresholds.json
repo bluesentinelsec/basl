@@ -6,6 +6,9 @@
     "rss_regress_abs_kb": 2048
   },
   "benchmarks": {
+    "run_fib": {
+      "time_regress_pct": 25.0
+    },
     "run_vm_arith": {
       "time_regress_pct": 15.0
     },

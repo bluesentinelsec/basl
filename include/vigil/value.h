@@ -162,6 +162,20 @@ extern "C"
     VIGIL_API int vigil_map_object_remove(vigil_object_t *object, const vigil_value_t *key, vigil_value_t *out_value,
                                           vigil_error_t *error);
 
+    /* Array extended operations. */
+    VIGIL_API void vigil_array_object_reverse(vigil_object_t *object);
+    VIGIL_API void vigil_array_object_sort(vigil_object_t *object, int descending);
+    VIGIL_API int vigil_array_object_index_of(const vigil_object_t *object, const vigil_value_t *needle);
+    VIGIL_API vigil_status_t vigil_array_object_remove_at(vigil_object_t *object, size_t index,
+                                                          vigil_value_t *out_value, vigil_error_t *error);
+    VIGIL_API vigil_status_t vigil_array_object_insert_at(vigil_object_t *object, size_t index,
+                                                          const vigil_value_t *value, vigil_error_t *error);
+    VIGIL_API void vigil_array_object_clear(vigil_object_t *object);
+    VIGIL_API void vigil_map_object_clear(vigil_object_t *object);
+
+    /* Value comparison (defined in vm.c). */
+    VIGIL_API int vigil_vm_values_equal(const vigil_value_t *left, const vigil_value_t *right);
+
     /**
      * Native function callback.  The implementation reads `arg_count`
      * arguments from the top of the VM stack (bottom-up, first arg is

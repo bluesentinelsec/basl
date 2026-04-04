@@ -203,6 +203,35 @@ vigil_status_t vigil_parser_parse_string_method_call(vigil_parser_state_t *state
         return VIGIL_STATUS_OK;
     }
 
+    /* .pad_left() / .pad_right() — special case for regvm compat. */
+    if (vigil_program_names_equal(method_name, method_length, "pad_left", 8U) ||
+        vigil_program_names_equal(method_name, method_length, "pad_right", 9U))
+    {
+        vigil_expression_result_t arg1, arg2;
+        vigil_expression_result_clear(&arg1);
+        vigil_expression_result_clear(&arg2);
+        status = vigil_parser_parse_expression(state, &arg1);
+        if (status != VIGIL_STATUS_OK)
+            return status;
+        status = vigil_parser_expect(state, VIGIL_TOKEN_COMMA, "pad requires two arguments", NULL);
+        if (status != VIGIL_STATUS_OK)
+            return status;
+        status = vigil_parser_parse_expression(state, &arg2);
+        if (status != VIGIL_STATUS_OK)
+            return status;
+        status = vigil_parser_expect(state, VIGIL_TOKEN_RPAREN, "expected ')' after pad arguments", NULL);
+        if (status != VIGIL_STATUS_OK)
+            return status;
+        vigil_opcode_t op = vigil_program_names_equal(method_name, method_length, "pad_left", 8U)
+                                ? VIGIL_OPCODE_STRING_PAD_LEFT
+                                : VIGIL_OPCODE_STRING_PAD_RIGHT;
+        status = vigil_parser_emit_opcode(state, op, method_token->span);
+        if (status != VIGIL_STATUS_OK)
+            return status;
+        vigil_expression_result_set_type(out_result, vigil_binding_type_primitive(VIGIL_TYPE_STRING));
+        return VIGIL_STATUS_OK;
+    }
+
     if (descriptor == NULL)
     {
         return vigil_parser_report(state, method_token->span, "unknown string method");
@@ -506,6 +535,82 @@ vigil_status_t vigil_parser_parse_array_method_call(vigil_parser_state_t *state,
             state, method_token, vigil_program_names_equal(method_name, method_length, "any", 3U), out_result);
     }
 
+    if (vigil_program_names_equal(method_name, method_length, "sort", 4U) ||
+        vigil_program_names_equal(method_name, method_length, "sort_desc", 9U) ||
+        vigil_program_names_equal(method_name, method_length, "reverse", 7U) ||
+        vigil_program_names_equal(method_name, method_length, "clear", 5U))
+    {
+        status = vigil_parser_expect(state, VIGIL_TOKEN_RPAREN, "array method does not accept arguments", NULL);
+        if (status != VIGIL_STATUS_OK)
+            return status;
+        vigil_opcode_t op;
+        if (vigil_program_names_equal(method_name, method_length, "sort", 4U))
+            op = VIGIL_OPCODE_ARRAY_SORT;
+        else if (vigil_program_names_equal(method_name, method_length, "sort_desc", 9U))
+            op = VIGIL_OPCODE_ARRAY_SORT_DESC;
+        else if (vigil_program_names_equal(method_name, method_length, "reverse", 7U))
+            op = VIGIL_OPCODE_ARRAY_REVERSE;
+        else
+            op = VIGIL_OPCODE_ARRAY_CLEAR;
+        status = vigil_parser_emit_opcode(state, op, method_token->span);
+        if (status != VIGIL_STATUS_OK)
+            return status;
+        vigil_expression_result_set_type(out_result, vigil_binding_type_primitive(VIGIL_TYPE_VOID));
+        return VIGIL_STATUS_OK;
+    }
+
+    if (vigil_program_names_equal(method_name, method_length, "index_of", 8U))
+    {
+        status = compile_array_parse_one_arg(state, method_token, &first_arg);
+        if (status != VIGIL_STATUS_OK)
+            return status;
+        status = vigil_parser_require_type(state, method_token->span, first_arg.type, element_type,
+                                           "index_of argument must match array element type");
+        if (status != VIGIL_STATUS_OK)
+            return status;
+        status = vigil_parser_emit_opcode(state, VIGIL_OPCODE_ARRAY_INDEX_OF, method_token->span);
+        if (status != VIGIL_STATUS_OK)
+            return status;
+        vigil_expression_result_set_type(out_result, vigil_binding_type_primitive(VIGIL_TYPE_I32));
+        return VIGIL_STATUS_OK;
+    }
+
+    if (vigil_program_names_equal(method_name, method_length, "remove", 6U))
+    {
+        status = compile_array_parse_one_arg(state, method_token, &first_arg);
+        if (status != VIGIL_STATUS_OK)
+            return status;
+        status = vigil_parser_require_type(state, method_token->span, first_arg.type,
+                                           vigil_binding_type_primitive(VIGIL_TYPE_I32), "remove index must be i32");
+        if (status != VIGIL_STATUS_OK)
+            return status;
+        status = vigil_parser_emit_opcode(state, VIGIL_OPCODE_ARRAY_REMOVE_AT, method_token->span);
+        if (status != VIGIL_STATUS_OK)
+            return status;
+        vigil_expression_result_set_pair(out_result, element_type, vigil_binding_type_primitive(VIGIL_TYPE_ERR));
+        return VIGIL_STATUS_OK;
+    }
+
+    if (vigil_program_names_equal(method_name, method_length, "insert", 6U))
+    {
+        status = compile_array_parse_two_args(state, method_token, &first_arg, &second_arg);
+        if (status != VIGIL_STATUS_OK)
+            return status;
+        status = vigil_parser_require_type(state, method_token->span, first_arg.type,
+                                           vigil_binding_type_primitive(VIGIL_TYPE_I32), "insert index must be i32");
+        if (status != VIGIL_STATUS_OK)
+            return status;
+        status = vigil_parser_require_type(state, method_token->span, second_arg.type, element_type,
+                                           "insert element must match array element type");
+        if (status != VIGIL_STATUS_OK)
+            return status;
+        status = vigil_parser_emit_opcode(state, VIGIL_OPCODE_ARRAY_INSERT_AT, method_token->span);
+        if (status != VIGIL_STATUS_OK)
+            return status;
+        vigil_expression_result_set_type(out_result, vigil_binding_type_primitive(VIGIL_TYPE_ERR));
+        return VIGIL_STATUS_OK;
+    }
+
     if (vigil_program_names_equal(method_name, method_length, "push", 4U) ||
         vigil_program_names_equal(method_name, method_length, "get", 3U) ||
         vigil_program_names_equal(method_name, method_length, "contains", 8U))
@@ -697,7 +802,8 @@ vigil_status_t vigil_parser_parse_map_method_call(vigil_parser_state_t *state, v
         vigil_program_names_equal(method_name, method_length, "keys", 4U) ||
         vigil_program_names_equal(method_name, method_length, "values", 6U) ||
         vigil_program_names_equal(method_name, method_length, "any", 3U) ||
-        vigil_program_names_equal(method_name, method_length, "none", 4U))
+        vigil_program_names_equal(method_name, method_length, "none", 4U) ||
+        vigil_program_names_equal(method_name, method_length, "clear", 5U))
     {
         status = vigil_parser_expect(state, VIGIL_TOKEN_RPAREN, "map method does not accept arguments", NULL);
         if (status != VIGIL_STATUS_OK)
@@ -713,6 +819,14 @@ vigil_status_t vigil_parser_parse_map_method_call(vigil_parser_state_t *state, v
         {
             return compile_collection_any_none(
                 state, method_token, vigil_program_names_equal(method_name, method_length, "any", 3U), out_result);
+        }
+        if (vigil_program_names_equal(method_name, method_length, "clear", 5U))
+        {
+            status = vigil_parser_emit_opcode(state, VIGIL_OPCODE_MAP_CLEAR, method_token->span);
+            if (status != VIGIL_STATUS_OK)
+                return status;
+            vigil_expression_result_set_type(out_result, vigil_binding_type_primitive(VIGIL_TYPE_VOID));
+            return VIGIL_STATUS_OK;
         }
         if (vigil_program_names_equal(method_name, method_length, "keys", 4U))
         {

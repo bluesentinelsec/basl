@@ -223,6 +223,15 @@ typedef enum vigil_reg_op
     VREG_DUP = 125,     /* A B      R[A] = R[B] (with retain) */
     VREG_RELEASE = 126, /* A        release object in R[A] if present */
 
+    VREG_ARRAY_SORT = 127,      /* A        sort R[A] ascending */
+    VREG_ARRAY_SORT_DESC = 128, /* A        sort R[A] descending */
+    VREG_ARRAY_REVERSE = 129,   /* A        reverse R[A] in place */
+    VREG_ARRAY_INDEX_OF = 130,  /* A B C    R[A] = index_of(R[B], R[C]) */
+    VREG_ARRAY_REMOVE_AT = 131, /* A B C    R[A],R[A+1] = remove(R[B], R[C]) */
+    VREG_ARRAY_INSERT_AT = 132, /* A B C    R[A] = insert(R[B], R[C], ...) */
+    VREG_ARRAY_CLEAR = 133,     /* A        clear R[A] */
+    VREG_MAP_CLEAR = 134,       /* A        clear R[A] */
+
     VREG_OP_COUNT
 } vigil_reg_op_t;
 
