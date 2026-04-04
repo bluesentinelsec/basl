@@ -33,6 +33,9 @@ extern "C"
     extern VIGIL_API const vigil_native_module_t vigil_stdlib_compress;
     extern VIGIL_API const vigil_native_module_t vigil_stdlib_crypto;
     extern VIGIL_API const vigil_native_module_t vigil_stdlib_csv;
+    extern VIGIL_API const vigil_native_module_t vigil_stdlib_encoding;
+    extern VIGIL_API const vigil_native_module_t vigil_stdlib_hash;
+    extern VIGIL_API const vigil_native_module_t vigil_stdlib_strings;
 #ifdef VIGIL_HAS_STDLIB_FFI
     extern VIGIL_API const vigil_native_module_t vigil_stdlib_ffi;
 #endif
@@ -88,9 +91,11 @@ extern "C"
             {"compress", 8U, &vigil_stdlib_compress},                                                                  \
             {"crypto",   6U, &vigil_stdlib_crypto},                                                                    \
             {"csv",      3U, &vigil_stdlib_csv},                                                                       \
+            {"encoding", 8U, &vigil_stdlib_encoding},                                                                  \
             VIGIL_STDLIB_FFI_ENTRY                                                                                     \
             {"fmt",      3U, &vigil_stdlib_fmt},                                                                       \
             VIGIL_STDLIB_FS_ENTRY                                                                                      \
+            {"hash",     4U, &vigil_stdlib_hash},                                                                      \
             VIGIL_STDLIB_HTTP_ENTRY                                                                                    \
             {"json",     4U, &vigil_stdlib_json},                                                                      \
             {"log",      3U, &vigil_stdlib_log},                                                                       \
@@ -101,6 +106,7 @@ extern "C"
             {"random",   6U, &vigil_stdlib_random},                                                                    \
             VIGIL_STDLIB_READLINE_ENTRY                                                                                \
             {"regex",    5U, &vigil_stdlib_regex},                                                                     \
+            {"strings",  7U, &vigil_stdlib_strings},                                                                   \
             {"test",     4U, &vigil_stdlib_test},                                                                      \
             VIGIL_STDLIB_THREAD_ENTRY                                                                                  \
             VIGIL_STDLIB_TIME_ENTRY                                                                                    \

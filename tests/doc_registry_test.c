@@ -545,7 +545,7 @@ TEST(DocRegistryTest, ModuleListUsesCanonicalStdlibSet)
     EXPECT_TRUE(module_name_in_list("fmt", modules, count));
     EXPECT_TRUE(module_name_in_list("args", modules, count));
     EXPECT_TRUE(module_name_in_list("test_plugin", modules, count));
-    EXPECT_FALSE(module_name_in_list("strings", modules, count));
+    EXPECT_TRUE(module_name_in_list("strings", modules, count));
     EXPECT_EQ(module_name_in_list("sdl", modules, count), vigil_plugin_is_known_module("sdl", 3U));
 }
 
