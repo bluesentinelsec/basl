@@ -4,6 +4,7 @@
  * dispatch layer, handle registry, grid layout, and callback bridge
  * without any platform GUI.
  */
+// NOLINTBEGIN(readability-function-cognitive-complexity)
 #include "vigil_test.h"
 
 #include <string.h>
@@ -205,3 +206,4 @@ void register_gui_tests(void)
     REGISTER_TEST(GuiPlugin, EachClassHasHandleField);
     REGISTER_TEST(GuiPlugin, ModuleHasDoc);
 }
+// NOLINTEND(readability-function-cognitive-complexity)
