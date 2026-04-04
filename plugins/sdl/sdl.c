@@ -19,6 +19,7 @@
 
 #include "internal/vigil_internal.h"
 #include "internal/vigil_nanbox.h"
+#include "vigil_image.h"
 
 /* ── Handle registry ─────────────────────────────────────────────────
  * Generic slot table mapping i64 handle → void* pointer.
@@ -2198,7 +2199,9 @@ enum
     TEX_FIELD_COUNT
 };
 
-/* Surface.load(string path) -> (Surface, err) */
+/* Surface.load(string path) -> (Surface, err)
+ * Tries SDL_LoadSurface first (BMP/PNG), then falls back to stb_image
+ * for JPEG, TGA, GIF, PSD, PIC, and other formats. */
 static vigil_status_t sdl_surface_load(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
 {
     size_t base = vigil_vm_stack_depth(vm) - arg_count;
@@ -2207,9 +2210,30 @@ static vigil_status_t sdl_surface_load(vigil_vm_t *vm, size_t arg_count, vigil_e
     sdl_arg_str(vm, base, 1, path, sizeof(path));
     vigil_vm_stack_pop_n(vm, arg_count);
 
+    /* Try SDL3 native loader first (handles BMP and PNG). */
     SDL_Surface *surf = SDL_LoadSurface(path);
+
+    /* Fall back to stb_image for other formats (JPEG, TGA, GIF, etc.). */
     if (!surf)
-        return sdl_push_nil_and_sdl_err(vm, SDL_ERR_IO, error);
+    {
+        vigil_image_t img;
+        if (vigil_image_load_file(path, &img) != 0)
+            return sdl_push_nil_and_err(vm, "failed to load image", SDL_ERR_IO, error);
+        surf = SDL_CreateSurfaceFrom(img.width, img.height, SDL_PIXELFORMAT_RGBA32, img.pixels, img.width * 4);
+        if (!surf)
+        {
+            vigil_image_free(&img);
+            return sdl_push_nil_and_sdl_err(vm, SDL_ERR_IO, error);
+        }
+        /* SDL_CreateSurfaceFrom does not copy pixels — we must keep them alive.
+           Duplicate the surface so SDL owns the pixel data, then free stb's buffer. */
+        SDL_Surface *owned = SDL_DuplicateSurface(surf);
+        SDL_DestroySurface(surf);
+        vigil_image_free(&img);
+        surf = owned;
+        if (!surf)
+            return sdl_push_nil_and_sdl_err(vm, SDL_ERR_IO, error);
+    }
 
     int64_t handle;
     if (SDL_HANDLE_STORE(surfaces, surf, &handle) < 0)
@@ -4142,6 +4166,68 @@ static vigil_status_t sdl_surface_load_png(vigil_vm_t *vm, size_t arg_count, vig
     SDL_Surface *surf = SDL_LoadPNG(path);
     if (!surf)
         return sdl_push_nil_and_sdl_err(vm, SDL_ERR_IO, error);
+    int64_t handle;
+    if (SDL_HANDLE_STORE(surfaces, surf, &handle) < 0)
+    {
+        SDL_DestroySurface(surf);
+        return sdl_push_nil_and_err(vm, "too many surfaces", SDL_ERR_STATE, error);
+    }
+    vigil_status_t st = sdl_push_handle_instance(vm, ci, handle, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_ok(vm, error);
+}
+
+/* Surface.load_bytes(array<u8> data) -> (Surface, err)
+ * Decode an image from raw bytes in memory using stb_image.
+ * Supports PNG, JPEG, BMP, GIF, TGA, PSD, PIC. */
+static vigil_status_t sdl_surface_load_bytes(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    size_t ci = sdl_static_class_index(vm, base);
+    vigil_value_t arr_val = vigil_vm_stack_get(vm, base + 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+
+    vigil_object_t *arr_obj = vigil_value_as_object(&arr_val);
+    if (arr_obj == NULL || vigil_object_type(arr_obj) != VIGIL_OBJECT_ARRAY)
+        return sdl_push_nil_and_err(vm, "load_bytes requires array<u8>", SDL_ERR_ARG, error);
+
+    size_t len = vigil_array_object_length(arr_obj);
+    if (len == 0)
+        return sdl_push_nil_and_err(vm, "load_bytes: empty data", SDL_ERR_ARG, error);
+
+    /* Extract raw bytes from the array. */
+    unsigned char *buf = (unsigned char *)malloc(len);
+    if (!buf)
+        return sdl_push_nil_and_err(vm, "out of memory", SDL_ERR_STATE, error);
+    for (size_t i = 0; i < len; i++)
+    {
+        vigil_value_t elem;
+        vigil_array_object_get(arr_obj, i, &elem);
+        buf[i] = (unsigned char)vigil_value_as_int(&elem);
+    }
+
+    vigil_image_t img;
+    if (vigil_image_load_memory(buf, len, &img) != 0)
+    {
+        free(buf);
+        return sdl_push_nil_and_err(vm, "failed to decode image from bytes", SDL_ERR_IO, error);
+    }
+    free(buf);
+
+    SDL_Surface *surf = SDL_CreateSurfaceFrom(img.width, img.height, SDL_PIXELFORMAT_RGBA32, img.pixels, img.width * 4);
+    if (!surf)
+    {
+        vigil_image_free(&img);
+        return sdl_push_nil_and_sdl_err(vm, SDL_ERR_IO, error);
+    }
+    SDL_Surface *owned = SDL_DuplicateSurface(surf);
+    SDL_DestroySurface(surf);
+    vigil_image_free(&img);
+    surf = owned;
+    if (!surf)
+        return sdl_push_nil_and_sdl_err(vm, SDL_ERR_IO, error);
+
     int64_t handle;
     if (SDL_HANDLE_STORE(surfaces, surf, &handle) < 0)
     {
@@ -16568,6 +16654,7 @@ static const vigil_native_class_method_t sdl_surface_methods[] = {
     SDL_METHOD("write_pixel", 11U, sdl_surface_write_pixel, 6U, p_i32_i32_i32_i32_i32_i32, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
     /* Slice 28: surface extras */
     SDL_STATIC("load_png", 8U, sdl_surface_load_png, 1U, p_str, VIGIL_TYPE_OBJECT, 2U, rt_obj_err),
+    SDL_STATIC("load_bytes", 10U, sdl_surface_load_bytes, 1U, p_obj, VIGIL_TYPE_OBJECT, 2U, rt_obj_err),
     SDL_METHOD("blit_scaled", 11U, sdl_surface_blit_scaled, 10U, p_obj_i32x9, VIGIL_TYPE_BOOL, 2U, rt_bool_err),
     SDL_METHOD("get_color_key", 13U, sdl_surface_get_color_key, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL),
     /* Slice 31: convert */

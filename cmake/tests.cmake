@@ -35,6 +35,8 @@ add_executable(vigil_tests
     tests/editor_test.c
     tests/embed_api_test.c
     tests/ffi_test.c
+    tests/image_test.c
+    plugins/sdl/vigil_image.c
     tests/fs_test.c
     tests/gc_test.c
     tests/json_test.c
@@ -118,6 +120,11 @@ endif()
 # ── Test link and include setup ──────────────────────────────────────
 
 target_link_libraries(vigil_tests PRIVATE vigil)
+
+# vigil_image.c (stb_image) needs libm on Linux/Unix.
+if(UNIX)
+    target_link_libraries(vigil_tests PRIVATE m)
+endif()
 target_include_directories(vigil_tests PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${CMAKE_CURRENT_SOURCE_DIR}/tests
