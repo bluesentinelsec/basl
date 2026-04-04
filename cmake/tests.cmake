@@ -36,7 +36,9 @@ add_executable(vigil_tests
     tests/embed_api_test.c
     tests/ffi_test.c
     tests/image_test.c
+    tests/font_test.c
     plugins/sdl/vigil_image.c
+    plugins/sdl/vigil_font.c
     tests/fs_test.c
     tests/gc_test.c
     tests/json_test.c
