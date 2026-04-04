@@ -1,5 +1,9 @@
 /* vigil_image.c — stb_image wrapper implementation. */
 
+#ifdef _MSC_VER
+#define _CRT_SECURE_NO_WARNINGS
+#endif
+
 #define STB_IMAGE_IMPLEMENTATION
 #define STBI_NO_STDIO /* we handle file I/O ourselves for portability */
 #define STBI_NO_HDR   /* skip HDR float format — not needed for games */

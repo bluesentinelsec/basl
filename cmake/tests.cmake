@@ -120,6 +120,11 @@ endif()
 # ── Test link and include setup ──────────────────────────────────────
 
 target_link_libraries(vigil_tests PRIVATE vigil)
+
+# vigil_image.c (stb_image) needs libm on Linux/Unix.
+if(UNIX)
+    target_link_libraries(vigil_tests PRIVATE m)
+endif()
 target_include_directories(vigil_tests PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${CMAKE_CURRENT_SOURCE_DIR}/tests

@@ -18,9 +18,8 @@
 #include "vigil/vm.h"
 
 #include "internal/vigil_internal.h"
-
-#include "vigil_image.h"
 #include "internal/vigil_nanbox.h"
+#include "vigil_image.h"
 
 /* ── Handle registry ─────────────────────────────────────────────────
  * Generic slot table mapping i64 handle → void* pointer.
@@ -2220,8 +2219,7 @@ static vigil_status_t sdl_surface_load(vigil_vm_t *vm, size_t arg_count, vigil_e
         vigil_image_t img;
         if (vigil_image_load_file(path, &img) != 0)
             return sdl_push_nil_and_err(vm, "failed to load image", SDL_ERR_IO, error);
-        surf = SDL_CreateSurfaceFrom(img.width, img.height, SDL_PIXELFORMAT_RGBA32, img.pixels,
-                                     img.width * 4);
+        surf = SDL_CreateSurfaceFrom(img.width, img.height, SDL_PIXELFORMAT_RGBA32, img.pixels, img.width * 4);
         if (!surf)
         {
             vigil_image_free(&img);
@@ -4217,8 +4215,7 @@ static vigil_status_t sdl_surface_load_bytes(vigil_vm_t *vm, size_t arg_count, v
     }
     free(buf);
 
-    SDL_Surface *surf = SDL_CreateSurfaceFrom(img.width, img.height, SDL_PIXELFORMAT_RGBA32, img.pixels,
-                                              img.width * 4);
+    SDL_Surface *surf = SDL_CreateSurfaceFrom(img.width, img.height, SDL_PIXELFORMAT_RGBA32, img.pixels, img.width * 4);
     if (!surf)
     {
         vigil_image_free(&img);
