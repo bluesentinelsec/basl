@@ -303,7 +303,9 @@ extern "C"
         VIGIL_OPCODE_ARRAY_REMOVE_AT = 194,
         VIGIL_OPCODE_ARRAY_INSERT_AT = 195,
         VIGIL_OPCODE_ARRAY_CLEAR = 196,
-        VIGIL_OPCODE_MAP_CLEAR = 197
+        VIGIL_OPCODE_MAP_CLEAR = 197,
+        VIGIL_OPCODE_STRING_PAD_LEFT = 198,
+        VIGIL_OPCODE_STRING_PAD_RIGHT = 199
     } vigil_opcode_t;
 
     /* Forward-declare the register chunk for the translation cache. */

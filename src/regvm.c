@@ -612,6 +612,8 @@ static size_t stack_op_size(const uint8_t *code, size_t ip, size_t code_size)
     case VIGIL_OPCODE_STRING_JOIN:
     case VIGIL_OPCODE_STRING_NEXT_CHAR:
     case VIGIL_OPCODE_STRING_CUT:
+    case VIGIL_OPCODE_STRING_PAD_LEFT:
+    case VIGIL_OPCODE_STRING_PAD_RIGHT:
     case VIGIL_OPCODE_STRING_FIELDS:
     case VIGIL_OPCODE_STRING_EQUAL_FOLD:
     case VIGIL_OPCODE_GET_INDEX:
@@ -2585,7 +2587,9 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
             ip += 1;
             break;
         }
-        case VIGIL_OPCODE_STRING_CUT: {
+        case VIGIL_OPCODE_STRING_CUT:
+    case VIGIL_OPCODE_STRING_PAD_LEFT:
+    case VIGIL_OPCODE_STRING_PAD_RIGHT: {
             /* Pop 2 (str, sep), push 3 (before, after, found). */
             SYNC_PACK(2);
             uint8_t arg = vs_pop(&vs);
@@ -5174,6 +5178,16 @@ r_dispatch_switch_check:
             pop_count = 2;
             helper_ret_count = 3;
             status = vigil_vm_op_string_cut(vm, frame, error);
+            break;
+        case VIGIL_OPCODE_STRING_PAD_LEFT:
+            pop_count = 3;
+            helper_ret_count = 1;
+            status = vigil_vm_op_string_pad_left(vm, frame, error);
+            break;
+        case VIGIL_OPCODE_STRING_PAD_RIGHT:
+            pop_count = 3;
+            helper_ret_count = 1;
+            status = vigil_vm_op_string_pad_right(vm, frame, error);
             break;
         case VIGIL_OPCODE_STRING_JOIN:
             pop_count = 2;

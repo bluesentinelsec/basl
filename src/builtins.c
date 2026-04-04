@@ -113,6 +113,12 @@ static const vigil_doc_entry_t string_method_docs[] = {
     {"strings.equal_fold", "s.equal_fold(t: string) -> bool",
      "Return true if s equals t under case-insensitive comparison.", "Compares ASCII letters case-insensitively.",
      "\"Go\".equal_fold(\"go\")  // true"},
+    {"strings.pad_left", "s.pad_left(width: i32, fill: string) -> string",
+     "Pad s on the left to the given width using the fill string.", NULL,
+     "\"42\".pad_left(5, \"0\")  // \"00042\""},
+    {"strings.pad_right", "s.pad_right(width: i32, fill: string) -> string",
+     "Pad s on the right to the given width using the fill string.", NULL,
+     "\"hi\".pad_right(5, \" \")  // \"hi   \""},
 };
 
 static const vigil_string_method_descriptor_t string_method_descriptors_[] = {
@@ -215,6 +221,12 @@ static const vigil_string_method_descriptor_t string_method_descriptors_[] = {
     STRING_METHOD_DESCRIPTOR("equal_fold", VIGIL_OPCODE_STRING_EQUAL_FOLD, 1U, VIGIL_TYPE_STRING, 0, 0,
                              VIGIL_TYPE_INVALID, 0, 0, VIGIL_TYPE_BOOL, 0, 0, 0U, VIGIL_TYPE_INVALID,
                              VIGIL_TYPE_INVALID, VIGIL_TYPE_INVALID, 27),
+    STRING_METHOD_DESCRIPTOR("pad_left", VIGIL_OPCODE_STRING_PAD_LEFT, 2U, VIGIL_TYPE_I32, 0, 0,
+                             VIGIL_TYPE_STRING, 0, 0, VIGIL_TYPE_STRING, 0, 0, 0U, VIGIL_TYPE_INVALID,
+                             VIGIL_TYPE_INVALID, VIGIL_TYPE_INVALID, 29),
+    STRING_METHOD_DESCRIPTOR("pad_right", VIGIL_OPCODE_STRING_PAD_RIGHT, 2U, VIGIL_TYPE_I32, 0, 0,
+                             VIGIL_TYPE_STRING, 0, 0, VIGIL_TYPE_STRING, 0, 0, 0U, VIGIL_TYPE_INVALID,
+                             VIGIL_TYPE_INVALID, VIGIL_TYPE_INVALID, 30),
 #undef STRING_METHOD_DESCRIPTOR
 };
 

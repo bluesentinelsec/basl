@@ -9,6 +9,7 @@
 #include "vm_ops_string.h"
 
 #include <ctype.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "vigil/string.h"
@@ -1342,4 +1343,94 @@ vigil_status_t vigil_vm_op_string_next_char(vigil_vm_t *vm, vigil_vm_frame_t *fr
         status = vigil_vm_push(vm, &next_val, error);
     VIGIL_VM_VALUE_RELEASE(&next_val);
     return status;
+}
+
+/* ── STRING_PAD_LEFT / STRING_PAD_RIGHT ────────────────────────── */
+
+static vigil_status_t vigil_vm_op_string_pad(vigil_vm_t *vm, vigil_vm_frame_t *frame, int left, vigil_error_t *error)
+{
+    vigil_status_t status;
+    vigil_value_t str_val, width_val, fill_val, result;
+    const char *text;
+    size_t text_len;
+    const char *fill_text;
+    size_t fill_len;
+
+    frame->ip += 1U;
+    fill_val = vigil_vm_pop_or_nil(vm);
+    width_val = vigil_vm_pop_or_nil(vm);
+    str_val = vigil_vm_pop_or_nil(vm);
+
+    if (!vigil_vm_get_string_parts(&str_val, &text, &text_len))
+    {
+        VIGIL_VM_VALUE_RELEASE(&str_val);
+        VIGIL_VM_VALUE_RELEASE(&width_val);
+        VIGIL_VM_VALUE_RELEASE(&fill_val);
+        return vigil_vm_fail_at_ip(vm, VIGIL_STATUS_INVALID_ARGUMENT, "pad requires a string receiver", error);
+    }
+
+    int64_t width = vigil_value_as_int(&width_val);
+    VIGIL_VM_VALUE_RELEASE(&width_val);
+
+    if (!vigil_vm_get_string_parts(&fill_val, &fill_text, &fill_len) || fill_len == 0)
+    {
+        VIGIL_VM_VALUE_RELEASE(&str_val);
+        VIGIL_VM_VALUE_RELEASE(&fill_val);
+        return vigil_vm_fail_at_ip(vm, VIGIL_STATUS_INVALID_ARGUMENT, "pad fill must be a non-empty string", error);
+    }
+
+    if (width <= 0 || (size_t)width <= text_len)
+    {
+        /* No padding needed — return original string. */
+        VIGIL_VM_VALUE_RELEASE(&fill_val);
+        status = vigil_vm_push(vm, &str_val, error);
+        VIGIL_VM_VALUE_RELEASE(&str_val);
+        return status;
+    }
+
+    size_t target = (size_t)width;
+    size_t pad_count = target - text_len;
+    size_t total = target;
+    char *buf = (char *)malloc(total + 1U);
+    if (buf == NULL)
+    {
+        VIGIL_VM_VALUE_RELEASE(&str_val);
+        VIGIL_VM_VALUE_RELEASE(&fill_val);
+        return vigil_vm_fail_at_ip(vm, VIGIL_STATUS_INTERNAL, "out of memory", error);
+    }
+
+    if (left)
+    {
+        for (size_t i = 0; i < pad_count; i++)
+            buf[i] = fill_text[i % fill_len];
+        memcpy(buf + pad_count, text, text_len);
+    }
+    else
+    {
+        memcpy(buf, text, text_len);
+        for (size_t i = 0; i < pad_count; i++)
+            buf[text_len + i] = fill_text[i % fill_len];
+    }
+    buf[total] = '\0';
+
+    VIGIL_VM_VALUE_RELEASE(&str_val);
+    VIGIL_VM_VALUE_RELEASE(&fill_val);
+
+    status = vigil_vm_new_string_value(vm, buf, total, &result, error);
+    free(buf);
+    if (status != VIGIL_STATUS_OK)
+        return status;
+    status = vigil_vm_push(vm, &result, error);
+    VIGIL_VM_VALUE_RELEASE(&result);
+    return status;
+}
+
+vigil_status_t vigil_vm_op_string_pad_left(vigil_vm_t *vm, vigil_vm_frame_t *frame, vigil_error_t *error)
+{
+    return vigil_vm_op_string_pad(vm, frame, 1, error);
+}
+
+vigil_status_t vigil_vm_op_string_pad_right(vigil_vm_t *vm, vigil_vm_frame_t *frame, vigil_error_t *error)
+{
+    return vigil_vm_op_string_pad(vm, frame, 0, error);
 }
