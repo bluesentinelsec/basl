@@ -25,6 +25,7 @@ set(VIGIL_STDLIB_ALWAYS_SOURCES
     src/stdlib/test.c
     src/stdlib/unsafe.c
     src/stdlib/url.c
+    src/stdlib/uuid.c
     src/stdlib/xml.c
     src/stdlib/yaml.c
 )
