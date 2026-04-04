@@ -3420,7 +3420,7 @@ TEST(VigilCompilerTest, RejectsParameterReassignment)
                                    "    return x;\n"
                                    "}\n"
                                    "fn main() -> i32 { return mutate(5); }\n",
-                                   "cannot assign to const local variable");
+                                   "cannot assign to function parameter");
 }
 
 TEST(VigilCompilerTest, RejectsWalrusWithVoidExpression)

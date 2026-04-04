@@ -13180,13 +13180,24 @@ vigil_status_t vigil_compile_seed_parameter_symbols(vigil_parser_state_t *state,
             local_spec.name_length = 4U;
             local_spec.type = decl->params[i].type;
             local_spec.is_const = 1;
+            local_spec.is_param = 1;
             status = vigil_binding_scope_stack_declare_local(&state->locals, &local_spec, NULL, state->program->error);
         }
         else
         {
             const vigil_token_t fake_name = {VIGIL_TOKEN_IDENTIFIER, decl->params[i].span};
+            vigil_binding_local_spec_t param_spec = {0};
+            const char *pname;
+            size_t pname_length;
 
-            status = vigil_parser_declare_local_symbol(state, &fake_name, decl->params[i].type, 1, NULL);
+            pname = vigil_program_token_text(state->program, &fake_name, &pname_length);
+            param_spec.name = pname;
+            param_spec.name_length = pname_length;
+            param_spec.type = decl->params[i].type;
+            param_spec.is_const = 1;
+            param_spec.is_param = 1;
+            status =
+                vigil_binding_scope_stack_declare_local(&state->locals, &param_spec, NULL, state->program->error);
         }
         if (status != VIGIL_STATUS_OK)
         {

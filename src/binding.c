@@ -710,6 +710,7 @@ vigil_status_t vigil_binding_scope_stack_declare_local(vigil_binding_scope_stack
     local->depth = stack->scope_depth;
     local->type = spec->type;
     local->is_const = spec->is_const != 0;
+    local->is_param = spec->is_param != 0;
     if (out_index != NULL)
     {
         *out_index = stack->local_count;
