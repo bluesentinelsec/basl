@@ -6,8 +6,8 @@
 
 #define STB_TRUETYPE_IMPLEMENTATION
 
-#include "vigil_font.h"
 #include "../../deps/stb/stb_truetype.h"
+#include "vigil_font.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -109,8 +109,6 @@ vigil_font_t *vigil_font_load_memory(const unsigned char *data, size_t length)
             return NULL;
         }
     }
-
-    return font;
 
     return font;
 }
