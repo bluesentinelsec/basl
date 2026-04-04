@@ -18,6 +18,13 @@ class TestGuiPlugin(unittest.TestCase):
     def setUp(self):
         self.tmpdir = tempfile.mkdtemp(prefix="vigil_gui_")
         self.vigil = resolve_vigil_command()
+        # Skip all tests if the gui plugin is not compiled in.
+        r = subprocess.run(
+            [*self.vigil, "doc", "gui"],
+            capture_output=True, text=True, timeout=10,
+        )
+        if r.returncode != 0:
+            self.skipTest("gui plugin not compiled in")
 
     def _write(self, name, content):
         path = Path(self.tmpdir) / name
@@ -76,6 +83,7 @@ class TestGuiPlugin(unittest.TestCase):
         )
         r = self._run("check", script)
         self.assertNotEqual(r.returncode, 0)
+        self.assertIn("type", r.stderr.lower())
 
     # ── vigil doc ────────────────────────────────────────────────
 
