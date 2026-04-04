@@ -1514,7 +1514,11 @@ vigil_status_t resolve_nonlocal_target(vigil_parser_state_t *state, assignment_t
 vigil_status_t validate_assignment_target_writable(vigil_parser_state_t *state, const assignment_target_t *t)
 {
     if (t->is_const_local && !assignment_target_is_composite(t))
+    {
+        if (t->is_param_local)
+            return vigil_parser_report(state, t->target_token->span, "cannot assign to function parameter");
         return vigil_parser_report(state, t->target_token->span, "cannot assign to const local variable");
+    }
     return VIGIL_STATUS_OK;
 }
 
@@ -1554,6 +1558,7 @@ vigil_status_t resolve_assignment_target(vigil_parser_state_t *state, assignment
             t->local_decl = vigil_binding_scope_stack_local_at(&state->locals, t->local_index);
             t->local_type = t->local_decl->type;
             t->is_const_local = t->local_decl->is_const;
+            t->is_param_local = t->local_decl->is_param;
         }
     }
     else

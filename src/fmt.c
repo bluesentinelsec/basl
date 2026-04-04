@@ -264,7 +264,7 @@ static const uint64_t kBinaryOpBits[2] = {
 static const uint64_t kAssignOpBits[2] = {
     TOK_BIT(VIGIL_TOKEN_ASSIGN) | TOK_BIT(VIGIL_TOKEN_PLUS_ASSIGN) | TOK_BIT(VIGIL_TOKEN_MINUS_ASSIGN) |
     TOK_BIT(VIGIL_TOKEN_STAR_ASSIGN) | TOK_BIT(VIGIL_TOKEN_SLASH_ASSIGN) | TOK_BIT(VIGIL_TOKEN_PERCENT_ASSIGN) ,
-    0
+    TOK_BIT(VIGIL_TOKEN_WALRUS)
 };
 
 static const uint64_t kKeywordBits[2] = {
@@ -303,7 +303,7 @@ static const uint64_t kLiteralBraceOpenerBits[2] = {
     TOK_BIT(VIGIL_TOKEN_STAR_ASSIGN) | TOK_BIT(VIGIL_TOKEN_SLASH_ASSIGN) | TOK_BIT(VIGIL_TOKEN_PERCENT_ASSIGN) |
     TOK_BIT(VIGIL_TOKEN_LPAREN) | TOK_BIT(VIGIL_TOKEN_LBRACKET) | TOK_BIT(VIGIL_TOKEN_COMMA) |
     TOK_BIT(VIGIL_TOKEN_RETURN) | TOK_BIT(VIGIL_TOKEN_COLON),
-    0
+    TOK_BIT(VIGIL_TOKEN_WALRUS)
 };
 
 static bool is_binary_op(vigil_token_kind_t k) { return TOK_TEST(kBinaryOpBits, k); }

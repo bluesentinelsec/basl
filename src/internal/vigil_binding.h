@@ -105,6 +105,7 @@ typedef struct vigil_binding_local
     size_t depth;
     vigil_binding_type_t type;
     int is_const;
+    int is_param;
 } vigil_binding_local_t;
 
 typedef struct vigil_binding_local_spec
@@ -113,6 +114,7 @@ typedef struct vigil_binding_local_spec
     size_t name_length;
     vigil_binding_type_t type;
     int is_const;
+    int is_param;
 } vigil_binding_local_spec_t;
 
 typedef struct vigil_binding_scope_stack

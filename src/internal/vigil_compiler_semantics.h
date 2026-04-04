@@ -31,6 +31,7 @@ typedef struct
     int is_index_assignment;
     int is_global_assignment;
     int is_const_local;
+    int is_param_local;
     int emitted_target_base;
     int is_capture_local;
 } assignment_target_t;

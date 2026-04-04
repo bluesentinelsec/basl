@@ -13096,6 +13096,38 @@ static int vigil_parser_is_variable_declaration_start(const vigil_parser_state_t
     }
 }
 
+static int vigil_parser_is_walrus_declaration_start(const vigil_parser_state_t *state)
+{
+    /* name := expr  OR  name, name := expr */
+    size_t cursor = state->current;
+    const vigil_token_t *token;
+
+    while (1)
+    {
+        token = vigil_program_token_at(state->program, cursor);
+        if (token == NULL || token->kind != VIGIL_TOKEN_IDENTIFIER)
+            return 0;
+        cursor += 1U;
+        token = vigil_program_token_at(state->program, cursor);
+        if (token == NULL)
+            return 0;
+        if (token->kind == VIGIL_TOKEN_WALRUS)
+            return 1;
+        if (token->kind != VIGIL_TOKEN_COMMA)
+            return 0;
+        cursor += 1U;
+    }
+}
+
+static int vigil_parser_is_const_walrus_start(const vigil_parser_state_t *state)
+{
+    /* const name := expr */
+    if (!vigil_parser_check(state, VIGIL_TOKEN_CONST))
+        return 0;
+    const vigil_token_t *t1 = vigil_program_token_at(state->program, state->current + 1U);
+    const vigil_token_t *t2 = vigil_program_token_at(state->program, state->current + 2U);
+    return t1 != NULL && t1->kind == VIGIL_TOKEN_IDENTIFIER && t2 != NULL && t2->kind == VIGIL_TOKEN_WALRUS;
+}
 static vigil_status_t vigil_parser_parse_declaration(vigil_parser_state_t *state, vigil_statement_result_t *out_result)
 {
     if (vigil_parser_check(state, VIGIL_TOKEN_FN) &&
@@ -13106,9 +13138,17 @@ static vigil_status_t vigil_parser_parse_declaration(vigil_parser_state_t *state
     {
         return vigil_parser_parse_local_function_declaration(state, out_result);
     }
+    if (vigil_parser_is_const_walrus_start(state))
+    {
+        return vigil_parser_parse_const_walrus_declaration(state, out_result);
+    }
     if (vigil_parser_check(state, VIGIL_TOKEN_CONST))
     {
         return vigil_parser_parse_const_declaration(state, out_result);
+    }
+    if (vigil_parser_is_walrus_declaration_start(state))
+    {
+        return vigil_parser_parse_walrus_declaration(state, out_result);
     }
     if (vigil_parser_is_variable_declaration_start(state))
     {
@@ -13139,14 +13179,25 @@ vigil_status_t vigil_compile_seed_parameter_symbols(vigil_parser_state_t *state,
             local_spec.name = "self";
             local_spec.name_length = 4U;
             local_spec.type = decl->params[i].type;
-            local_spec.is_const = 0;
+            local_spec.is_const = 1;
+            local_spec.is_param = 1;
             status = vigil_binding_scope_stack_declare_local(&state->locals, &local_spec, NULL, state->program->error);
         }
         else
         {
             const vigil_token_t fake_name = {VIGIL_TOKEN_IDENTIFIER, decl->params[i].span};
+            vigil_binding_local_spec_t param_spec = {0};
+            const char *pname;
+            size_t pname_length;
 
-            status = vigil_parser_declare_local_symbol(state, &fake_name, decl->params[i].type, 0, NULL);
+            pname = vigil_program_token_text(state->program, &fake_name, &pname_length);
+            param_spec.name = pname;
+            param_spec.name_length = pname_length;
+            param_spec.type = decl->params[i].type;
+            param_spec.is_const = 1;
+            param_spec.is_param = 1;
+            status =
+                vigil_binding_scope_stack_declare_local(&state->locals, &param_spec, NULL, state->program->error);
         }
         if (status != VIGIL_STATUS_OK)
         {

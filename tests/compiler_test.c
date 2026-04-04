@@ -227,7 +227,8 @@ TEST(VigilCompilerTest, CompilesAndExecutesArithmeticAndLocals)
 
 TEST(VigilCompilerTest, CompilesAndExecutesFloatArithmeticAndComparison)
 {
-    EXPECT_EQ(CompileAndRun(vigil_test_failed_, "fn scale(f64 value) -> f64 {"
+    EXPECT_EQ(CompileAndRun(vigil_test_failed_, "fn scale(f64 v) -> f64 {"
+                                                "    f64 value = v;"
                                                 "    value *= 2.0;"
                                                 "    value++;"
                                                 "    return value;"
@@ -264,7 +265,8 @@ TEST(VigilCompilerTest, CompilesAndExecutesWiderIntegerTypesAndConversions)
                       "fn double_i64(i64 value) -> i64 {"
                       "    return value * i64(2);"
                       "}"
-                      "fn bump_u8(u8 value) -> u8 {"
+                      "fn bump_u8(u8 v) -> u8 {"
+                      "    u8 value = v;"
                       "    value += u8(5);"
                       "    return value;"
                       "}"
@@ -3348,6 +3350,90 @@ TEST(VigilCompilerTest, AnyNoneMethodsOnAllCollectionTypes)
               0);
 }
 
+TEST(VigilCompilerTest, WalrusInfersSingleValueTypes)
+{
+    EXPECT_EQ(CompileAndRun(vigil_test_failed_, "fn main() -> i32 {\n"
+                                                "    x := 42;\n"
+                                                "    name := \"hello\";\n"
+                                                "    pi := 3.14;\n"
+                                                "    flag := true;\n"
+                                                "    if x != 42 { return 1; }\n"
+                                                "    if name != \"hello\" { return 2; }\n"
+                                                "    if pi < 3.0 { return 3; }\n"
+                                                "    if !flag { return 4; }\n"
+                                                "    x = 99;\n"
+                                                "    if x != 99 { return 5; }\n"
+                                                "    return 0;\n"
+                                                "}\n"),
+              0);
+}
+
+TEST(VigilCompilerTest, WalrusInfersFromFunctionReturn)
+{
+    EXPECT_EQ(CompileAndRun(vigil_test_failed_, "fn double(i32 n) -> i32 { return n * 2; }\n"
+                                                "fn main() -> i32 {\n"
+                                                "    result := double(21);\n"
+                                                "    return result;\n"
+                                                "}\n"),
+              42);
+}
+
+TEST(VigilCompilerTest, WalrusMultiReturnInference)
+{
+    EXPECT_EQ(CompileAndRun(vigil_test_failed_, "fn divide(i32 a, i32 b) -> (i32, err) {\n"
+                                                "    if b == 0 { return 0, err(\"zero\", err.arg); }\n"
+                                                "    return a / b, ok;\n"
+                                                "}\n"
+                                                "fn main() -> i32 {\n"
+                                                "    val, e := divide(10, 2);\n"
+                                                "    if e != ok { return 1; }\n"
+                                                "    return val;\n"
+                                                "}\n"),
+              5);
+}
+
+TEST(VigilCompilerTest, ConstWalrusInfersAndEnforcesImmutability)
+{
+    EXPECT_EQ(CompileAndRun(vigil_test_failed_, "fn main() -> i32 {\n"
+                                                "    const x := 42;\n"
+                                                "    return x;\n"
+                                                "}\n"),
+              42);
+}
+
+TEST(VigilCompilerTest, RejectsConstWalrusReassignment)
+{
+    ExpectSingleCompilerDiagnostic(vigil_test_failed_,
+                                   "fn main() -> i32 {\n"
+                                   "    const x := 42;\n"
+                                   "    x = 99;\n"
+                                   "    return x;\n"
+                                   "}\n",
+                                   "cannot assign to const local variable");
+}
+
+TEST(VigilCompilerTest, RejectsParameterReassignment)
+{
+    ExpectSingleCompilerDiagnostic(vigil_test_failed_,
+                                   "fn mutate(i32 x) -> i32 {\n"
+                                   "    x = 10;\n"
+                                   "    return x;\n"
+                                   "}\n"
+                                   "fn main() -> i32 { return mutate(5); }\n",
+                                   "cannot assign to function parameter");
+}
+
+TEST(VigilCompilerTest, RejectsWalrusWithVoidExpression)
+{
+    ExpectSingleCompilerDiagnostic(vigil_test_failed_,
+                                   "fn noop() -> void {}\n"
+                                   "fn main() -> i32 {\n"
+                                   "    x := noop();\n"
+                                   "    return 0;\n"
+                                   "}\n",
+                                   "cannot infer type from void expression");
+}
+
 static void register_compiler_defer_tests(void)
 {
     REGISTER_TEST(VigilCompilerTest, CompilesAndExecutesDeferredFunctionValues);
@@ -3486,4 +3572,11 @@ void register_compiler_tests(void)
     REGISTER_TEST(VigilCompilerTest, AcceptsTrailingCommasInCallsArraysAndMaps);
     REGISTER_TEST(VigilCompilerTest, ImplicitSemiBeforeClosingBrace);
     REGISTER_TEST(VigilCompilerTest, AnyNoneMethodsOnAllCollectionTypes);
+    REGISTER_TEST(VigilCompilerTest, WalrusInfersSingleValueTypes);
+    REGISTER_TEST(VigilCompilerTest, WalrusInfersFromFunctionReturn);
+    REGISTER_TEST(VigilCompilerTest, WalrusMultiReturnInference);
+    REGISTER_TEST(VigilCompilerTest, ConstWalrusInfersAndEnforcesImmutability);
+    REGISTER_TEST(VigilCompilerTest, RejectsConstWalrusReassignment);
+    REGISTER_TEST(VigilCompilerTest, RejectsParameterReassignment);
+    REGISTER_TEST(VigilCompilerTest, RejectsWalrusWithVoidExpression);
 }
