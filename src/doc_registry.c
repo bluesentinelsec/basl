@@ -42,9 +42,9 @@ typedef struct native_doc_buf
     size_t capacity;
 } native_doc_buf_t;
 
-static native_doc_cache_t native_doc_caches[32];
+static native_doc_cache_t native_doc_caches[64];
 static size_t native_doc_cache_count = 0U;
-static const char *generated_module_names[32];
+static const char *generated_module_names[64];
 static size_t generated_module_name_count = 0U;
 static int generated_module_names_ready = 0;
 
@@ -524,7 +524,7 @@ static native_doc_cache_t *native_doc_build_module_cache(const vigil_native_modu
     size_t index = 0U;
 
     if (module == NULL || (!native_doc_module_has_docs(module) && !native_doc_module_has_any_symbols(module)) ||
-        native_doc_cache_count >= 32U)
+        native_doc_cache_count >= 64U)
         return NULL;
 
     count = native_doc_count_module_entries(module);

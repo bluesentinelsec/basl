@@ -1,4 +1,3 @@
-/* alloc-check: exempt — temporary buffers freed within same function */
 /* hash.c — hash module: non-cryptographic and cryptographic hash functions. */
 
 #include <stdint.h>

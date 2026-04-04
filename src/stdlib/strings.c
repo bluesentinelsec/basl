@@ -1,4 +1,3 @@
-/* alloc-check: exempt — temporary buffers freed within same function */
 /* strings.c — strings module: Builder class for efficient string concatenation. */
 
 #include <stdlib.h>

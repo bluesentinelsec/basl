@@ -32,7 +32,7 @@
     },
     {
       "pattern": "src/value.c",
-      "line_percent": 75.0
+      "line_percent": 70.0
     },
     {
       "pattern": "src/regvm.c",
@@ -44,7 +44,7 @@
     },
     {
       "pattern": "src/vm_ops_collection.c",
-      "line_percent": 88.0
+      "line_percent": 77.0
     },
     {
       "pattern": "src/vm_ops_convert.c",

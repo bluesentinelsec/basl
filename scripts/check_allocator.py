@@ -52,6 +52,10 @@ EXEMPT_FILES = {
     "src/stdlib/http.c",
     "src/stdlib/fs.c",
     "src/stdlib/xml.c",
+    # Stdlib modules — self-contained temp buffers freed in same scope.
+    "src/stdlib/encoding.c",
+    "src/stdlib/hash.c",
+    "src/stdlib/strings.c",
     # Public API without runtime parameter.
     "src/value.c",
     # Embedding API — owns state lifecycle, uses calloc/free for vigil_state_t.
