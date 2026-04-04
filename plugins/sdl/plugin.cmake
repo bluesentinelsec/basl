@@ -19,6 +19,6 @@ add_subdirectory("${CMAKE_SOURCE_DIR}/deps/sdl3" "${CMAKE_BINARY_DIR}/deps/sdl3"
 
 vigil_add_plugin(
     NAME sdl
-    SOURCES sdl.c vigil_image.c
+    SOURCES sdl.c vigil_image.c vigil_font.c
     LIBRARIES SDL3::SDL3-static
 )

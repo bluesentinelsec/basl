@@ -19,6 +19,7 @@
 
 #include "internal/vigil_internal.h"
 #include "internal/vigil_nanbox.h"
+#include "vigil_font.h"
 #include "vigil_image.h"
 
 /* ── Handle registry ─────────────────────────────────────────────────
@@ -838,6 +839,7 @@ static const int p_i32[] = {VIGIL_TYPE_I32};
 static const int p_i64[] = {VIGIL_TYPE_I64};
 static const int p_str[] = {VIGIL_TYPE_STRING};
 static const int p_str_str[] = {VIGIL_TYPE_STRING, VIGIL_TYPE_STRING};
+static const int p_str_f64[] = {VIGIL_TYPE_STRING, VIGIL_TYPE_F64};
 static const int p_str_i32[] = {VIGIL_TYPE_STRING, VIGIL_TYPE_I32};
 static const int p_i32_str[] = {VIGIL_TYPE_I32, VIGIL_TYPE_STRING};
 static const int p_i32_obj[] = {VIGIL_TYPE_I32, VIGIL_TYPE_OBJECT};
@@ -4274,6 +4276,117 @@ static vigil_status_t sdl_surface_get_color_key(vigil_vm_t *vm, size_t arg_count
     if (s)
         SDL_GetSurfaceColorKey(s, &key);
     return sdl_push_i32(vm, (int32_t)key, error);
+}
+
+/* ── Font (stb_truetype) ──────────────────────────────────────────── */
+
+SDL_HANDLE_REGISTRY(fonts);
+
+enum
+{
+    FONT_HANDLE = 0,
+    FONT_FIELD_COUNT
+};
+
+/* Font.load(string path) -> (Font, err) */
+static vigil_status_t sdl_font_load(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    size_t ci = sdl_static_class_index(vm, base);
+    char path[512];
+    sdl_arg_str(vm, base, 1, path, sizeof(path));
+    vigil_vm_stack_pop_n(vm, arg_count);
+
+    vigil_font_t *font = vigil_font_load_file(path);
+    if (!font)
+        return sdl_push_nil_and_err(vm, "failed to load font", SDL_ERR_IO, error);
+
+    int64_t handle;
+    if (SDL_HANDLE_STORE(fonts, font, &handle) < 0)
+    {
+        vigil_font_free(font);
+        return sdl_push_nil_and_err(vm, "too many fonts", SDL_ERR_STATE, error);
+    }
+    vigil_status_t st = sdl_push_handle_instance(vm, ci, handle, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_ok(vm, error);
+}
+
+/* font.destroy() */
+static vigil_status_t sdl_font_destroy(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = sdl_field_i64(vm, base, FONT_HANDLE);
+    (void)error;
+    vigil_vm_stack_pop_n(vm, arg_count);
+    vigil_font_t *font = (vigil_font_t *)SDL_HANDLE_GET(fonts, h);
+    if (font)
+    {
+        vigil_font_free(font);
+        SDL_HANDLE_CLEAR(fonts, h);
+    }
+    return VIGIL_STATUS_OK;
+}
+
+/* font.render_text(string text, f64 size) -> (Surface, err)
+ * Renders text to an RGBA SDL_Surface with white text on transparent background. */
+static vigil_status_t sdl_font_render_text(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t fh = sdl_field_i64(vm, base, FONT_HANDLE);
+    char text[1024];
+    sdl_arg_str(vm, base, 1, text, sizeof(text));
+    double size = sdl_arg_f64(vm, base, 2);
+    vigil_vm_stack_pop_n(vm, arg_count);
+
+    vigil_font_t *font = (vigil_font_t *)SDL_HANDLE_GET(fonts, fh);
+    if (!font)
+        return sdl_push_nil_and_err(vm, "invalid font handle", SDL_ERR_ARG, error);
+
+    vigil_text_bitmap_t bmp;
+    if (vigil_font_render_text(font, text, (float)size, &bmp) != 0)
+        return sdl_push_nil_and_err(vm, "failed to render text", SDL_ERR_IO, error);
+
+    /* Convert grayscale bitmap to RGBA (white text, alpha from grayscale). */
+    unsigned char *rgba = (unsigned char *)calloc(4, (size_t)(bmp.width * bmp.height));
+    if (!rgba)
+    {
+        vigil_text_bitmap_free(&bmp);
+        return sdl_push_nil_and_err(vm, "out of memory", SDL_ERR_STATE, error);
+    }
+    for (int i = 0; i < bmp.width * bmp.height; i++)
+    {
+        rgba[i * 4 + 0] = 255;           /* R */
+        rgba[i * 4 + 1] = 255;           /* G */
+        rgba[i * 4 + 2] = 255;           /* B */
+        rgba[i * 4 + 3] = bmp.pixels[i]; /* A from grayscale */
+    }
+    vigil_text_bitmap_free(&bmp);
+
+    SDL_Surface *surf = SDL_CreateSurfaceFrom(bmp.width, bmp.height, SDL_PIXELFORMAT_RGBA32, rgba, bmp.width * 4);
+    if (!surf)
+    {
+        free(rgba);
+        return sdl_push_nil_and_sdl_err(vm, SDL_ERR_IO, error);
+    }
+    SDL_Surface *owned = SDL_DuplicateSurface(surf);
+    SDL_DestroySurface(surf);
+    free(rgba);
+    if (!owned)
+        return sdl_push_nil_and_sdl_err(vm, SDL_ERR_IO, error);
+
+    /* Return a Surface instance (Surface is class index 3 in sdl_classes). */
+    int64_t surf_handle;
+    if (SDL_HANDLE_STORE(surfaces, owned, &surf_handle) < 0)
+    {
+        SDL_DestroySurface(owned);
+        return sdl_push_nil_and_err(vm, "too many surfaces", SDL_ERR_STATE, error);
+    }
+    vigil_status_t st = sdl_push_handle_instance(vm, 3U, surf_handle, error); /* Surface = class 3 */
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return sdl_push_ok(vm, error);
 }
 
 /* ── Slice 29: Joystick (Raw Input) ───────────────────────────────── */
@@ -16881,6 +16994,21 @@ static const vigil_native_class_method_t sdl_camera_methods[] = {
     SDL_METHOD("release_frame", 13U, sdl_camera_release_frame, 1U, p_i64, VIGIL_TYPE_VOID, 0U, NULL),
 };
 
+/* ── Font class descriptor ──────────────────────────────────────── */
+
+static const vigil_native_class_field_t sdl_font_fields[] = {
+    SDL_PFIELD("handle", 6U, VIGIL_TYPE_I64),
+};
+
+/* clang-format off */
+static const vigil_native_class_method_t sdl_font_methods[] = {
+    SDL_STATIC("load", 4U, sdl_font_load, 1U, p_str, VIGIL_TYPE_OBJECT, 2U, rt_obj_err),
+    SDL_METHOD("destroy", 7U, sdl_font_destroy, 0U, NULL, VIGIL_TYPE_VOID, 0U, NULL),
+    {"render_text", 11U, sdl_font_render_text, 2U, p_str_f64, VIGIL_TYPE_OBJECT, 2U, rt_obj_err, 0, NULL, 0U, 0, NULL,
+     NULL, NULL, NULL},
+};
+/* clang-format on */
+
 static const vigil_native_class_t sdl_classes[] = {
     {"Window", 6U, sdl_window_fields, WIN_FIELD_COUNT, sdl_window_methods,
      sizeof(sdl_window_methods) / sizeof(sdl_window_methods[0]), NULL, NULL},
@@ -16902,6 +17030,8 @@ static const vigil_native_class_t sdl_classes[] = {
      sizeof(sdl_haptic_methods) / sizeof(sdl_haptic_methods[0]), NULL, NULL},
     {"Camera", 6U, sdl_camera_fields, CAM_FIELD_COUNT, sdl_camera_methods,
      sizeof(sdl_camera_methods) / sizeof(sdl_camera_methods[0]), NULL, NULL},
+    {"Font", 4U, sdl_font_fields, FONT_FIELD_COUNT, sdl_font_methods,
+     sizeof(sdl_font_methods) / sizeof(sdl_font_methods[0]), NULL, NULL},
 };
 /* clang-format on */
 

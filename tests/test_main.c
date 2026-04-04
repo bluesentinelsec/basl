@@ -59,6 +59,7 @@ extern void register_plugin_tests(void);
 extern void register_embed_api_tests(void);
 extern void register_editor_tests(void);
 extern void register_image_tests(void);
+extern void register_font_tests(void);
 
 int main(void)
 {
@@ -120,5 +121,6 @@ int main(void)
     register_embed_api_tests();
     register_editor_tests();
     register_image_tests();
+    register_font_tests();
     return vigil_test_run_all_();
 }
