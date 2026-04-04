@@ -3434,6 +3434,52 @@ TEST(VigilCompilerTest, RejectsWalrusWithVoidExpression)
                                    "cannot infer type from void expression");
 }
 
+TEST(VigilCompilerTest, StructDeclarationAndConstruction)
+{
+    EXPECT_EQ(CompileAndRun(vigil_test_failed_, "struct Point { f64 x; f64 y; }\n"
+                                                "fn main() -> i32 {\n"
+                                                "    Point p = Point(3.0, 4.0);\n"
+                                                "    if p.x != 3.0 { return 1; }\n"
+                                                "    if p.y != 4.0 { return 2; }\n"
+                                                "    p.x = 10.0;\n"
+                                                "    if p.x != 10.0 { return 3; }\n"
+                                                "    return 0;\n"
+                                                "}\n"),
+              0);
+}
+
+TEST(VigilCompilerTest, StructAsParameter)
+{
+    EXPECT_EQ(CompileAndRun(vigil_test_failed_, "struct Pair { i32 a; i32 b; }\n"
+                                                "fn sum(Pair p) -> i32 { return p.a + p.b; }\n"
+                                                "fn main() -> i32 { return sum(Pair(17, 25)); }\n"),
+              42);
+}
+
+TEST(VigilCompilerTest, RejectsStructWithMethods)
+{
+    ExpectSingleCompilerDiagnostic(vigil_test_failed_,
+                                   "struct Bad { i32 x; fn foo() -> void {} }\n"
+                                   "fn main() -> i32 { return 0; }\n",
+                                   "structs cannot contain methods");
+}
+
+TEST(VigilCompilerTest, RejectsEmptyStruct)
+{
+    ExpectSingleCompilerDiagnostic(vigil_test_failed_,
+                                   "struct Empty {}\n"
+                                   "fn main() -> i32 { return 0; }\n",
+                                   "structs must have at least one field");
+}
+
+TEST(VigilCompilerTest, RejectsStructWithPub)
+{
+    ExpectSingleCompilerDiagnostic(vigil_test_failed_,
+                                   "struct Bad { pub i32 x; }\n"
+                                   "fn main() -> i32 { return 0; }\n",
+                                   "struct fields are public by default; remove 'pub'");
+}
+
 static void register_compiler_defer_tests(void)
 {
     REGISTER_TEST(VigilCompilerTest, CompilesAndExecutesDeferredFunctionValues);
@@ -3579,4 +3625,9 @@ void register_compiler_tests(void)
     REGISTER_TEST(VigilCompilerTest, RejectsConstWalrusReassignment);
     REGISTER_TEST(VigilCompilerTest, RejectsParameterReassignment);
     REGISTER_TEST(VigilCompilerTest, RejectsWalrusWithVoidExpression);
+    REGISTER_TEST(VigilCompilerTest, StructDeclarationAndConstruction);
+    REGISTER_TEST(VigilCompilerTest, StructAsParameter);
+    REGISTER_TEST(VigilCompilerTest, RejectsStructWithMethods);
+    REGISTER_TEST(VigilCompilerTest, RejectsEmptyStruct);
+    REGISTER_TEST(VigilCompilerTest, RejectsStructWithPub);
 }

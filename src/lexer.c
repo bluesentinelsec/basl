@@ -165,6 +165,7 @@ static vigil_token_kind_t vigil_lexer_keyword_kind(const char *text, size_t leng
         {"default", 7U, VIGIL_TOKEN_DEFAULT},
         {"continue", 8U, VIGIL_TOKEN_CONTINUE},
         {"interface", 9U, VIGIL_TOKEN_INTERFACE},
+        {"struct", 6U, VIGIL_TOKEN_STRUCT},
     };
     size_t i;
 

@@ -635,6 +635,39 @@ switch e.kind() {
 }
 ```
 
+## Structs
+
+Structs are plain data types — all fields are public, no methods, no `init()`:
+
+```
+struct Point {
+    f64 x
+    f64 y
+}
+
+struct Color {
+    i32 r
+    i32 g
+    i32 b
+    i32 a
+}
+```
+
+Construct with positional arguments:
+
+```
+Point p = Point(1.0, 2.0)
+Color red = Color(255, 0, 0, 255)
+```
+
+Fields are mutable:
+
+```
+p.x = 10.0
+```
+
+Use `class` instead of `struct` when you need methods, `init()`, interfaces, or visibility control.
+
 ## Classes
 
 ```

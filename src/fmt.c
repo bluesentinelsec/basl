@@ -295,7 +295,7 @@ static const uint64_t kNoSpaceAfterBits[2] = {
 static const uint64_t kTopLevelDeclBits[2] = {
     TOK_BIT(VIGIL_TOKEN_FN) | TOK_BIT(VIGIL_TOKEN_CLASS) | TOK_BIT(VIGIL_TOKEN_INTERFACE) |
     TOK_BIT(VIGIL_TOKEN_ENUM) | TOK_BIT(VIGIL_TOKEN_CONST) | TOK_BIT(VIGIL_TOKEN_PUB),
-    0
+    TOK_BIT(VIGIL_TOKEN_STRUCT)
 };
 
 static const uint64_t kLiteralBraceOpenerBits[2] = {

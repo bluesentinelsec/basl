@@ -1690,3 +1690,81 @@ vigil_status_t vigil_program_parse_class_declaration(vigil_program_state_t *prog
 
     return vigil_program_synthesize_class_constructor(program, decl);
 }
+
+/* ── Struct declarations ──────────────────────────────────────────── */
+
+vigil_status_t vigil_program_parse_struct_declaration(vigil_program_state_t *program, size_t *cursor, int is_public)
+{
+    vigil_status_t status;
+    const vigil_token_t *struct_token;
+    const vigil_token_t *name_token;
+    const vigil_token_t *type_token;
+    const char *name_text;
+    size_t name_length;
+    vigil_class_decl_t *decl;
+
+    struct_token = vigil_program_cursor_peek(program, *cursor);
+    if (struct_token == NULL || struct_token->kind != VIGIL_TOKEN_STRUCT)
+        return vigil_compile_report(
+            program, struct_token == NULL ? vigil_program_eof_span(program) : struct_token->span, "expected 'struct'");
+    vigil_program_cursor_advance(program, cursor);
+
+    name_token = vigil_program_cursor_peek(program, *cursor);
+    if (name_token == NULL || name_token->kind != VIGIL_TOKEN_IDENTIFIER)
+        return vigil_compile_report(program, struct_token->span, "expected struct name");
+    name_text = vigil_program_token_text(program, name_token, &name_length);
+
+    status = class_check_name_conflicts(program, name_token, name_text, name_length);
+    if (status != VIGIL_STATUS_OK)
+        return status;
+
+    status = vigil_program_grow_classes(program, program->class_count + 1U);
+    if (status != VIGIL_STATUS_OK)
+        return status;
+
+    decl = &program->classes[program->class_count];
+    memset(decl, 0, sizeof(*decl));
+    decl->constructor_function_index = (size_t)-1;
+    decl->source_id = program->source->id;
+    decl->name = name_text;
+    decl->name_length = name_length;
+    decl->name_span = name_token->span;
+    decl->is_public = is_public;
+    program->class_count += 1U;
+    vigil_program_cursor_advance(program, cursor);
+
+    type_token = vigil_program_cursor_peek(program, *cursor);
+    if (type_token == NULL || type_token->kind != VIGIL_TOKEN_LBRACE)
+        return vigil_compile_report(program, name_token->span, "expected '{' after struct name");
+    vigil_program_cursor_advance(program, cursor);
+
+    while (1)
+    {
+        type_token = vigil_program_cursor_peek(program, *cursor);
+        if (type_token == NULL)
+            return vigil_compile_report(program, vigil_program_eof_span(program), "expected '}' after struct body");
+        if (type_token->kind == VIGIL_TOKEN_RBRACE)
+        {
+            vigil_program_cursor_advance(program, cursor);
+            break;
+        }
+        if (type_token->kind == VIGIL_TOKEN_SEMICOLON)
+        {
+            vigil_program_cursor_advance(program, cursor);
+            continue;
+        }
+        if (type_token->kind == VIGIL_TOKEN_FN)
+            return vigil_compile_report(program, type_token->span, "structs cannot contain methods");
+        if (type_token->kind == VIGIL_TOKEN_PUB)
+            return vigil_compile_report(program, type_token->span, "struct fields are public by default; remove 'pub'");
+
+        status = class_parse_field(program, cursor, decl, name_token, 1);
+        if (status != VIGIL_STATUS_OK)
+            return status;
+    }
+
+    if (decl->field_count == 0U)
+        return vigil_compile_report(program, name_token->span, "structs must have at least one field");
+
+    return VIGIL_STATUS_OK;
+}
