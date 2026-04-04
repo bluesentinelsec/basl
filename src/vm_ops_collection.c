@@ -832,7 +832,9 @@ vigil_status_t vigil_vm_op_array_index_of(vigil_vm_t *vm, vigil_vm_frame_t *fram
 vigil_status_t vigil_vm_op_array_remove_at(vigil_vm_t *vm, vigil_vm_frame_t *frame, vigil_error_t *error)
 {
     vigil_status_t status;
-    vigil_value_t left, idx_val, removed, err_val;
+    vigil_value_t left, idx_val, removed;
+    vigil_value_t err_val;
+    vigil_value_init_nil(&err_val);
     frame->ip += 1U;
     idx_val = vigil_vm_pop_or_nil(vm);
     left = vigil_vm_pop_or_nil(vm);
@@ -877,7 +879,9 @@ vigil_status_t vigil_vm_op_array_remove_at(vigil_vm_t *vm, vigil_vm_frame_t *fra
 vigil_status_t vigil_vm_op_array_insert_at(vigil_vm_t *vm, vigil_vm_frame_t *frame, vigil_error_t *error)
 {
     vigil_status_t status;
-    vigil_value_t left, idx_val, elem, err_val;
+    vigil_value_t left, idx_val, elem;
+    vigil_value_t err_val;
+    vigil_value_init_nil(&err_val);
     frame->ip += 1U;
     elem = vigil_vm_pop_or_nil(vm);
     idx_val = vigil_vm_pop_or_nil(vm);

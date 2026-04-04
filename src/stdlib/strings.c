@@ -122,8 +122,8 @@ static vigil_status_t builder_write(vigil_vm_t *vm, size_t arg_count, vigil_erro
 {
     size_t base = vigil_vm_stack_depth(vm) - arg_count;
     int64_t h = get_builder_handle(vm, base);
-    const char *s;
-    size_t len;
+    const char *s = NULL;
+    size_t len = 0;
     get_str(vm, base, 1, &s, &len);
     vigil_vm_stack_pop_n(vm, arg_count);
     (void)error;

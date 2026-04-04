@@ -134,6 +134,7 @@ static const vigil_doc_entry_t string_method_docs[] = {
      "\"abc\".is_lower()  // true"},
 };
 
+// clang-format off
 static const vigil_string_method_descriptor_t string_method_descriptors_[] = {
 #define STRING_METHOD_DESCRIPTOR(name_, opcode_, arg_count_, arg0_type_, arg0_object_kind_, arg0_element_type_,        \
                                  arg1_type_, arg1_object_kind_, arg1_element_type_, return_type_, return_object_kind_, \
@@ -260,6 +261,7 @@ static const vigil_string_method_descriptor_t string_method_descriptors_[] = {
                              VIGIL_TYPE_INVALID, 36),
 #undef STRING_METHOD_DESCRIPTOR
 };
+// clang-format on
 
 static vigil_doc_entry_t builtin_module_entries[1U + sizeof(builtin_descriptors_) / sizeof(builtin_descriptors_[0])];
 static vigil_doc_entry_t
