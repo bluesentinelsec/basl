@@ -630,6 +630,14 @@ static size_t stack_op_size(const uint8_t *code, size_t ip, size_t code_size)
     case VIGIL_OPCODE_MAP_VALUES:
     case VIGIL_OPCODE_GET_MAP_KEY_AT:
     case VIGIL_OPCODE_GET_MAP_VALUE_AT:
+    case VIGIL_OPCODE_ARRAY_SORT:
+    case VIGIL_OPCODE_ARRAY_SORT_DESC:
+    case VIGIL_OPCODE_ARRAY_REVERSE:
+    case VIGIL_OPCODE_ARRAY_INDEX_OF:
+    case VIGIL_OPCODE_ARRAY_REMOVE_AT:
+    case VIGIL_OPCODE_ARRAY_INSERT_AT:
+    case VIGIL_OPCODE_ARRAY_CLEAR:
+    case VIGIL_OPCODE_MAP_CLEAR:
     case VIGIL_OPCODE_PARSE_I32:
     case VIGIL_OPCODE_PARSE_F64:
     case VIGIL_OPCODE_PARSE_BOOL:
@@ -2734,6 +2742,67 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
             ip += 1;
             break;
         }
+
+        /* ── New collection ops ────────────────────────────────── */
+        case VIGIL_OPCODE_ARRAY_SORT: {
+            uint8_t arr = vs_pop(&vs);
+            TR_EMIT(vigil_reg_abc(VREG_ARRAY_SORT, arr, 0, 0));
+            ip += 1;
+            break;
+        }
+        case VIGIL_OPCODE_ARRAY_SORT_DESC: {
+            uint8_t arr = vs_pop(&vs);
+            TR_EMIT(vigil_reg_abc(VREG_ARRAY_SORT_DESC, arr, 0, 0));
+            ip += 1;
+            break;
+        }
+        case VIGIL_OPCODE_ARRAY_REVERSE: {
+            uint8_t arr = vs_pop(&vs);
+            TR_EMIT(vigil_reg_abc(VREG_ARRAY_REVERSE, arr, 0, 0));
+            ip += 1;
+            break;
+        }
+        case VIGIL_OPCODE_ARRAY_INDEX_OF: {
+            uint8_t needle = vs_pop(&vs);
+            uint8_t arr = vs_pop(&vs);
+            uint8_t r = vs_push_result(&vs, arr);
+            TR_EMIT(vigil_reg_abc(VREG_ARRAY_INDEX_OF, r, arr, needle));
+            ip += 1;
+            break;
+        }
+        case VIGIL_OPCODE_ARRAY_REMOVE_AT: {
+            SYNC_PACK(2);
+            uint8_t idx = vs_pop(&vs);
+            uint8_t arr = vs_pop(&vs);
+            uint8_t result_base;
+            PUSH_RESULT_REGS(arr, 2, result_base);
+            TR_EMIT(vigil_reg_abc(VREG_ARRAY_REMOVE_AT, result_base, arr, idx));
+            ip += 1;
+            break;
+        }
+        case VIGIL_OPCODE_ARRAY_INSERT_AT: {
+            SYNC_PACK(3);
+            uint8_t elem = vs_pop(&vs);
+            uint8_t idx = vs_pop(&vs);
+            uint8_t arr = vs_pop(&vs);
+            uint8_t r = vs_push_result(&vs, arr);
+            TR_EMIT(vigil_reg_abc(VREG_ARRAY_INSERT_AT, r, arr, elem));
+            (void)idx;
+            ip += 1;
+            break;
+        }
+        case VIGIL_OPCODE_ARRAY_CLEAR: {
+            uint8_t arr = vs_pop(&vs);
+            TR_EMIT(vigil_reg_abc(VREG_ARRAY_CLEAR, arr, 0, 0));
+            ip += 1;
+            break;
+        }
+        case VIGIL_OPCODE_MAP_CLEAR: {
+            uint8_t map = vs_pop(&vs);
+            TR_EMIT(vigil_reg_abc(VREG_MAP_CLEAR, map, 0, 0));
+            ip += 1;
+            break;
+        }
         case VIGIL_OPCODE_GET_MAP_KEY_AT:
         case VIGIL_OPCODE_GET_MAP_VALUE_AT: {
             SYNC_PACK(2);
@@ -3319,6 +3388,14 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
             [VREG_MAP_HAS] = &&r_MAP_HAS,
             [VREG_MAP_KEYS] = &&r_MAP_KEYS,
             [VREG_MAP_VALUES] = &&r_MAP_VALUES,
+            [VREG_ARRAY_SORT] = &&r_ARRAY_SORT,
+            [VREG_ARRAY_SORT_DESC] = &&r_ARRAY_SORT_DESC,
+            [VREG_ARRAY_REVERSE] = &&r_ARRAY_REVERSE,
+            [VREG_ARRAY_INDEX_OF] = &&r_ARRAY_INDEX_OF,
+            [VREG_ARRAY_REMOVE_AT] = &&r_ARRAY_REMOVE_AT,
+            [VREG_ARRAY_INSERT_AT] = &&r_ARRAY_INSERT_AT,
+            [VREG_ARRAY_CLEAR] = &&r_ARRAY_CLEAR,
+            [VREG_MAP_CLEAR] = &&r_MAP_CLEAR,
             [VREG_CHAR_FROM_INT] = &&r_CHAR_FROM_INT,
         };
 
@@ -5687,6 +5764,48 @@ r_dispatch_switch_check:
     {
         vigil_reg_instr_t i = code[ip];
         REGVM_STACK_HELPER(VREG_GET_C(i), 2, VREG_GET_A(i), 1, vigil_vm_op_get_map_value_at(vm, frame, error));
+    }
+
+    /* ── New collection ops ────────────────────────────────────── */
+    RCASE(ARRAY_SORT)
+    {
+        vigil_reg_instr_t i = code[ip];
+        REGVM_STACK_HELPER(VREG_GET_A(i), 1, VREG_GET_A(i), 0, vigil_vm_op_array_sort(vm, frame, error));
+    }
+    RCASE(ARRAY_SORT_DESC)
+    {
+        vigil_reg_instr_t i = code[ip];
+        REGVM_STACK_HELPER(VREG_GET_A(i), 1, VREG_GET_A(i), 0, vigil_vm_op_array_sort_desc(vm, frame, error));
+    }
+    RCASE(ARRAY_REVERSE)
+    {
+        vigil_reg_instr_t i = code[ip];
+        REGVM_STACK_HELPER(VREG_GET_A(i), 1, VREG_GET_A(i), 0, vigil_vm_op_array_reverse(vm, frame, error));
+    }
+    RCASE(ARRAY_INDEX_OF)
+    {
+        vigil_reg_instr_t i = code[ip];
+        REGVM_STACK_HELPER(VREG_GET_C(i), 2, VREG_GET_A(i), 1, vigil_vm_op_array_index_of(vm, frame, error));
+    }
+    RCASE(ARRAY_REMOVE_AT)
+    {
+        vigil_reg_instr_t i = code[ip];
+        REGVM_STACK_HELPER(VREG_GET_C(i), 2, VREG_GET_A(i), 2, vigil_vm_op_array_remove_at(vm, frame, error));
+    }
+    RCASE(ARRAY_INSERT_AT)
+    {
+        vigil_reg_instr_t i = code[ip];
+        REGVM_STACK_HELPER(VREG_GET_C(i), 3, VREG_GET_A(i), 1, vigil_vm_op_array_insert_at(vm, frame, error));
+    }
+    RCASE(ARRAY_CLEAR)
+    {
+        vigil_reg_instr_t i = code[ip];
+        REGVM_STACK_HELPER(VREG_GET_A(i), 1, VREG_GET_A(i), 0, vigil_vm_op_array_clear(vm, frame, error));
+    }
+    RCASE(MAP_CLEAR)
+    {
+        vigil_reg_instr_t i = code[ip];
+        REGVM_STACK_HELPER(VREG_GET_A(i), 1, VREG_GET_A(i), 0, vigil_vm_op_map_clear(vm, frame, error));
     }
 
     /* ── Char from int ─────────────────────────────────────────── */

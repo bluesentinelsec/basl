@@ -3480,6 +3480,54 @@ TEST(VigilCompilerTest, RejectsStructWithPub)
                                    "struct fields are public by default; remove 'pub'");
 }
 
+TEST(VigilCompilerTest, ArraySortReverseIndexOf)
+{
+    EXPECT_EQ(CompileAndRun(vigil_test_failed_, "fn main() -> i32 {\n"
+                                                "    array<i32> a = [3, 1, 2];\n"
+                                                "    a.sort();\n"
+                                                "    if a[0] != 1 { return 1; }\n"
+                                                "    if a[2] != 3 { return 2; }\n"
+                                                "    a.sort_desc();\n"
+                                                "    if a[0] != 3 { return 3; }\n"
+                                                "    a.reverse();\n"
+                                                "    if a[0] != 1 { return 4; }\n"
+                                                "    if a.index_of(2) != 1 { return 5; }\n"
+                                                "    if a.index_of(99) != -1 { return 6; }\n"
+                                                "    return 0;\n"
+                                                "}\n"),
+              0);
+}
+
+TEST(VigilCompilerTest, ArrayRemoveInsertClear)
+{
+    EXPECT_EQ(CompileAndRun(vigil_test_failed_, "fn main() -> i32 {\n"
+                                                "    array<i32> a = [10, 20, 30];\n"
+                                                "    i32 removed, err e = a.remove(1);\n"
+                                                "    if e != ok { return 1; }\n"
+                                                "    if removed != 20 { return 2; }\n"
+                                                "    if a.len() != 2 { return 3; }\n"
+                                                "    err e2 = a.insert(0, 99);\n"
+                                                "    if e2 != ok { return 4; }\n"
+                                                "    if a[0] != 99 { return 5; }\n"
+                                                "    if a.len() != 3 { return 6; }\n"
+                                                "    a.clear();\n"
+                                                "    if a.len() != 0 { return 7; }\n"
+                                                "    return 0;\n"
+                                                "}\n"),
+              0);
+}
+
+TEST(VigilCompilerTest, MapClear)
+{
+    EXPECT_EQ(CompileAndRun(vigil_test_failed_, "fn main() -> i32 {\n"
+                                                "    map<string, i32> m = {\"a\": 1, \"b\": 2};\n"
+                                                "    if m.len() != 2 { return 1; }\n"
+                                                "    m.clear();\n"
+                                                "    if m.len() != 0 { return 2; }\n"
+                                                "    return 0;\n"
+                                                "}\n"),
+              0);
+}
 static void register_compiler_defer_tests(void)
 {
     REGISTER_TEST(VigilCompilerTest, CompilesAndExecutesDeferredFunctionValues);
@@ -3630,4 +3678,7 @@ void register_compiler_tests(void)
     REGISTER_TEST(VigilCompilerTest, RejectsStructWithMethods);
     REGISTER_TEST(VigilCompilerTest, RejectsEmptyStruct);
     REGISTER_TEST(VigilCompilerTest, RejectsStructWithPub);
+    REGISTER_TEST(VigilCompilerTest, ArraySortReverseIndexOf);
+    REGISTER_TEST(VigilCompilerTest, ArrayRemoveInsertClear);
+    REGISTER_TEST(VigilCompilerTest, MapClear);
 }

@@ -1631,6 +1631,152 @@ vigil_status_t vigil_array_object_slice(const vigil_object_t *object, size_t sta
                                   error);
 }
 
+/* ── Additional array operations ──────────────────────────────────── */
+
+static vigil_array_object_t *vigil_array_cast_mut(vigil_object_t *object)
+{
+    if (object == NULL || object->type != VIGIL_OBJECT_ARRAY)
+        return NULL;
+    return (vigil_array_object_t *)object;
+}
+
+static vigil_map_object_t *vigil_map_cast_mut(vigil_object_t *object)
+{
+    if (object == NULL || object->type != VIGIL_OBJECT_MAP)
+        return NULL;
+    return (vigil_map_object_t *)object;
+}
+
+void vigil_array_object_reverse(vigil_object_t *object)
+{
+    vigil_array_object_t *arr = vigil_array_cast_mut(object);
+    if (arr == NULL || arr->item_count < 2U)
+        return;
+    for (size_t i = 0, j = arr->item_count - 1U; i < j; i++, j--)
+    {
+        vigil_value_t tmp = arr->items[i];
+        arr->items[i] = arr->items[j];
+        arr->items[j] = tmp;
+    }
+}
+
+static int vigil_array_compare_asc(const void *a, const void *b)
+{
+    const vigil_value_t *va = (const vigil_value_t *)a;
+    const vigil_value_t *vb = (const vigil_value_t *)b;
+    if (vigil_value_kind(va) == VIGIL_VALUE_INT && vigil_value_kind(vb) == VIGIL_VALUE_INT)
+    {
+        int64_t ia = vigil_value_as_int(va), ib = vigil_value_as_int(vb);
+        return (ia > ib) - (ia < ib);
+    }
+    if (vigil_value_kind(va) == VIGIL_VALUE_FLOAT && vigil_value_kind(vb) == VIGIL_VALUE_FLOAT)
+    {
+        double fa = vigil_value_as_float(va), fb = vigil_value_as_float(vb);
+        return (fa > fb) - (fa < fb);
+    }
+    if (vigil_value_kind(va) == VIGIL_VALUE_OBJECT && vigil_value_kind(vb) == VIGIL_VALUE_OBJECT)
+    {
+        vigil_object_t *oa = vigil_value_as_object(va);
+        vigil_object_t *ob = vigil_value_as_object(vb);
+        if (oa != NULL && ob != NULL && vigil_object_type(oa) == VIGIL_OBJECT_STRING &&
+            vigil_object_type(ob) == VIGIL_OBJECT_STRING)
+        {
+            const char *sa = vigil_string_object_c_str(oa);
+            const char *sb = vigil_string_object_c_str(ob);
+            if (sa != NULL && sb != NULL)
+                return strcmp(sa, sb);
+        }
+    }
+    return 0;
+}
+
+static int vigil_array_compare_desc(const void *a, const void *b)
+{
+    return vigil_array_compare_asc(b, a);
+}
+
+void vigil_array_object_sort(vigil_object_t *object, int descending)
+{
+    vigil_array_object_t *arr = vigil_array_cast_mut(object);
+    if (arr == NULL || arr->item_count < 2U)
+        return;
+    qsort(arr->items, arr->item_count, sizeof(vigil_value_t),
+          descending ? vigil_array_compare_desc : vigil_array_compare_asc);
+}
+
+int vigil_array_object_index_of(const vigil_object_t *object, const vigil_value_t *needle)
+{
+    const vigil_array_object_t *arr = vigil_array_object_cast(object);
+    if (arr == NULL || needle == NULL)
+        return -1;
+    for (size_t i = 0; i < arr->item_count; i++)
+    {
+        if (vigil_vm_values_equal(&arr->items[i], needle))
+            return (int)i;
+    }
+    return -1;
+}
+
+vigil_status_t vigil_array_object_remove_at(vigil_object_t *object, size_t index, vigil_value_t *out_value,
+                                            vigil_error_t *error)
+{
+    vigil_array_object_t *arr = vigil_array_cast_mut(object);
+    vigil_error_clear(error);
+    if (arr == NULL || index >= arr->item_count)
+    {
+        vigil_error_set_literal(error, VIGIL_STATUS_INVALID_ARGUMENT, "array remove index out of bounds");
+        return VIGIL_STATUS_INVALID_ARGUMENT;
+    }
+    if (out_value != NULL)
+        *out_value = arr->items[index];
+    else
+        vigil_value_release(&arr->items[index]);
+    for (size_t i = index; i + 1U < arr->item_count; i++)
+        arr->items[i] = arr->items[i + 1U];
+    arr->item_count -= 1U;
+    return VIGIL_STATUS_OK;
+}
+
+vigil_status_t vigil_array_object_insert_at(vigil_object_t *object, size_t index, const vigil_value_t *value,
+                                            vigil_error_t *error)
+{
+    vigil_array_object_t *arr = vigil_array_cast_mut(object);
+    vigil_error_clear(error);
+    if (arr == NULL || value == NULL || index > arr->item_count)
+    {
+        vigil_error_set_literal(error, VIGIL_STATUS_INVALID_ARGUMENT, "array insert arguments are invalid");
+        return VIGIL_STATUS_INVALID_ARGUMENT;
+    }
+    /* Use append to handle growth, then shift elements. */
+    vigil_value_t placeholder;
+    vigil_value_init_nil(&placeholder);
+    vigil_status_t status = vigil_array_object_append(object, &placeholder, error);
+    if (status != VIGIL_STATUS_OK)
+        return status;
+    for (size_t i = arr->item_count - 1U; i > index; i--)
+        arr->items[i] = arr->items[i - 1U];
+    arr->items[index] = vigil_value_copy(value);
+    return VIGIL_STATUS_OK;
+}
+
+void vigil_array_object_clear(vigil_object_t *object)
+{
+    vigil_array_object_t *arr = vigil_array_cast_mut(object);
+    if (arr == NULL)
+        return;
+    for (size_t i = 0; i < arr->item_count; i++)
+        vigil_value_release(&arr->items[i]);
+    arr->item_count = 0U;
+}
+
+void vigil_map_object_clear(vigil_object_t *object)
+{
+    vigil_map_object_t *map = vigil_map_cast_mut(object);
+    if (map == NULL)
+        return;
+    vigil_map_clear(&map->entries);
+}
+
 vigil_status_t vigil_map_object_new(vigil_runtime_t *runtime, vigil_object_t **out_object, vigil_error_t *error)
 {
     vigil_status_t status;

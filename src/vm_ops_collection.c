@@ -747,3 +747,206 @@ vigil_status_t vigil_vm_op_set_index(vigil_vm_t *vm, vigil_vm_frame_t *frame, vi
     VIGIL_VM_VALUE_RELEASE(&value);
     return status;
 }
+
+/* ── ARRAY_SORT ────────────────────────────────────────────────── */
+
+vigil_status_t vigil_vm_op_array_sort(vigil_vm_t *vm, vigil_vm_frame_t *frame, vigil_error_t *error)
+{
+    vigil_value_t left;
+    frame->ip += 1U;
+    left = vigil_vm_pop_or_nil(vm);
+    vigil_object_t *arr = get_object(&left);
+    if (arr == NULL || vigil_object_type(arr) != VIGIL_OBJECT_ARRAY)
+    {
+        VIGIL_VM_VALUE_RELEASE(&left);
+        return vigil_vm_fail_at_ip(vm, VIGIL_STATUS_INVALID_ARGUMENT, "sort() requires an array receiver", error);
+    }
+    vigil_array_object_sort(arr, 0);
+    VIGIL_VM_VALUE_RELEASE(&left);
+    return VIGIL_STATUS_OK;
+}
+
+/* ── ARRAY_SORT_DESC ───────────────────────────────────────────── */
+
+vigil_status_t vigil_vm_op_array_sort_desc(vigil_vm_t *vm, vigil_vm_frame_t *frame, vigil_error_t *error)
+{
+    vigil_value_t left;
+    frame->ip += 1U;
+    left = vigil_vm_pop_or_nil(vm);
+    vigil_object_t *arr = get_object(&left);
+    if (arr == NULL || vigil_object_type(arr) != VIGIL_OBJECT_ARRAY)
+    {
+        VIGIL_VM_VALUE_RELEASE(&left);
+        return vigil_vm_fail_at_ip(vm, VIGIL_STATUS_INVALID_ARGUMENT, "sort_desc() requires an array receiver", error);
+    }
+    vigil_array_object_sort(arr, 1);
+    VIGIL_VM_VALUE_RELEASE(&left);
+    return VIGIL_STATUS_OK;
+}
+
+/* ── ARRAY_REVERSE ─────────────────────────────────────────────── */
+
+vigil_status_t vigil_vm_op_array_reverse(vigil_vm_t *vm, vigil_vm_frame_t *frame, vigil_error_t *error)
+{
+    vigil_value_t left;
+    frame->ip += 1U;
+    left = vigil_vm_pop_or_nil(vm);
+    vigil_object_t *arr = get_object(&left);
+    if (arr == NULL || vigil_object_type(arr) != VIGIL_OBJECT_ARRAY)
+    {
+        VIGIL_VM_VALUE_RELEASE(&left);
+        return vigil_vm_fail_at_ip(vm, VIGIL_STATUS_INVALID_ARGUMENT, "reverse() requires an array receiver", error);
+    }
+    vigil_array_object_reverse(arr);
+    VIGIL_VM_VALUE_RELEASE(&left);
+    return VIGIL_STATUS_OK;
+}
+
+/* ── ARRAY_INDEX_OF ────────────────────────────────────────────── */
+
+vigil_status_t vigil_vm_op_array_index_of(vigil_vm_t *vm, vigil_vm_frame_t *frame, vigil_error_t *error)
+{
+    vigil_status_t status;
+    vigil_value_t left, needle, result;
+    frame->ip += 1U;
+    needle = vigil_vm_pop_or_nil(vm);
+    left = vigil_vm_pop_or_nil(vm);
+    vigil_object_t *arr = get_object(&left);
+    if (arr == NULL || vigil_object_type(arr) != VIGIL_OBJECT_ARRAY)
+    {
+        VIGIL_VM_VALUE_RELEASE(&left);
+        VIGIL_VM_VALUE_RELEASE(&needle);
+        return vigil_vm_fail_at_ip(vm, VIGIL_STATUS_INVALID_ARGUMENT, "index_of() requires an array receiver", error);
+    }
+    int idx = vigil_array_object_index_of(arr, &needle);
+    vigil_value_init_int(&result, (int64_t)idx);
+    VIGIL_VM_VALUE_RELEASE(&left);
+    VIGIL_VM_VALUE_RELEASE(&needle);
+    status = vigil_vm_push(vm, &result, error);
+    VIGIL_VM_VALUE_RELEASE(&result);
+    return status;
+}
+
+/* ── ARRAY_REMOVE_AT ───────────────────────────────────────────── */
+
+vigil_status_t vigil_vm_op_array_remove_at(vigil_vm_t *vm, vigil_vm_frame_t *frame, vigil_error_t *error)
+{
+    vigil_status_t status;
+    vigil_value_t left, idx_val, removed, err_val;
+    frame->ip += 1U;
+    idx_val = vigil_vm_pop_or_nil(vm);
+    left = vigil_vm_pop_or_nil(vm);
+    vigil_object_t *arr = get_object(&left);
+    if (arr == NULL || vigil_object_type(arr) != VIGIL_OBJECT_ARRAY)
+    {
+        VIGIL_VM_VALUE_RELEASE(&left);
+        VIGIL_VM_VALUE_RELEASE(&idx_val);
+        return vigil_vm_fail_at_ip(vm, VIGIL_STATUS_INVALID_ARGUMENT, "remove() requires an array receiver", error);
+    }
+    int64_t index = vigil_value_as_int(&idx_val);
+    VIGIL_VM_VALUE_RELEASE(&idx_val);
+    if (index < 0 || (size_t)index >= vigil_array_object_length(arr))
+    {
+        status = vigil_vm_make_bounds_error_value(vm, "array remove index out of bounds", &removed, error);
+    }
+    else
+    {
+        status = vigil_array_object_remove_at(arr, (size_t)index, &removed, error);
+        if (status == VIGIL_STATUS_OK)
+        {
+            VIGIL_VM_VALUE_INIT_NIL(&err_val);
+            status = vigil_vm_make_ok_error_value(vm, &err_val, error);
+        }
+    }
+    VIGIL_VM_VALUE_RELEASE(&left);
+    if (status != VIGIL_STATUS_OK)
+    {
+        VIGIL_VM_VALUE_RELEASE(&removed);
+        return status;
+    }
+    status = vigil_vm_push(vm, &removed, error);
+    VIGIL_VM_VALUE_RELEASE(&removed);
+    if (status == VIGIL_STATUS_OK)
+        status = vigil_vm_push(vm, &err_val, error);
+    VIGIL_VM_VALUE_RELEASE(&err_val);
+    return status;
+}
+
+/* ── ARRAY_INSERT_AT ───────────────────────────────────────────── */
+
+vigil_status_t vigil_vm_op_array_insert_at(vigil_vm_t *vm, vigil_vm_frame_t *frame, vigil_error_t *error)
+{
+    vigil_status_t status;
+    vigil_value_t left, idx_val, elem, err_val;
+    frame->ip += 1U;
+    elem = vigil_vm_pop_or_nil(vm);
+    idx_val = vigil_vm_pop_or_nil(vm);
+    left = vigil_vm_pop_or_nil(vm);
+    vigil_object_t *arr = get_object(&left);
+    if (arr == NULL || vigil_object_type(arr) != VIGIL_OBJECT_ARRAY)
+    {
+        VIGIL_VM_VALUE_RELEASE(&left);
+        VIGIL_VM_VALUE_RELEASE(&idx_val);
+        VIGIL_VM_VALUE_RELEASE(&elem);
+        return vigil_vm_fail_at_ip(vm, VIGIL_STATUS_INVALID_ARGUMENT, "insert() requires an array receiver", error);
+    }
+    int64_t index = vigil_value_as_int(&idx_val);
+    VIGIL_VM_VALUE_RELEASE(&idx_val);
+    if (index < 0 || (size_t)index > vigil_array_object_length(arr))
+    {
+        VIGIL_VM_VALUE_RELEASE(&elem);
+        status = vigil_vm_make_bounds_error_value(vm, "array insert index out of bounds", &err_val, error);
+    }
+    else
+    {
+        status = vigil_array_object_insert_at(arr, (size_t)index, &elem, error);
+        VIGIL_VM_VALUE_RELEASE(&elem);
+        if (status == VIGIL_STATUS_OK)
+            status = vigil_vm_make_ok_error_value(vm, &err_val, error);
+    }
+    VIGIL_VM_VALUE_RELEASE(&left);
+    if (status != VIGIL_STATUS_OK)
+    {
+        VIGIL_VM_VALUE_RELEASE(&err_val);
+        return status;
+    }
+    status = vigil_vm_push(vm, &err_val, error);
+    VIGIL_VM_VALUE_RELEASE(&err_val);
+    return status;
+}
+
+/* ── ARRAY_CLEAR ───────────────────────────────────────────────── */
+
+vigil_status_t vigil_vm_op_array_clear(vigil_vm_t *vm, vigil_vm_frame_t *frame, vigil_error_t *error)
+{
+    vigil_value_t left;
+    frame->ip += 1U;
+    left = vigil_vm_pop_or_nil(vm);
+    vigil_object_t *arr = get_object(&left);
+    if (arr == NULL || vigil_object_type(arr) != VIGIL_OBJECT_ARRAY)
+    {
+        VIGIL_VM_VALUE_RELEASE(&left);
+        return vigil_vm_fail_at_ip(vm, VIGIL_STATUS_INVALID_ARGUMENT, "clear() requires an array receiver", error);
+    }
+    vigil_array_object_clear(arr);
+    VIGIL_VM_VALUE_RELEASE(&left);
+    return VIGIL_STATUS_OK;
+}
+
+/* ── MAP_CLEAR ─────────────────────────────────────────────────── */
+
+vigil_status_t vigil_vm_op_map_clear(vigil_vm_t *vm, vigil_vm_frame_t *frame, vigil_error_t *error)
+{
+    vigil_value_t left;
+    frame->ip += 1U;
+    left = vigil_vm_pop_or_nil(vm);
+    vigil_object_t *obj = get_object(&left);
+    if (obj == NULL || vigil_object_type(obj) != VIGIL_OBJECT_MAP)
+    {
+        VIGIL_VM_VALUE_RELEASE(&left);
+        return vigil_vm_fail_at_ip(vm, VIGIL_STATUS_INVALID_ARGUMENT, "clear() requires a map receiver", error);
+    }
+    vigil_map_object_clear(obj);
+    VIGIL_VM_VALUE_RELEASE(&left);
+    return VIGIL_STATUS_OK;
+}
