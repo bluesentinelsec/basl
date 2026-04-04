@@ -2587,9 +2587,7 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
             ip += 1;
             break;
         }
-        case VIGIL_OPCODE_STRING_CUT:
-    case VIGIL_OPCODE_STRING_PAD_LEFT:
-    case VIGIL_OPCODE_STRING_PAD_RIGHT: {
+        case VIGIL_OPCODE_STRING_CUT: {
             /* Pop 2 (str, sep), push 3 (before, after, found). */
             SYNC_PACK(2);
             uint8_t arg = vs_pop(&vs);
@@ -2597,6 +2595,18 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
             uint8_t result_base;
             PUSH_RESULT_REGS(str, 3, result_base);
             TR_EMIT(vigil_reg_abc(VREG_STRING_OP, result_base, arg, op));
+            ip += 1;
+            break;
+        }
+        case VIGIL_OPCODE_STRING_PAD_LEFT:
+        case VIGIL_OPCODE_STRING_PAD_RIGHT: {
+            SYNC_PACK(3);
+            uint8_t arg2 = vs_pop(&vs);
+            uint8_t arg1 = vs_pop(&vs);
+            (void)arg1;
+            uint8_t str = vs_pop(&vs);
+            uint8_t r = vs_push_result(&vs, str);
+            TR_EMIT(vigil_reg_abc(VREG_STRING_OP, r, arg2, op));
             ip += 1;
             break;
         }

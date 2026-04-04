@@ -3528,6 +3528,18 @@ TEST(VigilCompilerTest, MapClear)
                                                 "}\n"),
               0);
 }
+
+TEST(VigilCompilerTest, StringPadLeftAndPadRight)
+{
+    EXPECT_EQ(CompileAndRun(vigil_test_failed_,
+                            "fn main() -> i32 {\n"
+                            "    if \"42\".pad_left(5, \"0\") != \"00042\" { return 1; }\n"
+                            "    if \"hi\".pad_right(5, \"x\") != \"hixxx\" { return 2; }\n"
+                            "    if \"hello\".pad_left(3, \"x\") != \"hello\" { return 3; }\n"
+                            "    return 0;\n"
+                            "}\n"),
+              0);
+}
 static void register_compiler_defer_tests(void)
 {
     REGISTER_TEST(VigilCompilerTest, CompilesAndExecutesDeferredFunctionValues);
@@ -3681,4 +3693,5 @@ void register_compiler_tests(void)
     REGISTER_TEST(VigilCompilerTest, ArraySortReverseIndexOf);
     REGISTER_TEST(VigilCompilerTest, ArrayRemoveInsertClear);
     REGISTER_TEST(VigilCompilerTest, MapClear);
+    REGISTER_TEST(VigilCompilerTest, StringPadLeftAndPadRight);
 }

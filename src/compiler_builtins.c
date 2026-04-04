@@ -203,6 +203,35 @@ vigil_status_t vigil_parser_parse_string_method_call(vigil_parser_state_t *state
         return VIGIL_STATUS_OK;
     }
 
+    /* .pad_left() / .pad_right() — special case for regvm compat. */
+    if (vigil_program_names_equal(method_name, method_length, "pad_left", 8U) ||
+        vigil_program_names_equal(method_name, method_length, "pad_right", 9U))
+    {
+        vigil_expression_result_t arg1, arg2;
+        vigil_expression_result_clear(&arg1);
+        vigil_expression_result_clear(&arg2);
+        status = vigil_parser_parse_expression(state, &arg1);
+        if (status != VIGIL_STATUS_OK)
+            return status;
+        status = vigil_parser_expect(state, VIGIL_TOKEN_COMMA, "pad requires two arguments", NULL);
+        if (status != VIGIL_STATUS_OK)
+            return status;
+        status = vigil_parser_parse_expression(state, &arg2);
+        if (status != VIGIL_STATUS_OK)
+            return status;
+        status = vigil_parser_expect(state, VIGIL_TOKEN_RPAREN, "expected ')' after pad arguments", NULL);
+        if (status != VIGIL_STATUS_OK)
+            return status;
+        vigil_opcode_t op = vigil_program_names_equal(method_name, method_length, "pad_left", 8U)
+                                ? VIGIL_OPCODE_STRING_PAD_LEFT
+                                : VIGIL_OPCODE_STRING_PAD_RIGHT;
+        status = vigil_parser_emit_opcode(state, op, method_token->span);
+        if (status != VIGIL_STATUS_OK)
+            return status;
+        vigil_expression_result_set_type(out_result, vigil_binding_type_primitive(VIGIL_TYPE_STRING));
+        return VIGIL_STATUS_OK;
+    }
+
     if (descriptor == NULL)
     {
         return vigil_parser_report(state, method_token->span, "unknown string method");
