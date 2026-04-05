@@ -287,4 +287,7 @@ const gui_backend_t gui_backend_stub = {
     .canvas_draw_rect = stub_canvas_draw,
     .canvas_draw_oval = stub_canvas_draw,
     .canvas_draw_text = stub_canvas_text,
+    .canvas_set_stroke_color = stub_set_text,
+    .canvas_set_fill_color = stub_set_text,
+    .canvas_set_line_width = stub_set_double,
 };
