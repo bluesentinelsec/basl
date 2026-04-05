@@ -552,6 +552,145 @@ static void win32_select_set_index(void *handle, int index)
         SendMessageW((HWND)handle, CB_SETCURSEL, (WPARAM)index, 0);
 }
 
+/* ── Text ────────────────────────────────────────────────────────── */
+
+static void *win32_text_create(void *parent)
+{
+    if (!parent)
+        return NULL;
+    HWND hwnd = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"",
+                                WS_CHILD | WS_VISIBLE | ES_MULTILINE | ES_AUTOVSCROLL | ES_WANTRETURN | WS_VSCROLL, 0,
+                                0, 200, 100, (HWND)parent, (HMENU)(intptr_t)g_next_ctrl_id++, g_hinstance, NULL);
+    if (hwnd)
+        register_widget_parent(hwnd, (HWND)parent);
+    return (void *)hwnd;
+}
+
+static void win32_text_destroy(void *handle)
+{
+    if (handle)
+        DestroyWindow((HWND)handle);
+}
+
+static const char *win32_text_get_text(void *handle, char *buf, size_t bufsz)
+{
+    if (!handle)
+    {
+        buf[0] = '\0';
+        return buf;
+    }
+    int len = GetWindowTextLengthW((HWND)handle);
+    if (len <= 0)
+    {
+        buf[0] = '\0';
+        return buf;
+    }
+    wchar_t *wbuf = (wchar_t *)_alloca(sizeof(wchar_t) * (len + 1));
+    GetWindowTextW((HWND)handle, wbuf, len + 1);
+    WideCharToMultiByte(CP_UTF8, 0, wbuf, -1, buf, (int)bufsz, NULL, NULL);
+    buf[bufsz - 1] = '\0';
+    return buf;
+}
+
+static void win32_text_set_text(void *handle, const char *text)
+{
+    if (handle)
+        SetWindowTextW((HWND)handle, to_wide(text));
+}
+
+/* ── Radio ───────────────────────────────────────────────────────── */
+
+static void *win32_radio_create(void *parent, const char *text, void *group)
+{
+    if (!parent)
+        return NULL;
+    DWORD style = WS_CHILD | WS_VISIBLE | BS_AUTORADIOBUTTON;
+    if (!group)
+        style |= WS_GROUP;
+    HWND hwnd = CreateWindowExW(0, L"BUTTON", to_wide(text), style, 0, 0, 200, 24, (HWND)parent,
+                                (HMENU)(intptr_t)g_next_ctrl_id++, g_hinstance, NULL);
+    if (hwnd)
+        register_widget_parent(hwnd, (HWND)parent);
+    return (void *)hwnd;
+}
+
+static void win32_radio_destroy(void *handle)
+{
+    if (handle)
+        DestroyWindow((HWND)handle);
+}
+
+static void win32_radio_set_text(void *handle, const char *text)
+{
+    if (handle)
+        SetWindowTextW((HWND)handle, to_wide(text));
+}
+
+static bool win32_radio_get_active(void *handle)
+{
+    if (!handle)
+        return false;
+    return SendMessageW((HWND)handle, BM_GETCHECK, 0, 0) == BST_CHECKED;
+}
+
+static void win32_radio_set_active(void *handle, bool active)
+{
+    if (handle)
+        SendMessageW((HWND)handle, BM_SETCHECK, active ? BST_CHECKED : BST_UNCHECKED, 0);
+}
+
+/* ── Spinbox ─────────────────────────────────────────────────────── */
+
+/* Win32 doesn't have a native spin+edit combo in one call.
+   Use an EDIT control paired with an Up-Down control. For simplicity,
+   we use a trackbar-style approach: store min/max/step and use
+   an EDIT control with up-down buddy. */
+
+static void *win32_spinbox_create(void *parent, double min_val, double max_val, double step)
+{
+    (void)step;
+    if (!parent)
+        return NULL;
+    HWND edit = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"0", WS_CHILD | WS_VISIBLE | ES_NUMBER, 0, 0, 100, 24,
+                                (HWND)parent, (HMENU)(intptr_t)g_next_ctrl_id++, g_hinstance, NULL);
+    if (!edit)
+        return NULL;
+    HWND updown = CreateWindowExW(0, UPDOWN_CLASSW, L"", WS_CHILD | WS_VISIBLE | UDS_SETBUDDYINT | UDS_ALIGNRIGHT, 0, 0,
+                                  0, 0, (HWND)parent, (HMENU)(intptr_t)g_next_ctrl_id++, g_hinstance, NULL);
+    if (updown)
+    {
+        SendMessageW(updown, UDM_SETBUDDY, (WPARAM)edit, 0);
+        SendMessageW(updown, UDM_SETRANGE32, (WPARAM)(int)min_val, (LPARAM)(int)max_val);
+        SendMessageW(updown, UDM_SETPOS32, 0, (LPARAM)(int)min_val);
+    }
+    register_widget_parent(edit, (HWND)parent);
+    return (void *)edit;
+}
+
+static void win32_spinbox_destroy(void *handle)
+{
+    if (handle)
+        DestroyWindow((HWND)handle);
+}
+
+static double win32_spinbox_get_value(void *handle)
+{
+    if (!handle)
+        return 0.0;
+    wchar_t wbuf[64];
+    GetWindowTextW((HWND)handle, wbuf, 64);
+    return _wtof(wbuf);
+}
+
+static void win32_spinbox_set_value(void *handle, double value)
+{
+    if (!handle)
+        return;
+    wchar_t wbuf[64];
+    _snwprintf(wbuf, 64, L"%d", (int)value);
+    SetWindowTextW((HWND)handle, wbuf);
+}
+
 /* ── Grid layout ─────────────────────────────────────────────────── */
 
 static void win32_widget_grid(void *handle, int col, int row)
@@ -643,6 +782,19 @@ const gui_backend_t gui_backend_win32 = {
     .select_add_item = win32_select_add_item,
     .select_get_index = win32_select_get_index,
     .select_set_index = win32_select_set_index,
+    .text_create = win32_text_create,
+    .text_destroy = win32_text_destroy,
+    .text_get_text = win32_text_get_text,
+    .text_set_text = win32_text_set_text,
+    .radio_create = win32_radio_create,
+    .radio_destroy = win32_radio_destroy,
+    .radio_set_text = win32_radio_set_text,
+    .radio_get_active = win32_radio_get_active,
+    .radio_set_active = win32_radio_set_active,
+    .spinbox_create = win32_spinbox_create,
+    .spinbox_destroy = win32_spinbox_destroy,
+    .spinbox_get_value = win32_spinbox_get_value,
+    .spinbox_set_value = win32_spinbox_set_value,
     .widget_grid = win32_widget_grid,
     .widget_grid_remove = win32_widget_grid_remove,
     .container_grid_columnconfigure = win32_container_grid_columnconfigure,

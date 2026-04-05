@@ -81,6 +81,9 @@ static gui_handle_registry_t g_entries = {{0}, 0};
 static gui_handle_registry_t g_checkboxes = {{0}, 0};
 static gui_handle_registry_t g_sliders = {{0}, 0};
 static gui_handle_registry_t g_selects = {{0}, 0};
+static gui_handle_registry_t g_texts = {{0}, 0};
+static gui_handle_registry_t g_radios = {{0}, 0};
+static gui_handle_registry_t g_spinboxes = {{0}, 0};
 
 /* ── Stack helpers ───────────────────────────────────────────────── */
 
@@ -181,6 +184,9 @@ enum
     GUI_CHECKBOX_CLASS_INDEX = 5U,
     GUI_SLIDER_CLASS_INDEX = 6U,
     GUI_SELECT_CLASS_INDEX = 7U,
+    GUI_TEXT_CLASS_INDEX = 8U,
+    GUI_RADIO_CLASS_INDEX = 9U,
+    GUI_SPINBOX_CLASS_INDEX = 10U,
 };
 
 /* ── Callback bridge ─────────────────────────────────────────────── */
@@ -967,6 +973,297 @@ static vigil_status_t gui_select_on_change(vigil_vm_t *vm, size_t arg_count, vig
     return VIGIL_STATUS_OK;
 }
 
+/* ── gui.Text ────────────────────────────────────────────────────── */
+
+static vigil_status_t gui_text_new(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t parent_h = gui_arg_handle(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    void *parent = gui_handle_get(&g_windows, parent_h);
+    if (!parent || !g_backend)
+    {
+        gui_push_handle_instance(vm, GUI_TEXT_CLASS_INDEX, -1, error);
+        return gui_push_fail_err(vm, "gui: invalid parent window", error);
+    }
+    void *native = g_backend->text_create(parent);
+    int64_t handle;
+    gui_handle_store(&g_texts, native, &handle);
+    gui_push_handle_instance(vm, GUI_TEXT_CLASS_INDEX, handle, error);
+    return gui_push_ok_err(vm, error);
+}
+
+static vigil_status_t gui_text_destroy(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = gui_self_handle(vm, base);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    void *native = gui_handle_get(&g_texts, h);
+    if (native && g_backend)
+        g_backend->text_destroy(native);
+    gui_handle_clear(&g_texts, h);
+    (void)error;
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t gui_text_get(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = gui_self_handle(vm, base);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    char buf[4096] = {0};
+    void *native = gui_handle_get(&g_texts, h);
+    if (native && g_backend)
+        g_backend->text_get_text(native, buf, sizeof(buf));
+    vigil_runtime_t *rt = vigil_vm_runtime(vm);
+    vigil_object_t *str = NULL;
+    vigil_status_t st = vigil_string_object_new_cstr(rt, buf, &str, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    vigil_value_t v;
+    vigil_value_init_object(&v, &str);
+    st = vigil_vm_stack_push(vm, &v, error);
+    vigil_value_release(&v);
+    return st;
+}
+
+static vigil_status_t gui_text_set(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = gui_self_handle(vm, base);
+    char buf[4096];
+    const char *text = gui_arg_str(vm, base, 1, buf, sizeof(buf));
+    vigil_vm_stack_pop_n(vm, arg_count);
+    void *native = gui_handle_get(&g_texts, h);
+    if (native && g_backend)
+        g_backend->text_set_text(native, text);
+    (void)error;
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t gui_text_grid(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = gui_self_handle(vm, base);
+    int col = gui_arg_i32(vm, base, 1);
+    int row = gui_arg_i32(vm, base, 2);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    void *native = gui_handle_get(&g_texts, h);
+    if (native && g_backend)
+        g_backend->widget_grid(native, col, row);
+    (void)error;
+    return VIGIL_STATUS_OK;
+}
+
+/* ── gui.Radiobutton ─────────────────────────────────────────────── */
+
+static vigil_status_t gui_radio_new(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t parent_h = gui_arg_handle(vm, base, 1);
+    char buf[256];
+    const char *text = gui_arg_str(vm, base, 2, buf, sizeof(buf));
+    /* Optional group handle: -1 means no group (first in group). */
+    int64_t group_h = (arg_count > 3) ? gui_arg_handle(vm, base, 3) : -1;
+    vigil_vm_stack_pop_n(vm, arg_count);
+
+    void *parent = gui_handle_get(&g_windows, parent_h);
+    if (!parent || !g_backend)
+    {
+        gui_push_handle_instance(vm, GUI_RADIO_CLASS_INDEX, -1, error);
+        return gui_push_fail_err(vm, "gui: invalid parent window", error);
+    }
+    void *group = (group_h >= 0) ? gui_handle_get(&g_radios, group_h) : NULL;
+    void *native = g_backend->radio_create(parent, text, group);
+    int64_t handle;
+    gui_handle_store(&g_radios, native, &handle);
+    gui_push_handle_instance(vm, GUI_RADIO_CLASS_INDEX, handle, error);
+    return gui_push_ok_err(vm, error);
+}
+
+static vigil_status_t gui_radio_destroy(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = gui_self_handle(vm, base);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    void *native = gui_handle_get(&g_radios, h);
+    if (native && g_backend)
+        g_backend->radio_destroy(native);
+    gui_handle_clear(&g_radios, h);
+    (void)error;
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t gui_radio_set_text(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = gui_self_handle(vm, base);
+    char buf[256];
+    const char *text = gui_arg_str(vm, base, 1, buf, sizeof(buf));
+    vigil_vm_stack_pop_n(vm, arg_count);
+    void *native = gui_handle_get(&g_radios, h);
+    if (native && g_backend)
+        g_backend->radio_set_text(native, text);
+    (void)error;
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t gui_radio_get(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = gui_self_handle(vm, base);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    bool active = false;
+    void *native = gui_handle_get(&g_radios, h);
+    if (native && g_backend)
+        active = g_backend->radio_get_active(native);
+    vigil_value_t v = vigil_nanbox_from_bool(active);
+    return vigil_vm_stack_push(vm, &v, error);
+}
+
+static vigil_status_t gui_radio_set(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = gui_self_handle(vm, base);
+    int32_t val = gui_arg_i32(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    void *native = gui_handle_get(&g_radios, h);
+    if (native && g_backend)
+        g_backend->radio_set_active(native, val != 0);
+    (void)error;
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t gui_radio_grid(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = gui_self_handle(vm, base);
+    int col = gui_arg_i32(vm, base, 1);
+    int row = gui_arg_i32(vm, base, 2);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    void *native = gui_handle_get(&g_radios, h);
+    if (native && g_backend)
+        g_backend->widget_grid(native, col, row);
+    (void)error;
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t gui_radio_on_change(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = gui_self_handle(vm, base);
+    vigil_value_t closure = vigil_vm_stack_get(vm, base + 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    void *native = gui_handle_get(&g_radios, h);
+    if (native && g_backend)
+    {
+        gui_closure_t *c = gui_closure_store(vm, closure);
+        if (c)
+        {
+            gui_callback_t cb = {gui_closure_invoke, c};
+            g_backend->set_callback(native, GUI_EVENT_CHANGE, cb);
+        }
+    }
+    (void)error;
+    return VIGIL_STATUS_OK;
+}
+
+/* ── gui.Spinbox ─────────────────────────────────────────────────── */
+
+static vigil_status_t gui_spinbox_new(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t parent_h = gui_arg_handle(vm, base, 1);
+    double min_val = gui_arg_f64(vm, base, 2);
+    double max_val = gui_arg_f64(vm, base, 3);
+    double step = gui_arg_f64(vm, base, 4);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    void *parent = gui_handle_get(&g_windows, parent_h);
+    if (!parent || !g_backend)
+    {
+        gui_push_handle_instance(vm, GUI_SPINBOX_CLASS_INDEX, -1, error);
+        return gui_push_fail_err(vm, "gui: invalid parent window", error);
+    }
+    void *native = g_backend->spinbox_create(parent, min_val, max_val, step);
+    int64_t handle;
+    gui_handle_store(&g_spinboxes, native, &handle);
+    gui_push_handle_instance(vm, GUI_SPINBOX_CLASS_INDEX, handle, error);
+    return gui_push_ok_err(vm, error);
+}
+
+static vigil_status_t gui_spinbox_destroy(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = gui_self_handle(vm, base);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    void *native = gui_handle_get(&g_spinboxes, h);
+    if (native && g_backend)
+        g_backend->spinbox_destroy(native);
+    gui_handle_clear(&g_spinboxes, h);
+    (void)error;
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t gui_spinbox_get(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = gui_self_handle(vm, base);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    double val = 0.0;
+    void *native = gui_handle_get(&g_spinboxes, h);
+    if (native && g_backend)
+        val = g_backend->spinbox_get_value(native);
+    vigil_value_t v = vigil_nanbox_encode_double(val);
+    return vigil_vm_stack_push(vm, &v, error);
+}
+
+static vigil_status_t gui_spinbox_set(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = gui_self_handle(vm, base);
+    double val = gui_arg_f64(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    void *native = gui_handle_get(&g_spinboxes, h);
+    if (native && g_backend)
+        g_backend->spinbox_set_value(native, val);
+    (void)error;
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t gui_spinbox_grid(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = gui_self_handle(vm, base);
+    int col = gui_arg_i32(vm, base, 1);
+    int row = gui_arg_i32(vm, base, 2);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    void *native = gui_handle_get(&g_spinboxes, h);
+    if (native && g_backend)
+        g_backend->widget_grid(native, col, row);
+    (void)error;
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t gui_spinbox_on_change(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = gui_self_handle(vm, base);
+    vigil_value_t closure = vigil_vm_stack_get(vm, base + 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    void *native = gui_handle_get(&g_spinboxes, h);
+    if (native && g_backend)
+    {
+        gui_closure_t *c = gui_closure_store(vm, closure);
+        if (c)
+        {
+            gui_callback_t cb = {gui_closure_invoke, c};
+            g_backend->set_callback(native, GUI_EVENT_CHANGE, cb);
+        }
+    }
+    (void)error;
+    return VIGIL_STATUS_OK;
+}
+
 /* ── gui.message_box (module-level function) ─────────────────────── */
 
 static vigil_status_t gui_fn_message_box(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
@@ -1004,6 +1301,8 @@ static const int p_f64[] = {VIGIL_TYPE_F64};
 static const int p_i32[] = {VIGIL_TYPE_I32};
 static const int rt_f64[] = {VIGIL_TYPE_F64};
 static const int rt_i32[] = {VIGIL_TYPE_I32};
+static const int p_obj_str_obj[] = {VIGIL_TYPE_OBJECT, VIGIL_TYPE_STRING, VIGIL_TYPE_OBJECT};
+static const int p_obj_f64_f64_f64[] = {VIGIL_TYPE_OBJECT, VIGIL_TYPE_F64, VIGIL_TYPE_F64, VIGIL_TYPE_F64};
 
 /* ── Macro helpers ───────────────────────────────────────────────── */
 
@@ -1135,18 +1434,66 @@ static const vigil_native_class_method_t gui_select_methods[] = {
     GUI_METHOD("on_change", 9U, gui_select_on_change, 1U, p_obj, VIGIL_TYPE_VOID, 0U, NULL),
 };
 
+/* ── Text class ──────────────────────────────────────────────────── */
+
+static const vigil_native_class_field_t gui_text_fields[] = {
+    GUI_PFIELD("handle", 6U, VIGIL_TYPE_I64),
+};
+
+static const vigil_native_class_method_t gui_text_methods[] = {
+    GUI_STATIC("new", 3U, gui_text_new, 1U, p_obj, VIGIL_TYPE_OBJECT, 2U, rt_obj_err),
+    GUI_METHOD("destroy", 7U, gui_text_destroy, 0U, NULL, VIGIL_TYPE_VOID, 0U, NULL),
+    GUI_METHOD("get", 3U, gui_text_get, 0U, NULL, VIGIL_TYPE_STRING, 1U, rt_str),
+    GUI_METHOD("set", 3U, gui_text_set, 1U, p_str, VIGIL_TYPE_VOID, 0U, NULL),
+    GUI_METHOD("grid", 4U, gui_text_grid, 2U, p_i32_i32, VIGIL_TYPE_VOID, 0U, NULL),
+};
+
+/* ── Radiobutton class ───────────────────────────────────────────── */
+
+static const vigil_native_class_field_t gui_radio_fields[] = {
+    GUI_PFIELD("handle", 6U, VIGIL_TYPE_I64),
+};
+
+static const vigil_native_class_method_t gui_radio_methods[] = {
+    GUI_STATIC("new", 3U, gui_radio_new, 3U, p_obj_str_obj, VIGIL_TYPE_OBJECT, 2U, rt_obj_err),
+    GUI_METHOD("destroy", 7U, gui_radio_destroy, 0U, NULL, VIGIL_TYPE_VOID, 0U, NULL),
+    GUI_METHOD("set_text", 8U, gui_radio_set_text, 1U, p_str, VIGIL_TYPE_VOID, 0U, NULL),
+    GUI_METHOD("get", 3U, gui_radio_get, 0U, NULL, VIGIL_TYPE_BOOL, 1U, rt_bool),
+    GUI_METHOD("set", 3U, gui_radio_set, 1U, p_bool, VIGIL_TYPE_VOID, 0U, NULL),
+    GUI_METHOD("grid", 4U, gui_radio_grid, 2U, p_i32_i32, VIGIL_TYPE_VOID, 0U, NULL),
+    GUI_METHOD("on_change", 9U, gui_radio_on_change, 1U, p_obj, VIGIL_TYPE_VOID, 0U, NULL),
+};
+
+/* ── Spinbox class ───────────────────────────────────────────────── */
+
+static const vigil_native_class_field_t gui_spinbox_fields[] = {
+    GUI_PFIELD("handle", 6U, VIGIL_TYPE_I64),
+};
+
+static const vigil_native_class_method_t gui_spinbox_methods[] = {
+    GUI_STATIC("new", 3U, gui_spinbox_new, 4U, p_obj_f64_f64_f64, VIGIL_TYPE_OBJECT, 2U, rt_obj_err),
+    GUI_METHOD("destroy", 7U, gui_spinbox_destroy, 0U, NULL, VIGIL_TYPE_VOID, 0U, NULL),
+    GUI_METHOD("get", 3U, gui_spinbox_get, 0U, NULL, VIGIL_TYPE_F64, 1U, rt_f64),
+    GUI_METHOD("set", 3U, gui_spinbox_set, 1U, p_f64, VIGIL_TYPE_VOID, 0U, NULL),
+    GUI_METHOD("grid", 4U, gui_spinbox_grid, 2U, p_i32_i32, VIGIL_TYPE_VOID, 0U, NULL),
+    GUI_METHOD("on_change", 9U, gui_spinbox_on_change, 1U, p_obj, VIGIL_TYPE_VOID, 0U, NULL),
+};
+
 /* ── Class table ─────────────────────────────────────────────────── */
 
 /* clang-format off */
 static const vigil_native_class_t gui_classes[] = {
-    {"App",      3U, gui_app_fields,      1U, gui_app_methods,      sizeof(gui_app_methods)      / sizeof(gui_app_methods[0]),      NULL, NULL},
-    {"Window",   6U, gui_window_fields,   1U, gui_window_methods,   sizeof(gui_window_methods)   / sizeof(gui_window_methods[0]),   NULL, NULL},
-    {"Label",    5U, gui_label_fields,    1U, gui_label_methods,    sizeof(gui_label_methods)    / sizeof(gui_label_methods[0]),    NULL, NULL},
-    {"Button",   6U, gui_button_fields,   1U, gui_button_methods,   sizeof(gui_button_methods)   / sizeof(gui_button_methods[0]),   NULL, NULL},
-    {"Entry",    5U, gui_entry_fields,    1U, gui_entry_methods,    sizeof(gui_entry_methods)    / sizeof(gui_entry_methods[0]),    NULL, NULL},
-    {"Checkbox", 8U, gui_checkbox_fields, 1U, gui_checkbox_methods, sizeof(gui_checkbox_methods) / sizeof(gui_checkbox_methods[0]), NULL, NULL},
-    {"Slider",   6U, gui_slider_fields,   1U, gui_slider_methods,   sizeof(gui_slider_methods)   / sizeof(gui_slider_methods[0]),   NULL, NULL},
-    {"Select",   6U, gui_select_fields,   1U, gui_select_methods,   sizeof(gui_select_methods)   / sizeof(gui_select_methods[0]),   NULL, NULL},
+    {"App",         3U,  gui_app_fields,      1U, gui_app_methods,      sizeof(gui_app_methods)      / sizeof(gui_app_methods[0]),      NULL, NULL},
+    {"Window",      6U,  gui_window_fields,   1U, gui_window_methods,   sizeof(gui_window_methods)   / sizeof(gui_window_methods[0]),   NULL, NULL},
+    {"Label",       5U,  gui_label_fields,    1U, gui_label_methods,    sizeof(gui_label_methods)    / sizeof(gui_label_methods[0]),    NULL, NULL},
+    {"Button",      6U,  gui_button_fields,   1U, gui_button_methods,   sizeof(gui_button_methods)   / sizeof(gui_button_methods[0]),   NULL, NULL},
+    {"Entry",       5U,  gui_entry_fields,    1U, gui_entry_methods,    sizeof(gui_entry_methods)    / sizeof(gui_entry_methods[0]),    NULL, NULL},
+    {"Checkbox",    8U,  gui_checkbox_fields, 1U, gui_checkbox_methods, sizeof(gui_checkbox_methods) / sizeof(gui_checkbox_methods[0]), NULL, NULL},
+    {"Slider",      6U,  gui_slider_fields,   1U, gui_slider_methods,   sizeof(gui_slider_methods)   / sizeof(gui_slider_methods[0]),   NULL, NULL},
+    {"Select",      6U,  gui_select_fields,   1U, gui_select_methods,   sizeof(gui_select_methods)   / sizeof(gui_select_methods[0]),   NULL, NULL},
+    {"Text",        4U,  gui_text_fields,     1U, gui_text_methods,     sizeof(gui_text_methods)     / sizeof(gui_text_methods[0]),     NULL, NULL},
+    {"Radiobutton", 11U, gui_radio_fields,    1U, gui_radio_methods,    sizeof(gui_radio_methods)    / sizeof(gui_radio_methods[0]),    NULL, NULL},
+    {"Spinbox",     7U,  gui_spinbox_fields,  1U, gui_spinbox_methods,  sizeof(gui_spinbox_methods)  / sizeof(gui_spinbox_methods[0]),  NULL, NULL},
 };
 /* clang-format on */
 
