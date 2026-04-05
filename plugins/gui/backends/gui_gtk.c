@@ -163,6 +163,10 @@ typedef gboolean (*fn_gtk_check_button_get_active)(GtkWidget *);
 typedef void (*fn_gtk_check_button_set_active)(GtkWidget *, gboolean);
 typedef void (*fn_gtk_check_button_set_label)(GtkWidget *, const char *);
 typedef void (*fn_gtk_check_button_set_group)(GtkWidget *, GtkWidget *);
+typedef GtkWidget *(*fn_gtk_file_chooser_dialog_new_gtk4)(const char *, GtkWindow *, int, const char *, ...);
+typedef void *(*fn_gtk_file_chooser_get_file)(GtkWidget *);
+typedef char *(*fn_g_file_get_path)(void *);
+typedef void (*fn_g_free)(void *);
 typedef GtkWidget *(*fn_gtk_scrolled_window_new_gtk4)(void);
 typedef void (*fn_gtk_scrolled_window_set_child)(GtkWidget *, GtkWidget *);
 typedef void (*fn_gtk_frame_set_child_gtk4)(GtkWidget *, GtkWidget *);
@@ -782,6 +786,10 @@ static fn_gtk_check_button_get_active s_gtk4_check_get_active;
 static fn_gtk_check_button_set_active s_gtk4_check_set_active;
 static fn_gtk_check_button_set_label s_gtk4_check_set_label;
 static fn_gtk_check_button_set_group s_gtk4_check_set_group;
+static fn_gtk_file_chooser_dialog_new_gtk4 s_gtk4_file_chooser_new;
+static fn_gtk_file_chooser_get_file s_gtk4_file_chooser_get_file;
+static fn_g_file_get_path s_gtk4_g_file_get_path;
+static fn_g_free s_gtk4_g_free;
 static fn_gtk_scrolled_window_new_gtk4 s_gtk4_scrolled_window_new;
 static fn_gtk_scrolled_window_set_child s_gtk4_scrolled_window_set_child;
 static fn_gtk_frame_set_child_gtk4 s_gtk4_frame_set_child;
@@ -892,18 +900,66 @@ static void gtk4_message_box(void *parent, const char *title, const char *msg)
     s_gtk4_g_main_loop_unref(loop);
 }
 
+static int s_gtk4_dlg_response_code = -6;
+
+static void gtk4_on_dialog_response(GtkWidget *dlg, int response, void *data)
+{
+    (void)dlg;
+    s_gtk4_dlg_response_code = response;
+    s_gtk4_g_main_loop_quit((GMainLoop *)data);
+}
+
 static const char *gtk4_file_dialog(void *parent, const char *title, int action, char *buf, size_t bufsz)
 {
-    /* GTK4 removed gtk_dialog_run. Use GtkFileChooserDialog with a
-       nested GMainLoop, responding to the "response" signal. */
-    (void)parent;
-    (void)title;
-    (void)action;
     buf[0] = '\0';
-    /* Simplified: return empty for now. Full async file dialog
-       requires significant additional infrastructure. */
-    (void)bufsz;
+    GtkWidget *dlg = s_gtk4_file_chooser_new(title, parent, action, "Cancel", -6, "OK", -3, NULL);
+    if (!dlg)
+        return buf;
+
+    GMainLoop *loop = s_gtk4_g_main_loop_new(NULL, 0);
+    s_gtk4_dlg_response_code = -6;
+    G.g_signal_connect_data(dlg, "response", (GCallback)gtk4_on_dialog_response, loop, NULL, 0);
+
+    s_gtk4_widget_set_visible(dlg, 1);
+    s_gtk4_g_main_loop_run(loop);
+
+    if (s_gtk4_dlg_response_code == -3) /* GTK_RESPONSE_ACCEPT */
+    {
+        void *gfile = s_gtk4_file_chooser_get_file(dlg);
+        if (gfile)
+        {
+            char *path = s_gtk4_g_file_get_path(gfile);
+            if (path)
+            {
+                size_t len = strlen(path);
+                if (len >= bufsz)
+                    len = bufsz - 1;
+                memcpy(buf, path, len);
+                buf[len] = '\0';
+                s_gtk4_g_free(path);
+            }
+        }
+    }
+
+    s_gtk4_window_destroy(dlg);
+    s_gtk4_g_main_loop_unref(loop);
     return buf;
+}
+
+static bool s_gtk4_yesno_result = false;
+
+static void gtk4_yesno_yes_clicked(GtkWidget *w, void *data)
+{
+    (void)w;
+    s_gtk4_yesno_result = true;
+    s_gtk4_g_main_loop_quit((GMainLoop *)data);
+}
+
+static void gtk4_yesno_no_clicked(GtkWidget *w, void *data)
+{
+    (void)w;
+    s_gtk4_yesno_result = false;
+    s_gtk4_g_main_loop_quit((GMainLoop *)data);
 }
 
 static bool gtk4_yes_no_dialog(void *parent, const char *title, const char *msg)
@@ -922,34 +978,22 @@ static bool gtk4_yes_no_dialog(void *parent, const char *title, const char *msg)
     G.gtk_widget_set_vexpand(label, 1);
     G.gtk_grid_attach(grid, label, 0, 0, 2, 1);
 
-    /* Use a shared variable to capture the result. */
-
     GtkWidget *yes_btn = G.gtk_button_new_with_label("Yes");
     GtkWidget *no_btn = G.gtk_button_new_with_label("No");
     G.gtk_grid_attach(grid, yes_btn, 0, 1, 1, 1);
     G.gtk_grid_attach(grid, no_btn, 1, 1, 1, 1);
 
-    G.g_signal_connect_data(yes_btn, "clicked", (GCallback)s_gtk4_g_main_loop_quit, loop, NULL, 1);
-    G.g_signal_connect_data(no_btn, "clicked", (GCallback)s_gtk4_g_main_loop_quit, loop, NULL, 1);
+    s_gtk4_yesno_result = false;
+    G.g_signal_connect_data(yes_btn, "clicked", (GCallback)gtk4_yesno_yes_clicked, loop, NULL, 0);
+    G.g_signal_connect_data(no_btn, "clicked", (GCallback)gtk4_yesno_no_clicked, loop, NULL, 0);
     G.g_signal_connect_data(win, "close-request", (GCallback)s_gtk4_g_main_loop_quit, loop, NULL, 1);
-
-    /* Track which button was clicked via the callback system. */
-    if (g_callback_count + 1 < MAX_CALLBACKS)
-    {
-        gui_callback_t yes_cb = {NULL, (void *)1};
-        gui_callback_t no_cb = {NULL, (void *)0};
-        g_callbacks[g_callback_count++] = (callback_entry_t){yes_btn, GUI_EVENT_CLICK, yes_cb};
-        g_callbacks[g_callback_count++] = (callback_entry_t){no_btn, GUI_EVENT_CLICK, no_cb};
-    }
 
     s_gtk4_widget_set_visible(win, 1);
     s_gtk4_g_main_loop_run(loop);
 
-    /* Check which button has focus / was last clicked. Simplified:
-       check if yes_btn was the source. For now, default to false. */
     s_gtk4_window_destroy(win);
     s_gtk4_g_main_loop_unref(loop);
-    return false; /* GTK4 yes/no needs more infrastructure; placeholder */
+    return s_gtk4_yesno_result;
 }
 
 static const char *gtk4_entry_get_text(GtkWidget *entry)
@@ -1127,6 +1171,10 @@ static bool load_gtk4_symbols(void)
     LOAD_LOCAL(s_gtk4_check_set_active, gtk_check_button_set_active);
     LOAD_LOCAL(s_gtk4_check_set_label, gtk_check_button_set_label);
     LOAD_LOCAL(s_gtk4_check_set_group, gtk_check_button_set_group);
+    LOAD_LOCAL(s_gtk4_file_chooser_new, gtk_file_chooser_dialog_new);
+    LOAD_LOCAL(s_gtk4_file_chooser_get_file, gtk_file_chooser_get_file);
+    LOAD_LOCAL(s_gtk4_g_file_get_path, g_file_get_path);
+    LOAD_LOCAL(s_gtk4_g_free, g_free);
     LOAD_LOCAL(s_gtk4_scrolled_window_new, gtk_scrolled_window_new);
     LOAD_LOCAL(s_gtk4_scrolled_window_set_child, gtk_scrolled_window_set_child);
     LOAD_LOCAL(s_gtk4_frame_set_child, gtk_frame_set_child);
