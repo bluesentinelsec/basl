@@ -222,6 +222,14 @@ static LRESULT CALLBACK vigil_wndproc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
                 cb->fn(cb->user_data);
             return 0;
         }
+        /* Menu item commands (lp == 0 for menu items). */
+        if (lp == 0 && HIWORD(wp) == 0)
+        {
+            int id = LOWORD(wp) - g_menu_id_base;
+            if (id >= 0 && id < g_menu_cb_count && g_menu_cbs[id].fn)
+                g_menu_cbs[id].fn(g_menu_cbs[id].user_data);
+            return 0;
+        }
         break;
 
     case WM_SIZE: {
@@ -757,6 +765,43 @@ static void win32_listbox_set_selected(void *handle, int index)
         SendMessageW((HWND)handle, LB_SETCURSEL, (WPARAM)index, 0);
 }
 
+/* ── Menu ────────────────────────────────────────────────────────── */
+
+#define MAX_MENU_CALLBACKS 128
+static gui_callback_t g_menu_cbs[MAX_MENU_CALLBACKS];
+static int g_menu_cb_count = 0;
+static int g_menu_id_base = 9000;
+
+static void *win32_menubar_create(void *window)
+{
+    HMENU mb = CreateMenu();
+    if (mb)
+        SetMenu((HWND)window, mb);
+    return (void *)mb;
+}
+
+static void win32_menubar_destroy(void *handle)
+{
+    if (handle)
+        DestroyMenu((HMENU)handle);
+}
+
+static void *win32_menu_add_submenu(void *menubar, const char *label)
+{
+    HMENU sub = CreatePopupMenu();
+    if (sub)
+        AppendMenuW((HMENU)menubar, MF_POPUP, (UINT_PTR)sub, to_wide(label));
+    return (void *)sub;
+}
+
+static void win32_menu_add_item(void *submenu, const char *label, gui_callback_t cb)
+{
+    int id = g_menu_id_base + g_menu_cb_count;
+    if (g_menu_cb_count < MAX_MENU_CALLBACKS)
+        g_menu_cbs[g_menu_cb_count++] = cb;
+    AppendMenuW((HMENU)submenu, MF_STRING, (UINT_PTR)id, to_wide(label));
+}
+
 /* ── Grid layout ─────────────────────────────────────────────────── */
 
 static void win32_widget_grid(void *handle, int col, int row)
@@ -879,6 +924,10 @@ const gui_backend_t gui_backend_win32 = {
     .listbox_add_item = win32_listbox_add_item,
     .listbox_get_selected = win32_listbox_get_selected,
     .listbox_set_selected = win32_listbox_set_selected,
+    .menubar_create = win32_menubar_create,
+    .menubar_destroy = win32_menubar_destroy,
+    .menu_add_submenu = win32_menu_add_submenu,
+    .menu_add_item = win32_menu_add_item,
     .widget_grid = win32_widget_grid,
     .widget_grid_span = win32_widget_grid_span,
     .widget_grid_remove = win32_widget_grid_remove,

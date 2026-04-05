@@ -111,6 +111,12 @@ static void *stub_create_ddd(void *p, double a, double b, double c)
     (void)c;
     return NULL;
 }
+static void stub_menu_add_item(void *s, const char *l, gui_callback_t cb)
+{
+    (void)s;
+    (void)l;
+    (void)cb;
+}
 static void stub_grid(void *h, int c, int r)
 {
     (void)h;
@@ -203,6 +209,10 @@ const gui_backend_t gui_backend_stub = {
     .listbox_add_item = stub_set_text,
     .listbox_get_selected = stub_get_int,
     .listbox_set_selected = stub_set_int,
+    .menubar_create = stub_create_notext,
+    .menubar_destroy = stub_destroy,
+    .menu_add_submenu = stub_create,
+    .menu_add_item = stub_menu_add_item,
     .widget_grid = stub_grid,
     .widget_grid_span = stub_grid_span,
     .widget_grid_remove = stub_grid_remove,

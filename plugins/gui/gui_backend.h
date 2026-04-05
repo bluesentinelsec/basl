@@ -122,6 +122,12 @@ extern "C"
         int (*listbox_get_selected)(void *handle);
         void (*listbox_set_selected)(void *handle, int index);
 
+        /* Menu bar */
+        void *(*menubar_create)(void *window);
+        void (*menubar_destroy)(void *handle);
+        void *(*menu_add_submenu)(void *menubar, const char *label);
+        void (*menu_add_item)(void *submenu, const char *label, gui_callback_t cb);
+
         /* Grid layout */
         void (*widget_grid)(void *handle, int col, int row);
         void (*widget_grid_span)(void *handle, int col, int row, int colspan, int rowspan);

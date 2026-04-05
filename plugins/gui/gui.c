@@ -86,6 +86,8 @@ static gui_handle_registry_t g_radios = {{0}, 0};
 static gui_handle_registry_t g_spinboxes = {{0}, 0};
 static gui_handle_registry_t g_frames = {{0}, 0};
 static gui_handle_registry_t g_listboxes = {{0}, 0};
+static gui_handle_registry_t g_menubars = {{0}, 0};
+static gui_handle_registry_t g_submenus = {{0}, 0};
 
 /* ── Stack helpers ───────────────────────────────────────────────── */
 
@@ -191,6 +193,7 @@ enum
     GUI_SPINBOX_CLASS_INDEX = 10U,
     GUI_FRAME_CLASS_INDEX = 11U,
     GUI_LISTBOX_CLASS_INDEX = 12U,
+    GUI_MENU_CLASS_INDEX = 13U,
 };
 
 /* ── Callback bridge ─────────────────────────────────────────────── */
@@ -1437,6 +1440,79 @@ static vigil_status_t gui_listbox_on_change(vigil_vm_t *vm, size_t arg_count, vi
     return VIGIL_STATUS_OK;
 }
 
+/* ── gui.Menu ────────────────────────────────────────────────────── */
+
+static vigil_status_t gui_menu_new(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t win_h = gui_arg_handle(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    void *win = gui_handle_get(&g_windows, win_h);
+    if (!win || !g_backend)
+    {
+        gui_push_handle_instance(vm, GUI_MENU_CLASS_INDEX, -1, error);
+        return gui_push_fail_err(vm, "gui: invalid parent window", error);
+    }
+    void *native = g_backend->menubar_create(win);
+    int64_t handle;
+    gui_handle_store(&g_menubars, native, &handle);
+    gui_push_handle_instance(vm, GUI_MENU_CLASS_INDEX, handle, error);
+    return gui_push_ok_err(vm, error);
+}
+
+static vigil_status_t gui_menu_destroy(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = gui_self_handle(vm, base);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    void *native = gui_handle_get(&g_menubars, h);
+    if (native && g_backend)
+        g_backend->menubar_destroy(native);
+    gui_handle_clear(&g_menubars, h);
+    (void)error;
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t gui_menu_add_submenu(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = gui_self_handle(vm, base);
+    char buf[256];
+    const char *label = gui_arg_str(vm, base, 1, buf, sizeof(buf));
+    vigil_vm_stack_pop_n(vm, arg_count);
+    void *menubar = gui_handle_get(&g_menubars, h);
+    if (!menubar || !g_backend)
+        return gui_push_i32(vm, -1, error);
+    void *submenu = g_backend->menu_add_submenu(menubar, label);
+    int64_t sub_h;
+    gui_handle_store(&g_submenus, submenu, &sub_h);
+    return gui_push_i32(vm, (int32_t)sub_h, error);
+}
+
+static vigil_status_t gui_menu_add_item(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = gui_self_handle(vm, base);
+    int32_t sub_idx = gui_arg_i32(vm, base, 1);
+    char buf[256];
+    const char *label = gui_arg_str(vm, base, 2, buf, sizeof(buf));
+    vigil_value_t closure = vigil_vm_stack_get(vm, base + 3);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    (void)h;
+    void *submenu = gui_handle_get(&g_submenus, (int64_t)sub_idx);
+    if (submenu && g_backend)
+    {
+        gui_closure_t *c = gui_closure_store(vm, closure);
+        if (c)
+        {
+            gui_callback_t cb = {gui_closure_invoke, c};
+            g_backend->menu_add_item(submenu, label, cb);
+        }
+    }
+    (void)error;
+    return VIGIL_STATUS_OK;
+}
+
 /* ── gui.message_box (module-level function) ─────────────────────── */
 
 static vigil_status_t gui_fn_message_box(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
@@ -1476,6 +1552,7 @@ static const int rt_f64[] = {VIGIL_TYPE_F64};
 static const int rt_i32[] = {VIGIL_TYPE_I32};
 static const int p_obj_str_obj[] = {VIGIL_TYPE_OBJECT, VIGIL_TYPE_STRING, VIGIL_TYPE_OBJECT};
 static const int p_obj_f64_f64_f64[] = {VIGIL_TYPE_OBJECT, VIGIL_TYPE_F64, VIGIL_TYPE_F64, VIGIL_TYPE_F64};
+static const int p_i32_str_obj[] = {VIGIL_TYPE_I32, VIGIL_TYPE_STRING, VIGIL_TYPE_OBJECT};
 
 /* ── Macro helpers ───────────────────────────────────────────────── */
 
@@ -1681,6 +1758,19 @@ static const vigil_native_class_method_t gui_listbox_methods[] = {
     GUI_METHOD("on_change", 9U, gui_listbox_on_change, 1U, p_obj, VIGIL_TYPE_VOID, 0U, NULL),
 };
 
+/* ── Menu class ──────────────────────────────────────────────────── */
+
+static const vigil_native_class_field_t gui_menu_fields[] = {
+    GUI_PFIELD("handle", 6U, VIGIL_TYPE_I64),
+};
+
+static const vigil_native_class_method_t gui_menu_methods[] = {
+    GUI_STATIC("new", 3U, gui_menu_new, 1U, p_obj, VIGIL_TYPE_OBJECT, 2U, rt_obj_err),
+    GUI_METHOD("destroy", 7U, gui_menu_destroy, 0U, NULL, VIGIL_TYPE_VOID, 0U, NULL),
+    GUI_METHOD("add_submenu", 11U, gui_menu_add_submenu, 1U, p_str, VIGIL_TYPE_I32, 1U, rt_i32),
+    GUI_METHOD("add_item", 8U, gui_menu_add_item, 3U, p_i32_str_obj, VIGIL_TYPE_VOID, 0U, NULL),
+};
+
 /* ── Class table ─────────────────────────────────────────────────── */
 
 /* clang-format off */
@@ -1698,6 +1788,7 @@ static const vigil_native_class_t gui_classes[] = {
     {"Spinbox",     7U,  gui_spinbox_fields,  1U, gui_spinbox_methods,  sizeof(gui_spinbox_methods)  / sizeof(gui_spinbox_methods[0]),  NULL, NULL},
     {"Frame",       5U,  gui_frame_fields,    1U, gui_frame_methods,    sizeof(gui_frame_methods)    / sizeof(gui_frame_methods[0]),    NULL, NULL},
     {"Listbox",     7U,  gui_listbox_fields,  1U, gui_listbox_methods,  sizeof(gui_listbox_methods)  / sizeof(gui_listbox_methods[0]),  NULL, NULL},
+    {"Menu",        4U,  gui_menu_fields,     1U, gui_menu_methods,     sizeof(gui_menu_methods)     / sizeof(gui_menu_methods[0]),     NULL, NULL},
 };
 /* clang-format on */
 
