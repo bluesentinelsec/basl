@@ -41,6 +41,7 @@ add_executable(vigil_tests
     plugins/sdl/vigil_font.c
     tests/fs_test.c
     tests/gc_test.c
+    tests/gui_test.c
     tests/json_test.c
     tests/lexer_test.c
     tests/line_editor_internal_test.c
@@ -225,5 +226,8 @@ endif()
 vigil_add_integration_test(VigilUrlTest test_url.py)
 if(VIGIL_PLUGIN_TILED)
     vigil_add_integration_test(VigilTiledTest test_tiled.py)
+endif()
+if(VIGIL_PLUGIN_GUI)
+    vigil_add_integration_test(VigilGuiTest test_gui.py)
 endif()
 vigil_add_integration_test(VigilYamlTest test_yaml.py)
