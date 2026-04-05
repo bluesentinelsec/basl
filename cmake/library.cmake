@@ -44,6 +44,10 @@ if(VIGIL_PLUGIN_LIBRARIES)
     target_link_libraries(vigil PRIVATE ${VIGIL_PLUGIN_LIBRARIES})
 endif()
 
+if(VIGIL_MINIAUDIO_INCLUDE)
+    target_include_directories(vigil PRIVATE ${VIGIL_MINIAUDIO_INCLUDE})
+endif()
+
 target_compile_definitions(vigil PUBLIC VIGIL_VERSION="${PROJECT_VERSION}")
 target_compile_definitions(vigil PUBLIC ${VIGIL_STDLIB_COMPILE_DEFINITIONS})
 target_compile_definitions(vigil_core PRIVATE ${VIGIL_STDLIB_COMPILE_DEFINITIONS})
