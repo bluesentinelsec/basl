@@ -57,16 +57,18 @@ static const gui_backend_t *g_backend = NULL;
 
 /* ── Handle registry (same pattern as SDL plugin) ────────────────── */
 
-#define GUI_HANDLE_MAX 256
+#define GUI_HANDLE_INIT 64
 
 typedef struct
 {
-    void *items[GUI_HANDLE_MAX];
+    void **items;
     int32_t count;
+    int32_t capacity;
 } gui_handle_registry_t;
 
 static int gui_handle_store(gui_handle_registry_t *r, void *ptr, int64_t *out)
 {
+    /* Reuse a freed slot. */
     for (int32_t i = 0; i < r->count; i++)
     {
         if (r->items[i] == NULL)
@@ -76,8 +78,17 @@ static int gui_handle_store(gui_handle_registry_t *r, void *ptr, int64_t *out)
             return 0;
         }
     }
-    if (r->count >= GUI_HANDLE_MAX)
-        return -1;
+    /* Grow if needed. */
+    if (r->count >= r->capacity)
+    {
+        int32_t new_cap = r->capacity == 0 ? GUI_HANDLE_INIT : r->capacity * 2;
+        void **new_items = (void **)realloc(r->items, sizeof(void *) * (size_t)new_cap);
+        if (!new_items)
+            return -1;
+        memset(new_items + r->capacity, 0, sizeof(void *) * (size_t)(new_cap - r->capacity));
+        r->items = new_items;
+        r->capacity = new_cap;
+    }
     r->items[r->count] = ptr;
     *out = (int64_t)r->count++;
     return 0;
@@ -96,22 +107,22 @@ static void gui_handle_clear(gui_handle_registry_t *r, int64_t h)
         r->items[h] = NULL;
 }
 
-static gui_handle_registry_t g_windows = {{0}, 0};
-static gui_handle_registry_t g_labels = {{0}, 0};
-static gui_handle_registry_t g_buttons = {{0}, 0};
-static gui_handle_registry_t g_entries = {{0}, 0};
-static gui_handle_registry_t g_checkboxes = {{0}, 0};
-static gui_handle_registry_t g_sliders = {{0}, 0};
-static gui_handle_registry_t g_selects = {{0}, 0};
-static gui_handle_registry_t g_texts = {{0}, 0};
-static gui_handle_registry_t g_radios = {{0}, 0};
-static gui_handle_registry_t g_spinboxes = {{0}, 0};
-static gui_handle_registry_t g_frames = {{0}, 0};
-static gui_handle_registry_t g_listboxes = {{0}, 0};
-static gui_handle_registry_t g_menubars = {{0}, 0};
-static gui_handle_registry_t g_submenus = {{0}, 0};
-static gui_handle_registry_t g_paneds = {{0}, 0};
-static gui_handle_registry_t g_canvases = {{0}, 0};
+static gui_handle_registry_t g_windows = {0};
+static gui_handle_registry_t g_labels = {0};
+static gui_handle_registry_t g_buttons = {0};
+static gui_handle_registry_t g_entries = {0};
+static gui_handle_registry_t g_checkboxes = {0};
+static gui_handle_registry_t g_sliders = {0};
+static gui_handle_registry_t g_selects = {0};
+static gui_handle_registry_t g_texts = {0};
+static gui_handle_registry_t g_radios = {0};
+static gui_handle_registry_t g_spinboxes = {0};
+static gui_handle_registry_t g_frames = {0};
+static gui_handle_registry_t g_listboxes = {0};
+static gui_handle_registry_t g_menubars = {0};
+static gui_handle_registry_t g_submenus = {0};
+static gui_handle_registry_t g_paneds = {0};
+static gui_handle_registry_t g_canvases = {0};
 
 /* ── Stack helpers ───────────────────────────────────────────────── */
 
@@ -225,7 +236,7 @@ enum
 /* ── Callback bridge ─────────────────────────────────────────────── */
 /* Store Vigil closure objects and invoke them from the backend. */
 
-#define GUI_MAX_CLOSURES 256
+#define GUI_CLOSURE_INIT 64
 
 typedef struct
 {
@@ -233,7 +244,8 @@ typedef struct
     vigil_object_t *closure;
 } gui_closure_t;
 
-static gui_closure_t g_closures[GUI_MAX_CLOSURES];
+static gui_closure_t *g_closures = NULL;
+static int g_closure_capacity = 0;
 static int g_closure_count = 0;
 
 static void gui_closure_invoke(void *user_data)
@@ -250,7 +262,16 @@ static void gui_closure_invoke(void *user_data)
 
 static gui_closure_t *gui_closure_store(vigil_vm_t *vm, vigil_value_t closure_val)
 {
-    if (g_closure_count >= GUI_MAX_CLOSURES)
+    if (g_closure_count >= g_closure_capacity)
+    {
+        int nc = g_closure_capacity == 0 ? GUI_CLOSURE_INIT : g_closure_capacity * 2;
+        gui_closure_t *np = (gui_closure_t *)realloc(g_closures, sizeof(gui_closure_t) * (size_t)nc);
+        if (!np)
+            return NULL;
+        g_closures = np;
+        g_closure_capacity = nc;
+    }
+    if (0)
         return NULL;
     /* Extract the object pointer from the value. */
     vigil_object_t *obj = (vigil_object_t *)vigil_nanbox_decode_ptr(closure_val);
