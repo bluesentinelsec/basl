@@ -84,6 +84,13 @@ typedef void (*fn_gtk_widget_set_vexpand)(GtkWidget *, gboolean);
 typedef gulong (*fn_g_signal_connect_data)(void *, const char *, GCallback, void *, GClosureNotify, int);
 typedef GtkWidget *(*fn_gtk_entry_new)(void);
 typedef GtkWidget *(*fn_gtk_check_button_new_with_label)(const char *);
+typedef GtkWidget *(*fn_gtk_scale_new_with_range)(int, double, double, double);
+typedef GtkWidget *(*fn_gtk_combo_box_text_new)(void);
+typedef void (*fn_gtk_combo_box_text_append_text)(GtkWidget *, const char *);
+typedef gint (*fn_gtk_combo_box_get_active)(GtkWidget *);
+typedef void (*fn_gtk_combo_box_set_active)(GtkWidget *, gint);
+typedef double (*fn_gtk_range_get_value)(GtkWidget *);
+typedef void (*fn_gtk_range_set_value)(GtkWidget *, double);
 
 /* GTK3-only function pointer types */
 typedef GtkWidget *(*fn_gtk_window_new_gtk3)(int type);
@@ -180,6 +187,13 @@ static struct
     fn_g_signal_connect_data g_signal_connect_data;
     fn_gtk_entry_new gtk_entry_new;
     fn_gtk_check_button_new_with_label gtk_check_button_new_with_label;
+    fn_gtk_scale_new_with_range gtk_scale_new_with_range;
+    fn_gtk_combo_box_text_new gtk_combo_box_text_new;
+    fn_gtk_combo_box_text_append_text gtk_combo_box_text_append_text;
+    fn_gtk_combo_box_get_active gtk_combo_box_get_active;
+    fn_gtk_combo_box_set_active gtk_combo_box_set_active;
+    fn_gtk_range_get_value gtk_range_get_value;
+    fn_gtk_range_set_value gtk_range_set_value;
 } G;
 
 static const gtk_version_ops_t *g_vops = NULL;
@@ -661,6 +675,13 @@ static bool load_shared_symbols(void)
     LOAD_SHARED(g_signal_connect_data);
     LOAD_SHARED(gtk_entry_new);
     LOAD_SHARED(gtk_check_button_new_with_label);
+    LOAD_SHARED(gtk_scale_new_with_range);
+    LOAD_SHARED(gtk_combo_box_text_new);
+    LOAD_SHARED(gtk_combo_box_text_append_text);
+    LOAD_SHARED(gtk_combo_box_get_active);
+    LOAD_SHARED(gtk_combo_box_set_active);
+    LOAD_SHARED(gtk_range_get_value);
+    LOAD_SHARED(gtk_range_set_value);
     return true;
 fail:
     return false;
@@ -933,6 +954,96 @@ static void gtk_be_checkbox_set_checked(void *handle, bool checked)
         g_vops->checkbox_set_active(handle, checked ? 1 : 0);
 }
 
+/* ── Slider ───────────────────────────────────────────────────────── */
+
+static void on_slider_changed(GtkWidget *widget, void *data)
+{
+    (void)data;
+    gui_callback_t *cb = find_callback(widget, GUI_EVENT_CHANGE);
+    if (cb && cb->fn)
+        cb->fn(cb->user_data);
+}
+
+static void *gtk_be_slider_create(void *parent, double min_val, double max_val)
+{
+    if (!parent)
+        return NULL;
+    void *grid = grid_for_window(parent);
+    if (!grid)
+        return NULL;
+    GtkWidget *scale = G.gtk_scale_new_with_range(0, min_val, max_val, 1.0);
+    G.g_signal_connect_data(scale, "value-changed", (GCallback)on_slider_changed, NULL, NULL, 0);
+    register_widget_parent(scale, grid);
+    return scale;
+}
+
+static void gtk_be_slider_destroy(void *handle)
+{
+    if (handle)
+        g_vops->widget_destroy(handle);
+}
+
+static double gtk_be_slider_get_value(void *handle)
+{
+    if (!handle)
+        return 0.0;
+    return G.gtk_range_get_value(handle);
+}
+
+static void gtk_be_slider_set_value(void *handle, double value)
+{
+    if (handle)
+        G.gtk_range_set_value(handle, value);
+}
+
+/* ── Select ───────────────────────────────────────────────────────── */
+
+static void on_select_changed(GtkWidget *widget, void *data)
+{
+    (void)data;
+    gui_callback_t *cb = find_callback(widget, GUI_EVENT_CHANGE);
+    if (cb && cb->fn)
+        cb->fn(cb->user_data);
+}
+
+static void *gtk_be_select_create(void *parent)
+{
+    if (!parent)
+        return NULL;
+    void *grid = grid_for_window(parent);
+    if (!grid)
+        return NULL;
+    GtkWidget *combo = G.gtk_combo_box_text_new();
+    G.g_signal_connect_data(combo, "changed", (GCallback)on_select_changed, NULL, NULL, 0);
+    register_widget_parent(combo, grid);
+    return combo;
+}
+
+static void gtk_be_select_destroy(void *handle)
+{
+    if (handle)
+        g_vops->widget_destroy(handle);
+}
+
+static void gtk_be_select_add_item(void *handle, const char *text)
+{
+    if (handle)
+        G.gtk_combo_box_text_append_text(handle, text);
+}
+
+static int gtk_be_select_get_index(void *handle)
+{
+    if (!handle)
+        return -1;
+    return G.gtk_combo_box_get_active(handle);
+}
+
+static void gtk_be_select_set_index(void *handle, int index)
+{
+    if (handle)
+        G.gtk_combo_box_set_active(handle, index);
+}
+
 /* ── Grid layout ─────────────────────────────────────────────────── */
 
 static void gtk_be_widget_grid(void *handle, int col, int row)
@@ -1023,6 +1134,15 @@ const gui_backend_t gui_backend_gtk = {
     .checkbox_set_text = gtk_be_checkbox_set_text,
     .checkbox_get_checked = gtk_be_checkbox_get_checked,
     .checkbox_set_checked = gtk_be_checkbox_set_checked,
+    .slider_create = gtk_be_slider_create,
+    .slider_destroy = gtk_be_slider_destroy,
+    .slider_get_value = gtk_be_slider_get_value,
+    .slider_set_value = gtk_be_slider_set_value,
+    .select_create = gtk_be_select_create,
+    .select_destroy = gtk_be_select_destroy,
+    .select_add_item = gtk_be_select_add_item,
+    .select_get_index = gtk_be_select_get_index,
+    .select_set_index = gtk_be_select_set_index,
     .widget_grid = gtk_be_widget_grid,
     .widget_grid_remove = gtk_be_widget_grid_remove,
     .container_grid_columnconfigure = gtk_be_container_grid_columnconfigure,

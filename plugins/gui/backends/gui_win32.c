@@ -21,6 +21,7 @@
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #endif
+#include <commctrl.h>
 #include <windows.h>
 
 /* ── Grid layout engine ──────────────────────────────────────────── */
@@ -477,6 +478,80 @@ static void win32_checkbox_set_checked(void *handle, bool checked)
         SendMessageW((HWND)handle, BM_SETCHECK, checked ? BST_CHECKED : BST_UNCHECKED, 0);
 }
 
+/* ── Slider ──────────────────────────────────────────────────────── */
+
+static void *win32_slider_create(void *parent, double min_val, double max_val)
+{
+    if (!parent)
+        return NULL;
+    HWND hwnd = CreateWindowExW(0, TRACKBAR_CLASSW, L"", WS_CHILD | WS_VISIBLE | TBS_HORZ | TBS_AUTOTICKS, 0, 0, 200,
+                                30, (HWND)parent, (HMENU)(intptr_t)g_next_ctrl_id++, g_hinstance, NULL);
+    if (hwnd)
+    {
+        SendMessageW(hwnd, TBM_SETRANGEMIN, 0, (LPARAM)(int)min_val);
+        SendMessageW(hwnd, TBM_SETRANGEMAX, 0, (LPARAM)(int)max_val);
+        register_widget_parent(hwnd, (HWND)parent);
+    }
+    return (void *)hwnd;
+}
+
+static void win32_slider_destroy(void *handle)
+{
+    if (handle)
+        DestroyWindow((HWND)handle);
+}
+
+static double win32_slider_get_value(void *handle)
+{
+    if (!handle)
+        return 0.0;
+    return (double)SendMessageW((HWND)handle, TBM_GETPOS, 0, 0);
+}
+
+static void win32_slider_set_value(void *handle, double value)
+{
+    if (handle)
+        SendMessageW((HWND)handle, TBM_SETPOS, 1, (LPARAM)(int)value);
+}
+
+/* ── Select ──────────────────────────────────────────────────────── */
+
+static void *win32_select_create(void *parent)
+{
+    if (!parent)
+        return NULL;
+    HWND hwnd = CreateWindowExW(0, L"COMBOBOX", L"", WS_CHILD | WS_VISIBLE | CBS_DROPDOWNLIST | CBS_HASSTRINGS, 0, 0,
+                                200, 200, (HWND)parent, (HMENU)(intptr_t)g_next_ctrl_id++, g_hinstance, NULL);
+    if (hwnd)
+        register_widget_parent(hwnd, (HWND)parent);
+    return (void *)hwnd;
+}
+
+static void win32_select_destroy(void *handle)
+{
+    if (handle)
+        DestroyWindow((HWND)handle);
+}
+
+static void win32_select_add_item(void *handle, const char *text)
+{
+    if (handle)
+        SendMessageW((HWND)handle, CB_ADDSTRING, 0, (LPARAM)to_wide(text));
+}
+
+static int win32_select_get_index(void *handle)
+{
+    if (!handle)
+        return -1;
+    return (int)SendMessageW((HWND)handle, CB_GETCURSEL, 0, 0);
+}
+
+static void win32_select_set_index(void *handle, int index)
+{
+    if (handle)
+        SendMessageW((HWND)handle, CB_SETCURSEL, (WPARAM)index, 0);
+}
+
 /* ── Grid layout ─────────────────────────────────────────────────── */
 
 static void win32_widget_grid(void *handle, int col, int row)
@@ -559,6 +634,15 @@ const gui_backend_t gui_backend_win32 = {
     .checkbox_set_text = win32_checkbox_set_text,
     .checkbox_get_checked = win32_checkbox_get_checked,
     .checkbox_set_checked = win32_checkbox_set_checked,
+    .slider_create = win32_slider_create,
+    .slider_destroy = win32_slider_destroy,
+    .slider_get_value = win32_slider_get_value,
+    .slider_set_value = win32_slider_set_value,
+    .select_create = win32_select_create,
+    .select_destroy = win32_select_destroy,
+    .select_add_item = win32_select_add_item,
+    .select_get_index = win32_select_get_index,
+    .select_set_index = win32_select_set_index,
     .widget_grid = win32_widget_grid,
     .widget_grid_remove = win32_widget_grid_remove,
     .container_grid_columnconfigure = win32_container_grid_columnconfigure,

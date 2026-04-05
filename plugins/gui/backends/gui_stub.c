@@ -69,6 +69,33 @@ static void stub_set_bool(void *h, bool v)
     (void)h;
     (void)v;
 }
+static void *stub_create_dd(void *p, double a, double b)
+{
+    (void)p;
+    (void)a;
+    (void)b;
+    return NULL;
+}
+static double stub_get_double(void *h)
+{
+    (void)h;
+    return 0.0;
+}
+static void stub_set_double(void *h, double v)
+{
+    (void)h;
+    (void)v;
+}
+static int stub_get_int(void *h)
+{
+    (void)h;
+    return -1;
+}
+static void stub_set_int(void *h, int v)
+{
+    (void)h;
+    (void)v;
+}
 static void stub_grid(void *h, int c, int r)
 {
     (void)h;
@@ -123,6 +150,15 @@ const gui_backend_t gui_backend_stub = {
     .checkbox_set_text = stub_set_text,
     .checkbox_get_checked = stub_get_bool,
     .checkbox_set_checked = stub_set_bool,
+    .slider_create = stub_create_dd,
+    .slider_destroy = stub_destroy,
+    .slider_get_value = stub_get_double,
+    .slider_set_value = stub_set_double,
+    .select_create = stub_create_notext,
+    .select_destroy = stub_destroy,
+    .select_add_item = stub_set_text,
+    .select_get_index = stub_get_int,
+    .select_set_index = stub_set_int,
     .widget_grid = stub_grid,
     .widget_grid_remove = stub_grid_remove,
     .container_grid_columnconfigure = stub_grid_configure,
