@@ -164,6 +164,13 @@ static void stub_msgbox(void *p, const char *t, const char *m)
     (void)t;
     (void)m;
 }
+static bool stub_ask(void *p, const char *t, const char *m)
+{
+    (void)p;
+    (void)t;
+    (void)m;
+    return false;
+}
 
 const gui_backend_t gui_backend_stub = {
     .name = "stub",
@@ -236,4 +243,8 @@ const gui_backend_t gui_backend_stub = {
     .container_grid_rowconfigure = stub_grid_configure,
     .set_callback = stub_set_cb,
     .message_box = stub_msgbox,
+    .open_file_dialog = stub_get_text,
+    .save_file_dialog = stub_get_text,
+    .choose_directory = stub_get_text,
+    .ask_yes_no = stub_ask,
 };

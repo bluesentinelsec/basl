@@ -22,6 +22,7 @@
 #define WIN32_LEAN_AND_MEAN
 #endif
 #include <commctrl.h>
+#include <commdlg.h>
 #include <windows.h>
 
 /* ── Grid layout engine ──────────────────────────────────────────── */
@@ -911,6 +912,58 @@ static void win32_message_box(void *parent, const char *title, const char *messa
     MessageBoxW((HWND)parent, to_wide(message), title_buf, MB_OK | MB_ICONINFORMATION);
 }
 
+static const char *win32_open_file(void *parent, const char *title, char *buf, size_t bufsz)
+{
+    (void)title;
+    buf[0] = '\0';
+    OPENFILENAMEW ofn;
+    wchar_t wbuf[MAX_PATH] = {0};
+    memset(&ofn, 0, sizeof(ofn));
+    ofn.lStructSize = sizeof(ofn);
+    ofn.hwndOwner = (HWND)parent;
+    ofn.lpstrFile = wbuf;
+    ofn.nMaxFile = MAX_PATH;
+    ofn.Flags = OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST;
+    if (GetOpenFileNameW(&ofn))
+        WideCharToMultiByte(CP_UTF8, 0, wbuf, -1, buf, (int)bufsz, NULL, NULL);
+    return buf;
+}
+
+static const char *win32_save_file(void *parent, const char *title, char *buf, size_t bufsz)
+{
+    (void)title;
+    buf[0] = '\0';
+    OPENFILENAMEW ofn;
+    wchar_t wbuf[MAX_PATH] = {0};
+    memset(&ofn, 0, sizeof(ofn));
+    ofn.lStructSize = sizeof(ofn);
+    ofn.hwndOwner = (HWND)parent;
+    ofn.lpstrFile = wbuf;
+    ofn.nMaxFile = MAX_PATH;
+    ofn.Flags = OFN_OVERWRITEPROMPT;
+    if (GetSaveFileNameW(&ofn))
+        WideCharToMultiByte(CP_UTF8, 0, wbuf, -1, buf, (int)bufsz, NULL, NULL);
+    return buf;
+}
+
+static const char *win32_choose_dir(void *parent, const char *title, char *buf, size_t bufsz)
+{
+    (void)parent;
+    (void)title;
+    buf[0] = '\0';
+    (void)bufsz;
+    /* SHBrowseForFolder requires shell32; simplified stub. */
+    return buf;
+}
+
+static bool win32_ask_yes_no(void *parent, const char *title, const char *message)
+{
+    wchar_t title_buf[256];
+    MultiByteToWideChar(CP_UTF8, 0, title, -1, title_buf, (int)(sizeof(title_buf) / sizeof(title_buf[0])));
+    int result = MessageBoxW((HWND)parent, to_wide(message), title_buf, MB_YESNO | MB_ICONQUESTION);
+    return result == IDYES;
+}
+
 /* ── Export ───────────────────────────────────────────────────────── */
 
 const gui_backend_t gui_backend_win32 = {
@@ -984,6 +1037,10 @@ const gui_backend_t gui_backend_win32 = {
     .container_grid_rowconfigure = win32_container_grid_rowconfigure,
     .set_callback = win32_set_callback,
     .message_box = win32_message_box,
+    .open_file_dialog = win32_open_file,
+    .save_file_dialog = win32_save_file,
+    .choose_directory = win32_choose_dir,
+    .ask_yes_no = win32_ask_yes_no,
 };
 
 #endif /* _WIN32 */
