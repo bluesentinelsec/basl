@@ -109,6 +109,8 @@ typedef void *(*fn_gtk_list_box_get_selected_row)(GtkWidget *);
 typedef gint (*fn_gtk_list_box_row_get_index)(void *);
 typedef void (*fn_gtk_list_box_select_row)(GtkWidget *, void *);
 typedef void *(*fn_gtk_list_box_get_row_at_index)(GtkWidget *, gint);
+typedef GtkWidget *(*fn_gtk_paned_new)(int);
+typedef void (*fn_gtk_paned_set_position)(GtkWidget *, gint);
 
 /* GTK3-only function pointer types */
 typedef GtkWidget *(*fn_gtk_window_new_gtk3)(int type);
@@ -131,6 +133,8 @@ typedef GtkWidget *(*fn_gtk_menu_new)(void);
 typedef GtkWidget *(*fn_gtk_menu_item_new_with_label)(const char *);
 typedef void (*fn_gtk_menu_item_set_submenu)(GtkWidget *, GtkWidget *);
 typedef void (*fn_gtk_menu_shell_append)(GtkWidget *, GtkWidget *);
+typedef void (*fn_gtk_paned_pack1)(GtkWidget *, GtkWidget *, gboolean, gboolean);
+typedef void (*fn_gtk_paned_pack2)(GtkWidget *, GtkWidget *, gboolean, gboolean);
 
 /* GTK4-only function pointer types */
 typedef GtkWidget *(*fn_gtk_window_new_gtk4)(void);
@@ -156,6 +160,8 @@ typedef void *(*fn_g_simple_action_new)(const char *, void *);
 typedef void (*fn_g_action_map_add_action)(void *, void *);
 typedef void *(*fn_g_simple_action_group_new)(void);
 typedef void (*fn_gtk_widget_insert_action_group)(GtkWidget *, const char *, void *);
+typedef void (*fn_gtk_paned_set_start_child)(GtkWidget *, GtkWidget *);
+typedef void (*fn_gtk_paned_set_end_child)(GtkWidget *, GtkWidget *);
 typedef gulong (*fn_g_signal_connect_data_t)(void *, const char *, GCallback, void *, GClosureNotify, int);
 
 /* GLib main loop (used by GTK4 path; available in both versions) */
@@ -220,6 +226,10 @@ typedef struct gtk_version_ops
     void *(*menubar_create)(void *window);
     void *(*menu_add_submenu)(void *menubar, const char *label);
     void (*menu_add_item)(void *submenu, const char *label, gui_callback_t cb);
+
+    /* PanedWindow */
+    void (*paned_set_start)(GtkWidget *paned, GtkWidget *child);
+    void (*paned_set_end)(GtkWidget *paned, GtkWidget *child);
 } gtk_version_ops_t;
 
 /* ── Shared resolved symbols ─────────────────────────────────────── */
@@ -265,6 +275,8 @@ static struct
     fn_gtk_list_box_row_get_index gtk_list_box_row_get_index;
     fn_gtk_list_box_select_row gtk_list_box_select_row;
     fn_gtk_list_box_get_row_at_index gtk_list_box_get_row_at_index;
+    fn_gtk_paned_new gtk_paned_new;
+    fn_gtk_paned_set_position gtk_paned_set_position;
 } G;
 
 static const gtk_version_ops_t *g_vops = NULL;
@@ -436,6 +448,8 @@ static fn_gtk_menu_new s_gtk3_menu_new;
 static fn_gtk_menu_item_new_with_label s_gtk3_menu_item_new;
 static fn_gtk_menu_item_set_submenu s_gtk3_menu_item_set_submenu;
 static fn_gtk_menu_shell_append s_gtk3_menu_shell_append;
+static fn_gtk_paned_pack1 s_gtk3_paned_pack1;
+static fn_gtk_paned_pack2 s_gtk3_paned_pack2;
 
 static void gtk3_main_loop(void)
 {
@@ -592,6 +606,16 @@ static void gtk3_menu_add_item(void *submenu, const char *label, gui_callback_t 
     s_gtk3_widget_show_all(item);
 }
 
+static void gtk3_paned_set_start(GtkWidget *paned, GtkWidget *child)
+{
+    s_gtk3_paned_pack1(paned, child, 1, 0);
+}
+
+static void gtk3_paned_set_end(GtkWidget *paned, GtkWidget *child)
+{
+    s_gtk3_paned_pack2(paned, child, 1, 0);
+}
+
 static const gtk_version_ops_t g_gtk3_ops = {
     .version_name = "GTK3",
     .close_signal = "delete-event",
@@ -618,6 +642,8 @@ static const gtk_version_ops_t g_gtk3_ops = {
     .menubar_create = gtk3_menubar_create,
     .menu_add_submenu = gtk3_menu_add_submenu,
     .menu_add_item = gtk3_menu_add_item,
+    .paned_set_start = gtk3_paned_set_start,
+    .paned_set_end = gtk3_paned_set_end,
 };
 
 static bool load_gtk3_symbols(void)
@@ -643,6 +669,8 @@ static bool load_gtk3_symbols(void)
     LOAD_LOCAL(s_gtk3_menu_item_new, gtk_menu_item_new_with_label);
     LOAD_LOCAL(s_gtk3_menu_item_set_submenu, gtk_menu_item_set_submenu);
     LOAD_LOCAL(s_gtk3_menu_shell_append, gtk_menu_shell_append);
+    LOAD_LOCAL(s_gtk3_paned_pack1, gtk_paned_pack1);
+    LOAD_LOCAL(s_gtk3_paned_pack2, gtk_paned_pack2);
     return true;
 fail:
     return false;
@@ -679,6 +707,8 @@ static fn_g_simple_action_new s_gtk4_g_simple_action_new;
 static fn_g_action_map_add_action s_gtk4_g_action_map_add_action;
 static fn_g_simple_action_group_new s_gtk4_g_simple_action_group_new;
 static fn_gtk_widget_insert_action_group s_gtk4_gtk_widget_insert_action_group;
+static fn_gtk_paned_set_start_child s_gtk4_paned_set_start;
+static fn_gtk_paned_set_end_child s_gtk4_paned_set_end;
 
 /* GTK4 menu needs a window reference for action map. */
 static void *s_gtk4_menu_window = NULL;
@@ -883,6 +913,16 @@ static void gtk4_menu_add_item(void *submenu, const char *label, gui_callback_t 
         s_gtk4_g_action_map_add_action(s_gtk4_action_group, action);
 }
 
+static void gtk4_paned_set_start_wrap(GtkWidget *paned, GtkWidget *child)
+{
+    s_gtk4_paned_set_start(paned, child);
+}
+
+static void gtk4_paned_set_end_wrap(GtkWidget *paned, GtkWidget *child)
+{
+    s_gtk4_paned_set_end(paned, child);
+}
+
 static const gtk_version_ops_t g_gtk4_ops = {
     .version_name = "GTK4",
     .close_signal = "close-request",
@@ -909,6 +949,8 @@ static const gtk_version_ops_t g_gtk4_ops = {
     .menubar_create = gtk4_menubar_create,
     .menu_add_submenu = gtk4_menu_add_submenu,
     .menu_add_item = gtk4_menu_add_item,
+    .paned_set_start = gtk4_paned_set_start_wrap,
+    .paned_set_end = gtk4_paned_set_end_wrap,
 };
 
 static bool load_gtk4_symbols(void)
@@ -940,6 +982,8 @@ static bool load_gtk4_symbols(void)
     LOAD_LOCAL(s_gtk4_g_action_map_add_action, g_action_map_add_action);
     LOAD_LOCAL(s_gtk4_g_simple_action_group_new, g_simple_action_group_new);
     LOAD_LOCAL(s_gtk4_gtk_widget_insert_action_group, gtk_widget_insert_action_group);
+    LOAD_LOCAL(s_gtk4_paned_set_start, gtk_paned_set_start_child);
+    LOAD_LOCAL(s_gtk4_paned_set_end, gtk_paned_set_end_child);
     return true;
 fail:
     return false;
@@ -989,6 +1033,8 @@ static bool load_shared_symbols(void)
     LOAD_SHARED(gtk_list_box_row_get_index);
     LOAD_SHARED(gtk_list_box_select_row);
     LOAD_SHARED(gtk_list_box_get_row_at_index);
+    LOAD_SHARED(gtk_paned_new);
+    LOAD_SHARED(gtk_paned_set_position);
     return true;
 fail:
     return false;
@@ -1653,6 +1699,47 @@ static void gtk_be_menu_add_item(void *submenu, const char *label, gui_callback_
     g_vops->menu_add_item(submenu, label, cb);
 }
 
+/* ── PanedWindow ─────────────────────────────────────────────────── */
+
+static void *gtk_be_paned_create(void *parent, bool horizontal)
+{
+    if (!parent)
+        return NULL;
+    void *grid = grid_for_window(parent);
+    if (!grid)
+        return NULL;
+    /* GTK_ORIENTATION_HORIZONTAL=0, GTK_ORIENTATION_VERTICAL=1 */
+    GtkWidget *paned = G.gtk_paned_new(horizontal ? 0 : 1);
+    G.gtk_widget_set_hexpand(paned, 1);
+    G.gtk_widget_set_vexpand(paned, 1);
+    register_widget_parent(paned, grid);
+    return paned;
+}
+
+static void gtk_be_paned_destroy(void *handle)
+{
+    if (handle)
+        g_vops->widget_destroy(handle);
+}
+
+static void gtk_be_paned_set_start(void *handle, void *child)
+{
+    if (handle && child)
+        g_vops->paned_set_start(handle, child);
+}
+
+static void gtk_be_paned_set_end(void *handle, void *child)
+{
+    if (handle && child)
+        g_vops->paned_set_end(handle, child);
+}
+
+static void gtk_be_paned_set_position(void *handle, int pos)
+{
+    if (handle)
+        G.gtk_paned_set_position(handle, pos);
+}
+
 /* ── Grid layout ─────────────────────────────────────────────────── */
 
 static void gtk_be_widget_grid(void *handle, int col, int row)
@@ -1786,6 +1873,11 @@ const gui_backend_t gui_backend_gtk = {
     .menubar_destroy = gtk_be_menubar_destroy,
     .menu_add_submenu = gtk_be_menu_add_submenu,
     .menu_add_item = gtk_be_menu_add_item,
+    .paned_create = gtk_be_paned_create,
+    .paned_destroy = gtk_be_paned_destroy,
+    .paned_set_start = gtk_be_paned_set_start,
+    .paned_set_end = gtk_be_paned_set_end,
+    .paned_set_position = gtk_be_paned_set_position,
     .widget_grid = gtk_be_widget_grid,
     .widget_grid_span = gtk_be_widget_grid_span,
     .widget_grid_remove = gtk_be_widget_grid_remove,

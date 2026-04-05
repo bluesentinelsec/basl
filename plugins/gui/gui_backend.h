@@ -128,6 +128,13 @@ extern "C"
         void *(*menu_add_submenu)(void *menubar, const char *label);
         void (*menu_add_item)(void *submenu, const char *label, gui_callback_t cb);
 
+        /* PanedWindow (resizable split container) */
+        void *(*paned_create)(void *parent, bool horizontal);
+        void (*paned_destroy)(void *handle);
+        void (*paned_set_start)(void *handle, void *child);
+        void (*paned_set_end)(void *handle, void *child);
+        void (*paned_set_position)(void *handle, int pos);
+
         /* Grid layout */
         void (*widget_grid)(void *handle, int col, int row);
         void (*widget_grid_span)(void *handle, int col, int row, int colspan, int rowspan);

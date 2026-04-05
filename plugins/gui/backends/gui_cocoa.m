@@ -799,6 +799,41 @@ static void cocoa_menu_add_item(void *submenu, const char *label, gui_callback_t
     sendv_id((id)submenu, sel("addItem:"), item);
 }
 
+/* ── PanedWindow ──────────────────────────────────────────────────── */
+
+static void *cocoa_paned_create(void *parent, bool horizontal)
+{
+    if (!parent) return NULL;
+    id cv = send0((id)parent, sel("contentView"));
+    id split = send_rect(send0(cls("NSSplitView"), sel("alloc")),
+                         sel("initWithFrame:"), CGRectMake_(0, 0, 400, 200));
+    sendv_bool(split, sel("setVertical:"), horizontal ? 1 : 0);
+    sendv_id(cv, sel("addSubview:"), split);
+    register_widget_parent(split, cv);
+    return (void *)split;
+}
+
+static void cocoa_paned_destroy(void *handle)
+{
+    if (handle) sendv((id)handle, sel("removeFromSuperview"));
+}
+
+static void cocoa_paned_set_start(void *handle, void *child)
+{
+    if (handle && child) sendv_id((id)handle, sel("addSubview:"), (id)child);
+}
+
+static void cocoa_paned_set_end(void *handle, void *child)
+{
+    if (handle && child) sendv_id((id)handle, sel("addSubview:"), (id)child);
+}
+
+static void cocoa_paned_set_position(void *handle, int pos)
+{
+    if (handle) ((void (*)(id, SEL, double, long))objc_msgSend)(
+        (id)handle, sel("setPosition:ofDividerAtIndex:"), (double)pos, 0L);
+}
+
 /* ── Grid layout ─────────────────────────────────────────────────── */
 
 static void cocoa_widget_grid(void *handle, int col, int row)
@@ -920,6 +955,11 @@ const gui_backend_t gui_backend_cocoa = {
     .menubar_destroy               = cocoa_menubar_destroy,
     .menu_add_submenu              = cocoa_menu_add_submenu,
     .menu_add_item                 = cocoa_menu_add_item,
+    .paned_create                  = cocoa_paned_create,
+    .paned_destroy                 = cocoa_paned_destroy,
+    .paned_set_start               = cocoa_paned_set_start,
+    .paned_set_end                 = cocoa_paned_set_end,
+    .paned_set_position            = cocoa_paned_set_position,
     .widget_grid                   = cocoa_widget_grid,
     .widget_grid_span              = cocoa_widget_grid_span,
     .widget_grid_remove            = cocoa_widget_grid_remove,

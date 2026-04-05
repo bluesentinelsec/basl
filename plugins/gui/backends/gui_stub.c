@@ -117,6 +117,17 @@ static void stub_menu_add_item(void *s, const char *l, gui_callback_t cb)
     (void)l;
     (void)cb;
 }
+static void *stub_create_paned(void *p, bool h)
+{
+    (void)p;
+    (void)h;
+    return NULL;
+}
+static void stub_set_child(void *h, void *c)
+{
+    (void)h;
+    (void)c;
+}
 static void stub_grid(void *h, int c, int r)
 {
     (void)h;
@@ -213,6 +224,11 @@ const gui_backend_t gui_backend_stub = {
     .menubar_destroy = stub_destroy,
     .menu_add_submenu = stub_create,
     .menu_add_item = stub_menu_add_item,
+    .paned_create = stub_create_paned,
+    .paned_destroy = stub_destroy,
+    .paned_set_start = stub_set_child,
+    .paned_set_end = stub_set_child,
+    .paned_set_position = stub_set_int,
     .widget_grid = stub_grid,
     .widget_grid_span = stub_grid_span,
     .widget_grid_remove = stub_grid_remove,
