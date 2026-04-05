@@ -387,6 +387,10 @@ static void handle_focus(float mx, float my)
     SDL_StopTextInput(g_sdl_window);
 }
 
+/* Forward declarations for menu rendering (defined in Menu section). */
+static void sdl_render_menubar(void);
+static void sdl_handle_menubar_click(float mx, float my);
+
 static bool sdl_init(const char *app_name)
 {
     (void)app_name;
@@ -442,6 +446,7 @@ static void sdl_main_loop(void)
                 if (ev.button.button == SDL_BUTTON_LEFT)
                 {
                     handle_focus(ev.button.x, ev.button.y);
+                    sdl_handle_menubar_click(ev.button.x, ev.button.y);
                     handle_mouse_click(ev.button.x, ev.button.y);
                 }
                 break;
@@ -483,6 +488,7 @@ static void sdl_main_loop(void)
         for (int i = 0; i < g_widget_count; i++)
             if (g_widgets[i].type != SW_WINDOW)
                 render_widget(&g_widgets[i]);
+        sdl_render_menubar();
         SDL_RenderPresent(g_sdl_renderer);
         SDL_Delay(16); /* ~60 fps */
     }
@@ -842,28 +848,81 @@ static void sdl_listbox_set(void *h, int i)
     sdl_select_set(h, i);
 }
 
-/* ── Menu (simplified) ───────────────────────────────────────────── */
+/* ── Menu (flat bar with clickable items) ─────────────────────────── */
+
+#define SDL_MAX_MENU_ITEMS 64
+
+typedef struct
+{
+    char label[64];
+    gui_callback_t cb;
+    float x, w;
+} sdl_menu_item_t;
+
+static sdl_menu_item_t g_sdl_menu_items[SDL_MAX_MENU_ITEMS];
+static int g_sdl_menu_item_count = 0;
+static bool g_sdl_has_menubar = false;
+
+static void sdl_render_menubar(void)
+{
+    if (!g_sdl_has_menubar)
+        return;
+    SDL_FRect bar = {0, 0, (float)g_win_w, 20};
+    draw_rect_fill(&bar, COL_BTN_R, COL_BTN_G, COL_BTN_B);
+    for (int i = 0; i < g_sdl_menu_item_count; i++)
+        draw_text(g_sdl_menu_items[i].x + 4, 6, g_sdl_menu_items[i].label);
+}
+
+static void sdl_handle_menubar_click(float mx, float my)
+{
+    if (!g_sdl_has_menubar || my > 20)
+        return;
+    for (int i = 0; i < g_sdl_menu_item_count; i++)
+    {
+        if (mx >= g_sdl_menu_items[i].x && mx < g_sdl_menu_items[i].x + g_sdl_menu_items[i].w)
+        {
+            if (g_sdl_menu_items[i].cb.fn)
+                g_sdl_menu_items[i].cb.fn(g_sdl_menu_items[i].cb.user_data);
+            return;
+        }
+    }
+}
 
 static void *sdl_menubar_create(void *win)
 {
     (void)win;
+    g_sdl_has_menubar = true;
+    g_sdl_menu_item_count = 0;
     return sw_handle(0);
 }
+
 static void sdl_menubar_destroy(void *h)
 {
     (void)h;
+    g_sdl_has_menubar = false;
 }
+
 static void *sdl_menu_add_submenu(void *mb, const char *l)
 {
     (void)mb;
     (void)l;
     return sw_handle(0);
 }
+
 static void sdl_menu_add_item(void *sm, const char *l, gui_callback_t cb)
 {
     (void)sm;
-    (void)l;
-    (void)cb;
+    if (g_sdl_menu_item_count >= SDL_MAX_MENU_ITEMS)
+        return;
+    sdl_menu_item_t *item = &g_sdl_menu_items[g_sdl_menu_item_count];
+    snprintf(item->label, sizeof(item->label), "%s", l);
+    item->cb = cb;
+    float x = 4;
+    for (int i = 0; i < g_sdl_menu_item_count; i++)
+        x += g_sdl_menu_items[i].w;
+    item->x = x;
+    item->w = (float)(strlen(l) * 8 + 16);
+    g_sdl_menu_item_count++;
 }
 
 /* ── PanedWindow ─────────────────────────────────────────────────── */

@@ -225,6 +225,4 @@ If a feature isn't supported on your platform, implement it as a no-op (return N
 
 ## Known Limitations
 
-- **GTK4 file dialogs**: Stubbed because GTK4 removed all synchronous dialog APIs
-- **SDL text rendering**: Uses SDL3's built-in 8×8 debug font; `vigil_font.h` (stb_truetype) integration planned
-- **SDL menus**: Menu bar is a no-op in the SDL backend
+- **SDL text rendering**: Uses SDL3's built-in 8×8 debug font. Functional but compact. TTF font integration via `vigil_font.h` (stb_truetype) is a future enhancement for higher-quality text.
