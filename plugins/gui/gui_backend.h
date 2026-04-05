@@ -78,6 +78,19 @@ extern "C"
         bool (*checkbox_get_checked)(void *handle);
         void (*checkbox_set_checked)(void *handle, bool checked);
 
+        /* Slider (horizontal scale) */
+        void *(*slider_create)(void *parent, double min_val, double max_val);
+        void (*slider_destroy)(void *handle);
+        double (*slider_get_value)(void *handle);
+        void (*slider_set_value)(void *handle, double value);
+
+        /* Select (drop-down / combo box) */
+        void *(*select_create)(void *parent);
+        void (*select_destroy)(void *handle);
+        void (*select_add_item)(void *handle, const char *text);
+        int (*select_get_index)(void *handle);
+        void (*select_set_index)(void *handle, int index);
+
         /* Grid layout */
         void (*widget_grid)(void *handle, int col, int row);
         void (*widget_grid_remove)(void *handle);

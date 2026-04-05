@@ -79,12 +79,19 @@ static gui_handle_registry_t g_labels = {{0}, 0};
 static gui_handle_registry_t g_buttons = {{0}, 0};
 static gui_handle_registry_t g_entries = {{0}, 0};
 static gui_handle_registry_t g_checkboxes = {{0}, 0};
+static gui_handle_registry_t g_sliders = {{0}, 0};
+static gui_handle_registry_t g_selects = {{0}, 0};
 
 /* ── Stack helpers ───────────────────────────────────────────────── */
 
 static int32_t gui_arg_i32(vigil_vm_t *vm, size_t base, size_t idx)
 {
     return vigil_nanbox_decode_i32(vigil_vm_stack_get(vm, base + idx));
+}
+
+static double gui_arg_f64(vigil_vm_t *vm, size_t base, size_t idx)
+{
+    return vigil_nanbox_decode_double(vigil_vm_stack_get(vm, base + idx));
 }
 
 static const char *gui_arg_str(vigil_vm_t *vm, size_t base, size_t idx, char *buf, size_t bufsz)
@@ -172,6 +179,8 @@ enum
     GUI_BUTTON_CLASS_INDEX = 3U,
     GUI_ENTRY_CLASS_INDEX = 4U,
     GUI_CHECKBOX_CLASS_INDEX = 5U,
+    GUI_SLIDER_CLASS_INDEX = 6U,
+    GUI_SELECT_CLASS_INDEX = 7U,
 };
 
 /* ── Callback bridge ─────────────────────────────────────────────── */
@@ -753,6 +762,211 @@ static vigil_status_t gui_checkbox_on_change(vigil_vm_t *vm, size_t arg_count, v
     return VIGIL_STATUS_OK;
 }
 
+/* ── gui.Slider ──────────────────────────────────────────────────── */
+
+static vigil_status_t gui_slider_new(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t parent_h = gui_arg_handle(vm, base, 1);
+    double min_val = gui_arg_f64(vm, base, 2);
+    double max_val = gui_arg_f64(vm, base, 3);
+    vigil_vm_stack_pop_n(vm, arg_count);
+
+    void *parent = gui_handle_get(&g_windows, parent_h);
+    if (!parent || !g_backend)
+    {
+        gui_push_handle_instance(vm, GUI_SLIDER_CLASS_INDEX, -1, error);
+        return gui_push_fail_err(vm, "gui: invalid parent window", error);
+    }
+
+    void *native = g_backend->slider_create(parent, min_val, max_val);
+    int64_t handle;
+    gui_handle_store(&g_sliders, native, &handle);
+    gui_push_handle_instance(vm, GUI_SLIDER_CLASS_INDEX, handle, error);
+    return gui_push_ok_err(vm, error);
+}
+
+static vigil_status_t gui_slider_destroy(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = gui_self_handle(vm, base);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    void *native = gui_handle_get(&g_sliders, h);
+    if (native && g_backend)
+        g_backend->slider_destroy(native);
+    gui_handle_clear(&g_sliders, h);
+    (void)error;
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t gui_slider_get(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = gui_self_handle(vm, base);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    double val = 0.0;
+    void *native = gui_handle_get(&g_sliders, h);
+    if (native && g_backend)
+        val = g_backend->slider_get_value(native);
+    vigil_value_t v = vigil_nanbox_encode_double(val);
+    return vigil_vm_stack_push(vm, &v, error);
+}
+
+static vigil_status_t gui_slider_set(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = gui_self_handle(vm, base);
+    double val = gui_arg_f64(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    void *native = gui_handle_get(&g_sliders, h);
+    if (native && g_backend)
+        g_backend->slider_set_value(native, val);
+    (void)error;
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t gui_slider_grid(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = gui_self_handle(vm, base);
+    int col = gui_arg_i32(vm, base, 1);
+    int row = gui_arg_i32(vm, base, 2);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    void *native = gui_handle_get(&g_sliders, h);
+    if (native && g_backend)
+        g_backend->widget_grid(native, col, row);
+    (void)error;
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t gui_slider_on_change(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = gui_self_handle(vm, base);
+    vigil_value_t closure = vigil_vm_stack_get(vm, base + 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    void *native = gui_handle_get(&g_sliders, h);
+    if (native && g_backend)
+    {
+        gui_closure_t *c = gui_closure_store(vm, closure);
+        if (c)
+        {
+            gui_callback_t cb = {gui_closure_invoke, c};
+            g_backend->set_callback(native, GUI_EVENT_CHANGE, cb);
+        }
+    }
+    (void)error;
+    return VIGIL_STATUS_OK;
+}
+
+/* ── gui.Select ──────────────────────────────────────────────────── */
+
+static vigil_status_t gui_select_new(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t parent_h = gui_arg_handle(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+
+    void *parent = gui_handle_get(&g_windows, parent_h);
+    if (!parent || !g_backend)
+    {
+        gui_push_handle_instance(vm, GUI_SELECT_CLASS_INDEX, -1, error);
+        return gui_push_fail_err(vm, "gui: invalid parent window", error);
+    }
+
+    void *native = g_backend->select_create(parent);
+    int64_t handle;
+    gui_handle_store(&g_selects, native, &handle);
+    gui_push_handle_instance(vm, GUI_SELECT_CLASS_INDEX, handle, error);
+    return gui_push_ok_err(vm, error);
+}
+
+static vigil_status_t gui_select_destroy(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = gui_self_handle(vm, base);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    void *native = gui_handle_get(&g_selects, h);
+    if (native && g_backend)
+        g_backend->select_destroy(native);
+    gui_handle_clear(&g_selects, h);
+    (void)error;
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t gui_select_add_item(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = gui_self_handle(vm, base);
+    char buf[256];
+    const char *text = gui_arg_str(vm, base, 1, buf, sizeof(buf));
+    vigil_vm_stack_pop_n(vm, arg_count);
+    void *native = gui_handle_get(&g_selects, h);
+    if (native && g_backend)
+        g_backend->select_add_item(native, text);
+    (void)error;
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t gui_select_get(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = gui_self_handle(vm, base);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    int idx = -1;
+    void *native = gui_handle_get(&g_selects, h);
+    if (native && g_backend)
+        idx = g_backend->select_get_index(native);
+    return gui_push_i32(vm, (int32_t)idx, error);
+}
+
+static vigil_status_t gui_select_set(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = gui_self_handle(vm, base);
+    int idx = gui_arg_i32(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    void *native = gui_handle_get(&g_selects, h);
+    if (native && g_backend)
+        g_backend->select_set_index(native, idx);
+    (void)error;
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t gui_select_grid(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = gui_self_handle(vm, base);
+    int col = gui_arg_i32(vm, base, 1);
+    int row = gui_arg_i32(vm, base, 2);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    void *native = gui_handle_get(&g_selects, h);
+    if (native && g_backend)
+        g_backend->widget_grid(native, col, row);
+    (void)error;
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t gui_select_on_change(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = gui_self_handle(vm, base);
+    vigil_value_t closure = vigil_vm_stack_get(vm, base + 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    void *native = gui_handle_get(&g_selects, h);
+    if (native && g_backend)
+    {
+        gui_closure_t *c = gui_closure_store(vm, closure);
+        if (c)
+        {
+            gui_callback_t cb = {gui_closure_invoke, c};
+            g_backend->set_callback(native, GUI_EVENT_CHANGE, cb);
+        }
+    }
+    (void)error;
+    return VIGIL_STATUS_OK;
+}
+
 /* ── gui.message_box (module-level function) ─────────────────────── */
 
 static vigil_status_t gui_fn_message_box(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
@@ -785,6 +999,11 @@ static const int rt_i32_i32[] = {VIGIL_TYPE_I32, VIGIL_TYPE_I32};
 static const int rt_str[] = {VIGIL_TYPE_STRING};
 static const int rt_bool[] = {VIGIL_TYPE_BOOL};
 static const int p_bool[] = {VIGIL_TYPE_BOOL};
+static const int p_obj_f64_f64[] = {VIGIL_TYPE_OBJECT, VIGIL_TYPE_F64, VIGIL_TYPE_F64};
+static const int p_f64[] = {VIGIL_TYPE_F64};
+static const int p_i32[] = {VIGIL_TYPE_I32};
+static const int rt_f64[] = {VIGIL_TYPE_F64};
+static const int rt_i32[] = {VIGIL_TYPE_I32};
 
 /* ── Macro helpers ───────────────────────────────────────────────── */
 
@@ -885,6 +1104,37 @@ static const vigil_native_class_method_t gui_checkbox_methods[] = {
     GUI_METHOD("on_change", 9U, gui_checkbox_on_change, 1U, p_obj, VIGIL_TYPE_VOID, 0U, NULL),
 };
 
+/* ── Slider class ────────────────────────────────────────────────── */
+
+static const vigil_native_class_field_t gui_slider_fields[] = {
+    GUI_PFIELD("handle", 6U, VIGIL_TYPE_I64),
+};
+
+static const vigil_native_class_method_t gui_slider_methods[] = {
+    GUI_STATIC("new", 3U, gui_slider_new, 3U, p_obj_f64_f64, VIGIL_TYPE_OBJECT, 2U, rt_obj_err),
+    GUI_METHOD("destroy", 7U, gui_slider_destroy, 0U, NULL, VIGIL_TYPE_VOID, 0U, NULL),
+    GUI_METHOD("get", 3U, gui_slider_get, 0U, NULL, VIGIL_TYPE_F64, 1U, rt_f64),
+    GUI_METHOD("set", 3U, gui_slider_set, 1U, p_f64, VIGIL_TYPE_VOID, 0U, NULL),
+    GUI_METHOD("grid", 4U, gui_slider_grid, 2U, p_i32_i32, VIGIL_TYPE_VOID, 0U, NULL),
+    GUI_METHOD("on_change", 9U, gui_slider_on_change, 1U, p_obj, VIGIL_TYPE_VOID, 0U, NULL),
+};
+
+/* ── Select class ────────────────────────────────────────────────── */
+
+static const vigil_native_class_field_t gui_select_fields[] = {
+    GUI_PFIELD("handle", 6U, VIGIL_TYPE_I64),
+};
+
+static const vigil_native_class_method_t gui_select_methods[] = {
+    GUI_STATIC("new", 3U, gui_select_new, 1U, p_obj, VIGIL_TYPE_OBJECT, 2U, rt_obj_err),
+    GUI_METHOD("destroy", 7U, gui_select_destroy, 0U, NULL, VIGIL_TYPE_VOID, 0U, NULL),
+    GUI_METHOD("add_item", 8U, gui_select_add_item, 1U, p_str, VIGIL_TYPE_VOID, 0U, NULL),
+    GUI_METHOD("get", 3U, gui_select_get, 0U, NULL, VIGIL_TYPE_I32, 1U, rt_i32),
+    GUI_METHOD("set", 3U, gui_select_set, 1U, p_i32, VIGIL_TYPE_VOID, 0U, NULL),
+    GUI_METHOD("grid", 4U, gui_select_grid, 2U, p_i32_i32, VIGIL_TYPE_VOID, 0U, NULL),
+    GUI_METHOD("on_change", 9U, gui_select_on_change, 1U, p_obj, VIGIL_TYPE_VOID, 0U, NULL),
+};
+
 /* ── Class table ─────────────────────────────────────────────────── */
 
 /* clang-format off */
@@ -895,6 +1145,8 @@ static const vigil_native_class_t gui_classes[] = {
     {"Button",   6U, gui_button_fields,   1U, gui_button_methods,   sizeof(gui_button_methods)   / sizeof(gui_button_methods[0]),   NULL, NULL},
     {"Entry",    5U, gui_entry_fields,    1U, gui_entry_methods,    sizeof(gui_entry_methods)    / sizeof(gui_entry_methods[0]),    NULL, NULL},
     {"Checkbox", 8U, gui_checkbox_fields, 1U, gui_checkbox_methods, sizeof(gui_checkbox_methods) / sizeof(gui_checkbox_methods[0]), NULL, NULL},
+    {"Slider",   6U, gui_slider_fields,   1U, gui_slider_methods,   sizeof(gui_slider_methods)   / sizeof(gui_slider_methods[0]),   NULL, NULL},
+    {"Select",   6U, gui_select_fields,   1U, gui_select_methods,   sizeof(gui_select_methods)   / sizeof(gui_select_methods[0]),   NULL, NULL},
 };
 /* clang-format on */
 

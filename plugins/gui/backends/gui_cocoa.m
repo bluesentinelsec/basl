@@ -503,6 +503,72 @@ static void cocoa_checkbox_set_checked(void *handle, bool checked)
     if (handle) sendv_long((id)handle, sel("setState:"), checked ? 1 : 0);
 }
 
+/* ── Slider ───────────────────────────────────────────────────────── */
+
+static void *cocoa_slider_create(void *parent, double min_val, double max_val)
+{
+    if (!parent) return NULL;
+    id cv = send0((id)parent, sel("contentView"));
+    id slider = send_rect(send0(cls("NSSlider"), sel("alloc")),
+                          sel("initWithFrame:"), CGRectMake_(0, 0, 200, 24));
+    ((void (*)(id, SEL, double))objc_msgSend)(slider, sel("setMinValue:"), min_val);
+    ((void (*)(id, SEL, double))objc_msgSend)(slider, sel("setMaxValue:"), max_val);
+    ((void (*)(id, SEL, double))objc_msgSend)(slider, sel("setDoubleValue:"), min_val);
+    sendv_id(cv, sel("addSubview:"), slider);
+    register_widget_parent(slider, cv);
+    return (void *)slider;
+}
+
+static void cocoa_slider_destroy(void *handle)
+{
+    if (handle) sendv((id)handle, sel("removeFromSuperview"));
+}
+
+static double cocoa_slider_get_value(void *handle)
+{
+    if (!handle) return 0.0;
+    return ((double (*)(id, SEL))objc_msgSend)((id)handle, sel("doubleValue"));
+}
+
+static void cocoa_slider_set_value(void *handle, double value)
+{
+    if (handle) ((void (*)(id, SEL, double))objc_msgSend)((id)handle, sel("setDoubleValue:"), value);
+}
+
+/* ── Select ───────────────────────────────────────────────────────── */
+
+static void *cocoa_select_create(void *parent)
+{
+    if (!parent) return NULL;
+    id cv = send0((id)parent, sel("contentView"));
+    id popup = send_rect(send0(cls("NSPopUpButton"), sel("alloc")),
+                         sel("initWithFrame:"), CGRectMake_(0, 0, 200, 24));
+    sendv_id(cv, sel("addSubview:"), popup);
+    register_widget_parent(popup, cv);
+    return (void *)popup;
+}
+
+static void cocoa_select_destroy(void *handle)
+{
+    if (handle) sendv((id)handle, sel("removeFromSuperview"));
+}
+
+static void cocoa_select_add_item(void *handle, const char *text)
+{
+    if (handle) sendv_id((id)handle, sel("addItemWithTitle:"), nsstr(text));
+}
+
+static int cocoa_select_get_index(void *handle)
+{
+    if (!handle) return -1;
+    return (int)((long (*)(id, SEL))objc_msgSend)((id)handle, sel("indexOfSelectedItem"));
+}
+
+static void cocoa_select_set_index(void *handle, int index)
+{
+    if (handle) sendv_long((id)handle, sel("selectItemAtIndex:"), (long)index);
+}
+
 /* ── Grid layout ─────────────────────────────────────────────────── */
 
 static void cocoa_widget_grid(void *handle, int col, int row)
@@ -582,6 +648,15 @@ const gui_backend_t gui_backend_cocoa = {
     .checkbox_set_text             = cocoa_checkbox_set_text,
     .checkbox_get_checked          = cocoa_checkbox_get_checked,
     .checkbox_set_checked          = cocoa_checkbox_set_checked,
+    .slider_create                 = cocoa_slider_create,
+    .slider_destroy                = cocoa_slider_destroy,
+    .slider_get_value              = cocoa_slider_get_value,
+    .slider_set_value              = cocoa_slider_set_value,
+    .select_create                 = cocoa_select_create,
+    .select_destroy                = cocoa_select_destroy,
+    .select_add_item               = cocoa_select_add_item,
+    .select_get_index              = cocoa_select_get_index,
+    .select_set_index              = cocoa_select_set_index,
     .widget_grid                   = cocoa_widget_grid,
     .widget_grid_remove            = cocoa_widget_grid_remove,
     .container_grid_columnconfigure = cocoa_container_grid_columnconfigure,
