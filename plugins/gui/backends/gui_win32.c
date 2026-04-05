@@ -399,6 +399,84 @@ static void win32_button_set_text(void *handle, const char *text)
         SetWindowTextW((HWND)handle, to_wide(text));
 }
 
+/* ── Entry ───────────────────────────────────────────────────────── */
+
+static void *win32_entry_create(void *parent)
+{
+    if (!parent)
+        return NULL;
+    HWND hwnd = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL, 0, 0, 200, 24,
+                                (HWND)parent, (HMENU)(intptr_t)g_next_ctrl_id++, g_hinstance, NULL);
+    if (hwnd)
+        register_widget_parent(hwnd, (HWND)parent);
+    return (void *)hwnd;
+}
+
+static void win32_entry_destroy(void *handle)
+{
+    if (handle)
+        DestroyWindow((HWND)handle);
+}
+
+static const char *win32_entry_get_text(void *handle, char *buf, size_t bufsz)
+{
+    if (!handle)
+    {
+        buf[0] = '\0';
+        return buf;
+    }
+    wchar_t wbuf[1024];
+    int len = GetWindowTextW((HWND)handle, wbuf, (int)(sizeof(wbuf) / sizeof(wbuf[0])));
+    if (len > 0)
+        WideCharToMultiByte(CP_UTF8, 0, wbuf, len, buf, (int)bufsz - 1, NULL, NULL);
+    buf[(len > 0 && (size_t)len < bufsz) ? (size_t)len : 0] = '\0';
+    return buf;
+}
+
+static void win32_entry_set_text(void *handle, const char *text)
+{
+    if (handle)
+        SetWindowTextW((HWND)handle, to_wide(text));
+}
+
+/* ── Checkbox ────────────────────────────────────────────────────── */
+
+static void *win32_checkbox_create(void *parent, const char *text)
+{
+    if (!parent)
+        return NULL;
+    HWND hwnd = CreateWindowExW(0, L"BUTTON", to_wide(text), WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX, 0, 0, 200, 24,
+                                (HWND)parent, (HMENU)(intptr_t)g_next_ctrl_id++, g_hinstance, NULL);
+    if (hwnd)
+        register_widget_parent(hwnd, (HWND)parent);
+    return (void *)hwnd;
+}
+
+static void win32_checkbox_destroy(void *handle)
+{
+    if (handle)
+        DestroyWindow((HWND)handle);
+}
+
+static void win32_checkbox_set_text(void *handle, const char *text)
+{
+    if (handle)
+        SetWindowTextW((HWND)handle, to_wide(text));
+}
+
+static bool win32_checkbox_get_checked(void *handle)
+{
+    if (!handle)
+        return false;
+    return SendMessageW((HWND)handle, BM_GETCHECK, 0, 0) == BST_CHECKED;
+}
+
+static void win32_checkbox_set_checked(void *handle, bool checked)
+{
+    if (handle)
+        SendMessageW((HWND)handle, BM_SETCHECK, checked ? BST_CHECKED : BST_UNCHECKED, 0);
+}
+
 /* ── Grid layout ─────────────────────────────────────────────────── */
 
 static void win32_widget_grid(void *handle, int col, int row)
@@ -472,6 +550,15 @@ const gui_backend_t gui_backend_win32 = {
     .button_create = win32_button_create,
     .button_destroy = win32_button_destroy,
     .button_set_text = win32_button_set_text,
+    .entry_create = win32_entry_create,
+    .entry_destroy = win32_entry_destroy,
+    .entry_get_text = win32_entry_get_text,
+    .entry_set_text = win32_entry_set_text,
+    .checkbox_create = win32_checkbox_create,
+    .checkbox_destroy = win32_checkbox_destroy,
+    .checkbox_set_text = win32_checkbox_set_text,
+    .checkbox_get_checked = win32_checkbox_get_checked,
+    .checkbox_set_checked = win32_checkbox_set_checked,
     .widget_grid = win32_widget_grid,
     .widget_grid_remove = win32_widget_grid_remove,
     .container_grid_columnconfigure = win32_container_grid_columnconfigure,
