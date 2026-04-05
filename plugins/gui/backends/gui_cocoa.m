@@ -834,6 +834,38 @@ static void cocoa_paned_set_position(void *handle, int pos)
         (id)handle, sel("setPosition:ofDividerAtIndex:"), (double)pos, 0L);
 }
 
+/* ── Canvas ───────────────────────────────────────────────────────── */
+/* Cocoa canvas uses an NSView. Drawing is deferred — commands are
+   stored but actual rendering requires setNeedsDisplay + drawRect
+   override, which needs a runtime-created subclass. For now, provide
+   a basic NSView that can be extended later. */
+
+static void *cocoa_canvas_create(void *parent, int width, int height)
+{
+    if (!parent) return NULL;
+    id cv = send0((id)parent, sel("contentView"));
+    id view = send_rect(send0(cls("NSView"), sel("alloc")),
+                        sel("initWithFrame:"), CGRectMake_(0, 0, width, height));
+    sendv_id(cv, sel("addSubview:"), view);
+    register_widget_parent(view, cv);
+    return (void *)view;
+}
+
+static void cocoa_canvas_destroy(void *handle)
+{
+    if (handle) sendv((id)handle, sel("removeFromSuperview"));
+}
+
+static void cocoa_canvas_clear(void *handle) { (void)handle; }
+static void cocoa_canvas_draw_line(void *h, double x1, double y1, double x2, double y2)
+{ (void)h; (void)x1; (void)y1; (void)x2; (void)y2; }
+static void cocoa_canvas_draw_rect(void *h, double x, double y, double w, double ht)
+{ (void)h; (void)x; (void)y; (void)w; (void)ht; }
+static void cocoa_canvas_draw_oval(void *h, double x, double y, double w, double ht)
+{ (void)h; (void)x; (void)y; (void)w; (void)ht; }
+static void cocoa_canvas_draw_text(void *h, double x, double y, const char *t)
+{ (void)h; (void)x; (void)y; (void)t; }
+
 /* ── Grid layout ─────────────────────────────────────────────────── */
 
 static void cocoa_widget_grid(void *handle, int col, int row)
@@ -1021,6 +1053,13 @@ const gui_backend_t gui_backend_cocoa = {
     .paned_set_start               = cocoa_paned_set_start,
     .paned_set_end                 = cocoa_paned_set_end,
     .paned_set_position            = cocoa_paned_set_position,
+    .canvas_create                 = cocoa_canvas_create,
+    .canvas_destroy                = cocoa_canvas_destroy,
+    .canvas_clear                  = cocoa_canvas_clear,
+    .canvas_draw_line              = cocoa_canvas_draw_line,
+    .canvas_draw_rect              = cocoa_canvas_draw_rect,
+    .canvas_draw_oval              = cocoa_canvas_draw_oval,
+    .canvas_draw_text              = cocoa_canvas_draw_text,
     .widget_grid                   = cocoa_widget_grid,
     .widget_grid_span              = cocoa_widget_grid_span,
     .widget_grid_remove            = cocoa_widget_grid_remove,

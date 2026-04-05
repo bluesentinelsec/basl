@@ -89,6 +89,7 @@ static gui_handle_registry_t g_listboxes = {{0}, 0};
 static gui_handle_registry_t g_menubars = {{0}, 0};
 static gui_handle_registry_t g_submenus = {{0}, 0};
 static gui_handle_registry_t g_paneds = {{0}, 0};
+static gui_handle_registry_t g_canvases = {{0}, 0};
 
 /* ── Stack helpers ───────────────────────────────────────────────── */
 
@@ -196,6 +197,7 @@ enum
     GUI_LISTBOX_CLASS_INDEX = 12U,
     GUI_MENU_CLASS_INDEX = 13U,
     GUI_PANED_CLASS_INDEX = 14U,
+    GUI_CANVAS_CLASS_INDEX = 15U,
 };
 
 /* ── Callback bridge ─────────────────────────────────────────────── */
@@ -1576,6 +1578,131 @@ static vigil_status_t gui_paned_grid(vigil_vm_t *vm, size_t arg_count, vigil_err
     return VIGIL_STATUS_OK;
 }
 
+/* ── gui.Canvas ──────────────────────────────────────────────────── */
+
+static vigil_status_t gui_canvas_new(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t parent_h = gui_arg_handle(vm, base, 1);
+    int w = gui_arg_i32(vm, base, 2);
+    int h = gui_arg_i32(vm, base, 3);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    void *parent = gui_handle_get(&g_windows, parent_h);
+    if (!parent || !g_backend)
+    {
+        gui_push_handle_instance(vm, GUI_CANVAS_CLASS_INDEX, -1, error);
+        return gui_push_fail_err(vm, "gui: invalid parent window", error);
+    }
+    void *native = g_backend->canvas_create(parent, w, h);
+    int64_t handle;
+    gui_handle_store(&g_canvases, native, &handle);
+    gui_push_handle_instance(vm, GUI_CANVAS_CLASS_INDEX, handle, error);
+    return gui_push_ok_err(vm, error);
+}
+
+static vigil_status_t gui_canvas_destroy(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = gui_self_handle(vm, base);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    void *native = gui_handle_get(&g_canvases, h);
+    if (native && g_backend)
+        g_backend->canvas_destroy(native);
+    gui_handle_clear(&g_canvases, h);
+    (void)error;
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t gui_canvas_clear(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = gui_self_handle(vm, base);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    void *native = gui_handle_get(&g_canvases, h);
+    if (native && g_backend)
+        g_backend->canvas_clear(native);
+    (void)error;
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t gui_canvas_draw_line(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = gui_self_handle(vm, base);
+    double x1 = gui_arg_f64(vm, base, 1);
+    double y1 = gui_arg_f64(vm, base, 2);
+    double x2 = gui_arg_f64(vm, base, 3);
+    double y2 = gui_arg_f64(vm, base, 4);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    void *native = gui_handle_get(&g_canvases, h);
+    if (native && g_backend)
+        g_backend->canvas_draw_line(native, x1, y1, x2, y2);
+    (void)error;
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t gui_canvas_draw_rect(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = gui_self_handle(vm, base);
+    double x = gui_arg_f64(vm, base, 1);
+    double y = gui_arg_f64(vm, base, 2);
+    double w = gui_arg_f64(vm, base, 3);
+    double ht = gui_arg_f64(vm, base, 4);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    void *native = gui_handle_get(&g_canvases, h);
+    if (native && g_backend)
+        g_backend->canvas_draw_rect(native, x, y, w, ht);
+    (void)error;
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t gui_canvas_draw_oval(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = gui_self_handle(vm, base);
+    double x = gui_arg_f64(vm, base, 1);
+    double y = gui_arg_f64(vm, base, 2);
+    double w = gui_arg_f64(vm, base, 3);
+    double ht = gui_arg_f64(vm, base, 4);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    void *native = gui_handle_get(&g_canvases, h);
+    if (native && g_backend)
+        g_backend->canvas_draw_oval(native, x, y, w, ht);
+    (void)error;
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t gui_canvas_draw_text(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = gui_self_handle(vm, base);
+    double x = gui_arg_f64(vm, base, 1);
+    double y = gui_arg_f64(vm, base, 2);
+    char buf[1024];
+    const char *text = gui_arg_str(vm, base, 3, buf, sizeof(buf));
+    vigil_vm_stack_pop_n(vm, arg_count);
+    void *native = gui_handle_get(&g_canvases, h);
+    if (native && g_backend)
+        g_backend->canvas_draw_text(native, x, y, text);
+    (void)error;
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t gui_canvas_grid(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = gui_self_handle(vm, base);
+    int col = gui_arg_i32(vm, base, 1);
+    int row = gui_arg_i32(vm, base, 2);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    void *native = gui_handle_get(&g_canvases, h);
+    if (native && g_backend)
+        g_backend->widget_grid(native, col, row);
+    (void)error;
+    return VIGIL_STATUS_OK;
+}
+
 /* ── gui.message_box (module-level function) ─────────────────────── */
 
 static vigil_status_t gui_fn_message_box(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
@@ -1690,6 +1817,9 @@ static const int p_obj_str_obj[] = {VIGIL_TYPE_OBJECT, VIGIL_TYPE_STRING, VIGIL_
 static const int p_obj_f64_f64_f64[] = {VIGIL_TYPE_OBJECT, VIGIL_TYPE_F64, VIGIL_TYPE_F64, VIGIL_TYPE_F64};
 static const int p_i32_str_obj[] = {VIGIL_TYPE_I32, VIGIL_TYPE_STRING, VIGIL_TYPE_OBJECT};
 static const int p_obj_bool[] = {VIGIL_TYPE_OBJECT, VIGIL_TYPE_BOOL};
+static const int p_f64_f64_f64_f64[] = {VIGIL_TYPE_F64, VIGIL_TYPE_F64, VIGIL_TYPE_F64, VIGIL_TYPE_F64};
+static const int p_f64_f64_str[] = {VIGIL_TYPE_F64, VIGIL_TYPE_F64, VIGIL_TYPE_STRING};
+static const int p_obj_i32_i32[] = {VIGIL_TYPE_OBJECT, VIGIL_TYPE_I32, VIGIL_TYPE_I32};
 
 /* ── Macro helpers ───────────────────────────────────────────────── */
 
@@ -1921,6 +2051,23 @@ static const vigil_native_class_method_t gui_paned_methods[] = {
     GUI_METHOD("grid", 4U, gui_paned_grid, 2U, p_i32_i32, VIGIL_TYPE_VOID, 0U, NULL),
 };
 
+/* ── Canvas class ────────────────────────────────────────────────── */
+
+static const vigil_native_class_field_t gui_canvas_fields[] = {
+    GUI_PFIELD("handle", 6U, VIGIL_TYPE_I64),
+};
+
+static const vigil_native_class_method_t gui_canvas_methods[] = {
+    GUI_STATIC("new", 3U, gui_canvas_new, 3U, p_obj_i32_i32, VIGIL_TYPE_OBJECT, 2U, rt_obj_err),
+    GUI_METHOD("destroy", 7U, gui_canvas_destroy, 0U, NULL, VIGIL_TYPE_VOID, 0U, NULL),
+    GUI_METHOD("clear", 5U, gui_canvas_clear, 0U, NULL, VIGIL_TYPE_VOID, 0U, NULL),
+    GUI_METHOD("draw_line", 9U, gui_canvas_draw_line, 4U, p_f64_f64_f64_f64, VIGIL_TYPE_VOID, 0U, NULL),
+    GUI_METHOD("draw_rect", 9U, gui_canvas_draw_rect, 4U, p_f64_f64_f64_f64, VIGIL_TYPE_VOID, 0U, NULL),
+    GUI_METHOD("draw_oval", 9U, gui_canvas_draw_oval, 4U, p_f64_f64_f64_f64, VIGIL_TYPE_VOID, 0U, NULL),
+    GUI_METHOD("draw_text", 9U, gui_canvas_draw_text, 3U, p_f64_f64_str, VIGIL_TYPE_VOID, 0U, NULL),
+    GUI_METHOD("grid", 4U, gui_canvas_grid, 2U, p_i32_i32, VIGIL_TYPE_VOID, 0U, NULL),
+};
+
 /* ── Class table ─────────────────────────────────────────────────── */
 
 /* clang-format off */
@@ -1940,6 +2087,7 @@ static const vigil_native_class_t gui_classes[] = {
     {"Listbox",     7U,  gui_listbox_fields,  1U, gui_listbox_methods,  sizeof(gui_listbox_methods)  / sizeof(gui_listbox_methods[0]),  NULL, NULL},
     {"Menu",        4U,  gui_menu_fields,     1U, gui_menu_methods,     sizeof(gui_menu_methods)     / sizeof(gui_menu_methods[0]),     NULL, NULL},
     {"PanedWindow", 11U, gui_paned_fields,    1U, gui_paned_methods,    sizeof(gui_paned_methods)    / sizeof(gui_paned_methods[0]),    NULL, NULL},
+    {"Canvas",      6U,  gui_canvas_fields,   1U, gui_canvas_methods,   sizeof(gui_canvas_methods)   / sizeof(gui_canvas_methods[0]),   NULL, NULL},
 };
 /* clang-format on */
 
