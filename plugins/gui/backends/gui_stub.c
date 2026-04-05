@@ -96,6 +96,21 @@ static void stub_set_int(void *h, int v)
     (void)h;
     (void)v;
 }
+static void *stub_create_group(void *p, const char *t, void *g)
+{
+    (void)p;
+    (void)t;
+    (void)g;
+    return NULL;
+}
+static void *stub_create_ddd(void *p, double a, double b, double c)
+{
+    (void)p;
+    (void)a;
+    (void)b;
+    (void)c;
+    return NULL;
+}
 static void stub_grid(void *h, int c, int r)
 {
     (void)h;
@@ -159,6 +174,19 @@ const gui_backend_t gui_backend_stub = {
     .select_add_item = stub_set_text,
     .select_get_index = stub_get_int,
     .select_set_index = stub_set_int,
+    .text_create = stub_create_notext,
+    .text_destroy = stub_destroy,
+    .text_get_text = stub_get_text,
+    .text_set_text = stub_set_text,
+    .radio_create = stub_create_group,
+    .radio_destroy = stub_destroy,
+    .radio_set_text = stub_set_text,
+    .radio_get_active = stub_get_bool,
+    .radio_set_active = stub_set_bool,
+    .spinbox_create = stub_create_ddd,
+    .spinbox_destroy = stub_destroy,
+    .spinbox_get_value = stub_get_double,
+    .spinbox_set_value = stub_set_double,
     .widget_grid = stub_grid,
     .widget_grid_remove = stub_grid_remove,
     .container_grid_columnconfigure = stub_grid_configure,

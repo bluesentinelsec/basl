@@ -569,6 +569,129 @@ static void cocoa_select_set_index(void *handle, int index)
     if (handle) sendv_long((id)handle, sel("selectItemAtIndex:"), (long)index);
 }
 
+/* ── Text ─────────────────────────────────────────────────────────── */
+
+static void *cocoa_text_create(void *parent)
+{
+    if (!parent) return NULL;
+    id cv = send0((id)parent, sel("contentView"));
+    id sv = send_rect(send0(cls("NSScrollView"), sel("alloc")),
+                      sel("initWithFrame:"), CGRectMake_(0, 0, 200, 100));
+    sendv_bool(sv, sel("setHasVerticalScroller:"), 1);
+    id tv = send_rect(send0(cls("NSTextView"), sel("alloc")),
+                      sel("initWithFrame:"), CGRectMake_(0, 0, 200, 100));
+    sendv_bool(tv, sel("setEditable:"), 1);
+    sendv_id(sv, sel("setDocumentView:"), tv);
+    sendv_id(cv, sel("addSubview:"), sv);
+    register_widget_parent(sv, cv);
+    return (void *)sv;
+}
+
+static void cocoa_text_destroy(void *handle)
+{
+    if (handle) sendv((id)handle, sel("removeFromSuperview"));
+}
+
+static const char *cocoa_text_get_text(void *handle, char *buf, size_t bufsz)
+{
+    if (!handle) { buf[0] = '\0'; return buf; }
+    id tv = send0((id)handle, sel("documentView"));
+    id nsval = send0(tv, sel("string"));
+    const char *s = ((const char *(*)(id, SEL))objc_msgSend)(nsval, sel("UTF8String"));
+    if (s) {
+        size_t len = strlen(s);
+        if (len >= bufsz) len = bufsz - 1;
+        memcpy(buf, s, len);
+        buf[len] = '\0';
+    } else {
+        buf[0] = '\0';
+    }
+    return buf;
+}
+
+static void cocoa_text_set_text(void *handle, const char *text)
+{
+    if (!handle) return;
+    id tv = send0((id)handle, sel("documentView"));
+    sendv_id(tv, sel("setString:"), nsstr(text));
+}
+
+/* ── Radio ────────────────────────────────────────────────────────── */
+
+static void *cocoa_radio_create(void *parent, const char *text, void *group)
+{
+    (void)group; /* Cocoa radio buttons are grouped by sharing an action/target */
+    if (!parent) return NULL;
+    id cv = send0((id)parent, sel("contentView"));
+    id button = send_rect(send0(cls("NSButton"), sel("alloc")),
+                          sel("initWithFrame:"), CGRectMake_(0, 0, 200, 24));
+    sendv_id(button, sel("setTitle:"), nsstr(text));
+    sendv_long(button, sel("setButtonType:"), 4); /* NSRadioButton */
+    if (g_button_target) {
+        sendv_id(button, sel("setTarget:"), g_button_target);
+        sendv_sel(button, sel("setAction:"), sel("buttonClicked:"));
+    }
+    sendv_id(cv, sel("addSubview:"), button);
+    register_widget_parent(button, cv);
+    return (void *)button;
+}
+
+static void cocoa_radio_destroy(void *handle)
+{
+    if (handle) sendv((id)handle, sel("removeFromSuperview"));
+}
+
+static void cocoa_radio_set_text(void *handle, const char *text)
+{
+    if (handle) sendv_id((id)handle, sel("setTitle:"), nsstr(text));
+}
+
+static bool cocoa_radio_get_active(void *handle)
+{
+    if (!handle) return false;
+    long state = ((long (*)(id, SEL))objc_msgSend)((id)handle, sel("state"));
+    return state != 0;
+}
+
+static void cocoa_radio_set_active(void *handle, bool active)
+{
+    if (handle) sendv_long((id)handle, sel("setState:"), active ? 1 : 0);
+}
+
+/* ── Spinbox ──────────────────────────────────────────────────────── */
+
+static void *cocoa_spinbox_create(void *parent, double min_val, double max_val, double step)
+{
+    (void)step;
+    if (!parent) return NULL;
+    id cv = send0((id)parent, sel("contentView"));
+    id stepper = send_rect(send0(cls("NSStepper"), sel("alloc")),
+                           sel("initWithFrame:"), CGRectMake_(0, 0, 100, 24));
+    ((void (*)(id, SEL, double))objc_msgSend)(stepper, sel("setMinValue:"), min_val);
+    ((void (*)(id, SEL, double))objc_msgSend)(stepper, sel("setMaxValue:"), max_val);
+    ((void (*)(id, SEL, double))objc_msgSend)(stepper, sel("setIncrement:"), step);
+    ((void (*)(id, SEL, double))objc_msgSend)(stepper, sel("setDoubleValue:"), min_val);
+    sendv_id(cv, sel("addSubview:"), stepper);
+    register_widget_parent(stepper, cv);
+    return (void *)stepper;
+}
+
+static void cocoa_spinbox_destroy(void *handle)
+{
+    if (handle) sendv((id)handle, sel("removeFromSuperview"));
+}
+
+static double cocoa_spinbox_get_value(void *handle)
+{
+    if (!handle) return 0.0;
+    return ((double (*)(id, SEL))objc_msgSend)((id)handle, sel("doubleValue"));
+}
+
+static void cocoa_spinbox_set_value(void *handle, double value)
+{
+    if (handle) ((void (*)(id, SEL, double))objc_msgSend)((id)handle, sel("setDoubleValue:"), value);
+}
+
 /* ── Grid layout ─────────────────────────────────────────────────── */
 
 static void cocoa_widget_grid(void *handle, int col, int row)
@@ -657,6 +780,19 @@ const gui_backend_t gui_backend_cocoa = {
     .select_add_item               = cocoa_select_add_item,
     .select_get_index              = cocoa_select_get_index,
     .select_set_index              = cocoa_select_set_index,
+    .text_create                   = cocoa_text_create,
+    .text_destroy                  = cocoa_text_destroy,
+    .text_get_text                 = cocoa_text_get_text,
+    .text_set_text                 = cocoa_text_set_text,
+    .radio_create                  = cocoa_radio_create,
+    .radio_destroy                 = cocoa_radio_destroy,
+    .radio_set_text                = cocoa_radio_set_text,
+    .radio_get_active              = cocoa_radio_get_active,
+    .radio_set_active              = cocoa_radio_set_active,
+    .spinbox_create                = cocoa_spinbox_create,
+    .spinbox_destroy               = cocoa_spinbox_destroy,
+    .spinbox_get_value             = cocoa_spinbox_get_value,
+    .spinbox_set_value             = cocoa_spinbox_set_value,
     .widget_grid                   = cocoa_widget_grid,
     .widget_grid_remove            = cocoa_widget_grid_remove,
     .container_grid_columnconfigure = cocoa_container_grid_columnconfigure,

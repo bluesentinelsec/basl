@@ -91,6 +91,25 @@ extern "C"
         int (*select_get_index)(void *handle);
         void (*select_set_index)(void *handle, int index);
 
+        /* Text (multi-line text area) */
+        void *(*text_create)(void *parent);
+        void (*text_destroy)(void *handle);
+        const char *(*text_get_text)(void *handle, char *buf, size_t bufsz);
+        void (*text_set_text)(void *handle, const char *text);
+
+        /* Radiobutton */
+        void *(*radio_create)(void *parent, const char *text, void *group);
+        void (*radio_destroy)(void *handle);
+        void (*radio_set_text)(void *handle, const char *text);
+        bool (*radio_get_active)(void *handle);
+        void (*radio_set_active)(void *handle, bool active);
+
+        /* Spinbox (numeric entry with arrows) */
+        void *(*spinbox_create)(void *parent, double min_val, double max_val, double step);
+        void (*spinbox_destroy)(void *handle);
+        double (*spinbox_get_value)(void *handle);
+        void (*spinbox_set_value)(void *handle, double value);
+
         /* Grid layout */
         void (*widget_grid)(void *handle, int col, int row);
         void (*widget_grid_remove)(void *handle);

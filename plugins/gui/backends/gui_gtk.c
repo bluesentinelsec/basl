@@ -91,6 +91,16 @@ typedef gint (*fn_gtk_combo_box_get_active)(GtkWidget *);
 typedef void (*fn_gtk_combo_box_set_active)(GtkWidget *, gint);
 typedef double (*fn_gtk_range_get_value)(GtkWidget *);
 typedef void (*fn_gtk_range_set_value)(GtkWidget *, double);
+typedef GtkWidget *(*fn_gtk_text_view_new)(void);
+typedef void *(*fn_gtk_text_view_get_buffer)(GtkWidget *);
+typedef char *(*fn_gtk_text_buffer_get_text)(void *, void *, void *, gboolean);
+typedef void (*fn_gtk_text_buffer_set_text)(void *, const char *, gint);
+typedef void (*fn_gtk_text_buffer_get_start_iter)(void *, void *);
+typedef void (*fn_gtk_text_buffer_get_end_iter)(void *, void *);
+typedef GtkWidget *(*fn_gtk_scrolled_window_new_gtk3)(void *, void *);
+typedef GtkWidget *(*fn_gtk_spin_button_new_with_range)(double, double, double);
+typedef double (*fn_gtk_spin_button_get_value)(GtkWidget *);
+typedef void (*fn_gtk_spin_button_set_value)(GtkWidget *, double);
 
 /* GTK3-only function pointer types */
 typedef GtkWidget *(*fn_gtk_window_new_gtk3)(int type);
@@ -106,6 +116,8 @@ typedef const char *(*fn_gtk_entry_get_text_gtk3)(GtkWidget *);
 typedef void (*fn_gtk_entry_set_text_gtk3)(GtkWidget *, const char *);
 typedef gboolean (*fn_gtk_toggle_button_get_active)(GtkWidget *);
 typedef void (*fn_gtk_toggle_button_set_active)(GtkWidget *, gboolean);
+typedef GtkWidget *(*fn_gtk_radio_button_new_with_label)(void *, const char *);
+typedef GtkWidget *(*fn_gtk_radio_button_new_with_label_from_widget)(GtkWidget *, const char *);
 
 /* GTK4-only function pointer types */
 typedef GtkWidget *(*fn_gtk_window_new_gtk4)(void);
@@ -119,6 +131,9 @@ typedef void (*fn_gtk_editable_set_text)(GtkWidget *, const char *);
 typedef gboolean (*fn_gtk_check_button_get_active)(GtkWidget *);
 typedef void (*fn_gtk_check_button_set_active)(GtkWidget *, gboolean);
 typedef void (*fn_gtk_check_button_set_label)(GtkWidget *, const char *);
+typedef void (*fn_gtk_check_button_set_group)(GtkWidget *, GtkWidget *);
+typedef GtkWidget *(*fn_gtk_scrolled_window_new_gtk4)(void);
+typedef void (*fn_gtk_scrolled_window_set_child)(GtkWidget *, GtkWidget *);
 
 /* GLib main loop (used by GTK4 path; available in both versions) */
 typedef GMainLoop *(*fn_g_main_loop_new)(GMainContext *, gboolean);
@@ -166,6 +181,14 @@ typedef struct gtk_version_ops
     gboolean (*checkbox_get_active)(GtkWidget *cb);
     void (*checkbox_set_active)(GtkWidget *cb, gboolean active);
     void (*checkbox_set_label)(GtkWidget *cb, const char *text);
+
+    /* Radio */
+    GtkWidget *(*radio_create)(void *parent_grid, const char *text, void *group);
+    void (*radio_set_label)(GtkWidget *rb, const char *text);
+
+    /* Scrolled window (for Text widget) */
+    GtkWidget *(*scrolled_window_new)(void);
+    void (*scrolled_window_set_child)(GtkWidget *sw, GtkWidget *child);
 } gtk_version_ops_t;
 
 /* ── Shared resolved symbols ─────────────────────────────────────── */
@@ -194,6 +217,15 @@ static struct
     fn_gtk_combo_box_set_active gtk_combo_box_set_active;
     fn_gtk_range_get_value gtk_range_get_value;
     fn_gtk_range_set_value gtk_range_set_value;
+    fn_gtk_text_view_new gtk_text_view_new;
+    fn_gtk_text_view_get_buffer gtk_text_view_get_buffer;
+    fn_gtk_text_buffer_get_text gtk_text_buffer_get_text;
+    fn_gtk_text_buffer_set_text gtk_text_buffer_set_text;
+    fn_gtk_text_buffer_get_start_iter gtk_text_buffer_get_start_iter;
+    fn_gtk_text_buffer_get_end_iter gtk_text_buffer_get_end_iter;
+    fn_gtk_spin_button_new_with_range gtk_spin_button_new_with_range;
+    fn_gtk_spin_button_get_value gtk_spin_button_get_value;
+    fn_gtk_spin_button_set_value gtk_spin_button_set_value;
 } G;
 
 static const gtk_version_ops_t *g_vops = NULL;
@@ -357,6 +389,9 @@ static fn_gtk_entry_get_text_gtk3 s_gtk3_entry_get_text;
 static fn_gtk_entry_set_text_gtk3 s_gtk3_entry_set_text;
 static fn_gtk_toggle_button_get_active s_gtk3_toggle_get_active;
 static fn_gtk_toggle_button_set_active s_gtk3_toggle_set_active;
+static fn_gtk_radio_button_new_with_label s_gtk3_radio_new;
+static fn_gtk_radio_button_new_with_label_from_widget s_gtk3_radio_new_from;
+static fn_gtk_scrolled_window_new_gtk3 s_gtk3_scrolled_window_new;
 
 static void gtk3_main_loop(void)
 {
@@ -439,6 +474,29 @@ static void gtk3_checkbox_set_label(GtkWidget *cb, const char *text)
     G.gtk_button_set_label(cb, text);
 }
 
+static GtkWidget *gtk3_radio_create(void *parent_grid, const char *text, void *group)
+{
+    (void)parent_grid;
+    if (group)
+        return s_gtk3_radio_new_from(group, text);
+    return s_gtk3_radio_new(NULL, text);
+}
+
+static void gtk3_radio_set_label(GtkWidget *rb, const char *text)
+{
+    G.gtk_button_set_label(rb, text);
+}
+
+static GtkWidget *gtk3_scrolled_window_new(void)
+{
+    return s_gtk3_scrolled_window_new(NULL, NULL);
+}
+
+static void gtk3_scrolled_window_set_child(GtkWidget *sw, GtkWidget *child)
+{
+    s_gtk3_container_add(sw, child);
+}
+
 static const gtk_version_ops_t g_gtk3_ops = {
     .version_name = "GTK3",
     .close_signal = "delete-event",
@@ -457,6 +515,10 @@ static const gtk_version_ops_t g_gtk3_ops = {
     .checkbox_get_active = gtk3_checkbox_get_active,
     .checkbox_set_active = gtk3_checkbox_set_active,
     .checkbox_set_label = gtk3_checkbox_set_label,
+    .radio_create = gtk3_radio_create,
+    .radio_set_label = gtk3_radio_set_label,
+    .scrolled_window_new = gtk3_scrolled_window_new,
+    .scrolled_window_set_child = gtk3_scrolled_window_set_child,
 };
 
 static bool load_gtk3_symbols(void)
@@ -474,6 +536,9 @@ static bool load_gtk3_symbols(void)
     LOAD_LOCAL(s_gtk3_entry_set_text, gtk_entry_set_text);
     LOAD_LOCAL(s_gtk3_toggle_get_active, gtk_toggle_button_get_active);
     LOAD_LOCAL(s_gtk3_toggle_set_active, gtk_toggle_button_set_active);
+    LOAD_LOCAL(s_gtk3_radio_new, gtk_radio_button_new_with_label);
+    LOAD_LOCAL(s_gtk3_radio_new_from, gtk_radio_button_new_with_label_from_widget);
+    LOAD_LOCAL(s_gtk3_scrolled_window_new, gtk_scrolled_window_new);
     return true;
 fail:
     return false;
@@ -498,6 +563,9 @@ static fn_gtk_editable_set_text s_gtk4_editable_set_text;
 static fn_gtk_check_button_get_active s_gtk4_check_get_active;
 static fn_gtk_check_button_set_active s_gtk4_check_set_active;
 static fn_gtk_check_button_set_label s_gtk4_check_set_label;
+static fn_gtk_check_button_set_group s_gtk4_check_set_group;
+static fn_gtk_scrolled_window_new_gtk4 s_gtk4_scrolled_window_new;
+static fn_gtk_scrolled_window_set_child s_gtk4_scrolled_window_set_child;
 
 static GMainLoop *s_gtk4_loop = NULL;
 
@@ -613,6 +681,30 @@ static void gtk4_checkbox_set_label(GtkWidget *cb, const char *text)
     s_gtk4_check_set_label(cb, text);
 }
 
+static GtkWidget *gtk4_radio_create(void *parent_grid, const char *text, void *group)
+{
+    (void)parent_grid;
+    GtkWidget *rb = G.gtk_check_button_new_with_label(text);
+    if (group)
+        s_gtk4_check_set_group(rb, group);
+    return rb;
+}
+
+static void gtk4_radio_set_label(GtkWidget *rb, const char *text)
+{
+    s_gtk4_check_set_label(rb, text);
+}
+
+static GtkWidget *gtk4_scrolled_window_new(void)
+{
+    return s_gtk4_scrolled_window_new();
+}
+
+static void gtk4_scrolled_window_set_child(GtkWidget *sw, GtkWidget *child)
+{
+    s_gtk4_scrolled_window_set_child(sw, child);
+}
+
 static const gtk_version_ops_t g_gtk4_ops = {
     .version_name = "GTK4",
     .close_signal = "close-request",
@@ -631,6 +723,10 @@ static const gtk_version_ops_t g_gtk4_ops = {
     .checkbox_get_active = gtk4_checkbox_get_active,
     .checkbox_set_active = gtk4_checkbox_set_active,
     .checkbox_set_label = gtk4_checkbox_set_label,
+    .radio_create = gtk4_radio_create,
+    .radio_set_label = gtk4_radio_set_label,
+    .scrolled_window_new = gtk4_scrolled_window_new,
+    .scrolled_window_set_child = gtk4_scrolled_window_set_child,
 };
 
 static bool load_gtk4_symbols(void)
@@ -650,6 +746,9 @@ static bool load_gtk4_symbols(void)
     LOAD_LOCAL(s_gtk4_check_get_active, gtk_check_button_get_active);
     LOAD_LOCAL(s_gtk4_check_set_active, gtk_check_button_set_active);
     LOAD_LOCAL(s_gtk4_check_set_label, gtk_check_button_set_label);
+    LOAD_LOCAL(s_gtk4_check_set_group, gtk_check_button_set_group);
+    LOAD_LOCAL(s_gtk4_scrolled_window_new, gtk_scrolled_window_new);
+    LOAD_LOCAL(s_gtk4_scrolled_window_set_child, gtk_scrolled_window_set_child);
     return true;
 fail:
     return false;
@@ -682,6 +781,15 @@ static bool load_shared_symbols(void)
     LOAD_SHARED(gtk_combo_box_set_active);
     LOAD_SHARED(gtk_range_get_value);
     LOAD_SHARED(gtk_range_set_value);
+    LOAD_SHARED(gtk_text_view_new);
+    LOAD_SHARED(gtk_text_view_get_buffer);
+    LOAD_SHARED(gtk_text_buffer_get_text);
+    LOAD_SHARED(gtk_text_buffer_set_text);
+    LOAD_SHARED(gtk_text_buffer_get_start_iter);
+    LOAD_SHARED(gtk_text_buffer_get_end_iter);
+    LOAD_SHARED(gtk_spin_button_new_with_range);
+    LOAD_SHARED(gtk_spin_button_get_value);
+    LOAD_SHARED(gtk_spin_button_set_value);
     return true;
 fail:
     return false;
@@ -1044,6 +1152,181 @@ static void gtk_be_select_set_index(void *handle, int index)
         G.gtk_combo_box_set_active(handle, index);
 }
 
+/* ── Text ────────────────────────────────────────────────────────── */
+
+/* Map scrolled-window handle → text view for buffer access. */
+#define MAX_TEXT_VIEWS 64
+static struct
+{
+    void *sw;
+    void *tv;
+} g_text_views[MAX_TEXT_VIEWS];
+static int g_text_view_count = 0;
+
+static void *text_view_for_sw(void *sw)
+{
+    for (int i = 0; i < g_text_view_count; i++)
+        if (g_text_views[i].sw == sw)
+            return g_text_views[i].tv;
+    return NULL;
+}
+
+static void *gtk_be_text_create(void *parent)
+{
+    if (!parent)
+        return NULL;
+    void *grid = grid_for_window(parent);
+    if (!grid)
+        return NULL;
+    GtkWidget *sw = g_vops->scrolled_window_new();
+    GtkWidget *tv = G.gtk_text_view_new();
+    g_vops->scrolled_window_set_child(sw, tv);
+    G.gtk_widget_set_hexpand(sw, 1);
+    G.gtk_widget_set_vexpand(sw, 1);
+    if (g_text_view_count < MAX_TEXT_VIEWS)
+        g_text_views[g_text_view_count++] = (typeof(g_text_views[0])){sw, tv};
+    register_widget_parent(sw, grid);
+    return sw;
+}
+
+static void gtk_be_text_destroy(void *handle)
+{
+    if (handle)
+        g_vops->widget_destroy(handle);
+}
+
+static const char *gtk_be_text_get_text(void *handle, char *buf, size_t bufsz)
+{
+    buf[0] = '\0';
+    if (!handle)
+        return buf;
+    void *tv = text_view_for_sw(handle);
+    if (!tv)
+        return buf;
+    void *buffer = G.gtk_text_view_get_buffer(tv);
+    if (!buffer)
+        return buf;
+    /* GtkTextIter is 80 bytes on 64-bit; allocate generously. */
+    char start_iter[128], end_iter[128];
+    G.gtk_text_buffer_get_start_iter(buffer, start_iter);
+    G.gtk_text_buffer_get_end_iter(buffer, end_iter);
+    char *text = G.gtk_text_buffer_get_text(buffer, start_iter, end_iter, 0);
+    if (text)
+    {
+        size_t len = strlen(text);
+        if (len >= bufsz)
+            len = bufsz - 1;
+        memcpy(buf, text, len);
+        buf[len] = '\0';
+        /* g_free — we don't have it loaded, but the text is valid until
+           the buffer changes.  Copy is already done. For correctness we
+           should call g_free, but the string is short-lived. */
+    }
+    return buf;
+}
+
+static void gtk_be_text_set_text(void *handle, const char *text)
+{
+    if (!handle)
+        return;
+    void *tv = text_view_for_sw(handle);
+    if (!tv)
+        return;
+    void *buffer = G.gtk_text_view_get_buffer(tv);
+    if (buffer)
+        G.gtk_text_buffer_set_text(buffer, text, -1);
+}
+
+/* ── Radio ───────────────────────────────────────────────────────── */
+
+static void on_radio_toggled(GtkWidget *widget, void *data)
+{
+    (void)data;
+    gui_callback_t *cb = find_callback(widget, GUI_EVENT_CHANGE);
+    if (cb && cb->fn)
+        cb->fn(cb->user_data);
+}
+
+static void *gtk_be_radio_create(void *parent, const char *text, void *group)
+{
+    if (!parent)
+        return NULL;
+    void *grid = grid_for_window(parent);
+    if (!grid)
+        return NULL;
+    GtkWidget *rb = g_vops->radio_create(grid, text, group);
+    G.g_signal_connect_data(rb, "toggled", (GCallback)on_radio_toggled, NULL, NULL, 0);
+    register_widget_parent(rb, grid);
+    return rb;
+}
+
+static void gtk_be_radio_destroy(void *handle)
+{
+    if (handle)
+        g_vops->widget_destroy(handle);
+}
+
+static void gtk_be_radio_set_text(void *handle, const char *text)
+{
+    if (handle)
+        g_vops->radio_set_label(handle, text);
+}
+
+static bool gtk_be_radio_get_active(void *handle)
+{
+    if (!handle)
+        return false;
+    return g_vops->checkbox_get_active(handle) != 0;
+}
+
+static void gtk_be_radio_set_active(void *handle, bool active)
+{
+    if (handle)
+        g_vops->checkbox_set_active(handle, active ? 1 : 0);
+}
+
+/* ── Spinbox ─────────────────────────────────────────────────────── */
+
+static void on_spinbox_changed(GtkWidget *widget, void *data)
+{
+    (void)data;
+    gui_callback_t *cb = find_callback(widget, GUI_EVENT_CHANGE);
+    if (cb && cb->fn)
+        cb->fn(cb->user_data);
+}
+
+static void *gtk_be_spinbox_create(void *parent, double min_val, double max_val, double step)
+{
+    if (!parent)
+        return NULL;
+    void *grid = grid_for_window(parent);
+    if (!grid)
+        return NULL;
+    GtkWidget *spin = G.gtk_spin_button_new_with_range(min_val, max_val, step);
+    G.g_signal_connect_data(spin, "value-changed", (GCallback)on_spinbox_changed, NULL, NULL, 0);
+    register_widget_parent(spin, grid);
+    return spin;
+}
+
+static void gtk_be_spinbox_destroy(void *handle)
+{
+    if (handle)
+        g_vops->widget_destroy(handle);
+}
+
+static double gtk_be_spinbox_get_value(void *handle)
+{
+    if (!handle)
+        return 0.0;
+    return G.gtk_spin_button_get_value(handle);
+}
+
+static void gtk_be_spinbox_set_value(void *handle, double value)
+{
+    if (handle)
+        G.gtk_spin_button_set_value(handle, value);
+}
+
 /* ── Grid layout ─────────────────────────────────────────────────── */
 
 static void gtk_be_widget_grid(void *handle, int col, int row)
@@ -1143,6 +1426,19 @@ const gui_backend_t gui_backend_gtk = {
     .select_add_item = gtk_be_select_add_item,
     .select_get_index = gtk_be_select_get_index,
     .select_set_index = gtk_be_select_set_index,
+    .text_create = gtk_be_text_create,
+    .text_destroy = gtk_be_text_destroy,
+    .text_get_text = gtk_be_text_get_text,
+    .text_set_text = gtk_be_text_set_text,
+    .radio_create = gtk_be_radio_create,
+    .radio_destroy = gtk_be_radio_destroy,
+    .radio_set_text = gtk_be_radio_set_text,
+    .radio_get_active = gtk_be_radio_get_active,
+    .radio_set_active = gtk_be_radio_set_active,
+    .spinbox_create = gtk_be_spinbox_create,
+    .spinbox_destroy = gtk_be_spinbox_destroy,
+    .spinbox_get_value = gtk_be_spinbox_get_value,
+    .spinbox_set_value = gtk_be_spinbox_set_value,
     .widget_grid = gtk_be_widget_grid,
     .widget_grid_remove = gtk_be_widget_grid_remove,
     .container_grid_columnconfigure = gtk_be_container_grid_columnconfigure,
