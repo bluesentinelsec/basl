@@ -757,6 +757,48 @@ static void cocoa_listbox_set_selected(void *handle, int index)
     (void)handle; (void)index;
 }
 
+/* ── Menu ─────────────────────────────────────────────────────────── */
+
+static void *cocoa_menubar_create(void *window)
+{
+    (void)window;
+    id mainMenu = send0(send0(cls("NSMenu"), sel("alloc")), sel("init"));
+    sendv_id(send0(cls("NSApplication"), sel("sharedApplication")),
+             sel("setMainMenu:"), mainMenu);
+    return (void *)mainMenu;
+}
+
+static void cocoa_menubar_destroy(void *handle)
+{
+    (void)handle;
+}
+
+static void *cocoa_menu_add_submenu(void *menubar, const char *label)
+{
+    id submenu = send0(send0(cls("NSMenu"), sel("alloc")), sel("init"));
+    sendv_id(submenu, sel("setTitle:"), nsstr(label));
+    id item = send0(send0(cls("NSMenuItem"), sel("alloc")), sel("init"));
+    sendv_id(item, sel("setTitle:"), nsstr(label));
+    sendv_id(item, sel("setSubmenu:"), submenu);
+    sendv_id((id)menubar, sel("addItem:"), item);
+    return (void *)submenu;
+}
+
+static void cocoa_menu_add_item(void *submenu, const char *label, gui_callback_t cb)
+{
+    id item = ((id (*)(id, SEL, id, SEL, id))objc_msgSend)(
+        send0(cls("NSMenuItem"), sel("alloc")),
+        sel("initWithTitle:action:keyEquivalent:"),
+        nsstr(label), (SEL)NULL, nsstr(""));
+    if (g_button_target)
+    {
+        sendv_id(item, sel("setTarget:"), g_button_target);
+        sendv_sel(item, sel("setAction:"), sel("buttonClicked:"));
+    }
+    cocoa_set_callback(item, GUI_EVENT_CLICK, cb);
+    sendv_id((id)submenu, sel("addItem:"), item);
+}
+
 /* ── Grid layout ─────────────────────────────────────────────────── */
 
 static void cocoa_widget_grid(void *handle, int col, int row)
@@ -874,6 +916,10 @@ const gui_backend_t gui_backend_cocoa = {
     .listbox_add_item              = cocoa_listbox_add_item,
     .listbox_get_selected          = cocoa_listbox_get_selected,
     .listbox_set_selected          = cocoa_listbox_set_selected,
+    .menubar_create                = cocoa_menubar_create,
+    .menubar_destroy               = cocoa_menubar_destroy,
+    .menu_add_submenu              = cocoa_menu_add_submenu,
+    .menu_add_item                 = cocoa_menu_add_item,
     .widget_grid                   = cocoa_widget_grid,
     .widget_grid_span              = cocoa_widget_grid_span,
     .widget_grid_remove            = cocoa_widget_grid_remove,

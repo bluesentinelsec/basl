@@ -126,6 +126,11 @@ typedef gboolean (*fn_gtk_toggle_button_get_active)(GtkWidget *);
 typedef void (*fn_gtk_toggle_button_set_active)(GtkWidget *, gboolean);
 typedef GtkWidget *(*fn_gtk_radio_button_new_with_label)(void *, const char *);
 typedef GtkWidget *(*fn_gtk_radio_button_new_with_label_from_widget)(GtkWidget *, const char *);
+typedef GtkWidget *(*fn_gtk_menu_bar_new)(void);
+typedef GtkWidget *(*fn_gtk_menu_new)(void);
+typedef GtkWidget *(*fn_gtk_menu_item_new_with_label)(const char *);
+typedef void (*fn_gtk_menu_item_set_submenu)(GtkWidget *, GtkWidget *);
+typedef void (*fn_gtk_menu_shell_append)(GtkWidget *, GtkWidget *);
 
 /* GTK4-only function pointer types */
 typedef GtkWidget *(*fn_gtk_window_new_gtk4)(void);
@@ -143,6 +148,15 @@ typedef void (*fn_gtk_check_button_set_group)(GtkWidget *, GtkWidget *);
 typedef GtkWidget *(*fn_gtk_scrolled_window_new_gtk4)(void);
 typedef void (*fn_gtk_scrolled_window_set_child)(GtkWidget *, GtkWidget *);
 typedef void (*fn_gtk_frame_set_child_gtk4)(GtkWidget *, GtkWidget *);
+typedef GtkWidget *(*fn_gtk_popover_menu_bar_new_from_model)(void *);
+typedef void *(*fn_g_menu_new)(void);
+typedef void (*fn_g_menu_append)(void *, const char *, const char *);
+typedef void (*fn_g_menu_append_submenu)(void *, const char *, void *);
+typedef void *(*fn_g_simple_action_new)(const char *, void *);
+typedef void (*fn_g_action_map_add_action)(void *, void *);
+typedef void *(*fn_g_simple_action_group_new)(void);
+typedef void (*fn_gtk_widget_insert_action_group)(GtkWidget *, const char *, void *);
+typedef gulong (*fn_g_signal_connect_data_t)(void *, const char *, GCallback, void *, GClosureNotify, int);
 
 /* GLib main loop (used by GTK4 path; available in both versions) */
 typedef GMainLoop *(*fn_g_main_loop_new)(GMainContext *, gboolean);
@@ -201,6 +215,11 @@ typedef struct gtk_version_ops
 
     /* Frame */
     void (*frame_set_child)(GtkWidget *frame, GtkWidget *child);
+
+    /* Menu bar */
+    void *(*menubar_create)(void *window);
+    void *(*menu_add_submenu)(void *menubar, const char *label);
+    void (*menu_add_item)(void *submenu, const char *label, gui_callback_t cb);
 } gtk_version_ops_t;
 
 /* ── Shared resolved symbols ─────────────────────────────────────── */
@@ -412,6 +431,11 @@ static fn_gtk_toggle_button_set_active s_gtk3_toggle_set_active;
 static fn_gtk_radio_button_new_with_label s_gtk3_radio_new;
 static fn_gtk_radio_button_new_with_label_from_widget s_gtk3_radio_new_from;
 static fn_gtk_scrolled_window_new_gtk3 s_gtk3_scrolled_window_new;
+static fn_gtk_menu_bar_new s_gtk3_menu_bar_new;
+static fn_gtk_menu_new s_gtk3_menu_new;
+static fn_gtk_menu_item_new_with_label s_gtk3_menu_item_new;
+static fn_gtk_menu_item_set_submenu s_gtk3_menu_item_set_submenu;
+static fn_gtk_menu_shell_append s_gtk3_menu_shell_append;
 
 static void gtk3_main_loop(void)
 {
@@ -522,6 +546,52 @@ static void gtk3_frame_set_child(GtkWidget *frame, GtkWidget *child)
     s_gtk3_container_add(frame, child);
 }
 
+static void *gtk3_menubar_create(void *window)
+{
+    GtkWidget *mb = s_gtk3_menu_bar_new();
+    /* Insert menubar at row -1 (above grid content) in the window's grid. */
+    void *grid = grid_for_window(window);
+    if (grid)
+    {
+        G.gtk_grid_attach(grid, mb, 0, -1, 10, 1);
+        s_gtk3_widget_show_all(mb);
+    }
+    return mb;
+}
+
+static void *gtk3_menu_add_submenu(void *menubar, const char *label)
+{
+    GtkWidget *menu = s_gtk3_menu_new();
+    GtkWidget *item = s_gtk3_menu_item_new(label);
+    s_gtk3_menu_item_set_submenu(item, menu);
+    s_gtk3_menu_shell_append(menubar, item);
+    s_gtk3_widget_show_all(item);
+    return menu;
+}
+
+static void gtk3_on_menu_activate(GtkWidget *widget, void *data)
+{
+    (void)widget;
+    gui_callback_t *cb = (gui_callback_t *)data;
+    if (cb && cb->fn)
+        cb->fn(cb->user_data);
+}
+
+static void gtk3_menu_add_item(void *submenu, const char *label, gui_callback_t cb)
+{
+    GtkWidget *item = s_gtk3_menu_item_new(label);
+    /* Store callback — we need it to persist. Use the global callback array. */
+    if (g_callback_count < MAX_CALLBACKS)
+    {
+        g_callbacks[g_callback_count] = (callback_entry_t){item, GUI_EVENT_CLICK, cb};
+        G.g_signal_connect_data(item, "activate", (GCallback)gtk3_on_menu_activate, &g_callbacks[g_callback_count].cb,
+                                NULL, 0);
+        g_callback_count++;
+    }
+    s_gtk3_menu_shell_append(submenu, item);
+    s_gtk3_widget_show_all(item);
+}
+
 static const gtk_version_ops_t g_gtk3_ops = {
     .version_name = "GTK3",
     .close_signal = "delete-event",
@@ -545,6 +615,9 @@ static const gtk_version_ops_t g_gtk3_ops = {
     .scrolled_window_new = gtk3_scrolled_window_new,
     .scrolled_window_set_child = gtk3_scrolled_window_set_child,
     .frame_set_child = gtk3_frame_set_child,
+    .menubar_create = gtk3_menubar_create,
+    .menu_add_submenu = gtk3_menu_add_submenu,
+    .menu_add_item = gtk3_menu_add_item,
 };
 
 static bool load_gtk3_symbols(void)
@@ -565,6 +638,11 @@ static bool load_gtk3_symbols(void)
     LOAD_LOCAL(s_gtk3_radio_new, gtk_radio_button_new_with_label);
     LOAD_LOCAL(s_gtk3_radio_new_from, gtk_radio_button_new_with_label_from_widget);
     LOAD_LOCAL(s_gtk3_scrolled_window_new, gtk_scrolled_window_new);
+    LOAD_LOCAL(s_gtk3_menu_bar_new, gtk_menu_bar_new);
+    LOAD_LOCAL(s_gtk3_menu_new, gtk_menu_new);
+    LOAD_LOCAL(s_gtk3_menu_item_new, gtk_menu_item_new_with_label);
+    LOAD_LOCAL(s_gtk3_menu_item_set_submenu, gtk_menu_item_set_submenu);
+    LOAD_LOCAL(s_gtk3_menu_shell_append, gtk_menu_shell_append);
     return true;
 fail:
     return false;
@@ -593,6 +671,20 @@ static fn_gtk_check_button_set_group s_gtk4_check_set_group;
 static fn_gtk_scrolled_window_new_gtk4 s_gtk4_scrolled_window_new;
 static fn_gtk_scrolled_window_set_child s_gtk4_scrolled_window_set_child;
 static fn_gtk_frame_set_child_gtk4 s_gtk4_frame_set_child;
+static fn_gtk_popover_menu_bar_new_from_model s_gtk4_popover_menu_bar_new;
+static fn_g_menu_new s_gtk4_g_menu_new;
+static fn_g_menu_append s_gtk4_g_menu_append;
+static fn_g_menu_append_submenu s_gtk4_g_menu_append_submenu;
+static fn_g_simple_action_new s_gtk4_g_simple_action_new;
+static fn_g_action_map_add_action s_gtk4_g_action_map_add_action;
+static fn_g_simple_action_group_new s_gtk4_g_simple_action_group_new;
+static fn_gtk_widget_insert_action_group s_gtk4_gtk_widget_insert_action_group;
+
+/* GTK4 menu needs a window reference for action map. */
+static void *s_gtk4_menu_window = NULL;
+static void *s_gtk4_menu_model = NULL;
+static void *s_gtk4_action_group = NULL;
+static int s_gtk4_action_id = 0;
 
 static GMainLoop *s_gtk4_loop = NULL;
 
@@ -737,6 +829,60 @@ static void gtk4_frame_set_child(GtkWidget *frame, GtkWidget *child)
     s_gtk4_frame_set_child(frame, child);
 }
 
+static void gtk4_on_action_activate(void *action, void *param, void *data)
+{
+    (void)action;
+    (void)param;
+    gui_callback_t *cb = (gui_callback_t *)data;
+    if (cb && cb->fn)
+        cb->fn(cb->user_data);
+}
+
+static void *gtk4_menubar_create(void *window)
+{
+    s_gtk4_menu_window = window;
+    s_gtk4_menu_model = s_gtk4_g_menu_new();
+    s_gtk4_action_group = s_gtk4_g_simple_action_group_new();
+    s_gtk4_action_id = 0;
+    s_gtk4_gtk_widget_insert_action_group(window, "win", s_gtk4_action_group);
+    GtkWidget *bar = s_gtk4_popover_menu_bar_new(s_gtk4_menu_model);
+    void *grid = grid_for_window(window);
+    if (grid)
+    {
+        G.gtk_grid_attach(grid, bar, 0, -1, 10, 1);
+        s_gtk4_widget_set_visible(bar, 1);
+    }
+    return bar;
+}
+
+static void *gtk4_menu_add_submenu(void *menubar, const char *label)
+{
+    (void)menubar;
+    void *submenu = s_gtk4_g_menu_new();
+    s_gtk4_g_menu_append_submenu(s_gtk4_menu_model, label, submenu);
+    return submenu;
+}
+
+static void gtk4_menu_add_item(void *submenu, const char *label, gui_callback_t cb)
+{
+    char action_name[64];
+    snprintf(action_name, sizeof(action_name), "act%d", s_gtk4_action_id++);
+    char detailed[80];
+    snprintf(detailed, sizeof(detailed), "win.%s", action_name);
+    s_gtk4_g_menu_append(submenu, label, detailed);
+
+    void *action = s_gtk4_g_simple_action_new(action_name, NULL);
+    if (g_callback_count < MAX_CALLBACKS)
+    {
+        g_callbacks[g_callback_count] = (callback_entry_t){action, GUI_EVENT_CLICK, cb};
+        G.g_signal_connect_data(action, "activate", (GCallback)gtk4_on_action_activate,
+                                &g_callbacks[g_callback_count].cb, NULL, 0);
+        g_callback_count++;
+    }
+    if (s_gtk4_action_group)
+        s_gtk4_g_action_map_add_action(s_gtk4_action_group, action);
+}
+
 static const gtk_version_ops_t g_gtk4_ops = {
     .version_name = "GTK4",
     .close_signal = "close-request",
@@ -760,6 +906,9 @@ static const gtk_version_ops_t g_gtk4_ops = {
     .scrolled_window_new = gtk4_scrolled_window_new,
     .scrolled_window_set_child = gtk4_scrolled_window_set_child,
     .frame_set_child = gtk4_frame_set_child,
+    .menubar_create = gtk4_menubar_create,
+    .menu_add_submenu = gtk4_menu_add_submenu,
+    .menu_add_item = gtk4_menu_add_item,
 };
 
 static bool load_gtk4_symbols(void)
@@ -783,6 +932,14 @@ static bool load_gtk4_symbols(void)
     LOAD_LOCAL(s_gtk4_scrolled_window_new, gtk_scrolled_window_new);
     LOAD_LOCAL(s_gtk4_scrolled_window_set_child, gtk_scrolled_window_set_child);
     LOAD_LOCAL(s_gtk4_frame_set_child, gtk_frame_set_child);
+    LOAD_LOCAL(s_gtk4_popover_menu_bar_new, gtk_popover_menu_bar_new_from_model);
+    LOAD_LOCAL(s_gtk4_g_menu_new, g_menu_new);
+    LOAD_LOCAL(s_gtk4_g_menu_append, g_menu_append);
+    LOAD_LOCAL(s_gtk4_g_menu_append_submenu, g_menu_append_submenu);
+    LOAD_LOCAL(s_gtk4_g_simple_action_new, g_simple_action_new);
+    LOAD_LOCAL(s_gtk4_g_action_map_add_action, g_action_map_add_action);
+    LOAD_LOCAL(s_gtk4_g_simple_action_group_new, g_simple_action_group_new);
+    LOAD_LOCAL(s_gtk4_gtk_widget_insert_action_group, gtk_widget_insert_action_group);
     return true;
 fail:
     return false;
@@ -1473,6 +1630,29 @@ static void gtk_be_listbox_set_selected(void *handle, int index)
     G.gtk_list_box_select_row(lb, row);
 }
 
+/* ── Menu ────────────────────────────────────────────────────────── */
+
+static void *gtk_be_menubar_create(void *window)
+{
+    return g_vops->menubar_create(window);
+}
+
+static void gtk_be_menubar_destroy(void *handle)
+{
+    if (handle)
+        g_vops->widget_destroy(handle);
+}
+
+static void *gtk_be_menu_add_submenu(void *menubar, const char *label)
+{
+    return g_vops->menu_add_submenu(menubar, label);
+}
+
+static void gtk_be_menu_add_item(void *submenu, const char *label, gui_callback_t cb)
+{
+    g_vops->menu_add_item(submenu, label, cb);
+}
+
 /* ── Grid layout ─────────────────────────────────────────────────── */
 
 static void gtk_be_widget_grid(void *handle, int col, int row)
@@ -1602,6 +1782,10 @@ const gui_backend_t gui_backend_gtk = {
     .listbox_add_item = gtk_be_listbox_add_item,
     .listbox_get_selected = gtk_be_listbox_get_selected,
     .listbox_set_selected = gtk_be_listbox_set_selected,
+    .menubar_create = gtk_be_menubar_create,
+    .menubar_destroy = gtk_be_menubar_destroy,
+    .menu_add_submenu = gtk_be_menu_add_submenu,
+    .menu_add_item = gtk_be_menu_add_item,
     .widget_grid = gtk_be_widget_grid,
     .widget_grid_span = gtk_be_widget_grid_span,
     .widget_grid_remove = gtk_be_widget_grid_remove,
