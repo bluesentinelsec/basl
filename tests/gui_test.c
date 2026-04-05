@@ -57,7 +57,7 @@ TEST(GuiPlugin, ModuleRegisters)
     EXPECT_STREQ(mod->name, "gui");
 }
 
-TEST(GuiPlugin, HasElevenClasses)
+TEST(GuiPlugin, HasThirteenClasses)
 {
     if (!gui_plugin_available())
         return;
@@ -65,7 +65,7 @@ TEST(GuiPlugin, HasElevenClasses)
     vigil_error_t error;
     const vigil_native_module_t *mod = get_gui_module(&natives, &error);
     ASSERT_NE(mod, NULL);
-    EXPECT_EQ(mod->class_count, 11U);
+    EXPECT_EQ(mod->class_count, 13U);
     EXPECT_NE(find_class(mod, "App"), NULL);
     EXPECT_NE(find_class(mod, "Window"), NULL);
     EXPECT_NE(find_class(mod, "Label"), NULL);
@@ -77,6 +77,8 @@ TEST(GuiPlugin, HasElevenClasses)
     EXPECT_NE(find_class(mod, "Text"), NULL);
     EXPECT_NE(find_class(mod, "Radiobutton"), NULL);
     EXPECT_NE(find_class(mod, "Spinbox"), NULL);
+    EXPECT_NE(find_class(mod, "Frame"), NULL);
+    EXPECT_NE(find_class(mod, "Listbox"), NULL);
 }
 
 TEST(GuiPlugin, HasMessageBoxFunction)
@@ -288,6 +290,41 @@ TEST(GuiPlugin, SpinboxClassMethods)
     EXPECT_NE(find_method(cls, "on_change"), NULL);
 }
 
+TEST(GuiPlugin, FrameClassMethods)
+{
+    if (!gui_plugin_available())
+        return;
+    vigil_native_registry_t natives;
+    vigil_error_t error;
+    const vigil_native_module_t *mod = get_gui_module(&natives, &error);
+    ASSERT_NE(mod, NULL);
+    const vigil_native_class_t *cls = find_class(mod, "Frame");
+    ASSERT_NE(cls, NULL);
+    EXPECT_NE(find_method(cls, "new"), NULL);
+    EXPECT_NE(find_method(cls, "destroy"), NULL);
+    EXPECT_NE(find_method(cls, "set_label"), NULL);
+    EXPECT_NE(find_method(cls, "grid"), NULL);
+}
+
+TEST(GuiPlugin, ListboxClassMethods)
+{
+    if (!gui_plugin_available())
+        return;
+    vigil_native_registry_t natives;
+    vigil_error_t error;
+    const vigil_native_module_t *mod = get_gui_module(&natives, &error);
+    ASSERT_NE(mod, NULL);
+    const vigil_native_class_t *cls = find_class(mod, "Listbox");
+    ASSERT_NE(cls, NULL);
+    EXPECT_NE(find_method(cls, "new"), NULL);
+    EXPECT_NE(find_method(cls, "destroy"), NULL);
+    EXPECT_NE(find_method(cls, "add_item"), NULL);
+    EXPECT_NE(find_method(cls, "get"), NULL);
+    EXPECT_NE(find_method(cls, "set"), NULL);
+    EXPECT_NE(find_method(cls, "grid"), NULL);
+    EXPECT_NE(find_method(cls, "on_change"), NULL);
+}
+
 TEST(GuiPlugin, AppNewIsStatic)
 {
     if (!gui_plugin_available())
@@ -311,9 +348,9 @@ TEST(GuiPlugin, EachClassHasHandleField)
     vigil_error_t error;
     const vigil_native_module_t *mod = get_gui_module(&natives, &error);
     ASSERT_NE(mod, NULL);
-    static const char *names[] = {"App",    "Window", "Label", "Button",      "Entry",  "Checkbox",
-                                  "Slider", "Select", "Text",  "Radiobutton", "Spinbox"};
-    for (size_t i = 0; i < 11; i++)
+    static const char *names[] = {"App",    "Window", "Label",       "Button",  "Entry", "Checkbox", "Slider",
+                                  "Select", "Text",   "Radiobutton", "Spinbox", "Frame", "Listbox"};
+    for (size_t i = 0; i < 13; i++)
     {
         const vigil_native_class_t *cls = find_class(mod, names[i]);
         ASSERT_NE(cls, NULL);
@@ -339,7 +376,7 @@ TEST(GuiPlugin, ModuleHasDoc)
 void register_gui_tests(void)
 {
     REGISTER_TEST(GuiPlugin, ModuleRegisters);
-    REGISTER_TEST(GuiPlugin, HasElevenClasses);
+    REGISTER_TEST(GuiPlugin, HasThirteenClasses);
     REGISTER_TEST(GuiPlugin, HasMessageBoxFunction);
     REGISTER_TEST(GuiPlugin, AppClassMethods);
     REGISTER_TEST(GuiPlugin, WindowClassMethods);
@@ -352,6 +389,8 @@ void register_gui_tests(void)
     REGISTER_TEST(GuiPlugin, TextClassMethods);
     REGISTER_TEST(GuiPlugin, RadioClassMethods);
     REGISTER_TEST(GuiPlugin, SpinboxClassMethods);
+    REGISTER_TEST(GuiPlugin, FrameClassMethods);
+    REGISTER_TEST(GuiPlugin, ListboxClassMethods);
     REGISTER_TEST(GuiPlugin, AppNewIsStatic);
     REGISTER_TEST(GuiPlugin, EachClassHasHandleField);
     REGISTER_TEST(GuiPlugin, ModuleHasDoc);

@@ -691,10 +691,86 @@ static void win32_spinbox_set_value(void *handle, double value)
     SetWindowTextW((HWND)handle, wbuf);
 }
 
+/* ── Frame ───────────────────────────────────────────────────────── */
+
+static void *win32_frame_create(void *parent, const char *label)
+{
+    if (!parent)
+        return NULL;
+    HWND hwnd = CreateWindowExW(0, L"BUTTON", to_wide(label), WS_CHILD | WS_VISIBLE | BS_GROUPBOX, 0, 0, 200, 100,
+                                (HWND)parent, (HMENU)(intptr_t)g_next_ctrl_id++, g_hinstance, NULL);
+    if (hwnd)
+    {
+        grid_ensure(hwnd);
+        register_widget_parent(hwnd, (HWND)parent);
+    }
+    return (void *)hwnd;
+}
+
+static void win32_frame_destroy(void *handle)
+{
+    if (handle)
+        DestroyWindow((HWND)handle);
+}
+
+static void win32_frame_set_label(void *handle, const char *label)
+{
+    if (handle)
+        SetWindowTextW((HWND)handle, to_wide(label));
+}
+
+/* ── Listbox ─────────────────────────────────────────────────────── */
+
+static void *win32_listbox_create(void *parent)
+{
+    if (!parent)
+        return NULL;
+    HWND hwnd = CreateWindowExW(WS_EX_CLIENTEDGE, L"LISTBOX", L"", WS_CHILD | WS_VISIBLE | LBS_NOTIFY | WS_VSCROLL, 0,
+                                0, 200, 100, (HWND)parent, (HMENU)(intptr_t)g_next_ctrl_id++, g_hinstance, NULL);
+    if (hwnd)
+        register_widget_parent(hwnd, (HWND)parent);
+    return (void *)hwnd;
+}
+
+static void win32_listbox_destroy(void *handle)
+{
+    if (handle)
+        DestroyWindow((HWND)handle);
+}
+
+static void win32_listbox_add_item(void *handle, const char *text)
+{
+    if (handle)
+        SendMessageW((HWND)handle, LB_ADDSTRING, 0, (LPARAM)to_wide(text));
+}
+
+static int win32_listbox_get_selected(void *handle)
+{
+    if (!handle)
+        return -1;
+    return (int)SendMessageW((HWND)handle, LB_GETCURSEL, 0, 0);
+}
+
+static void win32_listbox_set_selected(void *handle, int index)
+{
+    if (handle)
+        SendMessageW((HWND)handle, LB_SETCURSEL, (WPARAM)index, 0);
+}
+
 /* ── Grid layout ─────────────────────────────────────────────────── */
 
 static void win32_widget_grid(void *handle, int col, int row)
 {
+    HWND parent = get_widget_parent((HWND)handle);
+    if (parent)
+        grid_add_child(parent, (HWND)handle, col, row);
+}
+
+static void win32_widget_grid_span(void *handle, int col, int row, int colspan, int rowspan)
+{
+    /* Win32 grid engine doesn't support span yet; place at col/row. */
+    (void)colspan;
+    (void)rowspan;
     HWND parent = get_widget_parent((HWND)handle);
     if (parent)
         grid_add_child(parent, (HWND)handle, col, row);
@@ -795,7 +871,16 @@ const gui_backend_t gui_backend_win32 = {
     .spinbox_destroy = win32_spinbox_destroy,
     .spinbox_get_value = win32_spinbox_get_value,
     .spinbox_set_value = win32_spinbox_set_value,
+    .frame_create = win32_frame_create,
+    .frame_destroy = win32_frame_destroy,
+    .frame_set_label = win32_frame_set_label,
+    .listbox_create = win32_listbox_create,
+    .listbox_destroy = win32_listbox_destroy,
+    .listbox_add_item = win32_listbox_add_item,
+    .listbox_get_selected = win32_listbox_get_selected,
+    .listbox_set_selected = win32_listbox_set_selected,
     .widget_grid = win32_widget_grid,
+    .widget_grid_span = win32_widget_grid_span,
     .widget_grid_remove = win32_widget_grid_remove,
     .container_grid_columnconfigure = win32_container_grid_columnconfigure,
     .container_grid_rowconfigure = win32_container_grid_rowconfigure,

@@ -101,6 +101,14 @@ typedef GtkWidget *(*fn_gtk_scrolled_window_new_gtk3)(void *, void *);
 typedef GtkWidget *(*fn_gtk_spin_button_new_with_range)(double, double, double);
 typedef double (*fn_gtk_spin_button_get_value)(GtkWidget *);
 typedef void (*fn_gtk_spin_button_set_value)(GtkWidget *, double);
+typedef GtkWidget *(*fn_gtk_frame_new)(const char *);
+typedef void (*fn_gtk_frame_set_label)(GtkWidget *, const char *);
+typedef GtkWidget *(*fn_gtk_list_box_new)(void);
+typedef void (*fn_gtk_list_box_insert)(GtkWidget *, GtkWidget *, gint);
+typedef void *(*fn_gtk_list_box_get_selected_row)(GtkWidget *);
+typedef gint (*fn_gtk_list_box_row_get_index)(void *);
+typedef void (*fn_gtk_list_box_select_row)(GtkWidget *, void *);
+typedef void *(*fn_gtk_list_box_get_row_at_index)(GtkWidget *, gint);
 
 /* GTK3-only function pointer types */
 typedef GtkWidget *(*fn_gtk_window_new_gtk3)(int type);
@@ -134,6 +142,7 @@ typedef void (*fn_gtk_check_button_set_label)(GtkWidget *, const char *);
 typedef void (*fn_gtk_check_button_set_group)(GtkWidget *, GtkWidget *);
 typedef GtkWidget *(*fn_gtk_scrolled_window_new_gtk4)(void);
 typedef void (*fn_gtk_scrolled_window_set_child)(GtkWidget *, GtkWidget *);
+typedef void (*fn_gtk_frame_set_child_gtk4)(GtkWidget *, GtkWidget *);
 
 /* GLib main loop (used by GTK4 path; available in both versions) */
 typedef GMainLoop *(*fn_g_main_loop_new)(GMainContext *, gboolean);
@@ -189,6 +198,9 @@ typedef struct gtk_version_ops
     /* Scrolled window (for Text widget) */
     GtkWidget *(*scrolled_window_new)(void);
     void (*scrolled_window_set_child)(GtkWidget *sw, GtkWidget *child);
+
+    /* Frame */
+    void (*frame_set_child)(GtkWidget *frame, GtkWidget *child);
 } gtk_version_ops_t;
 
 /* ── Shared resolved symbols ─────────────────────────────────────── */
@@ -226,6 +238,14 @@ static struct
     fn_gtk_spin_button_new_with_range gtk_spin_button_new_with_range;
     fn_gtk_spin_button_get_value gtk_spin_button_get_value;
     fn_gtk_spin_button_set_value gtk_spin_button_set_value;
+    fn_gtk_frame_new gtk_frame_new;
+    fn_gtk_frame_set_label gtk_frame_set_label;
+    fn_gtk_list_box_new gtk_list_box_new;
+    fn_gtk_list_box_insert gtk_list_box_insert;
+    fn_gtk_list_box_get_selected_row gtk_list_box_get_selected_row;
+    fn_gtk_list_box_row_get_index gtk_list_box_row_get_index;
+    fn_gtk_list_box_select_row gtk_list_box_select_row;
+    fn_gtk_list_box_get_row_at_index gtk_list_box_get_row_at_index;
 } G;
 
 static const gtk_version_ops_t *g_vops = NULL;
@@ -497,6 +517,11 @@ static void gtk3_scrolled_window_set_child(GtkWidget *sw, GtkWidget *child)
     s_gtk3_container_add(sw, child);
 }
 
+static void gtk3_frame_set_child(GtkWidget *frame, GtkWidget *child)
+{
+    s_gtk3_container_add(frame, child);
+}
+
 static const gtk_version_ops_t g_gtk3_ops = {
     .version_name = "GTK3",
     .close_signal = "delete-event",
@@ -519,6 +544,7 @@ static const gtk_version_ops_t g_gtk3_ops = {
     .radio_set_label = gtk3_radio_set_label,
     .scrolled_window_new = gtk3_scrolled_window_new,
     .scrolled_window_set_child = gtk3_scrolled_window_set_child,
+    .frame_set_child = gtk3_frame_set_child,
 };
 
 static bool load_gtk3_symbols(void)
@@ -566,6 +592,7 @@ static fn_gtk_check_button_set_label s_gtk4_check_set_label;
 static fn_gtk_check_button_set_group s_gtk4_check_set_group;
 static fn_gtk_scrolled_window_new_gtk4 s_gtk4_scrolled_window_new;
 static fn_gtk_scrolled_window_set_child s_gtk4_scrolled_window_set_child;
+static fn_gtk_frame_set_child_gtk4 s_gtk4_frame_set_child;
 
 static GMainLoop *s_gtk4_loop = NULL;
 
@@ -705,6 +732,11 @@ static void gtk4_scrolled_window_set_child(GtkWidget *sw, GtkWidget *child)
     s_gtk4_scrolled_window_set_child(sw, child);
 }
 
+static void gtk4_frame_set_child(GtkWidget *frame, GtkWidget *child)
+{
+    s_gtk4_frame_set_child(frame, child);
+}
+
 static const gtk_version_ops_t g_gtk4_ops = {
     .version_name = "GTK4",
     .close_signal = "close-request",
@@ -727,6 +759,7 @@ static const gtk_version_ops_t g_gtk4_ops = {
     .radio_set_label = gtk4_radio_set_label,
     .scrolled_window_new = gtk4_scrolled_window_new,
     .scrolled_window_set_child = gtk4_scrolled_window_set_child,
+    .frame_set_child = gtk4_frame_set_child,
 };
 
 static bool load_gtk4_symbols(void)
@@ -749,6 +782,7 @@ static bool load_gtk4_symbols(void)
     LOAD_LOCAL(s_gtk4_check_set_group, gtk_check_button_set_group);
     LOAD_LOCAL(s_gtk4_scrolled_window_new, gtk_scrolled_window_new);
     LOAD_LOCAL(s_gtk4_scrolled_window_set_child, gtk_scrolled_window_set_child);
+    LOAD_LOCAL(s_gtk4_frame_set_child, gtk_frame_set_child);
     return true;
 fail:
     return false;
@@ -790,6 +824,14 @@ static bool load_shared_symbols(void)
     LOAD_SHARED(gtk_spin_button_new_with_range);
     LOAD_SHARED(gtk_spin_button_get_value);
     LOAD_SHARED(gtk_spin_button_set_value);
+    LOAD_SHARED(gtk_frame_new);
+    LOAD_SHARED(gtk_frame_set_label);
+    LOAD_SHARED(gtk_list_box_new);
+    LOAD_SHARED(gtk_list_box_insert);
+    LOAD_SHARED(gtk_list_box_get_selected_row);
+    LOAD_SHARED(gtk_list_box_row_get_index);
+    LOAD_SHARED(gtk_list_box_select_row);
+    LOAD_SHARED(gtk_list_box_get_row_at_index);
     return true;
 fail:
     return false;
@@ -1327,6 +1369,110 @@ static void gtk_be_spinbox_set_value(void *handle, double value)
         G.gtk_spin_button_set_value(handle, value);
 }
 
+/* ── Frame ───────────────────────────────────────────────────────── */
+
+static void *gtk_be_frame_create(void *parent, const char *label)
+{
+    if (!parent)
+        return NULL;
+    void *grid = grid_for_window(parent);
+    if (!grid)
+        return NULL;
+    GtkWidget *frame = G.gtk_frame_new(label);
+    GtkWidget *inner_grid = G.gtk_grid_new();
+    g_vops->frame_set_child(frame, inner_grid);
+    /* Register the frame's inner grid so children can be placed in it. */
+    if (g_window_grid_count < MAX_GRIDS)
+        g_window_grids[g_window_grid_count++] = (window_grid_t){frame, inner_grid};
+    register_widget_parent(frame, grid);
+    return frame;
+}
+
+static void gtk_be_frame_destroy(void *handle)
+{
+    if (handle)
+        g_vops->widget_destroy(handle);
+}
+
+static void gtk_be_frame_set_label(void *handle, const char *label)
+{
+    if (handle)
+        G.gtk_frame_set_label(handle, label);
+}
+
+/* ── Listbox ─────────────────────────────────────────────────────── */
+
+static void on_listbox_row_selected(GtkWidget *widget, void *row, void *data)
+{
+    (void)row;
+    (void)data;
+    gui_callback_t *cb = find_callback(widget, GUI_EVENT_CHANGE);
+    if (cb && cb->fn)
+        cb->fn(cb->user_data);
+}
+
+static void *gtk_be_listbox_create(void *parent)
+{
+    if (!parent)
+        return NULL;
+    void *grid = grid_for_window(parent);
+    if (!grid)
+        return NULL;
+    GtkWidget *sw = g_vops->scrolled_window_new();
+    GtkWidget *lb = G.gtk_list_box_new();
+    g_vops->scrolled_window_set_child(sw, lb);
+    G.gtk_widget_set_hexpand(sw, 1);
+    G.gtk_widget_set_vexpand(sw, 1);
+    G.g_signal_connect_data(lb, "row-selected", (GCallback)on_listbox_row_selected, NULL, NULL, 0);
+    /* Map sw → lb for item operations. Reuse text_views array pattern. */
+    if (g_text_view_count < MAX_TEXT_VIEWS)
+        g_text_views[g_text_view_count++] = (typeof(g_text_views[0])){sw, lb};
+    register_widget_parent(sw, grid);
+    return sw;
+}
+
+static void gtk_be_listbox_destroy(void *handle)
+{
+    if (handle)
+        g_vops->widget_destroy(handle);
+}
+
+static void gtk_be_listbox_add_item(void *handle, const char *text)
+{
+    if (!handle)
+        return;
+    void *lb = text_view_for_sw(handle);
+    if (!lb)
+        return;
+    GtkWidget *label = G.gtk_label_new(text);
+    G.gtk_list_box_insert(lb, label, -1);
+    g_vops->widget_show(label);
+}
+
+static int gtk_be_listbox_get_selected(void *handle)
+{
+    if (!handle)
+        return -1;
+    void *lb = text_view_for_sw(handle);
+    if (!lb)
+        return -1;
+    void *row = G.gtk_list_box_get_selected_row(lb);
+    if (!row)
+        return -1;
+    return G.gtk_list_box_row_get_index(row);
+}
+
+static void gtk_be_listbox_set_selected(void *handle, int index)
+{
+    if (!handle)
+        return;
+    void *lb = text_view_for_sw(handle);
+    if (!lb)
+        return;
+    void *row = G.gtk_list_box_get_row_at_index(lb, index);
+    G.gtk_list_box_select_row(lb, row);
+}
+
 /* ── Grid layout ─────────────────────────────────────────────────── */
 
 static void gtk_be_widget_grid(void *handle, int col, int row)
@@ -1335,6 +1481,15 @@ static void gtk_be_widget_grid(void *handle, int col, int row)
     if (!grid)
         return;
     G.gtk_grid_attach(grid, handle, col, row, 1, 1);
+    g_vops->widget_show(handle);
+}
+
+static void gtk_be_widget_grid_span(void *handle, int col, int row, int colspan, int rowspan)
+{
+    void *grid = get_widget_grid(handle);
+    if (!grid)
+        return;
+    G.gtk_grid_attach(grid, handle, col, row, colspan, rowspan);
     g_vops->widget_show(handle);
 }
 
@@ -1439,7 +1594,16 @@ const gui_backend_t gui_backend_gtk = {
     .spinbox_destroy = gtk_be_spinbox_destroy,
     .spinbox_get_value = gtk_be_spinbox_get_value,
     .spinbox_set_value = gtk_be_spinbox_set_value,
+    .frame_create = gtk_be_frame_create,
+    .frame_destroy = gtk_be_frame_destroy,
+    .frame_set_label = gtk_be_frame_set_label,
+    .listbox_create = gtk_be_listbox_create,
+    .listbox_destroy = gtk_be_listbox_destroy,
+    .listbox_add_item = gtk_be_listbox_add_item,
+    .listbox_get_selected = gtk_be_listbox_get_selected,
+    .listbox_set_selected = gtk_be_listbox_set_selected,
     .widget_grid = gtk_be_widget_grid,
+    .widget_grid_span = gtk_be_widget_grid_span,
     .widget_grid_remove = gtk_be_widget_grid_remove,
     .container_grid_columnconfigure = gtk_be_container_grid_columnconfigure,
     .container_grid_rowconfigure = gtk_be_container_grid_rowconfigure,
