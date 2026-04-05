@@ -176,6 +176,10 @@ extern const gui_backend_t gui_backend_win32;
 extern const gui_backend_t gui_backend_gtk;
 #endif
 
+#ifdef VIGIL_GUI_SDL_BACKEND
+    extern const gui_backend_t gui_backend_sdl;
+#endif
+
     extern const gui_backend_t gui_backend_stub;
 
 #ifdef __cplusplus

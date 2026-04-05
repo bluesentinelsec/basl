@@ -24,6 +24,14 @@ else()
     list(APPEND _gui_sources backends/gui_stub.c)
 endif()
 
+# SDL fallback backend — available when both GUI and SDL plugins are enabled.
+if(VIGIL_PLUGIN_SDL)
+    list(APPEND _gui_sources backends/gui_sdl.c)
+    list(APPEND _gui_libs SDL3::SDL3-static)
+    add_compile_definitions(VIGIL_GUI_SDL_BACKEND)
+    message(STATUS "Plugin 'gui': SDL fallback backend enabled")
+endif()
+
 vigil_add_plugin(
     NAME gui
     SOURCES ${_gui_sources}

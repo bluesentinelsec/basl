@@ -14,12 +14,20 @@
 #include "internal/vigil_internal.h"
 #include "internal/vigil_nanbox.h"
 
+#include <stdlib.h>
+#include <string.h>
+
 #include "gui_backend.h"
 
 /* ── Backend selection ───────────────────────────────────────────── */
 
 const gui_backend_t *gui_backend_select(void)
 {
+#ifdef VIGIL_GUI_SDL_BACKEND
+    const char *force = getenv("VIGIL_GUI_BACKEND");
+    if (force && strcmp(force, "sdl") == 0)
+        return &gui_backend_sdl;
+#endif
 #if defined(__APPLE__)
     return &gui_backend_cocoa;
 #elif defined(_WIN32)
@@ -27,7 +35,21 @@ const gui_backend_t *gui_backend_select(void)
 #elif defined(__linux__)
     return &gui_backend_gtk;
 #else
+#ifdef VIGIL_GUI_SDL_BACKEND
+    return &gui_backend_sdl;
+#else
     return &gui_backend_stub;
+#endif
+#endif
+}
+
+/* SDL fallback — tried if the native backend's init() fails. */
+static const gui_backend_t *gui_backend_fallback(void)
+{
+#ifdef VIGIL_GUI_SDL_BACKEND
+    return &gui_backend_sdl;
+#else
+    return NULL;
 #endif
 }
 
@@ -254,8 +276,18 @@ static vigil_status_t gui_app_new(vigil_vm_t *vm, size_t arg_count, vigil_error_
     g_backend = gui_backend_select();
     if (!g_backend || !g_backend->init(name))
     {
-        gui_push_handle_instance(vm, GUI_APP_CLASS_INDEX, -1, error);
-        return gui_push_fail_err(vm, "gui: no supported backend available on this platform", error);
+        /* Try SDL fallback if native backend failed. */
+        const gui_backend_t *fb = gui_backend_fallback();
+        if (fb && fb != g_backend && fb->init(name))
+        {
+            g_backend = fb;
+        }
+        else
+        {
+            g_backend = NULL;
+            gui_push_handle_instance(vm, GUI_APP_CLASS_INDEX, -1, error);
+            return gui_push_fail_err(vm, "gui: no supported backend available on this platform", error);
+        }
     }
 
     gui_push_handle_instance(vm, GUI_APP_CLASS_INDEX, 0, error);
