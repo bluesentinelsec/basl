@@ -14,12 +14,20 @@
 #include "internal/vigil_internal.h"
 #include "internal/vigil_nanbox.h"
 
+#include <stdlib.h>
+#include <string.h>
+
 #include "gui_backend.h"
 
 /* ── Backend selection ───────────────────────────────────────────── */
 
 const gui_backend_t *gui_backend_select(void)
 {
+#ifdef VIGIL_GUI_SDL_BACKEND
+    const char *force = getenv("VIGIL_GUI_BACKEND");
+    if (force && strcmp(force, "sdl") == 0)
+        return &gui_backend_sdl;
+#endif
 #if defined(__APPLE__)
     return &gui_backend_cocoa;
 #elif defined(_WIN32)
