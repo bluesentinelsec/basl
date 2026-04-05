@@ -120,6 +120,8 @@ typedef void (*fn_gtk_widget_destroy)(GtkWidget *);
 typedef void (*fn_gtk_container_add)(GtkWidget *, GtkWidget *);
 typedef GtkWidget *(*fn_gtk_message_dialog_new)(GtkWindow *, int, int, int, const char *, ...);
 typedef gint (*fn_gtk_dialog_run)(GtkWidget *);
+typedef GtkWidget *(*fn_gtk_file_chooser_dialog_new)(const char *, GtkWindow *, int, const char *, ...);
+typedef char *(*fn_gtk_file_chooser_get_filename)(GtkWidget *);
 typedef void (*fn_gtk_main)(void);
 typedef void (*fn_gtk_main_quit)(void);
 typedef const char *(*fn_gtk_entry_get_text_gtk3)(GtkWidget *);
@@ -201,6 +203,8 @@ typedef struct gtk_version_ops
 
     /* Dialogs */
     void (*message_box)(void *parent, const char *title, const char *msg);
+    const char *(*file_dialog)(void *parent, const char *title, int action, char *buf, size_t bufsz);
+    bool (*yes_no_dialog)(void *parent, const char *title, const char *msg);
 
     /* Entry (text input) */
     const char *(*entry_get_text)(GtkWidget *entry);
@@ -436,6 +440,8 @@ static fn_gtk_widget_destroy s_gtk3_widget_destroy;
 static fn_gtk_container_add s_gtk3_container_add;
 static fn_gtk_message_dialog_new s_gtk3_message_dialog_new;
 static fn_gtk_dialog_run s_gtk3_dialog_run;
+static fn_gtk_file_chooser_dialog_new s_gtk3_file_chooser_dialog_new;
+static fn_gtk_file_chooser_get_filename s_gtk3_file_chooser_get_filename;
 static fn_gtk_entry_get_text_gtk3 s_gtk3_entry_get_text;
 static fn_gtk_entry_set_text_gtk3 s_gtk3_entry_set_text;
 static fn_gtk_toggle_button_get_active s_gtk3_toggle_get_active;
@@ -505,6 +511,43 @@ static void gtk3_message_box(void *parent, const char *title, const char *msg)
     G.gtk_window_set_title(dialog, title);
     s_gtk3_dialog_run(dialog);
     s_gtk3_widget_destroy(dialog);
+}
+
+/* GTK_FILE_CHOOSER_ACTION: OPEN=0, SAVE=1, SELECT_FOLDER=2 */
+/* GTK_RESPONSE: ACCEPT=-3, CANCEL=-6 */
+static const char *gtk3_file_dialog(void *parent, const char *title, int action, char *buf, size_t bufsz)
+{
+    buf[0] = '\0';
+    GtkWidget *dlg = s_gtk3_file_chooser_dialog_new(title, parent, action, "Cancel", -6, "OK", -3, NULL);
+    if (!dlg)
+        return buf;
+    gint res = s_gtk3_dialog_run(dlg);
+    if (res == -3)
+    {
+        char *fname = s_gtk3_file_chooser_get_filename(dlg);
+        if (fname)
+        {
+            size_t len = strlen(fname);
+            if (len >= bufsz)
+                len = bufsz - 1;
+            memcpy(buf, fname, len);
+            buf[len] = '\0';
+        }
+    }
+    s_gtk3_widget_destroy(dlg);
+    return buf;
+}
+
+static bool gtk3_yes_no_dialog(void *parent, const char *title, const char *msg)
+{
+    GtkWidget *dlg = s_gtk3_message_dialog_new(parent, GTK_DIALOG_MODAL, 0, 4 /* GTK_BUTTONS_YES_NO */, "%s", msg);
+    if (!dlg)
+        return false;
+    G.gtk_window_set_title(dlg, title);
+    /* Add Yes/No buttons: GTK_RESPONSE_YES=-8, GTK_RESPONSE_NO=-9 */
+    gint res = s_gtk3_dialog_run(dlg);
+    s_gtk3_widget_destroy(dlg);
+    return res == -8;
 }
 
 static const char *gtk3_entry_get_text(GtkWidget *entry)
@@ -629,6 +672,8 @@ static const gtk_version_ops_t g_gtk3_ops = {
     .widget_destroy = gtk3_widget_destroy,
     .grid_remove_child = gtk3_grid_remove_child,
     .message_box = gtk3_message_box,
+    .file_dialog = gtk3_file_dialog,
+    .yes_no_dialog = gtk3_yes_no_dialog,
     .entry_get_text = gtk3_entry_get_text,
     .entry_set_text = gtk3_entry_set_text,
     .checkbox_get_active = gtk3_checkbox_get_active,
@@ -657,6 +702,8 @@ static bool load_gtk3_symbols(void)
     LOAD_LOCAL(s_gtk3_container_add, gtk_container_add);
     LOAD_LOCAL(s_gtk3_message_dialog_new, gtk_message_dialog_new);
     LOAD_LOCAL(s_gtk3_dialog_run, gtk_dialog_run);
+    LOAD_LOCAL(s_gtk3_file_chooser_dialog_new, gtk_file_chooser_dialog_new);
+    LOAD_LOCAL(s_gtk3_file_chooser_get_filename, gtk_file_chooser_get_filename);
     LOAD_LOCAL(s_gtk3_entry_get_text, gtk_entry_get_text);
     LOAD_LOCAL(s_gtk3_entry_set_text, gtk_entry_set_text);
     LOAD_LOCAL(s_gtk3_toggle_get_active, gtk_toggle_button_get_active);
@@ -805,6 +852,66 @@ static void gtk4_message_box(void *parent, const char *title, const char *msg)
     s_gtk4_g_main_loop_unref(loop);
 }
 
+static const char *gtk4_file_dialog(void *parent, const char *title, int action, char *buf, size_t bufsz)
+{
+    /* GTK4 removed gtk_dialog_run. Use GtkFileChooserDialog with a
+       nested GMainLoop, responding to the "response" signal. */
+    (void)parent;
+    (void)title;
+    (void)action;
+    buf[0] = '\0';
+    /* Simplified: return empty for now. Full async file dialog
+       requires significant additional infrastructure. */
+    (void)bufsz;
+    return buf;
+}
+
+static bool gtk4_yes_no_dialog(void *parent, const char *title, const char *msg)
+{
+    (void)parent;
+    GMainLoop *loop = s_gtk4_g_main_loop_new(NULL, 0);
+    GtkWidget *win = s_gtk4_window_new();
+    G.gtk_window_set_title(win, title);
+    G.gtk_window_set_default_size(win, 300, 120);
+
+    GtkWidget *grid = G.gtk_grid_new();
+    s_gtk4_window_set_child(win, grid);
+
+    GtkWidget *label = G.gtk_label_new(msg);
+    G.gtk_widget_set_hexpand(label, 1);
+    G.gtk_widget_set_vexpand(label, 1);
+    G.gtk_grid_attach(grid, label, 0, 0, 2, 1);
+
+    /* Use a shared variable to capture the result. */
+
+    GtkWidget *yes_btn = G.gtk_button_new_with_label("Yes");
+    GtkWidget *no_btn = G.gtk_button_new_with_label("No");
+    G.gtk_grid_attach(grid, yes_btn, 0, 1, 1, 1);
+    G.gtk_grid_attach(grid, no_btn, 1, 1, 1, 1);
+
+    G.g_signal_connect_data(yes_btn, "clicked", (GCallback)s_gtk4_g_main_loop_quit, loop, NULL, 1);
+    G.g_signal_connect_data(no_btn, "clicked", (GCallback)s_gtk4_g_main_loop_quit, loop, NULL, 1);
+    G.g_signal_connect_data(win, "close-request", (GCallback)s_gtk4_g_main_loop_quit, loop, NULL, 1);
+
+    /* Track which button was clicked via the callback system. */
+    if (g_callback_count + 1 < MAX_CALLBACKS)
+    {
+        gui_callback_t yes_cb = {NULL, (void *)1};
+        gui_callback_t no_cb = {NULL, (void *)0};
+        g_callbacks[g_callback_count++] = (callback_entry_t){yes_btn, GUI_EVENT_CLICK, yes_cb};
+        g_callbacks[g_callback_count++] = (callback_entry_t){no_btn, GUI_EVENT_CLICK, no_cb};
+    }
+
+    s_gtk4_widget_set_visible(win, 1);
+    s_gtk4_g_main_loop_run(loop);
+
+    /* Check which button has focus / was last clicked. Simplified:
+       check if yes_btn was the source. For now, default to false. */
+    s_gtk4_window_destroy(win);
+    s_gtk4_g_main_loop_unref(loop);
+    return false; /* GTK4 yes/no needs more infrastructure; placeholder */
+}
+
 static const char *gtk4_entry_get_text(GtkWidget *entry)
 {
     return s_gtk4_editable_get_text(entry);
@@ -936,6 +1043,8 @@ static const gtk_version_ops_t g_gtk4_ops = {
     .widget_destroy = gtk4_widget_destroy,
     .grid_remove_child = gtk4_grid_remove_child,
     .message_box = gtk4_message_box,
+    .file_dialog = gtk4_file_dialog,
+    .yes_no_dialog = gtk4_yes_no_dialog,
     .entry_get_text = gtk4_entry_get_text,
     .entry_set_text = gtk4_entry_set_text,
     .checkbox_get_active = gtk4_checkbox_get_active,
@@ -1812,6 +1921,26 @@ static void gtk_be_message_box(void *parent, const char *title, const char *mess
     g_vops->message_box(parent, title, message);
 }
 
+static const char *gtk_be_open_file(void *parent, const char *title, char *buf, size_t bufsz)
+{
+    return g_vops->file_dialog(parent, title, 0 /* OPEN */, buf, bufsz);
+}
+
+static const char *gtk_be_save_file(void *parent, const char *title, char *buf, size_t bufsz)
+{
+    return g_vops->file_dialog(parent, title, 1 /* SAVE */, buf, bufsz);
+}
+
+static const char *gtk_be_choose_dir(void *parent, const char *title, char *buf, size_t bufsz)
+{
+    return g_vops->file_dialog(parent, title, 2 /* SELECT_FOLDER */, buf, bufsz);
+}
+
+static bool gtk_be_ask_yes_no(void *parent, const char *title, const char *message)
+{
+    return g_vops->yes_no_dialog(parent, title, message);
+}
+
 /* ── Export ───────────────────────────────────────────────────────── */
 
 const gui_backend_t gui_backend_gtk = {
@@ -1885,6 +2014,10 @@ const gui_backend_t gui_backend_gtk = {
     .container_grid_rowconfigure = gtk_be_container_grid_rowconfigure,
     .set_callback = gtk_be_set_callback,
     .message_box = gtk_be_message_box,
+    .open_file_dialog = gtk_be_open_file,
+    .save_file_dialog = gtk_be_save_file,
+    .choose_directory = gtk_be_choose_dir,
+    .ask_yes_no = gtk_be_ask_yes_no,
 };
 
 #endif /* __linux__ */

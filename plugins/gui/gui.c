@@ -1594,6 +1594,79 @@ static vigil_status_t gui_fn_message_box(vigil_vm_t *vm, size_t arg_count, vigil
     return VIGIL_STATUS_OK;
 }
 
+/* Helper: push a string result from a C buffer. */
+static vigil_status_t gui_push_string(vigil_vm_t *vm, const char *str, vigil_error_t *error)
+{
+    vigil_runtime_t *rt = vigil_vm_runtime(vm);
+    vigil_object_t *obj = NULL;
+    vigil_status_t st = vigil_string_object_new_cstr(rt, str, &obj, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    vigil_value_t v;
+    vigil_value_init_object(&v, &obj);
+    st = vigil_vm_stack_push(vm, &v, error);
+    vigil_value_release(&v);
+    return st;
+}
+
+static vigil_status_t gui_fn_open_file(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t parent_h = gui_arg_handle(vm, base, 0);
+    char tbuf[256];
+    const char *title = gui_arg_str(vm, base, 1, tbuf, sizeof(tbuf));
+    vigil_vm_stack_pop_n(vm, arg_count);
+    char buf[1024] = {0};
+    void *parent = gui_handle_get(&g_windows, parent_h);
+    if (g_backend)
+        g_backend->open_file_dialog(parent, title, buf, sizeof(buf));
+    return gui_push_string(vm, buf, error);
+}
+
+static vigil_status_t gui_fn_save_file(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t parent_h = gui_arg_handle(vm, base, 0);
+    char tbuf[256];
+    const char *title = gui_arg_str(vm, base, 1, tbuf, sizeof(tbuf));
+    vigil_vm_stack_pop_n(vm, arg_count);
+    char buf[1024] = {0};
+    void *parent = gui_handle_get(&g_windows, parent_h);
+    if (g_backend)
+        g_backend->save_file_dialog(parent, title, buf, sizeof(buf));
+    return gui_push_string(vm, buf, error);
+}
+
+static vigil_status_t gui_fn_choose_directory(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t parent_h = gui_arg_handle(vm, base, 0);
+    char tbuf[256];
+    const char *title = gui_arg_str(vm, base, 1, tbuf, sizeof(tbuf));
+    vigil_vm_stack_pop_n(vm, arg_count);
+    char buf[1024] = {0};
+    void *parent = gui_handle_get(&g_windows, parent_h);
+    if (g_backend)
+        g_backend->choose_directory(parent, title, buf, sizeof(buf));
+    return gui_push_string(vm, buf, error);
+}
+
+static vigil_status_t gui_fn_ask_yes_no(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t parent_h = gui_arg_handle(vm, base, 0);
+    char tbuf[256], mbuf[1024];
+    const char *title = gui_arg_str(vm, base, 1, tbuf, sizeof(tbuf));
+    const char *message = gui_arg_str(vm, base, 2, mbuf, sizeof(mbuf));
+    vigil_vm_stack_pop_n(vm, arg_count);
+    bool result = false;
+    void *parent = gui_handle_get(&g_windows, parent_h);
+    if (g_backend)
+        result = g_backend->ask_yes_no(parent, title, message);
+    vigil_value_t v = vigil_nanbox_from_bool(result);
+    return vigil_vm_stack_push(vm, &v, error);
+}
+
 /* ── Parameter type arrays ───────────────────────────────────────── */
 
 static const int p_str[] = {VIGIL_TYPE_STRING};
@@ -1876,6 +1949,14 @@ static const vigil_native_class_t gui_classes[] = {
 
 static const vigil_native_module_function_t gui_functions[] = {
     {"message_box", 11U, gui_fn_message_box, 3U, p_obj_str_str, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, NULL, 0U, NULL,
+     NULL, NULL, NULL},
+    {"open_file", 9U, gui_fn_open_file, 2U, p_obj_str, VIGIL_TYPE_STRING, 1U, rt_str, 0, NULL, NULL, 0U, NULL, NULL,
+     NULL, NULL},
+    {"save_file", 9U, gui_fn_save_file, 2U, p_obj_str, VIGIL_TYPE_STRING, 1U, rt_str, 0, NULL, NULL, 0U, NULL, NULL,
+     NULL, NULL},
+    {"choose_directory", 16U, gui_fn_choose_directory, 2U, p_obj_str, VIGIL_TYPE_STRING, 1U, rt_str, 0, NULL, NULL, 0U,
+     NULL, NULL, NULL, NULL},
+    {"ask_yes_no", 10U, gui_fn_ask_yes_no, 3U, p_obj_str_str, VIGIL_TYPE_BOOL, 1U, rt_bool, 0, NULL, NULL, 0U, NULL,
      NULL, NULL, NULL},
 };
 

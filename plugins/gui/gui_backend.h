@@ -147,6 +147,10 @@ extern "C"
 
         /* Dialogs */
         void (*message_box)(void *parent, const char *title, const char *message);
+        const char *(*open_file_dialog)(void *parent, const char *title, char *buf, size_t bufsz);
+        const char *(*save_file_dialog)(void *parent, const char *title, char *buf, size_t bufsz);
+        const char *(*choose_directory)(void *parent, const char *title, char *buf, size_t bufsz);
+        bool (*ask_yes_no)(void *parent, const char *title, const char *message);
     } gui_backend_t;
 
     /* ── Backend selection ───────────────────────────────────────────── */

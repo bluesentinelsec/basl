@@ -83,7 +83,7 @@ TEST(GuiPlugin, HasThirteenClasses)
     EXPECT_NE(find_class(mod, "PanedWindow"), NULL);
 }
 
-TEST(GuiPlugin, HasMessageBoxFunction)
+TEST(GuiPlugin, HasDialogFunctions)
 {
     if (!gui_plugin_available())
         return;
@@ -91,12 +91,16 @@ TEST(GuiPlugin, HasMessageBoxFunction)
     vigil_error_t error;
     const vigil_native_module_t *mod = get_gui_module(&natives, &error);
     ASSERT_NE(mod, NULL);
-    EXPECT_GE(mod->function_count, 1U);
-    int found = 0;
-    for (size_t i = 0; i < mod->function_count; i++)
-        if (strcmp(mod->functions[i].name, "message_box") == 0)
-            found = 1;
-    EXPECT_EQ(found, 1);
+    EXPECT_GE(mod->function_count, 5U);
+    static const char *expected[] = {"message_box", "open_file", "save_file", "choose_directory", "ask_yes_no"};
+    for (size_t j = 0; j < 5; j++)
+    {
+        int found = 0;
+        for (size_t i = 0; i < mod->function_count; i++)
+            if (strcmp(mod->functions[i].name, expected[j]) == 0)
+                found = 1;
+        EXPECT_EQ(found, 1);
+    }
 }
 
 TEST(GuiPlugin, AppClassMethods)
@@ -412,7 +416,7 @@ void register_gui_tests(void)
 {
     REGISTER_TEST(GuiPlugin, ModuleRegisters);
     REGISTER_TEST(GuiPlugin, HasThirteenClasses);
-    REGISTER_TEST(GuiPlugin, HasMessageBoxFunction);
+    REGISTER_TEST(GuiPlugin, HasDialogFunctions);
     REGISTER_TEST(GuiPlugin, AppClassMethods);
     REGISTER_TEST(GuiPlugin, WindowClassMethods);
     REGISTER_TEST(GuiPlugin, LabelClassMethods);

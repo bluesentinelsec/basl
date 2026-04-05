@@ -894,6 +894,67 @@ static void cocoa_message_box(void *parent, const char *title, const char *messa
         sendv(alert, sel("runModal"));
 }
 
+/* NSModalResponseOK = 1 */
+static const char *cocoa_run_file_panel(id panel, char *buf, size_t bufsz)
+{
+    buf[0] = '\0';
+    long result = ((long (*)(id, SEL))objc_msgSend)(panel, sel("runModal"));
+    if (result == 1)
+    {
+        id url = send0(panel, sel("URL"));
+        id path = send0(url, sel("path"));
+        const char *s = ((const char *(*)(id, SEL))objc_msgSend)(path, sel("UTF8String"));
+        if (s) {
+            size_t len = strlen(s);
+            if (len >= bufsz) len = bufsz - 1;
+            memcpy(buf, s, len);
+            buf[len] = '\0';
+        }
+    }
+    return buf;
+}
+
+static const char *cocoa_open_file(void *parent, const char *title, char *buf, size_t bufsz)
+{
+    (void)parent;
+    id panel = send0(cls("NSOpenPanel"), sel("openPanel"));
+    sendv_id(panel, sel("setTitle:"), nsstr(title));
+    return cocoa_run_file_panel(panel, buf, bufsz);
+}
+
+static const char *cocoa_save_file(void *parent, const char *title, char *buf, size_t bufsz)
+{
+    (void)parent;
+    id panel = send0(send0(cls("NSSavePanel"), sel("alloc")), sel("init"));
+    sendv_id(panel, sel("setTitle:"), nsstr(title));
+    return cocoa_run_file_panel(panel, buf, bufsz);
+}
+
+static const char *cocoa_choose_dir(void *parent, const char *title, char *buf, size_t bufsz)
+{
+    (void)parent;
+    id panel = send0(cls("NSOpenPanel"), sel("openPanel"));
+    sendv_id(panel, sel("setTitle:"), nsstr(title));
+    sendv_bool(panel, sel("setCanChooseDirectories:"), 1);
+    sendv_bool(panel, sel("setCanChooseFiles:"), 0);
+    return cocoa_run_file_panel(panel, buf, bufsz);
+}
+
+static bool cocoa_ask_yes_no(void *parent, const char *title, const char *message)
+{
+    id alert = send0(send0(cls("NSAlert"), sel("alloc")), sel("init"));
+    sendv_id(alert, sel("setMessageText:"), nsstr(title));
+    sendv_id(alert, sel("setInformativeText:"), nsstr(message));
+    sendv_id(alert, sel("addButtonWithTitle:"), nsstr("Yes"));
+    sendv_id(alert, sel("addButtonWithTitle:"), nsstr("No"));
+    long result;
+    if (parent)
+        result = ((long (*)(id, SEL))objc_msgSend)(alert, sel("runModal"));
+    else
+        result = ((long (*)(id, SEL))objc_msgSend)(alert, sel("runModal"));
+    return result == 1000; /* NSAlertFirstButtonReturn */
+}
+
 /* ── Export ───────────────────────────────────────────────────────── */
 
 const gui_backend_t gui_backend_cocoa = {
@@ -967,6 +1028,10 @@ const gui_backend_t gui_backend_cocoa = {
     .container_grid_rowconfigure   = cocoa_container_grid_rowconfigure,
     .set_callback                  = cocoa_set_callback,
     .message_box                   = cocoa_message_box,
+    .open_file_dialog              = cocoa_open_file,
+    .save_file_dialog              = cocoa_save_file,
+    .choose_directory              = cocoa_choose_dir,
+    .ask_yes_no                    = cocoa_ask_yes_no,
 };
 
 #endif /* __APPLE__ */
