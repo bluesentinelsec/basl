@@ -14,5 +14,5 @@ vigil_add_plugin(
     LIBRARIES ""
 )
 
-# miniaudio is header-only; stash include path for library.cmake to pick up.
-set(VIGIL_MINIAUDIO_INCLUDE "${CMAKE_SOURCE_DIR}/deps/miniaudio" CACHE INTERNAL "")
+# miniaudio is header-only; stb_vorbis for OGG support.
+set(VIGIL_MINIAUDIO_INCLUDE "${CMAKE_SOURCE_DIR}/deps/miniaudio;${CMAKE_SOURCE_DIR}/deps/stb" CACHE INTERNAL "")

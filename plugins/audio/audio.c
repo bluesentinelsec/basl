@@ -7,9 +7,19 @@
  * Module functions: set_listener_position, set_listener_direction
  */
 
+/* Enable OGG Vorbis decoding via stb_vorbis.
+   Include the header portion first so miniaudio sees the declarations,
+   then include the implementation after miniaudio. */
+#define STB_VORBIS_HEADER_ONLY
+#include "stb_vorbis.c"
+
 #define MINIAUDIO_IMPLEMENTATION
-#define MA_NO_GENERATION /* we don't need waveform/noise generators */
+#define MA_NO_GENERATION
 #include "miniaudio.h"
+
+/* Now include the stb_vorbis implementation. */
+#undef STB_VORBIS_HEADER_ONLY
+#include "stb_vorbis.c"
 
 #include <string.h>
 
@@ -787,8 +797,8 @@ static const vigil_native_module_function_t audio_functions[] = {
 static const vigil_native_symbol_doc_t audio_module_doc = {
     "Audio playback and 3D spatialization.",
     "Provides SDL_mixer-style audio powered by miniaudio. "
-    "Supports WAV, MP3, FLAC. Sound effects are loaded into memory "
-    "for low-latency playback. Music is streamed from disk.",
+    "Supports WAV, MP3, FLAC, and OGG Vorbis. Sound effects are loaded "
+    "into memory for low-latency playback. Music is streamed from disk.",
     NULL,
 };
 
