@@ -76,6 +76,7 @@ static int g_widget_count = 0;
 static SDL_Window *g_sdl_window = NULL;
 static SDL_Renderer *g_sdl_renderer = NULL;
 static bool g_sdl_running = false;
+static int g_focused_widget = -1;
 static int g_win_w = 640, g_win_h = 480;
 
 /* ── Colors ──────────────────────────────────────────────────────── */
@@ -192,8 +193,16 @@ static void render_widget(sdl_widget_t *w)
     case SW_ENTRY: {
         SDL_FRect bg = *r;
         draw_rect_fill(&bg, COL_WHITE_R, COL_WHITE_G, COL_WHITE_B);
-        draw_rect_outline(&bg, COL_BORDER_R, COL_BORDER_G, COL_BORDER_B);
+        int is_focused = (w == &g_widgets[g_focused_widget]);
+        draw_rect_outline(&bg, is_focused ? COL_ACCENT_R : COL_BORDER_R, is_focused ? COL_ACCENT_G : COL_BORDER_G,
+                          is_focused ? COL_ACCENT_B : COL_BORDER_B);
         draw_text(r->x + 4, r->y + (r->h - 8) / 2, w->text);
+        if (is_focused)
+        {
+            float cx = r->x + 4 + (float)strlen(w->text) * 8;
+            SDL_SetRenderDrawColor(g_sdl_renderer, COL_FG_R, COL_FG_G, COL_FG_B, 255);
+            SDL_RenderLine(g_sdl_renderer, cx, r->y + 4, cx, r->y + r->h - 4);
+        }
         break;
     }
     case SW_CHECKBOX: {
@@ -362,7 +371,21 @@ static void handle_mouse_click(float mx, float my)
     }
 }
 
-/* ── Backend implementation ──────────────────────────────────────── */
+static void handle_focus(float mx, float my)
+{
+    g_focused_widget = -1;
+    for (int i = g_widget_count - 1; i >= 0; i--)
+    {
+        if ((g_widgets[i].type == SW_ENTRY || g_widgets[i].type == SW_TEXT) &&
+            point_in_rect(mx, my, &g_widgets[i].bounds))
+        {
+            g_focused_widget = i;
+            SDL_StartTextInput(g_sdl_window);
+            return;
+        }
+    }
+    SDL_StopTextInput(g_sdl_window);
+}
 
 static bool sdl_init(const char *app_name)
 {
@@ -417,7 +440,38 @@ static void sdl_main_loop(void)
                 break;
             case SDL_EVENT_MOUSE_BUTTON_DOWN:
                 if (ev.button.button == SDL_BUTTON_LEFT)
+                {
+                    handle_focus(ev.button.x, ev.button.y);
                     handle_mouse_click(ev.button.x, ev.button.y);
+                }
+                break;
+            case SDL_EVENT_TEXT_INPUT:
+                if (g_focused_widget >= 0)
+                {
+                    sdl_widget_t *fw = &g_widgets[g_focused_widget];
+                    size_t len = strlen(fw->text);
+                    size_t ilen = strlen(ev.text.text);
+                    if (len + ilen < SW_MAX_TEXT - 1)
+                    {
+                        memcpy(fw->text + len, ev.text.text, ilen);
+                        fw->text[len + ilen] = '\0';
+                        if (fw->on_change.fn)
+                            fw->on_change.fn(fw->on_change.user_data);
+                    }
+                }
+                break;
+            case SDL_EVENT_KEY_DOWN:
+                if (g_focused_widget >= 0 && ev.key.key == SDLK_BACKSPACE)
+                {
+                    sdl_widget_t *fw = &g_widgets[g_focused_widget];
+                    size_t len = strlen(fw->text);
+                    if (len > 0)
+                    {
+                        fw->text[len - 1] = '\0';
+                        if (fw->on_change.fn)
+                            fw->on_change.fn(fw->on_change.user_data);
+                    }
+                }
                 break;
             default:
                 break;

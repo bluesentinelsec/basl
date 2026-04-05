@@ -835,19 +835,147 @@ static void cocoa_paned_set_position(void *handle, int pos)
 }
 
 /* ── Canvas ───────────────────────────────────────────────────────── */
-/* Cocoa canvas uses an NSView. Drawing is deferred — commands are
-   stored but actual rendering requires setNeedsDisplay + drawRect
-   override, which needs a runtime-created subclass. For now, provide
-   a basic NSView that can be extended later. */
+
+/* Draw command queue for Cocoa canvas, replayed in drawRect:. */
+enum { COCOA_DRAW_LINE = 0, COCOA_DRAW_RECT, COCOA_DRAW_OVAL, COCOA_DRAW_TEXT };
+
+typedef struct {
+    int type;
+    double x1, y1, x2, y2;
+    char text[128];
+} cocoa_draw_cmd_t;
+
+#define COCOA_MAX_CANVAS 32
+#define COCOA_MAX_DRAW_CMDS 512
+
+typedef struct {
+    void *view;
+    cocoa_draw_cmd_t cmds[COCOA_MAX_DRAW_CMDS];
+    int cmd_count;
+} cocoa_canvas_t;
+
+static cocoa_canvas_t g_cocoa_canvas[COCOA_MAX_CANVAS];
+static int g_cocoa_canvas_count = 0;
+
+static cocoa_canvas_t *cocoa_canvas_for(void *view)
+{
+    for (int i = 0; i < g_cocoa_canvas_count; i++)
+        if (g_cocoa_canvas[i].view == view) return &g_cocoa_canvas[i];
+    return NULL;
+}
+
+/* drawRect: implementation for VigilCanvasView. */
+static void canvas_draw_rect_impl(id self, SEL _cmd, CGRect dirty)
+{
+    (void)_cmd; (void)dirty;
+    cocoa_canvas_t *cd = cocoa_canvas_for((void *)self);
+    if (!cd) return;
+
+    /* Get current NSGraphicsContext's CGContext. */
+    id gctx = send0(cls("NSGraphicsContext"), sel("currentContext"));
+    void *cgctx = ((void *(*)(id, SEL))objc_msgSend)(gctx, sel("CGContext"));
+    if (!cgctx) return;
+
+    /* White background. */
+    typedef void (*cg_set_rgb_t)(void *, double, double, double, double);
+    typedef void (*cg_move_t)(void *, double, double);
+    typedef void (*cg_line_t)(void *, double, double);
+    typedef void (*cg_rect_t)(void *, CGRect);
+    typedef void (*cg_stroke_t)(void *);
+    typedef void (*cg_fill_t)(void *);
+    typedef void (*cg_ellipse_t)(void *, CGRect);
+    typedef void (*cg_set_lw_t)(void *, double);
+
+    /* Resolve CG functions via dlsym from CoreGraphics. */
+    static void *cg_lib = NULL;
+    if (!cg_lib) cg_lib = dlopen("/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics", RTLD_LAZY);
+    if (!cg_lib) return;
+
+    cg_set_rgb_t CGContextSetRGBFillColor;
+    cg_set_rgb_t CGContextSetRGBStrokeColor;
+    cg_rect_t CGContextFillRect;
+    cg_move_t CGContextMoveToPoint;
+    cg_line_t CGContextAddLineToPoint;
+    cg_stroke_t CGContextStrokePath;
+    cg_rect_t CGContextStrokeRect;
+    cg_ellipse_t CGContextStrokeEllipseInRect;
+    cg_set_lw_t CGContextSetLineWidth;
+
+    memcpy(&CGContextSetRGBFillColor, &(void *){dlsym(cg_lib, "CGContextSetRGBFillColor")}, sizeof(void *));
+    memcpy(&CGContextSetRGBStrokeColor, &(void *){dlsym(cg_lib, "CGContextSetRGBStrokeColor")}, sizeof(void *));
+    memcpy(&CGContextFillRect, &(void *){dlsym(cg_lib, "CGContextFillRect")}, sizeof(void *));
+    memcpy(&CGContextMoveToPoint, &(void *){dlsym(cg_lib, "CGContextMoveToPoint")}, sizeof(void *));
+    memcpy(&CGContextAddLineToPoint, &(void *){dlsym(cg_lib, "CGContextAddLineToPoint")}, sizeof(void *));
+    memcpy(&CGContextStrokePath, &(void *){dlsym(cg_lib, "CGContextStrokePath")}, sizeof(void *));
+    memcpy(&CGContextStrokeRect, &(void *){dlsym(cg_lib, "CGContextStrokeRect")}, sizeof(void *));
+    memcpy(&CGContextStrokeEllipseInRect, &(void *){dlsym(cg_lib, "CGContextStrokeEllipseInRect")}, sizeof(void *));
+    memcpy(&CGContextSetLineWidth, &(void *){dlsym(cg_lib, "CGContextSetLineWidth")}, sizeof(void *));
+
+    /* White fill. */
+    CGContextSetRGBFillColor(cgctx, 1, 1, 1, 1);
+    CGContextFillRect(cgctx, dirty);
+
+    /* Black stroke. */
+    CGContextSetRGBStrokeColor(cgctx, 0, 0, 0, 1);
+    CGContextSetLineWidth(cgctx, 1.0);
+
+    for (int i = 0; i < cd->cmd_count; i++)
+    {
+        cocoa_draw_cmd_t *c = &cd->cmds[i];
+        switch (c->type)
+        {
+        case COCOA_DRAW_LINE:
+            CGContextMoveToPoint(cgctx, c->x1, c->y1);
+            CGContextAddLineToPoint(cgctx, c->x2, c->y2);
+            CGContextStrokePath(cgctx);
+            break;
+        case COCOA_DRAW_RECT:
+            CGContextStrokeRect(cgctx, CGRectMake_(c->x1, c->y1, c->x2, c->y2));
+            break;
+        case COCOA_DRAW_OVAL:
+            CGContextStrokeEllipseInRect(cgctx, CGRectMake_(c->x1, c->y1, c->x2, c->y2));
+            break;
+        case COCOA_DRAW_TEXT: {
+            /* Use NSString drawing for text. */
+            id str = nsstr(c->text);
+            CGRect tr = CGRectMake_(c->x1, c->y1, 400, 20);
+            ((void (*)(id, SEL, CGRect))objc_msgSend)(str, sel("drawInRect:"), tr);
+            break;
+        }
+        }
+    }
+}
+
+static bool g_canvas_class_registered = false;
 
 static void *cocoa_canvas_create(void *parent, int width, int height)
 {
     if (!parent) return NULL;
     id cv = send0((id)parent, sel("contentView"));
-    id view = send_rect(send0(cls("NSView"), sel("alloc")),
+
+    /* Register VigilCanvasView class once. */
+    if (!g_canvas_class_registered)
+    {
+        Class canvas_cls = objc_allocateClassPair(objc_getClass("NSView"), "VigilCanvasView", 0);
+        if (canvas_cls)
+        {
+            class_addMethod(canvas_cls, sel("drawRect:"), (IMP)canvas_draw_rect_impl, "v@:{CGRect=dddd}");
+            objc_registerClassPair(canvas_cls);
+        }
+        g_canvas_class_registered = true;
+    }
+
+    id view = send_rect(send0(cls("VigilCanvasView"), sel("alloc")),
                         sel("initWithFrame:"), CGRectMake_(0, 0, width, height));
     sendv_id(cv, sel("addSubview:"), view);
     register_widget_parent(view, cv);
+
+    if (g_cocoa_canvas_count < COCOA_MAX_CANVAS)
+    {
+        cocoa_canvas_t *c = &g_cocoa_canvas[g_cocoa_canvas_count++];
+        memset(c, 0, sizeof(*c));
+        c->view = (void *)view;
+    }
     return (void *)view;
 }
 
@@ -856,15 +984,56 @@ static void cocoa_canvas_destroy(void *handle)
     if (handle) sendv((id)handle, sel("removeFromSuperview"));
 }
 
-static void cocoa_canvas_clear(void *handle) { (void)handle; }
+static void cocoa_canvas_clear(void *handle)
+{
+    cocoa_canvas_t *c = cocoa_canvas_for(handle);
+    if (c) { c->cmd_count = 0; sendv_bool((id)handle, sel("setNeedsDisplay:"), 1); }
+}
+
 static void cocoa_canvas_draw_line(void *h, double x1, double y1, double x2, double y2)
-{ (void)h; (void)x1; (void)y1; (void)x2; (void)y2; }
+{
+    cocoa_canvas_t *c = cocoa_canvas_for(h);
+    if (c && c->cmd_count < COCOA_MAX_DRAW_CMDS)
+    {
+        c->cmds[c->cmd_count++] = (cocoa_draw_cmd_t){COCOA_DRAW_LINE, x1, y1, x2, y2, {0}};
+        sendv_bool((id)h, sel("setNeedsDisplay:"), 1);
+    }
+}
+
 static void cocoa_canvas_draw_rect(void *h, double x, double y, double w, double ht)
-{ (void)h; (void)x; (void)y; (void)w; (void)ht; }
+{
+    cocoa_canvas_t *c = cocoa_canvas_for(h);
+    if (c && c->cmd_count < COCOA_MAX_DRAW_CMDS)
+    {
+        c->cmds[c->cmd_count++] = (cocoa_draw_cmd_t){COCOA_DRAW_RECT, x, y, w, ht, {0}};
+        sendv_bool((id)h, sel("setNeedsDisplay:"), 1);
+    }
+}
+
 static void cocoa_canvas_draw_oval(void *h, double x, double y, double w, double ht)
-{ (void)h; (void)x; (void)y; (void)w; (void)ht; }
+{
+    cocoa_canvas_t *c = cocoa_canvas_for(h);
+    if (c && c->cmd_count < COCOA_MAX_DRAW_CMDS)
+    {
+        c->cmds[c->cmd_count++] = (cocoa_draw_cmd_t){COCOA_DRAW_OVAL, x, y, w, ht, {0}};
+        sendv_bool((id)h, sel("setNeedsDisplay:"), 1);
+    }
+}
+
 static void cocoa_canvas_draw_text(void *h, double x, double y, const char *t)
-{ (void)h; (void)x; (void)y; (void)t; }
+{
+    cocoa_canvas_t *c = cocoa_canvas_for(h);
+    if (c && c->cmd_count < COCOA_MAX_DRAW_CMDS)
+    {
+        cocoa_draw_cmd_t cmd = {COCOA_DRAW_TEXT, x, y, 0, 0, {0}};
+        size_t len = strlen(t);
+        if (len >= sizeof(cmd.text)) len = sizeof(cmd.text) - 1;
+        memcpy(cmd.text, t, len);
+        cmd.text[len] = '\0';
+        c->cmds[c->cmd_count++] = cmd;
+        sendv_bool((id)h, sel("setNeedsDisplay:"), 1);
+    }
+}
 
 /* ── Grid layout ─────────────────────────────────────────────────── */
 

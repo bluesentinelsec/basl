@@ -23,6 +23,7 @@
 #endif
 #include <commctrl.h>
 #include <commdlg.h>
+#include <shlobj.h>
 #include <windows.h>
 
 /* ── Grid layout engine ──────────────────────────────────────────── */
@@ -249,6 +250,54 @@ static LRESULT CALLBACK vigil_wndproc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
         }
         PostQuitMessage(0);
         return 0;
+    }
+
+    case WM_DRAWITEM: {
+        DRAWITEMSTRUCT *dis = (DRAWITEMSTRUCT *)lp;
+        w32_canvas_t *cv = w32_canvas_for(dis->hwndItem);
+        if (cv)
+        {
+            HDC hdc = dis->hDC;
+            RECT *rc = &dis->rcItem;
+            HBRUSH white = CreateSolidBrush(RGB(255, 255, 255));
+            FillRect(hdc, rc, white);
+            DeleteObject(white);
+            HPEN pen = CreatePen(PS_SOLID, 1, RGB(0, 0, 0));
+            SelectObject(hdc, pen);
+            SetBkMode(hdc, TRANSPARENT);
+            for (int i = 0; i < cv->cmd_count; i++)
+            {
+                w32_draw_cmd_t *d = &cv->cmds[i];
+                switch (d->type)
+                {
+                case W32_DRAW_LINE:
+                    MoveToEx(hdc, d->x1, d->y1, NULL);
+                    LineTo(hdc, d->x2, d->y2);
+                    break;
+                case W32_DRAW_RECT: {
+                    HBRUSH nb = (HBRUSH)GetStockObject(NULL_BRUSH);
+                    SelectObject(hdc, nb);
+                    Rectangle(hdc, d->x1, d->y1, d->x1 + d->x2, d->y1 + d->y2);
+                    break;
+                }
+                case W32_DRAW_OVAL: {
+                    HBRUSH nb2 = (HBRUSH)GetStockObject(NULL_BRUSH);
+                    SelectObject(hdc, nb2);
+                    Ellipse(hdc, d->x1, d->y1, d->x1 + d->x2, d->y1 + d->y2);
+                    break;
+                }
+                case W32_DRAW_TEXT: {
+                    wchar_t wt[128];
+                    MultiByteToWideChar(CP_UTF8, 0, d->text, -1, wt, 128);
+                    TextOutW(hdc, d->x1, d->y1, wt, (int)wcslen(wt));
+                    break;
+                }
+                }
+            }
+            DeleteObject(pen);
+            return TRUE;
+        }
+        break;
     }
 
     case WM_DESTROY:
@@ -848,8 +897,45 @@ static void win32_paned_set_position(void *handle, int pos)
 }
 
 /* ── Canvas ──────────────────────────────────────────────────────── */
-/* Win32 canvas: simplified stub using a STATIC control.
-   Full GDI drawing requires a custom window class with WM_PAINT. */
+
+/* Draw command queue — replayed in WM_PAINT via WM_DRAWITEM for
+   SS_OWNERDRAW static controls. */
+
+enum
+{
+    W32_DRAW_LINE = 0,
+    W32_DRAW_RECT,
+    W32_DRAW_OVAL,
+    W32_DRAW_TEXT
+};
+
+typedef struct
+{
+    int type;
+    int x1, y1, x2, y2;
+    char text[128];
+} w32_draw_cmd_t;
+
+#define W32_MAX_CANVAS 32
+#define W32_MAX_DRAW_CMDS 512
+
+typedef struct
+{
+    HWND hwnd;
+    w32_draw_cmd_t cmds[W32_MAX_DRAW_CMDS];
+    int cmd_count;
+} w32_canvas_t;
+
+static w32_canvas_t g_w32_canvas[W32_MAX_CANVAS];
+static int g_w32_canvas_count = 0;
+
+static w32_canvas_t *w32_canvas_for(HWND hwnd)
+{
+    for (int i = 0; i < g_w32_canvas_count; i++)
+        if (g_w32_canvas[i].hwnd == hwnd)
+            return &g_w32_canvas[i];
+    return NULL;
+}
 
 static void *win32_canvas_create(void *parent, int width, int height)
 {
@@ -858,7 +944,15 @@ static void *win32_canvas_create(void *parent, int width, int height)
     HWND hwnd = CreateWindowExW(WS_EX_CLIENTEDGE, L"STATIC", L"", WS_CHILD | WS_VISIBLE | SS_OWNERDRAW, 0, 0, width,
                                 height, (HWND)parent, (HMENU)(intptr_t)g_next_ctrl_id++, g_hinstance, NULL);
     if (hwnd)
+    {
         register_widget_parent(hwnd, (HWND)parent);
+        if (g_w32_canvas_count < W32_MAX_CANVAS)
+        {
+            w32_canvas_t *c = &g_w32_canvas[g_w32_canvas_count++];
+            memset(c, 0, sizeof(*c));
+            c->hwnd = hwnd;
+        }
+    }
     return (void *)hwnd;
 }
 
@@ -870,38 +964,58 @@ static void win32_canvas_destroy(void *handle)
 
 static void win32_canvas_clear(void *handle)
 {
-    (void)handle;
+    w32_canvas_t *c = w32_canvas_for((HWND)handle);
+    if (c)
+    {
+        c->cmd_count = 0;
+        InvalidateRect((HWND)handle, NULL, TRUE);
+    }
 }
+
 static void win32_canvas_draw_line(void *h, double x1, double y1, double x2, double y2)
 {
-    (void)h;
-    (void)x1;
-    (void)y1;
-    (void)x2;
-    (void)y2;
+    w32_canvas_t *c = w32_canvas_for((HWND)h);
+    if (c && c->cmd_count < W32_MAX_DRAW_CMDS)
+    {
+        c->cmds[c->cmd_count++] = (w32_draw_cmd_t){W32_DRAW_LINE, (int)x1, (int)y1, (int)x2, (int)y2, {0}};
+        InvalidateRect((HWND)h, NULL, FALSE);
+    }
 }
+
 static void win32_canvas_draw_rect(void *h, double x, double y, double w, double ht)
 {
-    (void)h;
-    (void)x;
-    (void)y;
-    (void)w;
-    (void)ht;
+    w32_canvas_t *c = w32_canvas_for((HWND)h);
+    if (c && c->cmd_count < W32_MAX_DRAW_CMDS)
+    {
+        c->cmds[c->cmd_count++] = (w32_draw_cmd_t){W32_DRAW_RECT, (int)x, (int)y, (int)w, (int)ht, {0}};
+        InvalidateRect((HWND)h, NULL, FALSE);
+    }
 }
+
 static void win32_canvas_draw_oval(void *h, double x, double y, double w, double ht)
 {
-    (void)h;
-    (void)x;
-    (void)y;
-    (void)w;
-    (void)ht;
+    w32_canvas_t *c = w32_canvas_for((HWND)h);
+    if (c && c->cmd_count < W32_MAX_DRAW_CMDS)
+    {
+        c->cmds[c->cmd_count++] = (w32_draw_cmd_t){W32_DRAW_OVAL, (int)x, (int)y, (int)w, (int)ht, {0}};
+        InvalidateRect((HWND)h, NULL, FALSE);
+    }
 }
+
 static void win32_canvas_draw_text(void *h, double x, double y, const char *t)
 {
-    (void)h;
-    (void)x;
-    (void)y;
-    (void)t;
+    w32_canvas_t *c = w32_canvas_for((HWND)h);
+    if (c && c->cmd_count < W32_MAX_DRAW_CMDS)
+    {
+        w32_draw_cmd_t cmd = {W32_DRAW_TEXT, (int)x, (int)y, 0, 0, {0}};
+        size_t len = strlen(t);
+        if (len >= sizeof(cmd.text))
+            len = sizeof(cmd.text) - 1;
+        memcpy(cmd.text, t, len);
+        cmd.text[len] = '\0';
+        c->cmds[c->cmd_count++] = cmd;
+        InvalidateRect((HWND)h, NULL, FALSE);
+    }
 }
 
 /* ── Grid layout ─────────────────────────────────────────────────── */
@@ -1008,8 +1122,19 @@ static const char *win32_choose_dir(void *parent, const char *title, char *buf, 
     (void)parent;
     (void)title;
     buf[0] = '\0';
-    (void)bufsz;
-    /* SHBrowseForFolder requires shell32; simplified stub. */
+    BROWSEINFOW bi;
+    wchar_t wpath[MAX_PATH] = {0};
+    memset(&bi, 0, sizeof(bi));
+    bi.hwndOwner = (HWND)parent;
+    bi.pszDisplayName = wpath;
+    bi.ulFlags = BIF_RETURNONLYFSDIRS | BIF_NEWDIALOGSTYLE;
+    PIDLIST_ABSOLUTE pidl = SHBrowseForFolderW(&bi);
+    if (pidl)
+    {
+        if (SHGetPathFromIDListW(pidl, wpath))
+            WideCharToMultiByte(CP_UTF8, 0, wpath, -1, buf, (int)bufsz, NULL, NULL);
+        CoTaskMemFree(pidl);
+    }
     return buf;
 }
 
