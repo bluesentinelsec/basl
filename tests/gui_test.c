@@ -20,8 +20,7 @@ static int gui_plugin_available(void)
     return vigil_plugin_is_known_module("gui", 3U);
 }
 
-static const vigil_native_module_t *get_gui_module(vigil_native_registry_t *natives,
-                                                    vigil_error_t *error)
+static const vigil_native_module_t *get_gui_module(vigil_native_registry_t *natives, vigil_error_t *error)
 {
     vigil_native_registry_init(natives);
     if (vigil_plugin_register_all(natives, error) != VIGIL_STATUS_OK)
@@ -29,8 +28,7 @@ static const vigil_native_module_t *get_gui_module(vigil_native_registry_t *nati
     return vigil_native_registry_find(natives, "gui", 3U);
 }
 
-static const vigil_native_class_t *find_class(const vigil_native_module_t *mod,
-                                               const char *name)
+static const vigil_native_class_t *find_class(const vigil_native_module_t *mod, const char *name)
 {
     for (size_t i = 0; i < mod->class_count; i++)
         if (strcmp(mod->classes[i].name, name) == 0)
@@ -38,8 +36,7 @@ static const vigil_native_class_t *find_class(const vigil_native_module_t *mod,
     return NULL;
 }
 
-static const vigil_native_class_method_t *find_method(const vigil_native_class_t *cls,
-                                                       const char *name)
+static const vigil_native_class_method_t *find_method(const vigil_native_class_t *cls, const char *name)
 {
     for (size_t i = 0; i < cls->method_count; i++)
         if (strcmp(cls->methods[i].name, name) == 0)
@@ -51,7 +48,8 @@ static const vigil_native_class_method_t *find_method(const vigil_native_class_t
 
 TEST(GuiPlugin, ModuleRegisters)
 {
-    if (!gui_plugin_available()) return;
+    if (!gui_plugin_available())
+        return;
     vigil_native_registry_t natives;
     vigil_error_t error;
     const vigil_native_module_t *mod = get_gui_module(&natives, &error);
@@ -61,7 +59,8 @@ TEST(GuiPlugin, ModuleRegisters)
 
 TEST(GuiPlugin, HasSixClasses)
 {
-    if (!gui_plugin_available()) return;
+    if (!gui_plugin_available())
+        return;
     vigil_native_registry_t natives;
     vigil_error_t error;
     const vigil_native_module_t *mod = get_gui_module(&natives, &error);
@@ -77,7 +76,8 @@ TEST(GuiPlugin, HasSixClasses)
 
 TEST(GuiPlugin, HasMessageBoxFunction)
 {
-    if (!gui_plugin_available()) return;
+    if (!gui_plugin_available())
+        return;
     vigil_native_registry_t natives;
     vigil_error_t error;
     const vigil_native_module_t *mod = get_gui_module(&natives, &error);
@@ -85,13 +85,15 @@ TEST(GuiPlugin, HasMessageBoxFunction)
     EXPECT_GE(mod->function_count, 1U);
     int found = 0;
     for (size_t i = 0; i < mod->function_count; i++)
-        if (strcmp(mod->functions[i].name, "message_box") == 0) found = 1;
+        if (strcmp(mod->functions[i].name, "message_box") == 0)
+            found = 1;
     EXPECT_EQ(found, 1);
 }
 
 TEST(GuiPlugin, AppClassMethods)
 {
-    if (!gui_plugin_available()) return;
+    if (!gui_plugin_available())
+        return;
     vigil_native_registry_t natives;
     vigil_error_t error;
     const vigil_native_module_t *mod = get_gui_module(&natives, &error);
@@ -106,23 +108,24 @@ TEST(GuiPlugin, AppClassMethods)
 
 TEST(GuiPlugin, WindowClassMethods)
 {
-    if (!gui_plugin_available()) return;
+    if (!gui_plugin_available())
+        return;
     vigil_native_registry_t natives;
     vigil_error_t error;
     const vigil_native_module_t *mod = get_gui_module(&natives, &error);
     ASSERT_NE(mod, NULL);
     const vigil_native_class_t *cls = find_class(mod, "Window");
     ASSERT_NE(cls, NULL);
-    static const char *expected[] = {"new", "destroy", "set_title", "get_size",
-                                     "grid_columnconfigure", "grid_rowconfigure",
-                                     "on_close"};
+    static const char *expected[] = {
+        "new", "destroy", "set_title", "get_size", "grid_columnconfigure", "grid_rowconfigure", "on_close"};
     for (size_t i = 0; i < sizeof(expected) / sizeof(expected[0]); i++)
         EXPECT_NE(find_method(cls, expected[i]), NULL);
 }
 
 TEST(GuiPlugin, LabelClassMethods)
 {
-    if (!gui_plugin_available()) return;
+    if (!gui_plugin_available())
+        return;
     vigil_native_registry_t natives;
     vigil_error_t error;
     const vigil_native_module_t *mod = get_gui_module(&natives, &error);
@@ -137,7 +140,8 @@ TEST(GuiPlugin, LabelClassMethods)
 
 TEST(GuiPlugin, ButtonClassMethods)
 {
-    if (!gui_plugin_available()) return;
+    if (!gui_plugin_available())
+        return;
     vigil_native_registry_t natives;
     vigil_error_t error;
     const vigil_native_module_t *mod = get_gui_module(&natives, &error);
@@ -153,7 +157,8 @@ TEST(GuiPlugin, ButtonClassMethods)
 
 TEST(GuiPlugin, EntryClassMethods)
 {
-    if (!gui_plugin_available()) return;
+    if (!gui_plugin_available())
+        return;
     vigil_native_registry_t natives;
     vigil_error_t error;
     const vigil_native_module_t *mod = get_gui_module(&natives, &error);
@@ -170,7 +175,8 @@ TEST(GuiPlugin, EntryClassMethods)
 
 TEST(GuiPlugin, CheckboxClassMethods)
 {
-    if (!gui_plugin_available()) return;
+    if (!gui_plugin_available())
+        return;
     vigil_native_registry_t natives;
     vigil_error_t error;
     const vigil_native_module_t *mod = get_gui_module(&natives, &error);
@@ -188,7 +194,8 @@ TEST(GuiPlugin, CheckboxClassMethods)
 
 TEST(GuiPlugin, AppNewIsStatic)
 {
-    if (!gui_plugin_available()) return;
+    if (!gui_plugin_available())
+        return;
     vigil_native_registry_t natives;
     vigil_error_t error;
     const vigil_native_module_t *mod = get_gui_module(&natives, &error);
@@ -202,7 +209,8 @@ TEST(GuiPlugin, AppNewIsStatic)
 
 TEST(GuiPlugin, EachClassHasHandleField)
 {
-    if (!gui_plugin_available()) return;
+    if (!gui_plugin_available())
+        return;
     vigil_native_registry_t natives;
     vigil_error_t error;
     const vigil_native_module_t *mod = get_gui_module(&natives, &error);
@@ -219,7 +227,8 @@ TEST(GuiPlugin, EachClassHasHandleField)
 
 TEST(GuiPlugin, ModuleHasDoc)
 {
-    if (!gui_plugin_available()) return;
+    if (!gui_plugin_available())
+        return;
     vigil_native_registry_t natives;
     vigil_error_t error;
     const vigil_native_module_t *mod = get_gui_module(&natives, &error);
