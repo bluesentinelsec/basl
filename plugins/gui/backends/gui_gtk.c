@@ -82,6 +82,8 @@ typedef void (*fn_gtk_grid_attach)(GtkGrid *, GtkWidget *, gint, gint, gint, gin
 typedef void (*fn_gtk_widget_set_hexpand)(GtkWidget *, gboolean);
 typedef void (*fn_gtk_widget_set_vexpand)(GtkWidget *, gboolean);
 typedef gulong (*fn_g_signal_connect_data)(void *, const char *, GCallback, void *, GClosureNotify, int);
+typedef GtkWidget *(*fn_gtk_entry_new)(void);
+typedef GtkWidget *(*fn_gtk_check_button_new_with_label)(const char *);
 
 /* GTK3-only function pointer types */
 typedef GtkWidget *(*fn_gtk_window_new_gtk3)(int type);
@@ -93,6 +95,10 @@ typedef GtkWidget *(*fn_gtk_message_dialog_new)(GtkWindow *, int, int, int, cons
 typedef gint (*fn_gtk_dialog_run)(GtkWidget *);
 typedef void (*fn_gtk_main)(void);
 typedef void (*fn_gtk_main_quit)(void);
+typedef const char *(*fn_gtk_entry_get_text_gtk3)(GtkWidget *);
+typedef void (*fn_gtk_entry_set_text_gtk3)(GtkWidget *, const char *);
+typedef gboolean (*fn_gtk_toggle_button_get_active)(GtkWidget *);
+typedef void (*fn_gtk_toggle_button_set_active)(GtkWidget *, gboolean);
 
 /* GTK4-only function pointer types */
 typedef GtkWidget *(*fn_gtk_window_new_gtk4)(void);
@@ -101,6 +107,11 @@ typedef void (*fn_gtk_widget_set_visible)(GtkWidget *, gboolean);
 typedef void (*fn_gtk_window_set_child)(GtkWindow *, GtkWidget *);
 typedef void (*fn_gtk_grid_remove)(GtkGrid *, GtkWidget *);
 typedef void (*fn_gtk_window_destroy)(GtkWindow *);
+typedef const char *(*fn_gtk_editable_get_text)(GtkWidget *);
+typedef void (*fn_gtk_editable_set_text)(GtkWidget *, const char *);
+typedef gboolean (*fn_gtk_check_button_get_active)(GtkWidget *);
+typedef void (*fn_gtk_check_button_set_active)(GtkWidget *, gboolean);
+typedef void (*fn_gtk_check_button_set_label)(GtkWidget *, const char *);
 
 /* GLib main loop (used by GTK4 path; available in both versions) */
 typedef GMainLoop *(*fn_g_main_loop_new)(GMainContext *, gboolean);
@@ -139,6 +150,15 @@ typedef struct gtk_version_ops
 
     /* Dialogs */
     void (*message_box)(void *parent, const char *title, const char *msg);
+
+    /* Entry (text input) */
+    const char *(*entry_get_text)(GtkWidget *entry);
+    void (*entry_set_text)(GtkWidget *entry, const char *text);
+
+    /* Checkbox */
+    gboolean (*checkbox_get_active)(GtkWidget *cb);
+    void (*checkbox_set_active)(GtkWidget *cb, gboolean active);
+    void (*checkbox_set_label)(GtkWidget *cb, const char *text);
 } gtk_version_ops_t;
 
 /* ── Shared resolved symbols ─────────────────────────────────────── */
@@ -158,6 +178,8 @@ static struct
     fn_gtk_widget_set_hexpand gtk_widget_set_hexpand;
     fn_gtk_widget_set_vexpand gtk_widget_set_vexpand;
     fn_g_signal_connect_data g_signal_connect_data;
+    fn_gtk_entry_new gtk_entry_new;
+    fn_gtk_check_button_new_with_label gtk_check_button_new_with_label;
 } G;
 
 static const gtk_version_ops_t *g_vops = NULL;
@@ -317,6 +339,10 @@ static fn_gtk_widget_destroy s_gtk3_widget_destroy;
 static fn_gtk_container_add s_gtk3_container_add;
 static fn_gtk_message_dialog_new s_gtk3_message_dialog_new;
 static fn_gtk_dialog_run s_gtk3_dialog_run;
+static fn_gtk_entry_get_text_gtk3 s_gtk3_entry_get_text;
+static fn_gtk_entry_set_text_gtk3 s_gtk3_entry_set_text;
+static fn_gtk_toggle_button_get_active s_gtk3_toggle_get_active;
+static fn_gtk_toggle_button_set_active s_gtk3_toggle_set_active;
 
 static void gtk3_main_loop(void)
 {
@@ -374,6 +400,31 @@ static void gtk3_message_box(void *parent, const char *title, const char *msg)
     s_gtk3_widget_destroy(dialog);
 }
 
+static const char *gtk3_entry_get_text(GtkWidget *entry)
+{
+    return s_gtk3_entry_get_text(entry);
+}
+
+static void gtk3_entry_set_text(GtkWidget *entry, const char *text)
+{
+    s_gtk3_entry_set_text(entry, text);
+}
+
+static gboolean gtk3_checkbox_get_active(GtkWidget *cb)
+{
+    return s_gtk3_toggle_get_active(cb);
+}
+
+static void gtk3_checkbox_set_active(GtkWidget *cb, gboolean active)
+{
+    s_gtk3_toggle_set_active(cb, active);
+}
+
+static void gtk3_checkbox_set_label(GtkWidget *cb, const char *text)
+{
+    G.gtk_button_set_label(cb, text);
+}
+
 static const gtk_version_ops_t g_gtk3_ops = {
     .version_name = "GTK3",
     .close_signal = "delete-event",
@@ -387,6 +438,11 @@ static const gtk_version_ops_t g_gtk3_ops = {
     .widget_destroy = gtk3_widget_destroy,
     .grid_remove_child = gtk3_grid_remove_child,
     .message_box = gtk3_message_box,
+    .entry_get_text = gtk3_entry_get_text,
+    .entry_set_text = gtk3_entry_set_text,
+    .checkbox_get_active = gtk3_checkbox_get_active,
+    .checkbox_set_active = gtk3_checkbox_set_active,
+    .checkbox_set_label = gtk3_checkbox_set_label,
 };
 
 static bool load_gtk3_symbols(void)
@@ -400,6 +456,10 @@ static bool load_gtk3_symbols(void)
     LOAD_LOCAL(s_gtk3_container_add, gtk_container_add);
     LOAD_LOCAL(s_gtk3_message_dialog_new, gtk_message_dialog_new);
     LOAD_LOCAL(s_gtk3_dialog_run, gtk_dialog_run);
+    LOAD_LOCAL(s_gtk3_entry_get_text, gtk_entry_get_text);
+    LOAD_LOCAL(s_gtk3_entry_set_text, gtk_entry_set_text);
+    LOAD_LOCAL(s_gtk3_toggle_get_active, gtk_toggle_button_get_active);
+    LOAD_LOCAL(s_gtk3_toggle_set_active, gtk_toggle_button_set_active);
     return true;
 fail:
     return false;
@@ -419,6 +479,11 @@ static fn_g_main_loop_new s_gtk4_g_main_loop_new;
 static fn_g_main_loop_run s_gtk4_g_main_loop_run;
 static fn_g_main_loop_quit s_gtk4_g_main_loop_quit;
 static fn_g_main_loop_unref s_gtk4_g_main_loop_unref;
+static fn_gtk_editable_get_text s_gtk4_editable_get_text;
+static fn_gtk_editable_set_text s_gtk4_editable_set_text;
+static fn_gtk_check_button_get_active s_gtk4_check_get_active;
+static fn_gtk_check_button_set_active s_gtk4_check_set_active;
+static fn_gtk_check_button_set_label s_gtk4_check_set_label;
 
 static GMainLoop *s_gtk4_loop = NULL;
 
@@ -509,6 +574,31 @@ static void gtk4_message_box(void *parent, const char *title, const char *msg)
     s_gtk4_g_main_loop_unref(loop);
 }
 
+static const char *gtk4_entry_get_text(GtkWidget *entry)
+{
+    return s_gtk4_editable_get_text(entry);
+}
+
+static void gtk4_entry_set_text(GtkWidget *entry, const char *text)
+{
+    s_gtk4_editable_set_text(entry, text);
+}
+
+static gboolean gtk4_checkbox_get_active(GtkWidget *cb)
+{
+    return s_gtk4_check_get_active(cb);
+}
+
+static void gtk4_checkbox_set_active(GtkWidget *cb, gboolean active)
+{
+    s_gtk4_check_set_active(cb, active);
+}
+
+static void gtk4_checkbox_set_label(GtkWidget *cb, const char *text)
+{
+    s_gtk4_check_set_label(cb, text);
+}
+
 static const gtk_version_ops_t g_gtk4_ops = {
     .version_name = "GTK4",
     .close_signal = "close-request",
@@ -522,6 +612,11 @@ static const gtk_version_ops_t g_gtk4_ops = {
     .widget_destroy = gtk4_widget_destroy,
     .grid_remove_child = gtk4_grid_remove_child,
     .message_box = gtk4_message_box,
+    .entry_get_text = gtk4_entry_get_text,
+    .entry_set_text = gtk4_entry_set_text,
+    .checkbox_get_active = gtk4_checkbox_get_active,
+    .checkbox_set_active = gtk4_checkbox_set_active,
+    .checkbox_set_label = gtk4_checkbox_set_label,
 };
 
 static bool load_gtk4_symbols(void)
@@ -536,6 +631,11 @@ static bool load_gtk4_symbols(void)
     LOAD_LOCAL(s_gtk4_g_main_loop_run, g_main_loop_run);
     LOAD_LOCAL(s_gtk4_g_main_loop_quit, g_main_loop_quit);
     LOAD_LOCAL(s_gtk4_g_main_loop_unref, g_main_loop_unref);
+    LOAD_LOCAL(s_gtk4_editable_get_text, gtk_editable_get_text);
+    LOAD_LOCAL(s_gtk4_editable_set_text, gtk_editable_set_text);
+    LOAD_LOCAL(s_gtk4_check_get_active, gtk_check_button_get_active);
+    LOAD_LOCAL(s_gtk4_check_set_active, gtk_check_button_set_active);
+    LOAD_LOCAL(s_gtk4_check_set_label, gtk_check_button_set_label);
     return true;
 fail:
     return false;
@@ -559,6 +659,8 @@ static bool load_shared_symbols(void)
     LOAD_SHARED(gtk_widget_set_hexpand);
     LOAD_SHARED(gtk_widget_set_vexpand);
     LOAD_SHARED(g_signal_connect_data);
+    LOAD_SHARED(gtk_entry_new);
+    LOAD_SHARED(gtk_check_button_new_with_label);
     return true;
 fail:
     return false;
@@ -725,6 +827,112 @@ static void gtk_be_button_set_text(void *handle, const char *text)
         G.gtk_button_set_label(handle, text);
 }
 
+/* ── Entry ───────────────────────────────────────────────────────── */
+
+static void on_entry_changed(GtkWidget *widget, void *data)
+{
+    (void)data;
+    gui_callback_t *cb = find_callback(widget, GUI_EVENT_CHANGE);
+    if (cb && cb->fn)
+        cb->fn(cb->user_data);
+}
+
+static void *gtk_be_entry_create(void *parent)
+{
+    if (!parent)
+        return NULL;
+    void *grid = grid_for_window(parent);
+    if (!grid)
+        return NULL;
+    GtkWidget *entry = G.gtk_entry_new();
+    G.g_signal_connect_data(entry, "changed", (GCallback)on_entry_changed, NULL, NULL, 0);
+    register_widget_parent(entry, grid);
+    return entry;
+}
+
+static void gtk_be_entry_destroy(void *handle)
+{
+    if (handle)
+        g_vops->widget_destroy(handle);
+}
+
+static const char *gtk_be_entry_get_text(void *handle, char *buf, size_t bufsz)
+{
+    if (!handle)
+    {
+        buf[0] = '\0';
+        return buf;
+    }
+    const char *text = g_vops->entry_get_text(handle);
+    if (text)
+    {
+        size_t len = strlen(text);
+        if (len >= bufsz)
+            len = bufsz - 1;
+        memcpy(buf, text, len);
+        buf[len] = '\0';
+    }
+    else
+    {
+        buf[0] = '\0';
+    }
+    return buf;
+}
+
+static void gtk_be_entry_set_text(void *handle, const char *text)
+{
+    if (handle)
+        g_vops->entry_set_text(handle, text);
+}
+
+/* ── Checkbox ────────────────────────────────────────────────────── */
+
+static void on_checkbox_toggled(GtkWidget *widget, void *data)
+{
+    (void)data;
+    gui_callback_t *cb = find_callback(widget, GUI_EVENT_CHANGE);
+    if (cb && cb->fn)
+        cb->fn(cb->user_data);
+}
+
+static void *gtk_be_checkbox_create(void *parent, const char *text)
+{
+    if (!parent)
+        return NULL;
+    void *grid = grid_for_window(parent);
+    if (!grid)
+        return NULL;
+    GtkWidget *cb = G.gtk_check_button_new_with_label(text);
+    G.g_signal_connect_data(cb, "toggled", (GCallback)on_checkbox_toggled, NULL, NULL, 0);
+    register_widget_parent(cb, grid);
+    return cb;
+}
+
+static void gtk_be_checkbox_destroy(void *handle)
+{
+    if (handle)
+        g_vops->widget_destroy(handle);
+}
+
+static void gtk_be_checkbox_set_text(void *handle, const char *text)
+{
+    if (handle)
+        g_vops->checkbox_set_label(handle, text);
+}
+
+static bool gtk_be_checkbox_get_checked(void *handle)
+{
+    if (!handle)
+        return false;
+    return g_vops->checkbox_get_active(handle) != 0;
+}
+
+static void gtk_be_checkbox_set_checked(void *handle, bool checked)
+{
+    if (handle)
+        g_vops->checkbox_set_active(handle, checked ? 1 : 0);
+}
+
 /* ── Grid layout ─────────────────────────────────────────────────── */
 
 static void gtk_be_widget_grid(void *handle, int col, int row)
@@ -806,6 +1014,15 @@ const gui_backend_t gui_backend_gtk = {
     .button_create = gtk_be_button_create,
     .button_destroy = gtk_be_button_destroy,
     .button_set_text = gtk_be_button_set_text,
+    .entry_create = gtk_be_entry_create,
+    .entry_destroy = gtk_be_entry_destroy,
+    .entry_get_text = gtk_be_entry_get_text,
+    .entry_set_text = gtk_be_entry_set_text,
+    .checkbox_create = gtk_be_checkbox_create,
+    .checkbox_destroy = gtk_be_checkbox_destroy,
+    .checkbox_set_text = gtk_be_checkbox_set_text,
+    .checkbox_get_checked = gtk_be_checkbox_get_checked,
+    .checkbox_set_checked = gtk_be_checkbox_set_checked,
     .widget_grid = gtk_be_widget_grid,
     .widget_grid_remove = gtk_be_widget_grid_remove,
     .container_grid_columnconfigure = gtk_be_container_grid_columnconfigure,

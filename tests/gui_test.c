@@ -59,18 +59,20 @@ TEST(GuiPlugin, ModuleRegisters)
     EXPECT_STREQ(mod->name, "gui");
 }
 
-TEST(GuiPlugin, HasFourClasses)
+TEST(GuiPlugin, HasSixClasses)
 {
     if (!gui_plugin_available()) return;
     vigil_native_registry_t natives;
     vigil_error_t error;
     const vigil_native_module_t *mod = get_gui_module(&natives, &error);
     ASSERT_NE(mod, NULL);
-    EXPECT_EQ(mod->class_count, 4U);
+    EXPECT_EQ(mod->class_count, 6U);
     EXPECT_NE(find_class(mod, "App"), NULL);
     EXPECT_NE(find_class(mod, "Window"), NULL);
     EXPECT_NE(find_class(mod, "Label"), NULL);
     EXPECT_NE(find_class(mod, "Button"), NULL);
+    EXPECT_NE(find_class(mod, "Entry"), NULL);
+    EXPECT_NE(find_class(mod, "Checkbox"), NULL);
 }
 
 TEST(GuiPlugin, HasMessageBoxFunction)
@@ -149,6 +151,41 @@ TEST(GuiPlugin, ButtonClassMethods)
     EXPECT_NE(find_method(cls, "on_click"), NULL);
 }
 
+TEST(GuiPlugin, EntryClassMethods)
+{
+    if (!gui_plugin_available()) return;
+    vigil_native_registry_t natives;
+    vigil_error_t error;
+    const vigil_native_module_t *mod = get_gui_module(&natives, &error);
+    ASSERT_NE(mod, NULL);
+    const vigil_native_class_t *cls = find_class(mod, "Entry");
+    ASSERT_NE(cls, NULL);
+    EXPECT_NE(find_method(cls, "new"), NULL);
+    EXPECT_NE(find_method(cls, "destroy"), NULL);
+    EXPECT_NE(find_method(cls, "get"), NULL);
+    EXPECT_NE(find_method(cls, "set"), NULL);
+    EXPECT_NE(find_method(cls, "grid"), NULL);
+    EXPECT_NE(find_method(cls, "on_change"), NULL);
+}
+
+TEST(GuiPlugin, CheckboxClassMethods)
+{
+    if (!gui_plugin_available()) return;
+    vigil_native_registry_t natives;
+    vigil_error_t error;
+    const vigil_native_module_t *mod = get_gui_module(&natives, &error);
+    ASSERT_NE(mod, NULL);
+    const vigil_native_class_t *cls = find_class(mod, "Checkbox");
+    ASSERT_NE(cls, NULL);
+    EXPECT_NE(find_method(cls, "new"), NULL);
+    EXPECT_NE(find_method(cls, "destroy"), NULL);
+    EXPECT_NE(find_method(cls, "set_text"), NULL);
+    EXPECT_NE(find_method(cls, "get"), NULL);
+    EXPECT_NE(find_method(cls, "set"), NULL);
+    EXPECT_NE(find_method(cls, "grid"), NULL);
+    EXPECT_NE(find_method(cls, "on_change"), NULL);
+}
+
 TEST(GuiPlugin, AppNewIsStatic)
 {
     if (!gui_plugin_available()) return;
@@ -170,8 +207,8 @@ TEST(GuiPlugin, EachClassHasHandleField)
     vigil_error_t error;
     const vigil_native_module_t *mod = get_gui_module(&natives, &error);
     ASSERT_NE(mod, NULL);
-    static const char *names[] = {"App", "Window", "Label", "Button"};
-    for (size_t i = 0; i < 4; i++)
+    static const char *names[] = {"App", "Window", "Label", "Button", "Entry", "Checkbox"};
+    for (size_t i = 0; i < 6; i++)
     {
         const vigil_native_class_t *cls = find_class(mod, names[i]);
         ASSERT_NE(cls, NULL);
@@ -196,12 +233,14 @@ TEST(GuiPlugin, ModuleHasDoc)
 void register_gui_tests(void)
 {
     REGISTER_TEST(GuiPlugin, ModuleRegisters);
-    REGISTER_TEST(GuiPlugin, HasFourClasses);
+    REGISTER_TEST(GuiPlugin, HasSixClasses);
     REGISTER_TEST(GuiPlugin, HasMessageBoxFunction);
     REGISTER_TEST(GuiPlugin, AppClassMethods);
     REGISTER_TEST(GuiPlugin, WindowClassMethods);
     REGISTER_TEST(GuiPlugin, LabelClassMethods);
     REGISTER_TEST(GuiPlugin, ButtonClassMethods);
+    REGISTER_TEST(GuiPlugin, EntryClassMethods);
+    REGISTER_TEST(GuiPlugin, CheckboxClassMethods);
     REGISTER_TEST(GuiPlugin, AppNewIsStatic);
     REGISTER_TEST(GuiPlugin, EachClassHasHandleField);
     REGISTER_TEST(GuiPlugin, ModuleHasDoc);

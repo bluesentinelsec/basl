@@ -419,6 +419,90 @@ static void cocoa_button_set_text(void *handle, const char *text)
     if (handle) sendv_id((id)handle, sel("setTitle:"), nsstr(text));
 }
 
+/* ── Entry ───────────────────────────────────────────────────────── */
+
+static void *cocoa_entry_create(void *parent)
+{
+    if (!parent) return NULL;
+    id cv = send0((id)parent, sel("contentView"));
+    id field = send_rect(send0(cls("NSTextField"), sel("alloc")),
+                         sel("initWithFrame:"), CGRectMake_(0, 0, 200, 24));
+    sendv_id(field, sel("setStringValue:"), nsstr(""));
+    sendv_bool(field, sel("setEditable:"), 1);
+    sendv_bool(field, sel("setBezeled:"), 1);
+    sendv_bool(field, sel("setDrawsBackground:"), 1);
+    sendv_id(cv, sel("addSubview:"), field);
+    register_widget_parent(field, cv);
+    return (void *)field;
+}
+
+static void cocoa_entry_destroy(void *handle)
+{
+    if (handle) sendv((id)handle, sel("removeFromSuperview"));
+}
+
+static const char *cocoa_entry_get_text(void *handle, char *buf, size_t bufsz)
+{
+    if (!handle) { buf[0] = '\0'; return buf; }
+    id nsval = send0((id)handle, sel("stringValue"));
+    const char *s = ((const char *(*)(id, SEL))objc_msgSend)(nsval, sel("UTF8String"));
+    if (s) {
+        size_t len = strlen(s);
+        if (len >= bufsz) len = bufsz - 1;
+        memcpy(buf, s, len);
+        buf[len] = '\0';
+    } else {
+        buf[0] = '\0';
+    }
+    return buf;
+}
+
+static void cocoa_entry_set_text(void *handle, const char *text)
+{
+    if (handle) sendv_id((id)handle, sel("setStringValue:"), nsstr(text));
+}
+
+/* ── Checkbox ────────────────────────────────────────────────────── */
+
+static void *cocoa_checkbox_create(void *parent, const char *text)
+{
+    if (!parent) return NULL;
+    id cv = send0((id)parent, sel("contentView"));
+    id button = send_rect(send0(cls("NSButton"), sel("alloc")),
+                          sel("initWithFrame:"), CGRectMake_(0, 0, 200, 24));
+    sendv_id(button, sel("setTitle:"), nsstr(text));
+    sendv_long(button, sel("setButtonType:"), 3); /* NSSwitchButton */
+    if (g_button_target) {
+        sendv_id(button, sel("setTarget:"), g_button_target);
+        sendv_sel(button, sel("setAction:"), sel("buttonClicked:"));
+    }
+    sendv_id(cv, sel("addSubview:"), button);
+    register_widget_parent(button, cv);
+    return (void *)button;
+}
+
+static void cocoa_checkbox_destroy(void *handle)
+{
+    if (handle) sendv((id)handle, sel("removeFromSuperview"));
+}
+
+static void cocoa_checkbox_set_text(void *handle, const char *text)
+{
+    if (handle) sendv_id((id)handle, sel("setTitle:"), nsstr(text));
+}
+
+static bool cocoa_checkbox_get_checked(void *handle)
+{
+    if (!handle) return false;
+    long state = ((long (*)(id, SEL))objc_msgSend)((id)handle, sel("state"));
+    return state != 0;
+}
+
+static void cocoa_checkbox_set_checked(void *handle, bool checked)
+{
+    if (handle) sendv_long((id)handle, sel("setState:"), checked ? 1 : 0);
+}
+
 /* ── Grid layout ─────────────────────────────────────────────────── */
 
 static void cocoa_widget_grid(void *handle, int col, int row)
@@ -489,6 +573,15 @@ const gui_backend_t gui_backend_cocoa = {
     .button_create                 = cocoa_button_create,
     .button_destroy                = cocoa_button_destroy,
     .button_set_text               = cocoa_button_set_text,
+    .entry_create                  = cocoa_entry_create,
+    .entry_destroy                 = cocoa_entry_destroy,
+    .entry_get_text                = cocoa_entry_get_text,
+    .entry_set_text                = cocoa_entry_set_text,
+    .checkbox_create               = cocoa_checkbox_create,
+    .checkbox_destroy              = cocoa_checkbox_destroy,
+    .checkbox_set_text             = cocoa_checkbox_set_text,
+    .checkbox_get_checked          = cocoa_checkbox_get_checked,
+    .checkbox_set_checked          = cocoa_checkbox_set_checked,
     .widget_grid                   = cocoa_widget_grid,
     .widget_grid_remove            = cocoa_widget_grid_remove,
     .container_grid_columnconfigure = cocoa_container_grid_columnconfigure,
