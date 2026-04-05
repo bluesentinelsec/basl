@@ -847,6 +847,63 @@ static void win32_paned_set_position(void *handle, int pos)
     (void)pos;
 }
 
+/* ── Canvas ──────────────────────────────────────────────────────── */
+/* Win32 canvas: simplified stub using a STATIC control.
+   Full GDI drawing requires a custom window class with WM_PAINT. */
+
+static void *win32_canvas_create(void *parent, int width, int height)
+{
+    if (!parent)
+        return NULL;
+    HWND hwnd = CreateWindowExW(WS_EX_CLIENTEDGE, L"STATIC", L"", WS_CHILD | WS_VISIBLE | SS_OWNERDRAW, 0, 0, width,
+                                height, (HWND)parent, (HMENU)(intptr_t)g_next_ctrl_id++, g_hinstance, NULL);
+    if (hwnd)
+        register_widget_parent(hwnd, (HWND)parent);
+    return (void *)hwnd;
+}
+
+static void win32_canvas_destroy(void *handle)
+{
+    if (handle)
+        DestroyWindow((HWND)handle);
+}
+
+static void win32_canvas_clear(void *handle)
+{
+    (void)handle;
+}
+static void win32_canvas_draw_line(void *h, double x1, double y1, double x2, double y2)
+{
+    (void)h;
+    (void)x1;
+    (void)y1;
+    (void)x2;
+    (void)y2;
+}
+static void win32_canvas_draw_rect(void *h, double x, double y, double w, double ht)
+{
+    (void)h;
+    (void)x;
+    (void)y;
+    (void)w;
+    (void)ht;
+}
+static void win32_canvas_draw_oval(void *h, double x, double y, double w, double ht)
+{
+    (void)h;
+    (void)x;
+    (void)y;
+    (void)w;
+    (void)ht;
+}
+static void win32_canvas_draw_text(void *h, double x, double y, const char *t)
+{
+    (void)h;
+    (void)x;
+    (void)y;
+    (void)t;
+}
+
 /* ── Grid layout ─────────────────────────────────────────────────── */
 
 static void win32_widget_grid(void *handle, int col, int row)
@@ -1030,6 +1087,13 @@ const gui_backend_t gui_backend_win32 = {
     .paned_set_start = win32_paned_set_start,
     .paned_set_end = win32_paned_set_end,
     .paned_set_position = win32_paned_set_position,
+    .canvas_create = win32_canvas_create,
+    .canvas_destroy = win32_canvas_destroy,
+    .canvas_clear = win32_canvas_clear,
+    .canvas_draw_line = win32_canvas_draw_line,
+    .canvas_draw_rect = win32_canvas_draw_rect,
+    .canvas_draw_oval = win32_canvas_draw_oval,
+    .canvas_draw_text = win32_canvas_draw_text,
     .widget_grid = win32_widget_grid,
     .widget_grid_span = win32_widget_grid_span,
     .widget_grid_remove = win32_widget_grid_remove,

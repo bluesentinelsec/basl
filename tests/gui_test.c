@@ -65,7 +65,7 @@ TEST(GuiPlugin, HasThirteenClasses)
     vigil_error_t error;
     const vigil_native_module_t *mod = get_gui_module(&natives, &error);
     ASSERT_NE(mod, NULL);
-    EXPECT_EQ(mod->class_count, 15U);
+    EXPECT_EQ(mod->class_count, 16U);
     EXPECT_NE(find_class(mod, "App"), NULL);
     EXPECT_NE(find_class(mod, "Window"), NULL);
     EXPECT_NE(find_class(mod, "Label"), NULL);
@@ -81,6 +81,7 @@ TEST(GuiPlugin, HasThirteenClasses)
     EXPECT_NE(find_class(mod, "Listbox"), NULL);
     EXPECT_NE(find_class(mod, "Menu"), NULL);
     EXPECT_NE(find_class(mod, "PanedWindow"), NULL);
+    EXPECT_NE(find_class(mod, "Canvas"), NULL);
 }
 
 TEST(GuiPlugin, HasDialogFunctions)
@@ -363,6 +364,26 @@ TEST(GuiPlugin, PanedWindowClassMethods)
     EXPECT_NE(find_method(cls, "grid"), NULL);
 }
 
+TEST(GuiPlugin, CanvasClassMethods)
+{
+    if (!gui_plugin_available())
+        return;
+    vigil_native_registry_t natives;
+    vigil_error_t error;
+    const vigil_native_module_t *mod = get_gui_module(&natives, &error);
+    ASSERT_NE(mod, NULL);
+    const vigil_native_class_t *cls = find_class(mod, "Canvas");
+    ASSERT_NE(cls, NULL);
+    EXPECT_NE(find_method(cls, "new"), NULL);
+    EXPECT_NE(find_method(cls, "destroy"), NULL);
+    EXPECT_NE(find_method(cls, "clear"), NULL);
+    EXPECT_NE(find_method(cls, "draw_line"), NULL);
+    EXPECT_NE(find_method(cls, "draw_rect"), NULL);
+    EXPECT_NE(find_method(cls, "draw_oval"), NULL);
+    EXPECT_NE(find_method(cls, "draw_text"), NULL);
+    EXPECT_NE(find_method(cls, "grid"), NULL);
+}
+
 TEST(GuiPlugin, AppNewIsStatic)
 {
     if (!gui_plugin_available())
@@ -386,10 +407,10 @@ TEST(GuiPlugin, EachClassHasHandleField)
     vigil_error_t error;
     const vigil_native_module_t *mod = get_gui_module(&natives, &error);
     ASSERT_NE(mod, NULL);
-    static const char *names[] = {"App",      "Window", "Label",   "Button", "Entry",
-                                  "Checkbox", "Slider", "Select",  "Text",   "Radiobutton",
-                                  "Spinbox",  "Frame",  "Listbox", "Menu",   "PanedWindow"};
-    for (size_t i = 0; i < 15; i++)
+    static const char *names[] = {"App",     "Window", "Label",       "Button",      "Entry",   "Checkbox",
+                                  "Slider",  "Select", "Text",        "Radiobutton", "Spinbox", "Frame",
+                                  "Listbox", "Menu",   "PanedWindow", "Canvas"};
+    for (size_t i = 0; i < 16; i++)
     {
         const vigil_native_class_t *cls = find_class(mod, names[i]);
         ASSERT_NE(cls, NULL);
@@ -432,6 +453,7 @@ void register_gui_tests(void)
     REGISTER_TEST(GuiPlugin, ListboxClassMethods);
     REGISTER_TEST(GuiPlugin, MenuClassMethods);
     REGISTER_TEST(GuiPlugin, PanedWindowClassMethods);
+    REGISTER_TEST(GuiPlugin, CanvasClassMethods);
     REGISTER_TEST(GuiPlugin, AppNewIsStatic);
     REGISTER_TEST(GuiPlugin, EachClassHasHandleField);
     REGISTER_TEST(GuiPlugin, ModuleHasDoc);

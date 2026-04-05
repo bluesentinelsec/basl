@@ -171,6 +171,28 @@ static bool stub_ask(void *p, const char *t, const char *m)
     (void)m;
     return false;
 }
+static void *stub_canvas_create(void *p, int w, int h)
+{
+    (void)p;
+    (void)w;
+    (void)h;
+    return NULL;
+}
+static void stub_canvas_draw(void *h, double a, double b, double c, double d)
+{
+    (void)h;
+    (void)a;
+    (void)b;
+    (void)c;
+    (void)d;
+}
+static void stub_canvas_text(void *h, double a, double b, const char *t)
+{
+    (void)h;
+    (void)a;
+    (void)b;
+    (void)t;
+}
 
 const gui_backend_t gui_backend_stub = {
     .name = "stub",
@@ -247,4 +269,11 @@ const gui_backend_t gui_backend_stub = {
     .save_file_dialog = stub_get_text,
     .choose_directory = stub_get_text,
     .ask_yes_no = stub_ask,
+    .canvas_create = stub_canvas_create,
+    .canvas_destroy = stub_destroy,
+    .canvas_clear = stub_destroy,
+    .canvas_draw_line = stub_canvas_draw,
+    .canvas_draw_rect = stub_canvas_draw,
+    .canvas_draw_oval = stub_canvas_draw,
+    .canvas_draw_text = stub_canvas_text,
 };

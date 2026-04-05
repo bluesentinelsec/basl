@@ -111,6 +111,18 @@ typedef void (*fn_gtk_list_box_select_row)(GtkWidget *, void *);
 typedef void *(*fn_gtk_list_box_get_row_at_index)(GtkWidget *, gint);
 typedef GtkWidget *(*fn_gtk_paned_new)(int);
 typedef void (*fn_gtk_paned_set_position)(GtkWidget *, gint);
+typedef GtkWidget *(*fn_gtk_drawing_area_new)(void);
+typedef void (*fn_gtk_widget_queue_draw)(GtkWidget *);
+typedef void (*fn_cairo_set_source_rgb)(void *, double, double, double);
+typedef void (*fn_cairo_set_line_width)(void *, double);
+typedef void (*fn_cairo_move_to)(void *, double, double);
+typedef void (*fn_cairo_line_to)(void *, double, double);
+typedef void (*fn_cairo_stroke)(void *);
+typedef void (*fn_cairo_rectangle)(void *, double, double, double, double);
+typedef void (*fn_cairo_fill)(void *);
+typedef void (*fn_cairo_arc)(void *, double, double, double, double, double);
+typedef void (*fn_cairo_show_text)(void *, const char *);
+typedef void (*fn_cairo_paint)(void *);
 
 /* GTK3-only function pointer types */
 typedef GtkWidget *(*fn_gtk_window_new_gtk3)(int type);
@@ -164,6 +176,7 @@ typedef void *(*fn_g_simple_action_group_new)(void);
 typedef void (*fn_gtk_widget_insert_action_group)(GtkWidget *, const char *, void *);
 typedef void (*fn_gtk_paned_set_start_child)(GtkWidget *, GtkWidget *);
 typedef void (*fn_gtk_paned_set_end_child)(GtkWidget *, GtkWidget *);
+typedef void (*fn_gtk_drawing_area_set_draw_func)(GtkWidget *, GCallback, void *, void *);
 typedef gulong (*fn_g_signal_connect_data_t)(void *, const char *, GCallback, void *, GClosureNotify, int);
 
 /* GLib main loop (used by GTK4 path; available in both versions) */
@@ -234,6 +247,9 @@ typedef struct gtk_version_ops
     /* PanedWindow */
     void (*paned_set_start)(GtkWidget *paned, GtkWidget *child);
     void (*paned_set_end)(GtkWidget *paned, GtkWidget *child);
+
+    /* Canvas */
+    void (*canvas_setup_draw)(GtkWidget *da, void *canvas_data);
 } gtk_version_ops_t;
 
 /* ── Shared resolved symbols ─────────────────────────────────────── */
@@ -281,6 +297,18 @@ static struct
     fn_gtk_list_box_get_row_at_index gtk_list_box_get_row_at_index;
     fn_gtk_paned_new gtk_paned_new;
     fn_gtk_paned_set_position gtk_paned_set_position;
+    fn_gtk_drawing_area_new gtk_drawing_area_new;
+    fn_gtk_widget_queue_draw gtk_widget_queue_draw;
+    fn_cairo_set_source_rgb cairo_set_source_rgb;
+    fn_cairo_set_line_width cairo_set_line_width;
+    fn_cairo_move_to cairo_move_to;
+    fn_cairo_line_to cairo_line_to;
+    fn_cairo_stroke cairo_stroke;
+    fn_cairo_rectangle cairo_rectangle;
+    fn_cairo_fill cairo_fill;
+    fn_cairo_arc cairo_arc;
+    fn_cairo_show_text cairo_show_text;
+    fn_cairo_paint cairo_paint;
 } G;
 
 static const gtk_version_ops_t *g_vops = NULL;
@@ -426,6 +454,10 @@ static gboolean on_window_close_gtk4(GtkWidget *widget, void *data)
     g_vops->main_quit();
     return 0;
 }
+
+/* Forward declarations for canvas draw callbacks (defined in Canvas section). */
+static gboolean gtk3_canvas_draw(GtkWidget *widget, void *cr, void *data);
+static void gtk4_canvas_draw_func(GtkWidget *da, void *cr, int w, int h, void *data);
 
 /* ════════════════════════════════════════════════════════════════════
  * GTK3 version ops
@@ -659,6 +691,12 @@ static void gtk3_paned_set_end(GtkWidget *paned, GtkWidget *child)
     s_gtk3_paned_pack2(paned, child, 1, 0);
 }
 
+static void gtk3_canvas_setup_draw(GtkWidget *da, void *data)
+{
+    (void)data;
+    G.g_signal_connect_data(da, "draw", (GCallback)gtk3_canvas_draw, NULL, NULL, 0);
+}
+
 static const gtk_version_ops_t g_gtk3_ops = {
     .version_name = "GTK3",
     .close_signal = "delete-event",
@@ -689,6 +727,7 @@ static const gtk_version_ops_t g_gtk3_ops = {
     .menu_add_item = gtk3_menu_add_item,
     .paned_set_start = gtk3_paned_set_start,
     .paned_set_end = gtk3_paned_set_end,
+    .canvas_setup_draw = gtk3_canvas_setup_draw,
 };
 
 static bool load_gtk3_symbols(void)
@@ -756,6 +795,7 @@ static fn_g_simple_action_group_new s_gtk4_g_simple_action_group_new;
 static fn_gtk_widget_insert_action_group s_gtk4_gtk_widget_insert_action_group;
 static fn_gtk_paned_set_start_child s_gtk4_paned_set_start;
 static fn_gtk_paned_set_end_child s_gtk4_paned_set_end;
+static fn_gtk_drawing_area_set_draw_func s_gtk4_set_draw_func;
 
 /* GTK4 menu needs a window reference for action map. */
 static void *s_gtk4_menu_window = NULL;
@@ -1030,6 +1070,12 @@ static void gtk4_paned_set_end_wrap(GtkWidget *paned, GtkWidget *child)
     s_gtk4_paned_set_end(paned, child);
 }
 
+static void gtk4_canvas_setup_draw(GtkWidget *da, void *data)
+{
+    (void)data;
+    s_gtk4_set_draw_func(da, (GCallback)gtk4_canvas_draw_func, NULL, NULL);
+}
+
 static const gtk_version_ops_t g_gtk4_ops = {
     .version_name = "GTK4",
     .close_signal = "close-request",
@@ -1060,6 +1106,7 @@ static const gtk_version_ops_t g_gtk4_ops = {
     .menu_add_item = gtk4_menu_add_item,
     .paned_set_start = gtk4_paned_set_start_wrap,
     .paned_set_end = gtk4_paned_set_end_wrap,
+    .canvas_setup_draw = gtk4_canvas_setup_draw,
 };
 
 static bool load_gtk4_symbols(void)
@@ -1093,6 +1140,7 @@ static bool load_gtk4_symbols(void)
     LOAD_LOCAL(s_gtk4_gtk_widget_insert_action_group, gtk_widget_insert_action_group);
     LOAD_LOCAL(s_gtk4_paned_set_start, gtk_paned_set_start_child);
     LOAD_LOCAL(s_gtk4_paned_set_end, gtk_paned_set_end_child);
+    LOAD_LOCAL(s_gtk4_set_draw_func, gtk_drawing_area_set_draw_func);
     return true;
 fail:
     return false;
@@ -1144,6 +1192,18 @@ static bool load_shared_symbols(void)
     LOAD_SHARED(gtk_list_box_get_row_at_index);
     LOAD_SHARED(gtk_paned_new);
     LOAD_SHARED(gtk_paned_set_position);
+    LOAD_SHARED(gtk_drawing_area_new);
+    LOAD_SHARED(gtk_widget_queue_draw);
+    LOAD_SHARED(cairo_set_source_rgb);
+    LOAD_SHARED(cairo_set_line_width);
+    LOAD_SHARED(cairo_move_to);
+    LOAD_SHARED(cairo_line_to);
+    LOAD_SHARED(cairo_stroke);
+    LOAD_SHARED(cairo_rectangle);
+    LOAD_SHARED(cairo_fill);
+    LOAD_SHARED(cairo_arc);
+    LOAD_SHARED(cairo_show_text);
+    LOAD_SHARED(cairo_paint);
     return true;
 fail:
     return false;
@@ -1849,6 +1909,184 @@ static void gtk_be_paned_set_position(void *handle, int pos)
         G.gtk_paned_set_position(handle, pos);
 }
 
+/* ── Canvas ──────────────────────────────────────────────────────── */
+
+enum
+{
+    DRAW_LINE = 0,
+    DRAW_RECT,
+    DRAW_OVAL,
+    DRAW_TEXT
+};
+
+typedef struct
+{
+    int type;
+    double x1, y1, x2, y2;
+    char text[128];
+} draw_cmd_t;
+
+#define MAX_CANVAS 32
+#define MAX_DRAW_CMDS 512
+
+typedef struct
+{
+    GtkWidget *da;
+    draw_cmd_t cmds[MAX_DRAW_CMDS];
+    int cmd_count;
+} canvas_data_t;
+
+static canvas_data_t g_canvas_data[MAX_CANVAS];
+static int g_canvas_count = 0;
+
+static canvas_data_t *canvas_for_da(void *da)
+{
+    for (int i = 0; i < g_canvas_count; i++)
+        if (g_canvas_data[i].da == da)
+            return &g_canvas_data[i];
+    return NULL;
+}
+
+static void canvas_replay(void *cr, canvas_data_t *cd)
+{
+    /* White background. */
+    G.cairo_set_source_rgb(cr, 1.0, 1.0, 1.0);
+    G.cairo_paint(cr);
+    /* Draw commands in black. */
+    G.cairo_set_source_rgb(cr, 0.0, 0.0, 0.0);
+    G.cairo_set_line_width(cr, 1.0);
+    for (int i = 0; i < cd->cmd_count; i++)
+    {
+        draw_cmd_t *c = &cd->cmds[i];
+        switch (c->type)
+        {
+        case DRAW_LINE:
+            G.cairo_move_to(cr, c->x1, c->y1);
+            G.cairo_line_to(cr, c->x2, c->y2);
+            G.cairo_stroke(cr);
+            break;
+        case DRAW_RECT:
+            G.cairo_rectangle(cr, c->x1, c->y1, c->x2, c->y2);
+            G.cairo_stroke(cr);
+            break;
+        case DRAW_OVAL:
+            G.cairo_arc(cr, c->x1 + c->x2 / 2, c->y1 + c->y2 / 2, (c->x2 < c->y2 ? c->x2 : c->y2) / 2, 0, 6.283185);
+            G.cairo_stroke(cr);
+            break;
+        case DRAW_TEXT:
+            G.cairo_move_to(cr, c->x1, c->y1);
+            G.cairo_show_text(cr, c->text);
+            break;
+        }
+    }
+}
+
+/* GTK3 draw callback: gboolean (*)(GtkWidget*, cairo_t*, gpointer) */
+static gboolean gtk3_canvas_draw(GtkWidget *widget, void *cr, void *data)
+{
+    (void)data;
+    canvas_data_t *cd = canvas_for_da(widget);
+    if (cd)
+        canvas_replay(cr, cd);
+    return 0;
+}
+
+/* GTK4 draw func: void (*)(GtkDrawingArea*, cairo_t*, int, int, gpointer) */
+static void gtk4_canvas_draw_func(GtkWidget *da, void *cr, int w, int h, void *data)
+{
+    (void)w;
+    (void)h;
+    (void)data;
+    canvas_data_t *cd = canvas_for_da(da);
+    if (cd)
+        canvas_replay(cr, cd);
+}
+
+static void *gtk_be_canvas_create(void *parent, int width, int height)
+{
+    if (!parent)
+        return NULL;
+    void *grid = grid_for_window(parent);
+    if (!grid)
+        return NULL;
+    GtkWidget *da = G.gtk_drawing_area_new();
+    G.gtk_widget_set_hexpand(da, 1);
+    G.gtk_widget_set_vexpand(da, 1);
+    (void)width;
+    (void)height;
+    if (g_canvas_count < MAX_CANVAS)
+    {
+        canvas_data_t *cd = &g_canvas_data[g_canvas_count++];
+        memset(cd, 0, sizeof(*cd));
+        cd->da = da;
+    }
+    g_vops->canvas_setup_draw(da, NULL);
+    register_widget_parent(da, grid);
+    return da;
+}
+
+static void gtk_be_canvas_destroy(void *handle)
+{
+    if (handle)
+        g_vops->widget_destroy(handle);
+}
+
+static void gtk_be_canvas_clear(void *handle)
+{
+    canvas_data_t *cd = canvas_for_da(handle);
+    if (cd)
+    {
+        cd->cmd_count = 0;
+        G.gtk_widget_queue_draw(handle);
+    }
+}
+
+static void gtk_be_canvas_draw_line(void *handle, double x1, double y1, double x2, double y2)
+{
+    canvas_data_t *cd = canvas_for_da(handle);
+    if (cd && cd->cmd_count < MAX_DRAW_CMDS)
+    {
+        cd->cmds[cd->cmd_count++] = (draw_cmd_t){DRAW_LINE, x1, y1, x2, y2, {0}};
+        G.gtk_widget_queue_draw(handle);
+    }
+}
+
+static void gtk_be_canvas_draw_rect(void *handle, double x, double y, double w, double h)
+{
+    canvas_data_t *cd = canvas_for_da(handle);
+    if (cd && cd->cmd_count < MAX_DRAW_CMDS)
+    {
+        cd->cmds[cd->cmd_count++] = (draw_cmd_t){DRAW_RECT, x, y, w, h, {0}};
+        G.gtk_widget_queue_draw(handle);
+    }
+}
+
+static void gtk_be_canvas_draw_oval(void *handle, double x, double y, double w, double h)
+{
+    canvas_data_t *cd = canvas_for_da(handle);
+    if (cd && cd->cmd_count < MAX_DRAW_CMDS)
+    {
+        cd->cmds[cd->cmd_count++] = (draw_cmd_t){DRAW_OVAL, x, y, w, h, {0}};
+        G.gtk_widget_queue_draw(handle);
+    }
+}
+
+static void gtk_be_canvas_draw_text(void *handle, double x, double y, const char *text)
+{
+    canvas_data_t *cd = canvas_for_da(handle);
+    if (cd && cd->cmd_count < MAX_DRAW_CMDS)
+    {
+        draw_cmd_t cmd = {DRAW_TEXT, x, y, 0, 0, {0}};
+        size_t len = strlen(text);
+        if (len >= sizeof(cmd.text))
+            len = sizeof(cmd.text) - 1;
+        memcpy(cmd.text, text, len);
+        cmd.text[len] = '\0';
+        cd->cmds[cd->cmd_count++] = cmd;
+        G.gtk_widget_queue_draw(handle);
+    }
+}
+
 /* ── Grid layout ─────────────────────────────────────────────────── */
 
 static void gtk_be_widget_grid(void *handle, int col, int row)
@@ -2007,6 +2245,13 @@ const gui_backend_t gui_backend_gtk = {
     .paned_set_start = gtk_be_paned_set_start,
     .paned_set_end = gtk_be_paned_set_end,
     .paned_set_position = gtk_be_paned_set_position,
+    .canvas_create = gtk_be_canvas_create,
+    .canvas_destroy = gtk_be_canvas_destroy,
+    .canvas_clear = gtk_be_canvas_clear,
+    .canvas_draw_line = gtk_be_canvas_draw_line,
+    .canvas_draw_rect = gtk_be_canvas_draw_rect,
+    .canvas_draw_oval = gtk_be_canvas_draw_oval,
+    .canvas_draw_text = gtk_be_canvas_draw_text,
     .widget_grid = gtk_be_widget_grid,
     .widget_grid_span = gtk_be_widget_grid_span,
     .widget_grid_remove = gtk_be_widget_grid_remove,

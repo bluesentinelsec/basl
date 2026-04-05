@@ -151,6 +151,15 @@ extern "C"
         const char *(*save_file_dialog)(void *parent, const char *title, char *buf, size_t bufsz);
         const char *(*choose_directory)(void *parent, const char *title, char *buf, size_t bufsz);
         bool (*ask_yes_no)(void *parent, const char *title, const char *message);
+
+        /* Canvas (drawing surface) */
+        void *(*canvas_create)(void *parent, int width, int height);
+        void (*canvas_destroy)(void *handle);
+        void (*canvas_clear)(void *handle);
+        void (*canvas_draw_line)(void *handle, double x1, double y1, double x2, double y2);
+        void (*canvas_draw_rect)(void *handle, double x, double y, double w, double h);
+        void (*canvas_draw_oval)(void *handle, double x, double y, double w, double h);
+        void (*canvas_draw_text)(void *handle, double x, double y, const char *text);
     } gui_backend_t;
 
     /* ── Backend selection ───────────────────────────────────────────── */
