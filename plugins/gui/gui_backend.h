@@ -175,6 +175,17 @@ extern "C"
         void (*canvas_set_stroke_color)(void *handle, const char *color);
         void (*canvas_set_fill_color)(void *handle, const char *color);
         void (*canvas_set_line_width)(void *handle, double width);
+
+        /* Timers */
+        int (*timer_after)(int ms, gui_callback_t cb);
+        int (*timer_every)(int ms, gui_callback_t cb);
+        void (*timer_cancel)(int timer_id);
+
+        /* Toplevel window */
+        void *(*toplevel_create)(const char *title, int w, int h);
+        void (*toplevel_destroy)(void *handle);
+        void (*toplevel_set_title)(void *handle, const char *title);
+        void (*toplevel_set_modal)(void *handle, bool modal);
     } gui_backend_t;
 
     /* ── Backend selection ───────────────────────────────────────────── */

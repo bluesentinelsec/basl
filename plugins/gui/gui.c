@@ -123,6 +123,7 @@ static gui_handle_registry_t g_menubars = {0};
 static gui_handle_registry_t g_submenus = {0};
 static gui_handle_registry_t g_paneds = {0};
 static gui_handle_registry_t g_canvases = {0};
+static gui_handle_registry_t g_toplevels = {0};
 
 /* ── Stack helpers ───────────────────────────────────────────────── */
 
@@ -231,6 +232,7 @@ enum
     GUI_MENU_CLASS_INDEX = 13U,
     GUI_PANED_CLASS_INDEX = 14U,
     GUI_CANVAS_CLASS_INDEX = 15U,
+    GUI_TOPLEVEL_CLASS_INDEX = 16U,
 };
 
 /* ── Callback bridge ─────────────────────────────────────────────── */
@@ -340,6 +342,56 @@ static vigil_status_t gui_app_destroy(vigil_vm_t *vm, size_t arg_count, vigil_er
     if (g_backend)
         g_backend->shutdown();
     g_backend = NULL;
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t gui_app_after(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int ms = gui_arg_i32(vm, base, 1);
+    vigil_value_t closure = vigil_vm_stack_get(vm, base + 2);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    if (g_backend && g_backend->timer_after)
+    {
+        gui_closure_t *c = gui_closure_store(vm, closure);
+        if (c)
+        {
+            gui_callback_t cb = {gui_closure_invoke, c};
+            g_backend->timer_after(ms, cb);
+        }
+    }
+    (void)error;
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t gui_app_every(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int ms = gui_arg_i32(vm, base, 1);
+    vigil_value_t closure = vigil_vm_stack_get(vm, base + 2);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    int tid = -1;
+    if (g_backend && g_backend->timer_every)
+    {
+        gui_closure_t *c = gui_closure_store(vm, closure);
+        if (c)
+        {
+            gui_callback_t cb = {gui_closure_invoke, c};
+            tid = g_backend->timer_every(ms, cb);
+        }
+    }
+    vigil_value_t v = vigil_nanbox_encode_i32(tid);
+    return vigil_vm_stack_push(vm, &v, error);
+}
+
+static vigil_status_t gui_app_cancel_timer(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int tid = gui_arg_i32(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    if (g_backend && g_backend->timer_cancel)
+        g_backend->timer_cancel(tid);
+    (void)error;
     return VIGIL_STATUS_OK;
 }
 
@@ -1857,6 +1909,73 @@ static vigil_status_t gui_canvas_on_key_press(vigil_vm_t *vm, size_t arg_count, 
     return VIGIL_STATUS_OK;
 }
 
+/* ── gui.Toplevel ────────────────────────────────────────────────── */
+
+static vigil_status_t gui_toplevel_new(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    char buf[256];
+    const char *title = gui_arg_str(vm, base, 1, buf, sizeof(buf));
+    int w = gui_arg_i32(vm, base, 2);
+    int h = gui_arg_i32(vm, base, 3);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    if (!g_backend || !g_backend->toplevel_create)
+    {
+        gui_push_handle_instance(vm, GUI_TOPLEVEL_CLASS_INDEX, -1, error);
+        return gui_push_fail_err(vm, "gui: toplevel not supported", error);
+    }
+    void *native = g_backend->toplevel_create(title, w, h);
+    if (!native)
+    {
+        gui_push_handle_instance(vm, GUI_TOPLEVEL_CLASS_INDEX, -1, error);
+        return gui_push_fail_err(vm, "gui: failed to create toplevel", error);
+    }
+    int64_t handle;
+    gui_handle_store(&g_toplevels, native, &handle);
+    gui_push_handle_instance(vm, GUI_TOPLEVEL_CLASS_INDEX, handle, error);
+    return gui_push_ok_err(vm, error);
+}
+
+static vigil_status_t gui_toplevel_destroy(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = gui_self_handle(vm, base);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    void *native = gui_handle_get(&g_toplevels, h);
+    if (native && g_backend && g_backend->toplevel_destroy)
+        g_backend->toplevel_destroy(native);
+    gui_handle_clear(&g_toplevels, h);
+    (void)error;
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t gui_toplevel_set_title(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = gui_self_handle(vm, base);
+    char buf[256];
+    const char *title = gui_arg_str(vm, base, 1, buf, sizeof(buf));
+    vigil_vm_stack_pop_n(vm, arg_count);
+    void *native = gui_handle_get(&g_toplevels, h);
+    if (native && g_backend && g_backend->toplevel_set_title)
+        g_backend->toplevel_set_title(native, title);
+    (void)error;
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t gui_toplevel_set_modal(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = gui_self_handle(vm, base);
+    int32_t modal = gui_arg_i32(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    void *native = gui_handle_get(&g_toplevels, h);
+    if (native && g_backend && g_backend->toplevel_set_modal)
+        g_backend->toplevel_set_modal(native, modal != 0);
+    (void)error;
+    return VIGIL_STATUS_OK;
+}
+
 /* ── gui.message_box (module-level function) ─────────────────────── */
 
 static vigil_status_t gui_fn_message_box(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
@@ -1952,6 +2071,7 @@ static vigil_status_t gui_fn_ask_yes_no(vigil_vm_t *vm, size_t arg_count, vigil_
 
 static const int p_str[] = {VIGIL_TYPE_STRING};
 static const int p_obj_str_i32_i32[] = {VIGIL_TYPE_OBJECT, VIGIL_TYPE_STRING, VIGIL_TYPE_I32, VIGIL_TYPE_I32};
+static const int p_str_i32_i32[] = {VIGIL_TYPE_STRING, VIGIL_TYPE_I32, VIGIL_TYPE_I32};
 static const int p_i32_i32[] = {VIGIL_TYPE_I32, VIGIL_TYPE_I32};
 static const int p_obj[] = {VIGIL_TYPE_OBJECT};
 static const int p_obj_str[] = {VIGIL_TYPE_OBJECT, VIGIL_TYPE_STRING};
@@ -1965,6 +2085,7 @@ static const int p_bool[] = {VIGIL_TYPE_BOOL};
 static const int p_obj_f64_f64[] = {VIGIL_TYPE_OBJECT, VIGIL_TYPE_F64, VIGIL_TYPE_F64};
 static const int p_f64[] = {VIGIL_TYPE_F64};
 static const int p_i32[] = {VIGIL_TYPE_I32};
+static const int p_i32_obj[] = {VIGIL_TYPE_I32, VIGIL_TYPE_OBJECT};
 static const int rt_f64[] = {VIGIL_TYPE_F64};
 static const int rt_i32[] = {VIGIL_TYPE_I32};
 static const int p_obj_str_obj[] = {VIGIL_TYPE_OBJECT, VIGIL_TYPE_STRING, VIGIL_TYPE_OBJECT};
@@ -1998,6 +2119,9 @@ static const vigil_native_class_method_t gui_app_methods[] = {
     GUI_METHOD("main_loop", 9U, gui_app_main_loop, 0U, NULL, VIGIL_TYPE_VOID, 0U, NULL),
     GUI_METHOD("quit", 4U, gui_app_quit, 0U, NULL, VIGIL_TYPE_VOID, 0U, NULL),
     GUI_METHOD("destroy", 7U, gui_app_destroy, 0U, NULL, VIGIL_TYPE_VOID, 0U, NULL),
+    GUI_METHOD("after", 5U, gui_app_after, 2U, p_i32_obj, VIGIL_TYPE_VOID, 0U, NULL),
+    GUI_METHOD("every", 5U, gui_app_every, 2U, p_i32_obj, VIGIL_TYPE_I32, 1U, rt_i32),
+    GUI_METHOD("cancel_timer", 12U, gui_app_cancel_timer, 1U, p_i32, VIGIL_TYPE_VOID, 0U, NULL),
 };
 
 /* ── Window class ────────────────────────────────────────────────── */
@@ -2228,6 +2352,19 @@ static const vigil_native_class_method_t gui_canvas_methods[] = {
     GUI_METHOD("grid", 4U, gui_canvas_grid, 2U, p_i32_i32, VIGIL_TYPE_VOID, 0U, NULL),
 };
 
+/* ── Toplevel class ──────────────────────────────────────────────── */
+
+static const vigil_native_class_field_t gui_toplevel_fields[] = {
+    GUI_PFIELD("handle", 6U, VIGIL_TYPE_I64),
+};
+
+static const vigil_native_class_method_t gui_toplevel_methods[] = {
+    GUI_STATIC("new", 3U, gui_toplevel_new, 3U, p_str_i32_i32, VIGIL_TYPE_OBJECT, 2U, rt_obj_err),
+    GUI_METHOD("destroy", 7U, gui_toplevel_destroy, 0U, NULL, VIGIL_TYPE_VOID, 0U, NULL),
+    GUI_METHOD("set_title", 9U, gui_toplevel_set_title, 1U, p_str, VIGIL_TYPE_VOID, 0U, NULL),
+    GUI_METHOD("set_modal", 9U, gui_toplevel_set_modal, 1U, p_bool, VIGIL_TYPE_VOID, 0U, NULL),
+};
+
 /* ── Class table ─────────────────────────────────────────────────── */
 
 /* clang-format off */
@@ -2248,6 +2385,7 @@ static const vigil_native_class_t gui_classes[] = {
     {"Menu",        4U,  gui_menu_fields,     1U, gui_menu_methods,     sizeof(gui_menu_methods)     / sizeof(gui_menu_methods[0]),     NULL, NULL},
     {"PanedWindow", 11U, gui_paned_fields,    1U, gui_paned_methods,    sizeof(gui_paned_methods)    / sizeof(gui_paned_methods[0]),    NULL, NULL},
     {"Canvas",      6U,  gui_canvas_fields,   1U, gui_canvas_methods,   sizeof(gui_canvas_methods)   / sizeof(gui_canvas_methods[0]),   NULL, NULL},
+    {"Toplevel",    8U,  gui_toplevel_fields,  1U, gui_toplevel_methods,  sizeof(gui_toplevel_methods)  / sizeof(gui_toplevel_methods[0]),  NULL, NULL},
 };
 /* clang-format on */
 

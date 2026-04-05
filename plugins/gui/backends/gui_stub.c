@@ -290,4 +290,11 @@ const gui_backend_t gui_backend_stub = {
     .canvas_set_stroke_color = stub_set_text,
     .canvas_set_fill_color = stub_set_text,
     .canvas_set_line_width = stub_set_double,
+    .timer_after = NULL,
+    .timer_every = NULL,
+    .timer_cancel = NULL,
+    .toplevel_create = NULL,
+    .toplevel_destroy = NULL,
+    .toplevel_set_title = NULL,
+    .toplevel_set_modal = NULL,
 };
