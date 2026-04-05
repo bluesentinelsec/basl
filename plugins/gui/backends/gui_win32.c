@@ -802,6 +802,50 @@ static void win32_menu_add_item(void *submenu, const char *label, gui_callback_t
     AppendMenuW((HMENU)submenu, MF_STRING, (UINT_PTR)id, to_wide(label));
 }
 
+/* ── PanedWindow ─────────────────────────────────────────────────── */
+
+/* Win32 has no native split pane. Use a static container; children
+   are positioned manually by the grid engine. */
+
+static void *win32_paned_create(void *parent, bool horizontal)
+{
+    (void)horizontal;
+    if (!parent)
+        return NULL;
+    HWND hwnd = CreateWindowExW(0, L"STATIC", L"", WS_CHILD | WS_VISIBLE, 0, 0, 400, 200, (HWND)parent,
+                                (HMENU)(intptr_t)g_next_ctrl_id++, g_hinstance, NULL);
+    if (hwnd)
+    {
+        grid_ensure(hwnd);
+        register_widget_parent(hwnd, (HWND)parent);
+    }
+    return (void *)hwnd;
+}
+
+static void win32_paned_destroy(void *handle)
+{
+    if (handle)
+        DestroyWindow((HWND)handle);
+}
+
+static void win32_paned_set_start(void *handle, void *child)
+{
+    (void)handle;
+    (void)child;
+}
+
+static void win32_paned_set_end(void *handle, void *child)
+{
+    (void)handle;
+    (void)child;
+}
+
+static void win32_paned_set_position(void *handle, int pos)
+{
+    (void)handle;
+    (void)pos;
+}
+
 /* ── Grid layout ─────────────────────────────────────────────────── */
 
 static void win32_widget_grid(void *handle, int col, int row)
@@ -928,6 +972,11 @@ const gui_backend_t gui_backend_win32 = {
     .menubar_destroy = win32_menubar_destroy,
     .menu_add_submenu = win32_menu_add_submenu,
     .menu_add_item = win32_menu_add_item,
+    .paned_create = win32_paned_create,
+    .paned_destroy = win32_paned_destroy,
+    .paned_set_start = win32_paned_set_start,
+    .paned_set_end = win32_paned_set_end,
+    .paned_set_position = win32_paned_set_position,
     .widget_grid = win32_widget_grid,
     .widget_grid_span = win32_widget_grid_span,
     .widget_grid_remove = win32_widget_grid_remove,
