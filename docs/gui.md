@@ -225,10 +225,6 @@ If a feature isn't supported on your platform, implement it as a no-op (return N
 
 ## Known Limitations
 
-- **Cocoa Canvas**: Drawing primitives are stubbed (NSView created but no Core Graphics rendering yet)
-- **Win32 Canvas**: Drawing primitives are stubbed (STATIC control created but no GDI rendering yet)
 - **GTK4 file dialogs**: Stubbed because GTK4 removed all synchronous dialog APIs
-- **Win32 choose_directory**: Stubbed (needs SHBrowseForFolder from shell32)
 - **SDL text rendering**: Uses SDL3's built-in 8×8 debug font; `vigil_font.h` (stb_truetype) integration planned
-- **SDL text input**: Entry/Text widgets store text but keyboard input dispatch is not yet implemented
 - **SDL menus**: Menu bar is a no-op in the SDL backend
