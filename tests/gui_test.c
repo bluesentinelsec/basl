@@ -57,7 +57,7 @@ TEST(GuiPlugin, ModuleRegisters)
     EXPECT_STREQ(mod->name, "gui");
 }
 
-TEST(GuiPlugin, HasThirteenClasses)
+TEST(GuiPlugin, HasSeventeenClasses)
 {
     if (!gui_plugin_available())
         return;
@@ -65,7 +65,7 @@ TEST(GuiPlugin, HasThirteenClasses)
     vigil_error_t error;
     const vigil_native_module_t *mod = get_gui_module(&natives, &error);
     ASSERT_NE(mod, NULL);
-    EXPECT_EQ(mod->class_count, 16U);
+    EXPECT_EQ(mod->class_count, 17U);
     EXPECT_NE(find_class(mod, "App"), NULL);
     EXPECT_NE(find_class(mod, "Window"), NULL);
     EXPECT_NE(find_class(mod, "Label"), NULL);
@@ -82,6 +82,7 @@ TEST(GuiPlugin, HasThirteenClasses)
     EXPECT_NE(find_class(mod, "Menu"), NULL);
     EXPECT_NE(find_class(mod, "PanedWindow"), NULL);
     EXPECT_NE(find_class(mod, "Canvas"), NULL);
+    EXPECT_NE(find_class(mod, "Toplevel"), NULL);
 }
 
 TEST(GuiPlugin, HasDialogFunctions)
@@ -409,8 +410,8 @@ TEST(GuiPlugin, EachClassHasHandleField)
     ASSERT_NE(mod, NULL);
     static const char *names[] = {"App",     "Window", "Label",       "Button",      "Entry",   "Checkbox",
                                   "Slider",  "Select", "Text",        "Radiobutton", "Spinbox", "Frame",
-                                  "Listbox", "Menu",   "PanedWindow", "Canvas"};
-    for (size_t i = 0; i < 16; i++)
+                                  "Listbox", "Menu",   "PanedWindow", "Canvas",      "Toplevel"};
+    for (size_t i = 0; i < 17; i++)
     {
         const vigil_native_class_t *cls = find_class(mod, names[i]);
         ASSERT_NE(cls, NULL);
@@ -436,7 +437,7 @@ TEST(GuiPlugin, ModuleHasDoc)
 void register_gui_tests(void)
 {
     REGISTER_TEST(GuiPlugin, ModuleRegisters);
-    REGISTER_TEST(GuiPlugin, HasThirteenClasses);
+    REGISTER_TEST(GuiPlugin, HasSeventeenClasses);
     REGISTER_TEST(GuiPlugin, HasDialogFunctions);
     REGISTER_TEST(GuiPlugin, AppClassMethods);
     REGISTER_TEST(GuiPlugin, WindowClassMethods);
