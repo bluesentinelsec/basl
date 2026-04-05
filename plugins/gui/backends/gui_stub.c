@@ -117,6 +117,14 @@ static void stub_grid(void *h, int c, int r)
     (void)c;
     (void)r;
 }
+static void stub_grid_span(void *h, int c, int r, int cs, int rs)
+{
+    (void)h;
+    (void)c;
+    (void)r;
+    (void)cs;
+    (void)rs;
+}
 static void stub_grid_remove(void *h)
 {
     (void)h;
@@ -187,7 +195,16 @@ const gui_backend_t gui_backend_stub = {
     .spinbox_destroy = stub_destroy,
     .spinbox_get_value = stub_get_double,
     .spinbox_set_value = stub_set_double,
+    .frame_create = stub_create,
+    .frame_destroy = stub_destroy,
+    .frame_set_label = stub_set_text,
+    .listbox_create = stub_create_notext,
+    .listbox_destroy = stub_destroy,
+    .listbox_add_item = stub_set_text,
+    .listbox_get_selected = stub_get_int,
+    .listbox_set_selected = stub_set_int,
     .widget_grid = stub_grid,
+    .widget_grid_span = stub_grid_span,
     .widget_grid_remove = stub_grid_remove,
     .container_grid_columnconfigure = stub_grid_configure,
     .container_grid_rowconfigure = stub_grid_configure,

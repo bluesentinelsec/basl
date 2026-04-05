@@ -692,10 +692,83 @@ static void cocoa_spinbox_set_value(void *handle, double value)
     if (handle) ((void (*)(id, SEL, double))objc_msgSend)((id)handle, sel("setDoubleValue:"), value);
 }
 
+/* ── Frame ────────────────────────────────────────────────────────── */
+
+static void *cocoa_frame_create(void *parent, const char *label)
+{
+    if (!parent) return NULL;
+    id cv = send0((id)parent, sel("contentView"));
+    id box = send_rect(send0(cls("NSBox"), sel("alloc")),
+                       sel("initWithFrame:"), CGRectMake_(0, 0, 200, 100));
+    sendv_id(box, sel("setTitle:"), nsstr(label));
+    sendv_id(cv, sel("addSubview:"), box);
+    register_widget_parent(box, cv);
+    return (void *)box;
+}
+
+static void cocoa_frame_destroy(void *handle)
+{
+    if (handle) sendv((id)handle, sel("removeFromSuperview"));
+}
+
+static void cocoa_frame_set_label(void *handle, const char *label)
+{
+    if (handle) sendv_id((id)handle, sel("setTitle:"), nsstr(label));
+}
+
+/* ── Listbox ──────────────────────────────────────────────────────── */
+
+static void *cocoa_listbox_create(void *parent)
+{
+    if (!parent) return NULL;
+    id cv = send0((id)parent, sel("contentView"));
+    id sv = send_rect(send0(cls("NSScrollView"), sel("alloc")),
+                      sel("initWithFrame:"), CGRectMake_(0, 0, 200, 100));
+    sendv_bool(sv, sel("setHasVerticalScroller:"), 1);
+    /* Use NSTableView as a simple list. */
+    id tv = send_rect(send0(cls("NSTableView"), sel("alloc")),
+                      sel("initWithFrame:"), CGRectMake_(0, 0, 200, 100));
+    sendv_id(sv, sel("setDocumentView:"), tv);
+    sendv_id(cv, sel("addSubview:"), sv);
+    register_widget_parent(sv, cv);
+    return (void *)sv;
+}
+
+static void cocoa_listbox_destroy(void *handle)
+{
+    if (handle) sendv((id)handle, sel("removeFromSuperview"));
+}
+
+static void cocoa_listbox_add_item(void *handle, const char *text)
+{
+    (void)handle; (void)text;
+    /* NSTableView requires a data source; simplified stub for now. */
+}
+
+static int cocoa_listbox_get_selected(void *handle)
+{
+    if (!handle) return -1;
+    id tv = send0((id)handle, sel("documentView"));
+    return (int)((long (*)(id, SEL))objc_msgSend)(tv, sel("selectedRow"));
+}
+
+static void cocoa_listbox_set_selected(void *handle, int index)
+{
+    (void)handle; (void)index;
+}
+
 /* ── Grid layout ─────────────────────────────────────────────────── */
 
 static void cocoa_widget_grid(void *handle, int col, int row)
 {
+    void *pcv = get_widget_parent(handle);
+    if (pcv) grid_add_child(pcv, handle, col, row);
+}
+
+static void cocoa_widget_grid_span(void *handle, int col, int row, int colspan, int rowspan)
+{
+    /* Cocoa grid engine doesn't support span yet; place at col/row. */
+    (void)colspan; (void)rowspan;
     void *pcv = get_widget_parent(handle);
     if (pcv) grid_add_child(pcv, handle, col, row);
 }
@@ -793,7 +866,16 @@ const gui_backend_t gui_backend_cocoa = {
     .spinbox_destroy               = cocoa_spinbox_destroy,
     .spinbox_get_value             = cocoa_spinbox_get_value,
     .spinbox_set_value             = cocoa_spinbox_set_value,
+    .frame_create                  = cocoa_frame_create,
+    .frame_destroy                 = cocoa_frame_destroy,
+    .frame_set_label               = cocoa_frame_set_label,
+    .listbox_create                = cocoa_listbox_create,
+    .listbox_destroy               = cocoa_listbox_destroy,
+    .listbox_add_item              = cocoa_listbox_add_item,
+    .listbox_get_selected          = cocoa_listbox_get_selected,
+    .listbox_set_selected          = cocoa_listbox_set_selected,
     .widget_grid                   = cocoa_widget_grid,
+    .widget_grid_span              = cocoa_widget_grid_span,
     .widget_grid_remove            = cocoa_widget_grid_remove,
     .container_grid_columnconfigure = cocoa_container_grid_columnconfigure,
     .container_grid_rowconfigure   = cocoa_container_grid_rowconfigure,

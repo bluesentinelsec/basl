@@ -110,8 +110,21 @@ extern "C"
         double (*spinbox_get_value)(void *handle);
         void (*spinbox_set_value)(void *handle, double value);
 
+        /* Frame (container with optional label) */
+        void *(*frame_create)(void *parent, const char *label);
+        void (*frame_destroy)(void *handle);
+        void (*frame_set_label)(void *handle, const char *label);
+
+        /* Listbox (scrollable list of selectable items) */
+        void *(*listbox_create)(void *parent);
+        void (*listbox_destroy)(void *handle);
+        void (*listbox_add_item)(void *handle, const char *text);
+        int (*listbox_get_selected)(void *handle);
+        void (*listbox_set_selected)(void *handle, int index);
+
         /* Grid layout */
         void (*widget_grid)(void *handle, int col, int row);
+        void (*widget_grid_span)(void *handle, int col, int row, int colspan, int rowspan);
         void (*widget_grid_remove)(void *handle);
         void (*container_grid_columnconfigure)(void *handle, int index, int weight);
         void (*container_grid_rowconfigure)(void *handle, int index, int weight);

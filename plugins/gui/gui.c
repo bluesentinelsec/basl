@@ -84,6 +84,8 @@ static gui_handle_registry_t g_selects = {{0}, 0};
 static gui_handle_registry_t g_texts = {{0}, 0};
 static gui_handle_registry_t g_radios = {{0}, 0};
 static gui_handle_registry_t g_spinboxes = {{0}, 0};
+static gui_handle_registry_t g_frames = {{0}, 0};
+static gui_handle_registry_t g_listboxes = {{0}, 0};
 
 /* ── Stack helpers ───────────────────────────────────────────────── */
 
@@ -187,6 +189,8 @@ enum
     GUI_TEXT_CLASS_INDEX = 8U,
     GUI_RADIO_CLASS_INDEX = 9U,
     GUI_SPINBOX_CLASS_INDEX = 10U,
+    GUI_FRAME_CLASS_INDEX = 11U,
+    GUI_LISTBOX_CLASS_INDEX = 12U,
 };
 
 /* ── Callback bridge ─────────────────────────────────────────────── */
@@ -1264,6 +1268,175 @@ static vigil_status_t gui_spinbox_on_change(vigil_vm_t *vm, size_t arg_count, vi
     return VIGIL_STATUS_OK;
 }
 
+/* ── gui.Frame ───────────────────────────────────────────────────── */
+
+static vigil_status_t gui_frame_new(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t parent_h = gui_arg_handle(vm, base, 1);
+    char buf[256];
+    const char *label = gui_arg_str(vm, base, 2, buf, sizeof(buf));
+    vigil_vm_stack_pop_n(vm, arg_count);
+    void *parent = gui_handle_get(&g_windows, parent_h);
+    if (!parent || !g_backend)
+    {
+        gui_push_handle_instance(vm, GUI_FRAME_CLASS_INDEX, -1, error);
+        return gui_push_fail_err(vm, "gui: invalid parent window", error);
+    }
+    void *native = g_backend->frame_create(parent, label);
+    int64_t handle;
+    gui_handle_store(&g_frames, native, &handle);
+    gui_push_handle_instance(vm, GUI_FRAME_CLASS_INDEX, handle, error);
+    return gui_push_ok_err(vm, error);
+}
+
+static vigil_status_t gui_frame_destroy(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = gui_self_handle(vm, base);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    void *native = gui_handle_get(&g_frames, h);
+    if (native && g_backend)
+        g_backend->frame_destroy(native);
+    gui_handle_clear(&g_frames, h);
+    (void)error;
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t gui_frame_set_label(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = gui_self_handle(vm, base);
+    char buf[256];
+    const char *label = gui_arg_str(vm, base, 1, buf, sizeof(buf));
+    vigil_vm_stack_pop_n(vm, arg_count);
+    void *native = gui_handle_get(&g_frames, h);
+    if (native && g_backend)
+        g_backend->frame_set_label(native, label);
+    (void)error;
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t gui_frame_grid(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = gui_self_handle(vm, base);
+    int col = gui_arg_i32(vm, base, 1);
+    int row = gui_arg_i32(vm, base, 2);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    void *native = gui_handle_get(&g_frames, h);
+    if (native && g_backend)
+        g_backend->widget_grid(native, col, row);
+    (void)error;
+    return VIGIL_STATUS_OK;
+}
+
+/* ── gui.Listbox ─────────────────────────────────────────────────── */
+
+static vigil_status_t gui_listbox_new(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t parent_h = gui_arg_handle(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    void *parent = gui_handle_get(&g_windows, parent_h);
+    if (!parent || !g_backend)
+    {
+        gui_push_handle_instance(vm, GUI_LISTBOX_CLASS_INDEX, -1, error);
+        return gui_push_fail_err(vm, "gui: invalid parent window", error);
+    }
+    void *native = g_backend->listbox_create(parent);
+    int64_t handle;
+    gui_handle_store(&g_listboxes, native, &handle);
+    gui_push_handle_instance(vm, GUI_LISTBOX_CLASS_INDEX, handle, error);
+    return gui_push_ok_err(vm, error);
+}
+
+static vigil_status_t gui_listbox_destroy(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = gui_self_handle(vm, base);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    void *native = gui_handle_get(&g_listboxes, h);
+    if (native && g_backend)
+        g_backend->listbox_destroy(native);
+    gui_handle_clear(&g_listboxes, h);
+    (void)error;
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t gui_listbox_add_item(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = gui_self_handle(vm, base);
+    char buf[256];
+    const char *text = gui_arg_str(vm, base, 1, buf, sizeof(buf));
+    vigil_vm_stack_pop_n(vm, arg_count);
+    void *native = gui_handle_get(&g_listboxes, h);
+    if (native && g_backend)
+        g_backend->listbox_add_item(native, text);
+    (void)error;
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t gui_listbox_get(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = gui_self_handle(vm, base);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    int idx = -1;
+    void *native = gui_handle_get(&g_listboxes, h);
+    if (native && g_backend)
+        idx = g_backend->listbox_get_selected(native);
+    return gui_push_i32(vm, (int32_t)idx, error);
+}
+
+static vigil_status_t gui_listbox_set(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = gui_self_handle(vm, base);
+    int idx = gui_arg_i32(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    void *native = gui_handle_get(&g_listboxes, h);
+    if (native && g_backend)
+        g_backend->listbox_set_selected(native, idx);
+    (void)error;
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t gui_listbox_grid(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = gui_self_handle(vm, base);
+    int col = gui_arg_i32(vm, base, 1);
+    int row = gui_arg_i32(vm, base, 2);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    void *native = gui_handle_get(&g_listboxes, h);
+    if (native && g_backend)
+        g_backend->widget_grid(native, col, row);
+    (void)error;
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t gui_listbox_on_change(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = gui_self_handle(vm, base);
+    vigil_value_t closure = vigil_vm_stack_get(vm, base + 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    void *native = gui_handle_get(&g_listboxes, h);
+    if (native && g_backend)
+    {
+        gui_closure_t *c = gui_closure_store(vm, closure);
+        if (c)
+        {
+            gui_callback_t cb = {gui_closure_invoke, c};
+            g_backend->set_callback(native, GUI_EVENT_CHANGE, cb);
+        }
+    }
+    (void)error;
+    return VIGIL_STATUS_OK;
+}
+
 /* ── gui.message_box (module-level function) ─────────────────────── */
 
 static vigil_status_t gui_fn_message_box(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
@@ -1479,6 +1652,35 @@ static const vigil_native_class_method_t gui_spinbox_methods[] = {
     GUI_METHOD("on_change", 9U, gui_spinbox_on_change, 1U, p_obj, VIGIL_TYPE_VOID, 0U, NULL),
 };
 
+/* ── Frame class ─────────────────────────────────────────────────── */
+
+static const vigil_native_class_field_t gui_frame_fields[] = {
+    GUI_PFIELD("handle", 6U, VIGIL_TYPE_I64),
+};
+
+static const vigil_native_class_method_t gui_frame_methods[] = {
+    GUI_STATIC("new", 3U, gui_frame_new, 2U, p_obj_str, VIGIL_TYPE_OBJECT, 2U, rt_obj_err),
+    GUI_METHOD("destroy", 7U, gui_frame_destroy, 0U, NULL, VIGIL_TYPE_VOID, 0U, NULL),
+    GUI_METHOD("set_label", 9U, gui_frame_set_label, 1U, p_str, VIGIL_TYPE_VOID, 0U, NULL),
+    GUI_METHOD("grid", 4U, gui_frame_grid, 2U, p_i32_i32, VIGIL_TYPE_VOID, 0U, NULL),
+};
+
+/* ── Listbox class ───────────────────────────────────────────────── */
+
+static const vigil_native_class_field_t gui_listbox_fields[] = {
+    GUI_PFIELD("handle", 6U, VIGIL_TYPE_I64),
+};
+
+static const vigil_native_class_method_t gui_listbox_methods[] = {
+    GUI_STATIC("new", 3U, gui_listbox_new, 1U, p_obj, VIGIL_TYPE_OBJECT, 2U, rt_obj_err),
+    GUI_METHOD("destroy", 7U, gui_listbox_destroy, 0U, NULL, VIGIL_TYPE_VOID, 0U, NULL),
+    GUI_METHOD("add_item", 8U, gui_listbox_add_item, 1U, p_str, VIGIL_TYPE_VOID, 0U, NULL),
+    GUI_METHOD("get", 3U, gui_listbox_get, 0U, NULL, VIGIL_TYPE_I32, 1U, rt_i32),
+    GUI_METHOD("set", 3U, gui_listbox_set, 1U, p_i32, VIGIL_TYPE_VOID, 0U, NULL),
+    GUI_METHOD("grid", 4U, gui_listbox_grid, 2U, p_i32_i32, VIGIL_TYPE_VOID, 0U, NULL),
+    GUI_METHOD("on_change", 9U, gui_listbox_on_change, 1U, p_obj, VIGIL_TYPE_VOID, 0U, NULL),
+};
+
 /* ── Class table ─────────────────────────────────────────────────── */
 
 /* clang-format off */
@@ -1494,6 +1696,8 @@ static const vigil_native_class_t gui_classes[] = {
     {"Text",        4U,  gui_text_fields,     1U, gui_text_methods,     sizeof(gui_text_methods)     / sizeof(gui_text_methods[0]),     NULL, NULL},
     {"Radiobutton", 11U, gui_radio_fields,    1U, gui_radio_methods,    sizeof(gui_radio_methods)    / sizeof(gui_radio_methods[0]),    NULL, NULL},
     {"Spinbox",     7U,  gui_spinbox_fields,  1U, gui_spinbox_methods,  sizeof(gui_spinbox_methods)  / sizeof(gui_spinbox_methods[0]),  NULL, NULL},
+    {"Frame",       5U,  gui_frame_fields,    1U, gui_frame_methods,    sizeof(gui_frame_methods)    / sizeof(gui_frame_methods[0]),    NULL, NULL},
+    {"Listbox",     7U,  gui_listbox_fields,  1U, gui_listbox_methods,  sizeof(gui_listbox_methods)  / sizeof(gui_listbox_methods[0]),  NULL, NULL},
 };
 /* clang-format on */
 
