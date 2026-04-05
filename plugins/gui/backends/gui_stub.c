@@ -158,6 +158,12 @@ static void stub_set_cb(void *w, gui_event_type_t t, gui_callback_t cb)
     (void)t;
     (void)cb;
 }
+static void stub_set_font(void *h, const char *f, int s)
+{
+    (void)h;
+    (void)f;
+    (void)s;
+}
 static void stub_msgbox(void *p, const char *t, const char *m)
 {
     (void)p;
@@ -264,6 +270,11 @@ const gui_backend_t gui_backend_stub = {
     .container_grid_columnconfigure = stub_grid_configure,
     .container_grid_rowconfigure = stub_grid_configure,
     .set_callback = stub_set_cb,
+    .widget_set_font = stub_set_font,
+    .widget_set_fg = stub_set_text,
+    .widget_set_bg = stub_set_text,
+    .widget_set_padding = stub_grid_configure,
+    .widget_set_state = stub_set_text,
     .message_box = stub_msgbox,
     .open_file_dialog = stub_get_text,
     .save_file_dialog = stub_get_text,

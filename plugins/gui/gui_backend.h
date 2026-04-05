@@ -145,6 +145,13 @@ extern "C"
         /* Events */
         void (*set_callback)(void *widget, gui_event_type_t type, gui_callback_t cb);
 
+        /* Styling */
+        void (*widget_set_font)(void *handle, const char *family, int size);
+        void (*widget_set_fg)(void *handle, const char *color);
+        void (*widget_set_bg)(void *handle, const char *color);
+        void (*widget_set_padding)(void *handle, int x, int y);
+        void (*widget_set_state)(void *handle, const char *state);
+
         /* Dialogs */
         void (*message_box)(void *parent, const char *title, const char *message);
         const char *(*open_file_dialog)(void *parent, const char *title, char *buf, size_t bufsz);
