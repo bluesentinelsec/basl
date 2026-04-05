@@ -1735,6 +1735,107 @@ static vigil_status_t gui_canvas_grid(vigil_vm_t *vm, size_t arg_count, vigil_er
     return VIGIL_STATUS_OK;
 }
 
+static vigil_status_t gui_canvas_set_stroke_color(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = gui_self_handle(vm, base);
+    char buf[64];
+    const char *color = gui_arg_str(vm, base, 1, buf, sizeof(buf));
+    vigil_vm_stack_pop_n(vm, arg_count);
+    void *native = gui_handle_get(&g_canvases, h);
+    if (native && g_backend && g_backend->canvas_set_stroke_color)
+        g_backend->canvas_set_stroke_color(native, color);
+    (void)error;
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t gui_canvas_set_fill_color(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = gui_self_handle(vm, base);
+    char buf[64];
+    const char *color = gui_arg_str(vm, base, 1, buf, sizeof(buf));
+    vigil_vm_stack_pop_n(vm, arg_count);
+    void *native = gui_handle_get(&g_canvases, h);
+    if (native && g_backend && g_backend->canvas_set_fill_color)
+        g_backend->canvas_set_fill_color(native, color);
+    (void)error;
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t gui_canvas_set_line_width(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = gui_self_handle(vm, base);
+    double w = gui_arg_f64(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    void *native = gui_handle_get(&g_canvases, h);
+    if (native && g_backend && g_backend->canvas_set_line_width)
+        g_backend->canvas_set_line_width(native, w);
+    (void)error;
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t gui_canvas_on_mouse_click(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = gui_self_handle(vm, base);
+    vigil_value_t closure = vigil_vm_stack_get(vm, base + 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    void *native = gui_handle_get(&g_canvases, h);
+    if (native && g_backend)
+    {
+        gui_closure_t *c = gui_closure_store(vm, closure);
+        if (c)
+        {
+            gui_callback_t cb = {gui_closure_invoke, c};
+            g_backend->set_callback(native, GUI_EVENT_CLICK, cb);
+        }
+    }
+    (void)error;
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t gui_canvas_on_mouse_move(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = gui_self_handle(vm, base);
+    vigil_value_t closure = vigil_vm_stack_get(vm, base + 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    void *native = gui_handle_get(&g_canvases, h);
+    if (native && g_backend)
+    {
+        gui_closure_t *c = gui_closure_store(vm, closure);
+        if (c)
+        {
+            gui_callback_t cb = {gui_closure_invoke, c};
+            g_backend->set_callback(native, GUI_EVENT_MOUSE_MOVE, cb);
+        }
+    }
+    (void)error;
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t gui_canvas_on_key_press(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = gui_self_handle(vm, base);
+    vigil_value_t closure = vigil_vm_stack_get(vm, base + 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    void *native = gui_handle_get(&g_canvases, h);
+    if (native && g_backend)
+    {
+        gui_closure_t *c = gui_closure_store(vm, closure);
+        if (c)
+        {
+            gui_callback_t cb = {gui_closure_invoke, c};
+            g_backend->set_callback(native, GUI_EVENT_KEY_PRESS, cb);
+        }
+    }
+    (void)error;
+    return VIGIL_STATUS_OK;
+}
+
 /* ── gui.message_box (module-level function) ─────────────────────── */
 
 static vigil_status_t gui_fn_message_box(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
@@ -2097,6 +2198,12 @@ static const vigil_native_class_method_t gui_canvas_methods[] = {
     GUI_METHOD("draw_rect", 9U, gui_canvas_draw_rect, 4U, p_f64_f64_f64_f64, VIGIL_TYPE_VOID, 0U, NULL),
     GUI_METHOD("draw_oval", 9U, gui_canvas_draw_oval, 4U, p_f64_f64_f64_f64, VIGIL_TYPE_VOID, 0U, NULL),
     GUI_METHOD("draw_text", 9U, gui_canvas_draw_text, 3U, p_f64_f64_str, VIGIL_TYPE_VOID, 0U, NULL),
+    GUI_METHOD("set_stroke_color", 16U, gui_canvas_set_stroke_color, 1U, p_str, VIGIL_TYPE_VOID, 0U, NULL),
+    GUI_METHOD("set_fill_color", 14U, gui_canvas_set_fill_color, 1U, p_str, VIGIL_TYPE_VOID, 0U, NULL),
+    GUI_METHOD("set_line_width", 14U, gui_canvas_set_line_width, 1U, p_f64, VIGIL_TYPE_VOID, 0U, NULL),
+    GUI_METHOD("on_mouse_click", 14U, gui_canvas_on_mouse_click, 1U, p_obj, VIGIL_TYPE_VOID, 0U, NULL),
+    GUI_METHOD("on_mouse_move", 13U, gui_canvas_on_mouse_move, 1U, p_obj, VIGIL_TYPE_VOID, 0U, NULL),
+    GUI_METHOD("on_key_press", 12U, gui_canvas_on_key_press, 1U, p_obj, VIGIL_TYPE_VOID, 0U, NULL),
     GUI_METHOD("grid", 4U, gui_canvas_grid, 2U, p_i32_i32, VIGIL_TYPE_VOID, 0U, NULL),
 };
 

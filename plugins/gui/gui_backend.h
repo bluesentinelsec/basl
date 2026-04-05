@@ -23,6 +23,11 @@ extern "C"
         GUI_EVENT_CLICK = 0,
         GUI_EVENT_CLOSE,
         GUI_EVENT_CHANGE,
+        GUI_EVENT_MOUSE_MOVE,
+        GUI_EVENT_MOUSE_RELEASE,
+        GUI_EVENT_SCROLL,
+        GUI_EVENT_KEY_PRESS,
+        GUI_EVENT_KEY_RELEASE,
         GUI_EVENT_COUNT
     } gui_event_type_t;
 
@@ -160,6 +165,9 @@ extern "C"
         void (*canvas_draw_rect)(void *handle, double x, double y, double w, double h);
         void (*canvas_draw_oval)(void *handle, double x, double y, double w, double h);
         void (*canvas_draw_text)(void *handle, double x, double y, const char *text);
+        void (*canvas_set_stroke_color)(void *handle, const char *color);
+        void (*canvas_set_fill_color)(void *handle, const char *color);
+        void (*canvas_set_line_width)(void *handle, double width);
     } gui_backend_t;
 
     /* ── Backend selection ───────────────────────────────────────────── */
