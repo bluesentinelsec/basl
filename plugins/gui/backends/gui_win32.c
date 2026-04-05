@@ -15,16 +15,31 @@
 #include <string.h>
 
 /* ── Minimal Win32 type stand-ins ────────────────────────────────── */
-/* Avoid pulling in <windows.h> to keep the translation unit small
-   and avoid macro pollution.  We define only what we need. */
+/* commctrl.h causes prsht.h parse errors on MSVC C11.
+   Define the constants we need manually instead. */
 
-#ifndef WIN32_LEAN_AND_MEAN
-#define WIN32_LEAN_AND_MEAN
-#endif
-#include <commctrl.h>
-#include <commdlg.h>
-#include <shlobj.h>
+/* clang-format off */
 #include <windows.h>
+#include <commdlg.h>
+/* clang-format on */
+
+#ifndef TRACKBAR_CLASSW
+#define TRACKBAR_CLASSW L"msctls_trackbar32"
+#endif
+#ifndef UPDOWN_CLASSW
+#define UPDOWN_CLASSW L"msctls_updown32"
+#endif
+#define TBS_HORZ 0x0000
+#define TBS_AUTOTICKS 0x0001
+#define TBM_SETRANGEMIN (WM_USER + 7)
+#define TBM_SETRANGEMAX (WM_USER + 8)
+#define TBM_GETPOS (WM_USER)
+#define TBM_SETPOS (WM_USER + 5)
+#define UDS_SETBUDDYINT 0x0002
+#define UDS_ALIGNRIGHT 0x0004
+#define UDM_SETBUDDY (WM_USER + 105)
+#define UDM_SETRANGE32 (WM_USER + 111)
+#define UDM_SETPOS32 (WM_USER + 113)
 
 /* ── Grid layout engine ──────────────────────────────────────────── */
 
@@ -211,6 +226,37 @@ static const wchar_t *to_wide(const char *utf8)
 
 /* ── Window procedure ────────────────────────────────────────────── */
 
+/* Forward declarations for menu and canvas (defined later). */
+#define MAX_MENU_CALLBACKS 128
+static gui_callback_t g_menu_cbs[MAX_MENU_CALLBACKS];
+static int g_menu_cb_count = 0;
+static int g_menu_id_base = 9000;
+
+enum
+{
+    W32_DRAW_LINE = 0,
+    W32_DRAW_RECT,
+    W32_DRAW_OVAL,
+    W32_DRAW_TEXT
+};
+typedef struct
+{
+    int type;
+    int x1, y1, x2, y2;
+    char text[128];
+} w32_draw_cmd_t;
+#define W32_MAX_CANVAS 32
+#define W32_MAX_DRAW_CMDS 512
+typedef struct
+{
+    HWND hwnd;
+    w32_draw_cmd_t cmds[W32_MAX_DRAW_CMDS];
+    int cmd_count;
+} w32_canvas_t;
+static w32_canvas_t g_w32_canvas[W32_MAX_CANVAS];
+static int g_w32_canvas_count = 0;
+static w32_canvas_t *w32_canvas_for(HWND hwnd);
+
 static LRESULT CALLBACK vigil_wndproc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
 {
     switch (msg)
@@ -320,7 +366,7 @@ static bool win32_init(const char *app_name)
     wc.cbSize = sizeof(wc);
     wc.lpfnWndProc = vigil_wndproc;
     wc.hInstance = g_hinstance;
-    wc.hCursor = LoadCursorW(NULL, IDC_ARROW);
+    wc.hCursor = LoadCursorW(NULL, (LPCWSTR)IDC_ARROW);
     wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
     wc.lpszClassName = g_wndclass_name;
 
@@ -745,7 +791,7 @@ static void win32_spinbox_set_value(void *handle, double value)
     if (!handle)
         return;
     wchar_t wbuf[64];
-    _snwprintf(wbuf, 64, L"%d", (int)value);
+    swprintf(wbuf, 64, L"%d", (int)value);
     SetWindowTextW((HWND)handle, wbuf);
 }
 
@@ -816,11 +862,6 @@ static void win32_listbox_set_selected(void *handle, int index)
 }
 
 /* ── Menu ────────────────────────────────────────────────────────── */
-
-#define MAX_MENU_CALLBACKS 128
-static gui_callback_t g_menu_cbs[MAX_MENU_CALLBACKS];
-static int g_menu_cb_count = 0;
-static int g_menu_id_base = 9000;
 
 static void *win32_menubar_create(void *window)
 {
@@ -897,37 +938,6 @@ static void win32_paned_set_position(void *handle, int pos)
 }
 
 /* ── Canvas ──────────────────────────────────────────────────────── */
-
-/* Draw command queue — replayed in WM_PAINT via WM_DRAWITEM for
-   SS_OWNERDRAW static controls. */
-
-enum
-{
-    W32_DRAW_LINE = 0,
-    W32_DRAW_RECT,
-    W32_DRAW_OVAL,
-    W32_DRAW_TEXT
-};
-
-typedef struct
-{
-    int type;
-    int x1, y1, x2, y2;
-    char text[128];
-} w32_draw_cmd_t;
-
-#define W32_MAX_CANVAS 32
-#define W32_MAX_DRAW_CMDS 512
-
-typedef struct
-{
-    HWND hwnd;
-    w32_draw_cmd_t cmds[W32_MAX_DRAW_CMDS];
-    int cmd_count;
-} w32_canvas_t;
-
-static w32_canvas_t g_w32_canvas[W32_MAX_CANVAS];
-static int g_w32_canvas_count = 0;
 
 static w32_canvas_t *w32_canvas_for(HWND hwnd)
 {
@@ -1119,22 +1129,12 @@ static const char *win32_save_file(void *parent, const char *title, char *buf, s
 
 static const char *win32_choose_dir(void *parent, const char *title, char *buf, size_t bufsz)
 {
+    /* shlobj.h removed due to prsht.h conflict on MSVC C11.
+       Directory picker requires shell32 APIs not available without it. */
     (void)parent;
     (void)title;
+    (void)bufsz;
     buf[0] = '\0';
-    BROWSEINFOW bi;
-    wchar_t wpath[MAX_PATH] = {0};
-    memset(&bi, 0, sizeof(bi));
-    bi.hwndOwner = (HWND)parent;
-    bi.pszDisplayName = wpath;
-    bi.ulFlags = BIF_RETURNONLYFSDIRS | BIF_NEWDIALOGSTYLE;
-    PIDLIST_ABSOLUTE pidl = SHBrowseForFolderW(&bi);
-    if (pidl)
-    {
-        if (SHGetPathFromIDListW(pidl, wpath))
-            WideCharToMultiByte(CP_UTF8, 0, wpath, -1, buf, (int)bufsz, NULL, NULL);
-        CoTaskMemFree(pidl);
-    }
     return buf;
 }
 
@@ -1229,6 +1229,28 @@ const gui_backend_t gui_backend_win32 = {
     .toplevel_destroy = NULL,
     .toplevel_set_title = NULL,
     .toplevel_set_modal = NULL,
+    .scrollbar_create = NULL,
+    .scrollbar_destroy = NULL,
+    .scrollbar_attach = NULL,
+    .notebook_create = NULL,
+    .notebook_destroy = NULL,
+    .notebook_add_tab = NULL,
+    .notebook_set_selected = NULL,
+    .notebook_get_selected = NULL,
+    .treeview_create = NULL,
+    .treeview_destroy = NULL,
+    .treeview_add_root = NULL,
+    .treeview_add_child = NULL,
+    .treeview_get_selected = NULL,
+    .treeview_expand = NULL,
+    .treeview_collapse = NULL,
+    .toolbar_create = NULL,
+    .toolbar_destroy = NULL,
+    .toolbar_add_button = NULL,
+    .toolbar_add_separator = NULL,
+    .statusbar_create = NULL,
+    .statusbar_destroy = NULL,
+    .statusbar_set_text = NULL,
     .widget_grid = win32_widget_grid,
     .widget_grid_span = win32_widget_grid_span,
     .widget_grid_remove = win32_widget_grid_remove,

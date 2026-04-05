@@ -202,7 +202,9 @@ int sysquery_plat_netstat(sysquery_connection_t *out, int max_count)
     if (f)
     {
         char line[512];
-        fgets(line, sizeof(line), f); /* skip header */
+        if (fgets(line, sizeof(line), f))
+        { /* skip header */
+        }
         while (fgets(line, sizeof(line), f) && count < max_count)
         {
             unsigned la, lp, ra, rp, st;
@@ -236,7 +238,9 @@ int sysquery_plat_arp(sysquery_arp_entry_t *out, int max_count)
     if (!f)
         return 0;
     char line[256];
-    fgets(line, sizeof(line), f); /* skip header */
+    if (fgets(line, sizeof(line), f))
+    { /* skip header */
+    }
     while (fgets(line, sizeof(line), f) && count < max_count)
     {
         sysquery_arp_entry_t *e = &out[count];
@@ -255,7 +259,9 @@ int sysquery_plat_route(sysquery_route_t *out, int max_count)
     if (!f)
         return 0;
     char line[256];
-    fgets(line, sizeof(line), f); /* skip header */
+    if (fgets(line, sizeof(line), f))
+    { /* skip header */
+    }
     while (fgets(line, sizeof(line), f) && count < max_count)
     {
         char iface[64];

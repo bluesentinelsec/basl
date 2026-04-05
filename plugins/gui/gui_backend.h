@@ -186,6 +186,38 @@ extern "C"
         void (*toplevel_destroy)(void *handle);
         void (*toplevel_set_title)(void *handle, const char *title);
         void (*toplevel_set_modal)(void *handle, bool modal);
+
+        /* Scrollbar */
+        void *(*scrollbar_create)(void *parent, bool horizontal);
+        void (*scrollbar_destroy)(void *handle);
+        void (*scrollbar_attach)(void *scrollbar, void *widget);
+
+        /* Notebook (tabs) */
+        void *(*notebook_create)(void *parent);
+        void (*notebook_destroy)(void *handle);
+        int (*notebook_add_tab)(void *handle, const char *label);
+        void (*notebook_set_selected)(void *handle, int index);
+        int (*notebook_get_selected)(void *handle);
+
+        /* TreeView */
+        void *(*treeview_create)(void *parent);
+        void (*treeview_destroy)(void *handle);
+        int (*treeview_add_root)(void *handle, const char *text);
+        int (*treeview_add_child)(void *handle, int parent_id, const char *text);
+        int (*treeview_get_selected)(void *handle);
+        void (*treeview_expand)(void *handle, int node_id);
+        void (*treeview_collapse)(void *handle, int node_id);
+
+        /* Toolbar */
+        void *(*toolbar_create)(void *window);
+        void (*toolbar_destroy)(void *handle);
+        void (*toolbar_add_button)(void *handle, const char *text, gui_callback_t cb);
+        void (*toolbar_add_separator)(void *handle);
+
+        /* StatusBar */
+        void *(*statusbar_create)(void *window);
+        void (*statusbar_destroy)(void *handle);
+        void (*statusbar_set_text)(void *handle, const char *text);
     } gui_backend_t;
 
     /* ── Backend selection ───────────────────────────────────────────── */

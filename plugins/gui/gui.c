@@ -124,6 +124,11 @@ static gui_handle_registry_t g_submenus = {0};
 static gui_handle_registry_t g_paneds = {0};
 static gui_handle_registry_t g_canvases = {0};
 static gui_handle_registry_t g_toplevels = {0};
+static gui_handle_registry_t g_scrollbars = {0};
+static gui_handle_registry_t g_notebooks = {0};
+static gui_handle_registry_t g_treeviews = {0};
+static gui_handle_registry_t g_toolbars = {0};
+static gui_handle_registry_t g_statusbars = {0};
 
 /* ── Stack helpers ───────────────────────────────────────────────── */
 
@@ -233,6 +238,11 @@ enum
     GUI_PANED_CLASS_INDEX = 14U,
     GUI_CANVAS_CLASS_INDEX = 15U,
     GUI_TOPLEVEL_CLASS_INDEX = 16U,
+    GUI_SCROLLBAR_CLASS_INDEX = 17U,
+    GUI_NOTEBOOK_CLASS_INDEX = 18U,
+    GUI_TREEVIEW_CLASS_INDEX = 19U,
+    GUI_TOOLBAR_CLASS_INDEX = 20U,
+    GUI_STATUSBAR_CLASS_INDEX = 21U,
 };
 
 /* ── Callback bridge ─────────────────────────────────────────────── */
@@ -420,7 +430,7 @@ static vigil_status_t gui_window_new(vigil_vm_t *vm, size_t arg_count, vigil_err
         return gui_push_fail_err(vm, "gui: failed to create window", error);
     }
 
-    int64_t handle;
+    int64_t handle = 0;
     gui_handle_store(&g_windows, native, &handle);
     gui_push_handle_instance(vm, GUI_WINDOW_CLASS_INDEX, handle, error);
     return gui_push_ok_err(vm, error);
@@ -533,7 +543,7 @@ static vigil_status_t gui_label_new(vigil_vm_t *vm, size_t arg_count, vigil_erro
     }
 
     void *native = g_backend->label_create(parent, text);
-    int64_t handle;
+    int64_t handle = 0;
     gui_handle_store(&g_labels, native, &handle);
     gui_push_handle_instance(vm, GUI_LABEL_CLASS_INDEX, handle, error);
     return gui_push_ok_err(vm, error);
@@ -599,7 +609,7 @@ static vigil_status_t gui_button_new(vigil_vm_t *vm, size_t arg_count, vigil_err
     }
 
     void *native = g_backend->button_create(parent, text);
-    int64_t handle;
+    int64_t handle = 0;
     gui_handle_store(&g_buttons, native, &handle);
     gui_push_handle_instance(vm, GUI_BUTTON_CLASS_INDEX, handle, error);
     return gui_push_ok_err(vm, error);
@@ -683,7 +693,7 @@ static vigil_status_t gui_entry_new(vigil_vm_t *vm, size_t arg_count, vigil_erro
     }
 
     void *native = g_backend->entry_create(parent);
-    int64_t handle;
+    int64_t handle = 0;
     gui_handle_store(&g_entries, native, &handle);
     gui_push_handle_instance(vm, GUI_ENTRY_CLASS_INDEX, handle, error);
     return gui_push_ok_err(vm, error);
@@ -791,7 +801,7 @@ static vigil_status_t gui_checkbox_new(vigil_vm_t *vm, size_t arg_count, vigil_e
     }
 
     void *native = g_backend->checkbox_create(parent, text);
-    int64_t handle;
+    int64_t handle = 0;
     gui_handle_store(&g_checkboxes, native, &handle);
     gui_push_handle_instance(vm, GUI_CHECKBOX_CLASS_INDEX, handle, error);
     return gui_push_ok_err(vm, error);
@@ -902,7 +912,7 @@ static vigil_status_t gui_slider_new(vigil_vm_t *vm, size_t arg_count, vigil_err
     }
 
     void *native = g_backend->slider_create(parent, min_val, max_val);
-    int64_t handle;
+    int64_t handle = 0;
     gui_handle_store(&g_sliders, native, &handle);
     gui_push_handle_instance(vm, GUI_SLIDER_CLASS_INDEX, handle, error);
     return gui_push_ok_err(vm, error);
@@ -997,7 +1007,7 @@ static vigil_status_t gui_select_new(vigil_vm_t *vm, size_t arg_count, vigil_err
     }
 
     void *native = g_backend->select_create(parent);
-    int64_t handle;
+    int64_t handle = 0;
     gui_handle_store(&g_selects, native, &handle);
     gui_push_handle_instance(vm, GUI_SELECT_CLASS_INDEX, handle, error);
     return gui_push_ok_err(vm, error);
@@ -1103,7 +1113,7 @@ static vigil_status_t gui_text_new(vigil_vm_t *vm, size_t arg_count, vigil_error
         return gui_push_fail_err(vm, "gui: invalid parent window", error);
     }
     void *native = g_backend->text_create(parent);
-    int64_t handle;
+    int64_t handle = 0;
     gui_handle_store(&g_texts, native, &handle);
     gui_push_handle_instance(vm, GUI_TEXT_CLASS_INDEX, handle, error);
     return gui_push_ok_err(vm, error);
@@ -1191,7 +1201,7 @@ static vigil_status_t gui_radio_new(vigil_vm_t *vm, size_t arg_count, vigil_erro
     }
     void *group = (group_h >= 0) ? gui_handle_get(&g_radios, group_h) : NULL;
     void *native = g_backend->radio_create(parent, text, group);
-    int64_t handle;
+    int64_t handle = 0;
     gui_handle_store(&g_radios, native, &handle);
     gui_push_handle_instance(vm, GUI_RADIO_CLASS_INDEX, handle, error);
     return gui_push_ok_err(vm, error);
@@ -1301,7 +1311,7 @@ static vigil_status_t gui_spinbox_new(vigil_vm_t *vm, size_t arg_count, vigil_er
         return gui_push_fail_err(vm, "gui: invalid parent window", error);
     }
     void *native = g_backend->spinbox_create(parent, min_val, max_val, step);
-    int64_t handle;
+    int64_t handle = 0;
     gui_handle_store(&g_spinboxes, native, &handle);
     gui_push_handle_instance(vm, GUI_SPINBOX_CLASS_INDEX, handle, error);
     return gui_push_ok_err(vm, error);
@@ -1396,7 +1406,7 @@ static vigil_status_t gui_frame_new(vigil_vm_t *vm, size_t arg_count, vigil_erro
         return gui_push_fail_err(vm, "gui: invalid parent window", error);
     }
     void *native = g_backend->frame_create(parent, label);
-    int64_t handle;
+    int64_t handle = 0;
     gui_handle_store(&g_frames, native, &handle);
     gui_push_handle_instance(vm, GUI_FRAME_CLASS_INDEX, handle, error);
     return gui_push_ok_err(vm, error);
@@ -1457,7 +1467,7 @@ static vigil_status_t gui_listbox_new(vigil_vm_t *vm, size_t arg_count, vigil_er
         return gui_push_fail_err(vm, "gui: invalid parent window", error);
     }
     void *native = g_backend->listbox_create(parent);
-    int64_t handle;
+    int64_t handle = 0;
     gui_handle_store(&g_listboxes, native, &handle);
     gui_push_handle_instance(vm, GUI_LISTBOX_CLASS_INDEX, handle, error);
     return gui_push_ok_err(vm, error);
@@ -1563,7 +1573,7 @@ static vigil_status_t gui_menu_new(vigil_vm_t *vm, size_t arg_count, vigil_error
         return gui_push_fail_err(vm, "gui: invalid parent window", error);
     }
     void *native = g_backend->menubar_create(win);
-    int64_t handle;
+    int64_t handle = 0;
     gui_handle_store(&g_menubars, native, &handle);
     gui_push_handle_instance(vm, GUI_MENU_CLASS_INDEX, handle, error);
     return gui_push_ok_err(vm, error);
@@ -1637,7 +1647,7 @@ static vigil_status_t gui_paned_new(vigil_vm_t *vm, size_t arg_count, vigil_erro
         return gui_push_fail_err(vm, "gui: invalid parent window", error);
     }
     void *native = g_backend->paned_create(parent, horizontal != 0);
-    int64_t handle;
+    int64_t handle = 0;
     gui_handle_store(&g_paneds, native, &handle);
     gui_push_handle_instance(vm, GUI_PANED_CLASS_INDEX, handle, error);
     return gui_push_ok_err(vm, error);
@@ -1699,7 +1709,7 @@ static vigil_status_t gui_canvas_new(vigil_vm_t *vm, size_t arg_count, vigil_err
         return gui_push_fail_err(vm, "gui: invalid parent window", error);
     }
     void *native = g_backend->canvas_create(parent, w, h);
-    int64_t handle;
+    int64_t handle = 0;
     gui_handle_store(&g_canvases, native, &handle);
     gui_push_handle_instance(vm, GUI_CANVAS_CLASS_INDEX, handle, error);
     return gui_push_ok_err(vm, error);
@@ -1930,7 +1940,7 @@ static vigil_status_t gui_toplevel_new(vigil_vm_t *vm, size_t arg_count, vigil_e
         gui_push_handle_instance(vm, GUI_TOPLEVEL_CLASS_INDEX, -1, error);
         return gui_push_fail_err(vm, "gui: failed to create toplevel", error);
     }
-    int64_t handle;
+    int64_t handle = 0;
     gui_handle_store(&g_toplevels, native, &handle);
     gui_push_handle_instance(vm, GUI_TOPLEVEL_CLASS_INDEX, handle, error);
     return gui_push_ok_err(vm, error);
@@ -1972,6 +1982,347 @@ static vigil_status_t gui_toplevel_set_modal(vigil_vm_t *vm, size_t arg_count, v
     void *native = gui_handle_get(&g_toplevels, h);
     if (native && g_backend && g_backend->toplevel_set_modal)
         g_backend->toplevel_set_modal(native, modal != 0);
+    (void)error;
+    return VIGIL_STATUS_OK;
+}
+
+/* ── gui.Scrollbar ───────────────────────────────────────────────── */
+
+static vigil_status_t gui_scrollbar_new(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t parent_h = gui_arg_handle(vm, base, 1);
+    int32_t horiz = gui_arg_i32(vm, base, 2);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    void *parent = gui_handle_get(&g_windows, parent_h);
+    if (!parent || !g_backend || !g_backend->scrollbar_create)
+    {
+        gui_push_handle_instance(vm, GUI_SCROLLBAR_CLASS_INDEX, -1, error);
+        return gui_push_fail_err(vm, "gui: scrollbar not supported", error);
+    }
+    void *native = g_backend->scrollbar_create(parent, horiz != 0);
+    int64_t handle = 0;
+    gui_handle_store(&g_scrollbars, native, &handle);
+    gui_push_handle_instance(vm, GUI_SCROLLBAR_CLASS_INDEX, handle, error);
+    return gui_push_ok_err(vm, error);
+}
+
+static vigil_status_t gui_scrollbar_destroy(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = gui_self_handle(vm, base);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    void *native = gui_handle_get(&g_scrollbars, h);
+    if (native && g_backend && g_backend->scrollbar_destroy)
+        g_backend->scrollbar_destroy(native);
+    gui_handle_clear(&g_scrollbars, h);
+    (void)error;
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t gui_scrollbar_grid(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = gui_self_handle(vm, base);
+    int col = gui_arg_i32(vm, base, 1);
+    int row = gui_arg_i32(vm, base, 2);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    void *native = gui_handle_get(&g_scrollbars, h);
+    if (native && g_backend)
+        g_backend->widget_grid(native, col, row);
+    (void)error;
+    return VIGIL_STATUS_OK;
+}
+
+/* ── gui.Notebook ────────────────────────────────────────────────── */
+
+static vigil_status_t gui_notebook_new(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t parent_h = gui_arg_handle(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    void *parent = gui_handle_get(&g_windows, parent_h);
+    if (!parent || !g_backend || !g_backend->notebook_create)
+    {
+        gui_push_handle_instance(vm, GUI_NOTEBOOK_CLASS_INDEX, -1, error);
+        return gui_push_fail_err(vm, "gui: notebook not supported", error);
+    }
+    void *native = g_backend->notebook_create(parent);
+    int64_t handle = 0;
+    gui_handle_store(&g_notebooks, native, &handle);
+    gui_push_handle_instance(vm, GUI_NOTEBOOK_CLASS_INDEX, handle, error);
+    return gui_push_ok_err(vm, error);
+}
+
+static vigil_status_t gui_notebook_destroy(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = gui_self_handle(vm, base);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    void *n = gui_handle_get(&g_notebooks, h);
+    if (n && g_backend && g_backend->notebook_destroy)
+        g_backend->notebook_destroy(n);
+    gui_handle_clear(&g_notebooks, h);
+    (void)error;
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t gui_notebook_add_tab(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = gui_self_handle(vm, base);
+    char buf[256];
+    const char *label = gui_arg_str(vm, base, 1, buf, sizeof(buf));
+    vigil_vm_stack_pop_n(vm, arg_count);
+    int idx = -1;
+    void *n = gui_handle_get(&g_notebooks, h);
+    if (n && g_backend && g_backend->notebook_add_tab)
+        idx = g_backend->notebook_add_tab(n, label);
+    vigil_value_t v = vigil_nanbox_encode_i32(idx);
+    return vigil_vm_stack_push(vm, &v, error);
+}
+
+static vigil_status_t gui_notebook_get(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = gui_self_handle(vm, base);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    int idx = -1;
+    void *n = gui_handle_get(&g_notebooks, h);
+    if (n && g_backend && g_backend->notebook_get_selected)
+        idx = g_backend->notebook_get_selected(n);
+    vigil_value_t v = vigil_nanbox_encode_i32(idx);
+    return vigil_vm_stack_push(vm, &v, error);
+}
+
+static vigil_status_t gui_notebook_set(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = gui_self_handle(vm, base);
+    int idx = gui_arg_i32(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    void *n = gui_handle_get(&g_notebooks, h);
+    if (n && g_backend && g_backend->notebook_set_selected)
+        g_backend->notebook_set_selected(n, idx);
+    (void)error;
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t gui_notebook_grid(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = gui_self_handle(vm, base);
+    int col = gui_arg_i32(vm, base, 1);
+    int row = gui_arg_i32(vm, base, 2);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    void *n = gui_handle_get(&g_notebooks, h);
+    if (n && g_backend)
+        g_backend->widget_grid(n, col, row);
+    (void)error;
+    return VIGIL_STATUS_OK;
+}
+
+/* ── gui.TreeView ────────────────────────────────────────────────── */
+
+static vigil_status_t gui_treeview_new(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t parent_h = gui_arg_handle(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    void *parent = gui_handle_get(&g_windows, parent_h);
+    if (!parent || !g_backend || !g_backend->treeview_create)
+    {
+        gui_push_handle_instance(vm, GUI_TREEVIEW_CLASS_INDEX, -1, error);
+        return gui_push_fail_err(vm, "gui: treeview not supported", error);
+    }
+    void *native = g_backend->treeview_create(parent);
+    int64_t handle = 0;
+    gui_handle_store(&g_treeviews, native, &handle);
+    gui_push_handle_instance(vm, GUI_TREEVIEW_CLASS_INDEX, handle, error);
+    return gui_push_ok_err(vm, error);
+}
+
+static vigil_status_t gui_treeview_destroy(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = gui_self_handle(vm, base);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    void *n = gui_handle_get(&g_treeviews, h);
+    if (n && g_backend && g_backend->treeview_destroy)
+        g_backend->treeview_destroy(n);
+    gui_handle_clear(&g_treeviews, h);
+    (void)error;
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t gui_treeview_add_root(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = gui_self_handle(vm, base);
+    char buf[256];
+    const char *text = gui_arg_str(vm, base, 1, buf, sizeof(buf));
+    vigil_vm_stack_pop_n(vm, arg_count);
+    int nid = -1;
+    void *n = gui_handle_get(&g_treeviews, h);
+    if (n && g_backend && g_backend->treeview_add_root)
+        nid = g_backend->treeview_add_root(n, text);
+    vigil_value_t v = vigil_nanbox_encode_i32(nid);
+    return vigil_vm_stack_push(vm, &v, error);
+}
+
+static vigil_status_t gui_treeview_add_child(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = gui_self_handle(vm, base);
+    int pid = gui_arg_i32(vm, base, 1);
+    char buf[256];
+    const char *text = gui_arg_str(vm, base, 2, buf, sizeof(buf));
+    vigil_vm_stack_pop_n(vm, arg_count);
+    int nid = -1;
+    void *n = gui_handle_get(&g_treeviews, h);
+    if (n && g_backend && g_backend->treeview_add_child)
+        nid = g_backend->treeview_add_child(n, pid, text);
+    vigil_value_t v = vigil_nanbox_encode_i32(nid);
+    return vigil_vm_stack_push(vm, &v, error);
+}
+
+static vigil_status_t gui_treeview_get_selected(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = gui_self_handle(vm, base);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    int sel = -1;
+    void *n = gui_handle_get(&g_treeviews, h);
+    if (n && g_backend && g_backend->treeview_get_selected)
+        sel = g_backend->treeview_get_selected(n);
+    vigil_value_t v = vigil_nanbox_encode_i32(sel);
+    return vigil_vm_stack_push(vm, &v, error);
+}
+
+static vigil_status_t gui_treeview_grid(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = gui_self_handle(vm, base);
+    int col = gui_arg_i32(vm, base, 1);
+    int row = gui_arg_i32(vm, base, 2);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    void *n = gui_handle_get(&g_treeviews, h);
+    if (n && g_backend)
+        g_backend->widget_grid(n, col, row);
+    (void)error;
+    return VIGIL_STATUS_OK;
+}
+
+/* ── gui.Toolbar ─────────────────────────────────────────────────── */
+
+static vigil_status_t gui_toolbar_new(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t win_h = gui_arg_handle(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    void *win = gui_handle_get(&g_windows, win_h);
+    if (!win || !g_backend || !g_backend->toolbar_create)
+    {
+        gui_push_handle_instance(vm, GUI_TOOLBAR_CLASS_INDEX, -1, error);
+        return gui_push_fail_err(vm, "gui: toolbar not supported", error);
+    }
+    void *native = g_backend->toolbar_create(win);
+    int64_t handle = 0;
+    gui_handle_store(&g_toolbars, native, &handle);
+    gui_push_handle_instance(vm, GUI_TOOLBAR_CLASS_INDEX, handle, error);
+    return gui_push_ok_err(vm, error);
+}
+
+static vigil_status_t gui_toolbar_destroy(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = gui_self_handle(vm, base);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    void *n = gui_handle_get(&g_toolbars, h);
+    if (n && g_backend && g_backend->toolbar_destroy)
+        g_backend->toolbar_destroy(n);
+    gui_handle_clear(&g_toolbars, h);
+    (void)error;
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t gui_toolbar_add_button(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = gui_self_handle(vm, base);
+    char buf[256];
+    const char *text = gui_arg_str(vm, base, 1, buf, sizeof(buf));
+    vigil_value_t closure = vigil_vm_stack_get(vm, base + 2);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    void *n = gui_handle_get(&g_toolbars, h);
+    if (n && g_backend && g_backend->toolbar_add_button)
+    {
+        gui_closure_t *c = gui_closure_store(vm, closure);
+        if (c)
+        {
+            gui_callback_t cb = {gui_closure_invoke, c};
+            g_backend->toolbar_add_button(n, text, cb);
+        }
+    }
+    (void)error;
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t gui_toolbar_add_separator(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = gui_self_handle(vm, base);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    void *n = gui_handle_get(&g_toolbars, h);
+    if (n && g_backend && g_backend->toolbar_add_separator)
+        g_backend->toolbar_add_separator(n);
+    (void)error;
+    return VIGIL_STATUS_OK;
+}
+
+/* ── gui.StatusBar ───────────────────────────────────────────────── */
+
+static vigil_status_t gui_statusbar_new(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t win_h = gui_arg_handle(vm, base, 1);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    void *win = gui_handle_get(&g_windows, win_h);
+    if (!win || !g_backend || !g_backend->statusbar_create)
+    {
+        gui_push_handle_instance(vm, GUI_STATUSBAR_CLASS_INDEX, -1, error);
+        return gui_push_fail_err(vm, "gui: statusbar not supported", error);
+    }
+    void *native = g_backend->statusbar_create(win);
+    int64_t handle = 0;
+    gui_handle_store(&g_statusbars, native, &handle);
+    gui_push_handle_instance(vm, GUI_STATUSBAR_CLASS_INDEX, handle, error);
+    return gui_push_ok_err(vm, error);
+}
+
+static vigil_status_t gui_statusbar_destroy(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = gui_self_handle(vm, base);
+    vigil_vm_stack_pop_n(vm, arg_count);
+    void *n = gui_handle_get(&g_statusbars, h);
+    if (n && g_backend && g_backend->statusbar_destroy)
+        g_backend->statusbar_destroy(n);
+    gui_handle_clear(&g_statusbars, h);
+    (void)error;
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t gui_statusbar_set_text(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    int64_t h = gui_self_handle(vm, base);
+    char buf[512];
+    const char *text = gui_arg_str(vm, base, 1, buf, sizeof(buf));
+    vigil_vm_stack_pop_n(vm, arg_count);
+    void *n = gui_handle_get(&g_statusbars, h);
+    if (n && g_backend && g_backend->statusbar_set_text)
+        g_backend->statusbar_set_text(n, text);
     (void)error;
     return VIGIL_STATUS_OK;
 }
@@ -2086,6 +2437,8 @@ static const int p_obj_f64_f64[] = {VIGIL_TYPE_OBJECT, VIGIL_TYPE_F64, VIGIL_TYP
 static const int p_f64[] = {VIGIL_TYPE_F64};
 static const int p_i32[] = {VIGIL_TYPE_I32};
 static const int p_i32_obj[] = {VIGIL_TYPE_I32, VIGIL_TYPE_OBJECT};
+static const int p_i32_str[] = {VIGIL_TYPE_I32, VIGIL_TYPE_STRING};
+static const int p_str_obj[] = {VIGIL_TYPE_STRING, VIGIL_TYPE_OBJECT};
 static const int rt_f64[] = {VIGIL_TYPE_F64};
 static const int rt_i32[] = {VIGIL_TYPE_I32};
 static const int p_obj_str_obj[] = {VIGIL_TYPE_OBJECT, VIGIL_TYPE_STRING, VIGIL_TYPE_OBJECT};
@@ -2365,6 +2718,63 @@ static const vigil_native_class_method_t gui_toplevel_methods[] = {
     GUI_METHOD("set_modal", 9U, gui_toplevel_set_modal, 1U, p_bool, VIGIL_TYPE_VOID, 0U, NULL),
 };
 
+/* ── Scrollbar class ─────────────────────────────────────────────── */
+static const vigil_native_class_field_t gui_scrollbar_fields[] = {
+    GUI_PFIELD("handle", 6U, VIGIL_TYPE_I64),
+};
+static const vigil_native_class_method_t gui_scrollbar_methods[] = {
+    GUI_STATIC("new", 3U, gui_scrollbar_new, 2U, p_obj_bool, VIGIL_TYPE_OBJECT, 2U, rt_obj_err),
+    GUI_METHOD("destroy", 7U, gui_scrollbar_destroy, 0U, NULL, VIGIL_TYPE_VOID, 0U, NULL),
+    GUI_METHOD("grid", 4U, gui_scrollbar_grid, 2U, p_i32_i32, VIGIL_TYPE_VOID, 0U, NULL),
+};
+
+/* ── Notebook class ──────────────────────────────────────────────── */
+static const vigil_native_class_field_t gui_notebook_fields[] = {
+    GUI_PFIELD("handle", 6U, VIGIL_TYPE_I64),
+};
+static const vigil_native_class_method_t gui_notebook_methods[] = {
+    GUI_STATIC("new", 3U, gui_notebook_new, 1U, p_obj, VIGIL_TYPE_OBJECT, 2U, rt_obj_err),
+    GUI_METHOD("destroy", 7U, gui_notebook_destroy, 0U, NULL, VIGIL_TYPE_VOID, 0U, NULL),
+    GUI_METHOD("add_tab", 7U, gui_notebook_add_tab, 1U, p_str, VIGIL_TYPE_I32, 1U, rt_i32),
+    GUI_METHOD("get", 3U, gui_notebook_get, 0U, NULL, VIGIL_TYPE_I32, 1U, rt_i32),
+    GUI_METHOD("set", 3U, gui_notebook_set, 1U, p_i32, VIGIL_TYPE_VOID, 0U, NULL),
+    GUI_METHOD("grid", 4U, gui_notebook_grid, 2U, p_i32_i32, VIGIL_TYPE_VOID, 0U, NULL),
+};
+
+/* ── TreeView class ──────────────────────────────────────────────── */
+static const vigil_native_class_field_t gui_treeview_fields[] = {
+    GUI_PFIELD("handle", 6U, VIGIL_TYPE_I64),
+};
+static const vigil_native_class_method_t gui_treeview_methods[] = {
+    GUI_STATIC("new", 3U, gui_treeview_new, 1U, p_obj, VIGIL_TYPE_OBJECT, 2U, rt_obj_err),
+    GUI_METHOD("destroy", 7U, gui_treeview_destroy, 0U, NULL, VIGIL_TYPE_VOID, 0U, NULL),
+    GUI_METHOD("add_root", 8U, gui_treeview_add_root, 1U, p_str, VIGIL_TYPE_I32, 1U, rt_i32),
+    GUI_METHOD("add_child", 9U, gui_treeview_add_child, 2U, p_i32_str, VIGIL_TYPE_I32, 1U, rt_i32),
+    GUI_METHOD("get_selected", 12U, gui_treeview_get_selected, 0U, NULL, VIGIL_TYPE_I32, 1U, rt_i32),
+    GUI_METHOD("grid", 4U, gui_treeview_grid, 2U, p_i32_i32, VIGIL_TYPE_VOID, 0U, NULL),
+};
+
+/* ── Toolbar class ───────────────────────────────────────────────── */
+static const vigil_native_class_field_t gui_toolbar_fields[] = {
+    GUI_PFIELD("handle", 6U, VIGIL_TYPE_I64),
+};
+static const vigil_native_class_method_t gui_toolbar_methods[] = {
+    GUI_STATIC("new", 3U, gui_toolbar_new, 1U, p_obj, VIGIL_TYPE_OBJECT, 2U, rt_obj_err),
+    GUI_METHOD("destroy", 7U, gui_toolbar_destroy, 0U, NULL, VIGIL_TYPE_VOID, 0U, NULL),
+    GUI_METHOD("add_button", 10U, gui_toolbar_add_button, 2U, p_str_obj, VIGIL_TYPE_VOID, 0U, NULL),
+    GUI_METHOD("add_separator", 13U, gui_toolbar_add_separator, 0U, NULL, VIGIL_TYPE_VOID, 0U, NULL),
+};
+
+/* ── StatusBar class ─────────────────────────────────────────────── */
+static const vigil_native_class_field_t gui_statusbar_fields[] = {
+    GUI_PFIELD("handle", 6U, VIGIL_TYPE_I64),
+};
+static const vigil_native_class_method_t gui_statusbar_methods[] = {
+    GUI_STATIC("new", 3U, gui_statusbar_new, 1U, p_obj, VIGIL_TYPE_OBJECT, 2U, rt_obj_err),
+    GUI_METHOD("destroy", 7U, gui_statusbar_destroy, 0U, NULL, VIGIL_TYPE_VOID, 0U, NULL),
+    GUI_METHOD("set_text", 8U, gui_statusbar_set_text, 1U, p_str, VIGIL_TYPE_VOID, 0U, NULL),
+};
+
 /* ── Class table ─────────────────────────────────────────────────── */
 
 /* clang-format off */
@@ -2386,6 +2796,11 @@ static const vigil_native_class_t gui_classes[] = {
     {"PanedWindow", 11U, gui_paned_fields,    1U, gui_paned_methods,    sizeof(gui_paned_methods)    / sizeof(gui_paned_methods[0]),    NULL, NULL},
     {"Canvas",      6U,  gui_canvas_fields,   1U, gui_canvas_methods,   sizeof(gui_canvas_methods)   / sizeof(gui_canvas_methods[0]),   NULL, NULL},
     {"Toplevel",    8U,  gui_toplevel_fields,  1U, gui_toplevel_methods,  sizeof(gui_toplevel_methods)  / sizeof(gui_toplevel_methods[0]),  NULL, NULL},
+    {"Scrollbar",   9U,  gui_scrollbar_fields, 1U, gui_scrollbar_methods, sizeof(gui_scrollbar_methods) / sizeof(gui_scrollbar_methods[0]), NULL, NULL},
+    {"Notebook",    8U,  gui_notebook_fields,  1U, gui_notebook_methods,  sizeof(gui_notebook_methods)  / sizeof(gui_notebook_methods[0]),  NULL, NULL},
+    {"TreeView",    8U,  gui_treeview_fields,  1U, gui_treeview_methods,  sizeof(gui_treeview_methods)  / sizeof(gui_treeview_methods[0]),  NULL, NULL},
+    {"Toolbar",     7U,  gui_toolbar_fields,   1U, gui_toolbar_methods,   sizeof(gui_toolbar_methods)   / sizeof(gui_toolbar_methods[0]),   NULL, NULL},
+    {"StatusBar",   9U,  gui_statusbar_fields, 1U, gui_statusbar_methods, sizeof(gui_statusbar_methods) / sizeof(gui_statusbar_methods[0]), NULL, NULL},
 };
 /* clang-format on */
 

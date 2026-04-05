@@ -45,6 +45,9 @@ jobs:
           cmake -S . -B build
           -DVIGIL_BUILD_TESTS=ON
           -DVIGIL_PLUGIN_SDL=ON
+          -DVIGIL_PLUGIN_GUI=ON
+          -DVIGIL_PLUGIN_AUDIO=ON
+          -DVIGIL_PLUGIN_SYSQUERY=ON
           -DVIGIL_STDLIB_FFI=ON
           -DVIGIL_STDLIB_FS=ON
           -DVIGIL_STDLIB_HTTP=ON
@@ -173,6 +176,9 @@ jobs:
           cmake -S . -B build
           -DVIGIL_BUILD_TESTS=OFF
           -DVIGIL_PLUGIN_SDL=ON
+          -DVIGIL_PLUGIN_GUI=ON
+          -DVIGIL_PLUGIN_AUDIO=ON
+          -DVIGIL_PLUGIN_SYSQUERY=ON
           -DVIGIL_PLUGIN_TILED=ON
           -DVIGIL_STDLIB_FFI=ON
           -DVIGIL_STDLIB_FS=ON
@@ -324,6 +330,9 @@ jobs:
           cmake -S . -B build
           -DVIGIL_BUILD_TESTS=ON
           -DVIGIL_PLUGIN_SDL=ON
+          -DVIGIL_PLUGIN_GUI=ON
+          -DVIGIL_PLUGIN_AUDIO=ON
+          -DVIGIL_PLUGIN_SYSQUERY=ON
           -DCMAKE_BUILD_TYPE=Debug
           -DCMAKE_C_FLAGS_DEBUG="-g -O0 -Wno-format-truncation"
 
@@ -365,6 +374,9 @@ jobs:
           cmake -S . -B build
           -DVIGIL_BUILD_TESTS=ON
           -DVIGIL_PLUGIN_SDL=ON
+          -DVIGIL_PLUGIN_GUI=ON
+          -DVIGIL_PLUGIN_AUDIO=ON
+          -DVIGIL_PLUGIN_SYSQUERY=ON
           -DCMAKE_BUILD_TYPE=Debug
           -DCMAKE_C_COMPILER=clang
           -DCMAKE_CXX_COMPILER=clang++

@@ -7,9 +7,12 @@
  * Module functions: set_listener_position, set_listener_direction
  */
 
-/* Enable OGG Vorbis decoding via stb_vorbis.
-   Include the header portion first so miniaudio sees the declarations,
-   then include the implementation after miniaudio. */
+/* Suppress warnings in vendored headers on MSVC. */
+#ifdef _MSC_VER
+#pragma warning(push)
+#pragma warning(disable : 4244 4245 4456 4457 4701)
+#endif
+
 #define STB_VORBIS_HEADER_ONLY
 #include "stb_vorbis.c"
 
@@ -20,6 +23,10 @@
 /* Now include the stb_vorbis implementation. */
 #undef STB_VORBIS_HEADER_ONLY
 #include "stb_vorbis.c"
+
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
 
 #include <string.h>
 
@@ -188,7 +195,7 @@ static vigil_status_t audio_engine_new(vigil_vm_t *vm, size_t arg_count, vigil_e
         return audio_push_fail_err(vm, "audio: failed to initialize engine", error);
     }
 
-    int64_t handle;
+    int64_t handle = 0;
     audio_handle_store(&g_engines, engine, &handle);
     audio_push_handle_instance(vm, AUDIO_ENGINE_CLASS, handle, error);
     return audio_push_ok_err(vm, error);
@@ -254,7 +261,7 @@ static vigil_status_t audio_sound_load(vigil_vm_t *vm, size_t arg_count, vigil_e
         return audio_push_fail_err(vm, "audio: failed to load sound", error);
     }
 
-    int64_t handle;
+    int64_t handle = 0;
     audio_handle_store(&g_sounds, sound, &handle);
     audio_push_handle_instance(vm, AUDIO_SOUND_CLASS, handle, error);
     return audio_push_ok_err(vm, error);
@@ -324,7 +331,7 @@ static vigil_status_t audio_sound_load_memory(vigil_vm_t *vm, size_t arg_count, 
        We leak them intentionally — they're freed when the sound is destroyed.
        A production implementation would track these per-sound. */
 
-    int64_t handle;
+    int64_t handle = 0;
     audio_handle_store(&g_sounds, sound, &handle);
     audio_push_handle_instance(vm, AUDIO_SOUND_CLASS, handle, error);
     return audio_push_ok_err(vm, error);
@@ -463,7 +470,7 @@ static vigil_status_t audio_music_load(vigil_vm_t *vm, size_t arg_count, vigil_e
         return audio_push_fail_err(vm, "audio: failed to load music", error);
     }
 
-    int64_t handle;
+    int64_t handle = 0;
     audio_handle_store(&g_musics, music, &handle);
     audio_push_handle_instance(vm, AUDIO_MUSIC_CLASS, handle, error);
     return audio_push_ok_err(vm, error);

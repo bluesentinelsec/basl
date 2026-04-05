@@ -107,3 +107,58 @@ class TestGuiPlugin(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+    # ── Phase 2 widgets ──────────────────────────────────────────
+
+    def test_check_entry_checkbox(self):
+        script = self._write(
+            "gui_entry.vigil",
+            'import "gui"\n'
+            "fn main() -> i32 {\n"
+            '    gui.App app, err e = gui.App.new("t")\n'
+            '    gui.Window win, err e2 = gui.Window.new(app, "w", 400, 300)\n'
+            "    gui.Entry ent, err e3 = gui.Entry.new(win)\n"
+            '    gui.Checkbox cb, err e4 = gui.Checkbox.new(win, "opt")\n'
+            "    return 0\n"
+            "}\n",
+        )
+        r = self._run("check", script)
+        self.assertEqual(r.returncode, 0, r.stderr)
+
+    def test_check_slider_select(self):
+        script = self._write(
+            "gui_slider.vigil",
+            'import "gui"\n'
+            "fn main() -> i32 {\n"
+            '    gui.App app, err e = gui.App.new("t")\n'
+            '    gui.Window win, err e2 = gui.Window.new(app, "w", 400, 300)\n'
+            "    gui.Slider sl, err e3 = gui.Slider.new(win, 0.0, 100.0)\n"
+            "    gui.Select sel, err e4 = gui.Select.new(win)\n"
+            "    return 0\n"
+            "}\n",
+        )
+        r = self._run("check", script)
+        self.assertEqual(r.returncode, 0, r.stderr)
+
+    def test_check_frame_listbox_menu(self):
+        script = self._write(
+            "gui_frame.vigil",
+            'import "gui"\n'
+            "fn main() -> i32 {\n"
+            '    gui.App app, err e = gui.App.new("t")\n'
+            '    gui.Window win, err e2 = gui.Window.new(app, "w", 400, 300)\n'
+            '    gui.Frame frm, err e3 = gui.Frame.new(win, "opts")\n'
+            "    gui.Listbox lb, err e4 = gui.Listbox.new(win)\n"
+            "    gui.Menu menu, err e5 = gui.Menu.new(win)\n"
+            "    return 0\n"
+            "}\n",
+        )
+        r = self._run("check", script)
+        self.assertEqual(r.returncode, 0, r.stderr)
+
+    def test_doc_gui_lists_new_classes(self):
+        r = self._run("doc", "gui")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        for name in ["Entry", "Checkbox", "Slider", "Select", "Frame",
+                      "Listbox", "Menu", "Canvas", "Toplevel"]:
+            self.assertIn(f"gui.{name}", r.stdout)

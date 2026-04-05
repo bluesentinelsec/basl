@@ -43,6 +43,7 @@ add_executable(vigil_tests
     tests/gc_test.c
     tests/gui_test.c
     tests/audio_test.c
+    tests/sysquery_test.c
     tests/json_test.c
     tests/lexer_test.c
     tests/line_editor_internal_test.c

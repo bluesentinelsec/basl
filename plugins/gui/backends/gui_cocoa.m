@@ -757,6 +757,9 @@ static void cocoa_listbox_set_selected(void *handle, int index)
     (void)handle; (void)index;
 }
 
+/* Forward declaration — defined in Events section below. */
+static void cocoa_set_callback(void *widget, gui_event_type_t type, gui_callback_t cb);
+
 /* ── Menu ─────────────────────────────────────────────────────────── */
 
 static void *cocoa_menubar_create(void *window)
@@ -882,7 +885,6 @@ static void canvas_draw_rect_impl(id self, SEL _cmd, CGRect dirty)
     typedef void (*cg_line_t)(void *, double, double);
     typedef void (*cg_rect_t)(void *, CGRect);
     typedef void (*cg_stroke_t)(void *);
-    typedef void (*cg_fill_t)(void *);
     typedef void (*cg_ellipse_t)(void *, CGRect);
     typedef void (*cg_set_lw_t)(void *, double);
 

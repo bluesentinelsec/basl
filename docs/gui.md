@@ -72,7 +72,13 @@ fn main() -> i32 {
 | `Listbox` | Scrollable selectable list | `new(parent)`, `add_item()`, `get()`, `set()`, `on_change()`, `grid()` |
 | `Menu` | Application menu bar | `new(window)`, `add_submenu()`, `add_item()` |
 | `PanedWindow` | Resizable split container | `new(parent, horizontal)`, `set_position()`, `grid()` |
-| `Canvas` | 2D drawing surface | `new(parent, w, h)`, `draw_line()`, `draw_rect()`, `draw_oval()`, `draw_text()`, `clear()`, `grid()` |
+| `Canvas` | 2D drawing surface | `new(parent, w, h)`, `draw_line()`, `draw_rect()`, `draw_oval()`, `draw_text()`, `set_stroke_color()`, `set_fill_color()`, `set_line_width()`, `on_mouse_click()`, `on_mouse_move()`, `on_key_press()`, `clear()`, `grid()` |
+| `Toplevel` | Secondary top-level window | `new(title, w, h)`, `destroy()`, `set_title()`, `set_modal(bool)` |
+| `Scrollbar` | Attachable scrollbar | `new(parent, horizontal)`, `destroy()`, `grid()` |
+| `Notebook` | Tabbed container | `new(parent)`, `add_tab(label)`, `get()`, `set(index)`, `grid()` |
+| `TreeView` | Hierarchical list | `new(parent)`, `add_root(text)`, `add_child(parent_id, text)`, `get_selected()`, `grid()` |
+| `Toolbar` | Horizontal button strip | `new(window)`, `add_button(text, callback)`, `add_separator()` |
+| `StatusBar` | Bottom text strip | `new(window)`, `set_text(text)` |
 
 ## Module-Level Functions
 
