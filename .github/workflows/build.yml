@@ -223,6 +223,9 @@ jobs:
           -DANDROID_ABI=${{ matrix.abi }}
           -DANDROID_PLATFORM=android-21
           -DVIGIL_BUILD_TESTS=OFF
+          -DVIGIL_PLUGIN_SDL=ON
+          -DVIGIL_PLUGIN_GUI=ON
+          -DVIGIL_PLUGIN_AUDIO=ON
           -DCMAKE_BUILD_TYPE=Release
 
       - name: Build
@@ -243,6 +246,7 @@ jobs:
           -DCMAKE_OSX_SYSROOT=iphonesimulator
           -DCMAKE_OSX_DEPLOYMENT_TARGET=15.0
           -DVIGIL_BUILD_TESTS=OFF
+          -DVIGIL_PLUGIN_AUDIO=ON
           -DCMAKE_BUILD_TYPE=Release
 
       - name: Build
@@ -262,7 +266,7 @@ jobs:
           version: latest
 
       - name: Configure
-        run: emcmake cmake -S . -B build -DVIGIL_BUILD_TESTS=OFF -DVIGIL_PLUGIN_SDL=ON -DCMAKE_BUILD_TYPE=Release
+        run: emcmake cmake -S . -B build -DVIGIL_BUILD_TESTS=OFF -DVIGIL_PLUGIN_SDL=ON -DVIGIL_PLUGIN_GUI=ON -DVIGIL_PLUGIN_AUDIO=ON -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_FLAGS="-pthread" -DCMAKE_EXE_LINKER_FLAGS="-pthread -sUSE_PTHREADS=1 -lwebsocket.js"
 
       - name: Build
         run: cmake --build build

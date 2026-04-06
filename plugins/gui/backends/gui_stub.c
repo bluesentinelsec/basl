@@ -170,6 +170,14 @@ static void stub_msgbox(void *p, const char *t, const char *m)
     (void)t;
     (void)m;
 }
+static const char *stub_file_dlg(void *p, const char *t, char *b, size_t s)
+{
+    (void)p;
+    (void)t;
+    (void)s;
+    b[0] = '\0';
+    return b;
+}
 static bool stub_ask(void *p, const char *t, const char *m)
 {
     (void)p;
@@ -276,9 +284,9 @@ const gui_backend_t gui_backend_stub = {
     .widget_set_padding = stub_grid_configure,
     .widget_set_state = stub_set_text,
     .message_box = stub_msgbox,
-    .open_file_dialog = stub_get_text,
-    .save_file_dialog = stub_get_text,
-    .choose_directory = stub_get_text,
+    .open_file_dialog = stub_file_dlg,
+    .save_file_dialog = stub_file_dlg,
+    .choose_directory = stub_file_dlg,
     .ask_yes_no = stub_ask,
     .canvas_create = stub_canvas_create,
     .canvas_destroy = stub_destroy,

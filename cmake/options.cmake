@@ -21,13 +21,13 @@ endif()
 # desktop-only. Emscripten gets its own platform file in Phase 2.
 
 if(EMSCRIPTEN)
+    # fs uses MEMFS (ephemeral). See docs/stdlib-portability.md for
+    # IDBFS/NODEFS persistence options.
     set(VIGIL_HAS_FILESYSTEM  ON)
-    # Threads require -pthread and -sUSE_PTHREADS=1 flags.
-    # Disabled until Emscripten CI job adds pthread support.
-    set(VIGIL_HAS_THREADS     OFF)
+    set(VIGIL_HAS_THREADS     ON)
     set(VIGIL_HAS_TIME        ON)
-    set(VIGIL_HAS_NETWORK     OFF)  # needs WebSocket proxy — Phase 2
-    set(VIGIL_HAS_HTTP        OFF)
+    set(VIGIL_HAS_NETWORK     ON)
+    set(VIGIL_HAS_HTTP        ON)
     set(VIGIL_HAS_FFI         OFF)
     set(VIGIL_HAS_READLINE    OFF)
 elseif(VIGIL_HAS_DESKTOP_PLATFORM)
