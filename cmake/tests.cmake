@@ -131,11 +131,20 @@ target_link_libraries(vigil_tests PRIVATE vigil)
 if(UNIX)
     target_link_libraries(vigil_tests PRIVATE m)
 endif()
+
+# SDL3 contains C++ code (hidapi); Android NDK requires explicit libc++ linkage.
+if(ANDROID)
+    target_link_libraries(vigil_tests PRIVATE c++)
+endif()
 target_include_directories(vigil_tests PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${CMAKE_CURRENT_SOURCE_DIR}/tests
     ${CMAKE_BINARY_DIR}/generated
 )
+
+if(VIGIL_HAS_DESKTOP_PLATFORM)
+    target_compile_definitions(vigil_tests PRIVATE VIGIL_HAS_DESKTOP_PLATFORM)
+endif()
 
 if(VIGIL_USE_LIBFFI AND VIGIL_STDLIB_FFI AND VIGIL_HAS_FFI)
     target_link_libraries(vigil_tests PRIVATE ffi_static)

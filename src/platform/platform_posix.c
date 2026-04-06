@@ -2405,6 +2405,11 @@ int vigil_platform_terminal_width(void)
     return 80;
 }
 
+int vigil_platform_terminal_read_byte(void)
+{
+    return -1;
+}
+
 #endif /* __EMSCRIPTEN__ stubs */
 
 #endif /* TARGET_OS_OSX */

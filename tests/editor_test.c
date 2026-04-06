@@ -146,6 +146,9 @@ TEST(EditorIntegration, VimInstallUninstallRoundTrip)
 
 TEST(EditorIntegration, VscodeInstallUninstallRoundTrip)
 {
+#ifndef VIGIL_HAS_DESKTOP_PLATFORM
+    return; /* system() is unavailable on mobile/web */
+#else
     /* Skip if npm is not available (e.g., CI sanitizer containers). */
     if (system("npm --version > /dev/null 2>&1") != 0)
         return;
@@ -162,6 +165,7 @@ TEST(EditorIntegration, VscodeInstallUninstallRoundTrip)
     EXPECT_EQ(vigil_editor_is_installed("vscode", tmpdir), 0);
 
     vigil_platform_remove_all(tmpdir, NULL);
+#endif /* VIGIL_HAS_DESKTOP_PLATFORM */
 }
 
 TEST(EditorIntegration, NvimInstallUninstallRoundTrip)
