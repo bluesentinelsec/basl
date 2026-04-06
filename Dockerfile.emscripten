@@ -1,0 +1,27 @@
+FROM --platform=linux/amd64 ubuntu:24.04
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git cmake make python3 ca-certificates xz-utils curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Emscripten SDK
+RUN git clone https://github.com/emscripten-core/emsdk.git /opt/emsdk && \
+    cd /opt/emsdk && \
+    ./emsdk install latest && \
+    ./emsdk activate latest
+
+ENV PATH="/opt/emsdk:/opt/emsdk/upstream/emscripten:${PATH}"
+ENV EMSDK="/opt/emsdk"
+
+WORKDIR /vigil
+COPY . .
+
+# Configure + Build — matches CI emscripten job
+RUN . /opt/emsdk/emsdk_env.sh && \
+    emcmake cmake -S . -B build \
+      -DVIGIL_BUILD_TESTS=OFF \
+      -DVIGIL_PLUGIN_SDL=ON \
+      -DCMAKE_BUILD_TYPE=Release && \
+    cmake --build build
+
+CMD ["echo", "Emscripten build succeeded"]
