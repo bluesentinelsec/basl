@@ -131,7 +131,7 @@ TEST(EditorIntegration, IsSupportedRejectsUnknown)
 TEST(EditorIntegration, VimInstallUninstallRoundTrip)
 {
     char tmpdir[256];
-    snprintf(tmpdir, sizeof(tmpdir), "/tmp/vigil_editor_test_vim_%d", __LINE__);
+    snprintf(tmpdir, sizeof(tmpdir), "%s/vigil_editor_test_vim_%d", vigil_test_tmpdir(), __LINE__);
 
     vigil_editor_result_t r = vigil_editor_install("vim", "/usr/local/bin/vigil", tmpdir);
     EXPECT_EQ(r.status, VIGIL_STATUS_OK);
