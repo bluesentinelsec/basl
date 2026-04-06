@@ -443,7 +443,11 @@ VIGIL_API vigil_status_t vigil_platform_setenv(const char *name, const char *val
 
 VIGIL_API const char *vigil_platform_os_name(void)
 {
-#if defined(__APPLE__)
+#if defined(__EMSCRIPTEN__)
+    return "emscripten";
+#elif defined(__ANDROID__)
+    return "android";
+#elif defined(__APPLE__)
     return "darwin";
 #elif defined(__linux__)
     return "linux";
@@ -453,8 +457,6 @@ VIGIL_API const char *vigil_platform_os_name(void)
     return "openbsd";
 #elif defined(__NetBSD__)
     return "netbsd";
-#elif defined(__ANDROID__)
-    return "android";
 #else
     return "posix";
 #endif
