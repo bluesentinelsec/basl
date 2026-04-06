@@ -6,6 +6,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#if defined(__APPLE__)
+#include <TargetConditionals.h>
+#endif
+
 #include "platform/platform.h"
 
 /* ── path helpers using platform layer ───────────────────────────── */
@@ -400,8 +404,8 @@ static vigil_editor_result_t install_vscode(const char *vigil_bin, const char *h
         return result_err("failed to write language config");
     }
 
-    /* Install npm dependencies (not available on iOS/Android) */
-#if !defined(__APPLE__) || !defined(TARGET_OS_IPHONE)
+    /* Install npm dependencies (not available on iOS/Android/Emscripten) */
+#if !defined(__EMSCRIPTEN__) && !defined(__ANDROID__) && !(defined(__APPLE__) && TARGET_OS_IPHONE)
     printf("Running npm install in %s\n", ext_dir);
     {
         char cmd[1200];

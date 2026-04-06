@@ -22,6 +22,7 @@
 #include <unistd.h>
 
 #ifdef __APPLE__
+#include <TargetConditionals.h>
 #include <mach-o/dyld.h>
 #endif
 
@@ -2019,6 +2020,10 @@ static curl_slist_free_all_t p_curl_slist_free_all = NULL;
 
 static int curl_load(void)
 {
+#if defined(__EMSCRIPTEN__) || defined(__ANDROID__) || (defined(__APPLE__) && TARGET_OS_IPHONE)
+    /* libcurl is not available on mobile/web targets. */
+    return 0;
+#else
     if (g_curl_lib)
         return 1;
     const char *libs[] = {"libcurl.so.4", "libcurl.so", "libcurl.dylib", NULL};
@@ -2039,6 +2044,7 @@ static int curl_load(void)
     vigil_platform_dlsym(g_curl_lib, "curl_slist_free_all", (void **)&p_curl_slist_free_all, NULL);
 
     return p_curl_easy_init && p_curl_easy_cleanup && p_curl_easy_setopt && p_curl_easy_perform && p_curl_easy_getinfo;
+#endif
 }
 
 typedef struct
@@ -2172,9 +2178,6 @@ VIGIL_API vigil_status_t vigil_platform_http_request(const vigil_allocator_t *al
 /* TARGET_OS_OSX is 1 only on macOS; it is 0 on iOS, tvOS, watchOS, etc.
  * SecTrustCopyAnchorCertificates exists only in the macOS SDK, so we must
  * guard with TARGET_OS_OSX and not just __APPLE__. */
-#if defined(__APPLE__)
-#include <TargetConditionals.h>
-#endif
 
 #if defined(__APPLE__) && defined(TARGET_OS_OSX) && TARGET_OS_OSX
 
