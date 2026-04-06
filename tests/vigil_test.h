@@ -345,4 +345,14 @@ static int vigil_test_run_all_(void)
 
 #endif /* VIGIL_TEST_IMPLEMENTATION */
 
+/* ── Portable temp directory ──────────────────────────────────────── */
+
+static inline const char *vigil_test_tmpdir(void)
+{
+    const char *d = getenv("TMPDIR");
+    if (d && d[0])
+        return d;
+    return "/tmp";
+}
+
 #endif /* VIGIL_TEST_H */

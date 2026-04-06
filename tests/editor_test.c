@@ -18,7 +18,7 @@ static int editor_test_exists(const char *path)
 
 static void editor_test_tmpdir(char *buf, size_t cap, const char *name, int line)
 {
-    snprintf(buf, cap, "/tmp/vigil_editor_test_%s_%d", name, line);
+    snprintf(buf, cap, "%s/vigil_editor_test_%s_%d", vigil_test_tmpdir(), name, line);
 }
 
 static void editor_test_sublime_syntax_path(char *buf, size_t cap, const char *tmpdir)
@@ -155,7 +155,7 @@ TEST(EditorIntegration, VscodeInstallUninstallRoundTrip)
         return;
 
     char tmpdir[256];
-    snprintf(tmpdir, sizeof(tmpdir), "/tmp/vigil_editor_test_vsc_%d", __LINE__);
+    snprintf(tmpdir, sizeof(tmpdir), "%s/vigil_editor_test_vsc_%d", vigil_test_tmpdir(), __LINE__);
 
     vigil_editor_result_t r = vigil_editor_install("vscode", "/usr/local/bin/vigil", tmpdir);
     EXPECT_EQ(r.status, VIGIL_STATUS_OK);

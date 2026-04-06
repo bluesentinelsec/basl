@@ -2612,7 +2612,7 @@ TEST(VigilStdlibJsonTest, ParseAndFileRoundTrip)
         snprintf(path, sizeof(path), "%s\\vigil-json-%ld.json", tmp, (long)getpid());
     }
 #else
-    snprintf(path, sizeof(path), "/tmp/vigil-json-%ld.json", (long)getpid());
+    snprintf(path, sizeof(path), "%s/vigil-json-%ld.json", vigil_test_tmpdir(), (long)getpid());
 #endif
 
     remove(path);
