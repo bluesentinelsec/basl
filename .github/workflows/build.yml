@@ -253,7 +253,7 @@ jobs:
           script: |
             adb wait-for-device
             adb push build/vigil_tests /data/local/tmp/vigil_tests
-            adb push $(find $ANDROID_NDK_HOME/toolchains -name "libc++_shared.so" | grep x86_64 | head -1) /data/local/tmp/libc++_shared.so
+            adb push $(find $ANDROID_NDK_HOME/toolchains -name "libc++_shared.so" -path "*/x86_64-linux-android/*" | head -1) /data/local/tmp/libc++_shared.so
             adb shell chmod 755 /data/local/tmp/vigil_tests
             adb shell "cd /data/local/tmp && LD_LIBRARY_PATH=/data/local/tmp ./vigil_tests"
 
