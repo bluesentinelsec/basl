@@ -86,5 +86,9 @@ target_include_directories(vigil_core
 target_compile_features(vigil_core PUBLIC c_std_11)
 target_compile_options(vigil_core PRIVATE ${VIGIL_WARNING_FLAGS})
 
+if(VIGIL_HAS_DESKTOP_PLATFORM)
+    target_compile_definitions(vigil_core PRIVATE VIGIL_HAS_DESKTOP_PLATFORM)
+endif()
+
 # Objects may end up in a shared library, so they need PIC on Linux.
 set_target_properties(vigil_core PROPERTIES POSITION_INDEPENDENT_CODE ON)

@@ -400,9 +400,8 @@ static vigil_editor_result_t install_vscode(const char *vigil_bin, const char *h
         return result_err("failed to write language config");
     }
 
-    /* Install npm dependencies (not available on Emscripten; skipped at
-     * runtime on other non-desktop targets if npm is absent). */
-#ifndef __EMSCRIPTEN__
+    /* Install npm dependencies (only on desktop where system() is available). */
+#ifdef VIGIL_HAS_DESKTOP_PLATFORM
     printf("Running npm install in %s\n", ext_dir);
     {
         char cmd[1200];
