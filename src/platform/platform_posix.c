@@ -545,6 +545,40 @@ VIGIL_API vigil_status_t vigil_platform_hostname(const vigil_allocator_t *alloca
     return VIGIL_STATUS_OK;
 }
 
+/* ── Environment variables ───────────────────────────────────────── */
+
+VIGIL_API vigil_status_t vigil_platform_unsetenv(const char *key, vigil_error_t *error)
+{
+    if (unsetenv(key) != 0)
+    {
+        vigil_error_set_literal(error, VIGIL_STATUS_INTERNAL, "unsetenv failed");
+        return VIGIL_STATUS_INTERNAL;
+    }
+    return VIGIL_STATUS_OK;
+}
+
+VIGIL_API vigil_status_t vigil_platform_environ(char ***out_env, size_t *out_count, vigil_error_t *error)
+{
+    extern char **environ;
+    size_t count = 0;
+    if (environ)
+        while (environ[count])
+            count++;
+
+    char **env = (char **)malloc((count + 1) * sizeof(char *));
+    if (!env)
+    {
+        vigil_error_set_literal(error, VIGIL_STATUS_INTERNAL, "out of memory");
+        return VIGIL_STATUS_INTERNAL;
+    }
+    for (size_t i = 0; i < count; i++)
+        env[i] = strdup(environ[i]);
+    env[count] = NULL;
+    *out_env = env;
+    *out_count = count;
+    return VIGIL_STATUS_OK;
+}
+
 #ifndef __EMSCRIPTEN__
 /* ── Process execution ───────────────────────────────────────────── */
 

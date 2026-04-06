@@ -101,6 +101,15 @@ extern "C"
      */
     VIGIL_API vigil_status_t vigil_platform_setenv(const char *name, const char *value, vigil_error_t *error);
 
+    /** Remove an environment variable. */
+    VIGIL_API vigil_status_t vigil_platform_unsetenv(const char *key, vigil_error_t *error);
+
+    /**
+     * Return a snapshot of all environment variables as an array of
+     * "KEY=VALUE" strings. Caller must free each string and the array.
+     */
+    VIGIL_API vigil_status_t vigil_platform_environ(char ***out_env, size_t *out_count, vigil_error_t *error);
+
     /* ── OS information ──────────────────────────────────────────────── */
 
     /** Return a static string identifying the OS: "linux", "darwin", "windows", etc. */
