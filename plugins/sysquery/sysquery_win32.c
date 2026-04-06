@@ -1,18 +1,24 @@
 /* sysquery_win32.c — Windows platform implementation for sysquery plugin. */
 #ifdef _WIN32
+#define _CRT_SECURE_NO_WARNINGS
 
 #include "sysquery_platform.h"
 
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #endif
+#include <stdlib.h>
+/* clang-format off */
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#include <windows.h>
 #include <iphlpapi.h>
+/* clang-format on */
 #include <lmcons.h>
 #include <sddl.h>
 #include <stdio.h>
 #include <string.h>
 #include <tlhelp32.h>
-#include <windows.h>
 
 #pragma comment(lib, "iphlpapi.lib")
 #pragma comment(lib, "ws2_32.lib")

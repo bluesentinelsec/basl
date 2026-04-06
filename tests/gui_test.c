@@ -55,9 +55,10 @@ TEST(GuiPlugin, ModuleRegisters)
     const vigil_native_module_t *mod = get_gui_module(&natives, &error);
     EXPECT_NE(mod, NULL);
     EXPECT_STREQ(mod->name, "gui");
+    vigil_native_registry_free(&natives);
 }
 
-TEST(GuiPlugin, HasSeventeenClasses)
+TEST(GuiPlugin, HasTwentyTwoClasses)
 {
     if (!gui_plugin_available())
         return;
@@ -65,7 +66,7 @@ TEST(GuiPlugin, HasSeventeenClasses)
     vigil_error_t error;
     const vigil_native_module_t *mod = get_gui_module(&natives, &error);
     ASSERT_NE(mod, NULL);
-    EXPECT_EQ(mod->class_count, 17U);
+    EXPECT_EQ(mod->class_count, 22U);
     EXPECT_NE(find_class(mod, "App"), NULL);
     EXPECT_NE(find_class(mod, "Window"), NULL);
     EXPECT_NE(find_class(mod, "Label"), NULL);
@@ -83,6 +84,12 @@ TEST(GuiPlugin, HasSeventeenClasses)
     EXPECT_NE(find_class(mod, "PanedWindow"), NULL);
     EXPECT_NE(find_class(mod, "Canvas"), NULL);
     EXPECT_NE(find_class(mod, "Toplevel"), NULL);
+    EXPECT_NE(find_class(mod, "Scrollbar"), NULL);
+    EXPECT_NE(find_class(mod, "Notebook"), NULL);
+    EXPECT_NE(find_class(mod, "TreeView"), NULL);
+    EXPECT_NE(find_class(mod, "Toolbar"), NULL);
+    EXPECT_NE(find_class(mod, "StatusBar"), NULL);
+    vigil_native_registry_free(&natives);
 }
 
 TEST(GuiPlugin, HasDialogFunctions)
@@ -103,6 +110,7 @@ TEST(GuiPlugin, HasDialogFunctions)
                 found = 1;
         EXPECT_EQ(found, 1);
     }
+    vigil_native_registry_free(&natives);
 }
 
 TEST(GuiPlugin, AppClassMethods)
@@ -119,6 +127,7 @@ TEST(GuiPlugin, AppClassMethods)
     EXPECT_NE(find_method(cls, "main_loop"), NULL);
     EXPECT_NE(find_method(cls, "quit"), NULL);
     EXPECT_NE(find_method(cls, "destroy"), NULL);
+    vigil_native_registry_free(&natives);
 }
 
 TEST(GuiPlugin, WindowClassMethods)
@@ -135,6 +144,7 @@ TEST(GuiPlugin, WindowClassMethods)
         "new", "destroy", "set_title", "get_size", "grid_columnconfigure", "grid_rowconfigure", "on_close"};
     for (size_t i = 0; i < sizeof(expected) / sizeof(expected[0]); i++)
         EXPECT_NE(find_method(cls, expected[i]), NULL);
+    vigil_native_registry_free(&natives);
 }
 
 TEST(GuiPlugin, LabelClassMethods)
@@ -151,6 +161,7 @@ TEST(GuiPlugin, LabelClassMethods)
     EXPECT_NE(find_method(cls, "destroy"), NULL);
     EXPECT_NE(find_method(cls, "set_text"), NULL);
     EXPECT_NE(find_method(cls, "grid"), NULL);
+    vigil_native_registry_free(&natives);
 }
 
 TEST(GuiPlugin, ButtonClassMethods)
@@ -168,6 +179,7 @@ TEST(GuiPlugin, ButtonClassMethods)
     EXPECT_NE(find_method(cls, "set_text"), NULL);
     EXPECT_NE(find_method(cls, "grid"), NULL);
     EXPECT_NE(find_method(cls, "on_click"), NULL);
+    vigil_native_registry_free(&natives);
 }
 
 TEST(GuiPlugin, EntryClassMethods)
@@ -186,6 +198,7 @@ TEST(GuiPlugin, EntryClassMethods)
     EXPECT_NE(find_method(cls, "set"), NULL);
     EXPECT_NE(find_method(cls, "grid"), NULL);
     EXPECT_NE(find_method(cls, "on_change"), NULL);
+    vigil_native_registry_free(&natives);
 }
 
 TEST(GuiPlugin, CheckboxClassMethods)
@@ -205,6 +218,7 @@ TEST(GuiPlugin, CheckboxClassMethods)
     EXPECT_NE(find_method(cls, "set"), NULL);
     EXPECT_NE(find_method(cls, "grid"), NULL);
     EXPECT_NE(find_method(cls, "on_change"), NULL);
+    vigil_native_registry_free(&natives);
 }
 
 TEST(GuiPlugin, SliderClassMethods)
@@ -223,6 +237,7 @@ TEST(GuiPlugin, SliderClassMethods)
     EXPECT_NE(find_method(cls, "set"), NULL);
     EXPECT_NE(find_method(cls, "grid"), NULL);
     EXPECT_NE(find_method(cls, "on_change"), NULL);
+    vigil_native_registry_free(&natives);
 }
 
 TEST(GuiPlugin, SelectClassMethods)
@@ -242,6 +257,7 @@ TEST(GuiPlugin, SelectClassMethods)
     EXPECT_NE(find_method(cls, "set"), NULL);
     EXPECT_NE(find_method(cls, "grid"), NULL);
     EXPECT_NE(find_method(cls, "on_change"), NULL);
+    vigil_native_registry_free(&natives);
 }
 
 TEST(GuiPlugin, TextClassMethods)
@@ -259,6 +275,7 @@ TEST(GuiPlugin, TextClassMethods)
     EXPECT_NE(find_method(cls, "get"), NULL);
     EXPECT_NE(find_method(cls, "set"), NULL);
     EXPECT_NE(find_method(cls, "grid"), NULL);
+    vigil_native_registry_free(&natives);
 }
 
 TEST(GuiPlugin, RadioClassMethods)
@@ -278,6 +295,7 @@ TEST(GuiPlugin, RadioClassMethods)
     EXPECT_NE(find_method(cls, "set"), NULL);
     EXPECT_NE(find_method(cls, "grid"), NULL);
     EXPECT_NE(find_method(cls, "on_change"), NULL);
+    vigil_native_registry_free(&natives);
 }
 
 TEST(GuiPlugin, SpinboxClassMethods)
@@ -296,6 +314,7 @@ TEST(GuiPlugin, SpinboxClassMethods)
     EXPECT_NE(find_method(cls, "set"), NULL);
     EXPECT_NE(find_method(cls, "grid"), NULL);
     EXPECT_NE(find_method(cls, "on_change"), NULL);
+    vigil_native_registry_free(&natives);
 }
 
 TEST(GuiPlugin, FrameClassMethods)
@@ -312,6 +331,7 @@ TEST(GuiPlugin, FrameClassMethods)
     EXPECT_NE(find_method(cls, "destroy"), NULL);
     EXPECT_NE(find_method(cls, "set_label"), NULL);
     EXPECT_NE(find_method(cls, "grid"), NULL);
+    vigil_native_registry_free(&natives);
 }
 
 TEST(GuiPlugin, ListboxClassMethods)
@@ -331,6 +351,7 @@ TEST(GuiPlugin, ListboxClassMethods)
     EXPECT_NE(find_method(cls, "set"), NULL);
     EXPECT_NE(find_method(cls, "grid"), NULL);
     EXPECT_NE(find_method(cls, "on_change"), NULL);
+    vigil_native_registry_free(&natives);
 }
 
 TEST(GuiPlugin, MenuClassMethods)
@@ -347,6 +368,7 @@ TEST(GuiPlugin, MenuClassMethods)
     EXPECT_NE(find_method(cls, "destroy"), NULL);
     EXPECT_NE(find_method(cls, "add_submenu"), NULL);
     EXPECT_NE(find_method(cls, "add_item"), NULL);
+    vigil_native_registry_free(&natives);
 }
 
 TEST(GuiPlugin, PanedWindowClassMethods)
@@ -363,6 +385,7 @@ TEST(GuiPlugin, PanedWindowClassMethods)
     EXPECT_NE(find_method(cls, "destroy"), NULL);
     EXPECT_NE(find_method(cls, "set_position"), NULL);
     EXPECT_NE(find_method(cls, "grid"), NULL);
+    vigil_native_registry_free(&natives);
 }
 
 TEST(GuiPlugin, CanvasClassMethods)
@@ -383,6 +406,7 @@ TEST(GuiPlugin, CanvasClassMethods)
     EXPECT_NE(find_method(cls, "draw_oval"), NULL);
     EXPECT_NE(find_method(cls, "draw_text"), NULL);
     EXPECT_NE(find_method(cls, "grid"), NULL);
+    vigil_native_registry_free(&natives);
 }
 
 TEST(GuiPlugin, AppNewIsStatic)
@@ -398,6 +422,7 @@ TEST(GuiPlugin, AppNewIsStatic)
     const vigil_native_class_method_t *m = find_method(cls, "new");
     ASSERT_NE(m, NULL);
     EXPECT_EQ(m->is_static, 1);
+    vigil_native_registry_free(&natives);
 }
 
 TEST(GuiPlugin, EachClassHasHandleField)
@@ -408,16 +433,18 @@ TEST(GuiPlugin, EachClassHasHandleField)
     vigil_error_t error;
     const vigil_native_module_t *mod = get_gui_module(&natives, &error);
     ASSERT_NE(mod, NULL);
-    static const char *names[] = {"App",     "Window", "Label",       "Button",      "Entry",   "Checkbox",
-                                  "Slider",  "Select", "Text",        "Radiobutton", "Spinbox", "Frame",
-                                  "Listbox", "Menu",   "PanedWindow", "Canvas",      "Toplevel"};
-    for (size_t i = 0; i < 17; i++)
+    static const char *names[] = {"App",      "Window",   "Label",       "Button",      "Entry",    "Checkbox",
+                                  "Slider",   "Select",   "Text",        "Radiobutton", "Spinbox",  "Frame",
+                                  "Listbox",  "Menu",     "PanedWindow", "Canvas",      "Toplevel", "Scrollbar",
+                                  "Notebook", "TreeView", "Toolbar",     "StatusBar"};
+    for (size_t i = 0; i < 22; i++)
     {
         const vigil_native_class_t *cls = find_class(mod, names[i]);
         ASSERT_NE(cls, NULL);
         EXPECT_GE(cls->field_count, 1U);
         EXPECT_STREQ(cls->fields[0].name, "handle");
     }
+    vigil_native_registry_free(&natives);
 }
 
 TEST(GuiPlugin, ModuleHasDoc)
@@ -430,6 +457,7 @@ TEST(GuiPlugin, ModuleHasDoc)
     ASSERT_NE(mod, NULL);
     EXPECT_NE(mod->doc, NULL);
     EXPECT_NE(mod->doc->summary, NULL);
+    vigil_native_registry_free(&natives);
 }
 
 /* ── registration ────────────────────────────────────────────────── */
@@ -437,7 +465,7 @@ TEST(GuiPlugin, ModuleHasDoc)
 void register_gui_tests(void)
 {
     REGISTER_TEST(GuiPlugin, ModuleRegisters);
-    REGISTER_TEST(GuiPlugin, HasSeventeenClasses);
+    REGISTER_TEST(GuiPlugin, HasTwentyTwoClasses);
     REGISTER_TEST(GuiPlugin, HasDialogFunctions);
     REGISTER_TEST(GuiPlugin, AppClassMethods);
     REGISTER_TEST(GuiPlugin, WindowClassMethods);

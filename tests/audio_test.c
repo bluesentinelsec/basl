@@ -46,6 +46,7 @@ TEST(AudioPlugin, ModuleRegisters)
     const vigil_native_module_t *mod = get_audio_module(&natives, &error);
     EXPECT_NE(mod, NULL);
     EXPECT_STREQ(mod->name, "audio");
+    vigil_native_registry_free(&natives);
 }
 
 TEST(AudioPlugin, HasThreeClasses)
@@ -60,6 +61,7 @@ TEST(AudioPlugin, HasThreeClasses)
     EXPECT_NE(find_class(mod, "Engine"), NULL);
     EXPECT_NE(find_class(mod, "Sound"), NULL);
     EXPECT_NE(find_class(mod, "Music"), NULL);
+    vigil_native_registry_free(&natives);
 }
 
 TEST(AudioPlugin, EngineClassMethods)
@@ -75,6 +77,7 @@ TEST(AudioPlugin, EngineClassMethods)
     EXPECT_NE(find_method(cls, "new"), NULL);
     EXPECT_NE(find_method(cls, "destroy"), NULL);
     EXPECT_NE(find_method(cls, "set_volume"), NULL);
+    vigil_native_registry_free(&natives);
 }
 
 TEST(AudioPlugin, SoundClassMethods)
@@ -96,6 +99,7 @@ TEST(AudioPlugin, SoundClassMethods)
     EXPECT_NE(find_method(cls, "set_pitch"), NULL);
     EXPECT_NE(find_method(cls, "set_looping"), NULL);
     EXPECT_NE(find_method(cls, "set_position"), NULL);
+    vigil_native_registry_free(&natives);
 }
 
 TEST(AudioPlugin, MusicClassMethods)
@@ -122,6 +126,7 @@ TEST(AudioPlugin, MusicClassMethods)
     EXPECT_NE(find_method(cls, "duration"), NULL);
     EXPECT_NE(find_method(cls, "fade_in"), NULL);
     EXPECT_NE(find_method(cls, "fade_out"), NULL);
+    vigil_native_registry_free(&natives);
 }
 
 TEST(AudioPlugin, HasListenerFunctions)
@@ -143,6 +148,7 @@ TEST(AudioPlugin, HasListenerFunctions)
     }
     EXPECT_EQ(found_pos, 1);
     EXPECT_EQ(found_dir, 1);
+    vigil_native_registry_free(&natives);
 }
 
 TEST(AudioPlugin, ModuleHasDoc)
@@ -155,6 +161,7 @@ TEST(AudioPlugin, ModuleHasDoc)
     ASSERT_NE(mod, NULL);
     EXPECT_NE(mod->doc, NULL);
     EXPECT_NE(mod->doc->summary, NULL);
+    vigil_native_registry_free(&natives);
 }
 
 void register_audio_tests(void)

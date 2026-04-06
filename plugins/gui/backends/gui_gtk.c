@@ -1646,7 +1646,8 @@ static void *gtk_be_text_create(void *parent)
     G.gtk_widget_set_hexpand(sw, 1);
     G.gtk_widget_set_vexpand(sw, 1);
     if (g_text_view_count < MAX_TEXT_VIEWS)
-        g_text_views[g_text_view_count++] = (typeof(g_text_views[0])){sw, tv};
+        g_text_views[g_text_view_count].sw = sw;
+    g_text_views[g_text_view_count++].tv = tv;
     register_widget_parent(sw, grid);
     return sw;
 }
@@ -1846,7 +1847,8 @@ static void *gtk_be_listbox_create(void *parent)
     G.g_signal_connect_data(lb, "row-selected", (GCallback)on_listbox_row_selected, NULL, NULL, 0);
     /* Map sw → lb for item operations. Reuse text_views array pattern. */
     if (g_text_view_count < MAX_TEXT_VIEWS)
-        g_text_views[g_text_view_count++] = (typeof(g_text_views[0])){sw, lb};
+        g_text_views[g_text_view_count].sw = sw;
+    g_text_views[g_text_view_count++].tv = lb;
     register_widget_parent(sw, grid);
     return sw;
 }
@@ -2310,6 +2312,28 @@ const gui_backend_t gui_backend_gtk = {
     .toplevel_destroy = NULL,
     .toplevel_set_title = NULL,
     .toplevel_set_modal = NULL,
+    .scrollbar_create = NULL,
+    .scrollbar_destroy = NULL,
+    .scrollbar_attach = NULL,
+    .notebook_create = NULL,
+    .notebook_destroy = NULL,
+    .notebook_add_tab = NULL,
+    .notebook_set_selected = NULL,
+    .notebook_get_selected = NULL,
+    .treeview_create = NULL,
+    .treeview_destroy = NULL,
+    .treeview_add_root = NULL,
+    .treeview_add_child = NULL,
+    .treeview_get_selected = NULL,
+    .treeview_expand = NULL,
+    .treeview_collapse = NULL,
+    .toolbar_create = NULL,
+    .toolbar_destroy = NULL,
+    .toolbar_add_button = NULL,
+    .toolbar_add_separator = NULL,
+    .statusbar_create = NULL,
+    .statusbar_destroy = NULL,
+    .statusbar_set_text = NULL,
     .widget_grid = gtk_be_widget_grid,
     .widget_grid_span = gtk_be_widget_grid_span,
     .widget_grid_remove = gtk_be_widget_grid_remove,

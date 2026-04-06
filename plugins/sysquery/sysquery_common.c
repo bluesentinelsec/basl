@@ -34,16 +34,8 @@ int sysquery_common_resolve(const char *hostname, char out[][64], int max_count)
         else
             continue;
 
-#ifdef _WIN32
-        /* Windows inet_ntop needs ws2tcpip.h */
-        DWORD len = 64;
-        struct sockaddr *sa = cur->ai_addr;
-        if (WSAAddressToStringA(sa, (DWORD)cur->ai_addrlen, NULL, out[count], &len) == 0)
-            count++;
-#else
         if (inet_ntop(cur->ai_family, addr, out[count], 64))
             count++;
-#endif
     }
     freeaddrinfo(res);
     return count;

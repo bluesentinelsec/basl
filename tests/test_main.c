@@ -24,6 +24,7 @@ extern void register_fs_tests(void);
 extern void register_gc_tests(void);
 extern void register_gui_tests(void);
 extern void register_audio_tests(void);
+extern void register_sysquery_tests(void);
 #ifdef VIGIL_HAS_STDLIB_HTTP
 extern void register_http_tests(void);
 #endif
@@ -88,6 +89,7 @@ int main(void)
     register_gc_tests();
     register_gui_tests();
     register_audio_tests();
+    register_sysquery_tests();
 #ifdef VIGIL_HAS_STDLIB_HTTP
     register_http_tests();
 #endif
