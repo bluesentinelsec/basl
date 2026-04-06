@@ -15,16 +15,49 @@ if(EMSCRIPTEN
     set(VIGIL_HAS_DESKTOP_PLATFORM OFF)
 endif()
 
-# ── Stdlib module options ────────────────────────────────────────────
-# Desktop-only modules default to ON on desktop, OFF elsewhere.
+# ── Per-capability flags ─────────────────────────────────────────────
+# Android and iOS use platform_posix.c which supports fs, threads, time,
+# sockets. Only ffi (dlopen) and readline (interactive stdin) are truly
+# desktop-only. Emscripten gets its own platform file in Phase 2.
 
-option(VIGIL_STDLIB_FFI "Build ffi stdlib module" ${VIGIL_HAS_DESKTOP_PLATFORM})
-option(VIGIL_STDLIB_FS "Build fs stdlib module" ${VIGIL_HAS_DESKTOP_PLATFORM})
-option(VIGIL_STDLIB_HTTP "Build http stdlib module" ${VIGIL_HAS_DESKTOP_PLATFORM})
-option(VIGIL_STDLIB_NET "Build net stdlib module" ${VIGIL_HAS_DESKTOP_PLATFORM})
-option(VIGIL_STDLIB_READLINE "Build readline stdlib module" ${VIGIL_HAS_DESKTOP_PLATFORM})
-option(VIGIL_STDLIB_THREAD "Build thread stdlib module" ${VIGIL_HAS_DESKTOP_PLATFORM})
-option(VIGIL_STDLIB_TIME "Build time stdlib module" ${VIGIL_HAS_DESKTOP_PLATFORM})
+if(EMSCRIPTEN)
+    set(VIGIL_HAS_FILESYSTEM  ON)
+    # Threads require -pthread and -sUSE_PTHREADS=1 flags.
+    # Disabled until Emscripten CI job adds pthread support.
+    set(VIGIL_HAS_THREADS     OFF)
+    set(VIGIL_HAS_TIME        ON)
+    set(VIGIL_HAS_NETWORK     OFF)  # needs WebSocket proxy — Phase 2
+    set(VIGIL_HAS_HTTP        OFF)
+    set(VIGIL_HAS_FFI         OFF)
+    set(VIGIL_HAS_READLINE    OFF)
+elseif(VIGIL_HAS_DESKTOP_PLATFORM)
+    set(VIGIL_HAS_FILESYSTEM  ON)
+    set(VIGIL_HAS_THREADS     ON)
+    set(VIGIL_HAS_TIME        ON)
+    set(VIGIL_HAS_NETWORK     ON)
+    set(VIGIL_HAS_HTTP        ON)
+    set(VIGIL_HAS_FFI         ON)
+    set(VIGIL_HAS_READLINE    ON)
+else()
+    # Android, iOS — POSIX capable
+    set(VIGIL_HAS_FILESYSTEM  ON)
+    set(VIGIL_HAS_THREADS     ON)
+    set(VIGIL_HAS_TIME        ON)
+    set(VIGIL_HAS_NETWORK     ON)
+    set(VIGIL_HAS_HTTP        ON)
+    set(VIGIL_HAS_FFI         OFF)
+    set(VIGIL_HAS_READLINE    OFF)
+endif()
+
+# ── Stdlib module options ────────────────────────────────────────────
+
+option(VIGIL_STDLIB_FFI "Build ffi stdlib module" ${VIGIL_HAS_FFI})
+option(VIGIL_STDLIB_FS "Build fs stdlib module" ${VIGIL_HAS_FILESYSTEM})
+option(VIGIL_STDLIB_HTTP "Build http stdlib module" ${VIGIL_HAS_HTTP})
+option(VIGIL_STDLIB_NET "Build net stdlib module" ${VIGIL_HAS_NETWORK})
+option(VIGIL_STDLIB_READLINE "Build readline stdlib module" ${VIGIL_HAS_READLINE})
+option(VIGIL_STDLIB_THREAD "Build thread stdlib module" ${VIGIL_HAS_THREADS})
+option(VIGIL_STDLIB_TIME "Build time stdlib module" ${VIGIL_HAS_TIME})
 
 # ── Compiler warning flags ───────────────────────────────────────────
 

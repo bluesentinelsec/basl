@@ -137,7 +137,7 @@ target_include_directories(vigil_tests PRIVATE
     ${CMAKE_BINARY_DIR}/generated
 )
 
-if(VIGIL_USE_LIBFFI AND VIGIL_STDLIB_FFI AND VIGIL_HAS_DESKTOP_PLATFORM)
+if(VIGIL_USE_LIBFFI AND VIGIL_STDLIB_FFI AND VIGIL_HAS_FFI)
     target_link_libraries(vigil_tests PRIVATE ffi_static)
     target_compile_definitions(vigil_tests PRIVATE VIGIL_HAS_LIBFFI)
 endif()

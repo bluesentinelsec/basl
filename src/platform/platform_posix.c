@@ -8,12 +8,16 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifndef __EMSCRIPTEN__
 #include <sys/ioctl.h>
 #include <sys/resource.h>
+#endif
 #include <sys/stat.h>
 #include <sys/time.h>
+#ifndef __EMSCRIPTEN__
 #include <sys/wait.h>
 #include <termios.h>
+#endif
 #include <time.h>
 #include <unistd.h>
 
@@ -320,6 +324,12 @@ vigil_status_t vigil_platform_self_exe(char *out_buf, size_t buf_size, vigil_err
 #endif
 }
 
+#ifdef __EMSCRIPTEN__
+VIGIL_API int64_t vigil_platform_peak_rss_kb(void)
+{
+    return 0;
+}
+#else
 VIGIL_API int64_t vigil_platform_peak_rss_kb(void)
 {
     struct rusage ru;
@@ -331,6 +341,7 @@ VIGIL_API int64_t vigil_platform_peak_rss_kb(void)
     return (int64_t)ru.ru_maxrss; /* KB on Linux */
 #endif
 }
+#endif
 
 vigil_status_t vigil_platform_make_executable(const char *path, vigil_error_t *error)
 {
@@ -530,6 +541,7 @@ VIGIL_API vigil_status_t vigil_platform_hostname(const vigil_allocator_t *alloca
     return VIGIL_STATUS_OK;
 }
 
+#ifndef __EMSCRIPTEN__
 /* ── Process execution ───────────────────────────────────────────── */
 
 VIGIL_API vigil_status_t vigil_platform_exec(const vigil_allocator_t *allocator, const char *const *argv,
@@ -781,6 +793,8 @@ int vigil_platform_terminal_width(void)
     return ws.ws_col;
 }
 
+#endif /* !__EMSCRIPTEN__ — exec, dlopen, terminal */
+
 /* ── Extended filesystem operations ──────────────────────────────── */
 
 VIGIL_API vigil_status_t vigil_platform_copy_file(const char *src, const char *dst, vigil_error_t *error)
@@ -853,6 +867,7 @@ VIGIL_API vigil_status_t vigil_platform_is_file(const char *path, int *out_is_fi
     return VIGIL_STATUS_OK;
 }
 
+#ifndef __EMSCRIPTEN__
 VIGIL_API vigil_status_t vigil_platform_symlink(const char *target, const char *linkpath, vigil_error_t *error)
 {
     if (symlink(target, linkpath) != 0)
@@ -902,7 +917,36 @@ VIGIL_API vigil_status_t vigil_platform_is_symlink(const char *path, int *out_is
     *out_is_symlink = S_ISLNK(st.st_mode) ? 1 : 0;
     return VIGIL_STATUS_OK;
 }
-
+#else
+VIGIL_API vigil_status_t vigil_platform_symlink(const char *t, const char *l, vigil_error_t *e)
+{
+    (void)t;
+    (void)l;
+    vigil_error_set_literal(e, VIGIL_STATUS_UNSUPPORTED, "symlink unsupported on Emscripten");
+    return VIGIL_STATUS_UNSUPPORTED;
+}
+VIGIL_API vigil_status_t vigil_platform_hardlink(const char *t, const char *l, vigil_error_t *e)
+{
+    (void)t;
+    (void)l;
+    vigil_error_set_literal(e, VIGIL_STATUS_UNSUPPORTED, "hardlink unsupported on Emscripten");
+    return VIGIL_STATUS_UNSUPPORTED;
+}
+VIGIL_API vigil_status_t vigil_platform_readlink(const vigil_allocator_t *a, const char *p, char **o, vigil_error_t *e)
+{
+    (void)a;
+    (void)p;
+    (void)o;
+    vigil_error_set_literal(e, VIGIL_STATUS_UNSUPPORTED, "readlink unsupported on Emscripten");
+    return VIGIL_STATUS_UNSUPPORTED;
+}
+VIGIL_API vigil_status_t vigil_platform_is_symlink(const char *p, int *o)
+{
+    (void)p;
+    *o = 0;
+    return VIGIL_STATUS_OK;
+}
+#endif /* !__EMSCRIPTEN__ symlink */
 static vigil_status_t remove_all_impl(const char *path, vigil_error_t *error)
 {
     struct stat st;
@@ -2265,5 +2309,74 @@ int vigil_platform_enumerate_tls_cas(vigil_tls_ca_cb_t cb, void *userdata)
     }
     return -1;
 }
+
+/* ── Emscripten stubs ────────────────────────────────────────────── */
+#ifdef __EMSCRIPTEN__
+
+VIGIL_API vigil_status_t vigil_platform_exec(const vigil_allocator_t *allocator, const char *const *argv,
+                                             char **out_stdout, char **out_stderr, int *out_exit_code,
+                                             vigil_error_t *error)
+{
+    (void)allocator;
+    (void)argv;
+    (void)out_stdout;
+    (void)out_stderr;
+    (void)out_exit_code;
+    vigil_error_set_literal(error, VIGIL_STATUS_UNSUPPORTED, "exec unsupported on Emscripten");
+    return VIGIL_STATUS_UNSUPPORTED;
+}
+
+VIGIL_API vigil_status_t vigil_platform_dlopen(const char *p, void **h, vigil_error_t *e)
+{
+    (void)p;
+    (void)h;
+    vigil_error_set_literal(e, VIGIL_STATUS_UNSUPPORTED, "dlopen unsupported");
+    return VIGIL_STATUS_UNSUPPORTED;
+}
+
+VIGIL_API vigil_status_t vigil_platform_dlsym(void *h, const char *n, void **s, vigil_error_t *e)
+{
+    (void)h;
+    (void)n;
+    (void)s;
+    vigil_error_set_literal(e, VIGIL_STATUS_UNSUPPORTED, "dlsym unsupported");
+    return VIGIL_STATUS_UNSUPPORTED;
+}
+
+VIGIL_API vigil_status_t vigil_platform_dlclose(void *h, vigil_error_t *e)
+{
+    (void)h;
+    vigil_error_set_literal(e, VIGIL_STATUS_UNSUPPORTED, "dlclose unsupported");
+    return VIGIL_STATUS_UNSUPPORTED;
+}
+
+struct vigil_terminal_state
+{
+    int dummy;
+};
+
+int vigil_platform_is_terminal(void)
+{
+    return 0;
+}
+
+vigil_status_t vigil_platform_terminal_raw(vigil_terminal_state_t **out_state, vigil_error_t *error)
+{
+    (void)out_state;
+    vigil_error_set_literal(error, VIGIL_STATUS_UNSUPPORTED, "terminal raw mode unsupported on Emscripten");
+    return VIGIL_STATUS_UNSUPPORTED;
+}
+
+void vigil_platform_terminal_restore(vigil_terminal_state_t *state)
+{
+    (void)state;
+}
+
+int vigil_platform_terminal_width(void)
+{
+    return 80;
+}
+
+#endif /* __EMSCRIPTEN__ stubs */
 
 #endif /* TARGET_OS_OSX */

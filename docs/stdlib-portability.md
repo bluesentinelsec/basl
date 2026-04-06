@@ -18,7 +18,7 @@ VIGIL now has two build profiles that matter for portability work:
 The implementation is not fully at the ideal end state yet. The most important remaining gaps are:
 
 - The portability checks are still heuristic. They enforce layering for the current stdlib surface, but they do not prove that every helper path uses the ideal allocator or ownership pattern.
-- Emscripten now builds against `src/platform/platform_stub.c`, which is the correct layering, but its CI coverage is intentionally a build-smoke job rather than a runtime test matrix.
+- Emscripten now builds against `src/platform/platform_posix.c` with `__EMSCRIPTEN__` guards disabling unsupported features (terminal control, process spawning, dlopen). Android and iOS also use `platform_posix.c` directly.
 
 Those constraints should be treated as the current contract, not as reasons to drift back toward platform-specific stdlib code.
 
@@ -173,3 +173,14 @@ When adding a stdlib module:
 4. Ensure the compiler reports a language-level error when the module is imported but disabled.
 5. Gate module-specific tests using the same option.
 6. Update this document if the portability surface changes.
+
+## Emscripten `fs` Module — Virtual Filesystem Caveat
+
+The `fs` module on Emscripten operates on Emscripten's virtual filesystem (MEMFS by default), not the host OS filesystem. Key implications:
+
+- Files written via `fs.write` exist only in memory and are **lost when the WASM module exits**.
+- To persist files in the browser, mount IDBFS (`FS.mount(IDBFS, {}, '/persist')` from JavaScript).
+- To access real files in Node.js, mount NODEFS (`FS.mount(NODEFS, { root: '.' }, '/local')`).
+- `fs.symlink` and `fs.readlink` return `VIGIL_STATUS_UNSUPPORTED` on Emscripten (MEMFS does not support symlinks).
+
+Vigil scripts using `fs` on web should be aware that the filesystem is ephemeral unless explicitly configured otherwise from the JavaScript host.
