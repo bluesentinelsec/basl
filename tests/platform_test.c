@@ -342,6 +342,7 @@ TEST_F(PlatformTest, RWLockReadThenWriteUnlocks)
 
 /* ── TLS CA enumeration ──────────────────────────────────────────── */
 
+#ifndef __EMSCRIPTEN__
 static int count_tls_cas_cb(const unsigned char *der, size_t len, void *userdata)
 {
     (void)der;
@@ -349,6 +350,7 @@ static int count_tls_cas_cb(const unsigned char *der, size_t len, void *userdata
     (*(int *)userdata)++;
     return 0;
 }
+#endif
 
 TEST_F(PlatformTest, EnumerateTlsCasCallback)
 {
