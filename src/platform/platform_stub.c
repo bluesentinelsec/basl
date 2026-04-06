@@ -217,6 +217,38 @@ vigil_status_t vigil_platform_exec(const vigil_allocator_t *allocator, const cha
     return VIGIL_STATUS_UNSUPPORTED;
 }
 
+vigil_status_t vigil_platform_exec_streaming(const char *const *argv, int *out_exit_code, vigil_error_t *error)
+{
+    (void)argv;
+    (void)out_exit_code;
+    vigil_error_set_literal(error, VIGIL_STATUS_UNSUPPORTED, "not supported");
+    return VIGIL_STATUS_UNSUPPORTED;
+}
+
+vigil_status_t vigil_platform_process_start(const char *const *argv, vigil_process_t **out_process,
+                                            vigil_error_t *error)
+{
+    (void)argv;
+    (void)out_process;
+    vigil_error_set_literal(error, VIGIL_STATUS_UNSUPPORTED, "not supported");
+    return VIGIL_STATUS_UNSUPPORTED;
+}
+
+vigil_status_t vigil_platform_process_wait(vigil_process_t **process, int *out_exit_code, vigil_error_t *error)
+{
+    (void)process;
+    (void)out_exit_code;
+    vigil_error_set_literal(error, VIGIL_STATUS_UNSUPPORTED, "not supported");
+    return VIGIL_STATUS_UNSUPPORTED;
+}
+
+vigil_status_t vigil_platform_process_kill(vigil_process_t **process, vigil_error_t *error)
+{
+    (void)process;
+    vigil_error_set_literal(error, VIGIL_STATUS_UNSUPPORTED, "not supported");
+    return VIGIL_STATUS_UNSUPPORTED;
+}
+
 vigil_status_t vigil_platform_dlopen(const char *path, void **out_handle, vigil_error_t *error)
 {
     (void)path;

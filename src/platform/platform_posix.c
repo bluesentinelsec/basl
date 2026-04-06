@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 #ifndef __EMSCRIPTEN__
+#include <signal.h>
 #include <sys/ioctl.h>
 #include <sys/resource.h>
 #endif
@@ -645,6 +646,91 @@ VIGIL_API vigil_status_t vigil_platform_exec(const vigil_allocator_t *allocator,
         *out_exit_code = WIFEXITED(status) ? WEXITSTATUS(status) : 128 + WTERMSIG(status);
     }
     return VIGIL_STATUS_OK;
+}
+
+/* ── Process handle (non-blocking child management) ──────────────── */
+
+struct vigil_process
+{
+    pid_t pid;
+};
+
+VIGIL_API vigil_status_t vigil_platform_process_start(const char *const *argv, vigil_process_t **out_process,
+                                                      vigil_error_t *error)
+{
+    if (!argv || !argv[0] || !out_process)
+    {
+        vigil_error_set_literal(error, VIGIL_STATUS_INVALID_ARGUMENT, "null argument");
+        return VIGIL_STATUS_INVALID_ARGUMENT;
+    }
+
+    pid_t pid = fork();
+    if (pid < 0)
+    {
+        vigil_error_set_literal(error, VIGIL_STATUS_INTERNAL, "fork failed");
+        return VIGIL_STATUS_INTERNAL;
+    }
+
+    if (pid == 0)
+    {
+        execvp(argv[0], (char *const *)argv);
+        _exit(127);
+    }
+
+    vigil_process_t *proc = (vigil_process_t *)malloc(sizeof(*proc));
+    proc->pid = pid;
+    *out_process = proc;
+    return VIGIL_STATUS_OK;
+}
+
+VIGIL_API vigil_status_t vigil_platform_process_wait(vigil_process_t **process, int *out_exit_code,
+                                                     vigil_error_t *error)
+{
+    if (!process || !*process || !out_exit_code)
+    {
+        vigil_error_set_literal(error, VIGIL_STATUS_INVALID_ARGUMENT, "null argument");
+        return VIGIL_STATUS_INVALID_ARGUMENT;
+    }
+
+    int status = 0;
+    waitpid((*process)->pid, &status, 0);
+    *out_exit_code = WIFEXITED(status) ? WEXITSTATUS(status) : 128 + WTERMSIG(status);
+    free(*process);
+    *process = NULL;
+    return VIGIL_STATUS_OK;
+}
+
+VIGIL_API vigil_status_t vigil_platform_process_kill(vigil_process_t **process, vigil_error_t *error)
+{
+    if (!process || !*process)
+    {
+        vigil_error_set_literal(error, VIGIL_STATUS_INVALID_ARGUMENT, "null argument");
+        return VIGIL_STATUS_INVALID_ARGUMENT;
+    }
+
+    kill((*process)->pid, SIGTERM);
+    int status = 0;
+    waitpid((*process)->pid, &status, 0);
+    free(*process);
+    *process = NULL;
+    return VIGIL_STATUS_OK;
+}
+
+/* exec_streaming is now a convenience wrapper over start + wait. */
+VIGIL_API vigil_status_t vigil_platform_exec_streaming(const char *const *argv, int *out_exit_code,
+                                                       vigil_error_t *error)
+{
+    if (!argv || !argv[0] || !out_exit_code)
+    {
+        vigil_error_set_literal(error, VIGIL_STATUS_INVALID_ARGUMENT, "null argument");
+        return VIGIL_STATUS_INVALID_ARGUMENT;
+    }
+
+    vigil_process_t *proc = NULL;
+    vigil_status_t s = vigil_platform_process_start(argv, &proc, error);
+    if (s != VIGIL_STATUS_OK)
+        return s;
+    return vigil_platform_process_wait(&proc, out_exit_code, error);
 }
 
 /* ── Dynamic library loading ─────────────────────────────────────── */
@@ -2350,6 +2436,45 @@ VIGIL_API vigil_status_t vigil_platform_exec(const vigil_allocator_t *allocator,
     (void)out_stdout;
     (void)out_stderr;
     (void)out_exit_code;
+    vigil_error_set_literal(error, VIGIL_STATUS_UNSUPPORTED, "exec unsupported on Emscripten");
+    return VIGIL_STATUS_UNSUPPORTED;
+}
+
+VIGIL_API vigil_status_t vigil_platform_exec_streaming(const char *const *argv, int *out_exit_code,
+                                                       vigil_error_t *error)
+{
+    (void)argv;
+    (void)out_exit_code;
+    vigil_error_set_literal(error, VIGIL_STATUS_UNSUPPORTED, "exec unsupported on Emscripten");
+    return VIGIL_STATUS_UNSUPPORTED;
+}
+
+struct vigil_process
+{
+    int dummy;
+};
+
+VIGIL_API vigil_status_t vigil_platform_process_start(const char *const *argv, vigil_process_t **out_process,
+                                                      vigil_error_t *error)
+{
+    (void)argv;
+    (void)out_process;
+    vigil_error_set_literal(error, VIGIL_STATUS_UNSUPPORTED, "exec unsupported on Emscripten");
+    return VIGIL_STATUS_UNSUPPORTED;
+}
+
+VIGIL_API vigil_status_t vigil_platform_process_wait(vigil_process_t **process, int *out_exit_code,
+                                                     vigil_error_t *error)
+{
+    (void)process;
+    (void)out_exit_code;
+    vigil_error_set_literal(error, VIGIL_STATUS_UNSUPPORTED, "exec unsupported on Emscripten");
+    return VIGIL_STATUS_UNSUPPORTED;
+}
+
+VIGIL_API vigil_status_t vigil_platform_process_kill(vigil_process_t **process, vigil_error_t *error)
+{
+    (void)process;
     vigil_error_set_literal(error, VIGIL_STATUS_UNSUPPORTED, "exec unsupported on Emscripten");
     return VIGIL_STATUS_UNSUPPORTED;
 }

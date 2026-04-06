@@ -632,6 +632,114 @@ VIGIL_API vigil_status_t vigil_platform_exec(const vigil_allocator_t *allocator,
     return VIGIL_STATUS_OK;
 }
 
+VIGIL_API vigil_status_t vigil_platform_exec_streaming(const char *const *argv, int *out_exit_code,
+                                                       vigil_error_t *error)
+{
+    if (!argv || !argv[0] || !out_exit_code)
+    {
+        vigil_error_set_literal(error, VIGIL_STATUS_INVALID_ARGUMENT, "null argument");
+        return VIGIL_STATUS_INVALID_ARGUMENT;
+    }
+
+    vigil_process_t *proc = NULL;
+    vigil_status_t s = vigil_platform_process_start(argv, &proc, error);
+    if (s != VIGIL_STATUS_OK)
+        return s;
+    return vigil_platform_process_wait(&proc, out_exit_code, error);
+}
+
+/* ── Process handle (non-blocking child management) ──────────────── */
+
+struct vigil_process
+{
+    HANDLE hProcess;
+};
+
+static int win32_build_cmdline(const char *const *argv, char *cmdline, size_t cmdline_size)
+{
+    size_t pos = 0;
+    for (int i = 0; argv[i]; i++)
+    {
+        if (i > 0 && pos < cmdline_size - 1)
+            cmdline[pos++] = ' ';
+        size_t len = strlen(argv[i]);
+        if (pos + len < cmdline_size - 1)
+        {
+            memcpy(cmdline + pos, argv[i], len);
+            pos += len;
+        }
+    }
+    cmdline[pos] = '\0';
+    return 1;
+}
+
+VIGIL_API vigil_status_t vigil_platform_process_start(const char *const *argv, vigil_process_t **out_process,
+                                                      vigil_error_t *error)
+{
+    PROCESS_INFORMATION pi;
+    STARTUPINFOA si;
+    char cmdline[32768];
+
+    if (!argv || !argv[0] || !out_process)
+    {
+        vigil_error_set_literal(error, VIGIL_STATUS_INVALID_ARGUMENT, "null argument");
+        return VIGIL_STATUS_INVALID_ARGUMENT;
+    }
+
+    win32_build_cmdline(argv, cmdline, sizeof(cmdline));
+
+    memset(&si, 0, sizeof(si));
+    si.cb = sizeof(si);
+    memset(&pi, 0, sizeof(pi));
+
+    if (!CreateProcessA(NULL, cmdline, NULL, NULL, TRUE, 0, NULL, NULL, &si, &pi))
+    {
+        vigil_error_set_literal(error, VIGIL_STATUS_INTERNAL, "CreateProcess failed");
+        return VIGIL_STATUS_INTERNAL;
+    }
+
+    CloseHandle(pi.hThread);
+    vigil_process_t *proc = (vigil_process_t *)malloc(sizeof(*proc));
+    proc->hProcess = pi.hProcess;
+    *out_process = proc;
+    return VIGIL_STATUS_OK;
+}
+
+VIGIL_API vigil_status_t vigil_platform_process_wait(vigil_process_t **process, int *out_exit_code,
+                                                     vigil_error_t *error)
+{
+    if (!process || !*process || !out_exit_code)
+    {
+        vigil_error_set_literal(error, VIGIL_STATUS_INVALID_ARGUMENT, "null argument");
+        return VIGIL_STATUS_INVALID_ARGUMENT;
+    }
+
+    DWORD exit_code;
+    WaitForSingleObject((*process)->hProcess, INFINITE);
+    GetExitCodeProcess((*process)->hProcess, &exit_code);
+    *out_exit_code = (int)exit_code;
+    CloseHandle((*process)->hProcess);
+    free(*process);
+    *process = NULL;
+    return VIGIL_STATUS_OK;
+}
+
+VIGIL_API vigil_status_t vigil_platform_process_kill(vigil_process_t **process, vigil_error_t *error)
+{
+    if (!process || !*process)
+    {
+        vigil_error_set_literal(error, VIGIL_STATUS_INVALID_ARGUMENT, "null argument");
+        return VIGIL_STATUS_INVALID_ARGUMENT;
+    }
+
+    TerminateProcess((*process)->hProcess, 1);
+    WaitForSingleObject((*process)->hProcess, INFINITE);
+    CloseHandle((*process)->hProcess);
+    free(*process);
+    *process = NULL;
+    return VIGIL_STATUS_OK;
+}
+
 /* ── Dynamic library loading ─────────────────────────────────────── */
 
 VIGIL_API vigil_status_t vigil_platform_dlopen(const char *path, void **out_handle, vigil_error_t *error)
