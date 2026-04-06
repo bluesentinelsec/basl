@@ -243,9 +243,11 @@ jobs:
           force-avd-creation: false
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
           script: |
+            adb wait-for-device
             adb push build/vigil_tests /data/local/tmp/vigil_tests
             adb shell chmod 755 /data/local/tmp/vigil_tests
-            adb shell /data/local/tmp/vigil_tests
+            adb shell "cd /data/local/tmp && ./vigil_tests; echo EXIT_CODE=\$?" | tee /tmp/android_test.log
+            grep -q "EXIT_CODE=0" /tmp/android_test.log
 
   ios:
     timeout-minutes: 15
@@ -288,7 +290,7 @@ jobs:
           echo "DEVICE_UDID=$DEVICE" >> "$GITHUB_ENV"
 
       - name: Run tests on iOS simulator
-        run: xcrun simctl spawn "$DEVICE_UDID" ./build/vigil_tests
+        run: xcrun simctl spawn "$DEVICE_UDID" "$PWD/build/vigil_tests"
 
       - name: Shutdown simulator
         if: always()

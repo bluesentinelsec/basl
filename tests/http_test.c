@@ -125,6 +125,8 @@ TEST(VigilHttpTest, ParseUrlLoopback)
 
 /* ── Loopback test server ────────────────────────────────────────── */
 
+#ifndef __EMSCRIPTEN__
+
 #define TEST_PORT 18787
 
 typedef struct
@@ -344,6 +346,8 @@ TEST(VigilHttpTest, SocketRequestLargeHeadersSucceed)
     stop_test_server(&srv, thr);
 }
 
+#endif /* !__EMSCRIPTEN__ — socket tests */
+
 TEST(VigilHttpTest, ParseUrlUppercaseScheme)
 {
     parsed_url_t u;
@@ -459,6 +463,8 @@ TEST(VigilHttpTest, RedirectChangesMethodFalse)
 
 /* ── do_request loopback tests ───────────────────────────────────── */
 
+#ifndef __EMSCRIPTEN__
+
 #define DO_REQ_PORT 18792
 #define DO_REQ_REDIR_PORT 18793
 #define DO_REQ_DEST_PORT 18794
@@ -547,6 +553,8 @@ TEST(VigilHttpTest, DoRequestHttpsFallbackFails)
         response_free(&resp);
     }
 }
+
+#endif /* !__EMSCRIPTEN__ — do_request tests */
 
 /* ── Additional URL parsing edge cases ───────────────────────────── */
 
@@ -643,6 +651,8 @@ TEST(VigilHttpTest, BuildRequestHeadersCookieOnly)
 }
 
 /* ── do_request: 307 preserves method ───────────────────────────── */
+
+#ifndef __EMSCRIPTEN__
 
 #define REDIR_307_PORT 18795
 #define DEST_307_PORT 18796
@@ -790,6 +800,8 @@ TEST(VigilHttpTest, DoRequestRedirectLocationTooLong)
     stop_test_server(&srv, thr);
 }
 
+#endif /* !__EMSCRIPTEN__ — redirect tests */
+
 /* ── Response free safety ────────────────────────────────────────── */
 
 TEST(VigilHttpTest, ResponseFreeNull)
@@ -814,6 +826,8 @@ TEST(VigilHttpTest, ParseHttpResponseMalformed)
 }
 
 /* ── Server round-trip tests ──────────────────────────────────────── */
+
+#ifndef __EMSCRIPTEN__
 
 #define SERVER_TEST_PORT 18788
 
@@ -975,6 +989,8 @@ TEST(VigilHttpTest, ServerPostRoundTrip)
     EXPECT_STREQ(ctx.received_method, "POST");
     EXPECT_TRUE(strcmp(ctx.received_path, "/submit") == 0);
 }
+
+#endif /* !__EMSCRIPTEN__ — server tests */
 
 /* ── BearSSL TLS loopback tests ──────────────────────────────────── */
 
@@ -1229,6 +1245,8 @@ TEST(VigilHttpTest, EnsureHdrCapacityGrows)
 
 /* ── parse_incoming_request loopback tests ────────────────────────── */
 
+#ifndef __EMSCRIPTEN__
+
 #define PARSE_INCOMING_PORT 18800
 
 typedef struct
@@ -1354,6 +1372,8 @@ TEST(VigilHttpTest, ParseIncomingRequestMalformed)
     EXPECT_EQ(rc, -1);
 }
 
+#endif /* !__EMSCRIPTEN__ — parse_incoming_request loopback */
+
 /* ── find_location_header tests ───────────────────────────────────── */
 
 TEST(VigilHttpTest, FindLocationHeaderBasic)
@@ -1452,6 +1472,8 @@ TEST(VigilHttpTest, CollectCookiesWithAttributes)
 
 /* ── do_request: 304 must not be followed as a redirect ──────────── */
 
+#ifndef __EMSCRIPTEN__
+
 #define DO_REQ_304_PORT 18796
 
 TEST(VigilHttpTest, DoRequest304NotRedirected)
@@ -1479,6 +1501,8 @@ TEST(VigilHttpTest, DoRequest304NotRedirected)
 
 /* ── parse_content_length: value too large ───────────────────────── */
 
+#endif /* !__EMSCRIPTEN__ — DoRequest304 */
+
 TEST(VigilHttpTest, ParseContentLengthTooLarge)
 {
     /* Value exceeding HTTP_MAX_BODY_BYTES must return -1. */
@@ -1486,6 +1510,8 @@ TEST(VigilHttpTest, ParseContentLengthTooLarge)
     int rc = parse_content_length("Content-Length: 99999999999\r\n", &out);
     EXPECT_EQ(rc, -1);
 }
+
+#ifndef __EMSCRIPTEN__
 
 /* ── recv_body_bytes: pre-buffered body (no socket needed) ─────────  */
 
@@ -1634,6 +1660,8 @@ TEST(VigilHttpTest, SocketRequestLargeResponse)
     free(canned);
 }
 
+#endif /* !__EMSCRIPTEN__ — remaining socket tests */
+
 /* ── Test Registration ───────────────────────────────────────────── */
 
 void register_http_tests(void)
@@ -1704,9 +1732,11 @@ void register_http_tests(void)
     REGISTER_TEST(VigilHttpTest, ParseContentLengthLowercase);
     REGISTER_TEST(VigilHttpTest, EnsureHdrCapacityNoGrowthNeeded);
     REGISTER_TEST(VigilHttpTest, EnsureHdrCapacityGrows);
+#ifndef __EMSCRIPTEN__
     REGISTER_TEST(VigilHttpTest, ParseIncomingRequestGet);
     REGISTER_TEST(VigilHttpTest, ParseIncomingRequestPost);
     REGISTER_TEST(VigilHttpTest, ParseIncomingRequestMalformed);
+#endif
     /* find_location_header */
     REGISTER_TEST(VigilHttpTest, FindLocationHeaderBasic);
     REGISTER_TEST(VigilHttpTest, FindLocationHeaderLowercase);
