@@ -258,7 +258,7 @@ TEST(VigilFsTest, TempFile)
 
 /* ── Symlink operations ──────────────────────────────────────────── */
 
-#ifndef _WIN32
+#if !defined(_WIN32) && !defined(__EMSCRIPTEN__)
 TEST(VigilFsTest, SymlinkCreateAndRead)
 {
     char target[256], link[256];
@@ -361,7 +361,7 @@ void register_fs_tests(void)
     REGISTER_TEST(VigilFsTest, HomeDir);
     REGISTER_TEST(VigilFsTest, ConfigDir);
     REGISTER_TEST(VigilFsTest, TempFile);
-#ifndef _WIN32
+#if !defined(_WIN32) && !defined(__EMSCRIPTEN__)
     REGISTER_TEST(VigilFsTest, SymlinkCreateAndRead);
 #endif
     REGISTER_TEST(VigilFsTest, RemoveAll);

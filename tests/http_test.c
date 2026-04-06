@@ -994,7 +994,7 @@ TEST(VigilHttpTest, ServerPostRoundTrip)
 
 /* ── BearSSL TLS loopback tests ──────────────────────────────────── */
 
-#if defined(VIGIL_ENABLE_BEARSSL_TLS) && defined(VIGIL_TLS_TEST_CERT_AVAILABLE)
+#if defined(VIGIL_ENABLE_BEARSSL_TLS) && defined(VIGIL_TLS_TEST_CERT_AVAILABLE) && !defined(__EMSCRIPTEN__)
 #ifdef _MSC_VER
 #pragma warning(push)
 #pragma warning(disable : 4244 4267)
@@ -1765,7 +1765,7 @@ void register_http_tests(void)
     REGISTER_TEST(VigilHttpTest, ParseIncomingRequestBodyTooLarge);
     REGISTER_TEST(VigilHttpTest, SocketRequestLargeResponse);
 #endif
-#if defined(VIGIL_ENABLE_BEARSSL_TLS) && defined(VIGIL_TLS_TEST_CERT_AVAILABLE)
+#if defined(VIGIL_ENABLE_BEARSSL_TLS) && defined(VIGIL_TLS_TEST_CERT_AVAILABLE) && !defined(__EMSCRIPTEN__)
     /* BearSSL TLS */
     REGISTER_TEST(VigilHttpTest, BearSslHttpsGet);
     REGISTER_TEST(VigilHttpTest, BearSslHttpsPost);
