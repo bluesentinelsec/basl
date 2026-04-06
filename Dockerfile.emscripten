@@ -1,24 +1,11 @@
-FROM --platform=linux/amd64 ubuntu:24.04
+FROM emscripten/emsdk:latest
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    git cmake make python3 ca-certificates xz-utils curl nodejs \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install Emscripten SDK
-RUN git clone https://github.com/emscripten-core/emsdk.git /opt/emsdk && \
-    cd /opt/emsdk && \
-    ./emsdk install latest && \
-    ./emsdk activate latest
-
-ENV PATH="/opt/emsdk:/opt/emsdk/upstream/emscripten:${PATH}"
-ENV EMSDK="/opt/emsdk"
+RUN apt-get update && apt-get install -y --no-install-recommends cmake && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /vigil
 COPY . .
 
-# Configure + Build — matches CI emscripten job
-RUN . /opt/emsdk/emsdk_env.sh && \
-    emcmake cmake -S . -B build \
+RUN emcmake cmake -S . -B build \
       -DVIGIL_BUILD_TESTS=ON \
       -DVIGIL_PLUGIN_SDL=ON \
       -DVIGIL_PLUGIN_GUI=ON \
@@ -29,5 +16,4 @@ RUN . /opt/emsdk/emsdk_env.sh && \
       -DCMAKE_EXE_LINKER_FLAGS="-pthread -sUSE_PTHREADS=1 -lwebsocket.js -sEXIT_RUNTIME=1 -sALLOW_MEMORY_GROWTH=1 -sNODERAWFS=1" && \
     cmake --build build
 
-# Run tests via Node.js
 CMD ["node", "build/vigil_tests.js"]
