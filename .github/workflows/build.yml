@@ -234,6 +234,13 @@ jobs:
       - name: Build
         run: cmake --build build --config Release
 
+      - name: Enable KVM
+        if: matrix.run_tests
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
       - name: Run tests on Android emulator
         if: matrix.run_tests
         uses: reactivecircus/android-emulator-runner@v2
@@ -273,10 +280,13 @@ jobs:
         run: cmake --build build --config Release
 
       - name: Run tests
-        run: ./build/vigil_tests
+        run: |
+          TEST_BIN=$(find build -name vigil_tests -type f | head -1)
+          echo "Running: $TEST_BIN"
+          "$TEST_BIN"
 
   emscripten:
-    timeout-minutes: 15
+    timeout-minutes: 30
     runs-on: ubuntu-latest
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
