@@ -17,6 +17,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#if defined(__APPLE__)
+#include <TargetConditionals.h>
+#endif
+
 #include "gui_backend.h"
 
 /* ── Backend selection ───────────────────────────────────────────── */
@@ -28,7 +32,21 @@ const gui_backend_t *gui_backend_select(void)
     if (force && strcmp(force, "sdl") == 0)
         return &gui_backend_sdl;
 #endif
-#if defined(__APPLE__)
+#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
+    /* Mobile/web: SDL is the primary backend. */
+#ifdef VIGIL_GUI_SDL_BACKEND
+    return &gui_backend_sdl;
+#else
+    return &gui_backend_stub;
+#endif
+#elif defined(__APPLE__) && TARGET_OS_IPHONE
+    /* iOS: SDL is the primary backend. */
+#ifdef VIGIL_GUI_SDL_BACKEND
+    return &gui_backend_sdl;
+#else
+    return &gui_backend_stub;
+#endif
+#elif defined(__APPLE__)
     return &gui_backend_cocoa;
 #elif defined(_WIN32)
     return &gui_backend_win32;
