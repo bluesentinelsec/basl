@@ -1983,6 +1983,32 @@ VIGIL_API vigil_status_t vigil_platform_udp_recv(vigil_socket_t sock, void *buf,
 
 /* ── HTTP client via libcurl (runtime-loaded) ────────────────────── */
 
+#if defined(__EMSCRIPTEN__) || defined(__ANDROID__) || (defined(__APPLE__) && TARGET_OS_IPHONE)
+
+/* libcurl is not available on mobile/web targets. Return UNSUPPORTED so
+ * the stdlib http module falls back to BearSSL or raw sockets. */
+VIGIL_API vigil_status_t vigil_platform_http_request(const vigil_allocator_t *allocator, const char *method,
+                                                     const char *url, const char *headers, const char *body,
+                                                     size_t body_len, vigil_http_response_t *out, vigil_error_t *error)
+{
+    (void)allocator;
+    (void)method;
+    (void)url;
+    (void)headers;
+    (void)body;
+    (void)body_len;
+    (void)out;
+    if (error)
+    {
+        error->type = VIGIL_STATUS_UNSUPPORTED;
+        error->value = "platform HTTP client not available";
+        error->length = 33;
+    }
+    return VIGIL_STATUS_UNSUPPORTED;
+}
+
+#else /* desktop — libcurl via dlopen */
+
 typedef void CURL;
 typedef int CURLcode;
 #define CURLE_OK 0
@@ -2020,10 +2046,6 @@ static curl_slist_free_all_t p_curl_slist_free_all = NULL;
 
 static int curl_load(void)
 {
-#if defined(__EMSCRIPTEN__) || defined(__ANDROID__) || (defined(__APPLE__) && TARGET_OS_IPHONE)
-    /* libcurl is not available on mobile/web targets. */
-    return 0;
-#else
     if (g_curl_lib)
         return 1;
     const char *libs[] = {"libcurl.so.4", "libcurl.so", "libcurl.dylib", NULL};
@@ -2044,7 +2066,6 @@ static int curl_load(void)
     vigil_platform_dlsym(g_curl_lib, "curl_slist_free_all", (void **)&p_curl_slist_free_all, NULL);
 
     return p_curl_easy_init && p_curl_easy_cleanup && p_curl_easy_setopt && p_curl_easy_perform && p_curl_easy_getinfo;
-#endif
 }
 
 typedef struct
@@ -2172,6 +2193,8 @@ VIGIL_API vigil_status_t vigil_platform_http_request(const vigil_allocator_t *al
     p_curl_easy_cleanup(curl);
     return VIGIL_STATUS_OK;
 }
+
+#endif /* desktop libcurl / mobile stub */
 
 /* ── TLS certificate store ──────────────────────────────────────── */
 

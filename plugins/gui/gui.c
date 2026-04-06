@@ -32,7 +32,8 @@ const gui_backend_t *gui_backend_select(void)
     if (force && strcmp(force, "sdl") == 0)
         return &gui_backend_sdl;
 #endif
-    /* Mobile/web: SDL is the primary backend. */
+
+/* Mobile/web: SDL is the primary backend. */
 #if defined(__EMSCRIPTEN__) || defined(__ANDROID__) || (defined(__APPLE__) && TARGET_OS_IPHONE)
 #ifdef VIGIL_GUI_SDL_BACKEND
     return &gui_backend_sdl;
