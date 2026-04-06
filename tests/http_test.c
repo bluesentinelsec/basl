@@ -1646,12 +1646,14 @@ void register_http_tests(void)
     REGISTER_TEST(VigilHttpTest, ParseUrlNoScheme);
     REGISTER_TEST(VigilHttpTest, ParseUrlLoopback);
     /* Socket client */
+#ifndef __EMSCRIPTEN__
     REGISTER_TEST(VigilHttpTest, SocketGetBasic);
     REGISTER_TEST(VigilHttpTest, SocketPostBody);
     REGISTER_TEST(VigilHttpTest, Socket404Response);
     REGISTER_TEST(VigilHttpTest, SocketEmptyBody);
     REGISTER_TEST(VigilHttpTest, SocketConnectionRefused);
     REGISTER_TEST(VigilHttpTest, SocketRequestLargeHeadersSucceed);
+#endif
     /* Cookie jar helpers */
     REGISTER_TEST(VigilHttpTest, CookieJarAppend);
     REGISTER_TEST(VigilHttpTest, CookieJarAppendNoOp);
@@ -1663,9 +1665,11 @@ void register_http_tests(void)
     REGISTER_TEST(VigilHttpTest, RedirectChangesMethodTrue);
     REGISTER_TEST(VigilHttpTest, RedirectChangesMethodFalse);
     /* do_request integration */
+#ifndef __EMSCRIPTEN__
     REGISTER_TEST(VigilHttpTest, DoRequestLoopback);
     REGISTER_TEST(VigilHttpTest, DoRequestFollowsRedirect);
     REGISTER_TEST(VigilHttpTest, DoRequestHttpsFallbackFails);
+#endif
     /* URL parsing extras */
     REGISTER_TEST(VigilHttpTest, ParseUrlUppercaseScheme);
     REGISTER_TEST(VigilHttpTest, ParseUrlPathTooLong);
@@ -1679,14 +1683,18 @@ void register_http_tests(void)
     REGISTER_TEST(VigilHttpTest, CollectCookiesNoTrailingCrlf);
     REGISTER_TEST(VigilHttpTest, BuildRequestHeadersCookieOnly);
     /* do_request extras */
+#ifndef __EMSCRIPTEN__
     REGISTER_TEST(VigilHttpTest, DoRequest307PreservesMethod);
     REGISTER_TEST(VigilHttpTest, DoRequestRedirectLocationTooLong);
+#endif
     /* Misc */
     REGISTER_TEST(VigilHttpTest, ResponseFreeNull);
     REGISTER_TEST(VigilHttpTest, ParseHttpResponseMalformed);
     /* Server */
+#ifndef __EMSCRIPTEN__
     REGISTER_TEST(VigilHttpTest, ServerRoundTrip);
     REGISTER_TEST(VigilHttpTest, ServerPostRoundTrip);
+#endif
     /* Server-side request parsing helpers */
     REGISTER_TEST(VigilHttpTest, ParseRequestLineBasic);
     REGISTER_TEST(VigilHttpTest, ParseRequestLineMissingPath);
@@ -1714,15 +1722,19 @@ void register_http_tests(void)
     /* collect_cookies extras */
     REGISTER_TEST(VigilHttpTest, CollectCookiesWithAttributes);
     /* do_request extras */
+#ifndef __EMSCRIPTEN__
     REGISTER_TEST(VigilHttpTest, DoRequest304NotRedirected);
+#endif
     /* parse_content_length / recv_body_bytes / recv_request_body coverage */
     REGISTER_TEST(VigilHttpTest, ParseContentLengthTooLarge);
+#ifndef __EMSCRIPTEN__
     REGISTER_TEST(VigilHttpTest, RecvBodyBytesPreBuffered);
     REGISTER_TEST(VigilHttpTest, RecvBodyBytesFromSocket);
     REGISTER_TEST(VigilHttpTest, RecvRequestBodyWithRecv);
     REGISTER_TEST(VigilHttpTest, ParseIncomingRequestConnectionClosed);
     REGISTER_TEST(VigilHttpTest, ParseIncomingRequestBodyTooLarge);
     REGISTER_TEST(VigilHttpTest, SocketRequestLargeResponse);
+#endif
 #if defined(VIGIL_ENABLE_BEARSSL_TLS) && defined(VIGIL_TLS_TEST_CERT_AVAILABLE)
     /* BearSSL TLS */
     REGISTER_TEST(VigilHttpTest, BearSslHttpsGet);

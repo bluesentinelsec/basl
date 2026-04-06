@@ -147,6 +147,7 @@ TEST(EditorIntegration, VimInstallUninstallRoundTrip)
 TEST(EditorIntegration, VscodeInstallUninstallRoundTrip)
 {
 #ifndef VIGIL_HAS_DESKTOP_PLATFORM
+    (void)vigil_test_failed_;
     return; /* system() is unavailable on mobile/web */
 #else
     /* Skip if npm is not available (e.g., CI sanitizer containers). */
