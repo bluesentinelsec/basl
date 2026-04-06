@@ -305,7 +305,7 @@ jobs:
           xcrun simctl delete "$DEVICE_UDID" 2>/dev/null || true
 
   emscripten:
-    timeout-minutes: 30
+    timeout-minutes: 15
     runs-on: ubuntu-latest
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -327,7 +327,6 @@ jobs:
           -DVIGIL_PLUGIN_SYSQUERY=ON
           -DCMAKE_BUILD_TYPE=Release
           -DCMAKE_C_FLAGS="-pthread"
-          -DCMAKE_EXE_LINKER_FLAGS="-pthread -sUSE_PTHREADS=1 -lwebsocket.js -sEXIT_RUNTIME=1 -sALLOW_MEMORY_GROWTH=1 -sNODERAWFS=1"
 
       - name: Build
         run: cmake --build build
