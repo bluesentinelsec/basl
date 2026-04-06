@@ -450,6 +450,75 @@ TEST_F(PlatformTest, FileExistsReturnsValidStatus)
     EXPECT_EQ(exists, 1); /* "." always exists */
 }
 
+#ifdef VIGIL_HAS_DESKTOP_PLATFORM
+TEST_F(PlatformTest, ExecStreamingRunsChild)
+{
+    int exit_code = -1;
+#ifdef _WIN32
+    const char *argv[] = {"cmd", "/c", "echo", "hello", NULL};
+#else
+    const char *argv[] = {"echo", "hello", NULL};
+#endif
+    vigil_status_t s = vigil_platform_exec_streaming(argv, &exit_code, &FIXTURE(PlatformTest)->error);
+    EXPECT_EQ(s, VIGIL_STATUS_OK);
+    EXPECT_EQ(exit_code, 0);
+}
+
+TEST_F(PlatformTest, ExecStreamingBadCommandFails)
+{
+    int exit_code = -1;
+    const char *argv[] = {"vigil_nonexistent_command_xyz", NULL};
+    vigil_platform_exec_streaming(argv, &exit_code, &FIXTURE(PlatformTest)->error);
+    EXPECT_NE(exit_code, 0);
+}
+
+TEST_F(PlatformTest, ExecStreamingNullArgvFails)
+{
+    int exit_code = 0;
+    vigil_status_t s = vigil_platform_exec_streaming(NULL, &exit_code, &FIXTURE(PlatformTest)->error);
+    EXPECT_EQ(s, VIGIL_STATUS_INVALID_ARGUMENT);
+}
+
+TEST_F(PlatformTest, ProcessStartAndWait)
+{
+#ifdef _WIN32
+    const char *argv[] = {"cmd", "/c", "echo", "hello", NULL};
+#else
+    const char *argv[] = {"echo", "hello", NULL};
+#endif
+    vigil_process_t *proc = NULL;
+    int exit_code = -1;
+    ASSERT_EQ(vigil_platform_process_start(argv, &proc, &FIXTURE(PlatformTest)->error), VIGIL_STATUS_OK);
+    ASSERT_EQ(vigil_platform_process_wait(&proc, &exit_code, &FIXTURE(PlatformTest)->error), VIGIL_STATUS_OK);
+    EXPECT_EQ(exit_code, 0);
+    EXPECT_EQ(proc, NULL);
+}
+
+TEST_F(PlatformTest, ProcessStartAndKill)
+{
+#ifdef _WIN32
+    const char *argv[] = {"cmd", "/c", "ping", "-n", "60", "127.0.0.1", NULL};
+#else
+    const char *argv[] = {"sleep", "60", NULL};
+#endif
+    vigil_process_t *proc = NULL;
+    vigil_status_t s = vigil_platform_process_start(argv, &proc, &FIXTURE(PlatformTest)->error);
+    EXPECT_EQ(s, VIGIL_STATUS_OK);
+    ASSERT_NE(proc, NULL);
+
+    s = vigil_platform_process_kill(&proc, &FIXTURE(PlatformTest)->error);
+    EXPECT_EQ(s, VIGIL_STATUS_OK);
+    EXPECT_EQ(proc, NULL);
+}
+
+TEST_F(PlatformTest, ProcessStartNullArgvFails)
+{
+    vigil_process_t *proc = NULL;
+    vigil_status_t s = vigil_platform_process_start(NULL, &proc, &FIXTURE(PlatformTest)->error);
+    EXPECT_EQ(s, VIGIL_STATUS_INVALID_ARGUMENT);
+}
+#endif /* VIGIL_HAS_DESKTOP_PLATFORM */
+
 void register_platform_tests(void)
 {
     REGISTER_TEST_F(PlatformTest, WriteAndReadFile);
@@ -471,4 +540,12 @@ void register_platform_tests(void)
     REGISTER_TEST_F(PlatformTest, LineEditorReadlineFallbackEofFails);
     REGISTER_TEST_F(PlatformTest, FileExistsReturnsValidStatus);
     REGISTER_TEST_F(PlatformTest, EnumerateTlsCasCallback);
+#ifdef VIGIL_HAS_DESKTOP_PLATFORM
+    REGISTER_TEST_F(PlatformTest, ExecStreamingRunsChild);
+    REGISTER_TEST_F(PlatformTest, ExecStreamingBadCommandFails);
+    REGISTER_TEST_F(PlatformTest, ExecStreamingNullArgvFails);
+    REGISTER_TEST_F(PlatformTest, ProcessStartAndWait);
+    REGISTER_TEST_F(PlatformTest, ProcessStartAndKill);
+    REGISTER_TEST_F(PlatformTest, ProcessStartNullArgvFails);
+#endif
 }

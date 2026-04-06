@@ -132,6 +132,40 @@ extern "C"
                                                  char **out_stdout, char **out_stderr, int *out_exit_code,
                                                  vigil_error_t *error);
 
+    /**
+     * Execute a child process with stdio inherited from the parent (live output).
+     * The child's stdout and stderr flow directly to the terminal.
+     * Returns the child's exit code via *out_exit_code.
+     * Use this for long-running build tools (gradle, xcodebuild, emcc, adb logcat).
+     * Returns VIGIL_STATUS_UNSUPPORTED on stub/embedded platforms.
+     */
+    VIGIL_API vigil_status_t vigil_platform_exec_streaming(const char *const *argv, int *out_exit_code,
+                                                           vigil_error_t *error);
+
+    /** Opaque handle to a running child process. */
+    typedef struct vigil_process vigil_process_t;
+
+    /**
+     * Start a child process with inherited stdio (non-blocking).
+     * Returns a process handle that must be cleaned up with _wait or _kill.
+     */
+    VIGIL_API vigil_status_t vigil_platform_process_start(const char *const *argv, vigil_process_t **out_process,
+                                                          vigil_error_t *error);
+
+    /**
+     * Wait for a child process to exit and retrieve its exit code.
+     * Frees the process handle. *out_process is set to NULL.
+     */
+    VIGIL_API vigil_status_t vigil_platform_process_wait(vigil_process_t **process, int *out_exit_code,
+                                                         vigil_error_t *error);
+
+    /**
+     * Send a termination signal to a child process, wait for it to exit,
+     * and free the handle. *out_process is set to NULL.
+     * Uses SIGTERM on POSIX, TerminateProcess on Windows.
+     */
+    VIGIL_API vigil_status_t vigil_platform_process_kill(vigil_process_t **process, vigil_error_t *error);
+
     /* ── Dynamic library loading ─────────────────────────────────────── */
 
     /**
