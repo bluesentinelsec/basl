@@ -203,15 +203,17 @@ jobs:
           pytest integration_tests/ -v
 
   android:
-    timeout-minutes: 10
+    timeout-minutes: 20
     runs-on: ubuntu-latest
 
     strategy:
       fail-fast: false
       matrix:
-        abi:
-          - arm64-v8a
-          - x86_64
+        include:
+          - abi: arm64-v8a
+            run_tests: false
+          - abi: x86_64
+            run_tests: true
 
     steps:
       - uses: actions/checkout@v6
@@ -222,17 +224,31 @@ jobs:
           -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake
           -DANDROID_ABI=${{ matrix.abi }}
           -DANDROID_PLATFORM=android-21
-          -DVIGIL_BUILD_TESTS=OFF
+          -DVIGIL_BUILD_TESTS=${{ matrix.run_tests && 'ON' || 'OFF' }}
           -DVIGIL_PLUGIN_SDL=ON
           -DVIGIL_PLUGIN_GUI=ON
           -DVIGIL_PLUGIN_AUDIO=ON
+          -DVIGIL_PLUGIN_SYSQUERY=ON
           -DCMAKE_BUILD_TYPE=Release
 
       - name: Build
         run: cmake --build build --config Release
 
+      - name: Run tests on Android emulator
+        if: matrix.run_tests
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 30
+          arch: x86_64
+          force-avd-creation: false
+          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
+          script: |
+            adb push build/vigil_tests /data/local/tmp/vigil_tests
+            adb shell chmod 755 /data/local/tmp/vigil_tests
+            adb shell /data/local/tmp/vigil_tests
+
   ios:
-    timeout-minutes: 10
+    timeout-minutes: 15
     runs-on: macos-latest
 
     steps:
@@ -245,15 +261,41 @@ jobs:
           -DCMAKE_OSX_ARCHITECTURES=arm64
           -DCMAKE_OSX_SYSROOT=iphonesimulator
           -DCMAKE_OSX_DEPLOYMENT_TARGET=15.0
-          -DVIGIL_BUILD_TESTS=OFF
+          -DVIGIL_BUILD_TESTS=ON
+          -DVIGIL_PLUGIN_SDL=ON
+          -DVIGIL_PLUGIN_GUI=ON
           -DVIGIL_PLUGIN_AUDIO=ON
+          -DVIGIL_PLUGIN_SYSQUERY=ON
           -DCMAKE_BUILD_TYPE=Release
 
       - name: Build
         run: cmake --build build --config Release
 
+      - name: Boot iOS simulator
+        run: |
+          DEVICE=$(xcrun simctl list devices available -j | python3 -c "
+          import json, sys
+          data = json.load(sys.stdin)
+          for runtime, devices in data['devices'].items():
+              if 'iOS' in runtime:
+                  for d in devices:
+                      if d['isAvailable']:
+                          print(d['udid'])
+                          sys.exit(0)
+          sys.exit(1)
+          ")
+          xcrun simctl boot "$DEVICE"
+          echo "DEVICE_UDID=$DEVICE" >> "$GITHUB_ENV"
+
+      - name: Run tests on iOS simulator
+        run: xcrun simctl spawn "$DEVICE_UDID" ./build/vigil_tests
+
+      - name: Shutdown simulator
+        if: always()
+        run: xcrun simctl shutdown "$DEVICE_UDID" 2>/dev/null || true
+
   emscripten:
-    timeout-minutes: 10
+    timeout-minutes: 15
     runs-on: ubuntu-latest
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -266,10 +308,22 @@ jobs:
           version: latest
 
       - name: Configure
-        run: emcmake cmake -S . -B build -DVIGIL_BUILD_TESTS=OFF -DVIGIL_PLUGIN_SDL=ON -DVIGIL_PLUGIN_GUI=ON -DVIGIL_PLUGIN_AUDIO=ON -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_FLAGS="-pthread" -DCMAKE_EXE_LINKER_FLAGS="-pthread -sUSE_PTHREADS=1 -lwebsocket.js"
+        run: >
+          emcmake cmake -S . -B build
+          -DVIGIL_BUILD_TESTS=ON
+          -DVIGIL_PLUGIN_SDL=ON
+          -DVIGIL_PLUGIN_GUI=ON
+          -DVIGIL_PLUGIN_AUDIO=ON
+          -DVIGIL_PLUGIN_SYSQUERY=ON
+          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_C_FLAGS="-pthread"
+          -DCMAKE_EXE_LINKER_FLAGS="-pthread -sUSE_PTHREADS=1 -lwebsocket.js -sEXIT_RUNTIME=1 -sALLOW_MEMORY_GROWTH=1 -sNODERAWFS=1"
 
       - name: Build
         run: cmake --build build
+
+      - name: Run tests via Node.js
+        run: node build/vigil_tests.js
 
   clang-format:
     timeout-minutes: 5

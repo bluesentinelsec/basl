@@ -144,7 +144,7 @@ endif()
 
 # ── FFI test shared library ──────────────────────────────────────────
 
-if(NOT EMSCRIPTEN)
+if(VIGIL_HAS_FFI AND NOT EMSCRIPTEN)
     add_library(ffi_testlib SHARED tests/ffi_testlib.c)
     target_compile_options(ffi_testlib PRIVATE ${VIGIL_WARNING_FLAGS})
     set_target_properties(ffi_testlib PROPERTIES PREFIX "")
