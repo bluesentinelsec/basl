@@ -252,9 +252,11 @@ jobs:
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
           script: |
             adb wait-for-device
+            LIBCXX=$(find $ANDROID_NDK_HOME -name "libc++_shared.so" -path "*x86_64*" | head -1)
             adb push build/vigil_tests /data/local/tmp/vigil_tests
+            if [ -n "$LIBCXX" ]; then adb push "$LIBCXX" /data/local/tmp/libc++_shared.so; fi
             adb shell chmod 755 /data/local/tmp/vigil_tests
-            adb shell /data/local/tmp/vigil_tests
+            adb shell "cd /data/local/tmp && LD_LIBRARY_PATH=/data/local/tmp ./vigil_tests"
 
   ios:
     timeout-minutes: 15
@@ -305,7 +307,7 @@ jobs:
           xcrun simctl delete "$DEVICE_UDID" 2>/dev/null || true
 
   emscripten:
-    timeout-minutes: 15
+    timeout-minutes: 30
     runs-on: ubuntu-latest
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -327,6 +329,7 @@ jobs:
           -DVIGIL_PLUGIN_SYSQUERY=ON
           -DCMAKE_BUILD_TYPE=Release
           -DCMAKE_C_FLAGS="-pthread"
+          -DCMAKE_EXE_LINKER_FLAGS="-pthread -sUSE_PTHREADS=1"
 
       - name: Build
         run: cmake --build build

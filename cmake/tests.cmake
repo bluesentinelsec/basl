@@ -127,11 +127,8 @@ endif()
 
 target_link_libraries(vigil_tests PRIVATE vigil)
 
-# Emscripten: build the test binary without pthreads. Thread tests are
-# already skipped on Emscripten, and removing Worker overhead cuts WASM
-# test execution time dramatically.
+# Emscripten: test-specific linker flags.
 if(EMSCRIPTEN)
-    target_compile_options(vigil_tests PRIVATE -Wno-pthreads-mem-growth)
     target_link_options(vigil_tests PRIVATE
         -sEXIT_RUNTIME=1 -sALLOW_MEMORY_GROWTH=1 -sNODERAWFS=1
         -lwebsocket.js)
