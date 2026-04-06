@@ -55,7 +55,8 @@ TEST(VigilImageTest, LoadFromMemoryRejectsNullInput)
 TEST(VigilImageTest, LoadFromFileDecodesWrittenPng)
 {
     vigil_image_t img;
-    const char *path = "/tmp/vigil_image_test.png";
+    char path[256];
+    snprintf(path, sizeof(path), "%s/vigil_image_test.png", vigil_test_tmpdir());
 
     /* Write the test PNG to disk. */
     FILE *f = fopen(path, "wb");

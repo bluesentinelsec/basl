@@ -3,6 +3,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#if defined(__APPLE__)
+#include <TargetConditionals.h>
+#endif
+
 #include "vigil/native_module.h"
 #include "vigil/status.h"
 #include "vigil/type.h"
@@ -84,14 +88,18 @@ static vigil_status_t os_exit_fn(vigil_vm_t *vm, size_t arg_count, vigil_error_t
 static vigil_status_t os_platform(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
 {
     vigil_vm_stack_pop_n(vm, arg_count);
-#if defined(_WIN32)
+#if defined(__EMSCRIPTEN__)
+    return push_cstr(vm, "wasm", error);
+#elif defined(_WIN32)
     return push_cstr(vm, "windows", error);
+#elif defined(__ANDROID__)
+    return push_cstr(vm, "android", error);
+#elif defined(__APPLE__) && TARGET_OS_IPHONE
+    return push_cstr(vm, "ios", error);
 #elif defined(__APPLE__)
     return push_cstr(vm, "macos", error);
 #elif defined(__linux__)
     return push_cstr(vm, "linux", error);
-#elif defined(__EMSCRIPTEN__)
-    return push_cstr(vm, "wasm", error);
 #else
     return push_cstr(vm, "unknown", error);
 #endif
@@ -101,7 +109,9 @@ static vigil_status_t os_platform(vigil_vm_t *vm, size_t arg_count, vigil_error_
 static vigil_status_t os_arch(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
 {
     vigil_vm_stack_pop_n(vm, arg_count);
-#if defined(__aarch64__) || defined(_M_ARM64)
+#if defined(__EMSCRIPTEN__)
+    return push_cstr(vm, "wasm32", error);
+#elif defined(__aarch64__) || defined(_M_ARM64)
     return push_cstr(vm, "arm64", error);
 #elif defined(__x86_64__) || defined(_M_X64)
     return push_cstr(vm, "x86_64", error);
@@ -109,8 +119,6 @@ static vigil_status_t os_arch(vigil_vm_t *vm, size_t arg_count, vigil_error_t *e
     return push_cstr(vm, "x86", error);
 #elif defined(__arm__) || defined(_M_ARM)
     return push_cstr(vm, "arm", error);
-#elif defined(__EMSCRIPTEN__)
-    return push_cstr(vm, "wasm32", error);
 #else
     return push_cstr(vm, "unknown", error);
 #endif

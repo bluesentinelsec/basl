@@ -18,7 +18,7 @@ static int editor_test_exists(const char *path)
 
 static void editor_test_tmpdir(char *buf, size_t cap, const char *name, int line)
 {
-    snprintf(buf, cap, "/tmp/vigil_editor_test_%s_%d", name, line);
+    snprintf(buf, cap, "%s/vigil_editor_test_%s_%d", vigil_test_tmpdir(), name, line);
 }
 
 static void editor_test_sublime_syntax_path(char *buf, size_t cap, const char *tmpdir)
@@ -131,7 +131,7 @@ TEST(EditorIntegration, IsSupportedRejectsUnknown)
 TEST(EditorIntegration, VimInstallUninstallRoundTrip)
 {
     char tmpdir[256];
-    snprintf(tmpdir, sizeof(tmpdir), "/tmp/vigil_editor_test_vim_%d", __LINE__);
+    snprintf(tmpdir, sizeof(tmpdir), "%s/vigil_editor_test_vim_%d", vigil_test_tmpdir(), __LINE__);
 
     vigil_editor_result_t r = vigil_editor_install("vim", "/usr/local/bin/vigil", tmpdir);
     EXPECT_EQ(r.status, VIGIL_STATUS_OK);
@@ -146,12 +146,16 @@ TEST(EditorIntegration, VimInstallUninstallRoundTrip)
 
 TEST(EditorIntegration, VscodeInstallUninstallRoundTrip)
 {
+#ifndef VIGIL_HAS_DESKTOP_PLATFORM
+    (void)vigil_test_failed_;
+    return; /* system() is unavailable on mobile/web */
+#else
     /* Skip if npm is not available (e.g., CI sanitizer containers). */
     if (system("npm --version > /dev/null 2>&1") != 0)
         return;
 
     char tmpdir[256];
-    snprintf(tmpdir, sizeof(tmpdir), "/tmp/vigil_editor_test_vsc_%d", __LINE__);
+    snprintf(tmpdir, sizeof(tmpdir), "%s/vigil_editor_test_vsc_%d", vigil_test_tmpdir(), __LINE__);
 
     vigil_editor_result_t r = vigil_editor_install("vscode", "/usr/local/bin/vigil", tmpdir);
     EXPECT_EQ(r.status, VIGIL_STATUS_OK);
@@ -162,6 +166,7 @@ TEST(EditorIntegration, VscodeInstallUninstallRoundTrip)
     EXPECT_EQ(vigil_editor_is_installed("vscode", tmpdir), 0);
 
     vigil_platform_remove_all(tmpdir, NULL);
+#endif /* VIGIL_HAS_DESKTOP_PLATFORM */
 }
 
 TEST(EditorIntegration, NvimInstallUninstallRoundTrip)

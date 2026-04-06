@@ -22,6 +22,7 @@
 #include <unistd.h>
 
 #ifdef __APPLE__
+#include <TargetConditionals.h>
 #include <mach-o/dyld.h>
 #endif
 
@@ -443,7 +444,11 @@ VIGIL_API vigil_status_t vigil_platform_setenv(const char *name, const char *val
 
 VIGIL_API const char *vigil_platform_os_name(void)
 {
-#if defined(__APPLE__)
+#if defined(__EMSCRIPTEN__)
+    return "emscripten";
+#elif defined(__ANDROID__)
+    return "android";
+#elif defined(__APPLE__)
     return "darwin";
 #elif defined(__linux__)
     return "linux";
@@ -453,8 +458,6 @@ VIGIL_API const char *vigil_platform_os_name(void)
     return "openbsd";
 #elif defined(__NetBSD__)
     return "netbsd";
-#elif defined(__ANDROID__)
-    return "android";
 #else
     return "posix";
 #endif
@@ -1980,6 +1983,32 @@ VIGIL_API vigil_status_t vigil_platform_udp_recv(vigil_socket_t sock, void *buf,
 
 /* ── HTTP client via libcurl (runtime-loaded) ────────────────────── */
 
+#if defined(__EMSCRIPTEN__) || defined(__ANDROID__) || (defined(__APPLE__) && TARGET_OS_IPHONE)
+
+/* libcurl is not available on mobile/web targets. Return UNSUPPORTED so
+ * the stdlib http module falls back to BearSSL or raw sockets. */
+VIGIL_API vigil_status_t vigil_platform_http_request(const vigil_allocator_t *allocator, const char *method,
+                                                     const char *url, const char *headers, const char *body,
+                                                     size_t body_len, vigil_http_response_t *out, vigil_error_t *error)
+{
+    (void)allocator;
+    (void)method;
+    (void)url;
+    (void)headers;
+    (void)body;
+    (void)body_len;
+    (void)out;
+    if (error)
+    {
+        error->type = VIGIL_STATUS_UNSUPPORTED;
+        error->value = "platform HTTP client not available";
+        error->length = 33;
+    }
+    return VIGIL_STATUS_UNSUPPORTED;
+}
+
+#else /* desktop — libcurl via dlopen */
+
 typedef void CURL;
 typedef int CURLcode;
 #define CURLE_OK 0
@@ -2165,14 +2194,13 @@ VIGIL_API vigil_status_t vigil_platform_http_request(const vigil_allocator_t *al
     return VIGIL_STATUS_OK;
 }
 
+#endif /* desktop libcurl / mobile stub */
+
 /* ── TLS certificate store ──────────────────────────────────────── */
 
 /* TARGET_OS_OSX is 1 only on macOS; it is 0 on iOS, tvOS, watchOS, etc.
  * SecTrustCopyAnchorCertificates exists only in the macOS SDK, so we must
  * guard with TARGET_OS_OSX and not just __APPLE__. */
-#if defined(__APPLE__)
-#include <TargetConditionals.h>
-#endif
 
 #if defined(__APPLE__) && defined(TARGET_OS_OSX) && TARGET_OS_OSX
 
@@ -2375,6 +2403,11 @@ void vigil_platform_terminal_restore(vigil_terminal_state_t *state)
 int vigil_platform_terminal_width(void)
 {
     return 80;
+}
+
+int vigil_platform_terminal_read_byte(void)
+{
+    return -1;
 }
 
 #endif /* __EMSCRIPTEN__ stubs */

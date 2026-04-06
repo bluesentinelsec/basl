@@ -400,8 +400,8 @@ static vigil_editor_result_t install_vscode(const char *vigil_bin, const char *h
         return result_err("failed to write language config");
     }
 
-    /* Install npm dependencies (not available on iOS/Android) */
-#if !defined(__APPLE__) || !defined(TARGET_OS_IPHONE)
+    /* Install npm dependencies (only on desktop where system() is available). */
+#ifdef VIGIL_HAS_DESKTOP_PLATFORM
     printf("Running npm install in %s\n", ext_dir);
     {
         char cmd[1200];

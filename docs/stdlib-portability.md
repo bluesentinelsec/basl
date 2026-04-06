@@ -14,11 +14,13 @@ VIGIL now has two build profiles that matter for portability work:
 
 - Full desktop builds: all platform-sensitive stdlib modules enabled and tested on Linux, macOS, and Windows.
 - Reduced portability builds: platform-sensitive stdlib modules disabled so the codebase can still build cleanly on constrained or unusual targets.
+- Non-desktop builds: Emscripten, Android, and iOS build and run unit tests in CI with all applicable modules enabled (FFI and readline disabled).
 
 The implementation is not fully at the ideal end state yet. The most important remaining gaps are:
 
 - The portability checks are still heuristic. They enforce layering for the current stdlib surface, but they do not prove that every helper path uses the ideal allocator or ownership pattern.
 - Emscripten now builds against `src/platform/platform_posix.c` with `__EMSCRIPTEN__` guards disabling unsupported features (terminal control, process spawning, dlopen). Android and iOS also use `platform_posix.c` directly.
+- The HTTP module skips libcurl dlopen on Android, iOS, and Emscripten and falls back to BearSSL (HTTPS) or raw sockets (HTTP). Platform-native HTTP backends are future work.
 
 Those constraints should be treated as the current contract, not as reasons to drift back toward platform-specific stdlib code.
 
@@ -63,17 +65,17 @@ These modules are built in every configuration today:
 
 ### Optional, platform-sensitive modules
 
-These modules are build-time toggles. They default `ON` for desktop builds and `OFF` for Emscripten, iOS, Android, and unknown platforms.
+These modules are build-time toggles. On desktop they default `ON`. On Emscripten, Android, and iOS, most default `ON` except `ffi` and `readline` which are disabled.
 
-| Module | CMake option | Why it is optional |
-|--------|--------------|--------------------|
-| `ffi` | `VIGIL_STDLIB_FFI` | Dynamic loading / foreign-call support |
-| `fs` | `VIGIL_STDLIB_FS` | Filesystem and host path access |
-| `http` | `VIGIL_STDLIB_HTTP` | Host networking and HTTP client/server support |
-| `net` | `VIGIL_STDLIB_NET` | Raw sockets |
-| `readline` | `VIGIL_STDLIB_READLINE` | Interactive terminal editing/history |
-| `thread` | `VIGIL_STDLIB_THREAD` | Host threading primitives |
-| `time` | `VIGIL_STDLIB_TIME` | Host timers / wall-clock helpers |
+| Module | CMake option | Why it is optional | Mobile/Web |
+|--------|--------------|--------------------|------------|
+| `ffi` | `VIGIL_STDLIB_FFI` | Dynamic loading / foreign-call support | OFF |
+| `fs` | `VIGIL_STDLIB_FS` | Filesystem and host path access | ON |
+| `http` | `VIGIL_STDLIB_HTTP` | Host networking and HTTP client/server support | ON (BearSSL fallback) |
+| `net` | `VIGIL_STDLIB_NET` | Raw sockets | ON |
+| `readline` | `VIGIL_STDLIB_READLINE` | Interactive terminal editing/history | OFF |
+| `thread` | `VIGIL_STDLIB_THREAD` | Host threading primitives | ON |
+| `time` | `VIGIL_STDLIB_TIME` | Host timers / wall-clock helpers | ON |
 
 ## Build Options
 
@@ -147,7 +149,9 @@ If you add new host-sensitive behavior, prefer moving the platform split downwar
 
 ## Testing And CI
 
-CI now covers two important desktop configurations on Linux, macOS, and Windows:
+CI covers desktop and non-desktop configurations:
+
+### Desktop (Linux, macOS, Windows)
 
 1. Full-feature native build and test run with all optional modules enabled.
 2. Reduced native build and test run with all optional modules disabled.
@@ -156,12 +160,22 @@ The full-feature matrix is also used for the Python integration suite so the opt
 
 In reduced builds, module-specific integration tests are skipped automatically, and a dedicated availability test verifies that disabled stdlib imports fail with the expected diagnostic.
 
-The portability CI job now runs two static checks:
+### Non-desktop (Emscripten, Android, iOS)
+
+All three targets build and run unit tests in CI:
+
+- **Emscripten**: Tests run via Node.js with `-sNODERAWFS=1` for filesystem access and `-lwebsocket.js` for socket emulation.
+- **Android**: Both arm64-v8a and x86_64 are built; tests run on x86_64 only via the Android emulator (KVM-accelerated on GitHub runners).
+- **iOS**: Tests run on the iOS simulator via `xcrun simctl spawn`.
+
+FFI and readline tests are excluded on all three targets. All other modules (fs, net, http, thread, time, etc.) are tested.
+
+### Static checks
+
+The portability CI job runs two static checks:
 
 1. `scripts/check_core_portability.py` keeps `vigil_core` restricted to ISO C11 headers.
 2. `scripts/check_stdlib_portability.py` ensures the stdlib layer does not pull platform headers directly and flags raw heap allocation in the portability-sensitive stdlib modules that are expected to use runtime/platform allocation paths instead.
-
-Emscripten builds use the stub platform backend and currently serve as build validation, not feature-parity execution coverage.
 
 ## Guidance For New Modules
 

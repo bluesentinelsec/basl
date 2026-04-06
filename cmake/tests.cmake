@@ -127,15 +127,31 @@ endif()
 
 target_link_libraries(vigil_tests PRIVATE vigil)
 
+# Emscripten: test-specific linker flags.
+if(EMSCRIPTEN)
+    target_link_options(vigil_tests PRIVATE
+        -sEXIT_RUNTIME=1 -sALLOW_MEMORY_GROWTH=1 -sNODERAWFS=1
+        -lwebsocket.js)
+endif()
+
 # vigil_image.c (stb_image) needs libm on Linux/Unix.
 if(UNIX)
     target_link_libraries(vigil_tests PRIVATE m)
+endif()
+
+# SDL3 contains C++ code (hidapi); Android NDK requires explicit libc++ linkage.
+if(ANDROID)
+    target_link_libraries(vigil_tests PRIVATE c++)
 endif()
 target_include_directories(vigil_tests PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${CMAKE_CURRENT_SOURCE_DIR}/tests
     ${CMAKE_BINARY_DIR}/generated
 )
+
+if(VIGIL_HAS_DESKTOP_PLATFORM)
+    target_compile_definitions(vigil_tests PRIVATE VIGIL_HAS_DESKTOP_PLATFORM)
+endif()
 
 if(VIGIL_USE_LIBFFI AND VIGIL_STDLIB_FFI AND VIGIL_HAS_FFI)
     target_link_libraries(vigil_tests PRIVATE ffi_static)
@@ -144,7 +160,7 @@ endif()
 
 # ── FFI test shared library ──────────────────────────────────────────
 
-if(NOT EMSCRIPTEN)
+if(VIGIL_HAS_FFI AND NOT EMSCRIPTEN)
     add_library(ffi_testlib SHARED tests/ffi_testlib.c)
     target_compile_options(ffi_testlib PRIVATE ${VIGIL_WARNING_FLAGS})
     set_target_properties(ffi_testlib PROPERTIES PREFIX "")
