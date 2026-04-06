@@ -88,6 +88,7 @@ endif()
 # ── BearSSL test certificate ─────────────────────────────────────────
 
 if(VIGIL_ENABLE_BEARSSL_TLS AND VIGIL_STDLIB_HTTP)
+    target_include_directories(vigil_tests PRIVATE "${CMAKE_SOURCE_DIR}/deps/bearssl/inc")
     target_link_libraries(vigil_tests PRIVATE bearssl_static)
     target_compile_definitions(vigil_tests PRIVATE VIGIL_ENABLE_BEARSSL_TLS)
 

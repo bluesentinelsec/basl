@@ -979,7 +979,14 @@ TEST(VigilHttpTest, ServerPostRoundTrip)
 /* ── BearSSL TLS loopback tests ──────────────────────────────────── */
 
 #if defined(VIGIL_ENABLE_BEARSSL_TLS) && defined(VIGIL_TLS_TEST_CERT_AVAILABLE)
+#ifdef _MSC_VER
+#pragma warning(push)
+#pragma warning(disable : 4244 4267)
+#endif
 #include "bearssl.h"
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
 #include "http_tls_test_cert.h"
 
 #define TLS_TEST_PORT 18790

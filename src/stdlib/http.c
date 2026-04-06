@@ -386,7 +386,14 @@ HTTP_STATIC int socket_request(const char *method, parsed_url_t *url, const char
 /* ── BearSSL TLS fallback client ─────────────────────────────────── */
 
 #ifdef VIGIL_ENABLE_BEARSSL_TLS
+#ifdef _MSC_VER
+#pragma warning(push)
+#pragma warning(disable : 4244 4267)
+#endif
 #include "bearssl.h"
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
 
 /* ---------- Socket I/O callbacks for BearSSL ---------------------- */
 
@@ -405,6 +412,13 @@ static int tls_write_cb(void *ctx, const unsigned char *buf, size_t len)
     return vigil_platform_tcp_send(sock, buf, len, &n, NULL) != VIGIL_STATUS_OK ? -1 : (int)n;
 }
 
+#if !defined(HTTP_TEST)
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-function"
+#pragma GCC diagnostic ignored "-Wunused-const-variable"
+#endif
+#endif
 /* ---------- Insecure x509 validator (test / no-CA-bundle) --------- */
 /* Accepts any server certificate without verification.  Only used when
  * bearssl_https_insecure_request() is called directly (unit tests). */
@@ -475,7 +489,6 @@ static const br_x509_class tls_x509_insecure_vtable = {
     x509_ins_end_chain,
     x509_ins_get_pkey,
 };
-
 /* ---------- Platform CA bundle loading ---------------------------- */
 
 #define TLS_MAX_TAS 512
@@ -731,7 +744,6 @@ HTTP_STATIC int bearssl_https_insecure_request(const char *method, const parsed_
     tls_req_t req = {method, url, headers, body, body_len};
     return bearssl_do_https(&req, resp, &sc);
 }
-
 #endif /* VIGIL_ENABLE_BEARSSL_TLS */
 
 /* ── Constants ───────────────────────────────────────────────────── */
@@ -830,25 +842,63 @@ HTTP_STATIC char *build_request_headers(const char *cookie_jar, const char *exis
     return out;
 }
 
+/* ── TLS backend selection ────────────────────────────────────────── */
+
+enum
+{
+    TLS_AUTO = 0,
+    TLS_PLATFORM,
+    TLS_BEARSSL
+};
+
+static int g_tls_backend = -1; /* -1 = uninitialized */
+
+static int tls_backend_get(void)
+{
+    if (g_tls_backend < 0)
+    {
+        const char *env = getenv("VIGIL_HTTP_TLS");
+        if (env && strcmp(env, "platform") == 0)
+            g_tls_backend = TLS_PLATFORM;
+        else if (env && strcmp(env, "bearssl") == 0)
+            g_tls_backend = TLS_BEARSSL;
+        else
+            g_tls_backend = TLS_AUTO;
+    }
+    return g_tls_backend;
+}
+
 HTTP_STATIC int do_request_once(const char *method, const char *url_str, const char *headers, const char *body,
                                 size_t body_len, http_response_t *resp)
 {
     memset(resp, 0, sizeof(*resp));
+    int backend = tls_backend_get();
 
-    /* Try native HTTP library first (supports HTTPS). */
-    vigil_http_response_t native_resp;
-    vigil_status_t st = vigil_platform_http_request(NULL, method, url_str, headers, body, body_len, &native_resp, NULL);
-
-    if (st == VIGIL_STATUS_OK)
+    /* Try native HTTP library first (unless forced to bearssl). */
+    if (backend != TLS_BEARSSL)
     {
-        resp->status_code = native_resp.status_code;
-        resp->headers = native_resp.headers;
-        resp->body = native_resp.body;
-        resp->body_len = native_resp.body_len;
-        return 0;
+        vigil_http_response_t native_resp;
+        vigil_status_t st =
+            vigil_platform_http_request(NULL, method, url_str, headers, body, body_len, &native_resp, NULL);
+
+        if (st == VIGIL_STATUS_OK)
+        {
+            resp->status_code = native_resp.status_code;
+            resp->headers = native_resp.headers;
+            resp->body = native_resp.body;
+            resp->body_len = native_resp.body_len;
+            return 0;
+        }
+
+        /* If forced to platform only, don't fall back. */
+        if (backend == TLS_PLATFORM)
+        {
+            fprintf(stderr, "vigil: HTTPS unavailable (platform TLS library not found)\n");
+            return -1;
+        }
     }
 
-    /* Native lib unavailable — fall back to sockets (HTTP only). */
+    /* Fall back to sockets (HTTP) or BearSSL (HTTPS). */
     parsed_url_t url;
     if (!parse_url(url_str, &url))
         return -1;
@@ -858,7 +908,8 @@ HTTP_STATIC int do_request_once(const char *method, const char *url_str, const c
 #ifdef VIGIL_ENABLE_BEARSSL_TLS
         return bearssl_https_request(method, &url, headers, body, body_len, resp);
 #else
-        fprintf(stderr, "vigil: HTTPS requires libcurl (not available); request aborted\n");
+        fprintf(stderr,
+                "vigil: HTTPS unavailable (no platform TLS library found and BearSSL fallback not compiled in)\n");
         return -1;
 #endif
     }
@@ -2296,6 +2347,58 @@ static const char *const http_conn_name_value_param_names[] = {"conn", "name", "
 static const char *const http_server_timeout_param_names[] = {"server", "ms"};
 static const char *const http_handler_param_types[] = {"i64", "string", "function"};
 
+/* ── TLS backend API ─────────────────────────────────────────────── */
+
+static vigil_status_t http_set_tls_backend(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    const char *val = NULL;
+    size_t val_len = 0;
+    get_string_arg(vm, base, 0, &val, &val_len);
+    vigil_vm_stack_pop_n(vm, arg_count);
+
+    if (!val)
+    {
+        vigil_error_set_literal(error, VIGIL_STATUS_INVALID_ARGUMENT, "set_tls_backend: expected string");
+        return VIGIL_STATUS_INVALID_ARGUMENT;
+    }
+
+    if (strcmp(val, "auto") == 0)
+        g_tls_backend = TLS_AUTO;
+    else if (strcmp(val, "platform") == 0)
+        g_tls_backend = TLS_PLATFORM;
+    else if (strcmp(val, "bearssl") == 0)
+    {
+#ifdef VIGIL_ENABLE_BEARSSL_TLS
+        g_tls_backend = TLS_BEARSSL;
+#else
+        vigil_error_set_literal(error, VIGIL_STATUS_INVALID_ARGUMENT, "set_tls_backend: BearSSL not compiled in");
+        return VIGIL_STATUS_INVALID_ARGUMENT;
+#endif
+    }
+    else
+    {
+        vigil_error_set_literal(error, VIGIL_STATUS_INVALID_ARGUMENT,
+                                "set_tls_backend: expected \"auto\", \"platform\", or \"bearssl\"");
+        return VIGIL_STATUS_INVALID_ARGUMENT;
+    }
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t http_tls_backend(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    vigil_vm_stack_pop_n(vm, arg_count);
+    int b = tls_backend_get();
+    const char *name = "none";
+    if (b == TLS_AUTO)
+        name = "auto";
+    else if (b == TLS_PLATFORM)
+        name = "platform";
+    else if (b == TLS_BEARSSL)
+        name = "bearssl";
+    return push_string(vm, name, strlen(name), error);
+}
+
 static const vigil_native_symbol_doc_t vigil_http_module_doc = {
     "HTTP client and server support.",
     "Issue HTTP requests and build simple HTTP/1.1 servers with route handlers and streaming responses.",
@@ -2452,6 +2555,20 @@ static const vigil_native_symbol_doc_t vigil_http_set_idle_timeout_doc = {
     NULL,
 };
 
+static const vigil_native_symbol_doc_t vigil_http_set_tls_backend_doc = {
+    "Set the TLS backend.",
+    "Set the TLS backend for subsequent HTTPS requests. "
+    "Accepts \"auto\" (platform first, BearSSL fallback), \"platform\" (libcurl/WinHTTP only), "
+    "or \"bearssl\" (skip platform, use BearSSL directly).",
+    NULL,
+};
+
+static const vigil_native_symbol_doc_t vigil_http_tls_backend_doc = {
+    "Get the current TLS backend.",
+    "Returns the currently active TLS backend name: \"auto\", \"platform\", \"bearssl\", or \"none\".",
+    NULL,
+};
+
 static const vigil_native_module_function_t http_functions[] = {
     {"get", 3, http_get, 1, http_1str, VIGIL_TYPE_I32, 3, http_ret_get, 0, NULL, NULL, 0U, http_url_param_names, NULL,
      NULL, &vigil_http_get_doc},
@@ -2503,6 +2620,10 @@ static const vigil_native_module_function_t http_functions[] = {
      http_server_timeout_param_names, NULL, NULL, &vigil_http_set_write_timeout_doc},
     {"set_idle_timeout", 16, http_set_idle_timeout, 2, http_i64_i64, VIGIL_TYPE_I32, 1, NULL, 0, NULL, NULL, 0U,
      http_server_timeout_param_names, NULL, NULL, &vigil_http_set_idle_timeout_doc},
+    {"set_tls_backend", 15, http_set_tls_backend, 1, http_1str, VIGIL_TYPE_VOID, 0, NULL, 0, NULL, NULL, 0U, NULL, NULL,
+     NULL, &vigil_http_set_tls_backend_doc},
+    {"tls_backend", 11, http_tls_backend, 0, NULL, VIGIL_TYPE_STRING, 1, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL,
+     &vigil_http_tls_backend_doc},
 };
 
 VIGIL_API const vigil_native_module_t vigil_stdlib_http = {

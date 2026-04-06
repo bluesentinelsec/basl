@@ -96,6 +96,13 @@ if(VIGIL_ENABLE_BEARSSL_TLS AND VIGIL_STDLIB_HTTP AND VIGIL_HAS_DESKTOP_PLATFORM
     add_subdirectory(deps/bearssl)
     target_link_libraries(vigil PRIVATE bearssl_static)
     target_compile_definitions(vigil PRIVATE VIGIL_ENABLE_BEARSSL_TLS)
+    if(MSVC)
+        target_compile_options(bearssl_static PRIVATE /w)
+    else()
+        # BearSSL uses type-punned function pointer vtables that trigger
+        # UBSan false positives. Exclude it from sanitizer instrumentation.
+        target_compile_options(bearssl_static PRIVATE -fno-sanitize=undefined -w)
+    endif()
 endif()
 
 # ── MSVC multi-config output directory fix ───────────────────────────
