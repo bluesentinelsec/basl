@@ -198,6 +198,23 @@ vigil_status_t vigil_platform_hostname(const vigil_allocator_t *allocator, char 
     return VIGIL_STATUS_UNSUPPORTED;
 }
 
+/* ── Environment variables (new) ──────────────────────────────────── */
+
+vigil_status_t vigil_platform_unsetenv(const char *key, vigil_error_t *error)
+{
+    (void)key;
+    vigil_error_set_literal(error, VIGIL_STATUS_UNSUPPORTED, "not supported");
+    return VIGIL_STATUS_UNSUPPORTED;
+}
+
+vigil_status_t vigil_platform_environ(char ***out_env, size_t *out_count, vigil_error_t *error)
+{
+    (void)out_env;
+    (void)out_count;
+    vigil_error_set_literal(error, VIGIL_STATUS_UNSUPPORTED, "not supported");
+    return VIGIL_STATUS_UNSUPPORTED;
+}
+
 /* ── Process execution ───────────────────────────────────────────── */
 
 vigil_status_t vigil_platform_exec(const vigil_allocator_t *allocator, const char *const *argv, char **out_stdout,

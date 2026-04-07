@@ -509,6 +509,60 @@ VIGIL_API vigil_status_t vigil_platform_hostname(const vigil_allocator_t *alloca
     return VIGIL_STATUS_OK;
 }
 
+/* ── Environment variables (new) ──────────────────────────────────── */
+
+VIGIL_API vigil_status_t vigil_platform_unsetenv(const char *key, vigil_error_t *error)
+{
+    if (!SetEnvironmentVariableA(key, NULL))
+    {
+        vigil_error_set_literal(error, VIGIL_STATUS_INTERNAL, "SetEnvironmentVariable failed");
+        return VIGIL_STATUS_INTERNAL;
+    }
+    return VIGIL_STATUS_OK;
+}
+
+VIGIL_API vigil_status_t vigil_platform_environ(char ***out_env, size_t *out_count, vigil_error_t *error)
+{
+    char *block = GetEnvironmentStringsA();
+    if (!block)
+    {
+        vigil_error_set_literal(error, VIGIL_STATUS_INTERNAL, "GetEnvironmentStrings failed");
+        return VIGIL_STATUS_INTERNAL;
+    }
+
+    size_t count = 0;
+    const char *p = block;
+    while (*p)
+    {
+        if (strchr(p, '=') && p[0] != '=')
+            count++;
+        p += strlen(p) + 1;
+    }
+
+    char **env = (char **)malloc((count + 1) * sizeof(char *));
+    if (!env)
+    {
+        FreeEnvironmentStringsA(block);
+        vigil_error_set_literal(error, VIGIL_STATUS_INTERNAL, "out of memory");
+        return VIGIL_STATUS_INTERNAL;
+    }
+
+    size_t idx = 0;
+    p = block;
+    while (*p)
+    {
+        if (strchr(p, '=') && p[0] != '=')
+            env[idx++] = _strdup(p);
+        p += strlen(p) + 1;
+    }
+    env[idx] = NULL;
+    FreeEnvironmentStringsA(block);
+
+    *out_env = env;
+    *out_count = idx;
+    return VIGIL_STATUS_OK;
+}
+
 /* ── Process execution ───────────────────────────────────────────── */
 
 VIGIL_API vigil_status_t vigil_platform_exec(const vigil_allocator_t *allocator, const char *const *argv,
