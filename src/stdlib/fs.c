@@ -299,6 +299,43 @@ static vigil_status_t fs_ext(vigil_vm_t *vm, size_t arg_count, vigil_error_t *er
     return push_string(vm, last_dot, path_len - (size_t)(last_dot - path), error);
 }
 
+static vigil_status_t fs_stem(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    const char *path;
+    size_t path_len;
+
+    if (!get_string_arg(vm, base, 0, &path, &path_len))
+    {
+        vigil_vm_stack_pop_n(vm, arg_count);
+        return push_string(vm, "", 0, error);
+    }
+
+    /* Find last separator to get the basename portion */
+    const char *last_sep = NULL;
+    for (size_t i = 0; i < path_len; i++)
+    {
+        if (path[i] == '/')
+            last_sep = path + i;
+    }
+
+    const char *name = last_sep ? last_sep + 1 : path;
+    size_t name_len = path_len - (size_t)(name - path);
+
+    /* Find last dot in the basename */
+    const char *last_dot = NULL;
+    for (size_t i = 0; i < name_len; i++)
+    {
+        if (name[i] == '.')
+            last_dot = name + i;
+    }
+
+    vigil_vm_stack_pop_n(vm, arg_count);
+    if (!last_dot || last_dot == name)
+        return push_string(vm, name, name_len, error);
+    return push_string(vm, name, (size_t)(last_dot - name), error);
+}
+
 static vigil_status_t fs_is_abs(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
 {
     size_t base = vigil_vm_stack_depth(vm) - arg_count;
@@ -884,6 +921,139 @@ static vigil_status_t fs_cwd(vigil_vm_t *vm, size_t arg_count, vigil_error_t *er
     return s;
 }
 
+static vigil_status_t fs_app_dir(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    vigil_vm_stack_pop_n(vm, arg_count);
+
+    char buf[4096];
+    vigil_status_t s = vigil_platform_self_exe(buf, sizeof(buf), error);
+    if (s != VIGIL_STATUS_OK)
+        return push_string(vm, "", 0, error);
+
+    /* Strip the filename to get the directory */
+    char *last_sep = strrchr(buf, '/');
+#ifdef _WIN32
+    char *last_bsep = strrchr(buf, '\\');
+    if (last_bsep && (!last_sep || last_bsep > last_sep))
+        last_sep = last_bsep;
+#endif
+    if (last_sep)
+        *last_sep = '\0';
+    else
+        buf[0] = '\0';
+
+    return push_string(vm, buf, strlen(buf), error);
+}
+
+static vigil_status_t fs_chdir(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    const char *path;
+    size_t path_len;
+
+    if (!get_string_arg(vm, base, 0, &path, &path_len))
+    {
+        vigil_vm_stack_pop_n(vm, arg_count);
+        return push_bool(vm, 0, error);
+    }
+
+    /* Need null-terminated copy since path may not be */
+    char buf[4096];
+    if (path_len >= sizeof(buf))
+    {
+        vigil_vm_stack_pop_n(vm, arg_count);
+        return push_bool(vm, 0, error);
+    }
+    memcpy(buf, path, path_len);
+    buf[path_len] = '\0';
+
+    vigil_vm_stack_pop_n(vm, arg_count);
+    vigil_status_t s = vigil_platform_chdir(buf, error);
+    return push_bool(vm, s == VIGIL_STATUS_OK, error);
+}
+
+static int is_invalid_filename_char(char c)
+{
+    if (c == '/' || c == '\0')
+        return 1;
+#ifdef _WIN32
+    if (c == '\\' || c == ':' || c == '*' || c == '?' || c == '"' || c == '<' || c == '>' || c == '|')
+        return 1;
+#endif
+    return 0;
+}
+
+#ifdef _WIN32
+static int is_reserved_win32_name(const char *name, size_t name_len)
+{
+    static const char *const reserved[] = {"CON",  "PRN",  "AUX",  "NUL",  "COM1", "COM2", "COM3", "COM4",
+                                           "COM5", "COM6", "COM7", "COM8", "COM9", "LPT1", "LPT2", "LPT3",
+                                           "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9", NULL};
+    /* Extract stem (before first dot) for comparison */
+    size_t stem_len = name_len;
+    for (size_t i = 0; i < name_len; i++)
+    {
+        if (name[i] == '.')
+        {
+            stem_len = i;
+            break;
+        }
+    }
+    for (const char *const *r = reserved; *r; r++)
+    {
+        size_t rlen = strlen(*r);
+        if (stem_len != rlen)
+            continue;
+        int match = 1;
+        for (size_t i = 0; i < rlen; i++)
+        {
+            char a = name[i];
+            if (a >= 'a' && a <= 'z')
+                a -= 32;
+            if (a != (*r)[i])
+            {
+                match = 0;
+                break;
+            }
+        }
+        if (match)
+            return 1;
+    }
+    return 0;
+}
+#endif
+
+static vigil_status_t fs_is_valid_name(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    const char *name;
+    size_t name_len;
+
+    if (!get_string_arg(vm, base, 0, &name, &name_len))
+    {
+        vigil_vm_stack_pop_n(vm, arg_count);
+        return push_bool(vm, 0, error);
+    }
+
+    vigil_vm_stack_pop_n(vm, arg_count);
+
+    if (name_len == 0)
+        return push_bool(vm, 0, error);
+
+    for (size_t i = 0; i < name_len; i++)
+    {
+        if (is_invalid_filename_char(name[i]))
+            return push_bool(vm, 0, error);
+    }
+
+#ifdef _WIN32
+    if (is_reserved_win32_name(name, name_len))
+        return push_bool(vm, 0, error);
+#endif
+
+    return push_bool(vm, 1, error);
+}
+
 /* ── Symlink operations ──────────────────────────────────────────── */
 
 static vigil_status_t fs_symlink(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
@@ -1077,6 +1247,8 @@ static const vigil_native_symbol_doc_t vigil_fs_base_doc = {"Get the final path 
                                                             "Returns the filename or last path segment.", NULL};
 static const vigil_native_symbol_doc_t vigil_fs_ext_doc = {
     "Get the file extension.", "Returns the extension including the leading dot when present.", NULL};
+static const vigil_native_symbol_doc_t vigil_fs_stem_doc = {
+    "Get the filename without its extension.", "Returns the basename with the final extension removed.", NULL};
 static const vigil_native_symbol_doc_t vigil_fs_is_abs_doc = {
     "Check whether a path is absolute.", "Returns true when the path is absolute on the current platform.", NULL};
 static const vigil_native_symbol_doc_t vigil_fs_read_doc = {
@@ -1133,6 +1305,16 @@ static const vigil_native_symbol_doc_t vigil_fs_data_dir_doc = {
     "Get the data directory.", "Returns the user-specific application data directory.", NULL};
 static const vigil_native_symbol_doc_t vigil_fs_cwd_doc = {"Get the current working directory.",
                                                            "Returns the current process working directory.", NULL};
+static const vigil_native_symbol_doc_t vigil_fs_app_dir_doc = {
+    "Get the directory containing the running executable.",
+    "Returns the directory portion of the current executable's path.", NULL};
+static const vigil_native_symbol_doc_t vigil_fs_chdir_doc = {
+    "Change the working directory.", "Changes the process working directory; returns true on success.", NULL};
+static const vigil_native_symbol_doc_t vigil_fs_is_valid_name_doc = {
+    "Check whether a filename is valid.",
+    "Returns true if the name contains no illegal characters or reserved names for the current platform.", NULL};
+
+static const char *const fs_name_param_names[] = {"name"};
 
 static const vigil_native_module_function_t vigil_fs_functions[] = {
     /* Path operations */
@@ -1146,6 +1328,8 @@ static const vigil_native_module_function_t vigil_fs_functions[] = {
      NULL, &vigil_fs_base_doc},
     {"ext", 3U, fs_ext, 1U, str_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U, fs_path_param_names, NULL, NULL,
      &vigil_fs_ext_doc},
+    {"stem", 4U, fs_stem, 1U, str_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U, fs_path_param_names, NULL,
+     NULL, &vigil_fs_stem_doc},
     {"is_abs", 6U, fs_is_abs, 1U, str_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U, fs_path_param_names, NULL,
      NULL, &vigil_fs_is_abs_doc},
     /* File operations */
@@ -1206,6 +1390,12 @@ static const vigil_native_module_function_t vigil_fs_functions[] = {
     {"data_dir", 8U, fs_data_dir, 0U, NULL, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL,
      &vigil_fs_data_dir_doc},
     {"cwd", 3U, fs_cwd, 0U, NULL, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, &vigil_fs_cwd_doc},
+    {"app_dir", 7U, fs_app_dir, 0U, NULL, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL,
+     &vigil_fs_app_dir_doc},
+    {"chdir", 5U, fs_chdir, 1U, str_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U, fs_path_param_names, NULL,
+     NULL, &vigil_fs_chdir_doc},
+    {"is_valid_name", 13U, fs_is_valid_name, 1U, str_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U,
+     fs_name_param_names, NULL, NULL, &vigil_fs_is_valid_name_doc},
 };
 
 #define FS_FUNCTION_COUNT (sizeof(vigil_fs_functions) / sizeof(vigil_fs_functions[0]))

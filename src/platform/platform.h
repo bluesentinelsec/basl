@@ -119,6 +119,9 @@ extern "C"
     VIGIL_API vigil_status_t vigil_platform_getcwd(const vigil_allocator_t *allocator, char **out_path,
                                                    vigil_error_t *error);
 
+    /** Change the current working directory.  Returns VIGIL_STATUS_OK on success. */
+    VIGIL_API vigil_status_t vigil_platform_chdir(const char *path, vigil_error_t *error);
+
     /** Get the system temporary directory path.  Caller must free *out_path. */
     VIGIL_API vigil_status_t vigil_platform_temp_dir(const vigil_allocator_t *allocator, char **out_path,
                                                      vigil_error_t *error);

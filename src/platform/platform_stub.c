@@ -172,6 +172,18 @@ vigil_status_t vigil_platform_getcwd(const vigil_allocator_t *allocator, char **
     return VIGIL_STATUS_UNSUPPORTED;
 }
 
+vigil_status_t vigil_platform_chdir(const char *path, vigil_error_t *error)
+{
+    (void)path;
+    if (error)
+    {
+        error->type = VIGIL_STATUS_UNSUPPORTED;
+        error->value = "not supported";
+        error->length = 13;
+    }
+    return VIGIL_STATUS_UNSUPPORTED;
+}
+
 vigil_status_t vigil_platform_temp_dir(const vigil_allocator_t *allocator, char **out_path, vigil_error_t *error)
 {
     (void)allocator;
