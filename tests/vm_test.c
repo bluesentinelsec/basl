@@ -3,8 +3,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "internal/vigil_regvm.h"
 #if !defined(_WIN32)
+#include "internal/vigil_regvm.h"
 #include "internal/vigil_vm_internal.h"
 #endif
 #include "vigil/vigil.h"
@@ -28,6 +28,7 @@ typedef struct VmTestContextOptions
     const vigil_vm_options_t *vm_options;
 } VmTestContextOptions;
 
+#if !defined(_WIN32)
 typedef struct CompiledMainFixture
 {
     vigil_runtime_t *runtime;
@@ -35,6 +36,7 @@ typedef struct CompiledMainFixture
     vigil_diagnostic_list_t diagnostics;
     vigil_object_t *function;
 } CompiledMainFixture;
+#endif
 
 static vigil_status_t OpenVmTestContextWithOptions(vigil_runtime_t **runtime, vigil_vm_t **vm, vigil_chunk_t *chunk,
                                                    vigil_value_t *result, const VmTestContextOptions *options,
@@ -201,6 +203,7 @@ static vigil_status_t RunCompiledSource(const char *source_text, int64_t *out_re
     return status;
 }
 
+#if !defined(_WIN32)
 static vigil_status_t OpenCompiledMainFixture(const char *source_text, CompiledMainFixture *fixture,
                                               vigil_error_t *error)
 {
@@ -295,6 +298,7 @@ static size_t CountRegOpcode(const vigil_reg_chunk_t *chunk, uint8_t opcode)
 
     return count;
 }
+#endif /* !_WIN32 */
 
 static vigil_status_t RunBinaryIntOpcode(vigil_opcode_t opcode, int64_t left_value, int64_t right_value,
                                          int64_t *out_result, vigil_error_t *error)
@@ -602,6 +606,7 @@ TEST(VigilVmTest, CompilesAndExecutesDeferredMultipleReturnValues)
     EXPECT_EQ(output, 145);
 }
 
+#if !defined(_WIN32)
 TEST(VigilVmTest, FusesPlainI32CompareJumpWithoutChainFallback)
 {
     static const char source[] = "fn main() -> i32 {"
@@ -698,6 +703,7 @@ TEST(VigilVmTest, FusesI64ImmediateAddAndSub)
 
     CloseCompiledMainFixture(&fixture);
 }
+#endif /* !_WIN32 */
 
 TEST(VigilVmTest, RejectsHugeFloatFormatPrecision)
 {
@@ -2398,9 +2404,11 @@ void register_vm_tests(void)
     REGISTER_TEST(VigilVmTest, ReturnedObjectSurvivesChunkLifetime);
     REGISTER_TEST(VigilVmTest, CompilesAndExecutesMultipleReturnValues);
     REGISTER_TEST(VigilVmTest, CompilesAndExecutesDeferredMultipleReturnValues);
+#if !defined(_WIN32)
     REGISTER_TEST(VigilVmTest, FusesPlainI32CompareJumpWithoutChainFallback);
     REGISTER_TEST(VigilVmTest, FusesI32ImmediateAddAndSub);
     REGISTER_TEST(VigilVmTest, FusesI64ImmediateAddAndSub);
+#endif
     REGISTER_TEST(VigilVmTest, ComparesDifferentObjectTypesByValue);
     REGISTER_TEST(VigilVmTest, RejectsToStringOnNonStringObject);
     REGISTER_TEST(VigilVmTest, RejectsDeferredNativeCallTargetThatIsNotNative);
