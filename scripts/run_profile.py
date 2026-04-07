@@ -171,6 +171,21 @@ def profile_one_perf(
         )
     print(f"[profile/perf]   annotate      -> {annotate_path.name}", flush=True)
 
+    # Capture opcode frequency counters (printed to stderr on exit).
+    opcode_path = output_dir / f"{name}_opcodes.txt"
+    opcode_run = subprocess.run(
+        [str(vigil_bin)] + list(entry["command"]),
+        cwd=str(repo_root),
+        stdin=subprocess.DEVNULL,
+        capture_output=True,
+        text=True,
+        timeout=int(entry.get("timeout_seconds", 20)),
+    )
+    opcode_lines = [l for l in opcode_run.stderr.splitlines() if l.strip()]
+    if opcode_lines:
+        opcode_path.write_text(opcode_run.stderr, encoding="utf-8")
+        print(f"[profile/perf]   opcodes       -> {opcode_path.name}", flush=True)
+
     # Clean up large perf.data file.
     perf_data.unlink(missing_ok=True)
 
