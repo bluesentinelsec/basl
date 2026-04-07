@@ -237,6 +237,7 @@ typedef enum vigil_reg_op
     VREG_SUBI = 136, /* A B C   R[A] = R[B] -i32 imm8(C) */
     VREG_ADDI_I64 = 137, /* A B C   R[A] = R[B] +i64 imm8(C) */
     VREG_SUBI_I64 = 138, /* A B C   R[A] = R[B] -i64 imm8(C) */
+    VREG_LT_I32_IMM_JMP = 139, /* A C + JMP   if R[A] <i32 imm8(C), skip following JMP */
 
     VREG_OP_COUNT
 } vigil_reg_op_t;

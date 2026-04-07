@@ -298,6 +298,80 @@ static size_t CountRegOpcode(const vigil_reg_chunk_t *chunk, uint8_t opcode)
 
     return count;
 }
+
+static const vigil_object_t *FindCompiledFunctionByName(const CompiledMainFixture *fixture, const char *name)
+{
+    size_t index;
+
+    if (fixture == NULL || fixture->function == NULL || name == NULL)
+        return NULL;
+
+    if (strcmp(vigil_function_object_name(fixture->function), name) == 0)
+        return fixture->function;
+
+    for (index = 0U;; index += 1U)
+    {
+        const vigil_object_t *candidate = vigil_function_object_sibling(fixture->function, index);
+        if (candidate == NULL)
+            return NULL;
+        if (strcmp(vigil_function_object_name(candidate), name) == 0)
+            return candidate;
+    }
+}
+
+static int HasSingleArgCallPackMove(const vigil_reg_chunk_t *chunk)
+{
+    size_t ip = 0U;
+    size_t prev_ip = (size_t)-1;
+
+    if (chunk == NULL)
+        return 0;
+
+    while (ip < chunk->code_count)
+    {
+        vigil_reg_instr_t instr = chunk->code[ip];
+        uint8_t op = VREG_GET_OP(instr);
+        uint8_t arg_base = 0U;
+        int check_move = 0;
+        size_t step = RegInstructionWordCount(chunk, ip);
+
+        switch (op)
+        {
+        case VREG_CALL:
+        case VREG_CALL_NATIVE:
+        case VREG_CALL_EXTERN:
+        case VREG_TAIL_CALL:
+            if (VREG_GET_C(instr) == 1U)
+            {
+                arg_base = VREG_GET_A(instr);
+                check_move = 1;
+            }
+            break;
+        case VREG_CALL_SELF:
+            if (VREG_GET_B(instr) == 1U && ip + 1U < chunk->code_count)
+            {
+                arg_base = (uint8_t)(chunk->code[ip + 1U] & 0xFFU);
+                check_move = 1;
+            }
+            break;
+        default:
+            break;
+        }
+
+        if (check_move && prev_ip != (size_t)-1 && VREG_GET_OP(chunk->code[prev_ip]) == VREG_MOVE &&
+            VREG_GET_A(chunk->code[prev_ip]) == arg_base)
+        {
+            return 1;
+        }
+
+        prev_ip = ip;
+        if (step == 0U || step > chunk->code_count - ip)
+            step = 1U;
+        ip += step;
+    }
+
+    return 0;
+}
 #endif /* !_WIN32 */
 
 static vigil_status_t RunBinaryIntOpcode(vigil_opcode_t opcode, int64_t left_value, int64_t right_value,
@@ -630,7 +704,8 @@ TEST(VigilVmTest, FusesPlainI32CompareJumpWithoutChainFallback)
                                            &error),
               VIGIL_STATUS_OK);
     ASSERT_NE(reg_chunk, NULL);
-    EXPECT_TRUE(CountRegOpcode(reg_chunk, VREG_LT_I32_JMP) >= 1U);
+    EXPECT_TRUE(CountRegOpcode(reg_chunk, VREG_LT_I32_IMM_JMP) >= 1U);
+    EXPECT_EQ(CountRegOpcode(reg_chunk, VREG_LT_I32_JMP), 0U);
     EXPECT_EQ(CountRegOpcode(reg_chunk, VREG_TEST), 0U);
 
     CloseCompiledMainFixture(&fixture);
@@ -700,6 +775,42 @@ TEST(VigilVmTest, FusesI64ImmediateAddAndSub)
     EXPECT_EQ(add_i64_imm_count + add_i64_count, 1U);
     EXPECT_EQ(sub_i64_imm_count, 1U);
     EXPECT_EQ(sub_i64_count, 0U);
+
+    CloseCompiledMainFixture(&fixture);
+}
+
+TEST(VigilVmTest, AvoidsSingleArgCallPackingMove)
+{
+    static const char source[] = "fn fib(i32 n) -> i32 {"
+                                 "    if n < 2 {"
+                                 "        return n;"
+                                 "    }"
+                                 "    return fib(n - 1);"
+                                 "}"
+                                 "fn main() -> i32 {"
+                                 "    return fib(6);"
+                                 "}";
+    CompiledMainFixture fixture;
+    vigil_error_t error = {0};
+    const vigil_object_t *fib_function = NULL;
+    const vigil_reg_chunk_t *reg_chunk = NULL;
+    vigil_chunk_t *chunk = NULL;
+
+    ASSERT_EQ(OpenCompiledMainFixture(source, &fixture, &error), VIGIL_STATUS_OK);
+    ASSERT_EQ(vigil_diagnostic_list_count(&fixture.diagnostics), 0U);
+
+    fib_function = FindCompiledFunctionByName(&fixture, "fib");
+    ASSERT_NE(fib_function, NULL);
+    chunk = (vigil_chunk_t *)vigil_function_object_chunk(fib_function);
+    ASSERT_NE(chunk, NULL);
+    ASSERT_EQ(vigil_chunk_ensure_reg_cache(chunk, (uint8_t)vigil_function_object_arity(fib_function), &reg_chunk,
+                                           &error),
+              VIGIL_STATUS_OK);
+    ASSERT_NE(reg_chunk, NULL);
+    EXPECT_TRUE(CountRegOpcode(reg_chunk, VREG_CALL_SELF) + CountRegOpcode(reg_chunk, VREG_CALL) +
+                    CountRegOpcode(reg_chunk, VREG_TAIL_CALL) >=
+                1U);
+    EXPECT_FALSE(HasSingleArgCallPackMove(reg_chunk));
 
     CloseCompiledMainFixture(&fixture);
 }
@@ -2408,6 +2519,7 @@ void register_vm_tests(void)
     REGISTER_TEST(VigilVmTest, FusesPlainI32CompareJumpWithoutChainFallback);
     REGISTER_TEST(VigilVmTest, FusesI32ImmediateAddAndSub);
     REGISTER_TEST(VigilVmTest, FusesI64ImmediateAddAndSub);
+    REGISTER_TEST(VigilVmTest, AvoidsSingleArgCallPackingMove);
 #endif
     REGISTER_TEST(VigilVmTest, ComparesDifferentObjectTypesByValue);
     REGISTER_TEST(VigilVmTest, RejectsToStringOnNonStringObject);

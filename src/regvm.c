@@ -333,6 +333,24 @@ static uint8_t vs_push_result(vstack_t *vs, uint8_t preferred)
     return vs_push_at(vs, vs_result_base(vs, preferred));
 }
 
+static int vs_top_is_contiguous(const vstack_t *vs, uint32_t count)
+{
+    uint8_t base;
+    uint32_t i;
+
+    if (vs == NULL || count == 0U || count > (uint32_t)vs->top)
+        return 0;
+
+    base = vs->regs[vs->top - (int)count];
+    for (i = 1U; i < count; i++)
+    {
+        if (vs->regs[vs->top - (int)count + (int)i] != (uint8_t)(base + (uint8_t)i))
+            return 0;
+    }
+
+    return 1;
+}
+
 static int vs_uses_reg(const vstack_t *vs, uint8_t reg)
 {
     size_t i;
@@ -2109,6 +2127,7 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
             size_t target = ip + (size_t)off;
             size_t direct_target = target;
             int in_chain = 0;
+            int fused_cmp_imm = 0;
 
             /* Detect &&/|| short-circuit chains where the bool must stay
                on the stack for the next comparison in the chain. */
@@ -2207,7 +2226,29 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
             {
                 NORMALIZE_TO_TARGET(direct_target);
 
-                TR_EMIT(vigil_reg_abc(map_cmp_jmp(op), ra, rb, 0));
+                if (op == VIGIL_OPCODE_LESS_I32_JUMP_IF_FALSE && rb >= vs.local_count && rc->code_count > 0U &&
+                    prev_op == VIGIL_OPCODE_CONSTANT && prev_start_ip != (size_t)-1 &&
+                    !jump_target_contains(jt, jt_count, prev_start_ip))
+                {
+                    vigil_reg_instr_t prev_instr = rc->code[rc->code_count - 1U];
+                    if (VREG_GET_OP(prev_instr) == VREG_LOAD_K && VREG_GET_A(prev_instr) == rb)
+                    {
+                        int8_t imm = 0;
+                        if (regvm_constant_as_i8(stack_chunk, VREG_GET_Bx(prev_instr), &imm))
+                        {
+                            rc->code_count -= 1U;
+                            if (omap.count > 0U && omap.stack_offsets[omap.count - 1U] == start_ip &&
+                                omap.reg_indices[omap.count - 1U] >= 1U)
+                            {
+                                omap.reg_indices[omap.count - 1U] -= 1U;
+                            }
+                            TR_EMIT(vigil_reg_abc(VREG_LT_I32_IMM_JMP, ra, 0, (uint8_t)imm));
+                            fused_cmp_imm = 1;
+                        }
+                    }
+                }
+                if (!fused_cmp_imm)
+                    TR_EMIT(vigil_reg_abc(map_cmp_jmp(op), ra, rb, 0));
                 jpatch_add(&patches, rc->code_count, direct_target, 0, vs.top);
                 RECORD_DEPTH(direct_target, vs.top);
                 TR_EMIT(vigil_reg_asbx(VREG_JMP, 0, 0));
@@ -2246,18 +2287,19 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
 #define PACK_CALL_ARGS(n)                                                                                              \
     do                                                                                                                 \
     {                                                                                                                  \
-        if ((n) > 0)                                                                                                   \
+        uint32_t _count = (uint32_t)(n);                                                                               \
+        if (_count > 0U && !vs_top_is_contiguous(&vs, _count))                                                         \
         {                                                                                                              \
             uint8_t _base = vs.next_reg;                                                                               \
-            for (uint32_t _ai = 0; _ai < (uint32_t)(n); _ai++)                                                         \
+            for (uint32_t _ai = 0; _ai < _count; _ai++)                                                                \
             {                                                                                                          \
                 uint8_t _exp = (uint8_t)(_base + (uint8_t)_ai);                                                        \
-                uint8_t _act = vs.regs[vs.top - (int)(n) + (int)_ai];                                                  \
+                uint8_t _act = vs.regs[vs.top - (int)_count + (int)_ai];                                               \
                 if (_act != _exp)                                                                                      \
                     TR_EMIT(vigil_reg_abc(VREG_MOVE, _exp, _act, 0));                                                  \
-                vs.regs[vs.top - (int)(n) + (int)_ai] = _exp;                                                          \
+                vs.regs[vs.top - (int)_count + (int)_ai] = _exp;                                                       \
             }                                                                                                          \
-            vs.next_reg = (uint8_t)(_base + (uint8_t)(n));                                                             \
+            vs.next_reg = (uint8_t)(_base + (uint8_t)_count);                                                          \
         }                                                                                                              \
     } while (0)
 
@@ -3524,6 +3566,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
             [VREG_JMP] = &&r_JMP,
             [VREG_TEST] = &&r_TEST,
             [VREG_LT_I32_JMP] = &&r_LT_I32_JMP,
+            [VREG_LT_I32_IMM_JMP] = &&r_LT_I32_IMM_JMP,
             [VREG_LE_I32_JMP] = &&r_LE_I32_JMP,
             [VREG_GT_I32_JMP] = &&r_GT_I32_JMP,
             [VREG_GE_I32_JMP] = &&r_GE_I32_JMP,
@@ -4133,6 +4176,17 @@ r_dispatch_switch_check:
     {
         vigil_reg_instr_t i = code[ip];
         if (vigil_nanbox_decode_i32(R[VREG_GET_A(i)]) < vigil_nanbox_decode_i32(R[VREG_GET_B(i)]))
+        {
+            ip += 2;
+            RDISPATCH(); /* skip jump */
+        }
+        ip++;
+        RDISPATCH(); /* execute jump */
+    }
+    RCASE(LT_I32_IMM_JMP)
+    {
+        vigil_reg_instr_t i = code[ip];
+        if (vigil_nanbox_decode_i32(R[VREG_GET_A(i)]) < (int32_t)(int8_t)VREG_GET_C(i))
         {
             ip += 2;
             RDISPATCH(); /* skip jump */
