@@ -105,6 +105,11 @@ if(VIGIL_ENABLE_BEARSSL_TLS AND VIGIL_STDLIB_HTTP)
     endif()
 endif()
 
+if(VIGIL_OPCODE_PROFILE)
+    target_compile_definitions(vigil PRIVATE VIGIL_OPCODE_PROFILE)
+    target_compile_definitions(vigil_core PRIVATE VIGIL_OPCODE_PROFILE)
+endif()
+
 # ── MSVC multi-config output directory fix ───────────────────────────
 
 if(MSVC)

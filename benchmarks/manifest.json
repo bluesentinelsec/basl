@@ -9,7 +9,8 @@
       ],
       "warmups": 1,
       "iterations": 5,
-      "timeout_seconds": 20
+      "timeout_seconds": 20,
+      "profile_iterations": 10
     },
     {
       "name": "run_vm_arith",
@@ -19,7 +20,8 @@
       ],
       "warmups": 1,
       "iterations": 5,
-      "timeout_seconds": 20
+      "timeout_seconds": 20,
+      "profile_iterations": 30
     },
     {
       "name": "run_parse_ops",
@@ -29,7 +31,8 @@
       ],
       "warmups": 1,
       "iterations": 5,
-      "timeout_seconds": 20
+      "timeout_seconds": 20,
+      "profile_iterations": 20
     },
     {
       "name": "run_regex_scan",
@@ -39,7 +42,8 @@
       ],
       "warmups": 1,
       "iterations": 5,
-      "timeout_seconds": 20
+      "timeout_seconds": 20,
+      "profile_iterations": 20
     },
     {
       "name": "run_csv_roundtrip",
@@ -49,7 +53,8 @@
       ],
       "warmups": 1,
       "iterations": 5,
-      "timeout_seconds": 20
+      "timeout_seconds": 20,
+      "profile_iterations": 20
     },
     {
       "name": "run_math_ops",
@@ -59,7 +64,8 @@
       ],
       "warmups": 1,
       "iterations": 5,
-      "timeout_seconds": 20
+      "timeout_seconds": 20,
+      "profile_iterations": 100
     },
     {
       "name": "run_fib",
@@ -69,7 +75,8 @@
       ],
       "warmups": 1,
       "iterations": 5,
-      "timeout_seconds": 20
+      "timeout_seconds": 20,
+      "profile_iterations": 50
     }
   ]
 }
