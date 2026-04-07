@@ -1080,6 +1080,79 @@ static uint8_t map_cmp_jmp(uint8_t stack_op)
     }
 }
 
+static int stack_opcode_is_comparison(uint8_t op)
+{
+    switch (op)
+    {
+    case VIGIL_OPCODE_EQUAL:
+    case VIGIL_OPCODE_LESS:
+    case VIGIL_OPCODE_GREATER:
+    case VIGIL_OPCODE_LESS_I32:
+    case VIGIL_OPCODE_LESS_EQUAL_I32:
+    case VIGIL_OPCODE_GREATER_I32:
+    case VIGIL_OPCODE_GREATER_EQUAL_I32:
+    case VIGIL_OPCODE_EQUAL_I32:
+    case VIGIL_OPCODE_NOT_EQUAL_I32:
+    case VIGIL_OPCODE_LESS_I64:
+    case VIGIL_OPCODE_LESS_EQUAL_I64:
+    case VIGIL_OPCODE_GREATER_I64:
+    case VIGIL_OPCODE_GREATER_EQUAL_I64:
+    case VIGIL_OPCODE_EQUAL_I64:
+    case VIGIL_OPCODE_NOT_EQUAL_I64:
+    case VIGIL_OPCODE_LESS_I32_JUMP_IF_FALSE:
+    case VIGIL_OPCODE_LESS_EQUAL_I32_JUMP_IF_FALSE:
+    case VIGIL_OPCODE_GREATER_I32_JUMP_IF_FALSE:
+    case VIGIL_OPCODE_GREATER_EQUAL_I32_JUMP_IF_FALSE:
+    case VIGIL_OPCODE_EQUAL_I32_JUMP_IF_FALSE:
+    case VIGIL_OPCODE_NOT_EQUAL_I32_JUMP_IF_FALSE:
+    case VIGIL_OPCODE_LESS_I64_JUMP_IF_FALSE:
+    case VIGIL_OPCODE_LESS_EQUAL_I64_JUMP_IF_FALSE:
+    case VIGIL_OPCODE_GREATER_I64_JUMP_IF_FALSE:
+    case VIGIL_OPCODE_GREATER_EQUAL_I64_JUMP_IF_FALSE:
+    case VIGIL_OPCODE_EQUAL_I64_JUMP_IF_FALSE:
+    case VIGIL_OPCODE_NOT_EQUAL_I64_JUMP_IF_FALSE:
+        return 1;
+    default:
+        return 0;
+    }
+}
+
+static int stack_opcode_is_chain_load(uint8_t op)
+{
+    return op == VIGIL_OPCODE_GET_LOCAL || op == VIGIL_OPCODE_CONSTANT || op == VIGIL_OPCODE_TRUE ||
+           op == VIGIL_OPCODE_FALSE || op == VIGIL_OPCODE_NIL || op == VIGIL_OPCODE_GET_GLOBAL;
+}
+
+static int regvm_constant_as_i8(const vigil_chunk_t *stack_chunk, uint16_t ci, int8_t *out_imm)
+{
+    const vigil_value_t *cv;
+    vigil_value_kind_t kind;
+    int64_t value;
+
+    if (stack_chunk == NULL || out_imm == NULL || ci >= stack_chunk->constant_count)
+        return 0;
+
+    cv = &stack_chunk->constants[ci];
+    kind = vigil_value_kind(cv);
+    if (kind == VIGIL_VALUE_UINT)
+    {
+        uint64_t uvalue = vigil_value_as_uint(cv);
+        if (uvalue > 127U)
+            return 0;
+        *out_imm = (int8_t)uvalue;
+        return 1;
+    }
+    if (kind != VIGIL_VALUE_INT)
+        return 0;
+
+    value = vigil_value_as_int(cv);
+    if (value < -128 || value > 127)
+        return 0;
+
+    *out_imm = (int8_t)value;
+    return 1;
+}
+
 static uint8_t map_conv(uint8_t stack_op)
 {
     switch (stack_op)
@@ -1621,6 +1694,10 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
     } while (0)
 
     size_t ip = 0;
+    size_t prev_prev_start_ip = (size_t)-1;
+    size_t prev_start_ip = (size_t)-1;
+    uint8_t prev_prev_op = 0xFFU;
+    uint8_t prev_op = 0xFFU;
     int reachable = 1;
 #define NORMALIZE_TO_TARGET(target_off)                                                                                \
     do                                                                                                                 \
@@ -1771,7 +1848,70 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
             uint8_t rb = vs_pop(&vs);
             uint8_t ra = vs_pop(&vs);
             uint8_t rd = vs_push(&vs);
-            TR_EMIT(vigil_reg_abc(map_binop(op), rd, ra, rb));
+            int fused_imm = 0;
+            uint8_t imm_op = 0;
+            size_t remove_count = 0U;
+            vigil_reg_instr_t load_k_instr = 0U;
+
+            if (op == VIGIL_OPCODE_ADD_I32)
+                imm_op = VREG_ADDI;
+            else if (op == VIGIL_OPCODE_SUBTRACT_I32)
+                imm_op = VREG_SUBI;
+            else if (op == VIGIL_OPCODE_ADD_I64)
+                imm_op = VREG_ADDI_I64;
+            else if (op == VIGIL_OPCODE_SUBTRACT_I64)
+                imm_op = VREG_SUBI_I64;
+
+            if (imm_op != 0 && rb >= vs.local_count && rc->code_count > 0U)
+            {
+                if (prev_op == VIGIL_OPCODE_CONSTANT && prev_start_ip != (size_t)-1 &&
+                    !jump_target_contains(jt, jt_count, prev_start_ip))
+                {
+                    vigil_reg_instr_t prev_instr = rc->code[rc->code_count - 1U];
+                    if (VREG_GET_OP(prev_instr) == VREG_LOAD_K && VREG_GET_A(prev_instr) == rb)
+                    {
+                        load_k_instr = prev_instr;
+                        remove_count = 1U;
+                    }
+                }
+                else if ((op == VIGIL_OPCODE_ADD_I64 || op == VIGIL_OPCODE_SUBTRACT_I64) &&
+                         prev_op == VIGIL_OPCODE_TO_I64 && prev_start_ip != (size_t)-1 &&
+                         prev_prev_op == VIGIL_OPCODE_CONSTANT && prev_prev_start_ip != (size_t)-1 &&
+                         !jump_target_contains(jt, jt_count, prev_start_ip) &&
+                         !jump_target_contains(jt, jt_count, prev_prev_start_ip) && rc->code_count > 1U)
+                {
+                    vigil_reg_instr_t to_i64_instr = rc->code[rc->code_count - 1U];
+                    vigil_reg_instr_t prev_instr = rc->code[rc->code_count - 2U];
+                    if (VREG_GET_OP(to_i64_instr) == VREG_TO_I64 && VREG_GET_A(to_i64_instr) == rb &&
+                        VREG_GET_B(to_i64_instr) == rb && VREG_GET_OP(prev_instr) == VREG_LOAD_K &&
+                        VREG_GET_A(prev_instr) == rb)
+                    {
+                        load_k_instr = prev_instr;
+                        remove_count = 2U;
+                    }
+                }
+
+                if (remove_count > 0U)
+                {
+                    int8_t imm = 0;
+                    if (regvm_constant_as_i8(stack_chunk, VREG_GET_Bx(load_k_instr), &imm))
+                    {
+                        /* Drop the now-dead immediate materialization sequence
+                           (LOAD_K or LOAD_K+TO_I64). */
+                        rc->code_count -= remove_count;
+                        if (omap.count > 0U && omap.stack_offsets[omap.count - 1U] == start_ip &&
+                            omap.reg_indices[omap.count - 1U] >= remove_count)
+                        {
+                            omap.reg_indices[omap.count - 1U] -= remove_count;
+                        }
+                        TR_EMIT(vigil_reg_abc(imm_op, rd, ra, (uint8_t)imm));
+                        fused_imm = 1;
+                    }
+                }
+            }
+
+            if (!fused_imm)
+                TR_EMIT(vigil_reg_abc(map_binop(op), rd, ra, rb));
             ip += 1;
             break;
         }
@@ -1975,10 +2115,35 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
             if (ip < code_size && code[ip] == VIGIL_OPCODE_POP && ip + 1 < code_size)
             {
                 uint8_t next = code[ip + 1U];
-                /* POP followed by a data load = right-hand side of &&/||. */
-                in_chain =
-                    (next == VIGIL_OPCODE_GET_LOCAL || next == VIGIL_OPCODE_CONSTANT || next == VIGIL_OPCODE_TRUE ||
-                     next == VIGIL_OPCODE_FALSE || next == VIGIL_OPCODE_NIL || next == VIGIL_OPCODE_GET_GLOBAL);
+                /* Treat POP+load as chain RHS only when the loaded value
+                   participates in another boolean test/comparison, not when
+                   it starts a plain statement body. */
+                if (stack_opcode_is_chain_load(next))
+                {
+                    size_t rhs_start = ip + 1U;
+                    size_t rhs_end = rhs_start + stack_op_size(code, rhs_start, code_size);
+                    size_t scan = rhs_end;
+                    size_t steps = 0U;
+
+                    while (scan < code_size && steps < 24U)
+                    {
+                        uint8_t sop = code[scan];
+                        if (sop == VIGIL_OPCODE_JUMP_IF_FALSE || stack_opcode_is_comparison(sop))
+                        {
+                            in_chain = 1;
+                            break;
+                        }
+                        if (sop == VIGIL_OPCODE_RETURN || sop == VIGIL_OPCODE_SET_LOCAL ||
+                            sop == VIGIL_OPCODE_SET_GLOBAL || sop == VIGIL_OPCODE_SET_CAPTURE ||
+                            sop == VIGIL_OPCODE_POP || sop == VIGIL_OPCODE_JUMP || sop == VIGIL_OPCODE_LOOP)
+                        {
+                            break;
+                        }
+
+                        scan += stack_op_size(code, scan, code_size);
+                        steps += 1U;
+                    }
+                }
             }
 
             if (!in_chain && ip < code_size && code[ip] == VIGIL_OPCODE_JUMP && target < code_size &&
@@ -2902,6 +3067,10 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
 
         if (vs.next_reg > max_next_reg)
             max_next_reg = vs.next_reg;
+        prev_prev_start_ip = prev_start_ip;
+        prev_start_ip = start_ip;
+        prev_prev_op = prev_op;
+        prev_op = op;
     }
 
     /* Record final offset mapping. */
@@ -3312,11 +3481,15 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
             [VREG_MOD] = &&r_MOD,
             [VREG_ADD_I32] = &&r_ADD_I32,
             [VREG_SUB_I32] = &&r_SUB_I32,
+            [VREG_ADDI] = &&r_ADDI,
+            [VREG_SUBI] = &&r_SUBI,
             [VREG_MUL_I32] = &&r_MUL_I32,
             [VREG_DIV_I32] = &&r_DIV_I32,
             [VREG_MOD_I32] = &&r_MOD_I32,
             [VREG_ADD_I64] = &&r_ADD_I64,
             [VREG_SUB_I64] = &&r_SUB_I64,
+            [VREG_ADDI_I64] = &&r_ADDI_I64,
+            [VREG_SUBI_I64] = &&r_SUBI_I64,
             [VREG_MUL_I64] = &&r_MUL_I64,
             [VREG_DIV_I64] = &&r_DIV_I64,
             [VREG_MOD_I64] = &&r_MOD_I64,
@@ -3604,6 +3777,28 @@ r_dispatch_switch_check:
         RSTORE(VREG_GET_A(i), vigil_nanbox_encode_i32(r));
         RNEXT();
     }
+    RCASE(ADDI)
+    {
+        vigil_reg_instr_t i = code[ip];
+        int32_t a = vigil_nanbox_decode_i32(R[VREG_GET_B(i)]);
+        int32_t b = (int32_t)(int8_t)VREG_GET_C(i);
+        int32_t r;
+        if (VIGIL_UNLIKELY(VIGIL_I32_ADD_OVERFLOW(a, b, &r)))
+            goto r_overflow;
+        RSTORE(VREG_GET_A(i), vigil_nanbox_encode_i32(r));
+        RNEXT();
+    }
+    RCASE(SUBI)
+    {
+        vigil_reg_instr_t i = code[ip];
+        int32_t a = vigil_nanbox_decode_i32(R[VREG_GET_B(i)]);
+        int32_t b = (int32_t)(int8_t)VREG_GET_C(i);
+        int32_t r;
+        if (VIGIL_UNLIKELY(VIGIL_I32_SUB_OVERFLOW(a, b, &r)))
+            goto r_overflow;
+        RSTORE(VREG_GET_A(i), vigil_nanbox_encode_i32(r));
+        RNEXT();
+    }
     RCASE(MUL_I32)
     {
         vigil_reg_instr_t i = code[ip];
@@ -3697,6 +3892,28 @@ r_dispatch_switch_check:
         vigil_reg_instr_t i = code[ip];
         int64_t a = regvm_decode_int(R[VREG_GET_B(i)]);
         int64_t b = regvm_decode_int(R[VREG_GET_C(i)]);
+        int64_t r;
+        if (VIGIL_UNLIKELY(!regvm_try_subtract_i64(a, b, &r)))
+            goto r_overflow;
+        RSTORE(VREG_GET_A(i), vigil_nanbox_encode_int(r));
+        RNEXT();
+    }
+    RCASE(ADDI_I64)
+    {
+        vigil_reg_instr_t i = code[ip];
+        int64_t a = regvm_decode_int(R[VREG_GET_B(i)]);
+        int64_t b = (int64_t)(int8_t)VREG_GET_C(i);
+        int64_t r;
+        if (VIGIL_UNLIKELY(!regvm_try_add_i64(a, b, &r)))
+            goto r_overflow;
+        RSTORE(VREG_GET_A(i), vigil_nanbox_encode_int(r));
+        RNEXT();
+    }
+    RCASE(SUBI_I64)
+    {
+        vigil_reg_instr_t i = code[ip];
+        int64_t a = regvm_decode_int(R[VREG_GET_B(i)]);
+        int64_t b = (int64_t)(int8_t)VREG_GET_C(i);
         int64_t r;
         if (VIGIL_UNLIKELY(!regvm_try_subtract_i64(a, b, &r)))
             goto r_overflow;

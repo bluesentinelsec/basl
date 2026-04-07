@@ -82,8 +82,8 @@
     {
       "path": "src/regvm.c",
       "thresholds": {
-        "ccn": 370,
-        "length": 2900
+        "ccn": 375,
+        "length": 2950
       }
     },
     {

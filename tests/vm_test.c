@@ -4,6 +4,7 @@
 #include <string.h>
 
 #if !defined(_WIN32)
+#include "internal/vigil_regvm.h"
 #include "internal/vigil_vm_internal.h"
 #endif
 #include "vigil/vigil.h"
@@ -26,6 +27,16 @@ typedef struct VmTestContextOptions
     const vigil_runtime_options_t *runtime_options;
     const vigil_vm_options_t *vm_options;
 } VmTestContextOptions;
+
+#if !defined(_WIN32)
+typedef struct CompiledMainFixture
+{
+    vigil_runtime_t *runtime;
+    vigil_source_registry_t registry;
+    vigil_diagnostic_list_t diagnostics;
+    vigil_object_t *function;
+} CompiledMainFixture;
+#endif
 
 static vigil_status_t OpenVmTestContextWithOptions(vigil_runtime_t **runtime, vigil_vm_t **vm, vigil_chunk_t *chunk,
                                                    vigil_value_t *result, const VmTestContextOptions *options,
@@ -191,6 +202,103 @@ static vigil_status_t RunCompiledSource(const char *source_text, int64_t *out_re
     vigil_runtime_close(&runtime);
     return status;
 }
+
+#if !defined(_WIN32)
+static vigil_status_t OpenCompiledMainFixture(const char *source_text, CompiledMainFixture *fixture,
+                                              vigil_error_t *error)
+{
+    vigil_source_id_t source_id = 0U;
+    vigil_status_t status;
+
+    memset(fixture, 0, sizeof(*fixture));
+
+    status = vigil_runtime_open(&fixture->runtime, NULL, error);
+    if (status != VIGIL_STATUS_OK)
+        return status;
+
+    vigil_source_registry_init(&fixture->registry, fixture->runtime);
+    vigil_diagnostic_list_init(&fixture->diagnostics, fixture->runtime);
+
+    status = vigil_source_registry_register_cstr(&fixture->registry, "main.vigil", source_text, &source_id, error);
+    if (status != VIGIL_STATUS_OK)
+        goto fail;
+
+    status = vigil_compile_source(&fixture->registry, source_id, &fixture->function, &fixture->diagnostics, error);
+    if (status != VIGIL_STATUS_OK)
+        goto fail;
+
+    return VIGIL_STATUS_OK;
+
+fail:
+    vigil_object_release(&fixture->function);
+    vigil_diagnostic_list_free(&fixture->diagnostics);
+    vigil_source_registry_free(&fixture->registry);
+    vigil_runtime_close(&fixture->runtime);
+    return status;
+}
+
+static void CloseCompiledMainFixture(CompiledMainFixture *fixture)
+{
+    vigil_object_release(&fixture->function);
+    vigil_diagnostic_list_free(&fixture->diagnostics);
+    vigil_source_registry_free(&fixture->registry);
+    vigil_runtime_close(&fixture->runtime);
+    memset(fixture, 0, sizeof(*fixture));
+}
+
+static size_t RegInstructionWordCount(const vigil_reg_chunk_t *chunk, size_t ip)
+{
+    uint8_t op;
+
+    if (chunk == NULL || ip >= chunk->code_count)
+        return 1U;
+
+    op = VREG_GET_OP(chunk->code[ip]);
+    switch (op)
+    {
+    case VREG_CALL_NATIVE:
+    case VREG_CALL_VALUE:
+    case VREG_CALL_SELF:
+    case VREG_CALL_EXTERN:
+    case VREG_NEW_INSTANCE:
+        return 2U;
+    case VREG_CALL_INTERFACE:
+    case VREG_FORLOOP_I32:
+    case VREG_FORLOOP_I64:
+    case VREG_FORMAT_SPEC:
+        return 3U;
+    case VREG_DEFER:
+        if (VREG_GET_A(chunk->code[ip]) == VIGIL_OPCODE_DEFER_CALL_INTERFACE)
+            return 4U;
+        return 3U;
+    default:
+        return 1U;
+    }
+}
+
+static size_t CountRegOpcode(const vigil_reg_chunk_t *chunk, uint8_t opcode)
+{
+    size_t count = 0U;
+    size_t i = 0U;
+
+    if (chunk == NULL)
+        return 0U;
+
+    while (i < chunk->code_count)
+    {
+        size_t step = RegInstructionWordCount(chunk, i);
+
+        if (VREG_GET_OP(chunk->code[i]) == opcode)
+            count += 1U;
+
+        if (step == 0U || step > chunk->code_count - i)
+            step = 1U;
+        i += step;
+    }
+
+    return count;
+}
+#endif /* !_WIN32 */
 
 static vigil_status_t RunBinaryIntOpcode(vigil_opcode_t opcode, int64_t left_value, int64_t right_value,
                                          int64_t *out_result, vigil_error_t *error)
@@ -497,6 +605,105 @@ TEST(VigilVmTest, CompilesAndExecutesDeferredMultipleReturnValues)
               VIGIL_STATUS_OK);
     EXPECT_EQ(output, 145);
 }
+
+#if !defined(_WIN32)
+TEST(VigilVmTest, FusesPlainI32CompareJumpWithoutChainFallback)
+{
+    static const char source[] = "fn main() -> i32 {"
+                                 "    i32 n = 1;"
+                                 "    if n < 2 {"
+                                 "        return n;"
+                                 "    }"
+                                 "    return 0;"
+                                 "}";
+    CompiledMainFixture fixture;
+    vigil_error_t error = {0};
+    const vigil_reg_chunk_t *reg_chunk = NULL;
+    vigil_chunk_t *chunk = NULL;
+
+    ASSERT_EQ(OpenCompiledMainFixture(source, &fixture, &error), VIGIL_STATUS_OK);
+    ASSERT_EQ(vigil_diagnostic_list_count(&fixture.diagnostics), 0U);
+
+    chunk = (vigil_chunk_t *)vigil_function_object_chunk(fixture.function);
+    ASSERT_NE(chunk, NULL);
+    ASSERT_EQ(vigil_chunk_ensure_reg_cache(chunk, (uint8_t)vigil_function_object_arity(fixture.function), &reg_chunk,
+                                           &error),
+              VIGIL_STATUS_OK);
+    ASSERT_NE(reg_chunk, NULL);
+    EXPECT_TRUE(CountRegOpcode(reg_chunk, VREG_LT_I32_JMP) >= 1U);
+    EXPECT_EQ(CountRegOpcode(reg_chunk, VREG_TEST), 0U);
+
+    CloseCompiledMainFixture(&fixture);
+}
+
+TEST(VigilVmTest, FusesI32ImmediateAddAndSub)
+{
+    static const char source[] = "fn main() -> i32 {"
+                                 "    i32 n = 3;"
+                                 "    i32 a = n + 2;"
+                                 "    return a - 1;"
+                                 "}";
+    CompiledMainFixture fixture;
+    vigil_error_t error = {0};
+    const vigil_reg_chunk_t *reg_chunk = NULL;
+    vigil_chunk_t *chunk = NULL;
+
+    ASSERT_EQ(OpenCompiledMainFixture(source, &fixture, &error), VIGIL_STATUS_OK);
+    ASSERT_EQ(vigil_diagnostic_list_count(&fixture.diagnostics), 0U);
+
+    chunk = (vigil_chunk_t *)vigil_function_object_chunk(fixture.function);
+    ASSERT_NE(chunk, NULL);
+    ASSERT_EQ(vigil_chunk_ensure_reg_cache(chunk, (uint8_t)vigil_function_object_arity(fixture.function), &reg_chunk,
+                                           &error),
+              VIGIL_STATUS_OK);
+    ASSERT_NE(reg_chunk, NULL);
+    EXPECT_EQ(CountRegOpcode(reg_chunk, VREG_ADDI), 1U);
+    EXPECT_EQ(CountRegOpcode(reg_chunk, VREG_SUBI), 1U);
+    EXPECT_EQ(CountRegOpcode(reg_chunk, VREG_LOAD_K), 1U);
+
+    CloseCompiledMainFixture(&fixture);
+}
+
+TEST(VigilVmTest, FusesI64ImmediateAddAndSub)
+{
+    static const char source[] = "fn main() -> i32 {"
+                                 "    i64 n = i64(3);"
+                                 "    i64 a = n + i64(2);"
+                                 "    i64 b = a - i64(1);"
+                                 "    if b == i64(4) {"
+                                 "        return 1;"
+                                 "    }"
+                                 "    return 0;"
+                                 "}";
+    CompiledMainFixture fixture;
+    vigil_error_t error = {0};
+    const vigil_reg_chunk_t *reg_chunk = NULL;
+    vigil_chunk_t *chunk = NULL;
+    size_t add_i64_imm_count = 0U;
+    size_t add_i64_count = 0U;
+    size_t sub_i64_imm_count = 0U;
+    size_t sub_i64_count = 0U;
+
+    ASSERT_EQ(OpenCompiledMainFixture(source, &fixture, &error), VIGIL_STATUS_OK);
+    ASSERT_EQ(vigil_diagnostic_list_count(&fixture.diagnostics), 0U);
+
+    chunk = (vigil_chunk_t *)vigil_function_object_chunk(fixture.function);
+    ASSERT_NE(chunk, NULL);
+    ASSERT_EQ(vigil_chunk_ensure_reg_cache(chunk, (uint8_t)vigil_function_object_arity(fixture.function), &reg_chunk,
+                                           &error),
+              VIGIL_STATUS_OK);
+    ASSERT_NE(reg_chunk, NULL);
+    add_i64_imm_count = CountRegOpcode(reg_chunk, VREG_ADDI_I64);
+    add_i64_count = CountRegOpcode(reg_chunk, VREG_ADD_I64);
+    sub_i64_imm_count = CountRegOpcode(reg_chunk, VREG_SUBI_I64);
+    sub_i64_count = CountRegOpcode(reg_chunk, VREG_SUB_I64);
+    EXPECT_EQ(add_i64_imm_count + add_i64_count, 1U);
+    EXPECT_EQ(sub_i64_imm_count, 1U);
+    EXPECT_EQ(sub_i64_count, 0U);
+
+    CloseCompiledMainFixture(&fixture);
+}
+#endif /* !_WIN32 */
 
 TEST(VigilVmTest, RejectsHugeFloatFormatPrecision)
 {
@@ -2197,6 +2404,11 @@ void register_vm_tests(void)
     REGISTER_TEST(VigilVmTest, ReturnedObjectSurvivesChunkLifetime);
     REGISTER_TEST(VigilVmTest, CompilesAndExecutesMultipleReturnValues);
     REGISTER_TEST(VigilVmTest, CompilesAndExecutesDeferredMultipleReturnValues);
+#if !defined(_WIN32)
+    REGISTER_TEST(VigilVmTest, FusesPlainI32CompareJumpWithoutChainFallback);
+    REGISTER_TEST(VigilVmTest, FusesI32ImmediateAddAndSub);
+    REGISTER_TEST(VigilVmTest, FusesI64ImmediateAddAndSub);
+#endif
     REGISTER_TEST(VigilVmTest, ComparesDifferentObjectTypesByValue);
     REGISTER_TEST(VigilVmTest, RejectsToStringOnNonStringObject);
     REGISTER_TEST(VigilVmTest, RejectsDeferredNativeCallTargetThatIsNotNative);
