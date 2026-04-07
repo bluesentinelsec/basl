@@ -972,41 +972,23 @@ static vigil_status_t fs_chdir(vigil_vm_t *vm, size_t arg_count, vigil_error_t *
     return push_bool(vm, s == VIGIL_STATUS_OK, error);
 }
 
-static vigil_status_t fs_is_valid_name(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+static int is_invalid_filename_char(char c)
 {
-    size_t base = vigil_vm_stack_depth(vm) - arg_count;
-    const char *name;
-    size_t name_len;
-
-    if (!get_string_arg(vm, base, 0, &name, &name_len))
-    {
-        vigil_vm_stack_pop_n(vm, arg_count);
-        return push_bool(vm, 0, error);
-    }
-
-    vigil_vm_stack_pop_n(vm, arg_count);
-
-    /* Empty name is invalid */
-    if (name_len == 0)
-        return push_bool(vm, 0, error);
-
-    /* Reject path separators — this validates a single filename component */
-    for (size_t i = 0; i < name_len; i++)
-    {
-        char c = name[i];
-        if (c == '/' || c == '\0')
-            return push_bool(vm, 0, error);
+    if (c == '/' || c == '\0')
+        return 1;
 #ifdef _WIN32
-        if (c == '\\' || c == ':' || c == '*' || c == '?' || c == '"' || c == '<' || c == '>' || c == '|')
-            return push_bool(vm, 0, error);
+    if (c == '\\' || c == ':' || c == '*' || c == '?' || c == '"' || c == '<' || c == '>' || c == '|')
+        return 1;
 #endif
-    }
+    return 0;
+}
 
 #ifdef _WIN32
-    /* Reject Windows reserved names (case-insensitive, with or without extension) */
-    static const char *const reserved[] = {"CON",  "PRN",  "AUX",  "NUL",  "COM1", "COM2", "COM3", "COM4", "COM5",
-                                           "COM6", "COM7", "COM8", "COM9", "LPT1", "LPT2", "LPT3", "LPT4", "LPT5",
-                                           "LPT6", "LPT7", "LPT8", "LPT9", NULL};
+static int is_reserved_win32_name(const char *name, size_t name_len)
+{
+    static const char *const reserved[] = {"CON",  "PRN",  "AUX",  "NUL",  "COM1", "COM2", "COM3", "COM4",
+                                           "COM5", "COM6", "COM7", "COM8", "COM9", "LPT1", "LPT2", "LPT3",
+                                           "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9", NULL};
     /* Extract stem (before first dot) for comparison */
     size_t stem_len = name_len;
     for (size_t i = 0; i < name_len; i++)
@@ -1026,18 +1008,47 @@ static vigil_status_t fs_is_valid_name(vigil_vm_t *vm, size_t arg_count, vigil_e
         for (size_t i = 0; i < rlen; i++)
         {
             char a = name[i];
-            char b = (*r)[i];
             if (a >= 'a' && a <= 'z')
                 a -= 32;
-            if (a != b)
+            if (a != (*r)[i])
             {
                 match = 0;
                 break;
             }
         }
         if (match)
+            return 1;
+    }
+    return 0;
+}
+#endif
+
+static vigil_status_t fs_is_valid_name(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    const char *name;
+    size_t name_len;
+
+    if (!get_string_arg(vm, base, 0, &name, &name_len))
+    {
+        vigil_vm_stack_pop_n(vm, arg_count);
+        return push_bool(vm, 0, error);
+    }
+
+    vigil_vm_stack_pop_n(vm, arg_count);
+
+    if (name_len == 0)
+        return push_bool(vm, 0, error);
+
+    for (size_t i = 0; i < name_len; i++)
+    {
+        if (is_invalid_filename_char(name[i]))
             return push_bool(vm, 0, error);
     }
+
+#ifdef _WIN32
+    if (is_reserved_win32_name(name, name_len))
+        return push_bool(vm, 0, error);
 #endif
 
     return push_bool(vm, 1, error);
