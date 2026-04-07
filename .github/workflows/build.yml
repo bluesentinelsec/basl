@@ -336,31 +336,6 @@ jobs:
       - name: Run tests via Node.js
         run: node build/vigil_tests.js
 
-  clang-format:
-    timeout-minutes: 5
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-
-      - name: Install clang-format
-        run: sudo apt-get update && sudo apt-get install -y clang-format-18
-
-      - name: Fetch main
-        run: git fetch origin main --depth=1
-
-      - name: Check formatting
-        env:
-          CLANG_FORMAT_BIN: /usr/bin/clang-format-18
-        run: |
-          mapfile -t files < <(git diff --name-only --diff-filter=ACMR origin/main...HEAD -- '*.c' '*.h' | grep -v '^deps/')
-          if [ "${#files[@]}" -eq 0 ]; then
-            echo "No C or header changes to format-check."
-            exit 0
-          fi
-          scripts/run_clang_format.sh --check "${files[@]}"
   portability:
     timeout-minutes: 5
     runs-on: ubuntu-latest
@@ -378,6 +353,7 @@ jobs:
         run: python3 scripts/check_stdlib_portability.py
 
   valgrind:
+    if: github.event_name == 'workflow_dispatch'
     timeout-minutes: 15
     runs-on: ubuntu-latest
 

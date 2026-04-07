@@ -1970,10 +1970,12 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
             size_t direct_target = target;
             int in_chain = 0;
 
+            /* Detect &&/|| short-circuit chains where the bool must stay
+               on the stack for the next comparison in the chain. */
             if (ip < code_size && code[ip] == VIGIL_OPCODE_POP && ip + 1 < code_size)
             {
                 uint8_t next = code[ip + 1U];
-
+                /* POP followed by a data load = right-hand side of &&/||. */
                 in_chain =
                     (next == VIGIL_OPCODE_GET_LOCAL || next == VIGIL_OPCODE_CONSTANT || next == VIGIL_OPCODE_TRUE ||
                      next == VIGIL_OPCODE_FALSE || next == VIGIL_OPCODE_NIL || next == VIGIL_OPCODE_GET_GLOBAL);
@@ -1989,14 +1991,6 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
                 direct_target += 1U;
 
             if (!in_chain && (depth_at[target] >= 0 || depth_at[direct_target] >= 0))
-                in_chain = 1;
-
-            /* When the target has a POP that the else-path would skip, other
-               jumps (or the LOOP back-edge) may also reach that POP via the
-               jump-target list, creating a stack-depth mismatch.  Fall back
-               to the safe in_chain path which keeps the boolean on the stack
-               and lets the POP execute normally. */
-            if (!in_chain && direct_target != target)
                 in_chain = 1;
 
             if (in_chain)
