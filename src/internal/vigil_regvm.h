@@ -232,6 +232,10 @@ typedef enum vigil_reg_op
     VREG_ARRAY_CLEAR = 133,     /* A        clear R[A] */
     VREG_MAP_CLEAR = 134,       /* A        clear R[A] */
 
+    /* Immediate i32 arithmetic. */
+    VREG_ADDI = 135, /* A B C   R[A] = R[B] +i32 imm8(C) */
+    VREG_SUBI = 136, /* A B C   R[A] = R[B] -i32 imm8(C) */
+
     VREG_OP_COUNT
 } vigil_reg_op_t;
 

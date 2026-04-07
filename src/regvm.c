@@ -1080,6 +1080,69 @@ static uint8_t map_cmp_jmp(uint8_t stack_op)
     }
 }
 
+static int stack_opcode_is_comparison(uint8_t op)
+{
+    switch (op)
+    {
+    case VIGIL_OPCODE_EQUAL:
+    case VIGIL_OPCODE_LESS:
+    case VIGIL_OPCODE_GREATER:
+    case VIGIL_OPCODE_LESS_I32:
+    case VIGIL_OPCODE_LESS_EQUAL_I32:
+    case VIGIL_OPCODE_GREATER_I32:
+    case VIGIL_OPCODE_GREATER_EQUAL_I32:
+    case VIGIL_OPCODE_EQUAL_I32:
+    case VIGIL_OPCODE_NOT_EQUAL_I32:
+    case VIGIL_OPCODE_LESS_I64:
+    case VIGIL_OPCODE_LESS_EQUAL_I64:
+    case VIGIL_OPCODE_GREATER_I64:
+    case VIGIL_OPCODE_GREATER_EQUAL_I64:
+    case VIGIL_OPCODE_EQUAL_I64:
+    case VIGIL_OPCODE_NOT_EQUAL_I64:
+    case VIGIL_OPCODE_LESS_I32_JUMP_IF_FALSE:
+    case VIGIL_OPCODE_LESS_EQUAL_I32_JUMP_IF_FALSE:
+    case VIGIL_OPCODE_GREATER_I32_JUMP_IF_FALSE:
+    case VIGIL_OPCODE_GREATER_EQUAL_I32_JUMP_IF_FALSE:
+    case VIGIL_OPCODE_EQUAL_I32_JUMP_IF_FALSE:
+    case VIGIL_OPCODE_NOT_EQUAL_I32_JUMP_IF_FALSE:
+    case VIGIL_OPCODE_LESS_I64_JUMP_IF_FALSE:
+    case VIGIL_OPCODE_LESS_EQUAL_I64_JUMP_IF_FALSE:
+    case VIGIL_OPCODE_GREATER_I64_JUMP_IF_FALSE:
+    case VIGIL_OPCODE_GREATER_EQUAL_I64_JUMP_IF_FALSE:
+    case VIGIL_OPCODE_EQUAL_I64_JUMP_IF_FALSE:
+    case VIGIL_OPCODE_NOT_EQUAL_I64_JUMP_IF_FALSE:
+        return 1;
+    default:
+        return 0;
+    }
+}
+
+static int stack_opcode_is_chain_load(uint8_t op)
+{
+    return op == VIGIL_OPCODE_GET_LOCAL || op == VIGIL_OPCODE_CONSTANT || op == VIGIL_OPCODE_TRUE ||
+           op == VIGIL_OPCODE_FALSE || op == VIGIL_OPCODE_NIL || op == VIGIL_OPCODE_GET_GLOBAL;
+}
+
+static int regvm_constant_as_i8(const vigil_chunk_t *stack_chunk, uint16_t ci, int8_t *out_imm)
+{
+    const vigil_value_t *cv;
+    int64_t value;
+
+    if (stack_chunk == NULL || out_imm == NULL || ci >= stack_chunk->constant_count)
+        return 0;
+
+    cv = &stack_chunk->constants[ci];
+    if (vigil_value_kind(cv) != VIGIL_VALUE_INT)
+        return 0;
+
+    value = vigil_value_as_int(cv);
+    if (value < -128 || value > 127)
+        return 0;
+
+    *out_imm = (int8_t)value;
+    return 1;
+}
+
 static uint8_t map_conv(uint8_t stack_op)
 {
     switch (stack_op)
@@ -1621,6 +1684,8 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
     } while (0)
 
     size_t ip = 0;
+    size_t prev_start_ip = (size_t)-1;
+    uint8_t prev_op = 0xFFU;
     int reachable = 1;
 #define NORMALIZE_TO_TARGET(target_off)                                                                                \
     do                                                                                                                 \
@@ -1771,7 +1836,35 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
             uint8_t rb = vs_pop(&vs);
             uint8_t ra = vs_pop(&vs);
             uint8_t rd = vs_push(&vs);
-            TR_EMIT(vigil_reg_abc(map_binop(op), rd, ra, rb));
+            int fused_imm = 0;
+
+            if ((op == VIGIL_OPCODE_ADD_I32 || op == VIGIL_OPCODE_SUBTRACT_I32) && rb >= vs.local_count &&
+                prev_op == VIGIL_OPCODE_CONSTANT && prev_start_ip != (size_t)-1 &&
+                !jump_target_contains(jt, jt_count, prev_start_ip) && rc->code_count > 0U)
+            {
+                vigil_reg_instr_t prev_instr = rc->code[rc->code_count - 1U];
+                if (VREG_GET_OP(prev_instr) == VREG_LOAD_K && VREG_GET_A(prev_instr) == rb)
+                {
+                    int8_t imm = 0;
+                    if (regvm_constant_as_i8(stack_chunk, VREG_GET_Bx(prev_instr), &imm))
+                    {
+                        /* Drop the immediately preceding LOAD_K so ADDI/SUBI
+                           replaces LOAD_K + ADD/SUB as intended. */
+                        rc->code_count -= 1U;
+                        if (omap.count > 0U && omap.stack_offsets[omap.count - 1U] == start_ip &&
+                            omap.reg_indices[omap.count - 1U] > 0U)
+                        {
+                            omap.reg_indices[omap.count - 1U] -= 1U;
+                        }
+                        TR_EMIT(vigil_reg_abc(op == VIGIL_OPCODE_ADD_I32 ? VREG_ADDI : VREG_SUBI, rd, ra,
+                                              (uint8_t)imm));
+                        fused_imm = 1;
+                    }
+                }
+            }
+
+            if (!fused_imm)
+                TR_EMIT(vigil_reg_abc(map_binop(op), rd, ra, rb));
             ip += 1;
             break;
         }
@@ -1975,10 +2068,35 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
             if (ip < code_size && code[ip] == VIGIL_OPCODE_POP && ip + 1 < code_size)
             {
                 uint8_t next = code[ip + 1U];
-                /* POP followed by a data load = right-hand side of &&/||. */
-                in_chain =
-                    (next == VIGIL_OPCODE_GET_LOCAL || next == VIGIL_OPCODE_CONSTANT || next == VIGIL_OPCODE_TRUE ||
-                     next == VIGIL_OPCODE_FALSE || next == VIGIL_OPCODE_NIL || next == VIGIL_OPCODE_GET_GLOBAL);
+                /* Treat POP+load as chain RHS only when the loaded value
+                   participates in another boolean test/comparison, not when
+                   it starts a plain statement body. */
+                if (stack_opcode_is_chain_load(next))
+                {
+                    size_t rhs_start = ip + 1U;
+                    size_t rhs_end = rhs_start + stack_op_size(code, rhs_start, code_size);
+                    size_t scan = rhs_end;
+                    size_t steps = 0U;
+
+                    while (scan < code_size && steps < 24U)
+                    {
+                        uint8_t sop = code[scan];
+                        if (sop == VIGIL_OPCODE_JUMP_IF_FALSE || stack_opcode_is_comparison(sop))
+                        {
+                            in_chain = 1;
+                            break;
+                        }
+                        if (sop == VIGIL_OPCODE_RETURN || sop == VIGIL_OPCODE_SET_LOCAL ||
+                            sop == VIGIL_OPCODE_SET_GLOBAL || sop == VIGIL_OPCODE_SET_CAPTURE ||
+                            sop == VIGIL_OPCODE_POP || sop == VIGIL_OPCODE_JUMP || sop == VIGIL_OPCODE_LOOP)
+                        {
+                            break;
+                        }
+
+                        scan += stack_op_size(code, scan, code_size);
+                        steps += 1U;
+                    }
+                }
             }
 
             if (!in_chain && ip < code_size && code[ip] == VIGIL_OPCODE_JUMP && target < code_size &&
@@ -2902,6 +3020,8 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
 
         if (vs.next_reg > max_next_reg)
             max_next_reg = vs.next_reg;
+        prev_start_ip = start_ip;
+        prev_op = op;
     }
 
     /* Record final offset mapping. */
@@ -3312,6 +3432,8 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
             [VREG_MOD] = &&r_MOD,
             [VREG_ADD_I32] = &&r_ADD_I32,
             [VREG_SUB_I32] = &&r_SUB_I32,
+            [VREG_ADDI] = &&r_ADDI,
+            [VREG_SUBI] = &&r_SUBI,
             [VREG_MUL_I32] = &&r_MUL_I32,
             [VREG_DIV_I32] = &&r_DIV_I32,
             [VREG_MOD_I32] = &&r_MOD_I32,
@@ -3598,6 +3720,28 @@ r_dispatch_switch_check:
         vigil_reg_instr_t i = code[ip];
         int32_t a = vigil_nanbox_decode_i32(R[VREG_GET_B(i)]);
         int32_t b = vigil_nanbox_decode_i32(R[VREG_GET_C(i)]);
+        int32_t r;
+        if (VIGIL_UNLIKELY(VIGIL_I32_SUB_OVERFLOW(a, b, &r)))
+            goto r_overflow;
+        RSTORE(VREG_GET_A(i), vigil_nanbox_encode_i32(r));
+        RNEXT();
+    }
+    RCASE(ADDI)
+    {
+        vigil_reg_instr_t i = code[ip];
+        int32_t a = vigil_nanbox_decode_i32(R[VREG_GET_B(i)]);
+        int32_t b = (int32_t)(int8_t)VREG_GET_C(i);
+        int32_t r;
+        if (VIGIL_UNLIKELY(VIGIL_I32_ADD_OVERFLOW(a, b, &r)))
+            goto r_overflow;
+        RSTORE(VREG_GET_A(i), vigil_nanbox_encode_i32(r));
+        RNEXT();
+    }
+    RCASE(SUBI)
+    {
+        vigil_reg_instr_t i = code[ip];
+        int32_t a = vigil_nanbox_decode_i32(R[VREG_GET_B(i)]);
+        int32_t b = (int32_t)(int8_t)VREG_GET_C(i);
         int32_t r;
         if (VIGIL_UNLIKELY(VIGIL_I32_SUB_OVERFLOW(a, b, &r)))
             goto r_overflow;
