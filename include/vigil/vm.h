@@ -37,6 +37,8 @@ extern "C"
                                               vigil_error_t *error);
     VIGIL_API vigil_status_t vigil_vm_execute_function(vigil_vm_t *vm, const vigil_object_t *function,
                                                        vigil_value_t *out_value, vigil_error_t *error);
+    VIGIL_API void vigil_vm_set_aot_enabled(vigil_vm_t *vm, int enabled);
+    VIGIL_API int vigil_vm_aot_enabled(const vigil_vm_t *vm);
 
     /* Stack access for native function implementations. */
     VIGIL_API vigil_value_t vigil_vm_stack_get(const vigil_vm_t *vm, size_t index);

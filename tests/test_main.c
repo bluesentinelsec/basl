@@ -5,6 +5,7 @@ extern void register_stdlib_regex_tests(void);
 extern void register_stdlib_parse_tests(void);
 extern void register_stdlib_csv_tests(void);
 extern void register_stdlib_json_tests(void);
+extern void register_aot_tests(void);
 extern void register_array_tests(void);
 extern void register_vigil_new_tests(void);
 extern void register_binding_tests(void);
@@ -70,6 +71,7 @@ int main(void)
     register_stdlib_parse_tests();
     register_stdlib_csv_tests();
     register_stdlib_json_tests();
+    register_aot_tests();
     register_array_tests();
     register_vigil_new_tests();
     register_binding_tests();

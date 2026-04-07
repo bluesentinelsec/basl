@@ -31,6 +31,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "internal/vigil_aot.h"
 #include "internal/vigil_internal.h"
 #include "internal/vigil_nanbox.h"
 #include "internal/vigil_regvm.h"
@@ -69,6 +70,22 @@ static vigil_status_t vigil_vm_validate(const vigil_vm_t *vm, vigil_error_t *err
     }
 
     return VIGIL_STATUS_OK;
+}
+
+static int vigil_vm_env_disables_aot(void)
+{
+    const char *value = getenv("VIGIL_NO_AOT");
+
+    return value != NULL && value[0] != '\0' && !(value[0] == '0' && value[1] == '\0');
+}
+
+static int vigil_vm_default_aot_enabled(void)
+{
+#if defined(VIGIL_ENABLE_AOT)
+    return !vigil_vm_env_disables_aot();
+#else
+    return 0;
+#endif
 }
 
 static void vigil_vm_release_stack(vigil_vm_t *vm)
@@ -1900,6 +1917,7 @@ vigil_status_t vigil_vm_open(vigil_vm_t **out_vm, vigil_runtime_t *runtime, cons
     /* Record the calling thread's ID so the debugger can identify which
      * thread owns this VM when a breakpoint fires. */
     vm->thread_id = vigil_platform_thread_current_id();
+    vm->aot_enabled = vigil_vm_default_aot_enabled();
 
     /* Register in the runtime's thread-aware VM registry. */
     status = vigil_runtime_register_vm(runtime, vm, error);
@@ -1956,6 +1974,26 @@ void vigil_vm_close(vigil_vm_t **vm)
     {
         vigil_runtime_free(runtime, &memory);
     }
+}
+
+void vigil_vm_set_aot_enabled(vigil_vm_t *vm, int enabled)
+{
+    if (vm == NULL)
+    {
+        return;
+    }
+
+    vm->aot_enabled = enabled != 0;
+}
+
+int vigil_vm_aot_enabled(const vigil_vm_t *vm)
+{
+    if (vm == NULL)
+    {
+        return 0;
+    }
+
+    return vm->aot_enabled;
 }
 
 vigil_runtime_t *vigil_vm_runtime(const vigil_vm_t *vm)
@@ -2375,7 +2413,7 @@ vigil_status_t vigil_vm_execute_call(vigil_vm_t *vm, const vigil_object_t *calle
     }
 
     vigil_value_t dummy = {0};
-    status = vigil_regvm_execute(vm, callee_rc, &dummy, error);
+    status = vigil_reg_execute_cached(vm, callee_rc, &dummy, error);
 
     /* Pop the callee frame. */
     vigil_vm_pop_frame(vm);
@@ -2478,7 +2516,7 @@ vigil_status_t vigil_vm_execute_function(vigil_vm_t *vm, const vigil_object_t *f
             return status;
         }
 
-        status = vigil_regvm_execute(vm, fn_rc, out_value, error);
+        status = vigil_reg_execute_cached(vm, fn_rc, out_value, error);
         {
             size_t nregs = (size_t)fn_rc->max_registers;
             if (status != VIGIL_STATUS_OK)
@@ -2506,7 +2544,7 @@ vigil_status_t vigil_vm_execute_function(vigil_vm_t *vm, const vigil_object_t *f
         if (status != VIGIL_STATUS_OK)
             return status;
 
-        status = vigil_regvm_execute(vm, fn_rc, out_value, error);
+        status = vigil_reg_execute_cached(vm, fn_rc, out_value, error);
         if (vm->in_regvm_call)
             return status;
         {

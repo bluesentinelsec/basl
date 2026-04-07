@@ -84,6 +84,7 @@ struct vigil_vm
      * opened so the debugger can identify which thread hit a breakpoint. */
     uint64_t thread_id;
     int in_regvm_call; /* set by vigil_vm_execute_call to skip cleanup */
+    int aot_enabled;
 };
 
 /* ── Inline value helpers ──────────────────────────────────────── */

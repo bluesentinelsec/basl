@@ -18,6 +18,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "internal/vigil_aot.h"
 #include "internal/vigil_nanbox.h"
 #include "internal/vigil_vm_internal.h"
 #include "value_internal.h"
@@ -36,6 +37,7 @@ void vigil_reg_chunk_init(vigil_reg_chunk_t *rc)
 void vigil_reg_chunk_free(vigil_reg_chunk_t *rc, vigil_runtime_t *runtime)
 {
     (void)runtime;
+    vigil_aot_cache_free(rc->aot_cache);
     free(rc->code);
     free(rc->span_map);
     memset(rc, 0, sizeof(*rc));

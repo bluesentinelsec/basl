@@ -55,11 +55,12 @@ def wait_for_process(proc: subprocess.Popen[Any], timeout_seconds: int) -> tuple
         time.sleep(0.01)
 
 
-def run_once(argv: list[str], cwd: Path, timeout_seconds: int) -> tuple[int, int]:
+def run_once(argv: list[str], cwd: Path, timeout_seconds: int, env: dict[str, str] | None = None) -> tuple[int, int]:
     with tempfile.TemporaryFile() as stdout_handle, tempfile.TemporaryFile() as stderr_handle:
         proc = subprocess.Popen(
             argv,
             cwd=str(cwd),
+            env=env,
             stdin=subprocess.DEVNULL,
             stdout=stdout_handle,
             stderr=stderr_handle,
@@ -85,20 +86,19 @@ def format_rss(rss_kb: int) -> str:
     return f"{rss_kb} KB"
 
 
-def run_benchmark(repo_root: Path, vigil_bin: Path, entry: dict[str, Any]) -> dict[str, Any]:
-    argv = [str(vigil_bin)] + list(entry["command"])
+def run_variant(repo_root: Path, argv: list[str], entry: dict[str, Any], env: dict[str, str] | None) -> dict[str, Any]:
     warmups = int(entry.get("warmups", 1))
     iterations = int(entry.get("iterations", 5))
     timeout_seconds = int(entry.get("timeout_seconds", 20))
 
     for _ in range(warmups):
-        run_once(argv, repo_root, timeout_seconds)
+        run_once(argv, repo_root, timeout_seconds, env=env)
 
     runs = []
     elapsed_values = []
     rss_values = []
     for _ in range(iterations):
-        elapsed_ns, max_rss_kb = run_once(argv, repo_root, timeout_seconds)
+        elapsed_ns, max_rss_kb = run_once(argv, repo_root, timeout_seconds, env=env)
         runs.append({
             "elapsed_ns": elapsed_ns,
             "max_rss_kb": max_rss_kb,
@@ -109,20 +109,33 @@ def run_benchmark(repo_root: Path, vigil_bin: Path, entry: dict[str, Any]) -> di
     median_elapsed_ns = median_int(elapsed_values)
     median_max_rss_kb = median_int(rss_values)
 
-    print(
-        f"{entry['name']:20s}  {format_ms(median_elapsed_ns):>8s} ms  {format_rss(median_max_rss_kb):>10s}",
-        flush=True,
-    )
-
     return {
-        "name": entry["name"],
-        "command": entry["command"],
         "warmups": warmups,
         "iterations": iterations,
         "timeout_seconds": timeout_seconds,
         "median_elapsed_ns": median_elapsed_ns,
         "median_max_rss_kb": median_max_rss_kb,
         "runs": runs,
+    }
+
+
+def run_benchmark(repo_root: Path, vigil_bin: Path, entry: dict[str, Any]) -> dict[str, Any]:
+    argv = [str(vigil_bin)] + list(entry["command"])
+    aot = run_variant(repo_root, argv, entry, env=None)
+    no_aot_env = os.environ.copy()
+    no_aot_env["VIGIL_NO_AOT"] = "1"
+    interpreter = run_variant(repo_root, argv, entry, env=no_aot_env)
+
+    print(
+        f"{entry['name']:20s}  aot {format_ms(aot['median_elapsed_ns']):>8s} ms  interp {format_ms(interpreter['median_elapsed_ns']):>8s} ms",
+        flush=True,
+    )
+
+    return {
+        "name": entry["name"],
+        "command": entry["command"],
+        "aot": aot,
+        "interpreter": interpreter,
     }
 
 
