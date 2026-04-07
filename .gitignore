@@ -47,3 +47,4 @@ build-prof/
 build-main/
 build-optest/
 profile_results/
+profiling_data/

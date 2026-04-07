@@ -1,0 +1,51 @@
+name: Nightly Format
+
+on:
+  schedule:
+    - cron: '0 6 * * *'  # 06:00 UTC daily
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  clang-format:
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+
+      - name: Install clang-format
+        run: sudo apt-get update && sudo apt-get install -y clang-format-18
+
+      - name: Format all source files
+        env:
+          CLANG_FORMAT_BIN: /usr/bin/clang-format-18
+        run: |
+          find src include plugins tests -name '*.c' -o -name '*.h' | grep -v '^deps/' | while read f; do
+            "$CLANG_FORMAT_BIN" -i "$f"
+          done
+
+      - name: Check for changes
+        id: diff
+        run: |
+          if git diff --quiet; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create pull request
+        if: steps.diff.outputs.changed == 'true'
+        uses: peter-evans/create-pull-request@v7
+        with:
+          branch: auto/nightly-format
+          commit-message: "style: nightly clang-format"
+          title: "style: nightly clang-format"
+          body: "Automated nightly formatting pass using clang-format-18."
+          base: main
+          delete-branch: true
