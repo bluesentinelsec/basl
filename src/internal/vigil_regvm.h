@@ -235,6 +235,8 @@ typedef enum vigil_reg_op
     /* Immediate i32 arithmetic. */
     VREG_ADDI = 135, /* A B C   R[A] = R[B] +i32 imm8(C) */
     VREG_SUBI = 136, /* A B C   R[A] = R[B] -i32 imm8(C) */
+    VREG_ADDI_I64 = 137, /* A B C   R[A] = R[B] +i64 imm8(C) */
+    VREG_SUBI_I64 = 138, /* A B C   R[A] = R[B] -i64 imm8(C) */
 
     VREG_OP_COUNT
 } vigil_reg_op_t;

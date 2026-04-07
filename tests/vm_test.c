@@ -659,6 +659,46 @@ TEST(VigilVmTest, FusesI32ImmediateAddAndSub)
     CloseCompiledMainFixture(&fixture);
 }
 
+TEST(VigilVmTest, FusesI64ImmediateAddAndSub)
+{
+    static const char source[] = "fn main() -> i32 {"
+                                 "    i64 n = i64(3);"
+                                 "    i64 a = n + i64(2);"
+                                 "    i64 b = a - i64(1);"
+                                 "    if b == i64(4) {"
+                                 "        return 1;"
+                                 "    }"
+                                 "    return 0;"
+                                 "}";
+    CompiledMainFixture fixture;
+    vigil_error_t error = {0};
+    const vigil_reg_chunk_t *reg_chunk = NULL;
+    vigil_chunk_t *chunk = NULL;
+    size_t add_i64_imm_count = 0U;
+    size_t add_i64_count = 0U;
+    size_t sub_i64_imm_count = 0U;
+    size_t sub_i64_count = 0U;
+
+    ASSERT_EQ(OpenCompiledMainFixture(source, &fixture, &error), VIGIL_STATUS_OK);
+    ASSERT_EQ(vigil_diagnostic_list_count(&fixture.diagnostics), 0U);
+
+    chunk = (vigil_chunk_t *)vigil_function_object_chunk(fixture.function);
+    ASSERT_NE(chunk, NULL);
+    ASSERT_EQ(vigil_chunk_ensure_reg_cache(chunk, (uint8_t)vigil_function_object_arity(fixture.function), &reg_chunk,
+                                           &error),
+              VIGIL_STATUS_OK);
+    ASSERT_NE(reg_chunk, NULL);
+    add_i64_imm_count = CountRegOpcode(reg_chunk, VREG_ADDI_I64);
+    add_i64_count = CountRegOpcode(reg_chunk, VREG_ADD_I64);
+    sub_i64_imm_count = CountRegOpcode(reg_chunk, VREG_SUBI_I64);
+    sub_i64_count = CountRegOpcode(reg_chunk, VREG_SUB_I64);
+    EXPECT_EQ(add_i64_imm_count + add_i64_count, 1U);
+    EXPECT_EQ(sub_i64_imm_count, 1U);
+    EXPECT_EQ(sub_i64_count, 0U);
+
+    CloseCompiledMainFixture(&fixture);
+}
+
 TEST(VigilVmTest, RejectsHugeFloatFormatPrecision)
 {
     vigil_runtime_t *runtime = NULL;
@@ -2360,6 +2400,7 @@ void register_vm_tests(void)
     REGISTER_TEST(VigilVmTest, CompilesAndExecutesDeferredMultipleReturnValues);
     REGISTER_TEST(VigilVmTest, FusesPlainI32CompareJumpWithoutChainFallback);
     REGISTER_TEST(VigilVmTest, FusesI32ImmediateAddAndSub);
+    REGISTER_TEST(VigilVmTest, FusesI64ImmediateAddAndSub);
     REGISTER_TEST(VigilVmTest, ComparesDifferentObjectTypesByValue);
     REGISTER_TEST(VigilVmTest, RejectsToStringOnNonStringObject);
     REGISTER_TEST(VigilVmTest, RejectsDeferredNativeCallTargetThatIsNotNative);
