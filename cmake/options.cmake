@@ -4,6 +4,7 @@ option(VIGIL_BUILD_TESTS "Build VIGIL unit tests" ON)
 option(VIGIL_USE_LIBFFI "Build with vendored libffi for full FFI support" ON)
 option(VIGIL_ENABLE_COVERAGE "Build with coverage instrumentation" OFF)
 option(VIGIL_ENABLE_BEARSSL_TLS "Enable BearSSL TLS for the fallback HTTPS client" ON)
+option(VIGIL_OPCODE_PROFILE "Instrument regvm with per-opcode dispatch counters" OFF)
 
 # ── Platform detection ───────────────────────────────────────────────
 

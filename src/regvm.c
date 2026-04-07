@@ -3205,6 +3205,24 @@ static inline vigil_value_t regvm_encode_uint(uint64_t v)
     return val;
 }
 
+/* ── Opcode frequency counters ────────────────────────────────────── */
+
+#ifdef VIGIL_OPCODE_PROFILE
+static uint64_t s_opcode_counts[256];
+
+static void opcode_profile_dump(void)
+{
+    fprintf(stderr, "\n[opcode profile]\n");
+    for (int i = 0; i < 256; i++)
+        if (s_opcode_counts[i])
+            fprintf(stderr, "  %3d  %llu\n", i, (unsigned long long)s_opcode_counts[i]);
+}
+
+#define OPCODE_COUNT() s_opcode_counts[VREG_GET_OP(code[ip])]++
+#else
+#define OPCODE_COUNT() ((void)0)
+#endif
+
 // NOLINTNEXTLINE(readability-function-cognitive-complexity)
 vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, vigil_value_t *out_value,
                                    vigil_error_t *error)
@@ -3433,6 +3451,9 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
             if (dtable[i] == NULL)
                 ((const void **)dtable)[i] = &&r_UNKNOWN;
         patched = 1;
+#ifdef VIGIL_OPCODE_PROFILE
+        atexit(opcode_profile_dump);
+#endif
     }
 
 #define REGVM_DEBUG_HOOK()                                                                                             \
@@ -3457,6 +3478,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
     do                                                                                                                 \
     {                                                                                                                  \
         ip++;                                                                                                          \
+        OPCODE_COUNT();                                                                                                \
         REGVM_DEBUG_HOOK();                                                                                            \
         RDISPATCH();                                                                                                   \
     } while (0)
@@ -3483,6 +3505,7 @@ vigil_status_t vigil_regvm_execute(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, 
     do                                                                                                                 \
     {                                                                                                                  \
         ip++;                                                                                                          \
+        OPCODE_COUNT();                                                                                                \
         goto r_dispatch_switch_check;                                                                                  \
     } while (0)
 #define RCASE(op) case VREG_##op:
