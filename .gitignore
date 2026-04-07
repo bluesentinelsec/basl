@@ -45,3 +45,5 @@ ffi.o
 *.o
 build-prof/
 build-main/
+build-optest/
+profile_results/

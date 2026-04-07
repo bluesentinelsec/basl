@@ -90,5 +90,12 @@ if(VIGIL_HAS_DESKTOP_PLATFORM)
     target_compile_definitions(vigil_core PRIVATE VIGIL_HAS_DESKTOP_PLATFORM)
 endif()
 
+# Disable Intel CET (endbr64) for the VM dispatch loop. Every computed-goto
+# target gets an endbr64 that costs 6-10% of dispatch overhead. CET provides
+# no security value for a VM dispatch loop with known jump targets.
+if(NOT MSVC AND NOT EMSCRIPTEN)
+    set_source_files_properties(src/regvm.c PROPERTIES COMPILE_OPTIONS "-fcf-protection=none")
+endif()
+
 # Objects may end up in a shared library, so they need PIC on Linux.
 set_target_properties(vigil_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
