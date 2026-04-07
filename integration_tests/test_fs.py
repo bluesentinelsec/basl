@@ -226,5 +226,55 @@ fn main() -> i32 {
         self.assertEqual(rc, 0, f"stderr: {err}")
 
 
+class FsNewFunctionsTest(unittest.TestCase):
+    """Tests for stem, app_dir, chdir, and is_valid_name"""
+
+    def test_stem(self):
+        code = '''import "fs"
+fn main() -> i32 {
+    if fs.stem("foo.png") != "foo" { return 1 }
+    if fs.stem("/a/b/bar.tar.gz") != "bar.tar" { return 2 }
+    if fs.stem("noext") != "noext" { return 3 }
+    if fs.stem(".hidden") != ".hidden" { return 4 }
+    return 0
+}'''
+        rc, out, err = run_vigil(code)
+        self.assertEqual(rc, 0, f"stderr: {err}")
+
+    def test_app_dir(self):
+        code = '''import "fs"
+fn main() -> i32 {
+    string d = fs.app_dir()
+    if d.len() == 0 { return 1 }
+    if !fs.is_dir(d) { return 2 }
+    return 0
+}'''
+        rc, out, err = run_vigil(code)
+        self.assertEqual(rc, 0, f"stderr: {err}")
+
+    def test_chdir(self):
+        code = '''import "fs"
+fn main() -> i32 {
+    string orig = fs.cwd()
+    string tmp = fs.temp_dir()
+    if !fs.chdir(tmp) { return 1 }
+    if !fs.chdir(orig) { return 2 }
+    return 0
+}'''
+        rc, out, err = run_vigil(code)
+        self.assertEqual(rc, 0, f"stderr: {err}")
+
+    def test_is_valid_name(self):
+        code = '''import "fs"
+fn main() -> i32 {
+    if !fs.is_valid_name("hello.txt") { return 1 }
+    if fs.is_valid_name("") { return 2 }
+    if fs.is_valid_name("a/b") { return 3 }
+    return 0
+}'''
+        rc, out, err = run_vigil(code)
+        self.assertEqual(rc, 0, f"stderr: {err}")
+
+
 if __name__ == "__main__":
     unittest.main()

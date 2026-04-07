@@ -445,6 +445,31 @@ VIGIL_API vigil_status_t vigil_platform_getcwd(const vigil_allocator_t *allocato
     return VIGIL_STATUS_OK;
 }
 
+VIGIL_API vigil_status_t vigil_platform_chdir(const char *path, vigil_error_t *error)
+{
+    if (!path)
+    {
+        if (error)
+        {
+            error->type = VIGIL_STATUS_INVALID_ARGUMENT;
+            error->value = "null argument";
+            error->length = 13;
+        }
+        return VIGIL_STATUS_INVALID_ARGUMENT;
+    }
+    if (!SetCurrentDirectoryA(path))
+    {
+        if (error)
+        {
+            error->type = VIGIL_STATUS_INTERNAL;
+            error->value = "chdir failed";
+            error->length = 12;
+        }
+        return VIGIL_STATUS_INTERNAL;
+    }
+    return VIGIL_STATUS_OK;
+}
+
 VIGIL_API vigil_status_t vigil_platform_temp_dir(const vigil_allocator_t *allocator, char **out_path,
                                                  vigil_error_t *error)
 {
