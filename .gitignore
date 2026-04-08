@@ -6,6 +6,7 @@
 /build-emscripten/
 /coverage-artifacts*/
 /compile_commands.json
+/.tmp/
 
 # C / CMake
 *.dylib

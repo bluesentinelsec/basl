@@ -347,12 +347,44 @@ static int vigil_test_run_all_(void)
 
 /* ── Portable temp directory ──────────────────────────────────────── */
 
+static inline const char *vigil_test_getenv(const char *name, char *buf, size_t cap)
+{
+#ifdef _MSC_VER
+    size_t len;
+
+    if (name == NULL || buf == NULL || cap == 0U)
+        return NULL;
+
+    if (getenv_s(&len, buf, cap, name) != 0 || len == 0U || buf[0] == '\0')
+        return NULL;
+    return buf;
+#else
+    (void)buf;
+    (void)cap;
+    return getenv(name);
+#endif
+}
+
 static inline const char *vigil_test_tmpdir(void)
 {
-    const char *d = getenv("TMPDIR");
+    static char tmpdir[4096];
+    const char *d = vigil_test_getenv("VIGIL_TEST_TMPDIR", tmpdir, sizeof(tmpdir));
     if (d && d[0])
         return d;
+    d = vigil_test_getenv("TMPDIR", tmpdir, sizeof(tmpdir));
+    if (d && d[0])
+        return d;
+#ifdef _WIN32
+    d = vigil_test_getenv("TEMP", tmpdir, sizeof(tmpdir));
+    if (d && d[0])
+        return d;
+    d = vigil_test_getenv("TMP", tmpdir, sizeof(tmpdir));
+    if (d && d[0])
+        return d;
+    return ".";
+#else
     return "/tmp";
+#endif
 }
 
 #endif /* VIGIL_TEST_H */
