@@ -2,6 +2,7 @@
 
 #include <string.h>
 
+#include "internal/vigil_internal.h"
 #if !defined(_WIN32)
 #include "internal/vigil_regvm.h"
 #endif
@@ -77,7 +78,7 @@ TEST(VigilAotTest, ExecuteFunctionWithAotDisabledStillWorks)
     vigil_runtime_close(&runtime);
 }
 
-#ifdef VIGIL_ENABLE_AOT
+#if defined(VIGIL_ENABLE_AOT) && !defined(_WIN32)
 TEST(VigilAotTest, ExecuteFunctionBuildsAotCache)
 {
     static const char *source_text = "fn fib(i32 n) -> i32 { if n < 2 { return n } return fib(n - 1) + fib(n - 2) }\n"
@@ -117,7 +118,7 @@ void register_aot_tests(void)
 {
     REGISTER_TEST(VigilAotTest, VmAotSetterRoundTrips);
     REGISTER_TEST(VigilAotTest, ExecuteFunctionWithAotDisabledStillWorks);
-#ifdef VIGIL_ENABLE_AOT
+#if defined(VIGIL_ENABLE_AOT) && !defined(_WIN32)
     REGISTER_TEST(VigilAotTest, ExecuteFunctionBuildsAotCache);
 #endif
 }
