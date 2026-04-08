@@ -820,6 +820,12 @@ static size_t *collect_jump_targets(const uint8_t *code, size_t code_size, size_
             uint32_t off = (uint32_t)code[ip + 1] | ((uint32_t)code[ip + 2] << 8) | ((uint32_t)code[ip + 3] << 16) |
                            ((uint32_t)code[ip + 4] << 24);
             target = ip + 5 + (size_t)off;
+            /* The fused compare+jump consumes the comparison operands
+               directly.  If the raw target is a POP (which the original
+               non-fused sequence used to discard the boolean result),
+               advance past it — the POP is dead code for the fused path. */
+            if (target < code_size && code[target] == VIGIL_OPCODE_POP)
+                target += 1U;
             has_target = 1;
         }
         else if (op == VIGIL_OPCODE_FORLOOP_I32 || op == VIGIL_OPCODE_FORLOOP_I64)
