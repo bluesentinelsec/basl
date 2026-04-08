@@ -16,6 +16,7 @@
 #include "internal/vigil_internal.h"
 #include "internal/vigil_nanbox.h"
 #include "internal/vigil_regvm.h"
+#include "internal/vigil_vm_internal.h"
 #include "platform/platform.h"
 
 #if defined(VIGIL_ENABLE_AOT)
@@ -42,62 +43,6 @@
 #define VIGIL_AOT_CACHE_STATE_READY 2LL
 
 #if defined(VIGIL_ENABLE_AOT)
-static vigil_status_t vigil_aot_grow_frames(vigil_vm_t *vm, size_t minimum_capacity, vigil_error_t *error)
-{
-    size_t old_capacity;
-    size_t next_capacity;
-    void *memory;
-    vigil_status_t status;
-
-    if (minimum_capacity <= vm->frame_capacity)
-    {
-        vigil_error_clear(error);
-        return VIGIL_STATUS_OK;
-    }
-
-    old_capacity = vm->frame_capacity;
-    next_capacity = old_capacity == 0U ? 4U : old_capacity;
-    while (next_capacity < minimum_capacity)
-    {
-        if (next_capacity > (SIZE_MAX / 2U))
-        {
-            next_capacity = minimum_capacity;
-            break;
-        }
-        next_capacity *= 2U;
-    }
-
-    if (next_capacity > (SIZE_MAX / sizeof(*vm->frames)))
-    {
-        vigil_error_set_literal(error, VIGIL_STATUS_OUT_OF_MEMORY, "vm frame allocation overflow");
-        return VIGIL_STATUS_OUT_OF_MEMORY;
-    }
-
-    if (vm->frames == NULL)
-    {
-        memory = NULL;
-        status = vigil_runtime_alloc(vm->runtime, next_capacity * sizeof(*vm->frames), &memory, error);
-        if (status != VIGIL_STATUS_OK)
-        {
-            return status;
-        }
-        memset(memory, 0, next_capacity * sizeof(*vm->frames));
-    }
-    else
-    {
-        memory = vm->frames;
-        status = vigil_runtime_realloc(vm->runtime, &memory, next_capacity * sizeof(*vm->frames), error);
-        if (status != VIGIL_STATUS_OK)
-        {
-            return status;
-        }
-        memset((vigil_vm_frame_t *)memory + old_capacity, 0, (next_capacity - old_capacity) * sizeof(*vm->frames));
-    }
-
-    vm->frames = (vigil_vm_frame_t *)memory;
-    vm->frame_capacity = next_capacity;
-    return VIGIL_STATUS_OK;
-}
 
 static vigil_status_t vigil_aot_prepare_frame(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, vigil_error_t *error)
 {
@@ -135,7 +80,6 @@ static vigil_status_t vigil_aot_numeric_call_self(vigil_vm_t *vm, const vigil_re
                                                   uint8_t arg_count, uint8_t arg_base_r, vigil_error_t *error)
 {
     vigil_vm_frame_t *frame;
-    vigil_vm_frame_t *child;
     vigil_aot_cache_t *cache = NULL;
     size_t base;
     size_t arg_base;
@@ -152,62 +96,46 @@ static vigil_status_t vigil_aot_numeric_call_self(vigil_vm_t *vm, const vigil_re
     arg_base = base + (size_t)arg_base_r;
     (void)arg_count;
 
-    status = vigil_aot_grow_frames(vm, vm->frame_count + 1U, error);
+    status = vigil_vm_push_frame(vm, frame->callable, frame->function, frame->chunk, arg_base, error);
     if (status != VIGIL_STATUS_OK)
-    {
         return status;
-    }
-
-    child = &vm->frames[vm->frame_count++];
-    memset(child, 0, sizeof(*child));
-    child->callable = frame->callable;
-    child->function = frame->function;
-    child->chunk = frame->chunk;
-    child->base_slot = arg_base;
 
     if (vm->stack_capacity < arg_base + (size_t)rc->max_registers + 16U)
     {
         status = vigil_vm_grow_stack(vm, arg_base + (size_t)rc->max_registers + 16U, error);
         if (status != VIGIL_STATUS_OK)
         {
-            vm->frame_count -= 1U;
+            vigil_vm_pop_frame(vm);
             return status;
         }
     }
 
     if (vm->stack_count < arg_base + (size_t)rc->max_registers)
-    {
         vm->stack_count = arg_base + (size_t)rc->max_registers;
-    }
 
     status = vigil_aot_ensure(rc, &cache, error);
     if (status != VIGIL_STATUS_OK)
     {
-        vm->frame_count -= 1U;
+        vigil_vm_pop_frame(vm);
         return status;
     }
     if (cache == NULL || cache->entry == NULL)
     {
-        vm->frame_count -= 1U;
+        vigil_vm_pop_frame(vm);
         vigil_error_set_literal(error, VIGIL_STATUS_INTERNAL, "AOT self-call cache missing native entry");
         return VIGIL_STATUS_INTERNAL;
     }
 
     status = cache->entry(vm, &vm->stack[base + (size_t)ret], error);
-    vm->frame_count -= 1U;
+    vigil_vm_pop_frame(vm);
+
     if (status != VIGIL_STATUS_OK)
-    {
         return status;
-    }
 
     if (vm->stack_count < base + (size_t)ret + 1U)
-    {
         vm->stack_count = base + (size_t)ret + 1U;
-    }
     if (vm->stack_count < base + (size_t)rc->max_registers)
-    {
         vm->stack_count = base + (size_t)rc->max_registers;
-    }
 
     return VIGIL_STATUS_OK;
 }

@@ -241,7 +241,7 @@ static void vigil_vm_clear_frames(vigil_vm_t *vm)
     vm->frame_count = 0U;
 }
 
-static void vigil_vm_pop_frame(vigil_vm_t *vm)
+void vigil_vm_pop_frame(vigil_vm_t *vm)
 {
     vigil_vm_frame_clear(vm->runtime, &vm->frames[vm->frame_count - 1U]);
     vm->frame_count -= 1U;
@@ -374,7 +374,7 @@ static vigil_vm_frame_t *vigil_vm_current_frame(vigil_vm_t *vm)
     return &vm->frames[vm->frame_count - 1U];
 }
 
-static vigil_status_t vigil_vm_push_frame(vigil_vm_t *vm, const vigil_object_t *callable,
+vigil_status_t vigil_vm_push_frame(vigil_vm_t *vm, const vigil_object_t *callable,
                                           const vigil_object_t *function, const vigil_chunk_t *chunk, size_t base_slot,
                                           vigil_error_t *error)
 {
