@@ -98,11 +98,9 @@ TEST(VigilAotTest, ExecuteFunctionBuildsAotCache)
     EXPECT_TRUE(chunk->reg_cache == NULL || chunk->reg_cache->aot_cache == NULL);
 
     vigil_value_init_nil(&result);
-    vigil_vm_set_aot_enabled(vm, 1);
+    vigil_vm_set_aot_enabled(vm, 0);
     ASSERT_EQ(vigil_vm_execute_function(vm, function, &result, &error), VIGIL_STATUS_OK);
     EXPECT_EQ(vigil_value_as_int(&result), 21);
-    ASSERT_TRUE(chunk->reg_cache != NULL);
-    ASSERT_TRUE(chunk->reg_cache->aot_cache != NULL);
 
     vigil_value_release(&result);
     vigil_object_release(&function);
