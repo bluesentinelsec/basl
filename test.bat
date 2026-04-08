@@ -38,6 +38,8 @@ cmake --build "%BUILD_DIR%" --config Release
 if errorlevel 1 exit /b %errorlevel%
 
 set "VIGIL_BIN=%CD%\%BUILD_DIR%\RELEASE\vigil.exe"
+if not exist "%VIGIL_BIN%" set "VIGIL_BIN=%CD%\%BUILD_DIR%\Release\vigil.exe"
+if not exist "%VIGIL_BIN%" set "VIGIL_BIN=%CD%\%BUILD_DIR%\vigil.exe"
 
 ctest --test-dir "%BUILD_DIR%" --output-on-failure -C Release
 if errorlevel 1 exit /b %errorlevel%

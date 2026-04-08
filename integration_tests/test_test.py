@@ -173,6 +173,7 @@ class TestVigilTest(unittest.TestCase):
         r = run_test(bad_test)
         self.assertEqual(r.returncode, 1)
         self.assertIn("FAIL\t", r.stdout)
+        self.assertIn("error:", r.stdout)
         self.assertIn("bad_test.vigil", r.stdout)
 
     def test_mixed_pass_fail(self):
