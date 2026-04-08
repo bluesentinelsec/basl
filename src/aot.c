@@ -1,5 +1,12 @@
 #include "internal/vigil_aot.h"
 
+/* MIR requires function-to-object pointer casts for MIR_load_external
+   and MIR_gen. This is inherent to any AOT/JIT system and unavoidable
+   in ISO C. Suppress the pedantic warning for this translation unit. */
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic ignored "-Wpedantic"
+#endif
+
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -16,8 +23,15 @@
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wextra-semi"
 #endif
+#if defined(_MSC_VER)
+#pragma warning(push)
+#pragma warning(disable : 4100 4244 4267)
+#endif
 #include "mir-gen.h"
 #include "mir.h"
+#if defined(_MSC_VER)
+#pragma warning(pop)
+#endif
 #if defined(__clang__)
 #pragma clang diagnostic pop
 #endif
@@ -460,7 +474,7 @@ static vigil_status_t vigil_aot_build_numeric(const vigil_reg_chunk_t *rc, vigil
     labels = (MIR_label_t *)calloc(rc->code_count + 1U, sizeof(*labels));
     if (labels == NULL)
     {
-        free(cache);
+        free(cache); /* alloc-check: exempt - calloc-allocated */
         return VIGIL_STATUS_OUT_OF_MEMORY;
     }
 
@@ -714,7 +728,7 @@ static vigil_status_t vigil_aot_build_numeric(const vigil_reg_chunk_t *rc, vigil
                             MIR_new_ret_insn(ctx, 1U, MIR_new_int_op(ctx, VIGIL_STATUS_OK)));
             continue;
         default:
-            free(labels);
+            free(labels); /* alloc-check: exempt - calloc-allocated */
             vigil_aot_cache_free(cache);
             vigil_error_set_literal(error, VIGIL_STATUS_UNSUPPORTED, "numeric AOT builder encountered unsupported op");
             return VIGIL_STATUS_UNSUPPORTED;
@@ -751,7 +765,7 @@ static vigil_status_t vigil_aot_build_numeric(const vigil_reg_chunk_t *rc, vigil
     MIR_link(ctx, MIR_set_gen_interface, NULL);
 
     cache->entry = (vigil_aot_entry_fn)MIR_gen(ctx, func);
-    free(labels);
+    free(labels); /* alloc-check: exempt - calloc-allocated */
     if (cache->entry == NULL)
     {
         vigil_aot_cache_free(cache);
@@ -784,7 +798,7 @@ void vigil_aot_cache_free(vigil_aot_cache_t *cache)
     }
 #endif
 
-    free(cache);
+    free(cache); /* alloc-check: exempt - calloc-allocated */
 }
 
 int vigil_aot_supported(void)

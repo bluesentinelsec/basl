@@ -72,12 +72,14 @@ static vigil_status_t vigil_vm_validate(const vigil_vm_t *vm, vigil_error_t *err
     return VIGIL_STATUS_OK;
 }
 
+#if defined(VIGIL_ENABLE_AOT)
 static int vigil_vm_env_disables_aot(void)
 {
     const char *value = getenv("VIGIL_NO_AOT");
 
     return value != NULL && value[0] != '\0' && !(value[0] == '0' && value[1] == '\0');
 }
+#endif
 
 static int vigil_vm_default_aot_enabled(void)
 {
