@@ -414,6 +414,7 @@ static vigil_status_t vigil_aot_build_numeric(const vigil_reg_chunk_t *rc, vigil
     /* Register promotion: slots written ONLY by typed ops get MIR virtual regs. */
     MIR_reg_t vreg[256];
     uint8_t promoted[256]; /* 0=no, 1=i32, 2=i64 */
+    int has_self_call = 0;
     memset(vreg, 0, sizeof(vreg));
     memset(promoted, 0, sizeof(promoted));
     MIR_label_t error_label;
@@ -503,7 +504,6 @@ static vigil_status_t vigil_aot_build_numeric(const vigil_reg_chunk_t *rc, vigil
     {
         uint8_t typed_w[256] = {0}; /* bit 0: i32 typed write, bit 1: i64 typed write */
         uint8_t other_w[256] = {0}; /* any non-typed write */
-        (void)0; int has_self_call = 0; (void)has_self_call;
         size_t sip = 0U;
         while (sip < rc->code_count)
         {
@@ -522,6 +522,14 @@ static vigil_status_t vigil_aot_build_numeric(const vigil_reg_chunk_t *rc, vigil
             case VREG_ADDI_I64: case VREG_SUBI_I64: case VREG_INC_I64: case VREG_FORLOOP_I64:
                 typed_w[sa] |= 2U;
                 break;
+            case VREG_LOAD_K: {
+                const vigil_value_t *kv = VIGIL_VM_CHUNK_CONSTANT(rc->stack_chunk, (size_t)VREG_GET_Bx(si));
+                if (kv != NULL && vigil_nanbox_is_int_inline(*kv))
+                    typed_w[sa] |= 1U;
+                else
+                    other_w[sa] = 1;
+                break;
+            }
             case VREG_CALL_SELF:
                 has_self_call = 1;
                 break;
@@ -547,7 +555,6 @@ static vigil_status_t vigil_aot_build_numeric(const vigil_reg_chunk_t *rc, vigil
             }
             sip += vigil_aot_instr_words(rc, sip);
         }
-        if (!has_self_call)
         {
             char rn[32];
             for (uint16_t ri = 0; ri < rc->max_registers && ri < 256; ri++)
@@ -749,7 +756,10 @@ static vigil_status_t vigil_aot_build_numeric(const vigil_reg_chunk_t *rc, vigil
     /* Initial load: load all slots from NaN-boxed memory into v[]. */
     if (v != NULL)
     {
-        for (uint16_t ri = 0; ri < rc->max_registers; ri++)
+        uint16_t entry_load_count = rc->max_registers;
+        if (has_self_call && rc->arity < entry_load_count)
+            entry_load_count = rc->arity;
+        for (uint16_t ri = 0; ri < entry_load_count; ri++)
             V_LOAD(ri);
     }
 
@@ -802,10 +812,15 @@ static vigil_status_t vigil_aot_build_numeric(const vigil_reg_chunk_t *rc, vigil
             }
             break;
         case VREG_LOAD_K: {
+            uint8_t dst = VREG_GET_A(instr);
             const vigil_value_t *k = VIGIL_VM_CHUNK_CONSTANT(rc->stack_chunk, (size_t)VREG_GET_Bx(instr));
             vigil_value_t kv = k != NULL ? *k : VIGIL_NANBOX_NIL;
-            MIR_append_insn(ctx, func, MIR_new_insn(ctx, MIR_MOV, MIR_new_reg_op(ctx, v[VREG_GET_A(instr)]),
-                            MIR_new_uint_op(ctx, kv)));
+            if (promoted[dst] == 1 && vigil_nanbox_is_int_inline(kv))
+                MIR_append_insn(ctx, func, MIR_new_insn(ctx, MIR_MOV, MIR_new_reg_op(ctx, v[dst]),
+                                MIR_new_int_op(ctx, (int64_t)vigil_nanbox_decode_i32(kv))));
+            else
+                MIR_append_insn(ctx, func, MIR_new_insn(ctx, MIR_MOV, MIR_new_reg_op(ctx, v[dst]),
+                                MIR_new_uint_op(ctx, kv)));
             break;
         }
         case VREG_LOAD_NIL:
