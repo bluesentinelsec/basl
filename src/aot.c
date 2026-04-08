@@ -54,7 +54,7 @@ static vigil_status_t vigil_aot_push_self_frame(vigil_vm_t *vm, size_t new_base,
     vigil_vm_frame_t *frame;
     vigil_status_t status;
 
-    if (__builtin_expect(vm->frame_count >= vm->frame_capacity, 0))
+    if (VIGIL_UNLIKELY(vm->frame_count >= vm->frame_capacity))
     {
         status = vigil_vm_push_frame(vm, NULL, NULL, NULL, 0U, error);
         if (status != VIGIL_STATUS_OK)
@@ -62,7 +62,7 @@ static vigil_status_t vigil_aot_push_self_frame(vigil_vm_t *vm, size_t new_base,
         vm->frame_count -= 1U;
     }
 
-    if (__builtin_expect(vm->stack_capacity < needed_stack, 0))
+    if (VIGIL_UNLIKELY(vm->stack_capacity < needed_stack))
     {
         status = vigil_vm_grow_stack(vm, needed_stack, error);
         if (status != VIGIL_STATUS_OK)
