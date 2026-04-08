@@ -315,6 +315,7 @@ static int vigil_aot_chunk_is_numeric_subset(const vigil_reg_chunk_t *rc)
         case VREG_EQ_I32_JMP:
         case VREG_NE_I32_JMP:
         case VREG_LT_I32_IMM_JMP:
+        case VREG_CALL:
         case VREG_CALL_SELF:
         case VREG_RETURN:
         case VREG_RELEASE:
