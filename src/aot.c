@@ -290,6 +290,8 @@ static int vigil_aot_chunk_is_numeric_subset(const vigil_reg_chunk_t *rc)
         case VREG_EQ_I64_JMP:
         case VREG_NE_I64_JMP:
         case VREG_LT_I32_IMM_JMP:
+        case VREG_TO_I32:
+        case VREG_TO_I64:
         case VREG_CALL:
         case VREG_CALL_SELF:
         case VREG_CALL_NATIVE:
@@ -516,10 +518,12 @@ static vigil_status_t vigil_aot_build_numeric(const vigil_reg_chunk_t *rc, vigil
             case VREG_ADDI: case VREG_SUBI: case VREG_NEG: case VREG_BNOT:
             case VREG_BAND: case VREG_BOR: case VREG_BXOR: case VREG_SHL: case VREG_SHR:
             case VREG_INC_I32: case VREG_FORLOOP_I32:
+            case VREG_TO_I32:
                 typed_w[sa] |= 1U;
                 break;
             case VREG_ADD_I64: case VREG_SUB_I64: case VREG_MUL_I64: case VREG_DIV_I64: case VREG_MOD_I64:
             case VREG_ADDI_I64: case VREG_SUBI_I64: case VREG_INC_I64: case VREG_FORLOOP_I64:
+            case VREG_TO_I64:
                 typed_w[sa] |= 2U;
                 break;
             case VREG_LOAD_K: {
@@ -978,6 +982,18 @@ static vigil_status_t vigil_aot_build_numeric(const vigil_reg_chunk_t *rc, vigil
                             MIR_new_reg_op(ctx, tmp0_reg), MIR_new_int_op(ctx, (int64_t)(int8_t)VREG_GET_B(instr))));
             MIR_append_insn(ctx, func, MIR_new_insn(ctx, MIR_BO, MIR_new_label_op(ctx, labels[rc->code_count])));
             V_ENC(tmp2_reg, VREG_GET_A(instr));
+            break;
+        }
+        /* ── Type conversions ────────────────────────────────────── */
+        case VREG_TO_I32: {
+            V_DEC_I32(tmp0_reg, VREG_GET_B(instr));
+            /* i32→i32 is identity; i64→i32 truncates (EXT32 already done by V_DEC_I32). */
+            V_ENC(tmp0_reg, VREG_GET_A(instr));
+            break;
+        }
+        case VREG_TO_I64: {
+            V_DEC_I64(tmp0_reg, VREG_GET_B(instr));
+            V_ENC(tmp0_reg, VREG_GET_A(instr));
             break;
         }
         /* ── For-loop ────────────────────────────────────────────── */
