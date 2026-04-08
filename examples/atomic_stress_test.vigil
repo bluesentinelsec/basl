@@ -561,7 +561,6 @@ fn run_new_ops_test() -> bool {
                 return i64(0)
             }
 
-            ,
         )
         threads.push(tid)
     }
@@ -598,7 +597,6 @@ fn run_new_ops_test() -> bool {
                 return i64(0)
             }
 
-            ,
         )
         threads2.push(tid)
     }
@@ -623,7 +621,6 @@ fn run_new_ops_test() -> bool {
                 return i64(0)
             }
 
-            ,
         )
         threads3.push(tid)
     }
@@ -650,7 +647,6 @@ fn run_new_ops_test() -> bool {
                 return i64(0)
             }
 
-            ,
         )
         threads4.push(tid)
     }
@@ -696,7 +692,6 @@ fn run_ring_buffer_test() -> bool {
                 return i64(0)
             }
 
-            ,
         )
         prod_threads.push(tid)
     }
@@ -723,7 +718,6 @@ fn run_ring_buffer_test() -> bool {
                 return local_count
             }
 
-            ,
         )
         cons_threads.push(tid)
     }
@@ -797,7 +791,6 @@ fn run_metrics_test() -> bool {
                 return i64(0)
             }
 
-            ,
         )
         threads.push(tid)
     }
@@ -849,7 +842,6 @@ fn run_spinlock_test() -> bool {
                 return i64(0)
             }
 
-            ,
         )
         threads.push(tid)
     }
@@ -901,7 +893,6 @@ fn run_stack_test() -> bool {
                 return i64(0)
             }
 
-            ,
         )
         push_threads.push(tid)
     }
@@ -930,7 +921,6 @@ fn run_stack_test() -> bool {
                 return i64(0)
             }
 
-            ,
         )
         pop_threads.push(tid)
     }
@@ -982,7 +972,6 @@ fn run_barrier_test() -> bool {
                 return i64(0)
             }
 
-            ,
         )
         threads.push(tid)
     }
@@ -1029,7 +1018,6 @@ fn run_mutex_reference_test() -> bool {
                 return i64(0)
             }
 
-            ,
         )
         threads.push(tid)
     }

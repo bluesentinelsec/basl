@@ -278,7 +278,6 @@ fn main() -> i32 {
                 return monte_carlo_worker(iters, seed)
             }
 
-            ,
         )
         handles.push(t)
     }
@@ -329,7 +328,6 @@ fn main() -> i32 {
                 producer_work(pid, tasks, q_mtx, q_not_full, q_not_empty, q_head, q_tail, q_count, q_base, pt)
             }
 
-            ,
         )
         prod_handles.push(t)
     }
@@ -342,7 +340,6 @@ fn main() -> i32 {
                 consumer_work(q_mtx, q_not_full, q_not_empty, q_head, q_tail, q_count, q_base, done_flag, consumed_sum, consumed_count)
             }
 
-            ,
         )
         cons_handles.push(t)
     }
@@ -400,7 +397,6 @@ fn main() -> i32 {
                 reader_work(rw, shared_val, read_sum, ops)
             }
 
-            ,
         )
         rw_handles.push(t)
     }
@@ -412,7 +408,6 @@ fn main() -> i32 {
                 writer_work(rw, shared_val, ops)
             }
 
-            ,
         )
         rw_handles.push(t)
     }
@@ -447,7 +442,6 @@ fn main() -> i32 {
                 trylock_worker(tl_mtx, tl_counter, iters)
             }
 
-            ,
         )
         tl_handles.push(t)
     }
@@ -480,7 +474,6 @@ fn main() -> i32 {
                 cas_worker(cas_counter, iters)
             }
 
-            ,
         )
         cas_handles.push(t)
     }
@@ -514,7 +507,6 @@ fn main() -> i32 {
                 barrier_worker(bar_mtx, bar_cond, bar_arrived, BROADCAST_THREADS, bar_result)
             }
 
-            ,
         )
         bar_handles.push(t)
     }
@@ -545,7 +537,6 @@ fn main() -> i32 {
                 detach_worker(detach_counter)
             }
 
-            ,
         )
         thread.detach(t)
     }
