@@ -44,98 +44,41 @@
 
 #if defined(VIGIL_ENABLE_AOT)
 
-static vigil_status_t vigil_aot_prepare_frame(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, vigil_error_t *error)
+/* Lightweight frame push for AOT self-calls.  Skips the cache lookup and
+   indirect entry call that made the old helper slow.  Only sets the fields
+   that matter for numeric-subset recursion. */
+static vigil_status_t vigil_aot_push_self_frame(vigil_vm_t *vm, size_t new_base, size_t needed_stack,
+                                                vigil_error_t *error)
 {
+    vigil_vm_frame_t *prev;
     vigil_vm_frame_t *frame;
-    size_t base;
     vigil_status_t status;
 
-    if (vm == NULL || rc == NULL || vm->frame_count == 0U)
+    if (__builtin_expect(vm->frame_count >= vm->frame_capacity, 0))
     {
-        vigil_error_set_literal(error, VIGIL_STATUS_INVALID_ARGUMENT, "AOT frame preparation requires an active frame");
-        return VIGIL_STATUS_INVALID_ARGUMENT;
-    }
-
-    frame = &vm->frames[vm->frame_count - 1U];
-    base = frame->base_slot;
-
-    if (vm->stack_capacity < base + (size_t)rc->max_registers + 16U)
-    {
-        status = vigil_vm_grow_stack(vm, base + (size_t)rc->max_registers + 16U, error);
+        status = vigil_vm_push_frame(vm, NULL, NULL, NULL, 0U, error);
         if (status != VIGIL_STATUS_OK)
-        {
             return status;
-        }
+        vm->frame_count -= 1U;
     }
 
-    if (vm->stack_count < base + (size_t)rc->max_registers)
+    if (__builtin_expect(vm->stack_capacity < needed_stack, 0))
     {
-        vm->stack_count = base + (size_t)rc->max_registers;
-    }
-
-    return VIGIL_STATUS_OK;
-}
-
-static vigil_status_t vigil_aot_numeric_call_self(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, uint8_t ret,
-                                                  uint8_t arg_count, uint8_t arg_base_r, vigil_error_t *error)
-{
-    vigil_vm_frame_t *frame;
-    vigil_aot_cache_t *cache = NULL;
-    size_t base;
-    size_t arg_base;
-    vigil_status_t status;
-
-    if (vm == NULL || vm->frame_count == 0U)
-    {
-        vigil_error_set_literal(error, VIGIL_STATUS_INVALID_ARGUMENT, "AOT self-call requires an active frame");
-        return VIGIL_STATUS_INVALID_ARGUMENT;
-    }
-
-    frame = &vm->frames[vm->frame_count - 1U];
-    base = frame->base_slot;
-    arg_base = base + (size_t)arg_base_r;
-    (void)arg_count;
-
-    status = vigil_vm_push_frame(vm, frame->callable, frame->function, frame->chunk, arg_base, error);
-    if (status != VIGIL_STATUS_OK)
-        return status;
-
-    if (vm->stack_capacity < arg_base + (size_t)rc->max_registers + 16U)
-    {
-        status = vigil_vm_grow_stack(vm, arg_base + (size_t)rc->max_registers + 16U, error);
+        status = vigil_vm_grow_stack(vm, needed_stack, error);
         if (status != VIGIL_STATUS_OK)
-        {
-            vigil_vm_pop_frame(vm);
             return status;
-        }
     }
 
-    if (vm->stack_count < arg_base + (size_t)rc->max_registers)
-        vm->stack_count = arg_base + (size_t)rc->max_registers;
+    prev = &vm->frames[vm->frame_count - 1U];
+    frame = &vm->frames[vm->frame_count];
+    frame->callable = prev->callable;
+    frame->function = prev->function;
+    frame->chunk = prev->chunk;
+    frame->base_slot = new_base;
+    vm->frame_count += 1U;
 
-    status = vigil_aot_ensure(rc, &cache, error);
-    if (status != VIGIL_STATUS_OK)
-    {
-        vigil_vm_pop_frame(vm);
-        return status;
-    }
-    if (cache == NULL || cache->entry == NULL)
-    {
-        vigil_vm_pop_frame(vm);
-        vigil_error_set_literal(error, VIGIL_STATUS_INTERNAL, "AOT self-call cache missing native entry");
-        return VIGIL_STATUS_INTERNAL;
-    }
-
-    status = cache->entry(vm, &vm->stack[base + (size_t)ret], error);
-    vigil_vm_pop_frame(vm);
-
-    if (status != VIGIL_STATUS_OK)
-        return status;
-
-    if (vm->stack_count < base + (size_t)ret + 1U)
-        vm->stack_count = base + (size_t)ret + 1U;
-    if (vm->stack_count < base + (size_t)rc->max_registers)
-        vm->stack_count = base + (size_t)rc->max_registers;
+    if (vm->stack_count < needed_stack)
+        vm->stack_count = needed_stack;
 
     return VIGIL_STATUS_OK;
 }
@@ -463,16 +406,17 @@ static vigil_status_t vigil_aot_build_numeric(const vigil_reg_chunk_t *rc, vigil
     MIR_context_t ctx = NULL;
     MIR_module_t module;
     MIR_item_t func;
-    MIR_item_t prepare_proto;
-    MIR_item_t prepare_import;
-    MIR_item_t call_self_proto;
-    MIR_item_t call_self_import;
+    MIR_item_t grow_stack_proto;
+    MIR_item_t grow_stack_import;
+    MIR_item_t grow_proto;
+    MIR_item_t grow_import;
     MIR_item_t call_proto;
     MIR_item_t call_import;
     MIR_item_t call_native_proto;
     MIR_item_t call_native_import;
     MIR_item_t fail_proto;
     MIR_item_t fail_import;
+    MIR_item_t self_proto;
     MIR_type_t res_type = MIR_T_I64;
     MIR_reg_t status_reg;
     MIR_reg_t vm_reg;
@@ -516,13 +460,14 @@ static vigil_status_t vigil_aot_build_numeric(const vigil_reg_chunk_t *rc, vigil
     (void)snprintf(func_name, sizeof(func_name), "vigil_entry_%p", (const void *)rc);
 
     module = MIR_new_module(ctx, module_name);
-    prepare_proto = MIR_new_proto(ctx, "vigil_aot_prepare_frame_proto", 1U, &res_type, 3U, MIR_T_P, "vm", MIR_T_P,
-                                  "rc", MIR_T_P, "error");
-    prepare_import = MIR_new_import(ctx, "vigil_aot_prepare_frame");
-    call_self_proto = MIR_new_proto(ctx, "vigil_aot_numeric_call_self_proto", 1U, &res_type, 6U, MIR_T_P, "vm",
-                                    MIR_T_P, "rc", MIR_T_I64, "ret", MIR_T_I64, "arg_count", MIR_T_I64, "arg_base",
-                                    MIR_T_P, "error");
-    call_self_import = MIR_new_import(ctx, "vigil_aot_numeric_call_self");
+    grow_stack_proto = MIR_new_proto(ctx, "vigil_vm_grow_stack_proto", 1U, &res_type, 3U, MIR_T_P, "vm", MIR_T_I64,
+                                     "min_cap", MIR_T_P, "error");
+    grow_stack_import = MIR_new_import(ctx, "vigil_vm_grow_stack");
+    grow_proto = MIR_new_proto(ctx, "vigil_aot_push_self_frame_proto", 1U, &res_type, 4U, MIR_T_P, "vm", MIR_T_I64,
+                               "new_base", MIR_T_I64, "needed_stack", MIR_T_P, "error");
+    grow_import = MIR_new_import(ctx, "vigil_aot_push_self_frame");
+    self_proto = MIR_new_proto(ctx, "vigil_aot_self_proto", 1U, &res_type, 3U, MIR_T_P, "vm", MIR_T_P, "out_value",
+                               MIR_T_P, "error");
     call_proto = MIR_new_proto(ctx, "vigil_aot_numeric_call_proto", 1U, &res_type, 6U, MIR_T_P, "vm", MIR_T_P, "rc",
                                MIR_T_I64, "arg_base", MIR_T_I64, "func_idx", MIR_T_I64, "arg_count", MIR_T_P,
                                "error");
@@ -552,14 +497,62 @@ static vigil_status_t vigil_aot_build_numeric(const vigil_reg_chunk_t *rc, vigil
     }
     error_label = MIR_new_label(ctx);
 
-    MIR_append_insn(ctx, func,
-                    MIR_new_call_insn(ctx, 6U, MIR_new_ref_op(ctx, prepare_proto),
-                                      MIR_new_ref_op(ctx, prepare_import), MIR_new_reg_op(ctx, status_reg),
-                                      MIR_new_reg_op(ctx, vm_reg), MIR_new_uint_op(ctx, (uint64_t)(uintptr_t)rc),
-                                      MIR_new_reg_op(ctx, error_reg)));
-    MIR_append_insn(ctx, func,
-                    MIR_new_insn(ctx, MIR_BNE, MIR_new_label_op(ctx, error_label),
-                                 MIR_new_reg_op(ctx, status_reg), MIR_new_int_op(ctx, VIGIL_STATUS_OK)));
+    /* Inline prepare_frame: check stack capacity, grow on slow path. */
+    {
+        MIR_label_t prep_grow = MIR_new_label(ctx);
+        MIR_label_t prep_done = MIR_new_label(ctx);
+
+        /* Load base_slot from current frame */
+        vigil_aot_emit_reload_regs(ctx, func, regs_reg, vm_reg, tmp0_reg, tmp1_reg, tmp2_reg, tmp3_reg, status_reg);
+        /* tmp3_reg = base_slot, regs_reg = &stack[base_slot] */
+
+        /* needed = base + max_registers + 16 */
+        MIR_append_insn(ctx, func,
+                        MIR_new_insn(ctx, MIR_ADD, MIR_new_reg_op(ctx, tmp0_reg), MIR_new_reg_op(ctx, tmp3_reg),
+                                     MIR_new_int_op(ctx, (int64_t)rc->max_registers + 16)));
+        /* if stack_capacity < needed → grow */
+        MIR_append_insn(ctx, func,
+                        MIR_new_insn(ctx, MIR_MOV, MIR_new_reg_op(ctx, tmp1_reg),
+                                     MIR_new_mem_op(ctx, MIR_T_I64, offsetof(vigil_vm_t, stack_capacity), vm_reg, 0U,
+                                                    1U)));
+        MIR_append_insn(ctx, func,
+                        MIR_new_insn(ctx, MIR_BLT, MIR_new_label_op(ctx, prep_grow), MIR_new_reg_op(ctx, tmp1_reg),
+                                     MIR_new_reg_op(ctx, tmp0_reg)));
+        MIR_append_insn(ctx, func, MIR_new_insn(ctx, MIR_JMP, MIR_new_label_op(ctx, prep_done)));
+
+        MIR_append_insn(ctx, func, prep_grow);
+        MIR_append_insn(ctx, func,
+                        MIR_new_call_insn(ctx, 6U, MIR_new_ref_op(ctx, grow_stack_proto),
+                                          MIR_new_ref_op(ctx, grow_stack_import), MIR_new_reg_op(ctx, status_reg),
+                                          MIR_new_reg_op(ctx, vm_reg), MIR_new_reg_op(ctx, tmp0_reg),
+                                          MIR_new_reg_op(ctx, error_reg)));
+        MIR_append_insn(ctx, func,
+                        MIR_new_insn(ctx, MIR_BNE, MIR_new_label_op(ctx, error_label),
+                                     MIR_new_reg_op(ctx, status_reg), MIR_new_int_op(ctx, VIGIL_STATUS_OK)));
+
+        MIR_append_insn(ctx, func, prep_done);
+
+        /* Update stack_count if needed: base + max_registers */
+        MIR_append_insn(ctx, func,
+                        MIR_new_insn(ctx, MIR_ADD, MIR_new_reg_op(ctx, tmp0_reg), MIR_new_reg_op(ctx, tmp3_reg),
+                                     MIR_new_int_op(ctx, (int64_t)rc->max_registers)));
+        MIR_append_insn(ctx, func,
+                        MIR_new_insn(ctx, MIR_MOV, MIR_new_reg_op(ctx, tmp1_reg),
+                                     MIR_new_mem_op(ctx, MIR_T_I64, offsetof(vigil_vm_t, stack_count), vm_reg, 0U,
+                                                    1U)));
+        {
+            MIR_label_t sc_ok = MIR_new_label(ctx);
+            MIR_append_insn(ctx, func,
+                            MIR_new_insn(ctx, MIR_BGE, MIR_new_label_op(ctx, sc_ok),
+                                         MIR_new_reg_op(ctx, tmp1_reg), MIR_new_reg_op(ctx, tmp0_reg)));
+            MIR_append_insn(ctx, func,
+                            MIR_new_insn(ctx, MIR_MOV,
+                                         MIR_new_mem_op(ctx, MIR_T_I64, offsetof(vigil_vm_t, stack_count), vm_reg, 0U,
+                                                        1U),
+                                         MIR_new_reg_op(ctx, tmp0_reg)));
+            MIR_append_insn(ctx, func, sc_ok);
+        }
+    }
     vigil_aot_emit_reload_regs(ctx, func, regs_reg, vm_reg, tmp0_reg, tmp1_reg, tmp2_reg, tmp3_reg, status_reg);
 
     for (ip = 0U; ip < rc->code_count; ip += vigil_aot_instr_words(rc, ip))
@@ -908,22 +901,146 @@ static vigil_status_t vigil_aot_build_numeric(const vigil_reg_chunk_t *rc, vigil
             vigil_aot_emit_reload_regs(ctx, func, regs_reg, vm_reg, tmp0_reg, tmp1_reg, tmp2_reg, tmp3_reg,
                                        status_reg);
             break;
-        case VREG_CALL_SELF:
+        case VREG_CALL_SELF: {
+            /* Inline frame push/pop with direct MIR self-call.
+               Fast path: set base_slot + increment frame_count in MIR.
+               Slow path: call C helper only when frame/stack growth needed. */
+            uint8_t ret_r = VREG_GET_A(instr);
+            uint8_t arg_base_r = (uint8_t)(rc->code[ip + 1U] & 0xFFU);
+            MIR_label_t grow_slow = MIR_new_label(ctx);
+            MIR_label_t push_done = MIR_new_label(ctx);
+
+            /* Reload to get current base_slot into tmp3_reg */
+            vigil_aot_emit_reload_regs(ctx, func, regs_reg, vm_reg, tmp0_reg, tmp1_reg, tmp2_reg, tmp3_reg,
+                                       status_reg);
+            /* tmp3_reg = current frame's base_slot */
+
+            /* new_base = base_slot + arg_base_r */
             MIR_append_insn(ctx, func,
-                            MIR_new_call_insn(ctx, 9U, MIR_new_ref_op(ctx, call_self_proto),
-                                              MIR_new_ref_op(ctx, call_self_import), MIR_new_reg_op(ctx, status_reg),
-                                              MIR_new_reg_op(ctx, vm_reg),
-                                              MIR_new_uint_op(ctx, (uint64_t)(uintptr_t)rc),
-                                              MIR_new_int_op(ctx, VREG_GET_A(instr)),
-                                              MIR_new_int_op(ctx, VREG_GET_B(instr)),
-                                              MIR_new_int_op(ctx, (int64_t)(rc->code[ip + 1U] & 0xFFU)),
+                            MIR_new_insn(ctx, MIR_ADD, MIR_new_reg_op(ctx, tmp0_reg),
+                                         MIR_new_reg_op(ctx, tmp3_reg),
+                                         MIR_new_int_op(ctx, (int64_t)arg_base_r)));
+            /* tmp0_reg = new_base */
+
+            /* Check: frame_count < frame_capacity AND stack_capacity >= needed */
+            MIR_append_insn(ctx, func,
+                            MIR_new_insn(ctx, MIR_MOV, MIR_new_reg_op(ctx, tmp1_reg),
+                                         MIR_new_mem_op(ctx, MIR_T_I64, offsetof(vigil_vm_t, frame_count), vm_reg, 0U,
+                                                        1U)));
+            MIR_append_insn(ctx, func,
+                            MIR_new_insn(ctx, MIR_MOV, MIR_new_reg_op(ctx, tmp2_reg),
+                                         MIR_new_mem_op(ctx, MIR_T_I64, offsetof(vigil_vm_t, frame_capacity), vm_reg,
+                                                        0U, 1U)));
+            MIR_append_insn(ctx, func,
+                            MIR_new_insn(ctx, MIR_BGE, MIR_new_label_op(ctx, grow_slow),
+                                         MIR_new_reg_op(ctx, tmp1_reg), MIR_new_reg_op(ctx, tmp2_reg)));
+            /* needed_stack = new_base + max_registers + 16 */
+            MIR_append_insn(ctx, func,
+                            MIR_new_insn(ctx, MIR_ADD, MIR_new_reg_op(ctx, tmp2_reg),
+                                         MIR_new_reg_op(ctx, tmp0_reg),
+                                         MIR_new_int_op(ctx, (int64_t)rc->max_registers + 16)));
+            MIR_append_insn(ctx, func,
+                            MIR_new_insn(ctx, MIR_MOV, MIR_new_reg_op(ctx, status_reg),
+                                         MIR_new_mem_op(ctx, MIR_T_I64, offsetof(vigil_vm_t, stack_capacity), vm_reg,
+                                                        0U, 1U)));
+            MIR_append_insn(ctx, func,
+                            MIR_new_insn(ctx, MIR_BLT, MIR_new_label_op(ctx, grow_slow),
+                                         MIR_new_reg_op(ctx, status_reg), MIR_new_reg_op(ctx, tmp2_reg)));
+
+            /* === FAST PATH: inline frame push === */
+            /* frame_ptr = frames + frame_count * sizeof(frame) */
+            MIR_append_insn(ctx, func,
+                            MIR_new_insn(ctx, MIR_MUL, MIR_new_reg_op(ctx, tmp2_reg),
+                                         MIR_new_reg_op(ctx, tmp1_reg),
+                                         MIR_new_int_op(ctx, (int64_t)sizeof(vigil_vm_frame_t))));
+            MIR_append_insn(ctx, func,
+                            MIR_new_insn(ctx, MIR_MOV, MIR_new_reg_op(ctx, status_reg),
+                                         MIR_new_mem_op(ctx, MIR_T_I64, offsetof(vigil_vm_t, frames), vm_reg, 0U,
+                                                        1U)));
+            MIR_append_insn(ctx, func,
+                            MIR_new_insn(ctx, MIR_ADD, MIR_new_reg_op(ctx, tmp2_reg),
+                                         MIR_new_reg_op(ctx, status_reg), MIR_new_reg_op(ctx, tmp2_reg)));
+            /* frames[frame_count].base_slot = new_base */
+            MIR_append_insn(ctx, func,
+                            MIR_new_insn(ctx, MIR_MOV,
+                                         MIR_new_mem_op(ctx, MIR_T_I64, offsetof(vigil_vm_frame_t, base_slot),
+                                                        tmp2_reg, 0U, 1U),
+                                         MIR_new_reg_op(ctx, tmp0_reg)));
+            /* frame_count++ */
+            MIR_append_insn(ctx, func,
+                            MIR_new_insn(ctx, MIR_ADD, MIR_new_reg_op(ctx, tmp1_reg),
+                                         MIR_new_reg_op(ctx, tmp1_reg), MIR_new_int_op(ctx, 1)));
+            MIR_append_insn(ctx, func,
+                            MIR_new_insn(ctx, MIR_MOV,
+                                         MIR_new_mem_op(ctx, MIR_T_I64, offsetof(vigil_vm_t, frame_count), vm_reg, 0U,
+                                                        1U),
+                                         MIR_new_reg_op(ctx, tmp1_reg)));
+            MIR_append_insn(ctx, func, MIR_new_insn(ctx, MIR_JMP, MIR_new_label_op(ctx, push_done)));
+
+            /* === SLOW PATH: call C helper for growth === */
+            MIR_append_insn(ctx, func, grow_slow);
+            MIR_append_insn(ctx, func,
+                            MIR_new_insn(ctx, MIR_ADD, MIR_new_reg_op(ctx, tmp2_reg),
+                                         MIR_new_reg_op(ctx, tmp0_reg),
+                                         MIR_new_int_op(ctx, (int64_t)rc->max_registers + 16)));
+            MIR_append_insn(ctx, func,
+                            MIR_new_call_insn(ctx, 7U, MIR_new_ref_op(ctx, grow_proto),
+                                              MIR_new_ref_op(ctx, grow_import), MIR_new_reg_op(ctx, status_reg),
+                                              MIR_new_reg_op(ctx, vm_reg), MIR_new_reg_op(ctx, tmp0_reg),
+                                              MIR_new_reg_op(ctx, tmp2_reg),
                                               MIR_new_reg_op(ctx, error_reg)));
+            MIR_append_insn(ctx, func,
+                            MIR_new_insn(ctx, MIR_BNE, MIR_new_label_op(ctx, error_label),
+                                         MIR_new_reg_op(ctx, status_reg), MIR_new_int_op(ctx, VIGIL_STATUS_OK)));
+
+            MIR_append_insn(ctx, func, push_done);
+
+            /* Compute out_ptr = &vm->stack[caller_base + ret_r] */
+            /* tmp3_reg still has caller's base_slot (set before the branch) */
+            MIR_append_insn(ctx, func,
+                            MIR_new_insn(ctx, MIR_ADD, MIR_new_reg_op(ctx, tmp1_reg),
+                                         MIR_new_reg_op(ctx, tmp3_reg),
+                                         MIR_new_int_op(ctx, (int64_t)ret_r)));
+            MIR_append_insn(ctx, func,
+                            MIR_new_insn(ctx, MIR_LSH, MIR_new_reg_op(ctx, tmp1_reg),
+                                         MIR_new_reg_op(ctx, tmp1_reg), MIR_new_int_op(ctx, 3)));
+            MIR_append_insn(ctx, func,
+                            MIR_new_insn(ctx, MIR_MOV, MIR_new_reg_op(ctx, tmp2_reg),
+                                         MIR_new_mem_op(ctx, MIR_T_I64, offsetof(vigil_vm_t, stack), vm_reg, 0U,
+                                                        1U)));
+            MIR_append_insn(ctx, func,
+                            MIR_new_insn(ctx, MIR_ADD, MIR_new_reg_op(ctx, tmp1_reg),
+                                         MIR_new_reg_op(ctx, tmp2_reg), MIR_new_reg_op(ctx, tmp1_reg)));
+
+            /* Direct self-call: self(vm, out_ptr, error) */
+            MIR_append_insn(ctx, func,
+                            MIR_new_call_insn(ctx, 6U, MIR_new_ref_op(ctx, self_proto),
+                                              MIR_new_ref_op(ctx, func), MIR_new_reg_op(ctx, status_reg),
+                                              MIR_new_reg_op(ctx, vm_reg), MIR_new_reg_op(ctx, tmp1_reg),
+                                              MIR_new_reg_op(ctx, error_reg)));
+
+            /* Inline frame pop: frame_count-- */
+            MIR_append_insn(ctx, func,
+                            MIR_new_insn(ctx, MIR_MOV, MIR_new_reg_op(ctx, tmp0_reg),
+                                         MIR_new_mem_op(ctx, MIR_T_I64, offsetof(vigil_vm_t, frame_count), vm_reg, 0U,
+                                                        1U)));
+            MIR_append_insn(ctx, func,
+                            MIR_new_insn(ctx, MIR_SUB, MIR_new_reg_op(ctx, tmp0_reg),
+                                         MIR_new_reg_op(ctx, tmp0_reg), MIR_new_int_op(ctx, 1)));
+            MIR_append_insn(ctx, func,
+                            MIR_new_insn(ctx, MIR_MOV,
+                                         MIR_new_mem_op(ctx, MIR_T_I64, offsetof(vigil_vm_t, frame_count), vm_reg, 0U,
+                                                        1U),
+                                         MIR_new_reg_op(ctx, tmp0_reg)));
+
+            /* Check self-call status */
             MIR_append_insn(ctx, func,
                             MIR_new_insn(ctx, MIR_BNE, MIR_new_label_op(ctx, error_label),
                                          MIR_new_reg_op(ctx, status_reg), MIR_new_int_op(ctx, VIGIL_STATUS_OK)));
             vigil_aot_emit_reload_regs(ctx, func, regs_reg, vm_reg, tmp0_reg, tmp1_reg, tmp2_reg, tmp3_reg,
                                        status_reg);
             break;
+        }
         case VREG_CALL_NATIVE:
             MIR_append_insn(ctx, func,
                             MIR_new_call_insn(ctx, 9U, MIR_new_ref_op(ctx, call_native_proto),
@@ -1004,8 +1121,8 @@ static vigil_status_t vigil_aot_build_numeric(const vigil_reg_chunk_t *rc, vigil
     MIR_finish_module(ctx);
 
     MIR_load_module(ctx, module);
-    MIR_load_external(ctx, "vigil_aot_prepare_frame", (void *)vigil_aot_prepare_frame);
-    MIR_load_external(ctx, "vigil_aot_numeric_call_self", (void *)vigil_aot_numeric_call_self);
+    MIR_load_external(ctx, "vigil_vm_grow_stack", (void *)vigil_vm_grow_stack);
+    MIR_load_external(ctx, "vigil_aot_push_self_frame", (void *)vigil_aot_push_self_frame);
     MIR_load_external(ctx, "vigil_aot_numeric_call", (void *)vigil_aot_numeric_call);
     MIR_load_external(ctx, "vigil_aot_numeric_call_native", (void *)vigil_aot_numeric_call_native);
     MIR_load_external(ctx, "vigil_aot_numeric_fail", (void *)vigil_aot_numeric_fail);
