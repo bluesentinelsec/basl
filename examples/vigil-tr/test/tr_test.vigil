@@ -17,6 +17,3 @@ fn test_tr_length_mismatch(test.T t) -> void {
 }
 
 
-fn main() -> i32 {
-    return 0
-}

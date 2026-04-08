@@ -20,6 +20,3 @@ fn test_cut_invalid_field(test.T t) -> void {
 }
 
 
-fn main() -> i32 {
-    return 0
-}
