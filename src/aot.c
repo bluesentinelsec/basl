@@ -547,15 +547,14 @@ static vigil_status_t vigil_aot_build_numeric(const vigil_reg_chunk_t *rc, vigil
             }
             sip += vigil_aot_instr_words(rc, sip);
         }
-        if (0)
+        if (!has_self_call)
         {
             char rn[32];
             for (uint16_t ri = 0; ri < rc->max_registers && ri < 256; ri++)
             {
                 if ((typed_w[ri] & 1U) && !other_w[ri])
                     promoted[ri] = 1;
-                else if ((typed_w[ri] & 2U) && !other_w[ri])
-                    promoted[ri] = 2;
+                /* i64 promotion disabled: raw values can exceed 48-bit NaN-box payload. */
                 if (promoted[ri])
                 {
                     (void)snprintf(rn, sizeof(rn), "$p%u", (unsigned)ri);
@@ -765,8 +764,42 @@ static vigil_status_t vigil_aot_build_numeric(const vigil_reg_chunk_t *rc, vigil
         switch (op)
         {
         case VREG_MOVE:
-            MIR_append_insn(ctx, func, MIR_new_insn(ctx, MIR_MOV, MIR_new_reg_op(ctx, v[VREG_GET_A(instr)]),
-                            MIR_new_reg_op(ctx, v[VREG_GET_B(instr)])));
+            if (v)
+            {
+                uint8_t dst = VREG_GET_A(instr), src = VREG_GET_B(instr);
+                if (promoted[src] && !promoted[dst])
+                {
+                    /* Source is raw, dest expects NaN-boxed — encode. */
+                    MIR_append_insn(ctx, func, MIR_new_insn(ctx, MIR_AND, MIR_new_reg_op(ctx, v[dst]),
+                                    MIR_new_reg_op(ctx, v[src]), MIR_new_uint_op(ctx, VIGIL_NANBOX_PAYLOAD_MASK)));
+                    MIR_append_insn(ctx, func, MIR_new_insn(ctx, MIR_OR, MIR_new_reg_op(ctx, v[dst]),
+                                    MIR_new_reg_op(ctx, v[dst]), MIR_new_uint_op(ctx, VIGIL_NANBOX_TAG_INT)));
+                }
+                else if (!promoted[src] && promoted[dst])
+                {
+                    /* Source is NaN-boxed, dest expects raw — decode. */
+                    MIR_append_insn(ctx, func, MIR_new_insn(ctx, MIR_MOV, MIR_new_reg_op(ctx, v[dst]),
+                                    MIR_new_reg_op(ctx, v[src])));
+                    if (promoted[dst] == 1)
+                        MIR_append_insn(ctx, func, MIR_new_insn(ctx, MIR_EXT32, MIR_new_reg_op(ctx, v[dst]),
+                                        MIR_new_reg_op(ctx, v[dst])));
+                    else
+                    {
+                        MIR_append_insn(ctx, func, MIR_new_insn(ctx, MIR_AND, MIR_new_reg_op(ctx, v[dst]),
+                                        MIR_new_reg_op(ctx, v[dst]), MIR_new_uint_op(ctx, VIGIL_NANBOX_PAYLOAD_MASK)));
+                        MIR_append_insn(ctx, func, MIR_new_insn(ctx, MIR_LSH, MIR_new_reg_op(ctx, v[dst]),
+                                        MIR_new_reg_op(ctx, v[dst]), MIR_new_int_op(ctx, 16)));
+                        MIR_append_insn(ctx, func, MIR_new_insn(ctx, MIR_RSH, MIR_new_reg_op(ctx, v[dst]),
+                                        MIR_new_reg_op(ctx, v[dst]), MIR_new_int_op(ctx, 16)));
+                    }
+                }
+                else
+                {
+                    /* Same representation — direct copy. */
+                    MIR_append_insn(ctx, func, MIR_new_insn(ctx, MIR_MOV, MIR_new_reg_op(ctx, v[dst]),
+                                    MIR_new_reg_op(ctx, v[src])));
+                }
+            }
             break;
         case VREG_LOAD_K: {
             const vigil_value_t *k = VIGIL_VM_CHUNK_CONSTANT(rc->stack_chunk, (size_t)VREG_GET_Bx(instr));
@@ -1001,10 +1034,20 @@ static vigil_status_t vigil_aot_build_numeric(const vigil_reg_chunk_t *rc, vigil
             MIR_append_insn(ctx, func, cmp_done);
             break;
         }
-        case VREG_DUP:
-            MIR_append_insn(ctx, func, MIR_new_insn(ctx, MIR_MOV, MIR_new_reg_op(ctx, V(VREG_GET_A(instr))),
-                            MIR_new_reg_op(ctx, V(VREG_GET_B(instr)))));
+        case VREG_DUP: {
+            uint8_t dst = VREG_GET_A(instr), src = VREG_GET_B(instr);
+            if (v && promoted[src] && !promoted[dst])
+            {
+                MIR_append_insn(ctx, func, MIR_new_insn(ctx, MIR_AND, MIR_new_reg_op(ctx, v[dst]),
+                                MIR_new_reg_op(ctx, v[src]), MIR_new_uint_op(ctx, VIGIL_NANBOX_PAYLOAD_MASK)));
+                MIR_append_insn(ctx, func, MIR_new_insn(ctx, MIR_OR, MIR_new_reg_op(ctx, v[dst]),
+                                MIR_new_reg_op(ctx, v[dst]), MIR_new_uint_op(ctx, VIGIL_NANBOX_TAG_INT)));
+            }
+            else
+                MIR_append_insn(ctx, func, MIR_new_insn(ctx, MIR_MOV, MIR_new_reg_op(ctx, V(dst)),
+                                MIR_new_reg_op(ctx, V(src))));
             break;
+        }
         case VREG_TESTSET: {
             MIR_label_t ts_skip = MIR_new_label(ctx);
             /* TESTSET needs NaN-boxed value for comparison. */
@@ -1338,16 +1381,17 @@ static vigil_status_t vigil_aot_build_numeric(const vigil_reg_chunk_t *rc, vigil
                             MIR_new_uint_op(ctx, VIGIL_NANBOX_NIL)));
             break;
         case VREG_RETURN:
-            V_FLUSH_ALL();
             vigil_aot_emit_reload_regs(ctx, func, regs_reg, vm_reg, tmp0_reg, tmp1_reg, tmp2_reg, tmp3_reg,
                                        status_reg);
+            V_FLUSH_ALL();
             if (VREG_GET_B(instr) > 0U)
             {
+                uint8_t ret_slot = VREG_GET_A(instr);
+                /* Read return value from memory (V_FLUSH_ALL already wrote it). */
                 MIR_append_insn(ctx, func,
                                 MIR_new_insn(ctx, MIR_MOV, MIR_new_reg_op(ctx, tmp0_reg),
                                              MIR_new_mem_op(ctx, MIR_T_I64,
-                                                            (MIR_disp_t)((size_t)VREG_GET_A(instr) *
-                                                                         sizeof(vigil_value_t)),
+                                                            (MIR_disp_t)((size_t)ret_slot * sizeof(vigil_value_t)),
                                                             regs_reg, 0U, 1U)));
                 MIR_append_insn(ctx, func,
                                 MIR_new_insn(ctx, MIR_MOV,
