@@ -480,6 +480,9 @@ static vigil_status_t vigil_aot_build_numeric(const vigil_reg_chunk_t *rc, vigil
     MIR_reg_t tmp2_reg;
     MIR_reg_t tmp3_reg;
     MIR_label_t *labels = NULL;
+    /* Dedicated MIR registers for FORLOOP counters — persist across iterations. */
+    MIR_reg_t forloop_regs[256];
+    memset(forloop_regs, 0, sizeof(forloop_regs));
     MIR_label_t error_label;
     char module_name[64];
     char func_name[64];
@@ -542,6 +545,26 @@ static vigil_status_t vigil_aot_build_numeric(const vigil_reg_chunk_t *rc, vigil
     tmp1_reg = MIR_new_func_reg(ctx, func->u.func, MIR_T_I64, "$tmp1");
     tmp2_reg = MIR_new_func_reg(ctx, func->u.func, MIR_T_I64, "$tmp2");
     tmp3_reg = MIR_new_func_reg(ctx, func->u.func, MIR_T_I64, "$tmp3");
+
+    /* Allocate dedicated MIR registers for FORLOOP counters. */
+    {
+        char rname[32];
+        size_t sip = 0U;
+        while (sip < rc->code_count)
+        {
+            uint8_t sop = VREG_GET_OP(rc->code[sip]);
+            if (sop == VREG_FORLOOP_I32 || sop == VREG_FORLOOP_I64)
+            {
+                uint8_t idx = VREG_GET_A(rc->code[sip]);
+                if (forloop_regs[idx] == 0)
+                {
+                    (void)snprintf(rname, sizeof(rname), "$fl%u", (unsigned)idx);
+                    forloop_regs[idx] = MIR_new_func_reg(ctx, func->u.func, MIR_T_I64, rname);
+                }
+            }
+            sip += vigil_aot_instr_words(rc, sip);
+        }
+    }
 
     for (ip = 0U; ip <= rc->code_count; ++ip)
     {
@@ -866,24 +889,22 @@ static vigil_status_t vigil_aot_build_numeric(const vigil_reg_chunk_t *rc, vigil
             const vigil_value_t *kv = VIGIL_VM_CHUNK_CONSTANT(rc->stack_chunk, (size_t)ci);
             int32_t limit = vigil_nanbox_decode_i32(kv != NULL ? *kv : VIGIL_NANBOX_NIL);
             MIR_label_t loop_cont = MIR_new_label(ctx);
-            /* val = R[idx], val += delta */
-            vigil_aot_emit_i32_decode(ctx, func, tmp0_reg, regs_reg, idx);
+            MIR_reg_t fl = forloop_regs[idx];
+            /* Load counter from memory (first iter) or use persisted reg (subsequent). */
+            vigil_aot_emit_i32_decode(ctx, func, fl, regs_reg, idx);
             MIR_append_insn(ctx, func,
-                            MIR_new_insn(ctx, MIR_ADDO, MIR_new_reg_op(ctx, tmp2_reg), MIR_new_reg_op(ctx, tmp0_reg),
+                            MIR_new_insn(ctx, MIR_ADDO, MIR_new_reg_op(ctx, fl), MIR_new_reg_op(ctx, fl),
                                          MIR_new_int_op(ctx, (int32_t)delta)));
             MIR_append_insn(ctx, func, MIR_new_insn(ctx, MIR_BO, MIR_new_label_op(ctx, labels[rc->code_count])));
-            vigil_aot_emit_i32_encode_store(ctx, func, tmp2_reg, tmp3_reg, regs_reg, idx);
-            /* Compare and branch: if condition met, execute back-jump (word 2) */
+            vigil_aot_emit_i32_encode_store(ctx, func, fl, tmp3_reg, regs_reg, idx);
             switch (cmp) {
-            case 0: MIR_append_insn(ctx, func, MIR_new_insn(ctx, MIR_BLT, MIR_new_label_op(ctx, loop_cont), MIR_new_reg_op(ctx, tmp2_reg), MIR_new_int_op(ctx, limit))); break;
-            case 1: MIR_append_insn(ctx, func, MIR_new_insn(ctx, MIR_BLE, MIR_new_label_op(ctx, loop_cont), MIR_new_reg_op(ctx, tmp2_reg), MIR_new_int_op(ctx, limit))); break;
-            case 2: MIR_append_insn(ctx, func, MIR_new_insn(ctx, MIR_BGT, MIR_new_label_op(ctx, loop_cont), MIR_new_reg_op(ctx, tmp2_reg), MIR_new_int_op(ctx, limit))); break;
-            case 3: MIR_append_insn(ctx, func, MIR_new_insn(ctx, MIR_BGE, MIR_new_label_op(ctx, loop_cont), MIR_new_reg_op(ctx, tmp2_reg), MIR_new_int_op(ctx, limit))); break;
-            default: MIR_append_insn(ctx, func, MIR_new_insn(ctx, MIR_BNE, MIR_new_label_op(ctx, loop_cont), MIR_new_reg_op(ctx, tmp2_reg), MIR_new_int_op(ctx, limit))); break;
+            case 0: MIR_append_insn(ctx, func, MIR_new_insn(ctx, MIR_BLT, MIR_new_label_op(ctx, loop_cont), MIR_new_reg_op(ctx, fl), MIR_new_int_op(ctx, limit))); break;
+            case 1: MIR_append_insn(ctx, func, MIR_new_insn(ctx, MIR_BLE, MIR_new_label_op(ctx, loop_cont), MIR_new_reg_op(ctx, fl), MIR_new_int_op(ctx, limit))); break;
+            case 2: MIR_append_insn(ctx, func, MIR_new_insn(ctx, MIR_BGT, MIR_new_label_op(ctx, loop_cont), MIR_new_reg_op(ctx, fl), MIR_new_int_op(ctx, limit))); break;
+            case 3: MIR_append_insn(ctx, func, MIR_new_insn(ctx, MIR_BGE, MIR_new_label_op(ctx, loop_cont), MIR_new_reg_op(ctx, fl), MIR_new_int_op(ctx, limit))); break;
+            default: MIR_append_insn(ctx, func, MIR_new_insn(ctx, MIR_BNE, MIR_new_label_op(ctx, loop_cont), MIR_new_reg_op(ctx, fl), MIR_new_int_op(ctx, limit))); break;
             }
-            /* Not taken: skip all 3 words */
             MIR_append_insn(ctx, func, MIR_new_insn(ctx, MIR_JMP, MIR_new_label_op(ctx, labels[ip + 3U])));
-            /* Taken: execute word 2 (the back-jump) */
             MIR_append_insn(ctx, func, loop_cont);
             MIR_append_insn(ctx, func, MIR_new_insn(ctx, MIR_JMP, MIR_new_label_op(ctx, labels[ip + 2U])));
             continue;
@@ -897,18 +918,19 @@ static vigil_status_t vigil_aot_build_numeric(const vigil_reg_chunk_t *rc, vigil
             const vigil_value_t *kv = VIGIL_VM_CHUNK_CONSTANT(rc->stack_chunk, (size_t)ci);
             int64_t limit = vigil_nanbox_decode_int(kv != NULL ? *kv : VIGIL_NANBOX_NIL);
             MIR_label_t loop_cont = MIR_new_label(ctx);
-            vigil_aot_emit_i64_decode(ctx, func, tmp0_reg, regs_reg, idx);
+            MIR_reg_t fl = forloop_regs[idx];
+            vigil_aot_emit_i64_decode(ctx, func, fl, regs_reg, idx);
             MIR_append_insn(ctx, func,
-                            MIR_new_insn(ctx, MIR_ADDO, MIR_new_reg_op(ctx, tmp2_reg), MIR_new_reg_op(ctx, tmp0_reg),
+                            MIR_new_insn(ctx, MIR_ADDO, MIR_new_reg_op(ctx, fl), MIR_new_reg_op(ctx, fl),
                                          MIR_new_int_op(ctx, delta)));
             MIR_append_insn(ctx, func, MIR_new_insn(ctx, MIR_BO, MIR_new_label_op(ctx, labels[rc->code_count])));
-            vigil_aot_emit_i64_encode_store(ctx, func, tmp2_reg, tmp3_reg, regs_reg, idx);
+            vigil_aot_emit_i64_encode_store(ctx, func, fl, tmp3_reg, regs_reg, idx);
             switch (cmp) {
-            case 0: MIR_append_insn(ctx, func, MIR_new_insn(ctx, MIR_BLT, MIR_new_label_op(ctx, loop_cont), MIR_new_reg_op(ctx, tmp2_reg), MIR_new_int_op(ctx, limit))); break;
-            case 1: MIR_append_insn(ctx, func, MIR_new_insn(ctx, MIR_BLE, MIR_new_label_op(ctx, loop_cont), MIR_new_reg_op(ctx, tmp2_reg), MIR_new_int_op(ctx, limit))); break;
-            case 2: MIR_append_insn(ctx, func, MIR_new_insn(ctx, MIR_BGT, MIR_new_label_op(ctx, loop_cont), MIR_new_reg_op(ctx, tmp2_reg), MIR_new_int_op(ctx, limit))); break;
-            case 3: MIR_append_insn(ctx, func, MIR_new_insn(ctx, MIR_BGE, MIR_new_label_op(ctx, loop_cont), MIR_new_reg_op(ctx, tmp2_reg), MIR_new_int_op(ctx, limit))); break;
-            default: MIR_append_insn(ctx, func, MIR_new_insn(ctx, MIR_BNE, MIR_new_label_op(ctx, loop_cont), MIR_new_reg_op(ctx, tmp2_reg), MIR_new_int_op(ctx, limit))); break;
+            case 0: MIR_append_insn(ctx, func, MIR_new_insn(ctx, MIR_BLT, MIR_new_label_op(ctx, loop_cont), MIR_new_reg_op(ctx, fl), MIR_new_int_op(ctx, limit))); break;
+            case 1: MIR_append_insn(ctx, func, MIR_new_insn(ctx, MIR_BLE, MIR_new_label_op(ctx, loop_cont), MIR_new_reg_op(ctx, fl), MIR_new_int_op(ctx, limit))); break;
+            case 2: MIR_append_insn(ctx, func, MIR_new_insn(ctx, MIR_BGT, MIR_new_label_op(ctx, loop_cont), MIR_new_reg_op(ctx, fl), MIR_new_int_op(ctx, limit))); break;
+            case 3: MIR_append_insn(ctx, func, MIR_new_insn(ctx, MIR_BGE, MIR_new_label_op(ctx, loop_cont), MIR_new_reg_op(ctx, fl), MIR_new_int_op(ctx, limit))); break;
+            default: MIR_append_insn(ctx, func, MIR_new_insn(ctx, MIR_BNE, MIR_new_label_op(ctx, loop_cont), MIR_new_reg_op(ctx, fl), MIR_new_int_op(ctx, limit))); break;
             }
             MIR_append_insn(ctx, func, MIR_new_insn(ctx, MIR_JMP, MIR_new_label_op(ctx, labels[ip + 3U])));
             MIR_append_insn(ctx, func, loop_cont);
