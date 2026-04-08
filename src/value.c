@@ -139,6 +139,7 @@ typedef struct vigil_native_function_object
     vigil_string_t name;
     size_t arity;
     vigil_native_fn_t function;
+    int return_type; /* vigil_type_kind_t — set by compiler for AOT safety checks */
 } vigil_native_function_object_t;
 
 static const vigil_string_object_t *vigil_string_object_cast(const vigil_object_t *object)
@@ -2576,4 +2577,17 @@ vigil_native_fn_t vigil_native_function_get(const vigil_object_t *object)
     }
     native = (const vigil_native_function_object_t *)object;
     return native->function;
+}
+
+VIGIL_API void vigil_native_function_set_return_type(vigil_object_t *object, int return_type)
+{
+    if (object != NULL && object->type == VIGIL_OBJECT_NATIVE_FUNCTION)
+        ((vigil_native_function_object_t *)object)->return_type = return_type;
+}
+
+VIGIL_API int vigil_native_function_get_return_type(const vigil_object_t *object)
+{
+    if (object != NULL && object->type == VIGIL_OBJECT_NATIVE_FUNCTION)
+        return ((const vigil_native_function_object_t *)object)->return_type;
+    return 0; /* VIGIL_TYPE_INVALID */
 }

@@ -246,6 +246,7 @@ static int vigil_aot_is_numeric_constant(const vigil_value_t *value)
 static int vigil_aot_chunk_is_numeric_subset(const vigil_reg_chunk_t *rc)
 {
     size_t ip = 0U;
+    int has_native_call = 0;
 
     if (rc == NULL)
     {
@@ -325,7 +326,40 @@ static int vigil_aot_chunk_is_numeric_subset(const vigil_reg_chunk_t *rc)
             }
         }
 
+        /* CALL_NATIVE is only safe when the callee deals exclusively with
+           numeric values.  If the function also contains RELEASE instructions
+           it manipulates object-typed registers (strings, arrays, …) and
+           must fall back to the interpreter. */
+        if (op == VREG_CALL_NATIVE)
+            has_native_call = 1;
+
         ip += vigil_aot_instr_words(rc, ip);
+    }
+
+    if (has_native_call)
+    {
+        /* Verify every CALL_NATIVE target returns a numeric type.
+           Native functions returning strings/objects would place
+           non-numeric values in the register window, which the
+           numeric AOT path cannot handle. */
+        size_t check_ip = 0U;
+        while (check_ip < rc->code_count)
+        {
+            vigil_reg_instr_t ci = rc->code[check_ip];
+            if (VREG_GET_OP(ci) == VREG_CALL_NATIVE && check_ip + 1U < rc->code_count)
+            {
+                uint32_t idx = rc->code[check_ip + 1U];
+                const vigil_value_t *nv = VIGIL_VM_CHUNK_CONSTANT(rc->stack_chunk, (size_t)idx);
+                if (nv == NULL || !vigil_nanbox_has_object(*nv))
+                    return 0;
+                vigil_object_t *obj = (vigil_object_t *)vigil_nanbox_decode_ptr(*nv);
+                int rt = vigil_native_function_get_return_type(obj);
+                if (rt == VIGIL_TYPE_STRING || rt == VIGIL_TYPE_ERR || rt == VIGIL_TYPE_OBJECT ||
+                    rt == VIGIL_TYPE_INVALID)
+                    return 0;
+            }
+            check_ip += vigil_aot_instr_words(rc, check_ip);
+        }
     }
 
     return 1;
@@ -432,6 +466,8 @@ static vigil_status_t vigil_aot_build_numeric(const vigil_reg_chunk_t *rc, vigil
     MIR_item_t call_self_import;
     MIR_item_t call_proto;
     MIR_item_t call_import;
+    MIR_item_t call_native_proto;
+    MIR_item_t call_native_import;
     MIR_item_t fail_proto;
     MIR_item_t fail_import;
     MIR_type_t res_type = MIR_T_I64;
@@ -488,10 +524,10 @@ static vigil_status_t vigil_aot_build_numeric(const vigil_reg_chunk_t *rc, vigil
                                MIR_T_I64, "arg_base", MIR_T_I64, "func_idx", MIR_T_I64, "arg_count", MIR_T_P,
                                "error");
     call_import = MIR_new_import(ctx, "vigil_aot_numeric_call");
-    MIR_item_t call_native_proto = MIR_new_proto(ctx, "vigil_aot_numeric_call_native_proto", 1U, &res_type, 6U,
-                                                  MIR_T_P, "vm", MIR_T_P, "rc", MIR_T_I64, "arg_base", MIR_T_I64,
-                                                  "arg_count", MIR_T_I64, "const_idx", MIR_T_P, "error");
-    MIR_item_t call_native_import = MIR_new_import(ctx, "vigil_aot_numeric_call_native");
+    call_native_proto = MIR_new_proto(ctx, "vigil_aot_numeric_call_native_proto", 1U, &res_type, 6U,
+                                      MIR_T_P, "vm", MIR_T_P, "rc", MIR_T_I64, "arg_base", MIR_T_I64,
+                                      "arg_count", MIR_T_I64, "const_idx", MIR_T_P, "error");
+    call_native_import = MIR_new_import(ctx, "vigil_aot_numeric_call_native");
     fail_proto = MIR_new_proto(ctx, "vigil_aot_numeric_fail_proto", 1U, &res_type, 3U, MIR_T_I64, "status", MIR_T_P,
                                "message", MIR_T_P, "error");
     fail_import = MIR_new_import(ctx, "vigil_aot_numeric_fail");

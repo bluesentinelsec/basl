@@ -190,6 +190,9 @@ extern "C"
 
     VIGIL_API vigil_native_fn_t vigil_native_function_get(const vigil_object_t *object);
 
+    VIGIL_API void vigil_native_function_set_return_type(vigil_object_t *object, int return_type);
+    VIGIL_API int vigil_native_function_get_return_type(const vigil_object_t *object);
+
 #ifdef __cplusplus
 }
 #endif
