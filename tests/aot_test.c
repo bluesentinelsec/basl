@@ -2,7 +2,6 @@
 
 #include <string.h>
 
-#include "internal/vigil_internal.h"
 #if !defined(_WIN32)
 #include "internal/vigil_regvm.h"
 #endif
@@ -16,7 +15,12 @@ static vigil_status_t CompileMainFunction(vigil_runtime_t *runtime, const char *
 
     if (runtime == NULL || source_text == NULL || registry == NULL || diagnostics == NULL || out_function == NULL)
     {
-        vigil_error_set_literal(error, VIGIL_STATUS_INVALID_ARGUMENT, "compile helper arguments must not be null");
+        if (error)
+        {
+            error->type = VIGIL_STATUS_INVALID_ARGUMENT;
+            error->value = "compile helper arguments must not be null";
+            error->length = 41;
+        }
         return VIGIL_STATUS_INVALID_ARGUMENT;
     }
 

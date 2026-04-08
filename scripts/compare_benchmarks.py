@@ -39,16 +39,24 @@ def merged_thresholds(all_thresholds: dict[str, Any], name: str) -> dict[str, fl
     return merged
 
 
+def _extract_metrics(entry: dict[str, Any]) -> tuple[int, int]:
+    """Extract median_elapsed_ns and median_max_rss_kb from either flat or nested format."""
+    if "median_elapsed_ns" in entry:
+        return int(entry["median_elapsed_ns"]), int(entry["median_max_rss_kb"])
+    if "aot" in entry:
+        aot = entry["aot"]
+        return int(aot["median_elapsed_ns"]), int(aot["median_max_rss_kb"])
+    raise KeyError("benchmark entry has neither 'median_elapsed_ns' nor 'aot' key")
+
+
 def summarize_row(
     name: str,
     baseline: dict[str, Any],
     candidate: dict[str, Any],
     limits: dict[str, float],
 ) -> tuple[list[str], list[str]]:
-    baseline_time = int(baseline["median_elapsed_ns"])
-    candidate_time = int(candidate["median_elapsed_ns"])
-    baseline_rss = int(baseline["median_max_rss_kb"])
-    candidate_rss = int(candidate["median_max_rss_kb"])
+    baseline_time, baseline_rss = _extract_metrics(baseline)
+    candidate_time, candidate_rss = _extract_metrics(candidate)
 
     time_delta_ns = candidate_time - baseline_time
     rss_delta_kb = candidate_rss - baseline_rss
