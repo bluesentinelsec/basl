@@ -112,6 +112,14 @@
         "length": 125,
         "param": 8
       }
+    },
+    {
+      "path": "src/aot.c",
+      "thresholds": {
+        "ccn": 75,
+        "length": 550,
+        "param": 10
+      }
     }
   ]
 }
