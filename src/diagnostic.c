@@ -245,7 +245,7 @@ vigil_status_t vigil_diagnostic_format(const vigil_source_registry_t *registry, 
 {
     vigil_source_location_t location;
     const vigil_source_file_t *source;
-    char prefix[128];
+    char number[32];
     int written;
     vigil_status_t status;
     const char *path;
@@ -294,15 +294,61 @@ vigil_status_t vigil_diagnostic_format(const vigil_source_registry_t *registry, 
         }
     }
 
-    written = snprintf(prefix, sizeof(prefix), "%s:%u:%u: %s: ", path, location.line, location.column,
-                       vigil_diagnostic_severity_name(diagnostic->severity));
-    if (written < 0)
+    status = vigil_string_append_cstr(output, path, error);
+    if (status != VIGIL_STATUS_OK)
     {
-        vigil_error_set_literal(error, VIGIL_STATUS_INTERNAL, "failed to format diagnostic prefix");
-        return VIGIL_STATUS_INTERNAL;
+        return status;
     }
 
-    status = vigil_string_append(output, prefix, (size_t)written, error);
+    status = vigil_string_append_cstr(output, ":", error);
+    if (status != VIGIL_STATUS_OK)
+    {
+        return status;
+    }
+
+    written = snprintf(number, sizeof(number), "%u", location.line);
+    if (written < 0)
+    {
+        vigil_error_set_literal(error, VIGIL_STATUS_INTERNAL, "failed to format diagnostic line");
+        return VIGIL_STATUS_INTERNAL;
+    }
+    status = vigil_string_append(output, number, (size_t)written, error);
+    if (status != VIGIL_STATUS_OK)
+    {
+        return status;
+    }
+
+    status = vigil_string_append_cstr(output, ":", error);
+    if (status != VIGIL_STATUS_OK)
+    {
+        return status;
+    }
+
+    written = snprintf(number, sizeof(number), "%u", location.column);
+    if (written < 0)
+    {
+        vigil_error_set_literal(error, VIGIL_STATUS_INTERNAL, "failed to format diagnostic column");
+        return VIGIL_STATUS_INTERNAL;
+    }
+    status = vigil_string_append(output, number, (size_t)written, error);
+    if (status != VIGIL_STATUS_OK)
+    {
+        return status;
+    }
+
+    status = vigil_string_append_cstr(output, ": ", error);
+    if (status != VIGIL_STATUS_OK)
+    {
+        return status;
+    }
+
+    status = vigil_string_append_cstr(output, vigil_diagnostic_severity_name(diagnostic->severity), error);
+    if (status != VIGIL_STATUS_OK)
+    {
+        return status;
+    }
+
+    status = vigil_string_append_cstr(output, ": ", error);
     if (status != VIGIL_STATUS_OK)
     {
         return status;

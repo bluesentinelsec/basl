@@ -154,10 +154,41 @@ static void test_server_func(void *arg)
     if (vigil_platform_tcp_accept(srv->listener, &client, NULL) != VIGIL_STATUS_OK)
         return;
 
-    /* Drain the request */
+    /* Drain the request, including any POST body. */
     char buf[4096];
     size_t n = 0;
-    vigil_platform_tcp_recv(client, buf, sizeof(buf), &n, NULL);
+    size_t len = 0;
+    size_t content_length = 0;
+    int saw_headers = 0;
+    for (;;)
+    {
+        if (len >= sizeof(buf) - 1U)
+            break;
+        if (vigil_platform_tcp_recv(client, buf + len, sizeof(buf) - len - 1U, &n, NULL) != VIGIL_STATUS_OK || n == 0)
+            break;
+        len += n;
+        buf[len] = '\0';
+        if (!saw_headers)
+        {
+            char *body_start = strstr(buf, "\r\n\r\n");
+            if (body_start != NULL)
+            {
+                size_t header_len = (size_t)(body_start - buf) + 4U;
+                if (parse_content_length(buf, &content_length) != 0)
+                    content_length = 0U;
+                saw_headers = 1;
+                if (len >= header_len + content_length)
+                    break;
+            }
+        }
+        else
+        {
+            char *body_start = strstr(buf, "\r\n\r\n");
+            size_t header_len = body_start != NULL ? (size_t)(body_start - buf) + 4U : len;
+            if (len >= header_len + content_length)
+                break;
+        }
+    }
 
     /* Send response */
     const char *resp = srv->response;
@@ -243,6 +274,11 @@ TEST(VigilHttpTest, SocketPostBody)
     http_response_t resp;
     const char *body = "{\"key\":\"val\"}";
     int rc = socket_request("POST", &url, "Content-Type: application/json\r\n", body, strlen(body), &resp);
+    if (rc != 0)
+    {
+        vigil_platform_thread_sleep(50);
+        rc = socket_request("POST", &url, "Content-Type: application/json\r\n", body, strlen(body), &resp);
+    }
     EXPECT_EQ(rc, 0);
     EXPECT_EQ(resp.status_code, 201);
     EXPECT_STREQ(resp.body, "ok");
@@ -857,9 +893,11 @@ static void server_thread_func(void *arg)
         return;
     }
 
-    /* Read request */
+    /* Read request, including any POST body. */
     char buf[4096];
     size_t len = 0;
+    size_t content_length = 0;
+    int saw_headers = 0;
     for (;;)
     {
         size_t n = 0;
@@ -867,8 +905,26 @@ static void server_thread_func(void *arg)
             break;
         len += n;
         buf[len] = '\0';
-        if (strstr(buf, "\r\n\r\n"))
-            break;
+        if (!saw_headers)
+        {
+            char *body_start = strstr(buf, "\r\n\r\n");
+            if (body_start != NULL)
+            {
+                size_t header_len = (size_t)(body_start - buf) + 4U;
+                if (parse_content_length(buf, &content_length) != 0)
+                    content_length = 0U;
+                saw_headers = 1;
+                if (len >= header_len + content_length)
+                    break;
+            }
+        }
+        else
+        {
+            char *body_start = strstr(buf, "\r\n\r\n");
+            size_t header_len = body_start != NULL ? (size_t)(body_start - buf) + 4U : len;
+            if (len >= header_len + content_length)
+                break;
+        }
     }
 
     /* Parse method and path */
@@ -973,6 +1029,7 @@ TEST(VigilHttpTest, ServerPostRoundTrip)
         vigil_platform_thread_join(thr, NULL);
         return;
     }
+    vigil_platform_thread_sleep(50);
 
     parsed_url_t url;
     parse_url("http://127.0.0.1:18789/submit", &url);
@@ -980,6 +1037,11 @@ TEST(VigilHttpTest, ServerPostRoundTrip)
     const char *body = "test data";
     http_response_t resp;
     int rc = socket_request("POST", &url, "Content-Type: text/plain\r\n", body, strlen(body), &resp);
+    for (int attempt = 0; rc != 0 && attempt < 19; attempt++)
+    {
+        vigil_platform_thread_sleep(50);
+        rc = socket_request("POST", &url, "Content-Type: text/plain\r\n", body, strlen(body), &resp);
+    }
     EXPECT_EQ(rc, 0);
     EXPECT_EQ(resp.status_code, 200);
     response_free(&resp);

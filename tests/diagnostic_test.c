@@ -221,6 +221,42 @@ TEST(VigilDiagnosticTest, FormatIncludesPathLineColumnSeverityAndMessage)
     vigil_runtime_close(&runtime);
 }
 
+TEST(VigilDiagnosticTest, FormatDoesNotTruncateLongPathPrefixes)
+{
+    vigil_runtime_t *runtime = NULL;
+    vigil_error_t error = {0};
+    vigil_source_registry_t registry;
+    vigil_source_id_t source_id = 0U;
+    vigil_diagnostic_list_t list;
+    vigil_string_t output;
+    vigil_source_span_t span;
+    const char *path = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.vigil";
+
+    ASSERT_EQ(vigil_runtime_open(&runtime, NULL, &error), VIGIL_STATUS_OK);
+    vigil_source_registry_init(&registry, runtime);
+    vigil_diagnostic_list_init(&list, runtime);
+    vigil_string_init(&output, runtime);
+
+    ASSERT_EQ(vigil_source_registry_register_cstr(&registry, path, "fn main() -> i32 {\n    return 1;\n}\n", &source_id,
+                                                  &error),
+              VIGIL_STATUS_OK);
+
+    span.source_id = source_id;
+    span.start_offset = 23U;
+    span.end_offset = 29U;
+    ASSERT_EQ(vigil_diagnostic_list_append_cstr(&list, VIGIL_DIAGNOSTIC_ERROR, span, "unexpected token", &error),
+              VIGIL_STATUS_OK);
+
+    ASSERT_EQ(vigil_diagnostic_format(&registry, vigil_diagnostic_list_get(&list, 0U), &output, &error),
+              VIGIL_STATUS_OK);
+    EXPECT_NE(strstr(vigil_string_c_str(&output), "error: unexpected token"), NULL);
+
+    vigil_string_free(&output);
+    vigil_diagnostic_list_free(&list);
+    vigil_source_registry_free(&registry);
+    vigil_runtime_close(&runtime);
+}
+
 void register_diagnostic_tests(void)
 {
     REGISTER_TEST(VigilDiagnosticTest, InitStartsEmpty);
@@ -231,4 +267,5 @@ void register_diagnostic_tests(void)
     REGISTER_TEST(VigilDiagnosticTest, FreeResetsWholeList);
     REGISTER_TEST(VigilDiagnosticTest, SeverityNamesAreStable);
     REGISTER_TEST(VigilDiagnosticTest, FormatIncludesPathLineColumnSeverityAndMessage);
+    REGISTER_TEST(VigilDiagnosticTest, FormatDoesNotTruncateLongPathPrefixes);
 }
