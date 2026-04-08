@@ -41,6 +41,7 @@
 #define VIGIL_AOT_CACHE_STATE_EMPTY 0LL
 #define VIGIL_AOT_CACHE_STATE_BUILDING 1LL
 #define VIGIL_AOT_CACHE_STATE_READY 2LL
+#define VIGIL_AOT_CACHE_STATE_UNSUPPORTED 3LL
 
 #if defined(VIGIL_ENABLE_AOT)
 
@@ -1727,6 +1728,11 @@ vigil_status_t vigil_aot_ensure(const vigil_reg_chunk_t *rc, vigil_aot_cache_t *
             return VIGIL_STATUS_OK;
         }
 
+        if (state == VIGIL_AOT_CACHE_STATE_UNSUPPORTED)
+        {
+            return VIGIL_STATUS_UNSUPPORTED;
+        }
+
         if (state == VIGIL_AOT_CACHE_STATE_EMPTY &&
             vigil_atomic_cas(&mutable_rc->aot_cache_state, VIGIL_AOT_CACHE_STATE_EMPTY, VIGIL_AOT_CACHE_STATE_BUILDING))
         {
@@ -1734,7 +1740,11 @@ vigil_status_t vigil_aot_ensure(const vigil_reg_chunk_t *rc, vigil_aot_cache_t *
 
             if (status != VIGIL_STATUS_OK)
             {
-                vigil_atomic_store(&mutable_rc->aot_cache_state, VIGIL_AOT_CACHE_STATE_EMPTY);
+                /* Cache UNSUPPORTED permanently so we don't retry on every call. */
+                if (status == VIGIL_STATUS_UNSUPPORTED)
+                    vigil_atomic_store(&mutable_rc->aot_cache_state, VIGIL_AOT_CACHE_STATE_UNSUPPORTED);
+                else
+                    vigil_atomic_store(&mutable_rc->aot_cache_state, VIGIL_AOT_CACHE_STATE_EMPTY);
                 return status;
             }
 
