@@ -69,6 +69,7 @@ Usage:
 
 ```text
 vigil run <file> [args...]
+vigil run --no-aot <file> [args...]
 vigil <file.vigil> [args...]
 ```
 
@@ -79,7 +80,7 @@ Arguments:
 
 Options:
 
-- none
+- `--no-aot`: disable MIR-backed load-time native execution for this run
 
 Behavior:
 
@@ -87,6 +88,7 @@ Behavior:
 - Resolves the project root automatically when possible.
 - Registers built-in stdlib modules and plugins before compilation.
 - Executes the compiled entrypoint.
+- Honors `VIGIL_NO_AOT=1` to force the interpreter path for the process.
 - Expects `main` to return `i32`.
 - Uses the returned `i32` as the process exit code.
 

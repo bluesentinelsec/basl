@@ -40,6 +40,8 @@
 #include "vigil/value.h"
 #include "vigil_vm_internal.h"
 
+typedef struct vigil_aot_cache vigil_aot_cache_t;
+
 /* ── Register instruction opcodes ──────────────────────────────── */
 
 typedef enum vigil_reg_op
@@ -292,6 +294,8 @@ typedef struct vigil_reg_chunk
     const vigil_chunk_t *stack_chunk;
     uint8_t max_registers;
     uint8_t arity; /* function parameter count, set before translation */
+    vigil_aot_cache_t *aot_cache;
+    volatile int64_t aot_cache_state;
 } vigil_reg_chunk_t;
 
 /* ── Translation API ───────────────────────────────────────────── */

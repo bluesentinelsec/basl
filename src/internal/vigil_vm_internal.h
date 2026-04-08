@@ -84,6 +84,7 @@ struct vigil_vm
      * opened so the debugger can identify which thread hit a breakpoint. */
     uint64_t thread_id;
     int in_regvm_call; /* set by vigil_vm_execute_call to skip cleanup */
+    int aot_enabled;
 };
 
 /* ── Inline value helpers ──────────────────────────────────────── */
@@ -125,6 +126,9 @@ vigil_status_t vigil_vm_fail_at_ip(vigil_vm_t *vm, vigil_status_t status, const 
 vigil_value_t vigil_vm_pop_or_nil(vigil_vm_t *vm);
 vigil_status_t vigil_vm_push(vigil_vm_t *vm, const vigil_value_t *value, vigil_error_t *error);
 vigil_status_t vigil_vm_grow_stack(vigil_vm_t *vm, size_t minimum_capacity, vigil_error_t *error);
+vigil_status_t vigil_vm_push_frame(vigil_vm_t *vm, const vigil_object_t *callable, const vigil_object_t *function,
+                                   const vigil_chunk_t *chunk, size_t base_slot, vigil_error_t *error);
+void vigil_vm_pop_frame(vigil_vm_t *vm);
 vigil_status_t vigil_vm_grow_value_array(vigil_runtime_t *runtime, vigil_value_t **values, size_t *capacity,
                                          size_t minimum_capacity, vigil_error_t *error);
 int vigil_vm_get_string_parts(const vigil_value_t *value, const char **out_text, size_t *out_length);

@@ -5,6 +5,7 @@ option(VIGIL_USE_LIBFFI "Build with vendored libffi for full FFI support" ON)
 option(VIGIL_ENABLE_COVERAGE "Build with coverage instrumentation" OFF)
 option(VIGIL_ENABLE_BEARSSL_TLS "Enable BearSSL TLS for the fallback HTTPS client" ON)
 option(VIGIL_OPCODE_PROFILE "Instrument regvm with per-opcode dispatch counters" OFF)
+option(VIGIL_ENABLE_AOT "Build with MIR-backed load-time AOT support" ON)
 
 # ── Platform detection ───────────────────────────────────────────────
 
@@ -14,6 +15,10 @@ if(EMSCRIPTEN
    OR CMAKE_SYSTEM_NAME STREQUAL "Android"
    OR (NOT WIN32 AND NOT UNIX))
     set(VIGIL_HAS_DESKTOP_PLATFORM OFF)
+endif()
+
+if(EMSCRIPTEN OR CMAKE_SYSTEM_NAME STREQUAL "iOS")
+    set(VIGIL_ENABLE_AOT OFF CACHE BOOL "Build with MIR-backed load-time AOT support" FORCE)
 endif()
 
 # ── Per-capability flags ─────────────────────────────────────────────

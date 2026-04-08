@@ -42,6 +42,7 @@ add_library(vigil_core OBJECT
     src/semantic.c
 
     # ── Bytecode and VM ──
+    src/aot.c
     src/chunk.c
     src/vm.c
     src/regvm.c

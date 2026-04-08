@@ -111,7 +111,7 @@ static void print_error(const vigil_source_registry_t *registry, const char *pre
 
 /* ── run command ─────────────────────────────────────────────────── */
 
-static int cmd_run(const char *script_path, const char *const *script_argv, size_t script_argc)
+static int cmd_run(const char *script_path, const char *const *script_argv, size_t script_argc, int disable_aot)
 {
     vigil_runtime_t *runtime = NULL;
     vigil_vm_t *vm = NULL;
@@ -134,6 +134,10 @@ static int cmd_run(const char *script_path, const char *const *script_argv, size
         log_cli_message(runtime, VIGIL_LOG_ERROR, "failed to initialize vm", "error", vigil_error_message(&error));
         vigil_runtime_close(&runtime);
         return 1;
+    }
+    if (disable_aot)
+    {
+        vigil_vm_set_aot_enabled(vm, 0);
     }
 
     vigil_source_registry_init(&registry, runtime);
@@ -2973,11 +2977,21 @@ static void normalize_format_arg(int argc, char **argv)
 
 static int early_dispatch_run(int argc, char **argv)
 {
-    if (argc < 3 || strcmp(argv[2], "--help") == 0 || strcmp(argv[2], "-h") == 0)
+    int arg_index = 2;
+    int disable_aot = 0;
+
+    if (argc < 3 || strcmp(argv[arg_index], "--help") == 0 || strcmp(argv[arg_index], "-h") == 0)
         return -1;
-    const char *const *script_argv = argc > 3 ? (const char *const *)&argv[3] : NULL;
-    size_t script_argc = argc > 3 ? (size_t)(argc - 3) : 0;
-    return cmd_run(argv[2], script_argv, script_argc);
+    if (strcmp(argv[arg_index], "--no-aot") == 0)
+    {
+        disable_aot = 1;
+        arg_index += 1;
+    }
+    if (argc <= arg_index || strcmp(argv[arg_index], "--help") == 0 || strcmp(argv[arg_index], "-h") == 0)
+        return -1;
+    const char *const *script_argv = argc > arg_index + 1 ? (const char *const *)&argv[arg_index + 1] : NULL;
+    size_t script_argc = argc > arg_index + 1 ? (size_t)(argc - arg_index - 1) : 0;
+    return cmd_run(argv[arg_index], script_argv, script_argc, disable_aot);
 }
 
 static int early_dispatch_embed(int argc, char **argv)
@@ -3706,7 +3720,7 @@ int main(int argc, char **argv)
         {
             const char *const *script_argv = argc > 2 ? (const char *const *)&argv[2] : NULL;
             size_t script_argc = argc > 2 ? (size_t)(argc - 2) : 0;
-            return cmd_run(argv[1], script_argv, script_argc);
+            return cmd_run(argv[1], script_argv, script_argc, 0);
         }
     }
 

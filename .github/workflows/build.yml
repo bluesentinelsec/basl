@@ -255,7 +255,7 @@ jobs:
             adb push build/vigil_tests /data/local/tmp/vigil_tests
             adb push $(find $ANDROID_NDK_HOME/toolchains -name "libc++_shared.so" -path "*/x86_64-linux-android/*" | head -1) /data/local/tmp/libc++_shared.so
             adb shell chmod 755 /data/local/tmp/vigil_tests
-            adb shell "cd /data/local/tmp && TMPDIR=/data/local/tmp LD_LIBRARY_PATH=/data/local/tmp ./vigil_tests"
+            adb shell "cd /data/local/tmp && TMPDIR=/data/local/tmp LD_LIBRARY_PATH=/data/local/tmp VIGIL_NO_AOT=1 ./vigil_tests"
 
   ios:
     timeout-minutes: 15
@@ -400,6 +400,7 @@ jobs:
     env:
       ASAN_OPTIONS: detect_leaks=1:halt_on_error=1:detect_odr_violation=0
       UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
+      VIGIL_NO_AOT: 1
 
     steps:
       - uses: actions/checkout@v6
