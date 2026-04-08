@@ -589,6 +589,160 @@ static vigil_status_t vigil_aot_build_numeric(const vigil_reg_chunk_t *rc, vigil
             MIR_append_insn(ctx, func, MIR_new_insn(ctx, MIR_BO, MIR_new_label_op(ctx, labels[rc->code_count])));
             vigil_aot_emit_i32_encode_store(ctx, func, tmp2_reg, tmp3_reg, regs_reg, VREG_GET_A(instr));
             break;
+        case VREG_MUL_I32:
+            vigil_aot_emit_i32_decode(ctx, func, tmp0_reg, regs_reg, VREG_GET_B(instr));
+            vigil_aot_emit_i32_decode(ctx, func, tmp1_reg, regs_reg, VREG_GET_C(instr));
+            MIR_append_insn(ctx, func,
+                            MIR_new_insn(ctx, MIR_MULO, MIR_new_reg_op(ctx, tmp2_reg), MIR_new_reg_op(ctx, tmp0_reg),
+                                         MIR_new_reg_op(ctx, tmp1_reg)));
+            MIR_append_insn(ctx, func, MIR_new_insn(ctx, MIR_BO, MIR_new_label_op(ctx, labels[rc->code_count])));
+            vigil_aot_emit_i32_encode_store(ctx, func, tmp2_reg, tmp3_reg, regs_reg, VREG_GET_A(instr));
+            break;
+        case VREG_DIV_I32:
+            vigil_aot_emit_i32_decode(ctx, func, tmp0_reg, regs_reg, VREG_GET_B(instr));
+            vigil_aot_emit_i32_decode(ctx, func, tmp1_reg, regs_reg, VREG_GET_C(instr));
+            MIR_append_insn(ctx, func,
+                            MIR_new_insn(ctx, MIR_BEQ, MIR_new_label_op(ctx, labels[rc->code_count]),
+                                         MIR_new_reg_op(ctx, tmp1_reg), MIR_new_int_op(ctx, 0)));
+            MIR_append_insn(ctx, func,
+                            MIR_new_insn(ctx, MIR_DIV, MIR_new_reg_op(ctx, tmp2_reg), MIR_new_reg_op(ctx, tmp0_reg),
+                                         MIR_new_reg_op(ctx, tmp1_reg)));
+            vigil_aot_emit_i32_encode_store(ctx, func, tmp2_reg, tmp3_reg, regs_reg, VREG_GET_A(instr));
+            break;
+        case VREG_MOD_I32:
+            vigil_aot_emit_i32_decode(ctx, func, tmp0_reg, regs_reg, VREG_GET_B(instr));
+            vigil_aot_emit_i32_decode(ctx, func, tmp1_reg, regs_reg, VREG_GET_C(instr));
+            MIR_append_insn(ctx, func,
+                            MIR_new_insn(ctx, MIR_BEQ, MIR_new_label_op(ctx, labels[rc->code_count]),
+                                         MIR_new_reg_op(ctx, tmp1_reg), MIR_new_int_op(ctx, 0)));
+            MIR_append_insn(ctx, func,
+                            MIR_new_insn(ctx, MIR_MOD, MIR_new_reg_op(ctx, tmp2_reg), MIR_new_reg_op(ctx, tmp0_reg),
+                                         MIR_new_reg_op(ctx, tmp1_reg)));
+            vigil_aot_emit_i32_encode_store(ctx, func, tmp2_reg, tmp3_reg, regs_reg, VREG_GET_A(instr));
+            break;
+        case VREG_NEG:
+            vigil_aot_emit_i32_decode(ctx, func, tmp0_reg, regs_reg, VREG_GET_B(instr));
+            MIR_append_insn(ctx, func,
+                            MIR_new_insn(ctx, MIR_NEG, MIR_new_reg_op(ctx, tmp2_reg), MIR_new_reg_op(ctx, tmp0_reg)));
+            vigil_aot_emit_i32_encode_store(ctx, func, tmp2_reg, tmp3_reg, regs_reg, VREG_GET_A(instr));
+            break;
+        case VREG_NOT: {
+            MIR_label_t not_true = MIR_new_label(ctx);
+            MIR_label_t not_done = MIR_new_label(ctx);
+            MIR_append_insn(ctx, func,
+                            MIR_new_insn(ctx, MIR_MOV, MIR_new_reg_op(ctx, tmp0_reg),
+                                         MIR_new_mem_op(ctx, MIR_T_I64,
+                                                        (MIR_disp_t)((size_t)VREG_GET_B(instr) * sizeof(vigil_value_t)),
+                                                        regs_reg, 0U, 1U)));
+            MIR_append_insn(ctx, func,
+                            MIR_new_insn(ctx, MIR_BEQ, MIR_new_label_op(ctx, not_true),
+                                         MIR_new_reg_op(ctx, tmp0_reg), MIR_new_uint_op(ctx, VIGIL_NANBOX_FALSE)));
+            MIR_append_insn(ctx, func,
+                            MIR_new_insn(ctx, MIR_BEQ, MIR_new_label_op(ctx, not_true),
+                                         MIR_new_reg_op(ctx, tmp0_reg), MIR_new_uint_op(ctx, VIGIL_NANBOX_NIL)));
+            vigil_aot_emit_store_constant(ctx, func, regs_reg, VREG_GET_A(instr), VIGIL_NANBOX_FALSE);
+            MIR_append_insn(ctx, func, MIR_new_insn(ctx, MIR_JMP, MIR_new_label_op(ctx, not_done)));
+            MIR_append_insn(ctx, func, not_true);
+            vigil_aot_emit_store_constant(ctx, func, regs_reg, VREG_GET_A(instr), VIGIL_NANBOX_TRUE);
+            MIR_append_insn(ctx, func, not_done);
+            break;
+        }
+        case VREG_BNOT:
+            vigil_aot_emit_i32_decode(ctx, func, tmp0_reg, regs_reg, VREG_GET_B(instr));
+            MIR_append_insn(ctx, func,
+                            MIR_new_insn(ctx, MIR_XOR, MIR_new_reg_op(ctx, tmp2_reg), MIR_new_reg_op(ctx, tmp0_reg),
+                                         MIR_new_int_op(ctx, -1)));
+            vigil_aot_emit_i32_encode_store(ctx, func, tmp2_reg, tmp3_reg, regs_reg, VREG_GET_A(instr));
+            break;
+        case VREG_BAND:
+            vigil_aot_emit_i32_decode(ctx, func, tmp0_reg, regs_reg, VREG_GET_B(instr));
+            vigil_aot_emit_i32_decode(ctx, func, tmp1_reg, regs_reg, VREG_GET_C(instr));
+            MIR_append_insn(ctx, func,
+                            MIR_new_insn(ctx, MIR_AND, MIR_new_reg_op(ctx, tmp2_reg), MIR_new_reg_op(ctx, tmp0_reg),
+                                         MIR_new_reg_op(ctx, tmp1_reg)));
+            vigil_aot_emit_i32_encode_store(ctx, func, tmp2_reg, tmp3_reg, regs_reg, VREG_GET_A(instr));
+            break;
+        case VREG_BOR:
+            vigil_aot_emit_i32_decode(ctx, func, tmp0_reg, regs_reg, VREG_GET_B(instr));
+            vigil_aot_emit_i32_decode(ctx, func, tmp1_reg, regs_reg, VREG_GET_C(instr));
+            MIR_append_insn(ctx, func,
+                            MIR_new_insn(ctx, MIR_OR, MIR_new_reg_op(ctx, tmp2_reg), MIR_new_reg_op(ctx, tmp0_reg),
+                                         MIR_new_reg_op(ctx, tmp1_reg)));
+            vigil_aot_emit_i32_encode_store(ctx, func, tmp2_reg, tmp3_reg, regs_reg, VREG_GET_A(instr));
+            break;
+        case VREG_BXOR:
+            vigil_aot_emit_i32_decode(ctx, func, tmp0_reg, regs_reg, VREG_GET_B(instr));
+            vigil_aot_emit_i32_decode(ctx, func, tmp1_reg, regs_reg, VREG_GET_C(instr));
+            MIR_append_insn(ctx, func,
+                            MIR_new_insn(ctx, MIR_XOR, MIR_new_reg_op(ctx, tmp2_reg), MIR_new_reg_op(ctx, tmp0_reg),
+                                         MIR_new_reg_op(ctx, tmp1_reg)));
+            vigil_aot_emit_i32_encode_store(ctx, func, tmp2_reg, tmp3_reg, regs_reg, VREG_GET_A(instr));
+            break;
+        case VREG_SHL:
+            vigil_aot_emit_i32_decode(ctx, func, tmp0_reg, regs_reg, VREG_GET_B(instr));
+            vigil_aot_emit_i32_decode(ctx, func, tmp1_reg, regs_reg, VREG_GET_C(instr));
+            MIR_append_insn(ctx, func,
+                            MIR_new_insn(ctx, MIR_LSH, MIR_new_reg_op(ctx, tmp2_reg), MIR_new_reg_op(ctx, tmp0_reg),
+                                         MIR_new_reg_op(ctx, tmp1_reg)));
+            vigil_aot_emit_i32_encode_store(ctx, func, tmp2_reg, tmp3_reg, regs_reg, VREG_GET_A(instr));
+            break;
+        case VREG_SHR:
+            vigil_aot_emit_i32_decode(ctx, func, tmp0_reg, regs_reg, VREG_GET_B(instr));
+            vigil_aot_emit_i32_decode(ctx, func, tmp1_reg, regs_reg, VREG_GET_C(instr));
+            MIR_append_insn(ctx, func,
+                            MIR_new_insn(ctx, MIR_RSH, MIR_new_reg_op(ctx, tmp2_reg), MIR_new_reg_op(ctx, tmp0_reg),
+                                         MIR_new_reg_op(ctx, tmp1_reg)));
+            vigil_aot_emit_i32_encode_store(ctx, func, tmp2_reg, tmp3_reg, regs_reg, VREG_GET_A(instr));
+            break;
+        case VREG_EQ_I32:
+        case VREG_NE_I32:
+        case VREG_LT_I32:
+        case VREG_LE_I32:
+        case VREG_GT_I32:
+        case VREG_GE_I32: {
+            MIR_label_t cmp_true = MIR_new_label(ctx);
+            MIR_label_t cmp_done = MIR_new_label(ctx);
+            MIR_insn_code_t cmp_op;
+            vigil_aot_emit_i32_decode(ctx, func, tmp0_reg, regs_reg, VREG_GET_B(instr));
+            vigil_aot_emit_i32_decode(ctx, func, tmp1_reg, regs_reg, VREG_GET_C(instr));
+            switch (op) {
+            case VREG_EQ_I32: cmp_op = MIR_BEQ; break;
+            case VREG_NE_I32: cmp_op = MIR_BNE; break;
+            case VREG_LT_I32: cmp_op = MIR_BLT; break;
+            case VREG_LE_I32: cmp_op = MIR_BLE; break;
+            case VREG_GT_I32: cmp_op = MIR_BGT; break;
+            default:          cmp_op = MIR_BGE; break;
+            }
+            MIR_append_insn(ctx, func,
+                            MIR_new_insn(ctx, cmp_op, MIR_new_label_op(ctx, cmp_true),
+                                         MIR_new_reg_op(ctx, tmp0_reg), MIR_new_reg_op(ctx, tmp1_reg)));
+            vigil_aot_emit_store_constant(ctx, func, regs_reg, VREG_GET_A(instr), VIGIL_NANBOX_FALSE);
+            MIR_append_insn(ctx, func, MIR_new_insn(ctx, MIR_JMP, MIR_new_label_op(ctx, cmp_done)));
+            MIR_append_insn(ctx, func, cmp_true);
+            vigil_aot_emit_store_constant(ctx, func, regs_reg, VREG_GET_A(instr), VIGIL_NANBOX_TRUE);
+            MIR_append_insn(ctx, func, cmp_done);
+            break;
+        }
+        case VREG_DUP:
+            vigil_aot_emit_move(ctx, func, regs_reg, tmp0_reg, VREG_GET_A(instr), VREG_GET_B(instr));
+            break;
+        case VREG_TESTSET: {
+            MIR_label_t ts_skip = MIR_new_label(ctx);
+            MIR_append_insn(ctx, func,
+                            MIR_new_insn(ctx, MIR_MOV, MIR_new_reg_op(ctx, tmp0_reg),
+                                         MIR_new_mem_op(ctx, MIR_T_I64,
+                                                        (MIR_disp_t)((size_t)VREG_GET_B(instr) * sizeof(vigil_value_t)),
+                                                        regs_reg, 0U, 1U)));
+            MIR_append_insn(ctx, func,
+                            MIR_new_insn(ctx, MIR_BEQ, MIR_new_label_op(ctx, ts_skip),
+                                         MIR_new_reg_op(ctx, tmp0_reg), MIR_new_uint_op(ctx, VIGIL_NANBOX_FALSE)));
+            MIR_append_insn(ctx, func,
+                            MIR_new_insn(ctx, MIR_BEQ, MIR_new_label_op(ctx, ts_skip),
+                                         MIR_new_reg_op(ctx, tmp0_reg), MIR_new_uint_op(ctx, VIGIL_NANBOX_NIL)));
+            vigil_aot_emit_move(ctx, func, regs_reg, tmp0_reg, VREG_GET_A(instr), VREG_GET_B(instr));
+            MIR_append_insn(ctx, func, ts_skip);
+            break;
+        }
         case VREG_JMP:
             off = VREG_GET_sBx(instr);
             MIR_append_insn(ctx, func,
@@ -659,6 +813,49 @@ static vigil_status_t vigil_aot_build_numeric(const vigil_reg_chunk_t *rc, vigil
                             MIR_new_insn(ctx, MIR_BLT, MIR_new_label_op(ctx, labels[ip + 2U]),
                                          MIR_new_reg_op(ctx, tmp0_reg),
                                          MIR_new_int_op(ctx, (int32_t)(int8_t)VREG_GET_C(instr))));
+            MIR_append_insn(ctx, func, MIR_new_insn(ctx, MIR_JMP, MIR_new_label_op(ctx, labels[ip + 1U])));
+            continue;
+        case VREG_LT_I64_JMP:
+        case VREG_LE_I64_JMP:
+        case VREG_GT_I64_JMP:
+        case VREG_GE_I64_JMP:
+        case VREG_EQ_I64_JMP:
+        case VREG_NE_I64_JMP:
+            vigil_aot_emit_i32_decode(ctx, func, tmp0_reg, regs_reg, VREG_GET_A(instr));
+            vigil_aot_emit_i32_decode(ctx, func, tmp1_reg, regs_reg, VREG_GET_B(instr));
+            switch (op)
+            {
+            case VREG_LT_I64_JMP:
+                MIR_append_insn(ctx, func,
+                                MIR_new_insn(ctx, MIR_BLT, MIR_new_label_op(ctx, labels[ip + 2U]),
+                                             MIR_new_reg_op(ctx, tmp0_reg), MIR_new_reg_op(ctx, tmp1_reg)));
+                break;
+            case VREG_LE_I64_JMP:
+                MIR_append_insn(ctx, func,
+                                MIR_new_insn(ctx, MIR_BLE, MIR_new_label_op(ctx, labels[ip + 2U]),
+                                             MIR_new_reg_op(ctx, tmp0_reg), MIR_new_reg_op(ctx, tmp1_reg)));
+                break;
+            case VREG_GT_I64_JMP:
+                MIR_append_insn(ctx, func,
+                                MIR_new_insn(ctx, MIR_BGT, MIR_new_label_op(ctx, labels[ip + 2U]),
+                                             MIR_new_reg_op(ctx, tmp0_reg), MIR_new_reg_op(ctx, tmp1_reg)));
+                break;
+            case VREG_GE_I64_JMP:
+                MIR_append_insn(ctx, func,
+                                MIR_new_insn(ctx, MIR_BGE, MIR_new_label_op(ctx, labels[ip + 2U]),
+                                             MIR_new_reg_op(ctx, tmp0_reg), MIR_new_reg_op(ctx, tmp1_reg)));
+                break;
+            case VREG_EQ_I64_JMP:
+                MIR_append_insn(ctx, func,
+                                MIR_new_insn(ctx, MIR_BEQ, MIR_new_label_op(ctx, labels[ip + 2U]),
+                                             MIR_new_reg_op(ctx, tmp0_reg), MIR_new_reg_op(ctx, tmp1_reg)));
+                break;
+            default:
+                MIR_append_insn(ctx, func,
+                                MIR_new_insn(ctx, MIR_BNE, MIR_new_label_op(ctx, labels[ip + 2U]),
+                                             MIR_new_reg_op(ctx, tmp0_reg), MIR_new_reg_op(ctx, tmp1_reg)));
+                break;
+            }
             MIR_append_insn(ctx, func, MIR_new_insn(ctx, MIR_JMP, MIR_new_label_op(ctx, labels[ip + 1U])));
             continue;
         case VREG_CALL:
