@@ -243,6 +243,32 @@ static int vigil_aot_is_numeric_constant(const vigil_value_t *value)
     return !vigil_nanbox_has_object(*value);
 }
 
+/* Check that every CALL_NATIVE in the chunk targets a native function
+   whose return type is numeric.  Returns 0 if any native call returns
+   a string, error, or object type. */
+static int vigil_aot_native_calls_are_numeric(const vigil_reg_chunk_t *rc)
+{
+    size_t ip = 0U;
+    while (ip < rc->code_count)
+    {
+        vigil_reg_instr_t ci = rc->code[ip];
+        if (VREG_GET_OP(ci) == VREG_CALL_NATIVE && ip + 1U < rc->code_count)
+        {
+            uint32_t idx = rc->code[ip + 1U];
+            const vigil_value_t *nv = VIGIL_VM_CHUNK_CONSTANT(rc->stack_chunk, (size_t)idx);
+            if (nv == NULL || !vigil_nanbox_has_object(*nv))
+                return 0;
+            int rt = vigil_native_function_get_return_type(
+                (vigil_object_t *)vigil_nanbox_decode_ptr(*nv));
+            if (rt == VIGIL_TYPE_STRING || rt == VIGIL_TYPE_ERR || rt == VIGIL_TYPE_OBJECT ||
+                rt == VIGIL_TYPE_INVALID)
+                return 0;
+        }
+        ip += vigil_aot_instr_words(rc, ip);
+    }
+    return 1;
+}
+
 static int vigil_aot_chunk_is_numeric_subset(const vigil_reg_chunk_t *rc)
 {
     size_t ip = 0U;
@@ -336,31 +362,8 @@ static int vigil_aot_chunk_is_numeric_subset(const vigil_reg_chunk_t *rc)
         ip += vigil_aot_instr_words(rc, ip);
     }
 
-    if (has_native_call)
-    {
-        /* Verify every CALL_NATIVE target returns a numeric type.
-           Native functions returning strings/objects would place
-           non-numeric values in the register window, which the
-           numeric AOT path cannot handle. */
-        size_t check_ip = 0U;
-        while (check_ip < rc->code_count)
-        {
-            vigil_reg_instr_t ci = rc->code[check_ip];
-            if (VREG_GET_OP(ci) == VREG_CALL_NATIVE && check_ip + 1U < rc->code_count)
-            {
-                uint32_t idx = rc->code[check_ip + 1U];
-                const vigil_value_t *nv = VIGIL_VM_CHUNK_CONSTANT(rc->stack_chunk, (size_t)idx);
-                if (nv == NULL || !vigil_nanbox_has_object(*nv))
-                    return 0;
-                vigil_object_t *obj = (vigil_object_t *)vigil_nanbox_decode_ptr(*nv);
-                int rt = vigil_native_function_get_return_type(obj);
-                if (rt == VIGIL_TYPE_STRING || rt == VIGIL_TYPE_ERR || rt == VIGIL_TYPE_OBJECT ||
-                    rt == VIGIL_TYPE_INVALID)
-                    return 0;
-            }
-            check_ip += vigil_aot_instr_words(rc, check_ip);
-        }
-    }
+    if (has_native_call && !vigil_aot_native_calls_are_numeric(rc))
+        return 0;
 
     return 1;
 }
