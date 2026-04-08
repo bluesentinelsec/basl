@@ -2,7 +2,9 @@
 
 #include <string.h>
 
+#if !defined(_WIN32)
 #include "internal/vigil_regvm.h"
+#endif
 #include "vigil/vigil.h"
 
 static vigil_status_t CompileMainFunction(vigil_runtime_t *runtime, const char *source_text,
