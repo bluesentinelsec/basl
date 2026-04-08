@@ -170,6 +170,43 @@ static vigil_status_t vigil_aot_numeric_call(vigil_vm_t *vm, const vigil_reg_chu
     return vigil_vm_execute_call(vm, callee, (size_t)arg_count, error);
 }
 
+static vigil_status_t vigil_aot_numeric_call_native(vigil_vm_t *vm, const vigil_reg_chunk_t *rc, uint8_t arg_base_r,
+                                                    uint8_t arg_count, uint32_t const_idx, vigil_error_t *error)
+{
+    if (vm == NULL || vm->frame_count == 0U)
+    {
+        vigil_error_set_literal(error, VIGIL_STATUS_INVALID_ARGUMENT, "AOT native call requires an active frame");
+        return VIGIL_STATUS_INVALID_ARGUMENT;
+    }
+
+    vigil_vm_frame_t *frame = &vm->frames[vm->frame_count - 1U];
+    size_t base = frame->base_slot;
+    vm->stack_count = base + (size_t)arg_base_r + (size_t)arg_count;
+
+    const vigil_value_t *native_val = VIGIL_VM_CHUNK_CONSTANT(rc->stack_chunk, (size_t)const_idx);
+    if (native_val == NULL || !vigil_nanbox_has_object(*native_val))
+    {
+        vigil_error_set_literal(error, VIGIL_STATUS_INTERNAL, "AOT native call: invalid constant");
+        return VIGIL_STATUS_INTERNAL;
+    }
+
+    vigil_native_fn_t native_fn = vigil_native_function_get((vigil_object_t *)vigil_nanbox_decode_ptr(*native_val));
+    if (native_fn == NULL)
+    {
+        vigil_error_set_literal(error, VIGIL_STATUS_UNSUPPORTED, "AOT native call: not a native function");
+        return VIGIL_STATUS_UNSUPPORTED;
+    }
+
+    vigil_status_t status = native_fn(vm, (size_t)arg_count, error);
+    if (status != VIGIL_STATUS_OK)
+        return status;
+
+    if (vm->stack_count < base + (size_t)rc->max_registers)
+        vm->stack_count = base + (size_t)rc->max_registers;
+
+    return VIGIL_STATUS_OK;
+}
+
 static vigil_status_t vigil_aot_numeric_fail(vigil_status_t status, const char *message, vigil_error_t *error)
 {
     vigil_error_set_literal(error, status, message);
@@ -189,6 +226,7 @@ static size_t vigil_aot_instr_words(const vigil_reg_chunk_t *rc, size_t ip)
     switch (op)
     {
     case VREG_CALL_SELF:
+    case VREG_CALL_NATIVE:
         return 2U;
     default:
         return 1U;
@@ -270,6 +308,7 @@ static int vigil_aot_chunk_is_numeric_subset(const vigil_reg_chunk_t *rc)
         case VREG_LT_I32_IMM_JMP:
         case VREG_CALL:
         case VREG_CALL_SELF:
+        case VREG_CALL_NATIVE:
         case VREG_RETURN:
         case VREG_RELEASE:
             break;
@@ -449,6 +488,10 @@ static vigil_status_t vigil_aot_build_numeric(const vigil_reg_chunk_t *rc, vigil
                                MIR_T_I64, "arg_base", MIR_T_I64, "func_idx", MIR_T_I64, "arg_count", MIR_T_P,
                                "error");
     call_import = MIR_new_import(ctx, "vigil_aot_numeric_call");
+    MIR_item_t call_native_proto = MIR_new_proto(ctx, "vigil_aot_numeric_call_native_proto", 1U, &res_type, 6U,
+                                                  MIR_T_P, "vm", MIR_T_P, "rc", MIR_T_I64, "arg_base", MIR_T_I64,
+                                                  "arg_count", MIR_T_I64, "const_idx", MIR_T_P, "error");
+    MIR_item_t call_native_import = MIR_new_import(ctx, "vigil_aot_numeric_call_native");
     fail_proto = MIR_new_proto(ctx, "vigil_aot_numeric_fail_proto", 1U, &res_type, 3U, MIR_T_I64, "status", MIR_T_P,
                                "message", MIR_T_P, "error");
     fail_import = MIR_new_import(ctx, "vigil_aot_numeric_fail");
@@ -842,6 +885,22 @@ static vigil_status_t vigil_aot_build_numeric(const vigil_reg_chunk_t *rc, vigil
             vigil_aot_emit_reload_regs(ctx, func, regs_reg, vm_reg, tmp0_reg, tmp1_reg, tmp2_reg, tmp3_reg,
                                        status_reg);
             break;
+        case VREG_CALL_NATIVE:
+            MIR_append_insn(ctx, func,
+                            MIR_new_call_insn(ctx, 9U, MIR_new_ref_op(ctx, call_native_proto),
+                                              MIR_new_ref_op(ctx, call_native_import), MIR_new_reg_op(ctx, status_reg),
+                                              MIR_new_reg_op(ctx, vm_reg),
+                                              MIR_new_uint_op(ctx, (uint64_t)(uintptr_t)rc),
+                                              MIR_new_int_op(ctx, VREG_GET_A(instr)),
+                                              MIR_new_int_op(ctx, VREG_GET_C(instr)),
+                                              MIR_new_int_op(ctx, (int64_t)rc->code[ip + 1U]),
+                                              MIR_new_reg_op(ctx, error_reg)));
+            MIR_append_insn(ctx, func,
+                            MIR_new_insn(ctx, MIR_BNE, MIR_new_label_op(ctx, error_label),
+                                         MIR_new_reg_op(ctx, status_reg), MIR_new_int_op(ctx, VIGIL_STATUS_OK)));
+            vigil_aot_emit_reload_regs(ctx, func, regs_reg, vm_reg, tmp0_reg, tmp1_reg, tmp2_reg, tmp3_reg,
+                                       status_reg);
+            break;
         case VREG_RELEASE:
             vigil_aot_emit_store_constant(ctx, func, regs_reg, VREG_GET_A(instr), VIGIL_NANBOX_NIL);
             break;
@@ -909,6 +968,7 @@ static vigil_status_t vigil_aot_build_numeric(const vigil_reg_chunk_t *rc, vigil
     MIR_load_external(ctx, "vigil_aot_prepare_frame", (void *)vigil_aot_prepare_frame);
     MIR_load_external(ctx, "vigil_aot_numeric_call_self", (void *)vigil_aot_numeric_call_self);
     MIR_load_external(ctx, "vigil_aot_numeric_call", (void *)vigil_aot_numeric_call);
+    MIR_load_external(ctx, "vigil_aot_numeric_call_native", (void *)vigil_aot_numeric_call_native);
     MIR_load_external(ctx, "vigil_aot_numeric_fail", (void *)vigil_aot_numeric_fail);
     MIR_gen_init(ctx);
     cache->generator_initialized = 1;

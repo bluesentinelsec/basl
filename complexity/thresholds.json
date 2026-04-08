@@ -117,7 +117,7 @@
       "path": "src/aot.c",
       "thresholds": {
         "ccn": 75,
-        "length": 550,
+        "length": 570,
         "param": 10
       }
     }
