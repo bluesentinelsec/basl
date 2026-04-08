@@ -219,6 +219,8 @@ static int vigil_aot_chunk_is_numeric_subset(const vigil_reg_chunk_t *rc)
 {
     size_t ip = 0U;
     int has_native_call = 0;
+    int has_call_self = 0;
+    int has_tail_call = 0;
 
     if (rc == NULL)
     {
@@ -295,6 +297,7 @@ static int vigil_aot_chunk_is_numeric_subset(const vigil_reg_chunk_t *rc)
         case VREG_CALL:
         case VREG_CALL_SELF:
         case VREG_CALL_NATIVE:
+        case VREG_TAIL_CALL:
         case VREG_RETURN:
         case VREG_RELEASE:
             break;
@@ -317,11 +320,18 @@ static int vigil_aot_chunk_is_numeric_subset(const vigil_reg_chunk_t *rc)
            must fall back to the interpreter. */
         if (op == VREG_CALL_NATIVE)
             has_native_call = 1;
+        if (op == VREG_CALL_SELF)
+            has_call_self = 1;
+        if (op == VREG_TAIL_CALL)
+            has_tail_call = 1;
 
         ip += vigil_aot_instr_words(rc, ip);
     }
 
     if (has_native_call && !vigil_aot_native_calls_are_numeric(rc))
+        return 0;
+
+    if (has_call_self && has_tail_call)
         return 0;
 
     return 1;
@@ -543,6 +553,7 @@ static vigil_status_t vigil_aot_build_numeric(const vigil_reg_chunk_t *rc, vigil
                 switch (sop)
                 {
                 case VREG_JMP: case VREG_TEST: case VREG_RETURN: case VREG_RELEASE:
+                case VREG_TAIL_CALL:
                 case VREG_LT_I32_JMP: case VREG_LE_I32_JMP: case VREG_GT_I32_JMP:
                 case VREG_GE_I32_JMP: case VREG_EQ_I32_JMP: case VREG_NE_I32_JMP:
                 case VREG_LT_I64_JMP: case VREG_LE_I64_JMP: case VREG_GT_I64_JMP:
@@ -1422,6 +1433,48 @@ static vigil_status_t vigil_aot_build_numeric(const vigil_reg_chunk_t *rc, vigil
                                        status_reg);
             V_LOAD_ALL();
             break;
+        case VREG_TAIL_CALL: {
+            V_FLUSH_ALL();
+            vigil_aot_emit_reload_regs(ctx, func, regs_reg, vm_reg, tmp0_reg, tmp1_reg, tmp2_reg, tmp3_reg,
+                                       status_reg);
+            MIR_append_insn(ctx, func,
+                            MIR_new_call_insn(ctx, 9U, MIR_new_ref_op(ctx, call_proto),
+                                              MIR_new_ref_op(ctx, call_import), MIR_new_reg_op(ctx, status_reg),
+                                              MIR_new_reg_op(ctx, vm_reg),
+                                              MIR_new_uint_op(ctx, (uint64_t)(uintptr_t)rc),
+                                              MIR_new_int_op(ctx, VREG_GET_A(instr)),
+                                              MIR_new_int_op(ctx, VREG_GET_B(instr)),
+                                              MIR_new_int_op(ctx, VREG_GET_C(instr)),
+                                              MIR_new_reg_op(ctx, error_reg)));
+            MIR_append_insn(ctx, func,
+                            MIR_new_insn(ctx, MIR_BNE, MIR_new_label_op(ctx, error_label),
+                                         MIR_new_reg_op(ctx, status_reg), MIR_new_int_op(ctx, VIGIL_STATUS_OK)));
+            vigil_aot_emit_reload_regs(ctx, func, regs_reg, vm_reg, tmp0_reg, tmp1_reg, tmp2_reg, tmp3_reg,
+                                       status_reg);
+            MIR_append_insn(ctx, func,
+                            MIR_new_insn(ctx, MIR_MOV, MIR_new_reg_op(ctx, tmp0_reg),
+                                         MIR_new_mem_op(ctx, MIR_T_I64,
+                                                        (MIR_disp_t)((size_t)VREG_GET_A(instr) * sizeof(vigil_value_t)),
+                                                        regs_reg, 0U, 1U)));
+            MIR_append_insn(ctx, func,
+                            MIR_new_insn(ctx, MIR_MOV,
+                                         MIR_new_mem_op(ctx, MIR_T_I64, 0, out_reg, 0U, 1U),
+                                         MIR_new_reg_op(ctx, tmp0_reg)));
+            MIR_append_insn(ctx, func,
+                            MIR_new_insn(ctx, MIR_MOV,
+                                         MIR_new_mem_op(ctx, MIR_T_I64, 0, regs_reg, 0U, 1U),
+                                         MIR_new_reg_op(ctx, tmp0_reg)));
+            MIR_append_insn(ctx, func,
+                            MIR_new_insn(ctx, MIR_ADD, MIR_new_reg_op(ctx, tmp0_reg), MIR_new_reg_op(ctx, tmp3_reg),
+                                         MIR_new_int_op(ctx, 1)));
+            MIR_append_insn(ctx, func,
+                            MIR_new_insn(ctx, MIR_MOV, MIR_new_mem_op(ctx, MIR_T_I64, offsetof(vigil_vm_t, stack_count),
+                                                                      vm_reg, 0U, 1U),
+                                         MIR_new_reg_op(ctx, tmp0_reg)));
+            MIR_append_insn(ctx, func,
+                            MIR_new_ret_insn(ctx, 1U, MIR_new_int_op(ctx, VIGIL_STATUS_OK)));
+            continue;
+        }
         case VREG_RELEASE:
             vigil_aot_emit_store_constant(ctx, func, regs_reg, VREG_GET_A(instr), VIGIL_NANBOX_NIL);
             MIR_append_insn(ctx, func, MIR_new_insn(ctx, MIR_MOV, MIR_new_reg_op(ctx, V(VREG_GET_A(instr))),
