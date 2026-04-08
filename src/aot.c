@@ -645,8 +645,10 @@ static vigil_status_t vigil_aot_build_numeric(const vigil_reg_chunk_t *rc, vigil
        Non-typed ops (NOT, TEST, TESTSET) flush to memory first.
        Calls flush all, then reload all after return. */
 
-    /* Allocate v[] regs for all slots. */
-    MIR_reg_t *v = (MIR_reg_t *)calloc((size_t)rc->max_registers, sizeof(*v));
+    /* Allocate v[] regs for all slots.
+       Skip for recursive functions — the per-call V_LOAD overhead
+       exceeds the benefit when calls dominate the runtime. */
+    MIR_reg_t *v = has_self_call ? NULL : (MIR_reg_t *)calloc((size_t)rc->max_registers, sizeof(*v));
     if (v != NULL)
     {
         char rn[32];
@@ -814,31 +816,45 @@ static vigil_status_t vigil_aot_build_numeric(const vigil_reg_chunk_t *rc, vigil
                                     MIR_new_reg_op(ctx, v[src])));
                 }
             }
+            else
+            {
+                MIR_append_insn(ctx, func,
+                                MIR_new_insn(ctx, MIR_MOV, MIR_new_reg_op(ctx, tmp0_reg),
+                                             MIR_new_mem_op(ctx, MIR_T_I64, (MIR_disp_t)((size_t)VREG_GET_B(instr) * sizeof(vigil_value_t)), regs_reg, 0U, 1U)));
+                MIR_append_insn(ctx, func,
+                                MIR_new_insn(ctx, MIR_MOV,
+                                             MIR_new_mem_op(ctx, MIR_T_I64, (MIR_disp_t)((size_t)VREG_GET_A(instr) * sizeof(vigil_value_t)), regs_reg, 0U, 1U),
+                                             MIR_new_reg_op(ctx, tmp0_reg)));
+            }
             break;
         case VREG_LOAD_K: {
             uint8_t dst = VREG_GET_A(instr);
             const vigil_value_t *k = VIGIL_VM_CHUNK_CONSTANT(rc->stack_chunk, (size_t)VREG_GET_Bx(instr));
             vigil_value_t kv = k != NULL ? *k : VIGIL_NANBOX_NIL;
-            if (promoted[dst] == 1 && vigil_nanbox_is_int_inline(kv))
-                MIR_append_insn(ctx, func, MIR_new_insn(ctx, MIR_MOV, MIR_new_reg_op(ctx, v[dst]),
-                                MIR_new_int_op(ctx, (int64_t)vigil_nanbox_decode_i32(kv))));
+            if (v)
+            {
+                if (promoted[dst] == 1 && vigil_nanbox_is_int_inline(kv))
+                    MIR_append_insn(ctx, func, MIR_new_insn(ctx, MIR_MOV, MIR_new_reg_op(ctx, v[dst]),
+                                    MIR_new_int_op(ctx, (int64_t)vigil_nanbox_decode_i32(kv))));
+                else
+                    MIR_append_insn(ctx, func, MIR_new_insn(ctx, MIR_MOV, MIR_new_reg_op(ctx, v[dst]),
+                                    MIR_new_uint_op(ctx, kv)));
+            }
             else
-                MIR_append_insn(ctx, func, MIR_new_insn(ctx, MIR_MOV, MIR_new_reg_op(ctx, v[dst]),
-                                MIR_new_uint_op(ctx, kv)));
+                vigil_aot_emit_store_constant(ctx, func, regs_reg, dst, kv);
             break;
         }
         case VREG_LOAD_NIL:
-            MIR_append_insn(ctx, func, MIR_new_insn(ctx, MIR_MOV, MIR_new_reg_op(ctx, v[VREG_GET_A(instr)]),
-                            MIR_new_uint_op(ctx, VIGIL_NANBOX_NIL)));
-            break;
         case VREG_LOAD_TRUE:
-            MIR_append_insn(ctx, func, MIR_new_insn(ctx, MIR_MOV, MIR_new_reg_op(ctx, v[VREG_GET_A(instr)]),
-                            MIR_new_uint_op(ctx, VIGIL_NANBOX_TRUE)));
+        case VREG_LOAD_FALSE: {
+            vigil_value_t cv = (op == VREG_LOAD_NIL) ? VIGIL_NANBOX_NIL : (op == VREG_LOAD_TRUE) ? VIGIL_NANBOX_TRUE : VIGIL_NANBOX_FALSE;
+            if (v)
+                MIR_append_insn(ctx, func, MIR_new_insn(ctx, MIR_MOV, MIR_new_reg_op(ctx, v[VREG_GET_A(instr)]),
+                                MIR_new_uint_op(ctx, cv)));
+            else
+                vigil_aot_emit_store_constant(ctx, func, regs_reg, VREG_GET_A(instr), cv);
             break;
-        case VREG_LOAD_FALSE:
-            MIR_append_insn(ctx, func, MIR_new_insn(ctx, MIR_MOV, MIR_new_reg_op(ctx, v[VREG_GET_A(instr)]),
-                            MIR_new_uint_op(ctx, VIGIL_NANBOX_FALSE)));
-            break;
+        }
         /* ── i32 binary arithmetic (with overflow check) ──────────── */
         case VREG_ADD_I32:
         case VREG_SUB_I32:
