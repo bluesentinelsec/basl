@@ -1309,12 +1309,30 @@ static int cmd_doc_list_modules(void)
 }
 
 /* Show documentation for a builtin/stdlib symbol or module */
-static int cmd_doc_builtin(const char *name)
+static int cmd_doc_builtin(const char *name, const char *symbol)
 {
     const vigil_doc_entry_t *entry;
     char *output = NULL;
     size_t output_len = 0;
     vigil_error_t error = {0};
+
+    /* If a specific symbol is requested, look it up directly as module.symbol */
+    if (symbol != NULL)
+    {
+        char qualified[256];
+        (void)snprintf(qualified, sizeof(qualified), "%s.%s", name, symbol);
+        entry = vigil_doc_lookup(qualified);
+        if (entry != NULL)
+        {
+            if (vigil_doc_entry_render(NULL, entry, &output, &output_len, &error) == VIGIL_STATUS_OK)
+            {
+                fwrite(output, 1, output_len, stdout);
+                free(output);
+            }
+            return 0;
+        }
+        /* Fall through to show full module if symbol not found */
+    }
 
     /* Try direct lookup first */
     entry = vigil_doc_lookup(name);
@@ -1370,7 +1388,7 @@ static int cmd_doc(const char *file_path, const char *symbol)
     }
 
     /* Check if it's a builtin/stdlib name first */
-    if (cmd_doc_builtin(file_path) == 0)
+    if (cmd_doc_builtin(file_path, symbol) == 0)
     {
         return 0;
     }
@@ -3630,7 +3648,16 @@ typedef struct
     int (*handler)(const parsed_args_t *args);
 } post_parse_command_t;
 
+static int dispatch_run_missing_file(const parsed_args_t *args)
+{
+    (void)args;
+    fprintf(stderr, "error: missing file argument\n");
+    fprintf(stderr, "Usage: vigil run [options] <file>\n");
+    return 2;
+}
+
 static const post_parse_command_t post_parse_commands[] = {
+    {"run", dispatch_run_missing_file},
     {"check", dispatch_check},
     {"new", dispatch_new},
     {"debug", dispatch_debug},
