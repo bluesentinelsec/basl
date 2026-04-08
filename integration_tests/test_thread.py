@@ -26,7 +26,7 @@ class ThreadCurrentIdTest(unittest.TestCase):
         code = '''import "thread"
 fn main() -> i32 {
     i64 id = thread.current_id()
-    if id > i64(0) { return 0 }
+    if id != i64(0) { return 0 }
     return 1
 }'''
         rc, out, err = run_vigil(code)

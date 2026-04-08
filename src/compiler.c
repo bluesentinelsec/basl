@@ -6929,6 +6929,7 @@ static vigil_status_t vigil_parser_emit_native_call(vigil_parser_state_t *state,
                                                  fn->param_count, fn->native_fn, &native_obj, state->program->error);
     if (status != VIGIL_STATUS_OK)
         return status;
+    vigil_native_function_set_return_type(native_obj, fn->return_type);
     vigil_value_init_object(&native_val, &native_obj);
     {
         size_t const_idx = 0U;
@@ -7144,6 +7145,7 @@ static vigil_status_t vigil_parser_parse_native_static_method_call(vigil_parser_
     {
         return status;
     }
+    vigil_native_function_set_return_type(native_obj, method->return_type);
     vigil_value_init_object(&native_val, &native_obj);
     {
         size_t const_idx = 0U;
@@ -7267,6 +7269,7 @@ static vigil_status_t vigil_parser_parse_native_method_call(vigil_parser_state_t
     {
         return status;
     }
+    vigil_native_function_set_return_type(native_obj, method->return_type);
     vigil_value_init_object(&native_val, &native_obj);
     {
         int defer_call = state->defer_mode;
