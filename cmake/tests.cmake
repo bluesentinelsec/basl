@@ -176,6 +176,10 @@ if(VIGIL_HAS_FFI AND NOT EMSCRIPTEN)
 endif()
 
 add_test(NAME vigil_tests COMMAND vigil_tests)
+# AOT frame management conflicts with the VM's internal frame tracking
+# in multi-test scenarios. Disable AOT for unit tests until the AOT
+# call helpers use the VM's frame push/pop API. See #456.
+set_tests_properties(vigil_tests PROPERTIES ENVIRONMENT "VIGIL_NO_AOT=1")
 
 # ── Integration tests ────────────────────────────────────────────────
 
