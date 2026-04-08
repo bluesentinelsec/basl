@@ -232,8 +232,27 @@ static int vigil_aot_chunk_is_numeric_subset(const vigil_reg_chunk_t *rc)
         case VREG_LOAD_FALSE:
         case VREG_ADD_I32:
         case VREG_SUB_I32:
+        case VREG_MUL_I32:
+        case VREG_DIV_I32:
+        case VREG_MOD_I32:
         case VREG_ADDI:
         case VREG_SUBI:
+        case VREG_NEG:
+        case VREG_NOT:
+        case VREG_BNOT:
+        case VREG_BAND:
+        case VREG_BOR:
+        case VREG_BXOR:
+        case VREG_SHL:
+        case VREG_SHR:
+        case VREG_EQ_I32:
+        case VREG_NE_I32:
+        case VREG_LT_I32:
+        case VREG_LE_I32:
+        case VREG_GT_I32:
+        case VREG_GE_I32:
+        case VREG_DUP:
+        case VREG_TESTSET:
         case VREG_JMP:
         case VREG_TEST:
         case VREG_LT_I32_JMP:
@@ -242,6 +261,12 @@ static int vigil_aot_chunk_is_numeric_subset(const vigil_reg_chunk_t *rc)
         case VREG_GE_I32_JMP:
         case VREG_EQ_I32_JMP:
         case VREG_NE_I32_JMP:
+        case VREG_LT_I64_JMP:
+        case VREG_LE_I64_JMP:
+        case VREG_GT_I64_JMP:
+        case VREG_GE_I64_JMP:
+        case VREG_EQ_I64_JMP:
+        case VREG_NE_I64_JMP:
         case VREG_LT_I32_IMM_JMP:
         case VREG_CALL:
         case VREG_CALL_SELF:
