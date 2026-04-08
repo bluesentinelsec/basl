@@ -2,7 +2,7 @@ BUILD_DIR ?= build
 BASELINE_ROOT ?= ../vigil-main
 COMPLEXITY_BUILD_DIR ?= build-complexity
 
-.PHONY: all build test clean format configure-dev configure-release build-dev build-release perf coverage complexity
+.PHONY: all build test clean format configure-dev configure-release build-dev build-release full perf coverage complexity
 
 all: build
 
@@ -20,6 +20,16 @@ build-dev: configure-dev
 
 build-release: configure-release
 	cmake --build $(BUILD_DIR)
+
+full:
+	cmake -S . -B $(BUILD_DIR) -DCMAKE_BUILD_TYPE=Release \
+		-DVIGIL_BUILD_TESTS=ON \
+		-DVIGIL_PLUGIN_SDL=ON \
+		-DVIGIL_PLUGIN_GUI=ON \
+		-DVIGIL_PLUGIN_AUDIO=ON \
+		-DVIGIL_PLUGIN_SYSQUERY=ON \
+		-DVIGIL_PLUGIN_TILED=ON
+	cmake --build $(BUILD_DIR) --parallel
 
 test: build
 	ctest --test-dir $(BUILD_DIR) --output-on-failure
