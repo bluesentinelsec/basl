@@ -1,0 +1,10 @@
+import "fmt"
+fn main() -> i32 {
+    string s = ""
+    i32 i = 0
+    while i < 100000 {
+        s = fmt.sprintf("%d", i)
+        i = i + 1
+    }
+    return 0
+}
