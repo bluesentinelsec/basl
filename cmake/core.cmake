@@ -76,6 +76,7 @@ add_library(vigil_core OBJECT
     src/lsp.c
     src/package.c
     src/pkg.c
+    src/transpile_c.c
 )
 
 target_include_directories(vigil_core
