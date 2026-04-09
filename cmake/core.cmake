@@ -77,6 +77,7 @@ add_library(vigil_core OBJECT
     src/package.c
     src/pkg.c
     src/transpile_c.c
+    src/transpile_rt.c
 )
 
 target_include_directories(vigil_core

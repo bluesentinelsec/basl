@@ -47,10 +47,19 @@ def transpile_compile_run(source: str, tmpdir: str) -> subprocess.CompletedProce
     if r.returncode != 0:
         return r
 
+    # Determine vigil project root for include/lib paths
+    vigil_bin = Path(VIGIL_BIN).resolve()
+    vigil_root = vigil_bin.parent.parent  # build/vigil -> project root
+    vigil_include = str(vigil_root / "include")
+    vigil_lib_dir = str(vigil_bin.parent)
+
     # Build generated C
     build_dir = out_dir / "build"
     r = subprocess.run(
-        ["cmake", "-S", str(out_dir), "-B", str(build_dir), "-DCMAKE_BUILD_TYPE=Release"],
+        ["cmake", "-S", str(out_dir), "-B", str(build_dir),
+         "-DCMAKE_BUILD_TYPE=Release",
+         f"-DVIGIL_INCLUDE_DIR={vigil_include}",
+         f"-DVIGIL_LIB_DIR={vigil_lib_dir}"],
         capture_output=True, text=True, timeout=30,
     )
     if r.returncode != 0:
@@ -63,11 +72,21 @@ def transpile_compile_run(source: str, tmpdir: str) -> subprocess.CompletedProce
     if r.returncode != 0:
         return r
 
-    # Run
+    # Run — set library path for shared lib
+    env = os.environ.copy()
+    if os.name == "nt":
+        env["PATH"] = vigil_lib_dir + ";" + env.get("PATH", "")
+    else:
+        env["LD_LIBRARY_PATH"] = vigil_lib_dir + ":" + env.get("LD_LIBRARY_PATH", "")
+        env["DYLD_LIBRARY_PATH"] = vigil_lib_dir + ":" + env.get("DYLD_LIBRARY_PATH", "")
+        # Suppress ASAN issues when linking against ASAN-instrumented libvigil
+        env["ASAN_OPTIONS"] = "verify_asan_link_order=0:" + env.get("ASAN_OPTIONS", "")
+
     exe = find_executable(build_dir, "vigil_app")
     return subprocess.run(
         [str(exe)],
         capture_output=True, text=True, timeout=10,
+        env=env,
     )
 
 
@@ -153,6 +172,32 @@ class TranspileConformanceTest(unittest.TestCase):
             "}\n"
             "fn main() -> i32 { return sum(10) - 55 }\n"
         )
+
+    def test_string_println(self) -> None:
+        """Transpiled program using fmt.println with a string constant."""
+        with tempfile.TemporaryDirectory(prefix="vigil_conform_") as tmpdir:
+            source = (
+                'import "fmt"\n'
+                "fn main() -> i32 {\n"
+                '    fmt.println("hello")\n'
+                "    return 0\n"
+                "}\n"
+            )
+            src = Path(tmpdir) / "main.vigil"
+            src.write_text(source, encoding="utf-8")
+
+            # Interpreter
+            env = os.environ.copy()
+            env["VIGIL_NO_AOT"] = "1"
+            interp = run_vigil(["run", str(src)], env=env)
+            self.assertEqual(interp.returncode, 0, msg=interp.stderr)
+            self.assertEqual(interp.stdout.strip(), "hello")
+
+            # Transpile-compile-run
+            compiled = transpile_compile_run(source, tmpdir)
+            self.assertEqual(compiled.returncode, 0,
+                             msg=f"Compiled: {compiled.stderr}")
+            self.assertEqual(compiled.stdout.strip(), "hello")
 
 
 if __name__ == "__main__":
