@@ -2,8 +2,6 @@
 
 #include <string.h>
 
-#include "internal/vigil_internal.h"
-#include "internal/vigil_regvm.h"
 #include "vigil/stdlib.h"
 #include "vigil/transpile.h"
 #include "vigil/vigil.h"

@@ -10,7 +10,6 @@
 #endif
 
 #include "internal/vigil_cli_frontend.h"
-#include "internal/vigil_internal.h"
 #include "platform/platform.h"
 #include "vigil/cli_lib.h"
 #include "vigil/dap.h"
@@ -3580,6 +3579,49 @@ static void write_transpile_main(char *buf, size_t buf_size, size_t entry_idx)
              entry_idx);
 }
 
+static int write_transpile_file(const char *dir, const char *name, const char *data, size_t len, vigil_error_t *error)
+{
+    char path[4096];
+    snprintf(path, sizeof(path), "%s/%s", dir, name);
+    if (vigil_platform_write_file(path, data, len, error) != VIGIL_STATUS_OK)
+    {
+        fprintf(stderr, "failed to write %s: %s\n", path, vigil_error_message(error));
+        return 0;
+    }
+    return 1;
+}
+
+static vigil_status_t transpile_compile(vigil_source_registry_t *registry, vigil_source_id_t source_id,
+                                        vigil_diagnostic_list_t *diagnostics, vigil_object_t **out_function,
+                                        vigil_error_t *error)
+{
+    vigil_native_registry_t natives;
+    vigil_status_t status;
+    vigil_native_registry_init(&natives);
+    vigil_stdlib_register_all(&natives, error);
+    vigil_plugin_register_all(&natives, error);
+    status = vigil_compile_source_with_natives(registry, source_id, &natives, out_function, diagnostics, error);
+    vigil_native_registry_free(&natives);
+    return status;
+}
+
+static int transpile_write_project(const char *output_dir, const vigil_string_t *source,
+                                    const vigil_object_t *function, vigil_error_t *error)
+{
+    size_t entry_idx = vigil_transpile_entry_index(function);
+    char hdr[512];
+    char main_src[512];
+    write_transpile_header(hdr, sizeof(hdr), entry_idx, 0);
+    write_transpile_main(main_src, sizeof(main_src), entry_idx);
+
+    if (vigil_platform_mkdir_p(output_dir, error) != VIGIL_STATUS_OK)
+        return 0;
+    return write_transpile_file(output_dir, "vigil_generated.c", vigil_string_c_str(source), vigil_string_length(source), error) &&
+           write_transpile_file(output_dir, "vigil_generated.h", hdr, strlen(hdr), error) &&
+           write_transpile_file(output_dir, "vigil_main.c", main_src, strlen(main_src), error) &&
+           write_transpile_file(output_dir, "CMakeLists.txt", transpile_cmake_template, strlen(transpile_cmake_template), error);
+}
+
 static int cmd_transpile(const char *script_path, const char *output_dir)
 {
     vigil_runtime_t *runtime = NULL;
@@ -3591,7 +3633,6 @@ static int cmd_transpile(const char *script_path, const char *output_dir)
     vigil_string_t source;
     vigil_status_t status;
     int exit_code = 0;
-    char path_buf[4096];
 
     if (vigil_runtime_open(&runtime, NULL, &error) != VIGIL_STATUS_OK)
     {
@@ -3614,14 +3655,7 @@ static int cmd_transpile(const char *script_path, const char *output_dir)
         }
     }
 
-    {
-        vigil_native_registry_t natives;
-        vigil_native_registry_init(&natives);
-        vigil_stdlib_register_all(&natives, &error);
-        vigil_plugin_register_all(&natives, &error);
-        status = vigil_compile_source_with_natives(&registry, source_id, &natives, &function, &diagnostics, &error);
-        vigil_native_registry_free(&natives);
-    }
+    status = transpile_compile(&registry, source_id, &diagnostics, &function, &error);
     if (status != VIGIL_STATUS_OK)
     {
         if (vigil_diagnostic_list_count(&diagnostics) != 0U)
@@ -3634,7 +3668,6 @@ static int cmd_transpile(const char *script_path, const char *output_dir)
         goto cleanup;
     }
 
-    /* Transpile to C */
     status = vigil_transpile_to_c(runtime, function, &source, &error);
     if (status != VIGIL_STATUS_OK)
     {
@@ -3643,77 +3676,10 @@ static int cmd_transpile(const char *script_path, const char *output_dir)
         goto cleanup;
     }
 
-    /* Find entry function index in sibling table */
+    if (!transpile_write_project(output_dir, &source, function, &error))
     {
-        size_t entry_idx = 0;
-        size_t fc = 0;
-        while (vigil_function_object_sibling(function, fc) != NULL)
-            fc++;
-        for (size_t fi = 0; fi < fc; fi++)
-        {
-            if (vigil_function_object_sibling(function, fi) == function)
-            {
-                entry_idx = fi;
-                break;
-            }
-        }
-
-        /* Create output directory */
-        status = vigil_platform_mkdir_p(output_dir, &error);
-        if (status != VIGIL_STATUS_OK)
-        {
-            fprintf(stderr, "failed to create output directory: %s\n", vigil_error_message(&error));
-            exit_code = 1;
-            goto cleanup;
-        }
-
-        /* Write vigil_generated.c */
-        snprintf(path_buf, sizeof(path_buf), "%s/vigil_generated.c", output_dir);
-        status = vigil_platform_write_file(path_buf, vigil_string_c_str(&source), vigil_string_length(&source), &error);
-        if (status != VIGIL_STATUS_OK)
-        {
-            fprintf(stderr, "failed to write %s: %s\n", path_buf, vigil_error_message(&error));
-            exit_code = 1;
-            goto cleanup;
-        }
-
-        /* Write vigil_generated.h */
-        {
-            char hdr[512];
-            write_transpile_header(hdr, sizeof(hdr), entry_idx, vigil_function_object_arity(function));
-            snprintf(path_buf, sizeof(path_buf), "%s/vigil_generated.h", output_dir);
-            status = vigil_platform_write_file(path_buf, hdr, strlen(hdr), &error);
-            if (status != VIGIL_STATUS_OK)
-            {
-                fprintf(stderr, "failed to write %s: %s\n", path_buf, vigil_error_message(&error));
-                exit_code = 1;
-                goto cleanup;
-            }
-        }
-
-        /* Write vigil_main.c */
-        {
-            char main_src[512];
-            write_transpile_main(main_src, sizeof(main_src), entry_idx);
-            snprintf(path_buf, sizeof(path_buf), "%s/vigil_main.c", output_dir);
-            status = vigil_platform_write_file(path_buf, main_src, strlen(main_src), &error);
-            if (status != VIGIL_STATUS_OK)
-            {
-                fprintf(stderr, "failed to write %s: %s\n", path_buf, vigil_error_message(&error));
-                exit_code = 1;
-                goto cleanup;
-            }
-        }
-
-        /* Write CMakeLists.txt */
-        snprintf(path_buf, sizeof(path_buf), "%s/CMakeLists.txt", output_dir);
-        status = vigil_platform_write_file(path_buf, transpile_cmake_template, strlen(transpile_cmake_template), &error);
-        if (status != VIGIL_STATUS_OK)
-        {
-            fprintf(stderr, "failed to write %s: %s\n", path_buf, vigil_error_message(&error));
-            exit_code = 1;
-            goto cleanup;
-        }
+        exit_code = 1;
+        goto cleanup;
     }
 
     printf("Transpiled to %s/\n", output_dir);
@@ -3727,6 +3693,18 @@ cleanup:
     return exit_code;
 }
 
+static void transpile_parse_args(int argc, char **argv, const char **out_input, const char **out_output)
+{
+    int i;
+    for (i = 2; i < argc; i++)
+    {
+        if (strcmp(argv[i], "-o") == 0 && i + 1 < argc)
+            *out_output = argv[++i];
+        else if (argv[i][0] != '-' && *out_input == NULL)
+            *out_input = argv[i];
+    }
+}
+
 static int early_dispatch_transpile(int argc, char **argv)
 {
     const char *input = NULL;
@@ -3734,32 +3712,18 @@ static int early_dispatch_transpile(int argc, char **argv)
 
     if (argc < 3 || strcmp(argv[2], "--help") == 0 || strcmp(argv[2], "-h") == 0)
     {
-        printf("Usage: vigil transpile <input> -o <dir>\n\n");
-        printf("Transpile a VIGIL program to a self-contained C project\n\nOptions:\n");
-        printf("  -o <dir>    Output directory (required)\n");
+        printf("Usage: vigil transpile <input> -o <dir>\n\n"
+               "Transpile a VIGIL program to a self-contained C project\n\nOptions:\n"
+               "  -o <dir>    Output directory (required)\n");
         return 0;
     }
 
-    for (int i = 2; i < argc; i++)
-    {
-        if ((strcmp(argv[i], "-o") == 0 || strcmp(argv[i], "--output") == 0) && i + 1 < argc)
-        {
-            output = argv[++i];
-        }
-        else if (argv[i][0] != '-' && input == NULL)
-        {
-            input = argv[i];
-        }
-    }
+    transpile_parse_args(argc, argv, &input, &output);
 
-    if (input == NULL)
+    if (input == NULL || output == NULL)
     {
-        fprintf(stderr, "error: missing input file\nUsage: vigil transpile <input> -o <dir>\n");
-        return 1;
-    }
-    if (output == NULL)
-    {
-        fprintf(stderr, "error: missing output directory (-o)\nUsage: vigil transpile <input> -o <dir>\n");
+        fprintf(stderr, "error: missing %s\nUsage: vigil transpile <input> -o <dir>\n",
+                input ? "output directory (-o)" : "input file");
         return 1;
     }
 

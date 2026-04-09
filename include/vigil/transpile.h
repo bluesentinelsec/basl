@@ -28,6 +28,13 @@ extern "C"
     VIGIL_API vigil_status_t vigil_transpile_to_c(vigil_runtime_t *runtime, const vigil_object_t *function,
                                                   vigil_string_t *out_source, vigil_error_t *error);
 
+    /**
+     * Return the sibling index of the entry function (main) within the
+     * compiled function's sibling table.  Used by the CLI to generate the
+     * correct header and main wrapper.
+     */
+    VIGIL_API size_t vigil_transpile_entry_index(const vigil_object_t *function);
+
 #ifdef __cplusplus
 }
 #endif

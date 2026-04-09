@@ -120,6 +120,13 @@
         "length": 570,
         "param": 10
       }
+    },
+    {
+      "path": "src/transpile_c.c",
+      "thresholds": {
+        "ccn": 100,
+        "length": 200
+      }
     }
   ]
 }
