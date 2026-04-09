@@ -319,6 +319,77 @@ TEST(TranspileTest, OutputContainsHeader)
     vigil_runtime_close(&runtime);
 }
 
+/* ── Phase 2 tests ───────────────────────────────────────────────── */
+
+TEST(TranspileTest, StringConstantEmitsObjectNew)
+{
+    vigil_runtime_t *runtime = NULL;
+    vigil_string_t out;
+    vigil_error_t error = {0};
+
+    ASSERT_EQ(vigil_runtime_open(&runtime, NULL, &error), VIGIL_STATUS_OK);
+    vigil_string_init(&out, runtime);
+
+    ASSERT_EQ(CompileAndTranspile(runtime,
+                                  "fn main() -> i32 {\n"
+                                  "    string s = \"hello\"\n"
+                                  "    return 0\n"
+                                  "}\n",
+                                  &out, &error),
+              VIGIL_STATUS_OK);
+
+    const char *c = vigil_string_c_str(&out);
+    EXPECT_TRUE(strstr(c, "vigil_string_object_new") != NULL);
+    EXPECT_TRUE(strstr(c, "\"hello\"") != NULL);
+
+    vigil_string_free(&out);
+    vigil_runtime_close(&runtime);
+}
+
+TEST(TranspileTest, NativeCallEmitsTcCallNative)
+{
+    vigil_runtime_t *runtime = NULL;
+    vigil_string_t out;
+    vigil_error_t error = {0};
+
+    ASSERT_EQ(vigil_runtime_open(&runtime, NULL, &error), VIGIL_STATUS_OK);
+    vigil_string_init(&out, runtime);
+
+    ASSERT_EQ(CompileAndTranspile(runtime,
+                                  "import \"fmt\"\n"
+                                  "fn main() -> i32 {\n"
+                                  "    fmt.println(\"test\")\n"
+                                  "    return 0\n"
+                                  "}\n",
+                                  &out, &error),
+              VIGIL_STATUS_OK);
+
+    const char *c = vigil_string_c_str(&out);
+    EXPECT_TRUE(strstr(c, "vigil_tc_call_native") != NULL);
+
+    vigil_string_free(&out);
+    vigil_runtime_close(&runtime);
+}
+
+TEST(TranspileTest, GeneratedCodeIncludesTranspileRt)
+{
+    vigil_runtime_t *runtime = NULL;
+    vigil_string_t out;
+    vigil_error_t error = {0};
+
+    ASSERT_EQ(vigil_runtime_open(&runtime, NULL, &error), VIGIL_STATUS_OK);
+    vigil_string_init(&out, runtime);
+
+    ASSERT_EQ(CompileAndTranspile(runtime, "fn main() -> i32 { return 0 }\n", &out, &error), VIGIL_STATUS_OK);
+
+    const char *c = vigil_string_c_str(&out);
+    EXPECT_TRUE(strstr(c, "vigil/transpile_rt.h") != NULL);
+    EXPECT_TRUE(strstr(c, "vigil_tc_t *tc") != NULL);
+
+    vigil_string_free(&out);
+    vigil_runtime_close(&runtime);
+}
+
 /* ── Registration ────────────────────────────────────────────────── */
 
 void register_transpile_tests(void)
@@ -335,4 +406,7 @@ void register_transpile_tests(void)
     REGISTER_TEST(TranspileTest, TypeConversions);
     REGISTER_TEST(TranspileTest, NestedLoop);
     REGISTER_TEST(TranspileTest, OutputContainsHeader);
+    REGISTER_TEST(TranspileTest, StringConstantEmitsObjectNew);
+    REGISTER_TEST(TranspileTest, NativeCallEmitsTcCallNative);
+    REGISTER_TEST(TranspileTest, GeneratedCodeIncludesTranspileRt);
 }
