@@ -150,6 +150,7 @@ static vigil_status_t emit_call_args(vigil_transpile_ctx_t *ctx, uint8_t base, u
 
 /* ── Main instruction dispatch ───────────────────────────────────── */
 
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
 static vigil_status_t emit_instruction(vigil_transpile_ctx_t *ctx, const vigil_reg_chunk_t *rc, size_t *ip,
                                        size_t func_index, size_t func_count)
 {
@@ -342,6 +343,7 @@ static vigil_status_t emit_instruction(vigil_transpile_ctx_t *ctx, const vigil_r
 
 /* ── Function emission ───────────────────────────────────────────── */
 
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
 vigil_status_t vigil_transpile_emit_function(vigil_transpile_ctx_t *ctx, const vigil_reg_chunk_t *rc,
                                              const char *func_name, uint8_t arity, uint8_t max_regs,
                                              size_t func_index, size_t func_count)
@@ -434,6 +436,7 @@ static vigil_status_t emit_forward_decl(vigil_transpile_ctx_t *ctx, const vigil_
     return VIGIL_STATUS_OK;
 }
 
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
 vigil_status_t vigil_transpile_to_c(vigil_runtime_t *runtime, const vigil_object_t *function,
                                     vigil_string_t *out_source, vigil_error_t *error)
 {

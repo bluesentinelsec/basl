@@ -16,6 +16,26 @@ def run_vigil(args, **kwargs):
     )
 
 
+def find_executable(build_dir: Path, name: str) -> Path:
+    """Find the built executable, handling MSVC multi-config output dirs."""
+    direct = build_dir / name
+    if direct.exists():
+        return direct
+    # Windows: .exe extension
+    direct_exe = build_dir / f"{name}.exe"
+    if direct_exe.exists():
+        return direct_exe
+    # MSVC multi-config: Release/ or Debug/ subdirectory
+    for sub in ("Release", "Debug", "RelWithDebInfo", "MinSizeRel"):
+        p = build_dir / sub / f"{name}.exe"
+        if p.exists():
+            return p
+        p = build_dir / sub / name
+        if p.exists():
+            return p
+    return direct  # fallback
+
+
 def transpile_compile_run(source: str, tmpdir: str) -> subprocess.CompletedProcess:
     """Transpile a Vigil program, compile the generated C, and run it."""
     src = Path(tmpdir) / "main.vigil"
@@ -37,15 +57,16 @@ def transpile_compile_run(source: str, tmpdir: str) -> subprocess.CompletedProce
         return r
 
     r = subprocess.run(
-        ["cmake", "--build", str(build_dir)],
+        ["cmake", "--build", str(build_dir), "--config", "Release"],
         capture_output=True, text=True, timeout=30,
     )
     if r.returncode != 0:
         return r
 
     # Run
+    exe = find_executable(build_dir, "vigil_app")
     return subprocess.run(
-        [str(build_dir / "vigil_app")],
+        [str(exe)],
         capture_output=True, text=True, timeout=10,
     )
 

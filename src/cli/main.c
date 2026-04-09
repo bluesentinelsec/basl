@@ -3549,7 +3549,11 @@ static const char *transpile_cmake_template =
     "project(vigil_generated C)\n"
     "set(CMAKE_C_STANDARD 11)\n"
     "add_executable(vigil_app vigil_main.c vigil_generated.c)\n"
-    "target_link_libraries(vigil_app PRIVATE m)\n";
+    "include(CheckLibraryExists)\n"
+    "check_library_exists(m floor \"\" NEEDS_LIBM)\n"
+    "if(NEEDS_LIBM)\n"
+    "    target_link_libraries(vigil_app PRIVATE m)\n"
+    "endif()\n";
 
 static void write_transpile_header(char *buf, size_t buf_size, size_t entry_idx, size_t arity)
 {
