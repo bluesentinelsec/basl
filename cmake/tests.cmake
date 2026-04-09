@@ -73,6 +73,7 @@ add_executable(vigil_tests
     tests/vm_ops_string_test.c
     tests/vm_test.c
     tests/yaml_test.c
+    tests/transpile_test.c
     src/cli_frontend.c
 )
 
@@ -261,3 +262,4 @@ if(VIGIL_PLUGIN_GUI)
     vigil_add_integration_test(VigilGuiTest test_gui.py)
 endif()
 vigil_add_integration_test(VigilYamlTest test_yaml.py)
+vigil_add_integration_test(VigilTranspileTest test_transpile.py)
