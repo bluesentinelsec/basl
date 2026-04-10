@@ -463,28 +463,33 @@ static vigil_status_t emit_instruction(vigil_transpile_ctx_t *ctx, const vigil_r
     }
     case VREG_CALL_INTERFACE:
     {
-        /* Three-word instruction: word1=[op,A=ret,B=iface_idx,C=arg_count], word2=method_idx, word3=arg_base */
+        /* Three-word: word1=[op,A=ret,B=iface_idx,C=arg_count], word2=method_idx, word3=arg_base */
         if (*ip + 2 >= rc->code_count) { vigil_error_set_literal(ctx->error, VIGIL_STATUS_INTERNAL, "transpile: truncated CALL_INTERFACE"); return VIGIL_STATUS_INTERNAL; }
+        uint32_t method_idx = rc->code[*ip + 1];
+        uint8_t arg_base_r = (uint8_t)(rc->code[*ip + 2] & 0xFF);
         *ip += 2;
-        /* Delegate to VM via native call mechanism — too complex for direct codegen. */
-        EMITF("    /* CALL_INTERFACE iface=%u method=%u args=%u — delegated to runtime */\n",
-              (unsigned)b, (unsigned)rc->code[*ip - 1], (unsigned)c);
+        EMITF("    /* CALL_INTERFACE iface=%u method=%u args=%u base=%u -- delegated to runtime */\n",
+              (unsigned)b, (unsigned)method_idx, (unsigned)c, (unsigned)arg_base_r);
         break;
     }
     case VREG_CALL_EXTERN:
     {
-        /* Two-word instruction */
+        /* A=ret, B=const_idx, C=arg_count. Next word = arg_base. */
         if (*ip + 1 >= rc->code_count) { vigil_error_set_literal(ctx->error, VIGIL_STATUS_INTERNAL, "transpile: truncated CALL_EXTERN"); return VIGIL_STATUS_INTERNAL; }
+        uint8_t arg_base_r = (uint8_t)(rc->code[*ip + 1] & 0xFF);
         *ip += 1;
-        EMITF("    /* CALL_EXTERN — delegated to runtime */\n");
+        EMITF("    vigil_tc_call_extern(tc, (uint64_t *)r, %u, %u, %u, %u, NULL);\n",
+              (unsigned)a, (unsigned)b, (unsigned)c, (unsigned)arg_base_r);
         break;
     }
     case VREG_CALL_VALUE:
     {
-        /* Two-word instruction */
+        /* A=ret, Bx=arg_count. Next word = arg_base. */
         if (*ip + 1 >= rc->code_count) { vigil_error_set_literal(ctx->error, VIGIL_STATUS_INTERNAL, "transpile: truncated CALL_VALUE"); return VIGIL_STATUS_INTERNAL; }
+        uint8_t arg_base_r = (uint8_t)(rc->code[*ip + 1] & 0xFF);
         *ip += 1;
-        EMITF("    /* CALL_VALUE -- delegated to runtime */\n");
+        EMITF("    vigil_tc_call_value(tc, (uint64_t *)r, %u, %u, %u, NULL);\n",
+              (unsigned)a, (unsigned)bx, (unsigned)arg_base_r);
         break;
     }
 
