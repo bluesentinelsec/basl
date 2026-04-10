@@ -111,6 +111,10 @@ for f in ["CMakeLists.txt", "lz4.c", "lz4.h"]:
 for f in ["CMakeLists.txt", "vigil_crypto.c", "vigil_crypto.h"]:
     _add("deps/crypto", f"deps/crypto/{f}")
 
+# stb headers (needed by SDL plugin for image/font loading)
+for f in ["stb_image.h", "stb_truetype.h"]:
+    _add("deps/stb", f"deps/stb/{f}")
+
 # Plugin sources
 _PLUGINS = {
     "sdl": ["sdl.c", "vigil_image.c", "vigil_font.c", "vigil_image.h", "vigil_font.h"],

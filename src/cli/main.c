@@ -3587,10 +3587,13 @@ static const char *transpile_cmake_template =
     "list(FILTER VIGIL_PLUGIN_SOURCES EXCLUDE REGEX \"gui_sdl\\.c$\")\n"
     "# Exclude plugins that need external deps not yet available\n"
     "list(FILTER VIGIL_PLUGIN_SOURCES EXCLUDE REGEX \"audio\\.c$\")\n"
-    "list(FILTER VIGIL_PLUGIN_SOURCES EXCLUDE REGEX \"sdl\\.c$\")\n"
-    "list(FILTER VIGIL_PLUGIN_SOURCES EXCLUDE REGEX \"vigil_image\\.c$\")\n"
-    "list(FILTER VIGIL_PLUGIN_SOURCES EXCLUDE REGEX \"vigil_font\\.c$\")\n"
     "list(FILTER VIGIL_PLUGIN_SOURCES EXCLUDE REGEX \"gui\")\n"
+    "# Exclude SDL if not needed\n"
+    "if(NOT EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/vigil_rt/NEEDS_SDL)\n"
+    "    list(FILTER VIGIL_PLUGIN_SOURCES EXCLUDE REGEX \"sdl\\\\.c$\")\n"
+    "    list(FILTER VIGIL_PLUGIN_SOURCES EXCLUDE REGEX \"vigil_image\\\\.c$\")\n"
+    "    list(FILTER VIGIL_PLUGIN_SOURCES EXCLUDE REGEX \"vigil_font\\\\.c$\")\n"
+    "endif()\n"
     "# Exclude stdlib modules with complex deps\n"
     "list(FILTER VIGIL_RT_STDLIB EXCLUDE REGEX \"(ffi|thread|http|net|readline)\\.c$\")\n"
     "add_library(vigil_rt STATIC ${VIGIL_RT_SOURCES} ${VIGIL_RT_STDLIB}\n"
@@ -3643,6 +3646,35 @@ static const char *transpile_cmake_template_2 =
     "if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/vigil_rt/deps/crypto)\n"
     "    add_subdirectory(vigil_rt/deps/crypto)\n"
     "    target_link_libraries(vigil_rt PRIVATE vigil_crypto)\n"
+    "endif()\n";
+
+static const char *transpile_cmake_template_3 =
+    "\n# SDL3 via FetchContent (only if sdl plugin sources are present)\n"
+    "if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/vigil_rt/NEEDS_SDL)\n"
+    "    include(FetchContent)\n"
+    "    set(SDL_SHARED OFF CACHE BOOL \"\" FORCE)\n"
+    "    set(SDL_STATIC ON CACHE BOOL \"\" FORCE)\n"
+    "    set(SDL_TEST_LIBRARY OFF CACHE BOOL \"\" FORCE)\n"
+    "    set(SDL_INSTALL OFF CACHE BOOL \"\" FORCE)\n"
+    "    set(SDL_PIPEWIRE OFF CACHE BOOL \"\" FORCE)\n"
+    "    FetchContent_Declare(SDL3\n"
+    "        GIT_REPOSITORY https://github.com/libsdl-org/SDL.git\n"
+    "        GIT_TAG release-3.4.2\n"
+    "        GIT_SHALLOW TRUE\n"
+    "    )\n"
+    "    FetchContent_MakeAvailable(SDL3)\n"
+    "    target_link_libraries(vigil_rt PRIVATE SDL3::SDL3-static)\n"
+    "    target_include_directories(vigil_rt PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/vigil_rt/deps)\n"
+    "    target_compile_definitions(vigil_rt PUBLIC VIGIL_PLUGIN_SDL_ENABLED)\n"
+    "else()\n"
+    "    # No SDL — exclude SDL plugin sources\n"
+    "    list(FILTER VIGIL_PLUGIN_SOURCES EXCLUDE REGEX \"sdl\\\\.c$\")\n"
+    "    list(FILTER VIGIL_PLUGIN_SOURCES EXCLUDE REGEX \"vigil_image\\\\.c$\")\n"
+    "    list(FILTER VIGIL_PLUGIN_SOURCES EXCLUDE REGEX \"vigil_font\\\\.c$\")\n"
+    "endif()\n"
+    "# stb headers for image/font loading\n"
+    "if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/vigil_rt/deps/stb)\n"
+    "    target_include_directories(vigil_rt PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/vigil_rt/deps)\n"
     "endif()\n";
 
 static void write_transpile_header(char *buf, size_t buf_size, size_t entry_idx, size_t arity)
@@ -3708,6 +3740,46 @@ static void escape_c_string(vigil_string_t *out, const char *text, size_t len, v
     }
 }
 
+static void embed_source_files(vigil_string_t *out, const vigil_source_registry_t *registry,
+                                size_t src_count, vigil_error_t *error)
+{
+    for (size_t i = 0; i < src_count; i++)
+    {
+        const vigil_source_file_t *sf = vigil_source_registry_get(registry, (vigil_source_id_t)(i + 1));
+        char decl[512];
+        if (!sf)
+            continue;
+        snprintf(decl, sizeof(decl), "static const char vigil_src_%zu[] = \"", i);
+        vigil_string_append_cstr(out, decl, error);
+        escape_c_string(out, vigil_string_c_str(&sf->text), vigil_string_length(&sf->text), error);
+        vigil_string_append_cstr(out, "\";\n", error);
+        snprintf(decl, sizeof(decl), "static const char vigil_path_%zu[] = \"", i);
+        vigil_string_append_cstr(out, decl, error);
+        escape_c_string(out, vigil_string_c_str(&sf->path), vigil_string_length(&sf->path), error);
+        vigil_string_append_cstr(out, "\";\n", error);
+    }
+}
+
+static int transpile_write_cmake_and_runtime(const char *output_dir, vigil_runtime_t *runtime, vigil_error_t *error)
+{
+    vigil_string_t cmake_buf;
+    int result;
+    vigil_string_init(&cmake_buf, runtime);
+    vigil_string_append_cstr(&cmake_buf, transpile_cmake_template, error);
+    vigil_string_append_cstr(&cmake_buf, transpile_cmake_template_2, error);
+    vigil_string_append_cstr(&cmake_buf, transpile_cmake_template_3, error);
+    result = write_transpile_file(output_dir, "CMakeLists.txt",
+                                  vigil_string_c_str(&cmake_buf), vigil_string_length(&cmake_buf), error);
+    vigil_string_free(&cmake_buf);
+    if (result)
+    {
+        vigil_status_t st = vigil_transpile_write_runtime(output_dir, error);
+        if (st != VIGIL_STATUS_OK)
+            result = 0;
+    }
+    return result;
+}
+
 static int transpile_write_project(const char *output_dir, const vigil_string_t *transpiled,
                                     const vigil_object_t *function,
                                     const vigil_source_registry_t *registry,
@@ -3718,6 +3790,18 @@ static int transpile_write_project(const char *output_dir, const vigil_string_t 
     vigil_string_t main_src;
     int result;
     size_t src_count = vigil_source_registry_count(registry);
+    int needs_sdl = 0;
+
+    /* Check if any source imports SDL. */
+    for (size_t si = 0; si < src_count; si++)
+    {
+        const vigil_source_file_t *sf = vigil_source_registry_get(registry, (vigil_source_id_t)(si + 1));
+        if (sf && strstr(vigil_string_c_str(&sf->text), "import \"sdl\""))
+        {
+            needs_sdl = 1;
+            break;
+        }
+    }
 
     write_transpile_header(hdr, sizeof(hdr), entry_idx, 0);
 
@@ -3734,26 +3818,7 @@ static int transpile_write_project(const char *output_dir, const vigil_string_t 
         "#include \"plugin_registry.h\"\n\n", error);
 
     /* Embed all source files as C string literals. */
-    for (size_t i = 0; i < src_count; i++)
-    {
-        const vigil_source_file_t *sf = vigil_source_registry_get(registry, (vigil_source_id_t)(i + 1));
-        if (!sf)
-            continue;
-        {
-            char decl[256];
-            snprintf(decl, sizeof(decl), "static const char vigil_src_%zu[] = \"", i);
-            vigil_string_append_cstr(&main_src, decl, error);
-        }
-        escape_c_string(&main_src, vigil_string_c_str(&sf->text), vigil_string_length(&sf->text), error);
-        vigil_string_append_cstr(&main_src, "\";\n", error);
-        {
-            char path_decl[512];
-            snprintf(path_decl, sizeof(path_decl), "static const char vigil_path_%zu[] = \"", i);
-            vigil_string_append_cstr(&main_src, path_decl, error);
-        }
-        escape_c_string(&main_src, vigil_string_c_str(&sf->path), vigil_string_length(&sf->path), error);
-        vigil_string_append_cstr(&main_src, "\";\n", error);
-    }
+    embed_source_files(&main_src, registry, src_count, error);
 
     {
         char tail[2048];
@@ -3827,24 +3892,15 @@ static int transpile_write_project(const char *output_dir, const vigil_string_t 
              write_transpile_file(output_dir, "vigil_generated.h", hdr, strlen(hdr), error) &&
              write_transpile_file(output_dir, "vigil_main.c", vigil_string_c_str(&main_src), vigil_string_length(&main_src), error);
 
-    /* Write CMakeLists.txt from two template parts. */
     if (result)
-    {
-        vigil_string_t cmake_buf;
-        vigil_string_init(&cmake_buf, runtime);
-        vigil_string_append_cstr(&cmake_buf, transpile_cmake_template, error);
-        vigil_string_append_cstr(&cmake_buf, transpile_cmake_template_2, error);
-        result = write_transpile_file(output_dir, "CMakeLists.txt",
-                                      vigil_string_c_str(&cmake_buf), vigil_string_length(&cmake_buf), error);
-        vigil_string_free(&cmake_buf);
-    }
+        result = transpile_write_cmake_and_runtime(output_dir, runtime, error);
 
-    /* Write embedded runtime sources to vigil_rt/. */
-    if (result)
+    /* Write SDL marker file if needed. */
+    if (result && needs_sdl)
     {
-        vigil_status_t st = vigil_transpile_write_runtime(output_dir, error);
-        if (st != VIGIL_STATUS_OK)
-            result = 0;
+        char marker[4096];
+        snprintf(marker, sizeof(marker), "%s/vigil_rt/NEEDS_SDL", output_dir);
+        vigil_platform_write_file(marker, "1", 1, error);
     }
 
     vigil_string_free(&main_src);
