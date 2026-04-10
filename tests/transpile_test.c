@@ -390,6 +390,30 @@ TEST(TranspileTest, GeneratedCodeIncludesTranspileRt)
     vigil_runtime_close(&runtime);
 }
 
+TEST(TranspileTest, ArrayNewEmitsVmOp)
+{
+    vigil_runtime_t *runtime = NULL;
+    vigil_string_t out;
+    vigil_error_t error = {0};
+
+    ASSERT_EQ(vigil_runtime_open(&runtime, NULL, &error), VIGIL_STATUS_OK);
+    vigil_string_init(&out, runtime);
+
+    ASSERT_EQ(CompileAndTranspile(runtime,
+                                  "fn main() -> i32 {\n"
+                                  "    i32 a = [1, 2, 3].len()\n"
+                                  "    return a - 3\n"
+                                  "}\n",
+                                  &out, &error),
+              VIGIL_STATUS_OK);
+
+    const char *c = vigil_string_c_str(&out);
+    EXPECT_TRUE(strstr(c, "vigil_tc_vm_op") != NULL);
+
+    vigil_string_free(&out);
+    vigil_runtime_close(&runtime);
+}
+
 /* ── Registration ────────────────────────────────────────────────── */
 
 void register_transpile_tests(void)
@@ -409,4 +433,5 @@ void register_transpile_tests(void)
     REGISTER_TEST(TranspileTest, StringConstantEmitsObjectNew);
     REGISTER_TEST(TranspileTest, NativeCallEmitsTcCallNative);
     REGISTER_TEST(TranspileTest, GeneratedCodeIncludesTranspileRt);
+    REGISTER_TEST(TranspileTest, ArrayNewEmitsVmOp);
 }

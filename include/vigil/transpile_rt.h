@@ -64,6 +64,21 @@ extern "C"
     vigil_status_t vigil_tc_parse_bool(vigil_tc_t *tc, vigil_value_t *dst, const vigil_value_t *src,
                                        vigil_error_t *error);
 
+    /**
+     * Execute a VM stack-based operation.  Syncs the given registers to the
+     * VM stack, calls the operation, and copies results back.
+     *
+     * @param tc        Transpiler context.
+     * @param regs      Register file (vigil_reg_t[] cast to vigil_value_t*).
+     * @param opcode    The VREG_* opcode to execute.
+     * @param a         A operand from the instruction.
+     * @param b         B operand from the instruction.
+     * @param c         C operand from the instruction.
+     * @param error     Error output.
+     */
+    vigil_status_t vigil_tc_vm_op(vigil_tc_t *tc, vigil_value_t *regs, uint8_t opcode,
+                                  uint8_t a, uint8_t b, uint8_t c, vigil_error_t *error);
+
 #ifdef __cplusplus
 }
 #endif

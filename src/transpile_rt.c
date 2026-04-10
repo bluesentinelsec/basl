@@ -11,8 +11,11 @@
 
 #include "internal/vigil_internal.h"
 #include "internal/vigil_nanbox.h"
+#include "internal/vigil_regvm.h"
 #include "internal/vigil_vm_internal.h"
 #include "vigil/value.h"
+#include "vm_ops_collection.h"
+#include "vm_ops_string.h"
 
 vigil_status_t vigil_tc_to_string(vigil_tc_t *tc, vigil_value_t *dst, const vigil_value_t *src,
                                   vigil_error_t *error)
@@ -236,4 +239,256 @@ vigil_status_t vigil_tc_parse_bool(vigil_tc_t *tc, vigil_value_t *dst, const vig
         vigil_value_init_object(&dst[1], &err_obj);
     }
     return VIGIL_STATUS_OK;
+}
+
+/* ── Generic VM stack-op bridge ──────────────────────────────────── */
+
+typedef vigil_status_t (*vm_op_fn)(vigil_vm_t *, vigil_vm_frame_t *, vigil_error_t *);
+typedef vigil_status_t (*vm_op_code_fn)(vigil_vm_t *, vigil_vm_frame_t *, const uint8_t *, vigil_error_t *);
+
+static vigil_status_t tc_ensure_frame(vigil_tc_t *tc, vigil_error_t *error)
+{
+    if (tc->vm->frame_count == 0U)
+        return vigil_vm_push_frame(tc->vm, (vigil_object_t *)tc->function, (vigil_object_t *)tc->function, NULL, 0U,
+                                   error);
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t tc_sync_and_call(vigil_tc_t *tc, vigil_value_t *regs, uint8_t top_reg,
+                                        uint8_t pop_count, uint8_t dst_reg, uint8_t ret_count,
+                                        vm_op_fn op, vigil_error_t *error)
+{
+    vigil_vm_t *vm = tc->vm;
+    vigil_status_t status;
+    size_t needed = (size_t)top_reg + 1;
+
+    status = tc_ensure_frame(tc, error);
+    if (status != VIGIL_STATUS_OK)
+        return status;
+
+    if (vm->stack_capacity < needed)
+    {
+        status = vigil_vm_grow_stack(vm, needed, error);
+        if (status != VIGIL_STATUS_OK)
+            return status;
+    }
+
+    /* Sync registers to VM stack, nanbox-encoding raw integers. */
+    for (size_t i = 0; i <= (size_t)top_reg; i++)
+    {
+        uint64_t v = regs[i];
+        if (vigil_nanbox_has_object(v) || vigil_nanbox_is_bool(v) || vigil_nanbox_is_int(v) ||
+            vigil_nanbox_is_uint(v) || vigil_nanbox_is_double(v) || v == 0)
+            vm->stack[i] = v;
+        else
+            vm->stack[i] = vigil_nanbox_encode_int((int64_t)v);
+    }
+    vm->stack_count = needed;
+
+    vigil_vm_frame_t *frame = &vm->frames[vm->frame_count - 1U];
+    frame->ip = 0;
+    status = op(vm, frame, error);
+    if (status != VIGIL_STATUS_OK)
+        return status;
+
+    {
+        size_t result_base = (size_t)top_reg + 1U - (size_t)pop_count;
+        for (uint8_t i = 0; i < ret_count; i++)
+        {
+            if (result_base + i < vm->stack_count)
+                regs[dst_reg + i] = vm->stack[result_base + i];
+        }
+    }
+
+    return VIGIL_STATUS_OK;
+}
+
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
+vigil_status_t vigil_tc_vm_op(vigil_tc_t *tc, vigil_value_t *regs, uint8_t opcode,
+                              uint8_t a, uint8_t b, uint8_t c, vigil_error_t *error)
+{
+    vigil_vm_t *vm = tc->vm;
+    vigil_status_t status;
+    uint8_t top;
+
+    status = tc_ensure_frame(tc, error);
+    if (status != VIGIL_STATUS_OK)
+        return status;
+
+    switch (opcode)
+    {
+    /* ── Core collection ops ─────────────────────────────────── */
+    case VREG_NEW_ARRAY:
+    {
+        uint16_t count = (uint16_t)((uint16_t)b << 8 | (uint16_t)c);
+        vigil_object_t *arr = NULL;
+        /* The register file may contain raw int64_t values from Phase 1
+           arithmetic.  Convert them to nanboxed values for the array API. */
+        vigil_value_t items_buf[256];
+        vigil_value_t *items = NULL;
+        if (count > 0 && count <= 256)
+        {
+            for (uint16_t idx = 0; idx < count; idx++)
+            {
+                uint64_t v = regs[a + idx];
+                if (vigil_nanbox_has_object(v) || vigil_nanbox_is_bool(v) || vigil_nanbox_is_int(v) ||
+                    vigil_nanbox_is_uint(v) || v == 0)
+                    items_buf[idx] = v; /* already nanboxed */
+                else
+                    items_buf[idx] = vigil_nanbox_encode_int((int64_t)v); /* raw int → nanbox */
+            }
+            items = items_buf;
+        }
+        status = vigil_array_object_new(vm->runtime, items, (size_t)count, &arr, error);
+        if (status != VIGIL_STATUS_OK)
+            return status;
+        vigil_value_release(&regs[a]);
+        vigil_value_init_object(&regs[a], &arr);
+        return VIGIL_STATUS_OK;
+    }
+    case VREG_NEW_MAP:
+    {
+        uint16_t pair_count = (uint16_t)((uint16_t)b << 8 | (uint16_t)c);
+        vigil_object_t *map = NULL;
+        status = vigil_map_object_new(vm->runtime, &map, error);
+        if (status != VIGIL_STATUS_OK)
+            return status;
+        for (uint16_t idx = 0; idx < pair_count; idx++)
+        {
+            vigil_value_t key = regs[a + idx * 2];
+            vigil_value_t val = regs[a + idx * 2 + 1];
+            /* Nanbox-encode raw integers if needed. */
+            if (!vigil_nanbox_has_object(key) && !vigil_nanbox_is_bool(key) &&
+                !vigil_nanbox_is_int(key) && !vigil_nanbox_is_uint(key) && key != 0)
+                key = vigil_nanbox_encode_int((int64_t)key);
+            if (!vigil_nanbox_has_object(val) && !vigil_nanbox_is_bool(val) &&
+                !vigil_nanbox_is_int(val) && !vigil_nanbox_is_uint(val) && val != 0)
+                val = vigil_nanbox_encode_int((int64_t)val);
+            status = vigil_map_object_set(map, &key, &val, error);
+            if (status != VIGIL_STATUS_OK)
+            {
+                vigil_object_release(&map);
+                return status;
+            }
+        }
+        vigil_value_release(&regs[a]);
+        vigil_value_init_object(&regs[a], &map);
+        return VIGIL_STATUS_OK;
+    }
+    case VREG_GET_INDEX:
+        top = b > c ? b : c;
+        return tc_sync_and_call(tc, regs, top, 2, a, 1, vigil_vm_op_get_index, error);
+    case VREG_SET_INDEX:
+        top = a;
+        if (b > top) top = b;
+        if (c > top) top = c;
+        return tc_sync_and_call(tc, regs, top, 3, a, 0, vigil_vm_op_set_index, error);
+    case VREG_COLLECTION_SIZE:
+    {
+        if (c == 1)
+            status = tc_sync_and_call(tc, regs, b, 1, a, 1, vigil_vm_op_get_string_size, error);
+        else
+            status = tc_sync_and_call(tc, regs, b, 1, a, 1, vigil_vm_op_get_collection_size, error);
+        if (status != VIGIL_STATUS_OK)
+            return status;
+        /* Decode nanboxed integer result to raw int64_t for arithmetic. */
+        if (vigil_nanbox_is_int(regs[a]))
+            regs[a] = (uint64_t)vigil_nanbox_decode_int(regs[a]);
+        return VIGIL_STATUS_OK;
+    }
+
+    /* ── Array methods ───────────────────────────────────────── */
+    case VREG_ARRAY_PUSH:
+        top = b > c ? b : c;
+        return tc_sync_and_call(tc, regs, top, 2, a, 0, vigil_vm_op_array_push, error);
+    case VREG_ARRAY_POP:
+        return tc_sync_and_call(tc, regs, c, 2, a, 2, vigil_vm_op_array_pop, error);
+    case VREG_ARRAY_GET_SAFE:
+        return tc_sync_and_call(tc, regs, c, 3, a, 2, vigil_vm_op_array_get_safe, error);
+    case VREG_ARRAY_SET_SAFE:
+        return tc_sync_and_call(tc, regs, c, 3, a, 1, vigil_vm_op_array_set_safe, error);
+    case VREG_ARRAY_SLICE:
+        top = c;
+        if (b > top) top = b;
+        return tc_sync_and_call(tc, regs, top, 3, a, 1, vigil_vm_op_array_slice, error);
+    case VREG_ARRAY_CONTAINS:
+        top = b > c ? b : c;
+        return tc_sync_and_call(tc, regs, top, 2, a, 1, vigil_vm_op_array_contains, error);
+    case VREG_ARRAY_SORT:
+        return tc_sync_and_call(tc, regs, a, 1, a, 0, vigil_vm_op_array_sort, error);
+    case VREG_ARRAY_SORT_DESC:
+        return tc_sync_and_call(tc, regs, a, 1, a, 0, vigil_vm_op_array_sort_desc, error);
+    case VREG_ARRAY_REVERSE:
+        return tc_sync_and_call(tc, regs, a, 1, a, 0, vigil_vm_op_array_reverse, error);
+    case VREG_ARRAY_INDEX_OF:
+        return tc_sync_and_call(tc, regs, c, 2, a, 1, vigil_vm_op_array_index_of, error);
+    case VREG_ARRAY_REMOVE_AT:
+        return tc_sync_and_call(tc, regs, c, 2, a, 2, vigil_vm_op_array_remove_at, error);
+    case VREG_ARRAY_INSERT_AT:
+        return tc_sync_and_call(tc, regs, c, 3, a, 1, vigil_vm_op_array_insert_at, error);
+    case VREG_ARRAY_CLEAR:
+        return tc_sync_and_call(tc, regs, a, 1, a, 0, vigil_vm_op_array_clear, error);
+
+    /* ── Map methods ─────────────────────────────────────────── */
+    case VREG_MAP_GET_SAFE:
+        return tc_sync_and_call(tc, regs, c, 3, a, 2, vigil_vm_op_map_get_safe, error);
+    case VREG_MAP_SET_SAFE:
+        return tc_sync_and_call(tc, regs, c, 3, a, 1, vigil_vm_op_map_set_safe, error);
+    case VREG_MAP_REMOVE_SAFE:
+        return tc_sync_and_call(tc, regs, c, 3, a, 2, vigil_vm_op_map_remove_safe, error);
+    case VREG_MAP_HAS:
+        return tc_sync_and_call(tc, regs, c, 2, a, 1, vigil_vm_op_map_has, error);
+    case VREG_MAP_KEYS:
+    {
+        uint8_t keys_op = VIGIL_OPCODE_MAP_KEYS;
+        size_t needed = (size_t)b + 1;
+        status = tc_ensure_frame(tc, error);
+        if (status != VIGIL_STATUS_OK) return status;
+        if (vm->stack_capacity < needed)
+        { status = vigil_vm_grow_stack(vm, needed, error); if (status != VIGIL_STATUS_OK) return status; }
+        for (size_t i = 0; i <= (size_t)b; i++) vm->stack[i] = regs[i];
+        vm->stack_count = needed;
+        { vigil_vm_frame_t *frame = &vm->frames[vm->frame_count - 1U];
+          frame->ip = 0;
+          status = vigil_vm_op_map_keys_values(vm, frame, &keys_op, error); }
+        if (status != VIGIL_STATUS_OK) return status;
+        { size_t rb = (size_t)b; if (rb < vm->stack_count) regs[a] = vm->stack[rb]; }
+        return VIGIL_STATUS_OK;
+    }
+    case VREG_MAP_VALUES:
+    {
+        uint8_t vals_op = VIGIL_OPCODE_MAP_VALUES;
+        size_t needed = (size_t)b + 1;
+        status = tc_ensure_frame(tc, error);
+        if (status != VIGIL_STATUS_OK) return status;
+        if (vm->stack_capacity < needed)
+        { status = vigil_vm_grow_stack(vm, needed, error); if (status != VIGIL_STATUS_OK) return status; }
+        for (size_t i = 0; i <= (size_t)b; i++) vm->stack[i] = regs[i];
+        vm->stack_count = needed;
+        { vigil_vm_frame_t *frame = &vm->frames[vm->frame_count - 1U];
+          frame->ip = 0;
+          status = vigil_vm_op_map_keys_values(vm, frame, &vals_op, error); }
+        if (status != VIGIL_STATUS_OK) return status;
+        { size_t rb = (size_t)b; if (rb < vm->stack_count) regs[a] = vm->stack[rb]; }
+        return VIGIL_STATUS_OK;
+    }
+    case VREG_MAP_KEY_AT:
+        return tc_sync_and_call(tc, regs, c, 2, a, 1, vigil_vm_op_get_map_key_at, error);
+    case VREG_MAP_VALUE_AT:
+        return tc_sync_and_call(tc, regs, c, 2, a, 1, vigil_vm_op_get_map_value_at, error);
+    case VREG_MAP_CLEAR:
+        return tc_sync_and_call(tc, regs, a, 1, a, 0, vigil_vm_op_map_clear, error);
+
+    /* ── Reference management ────────────────────────────────── */
+    case VREG_DUP:
+        regs[a] = vigil_value_copy(&regs[b]);
+        return VIGIL_STATUS_OK;
+    case VREG_RELEASE:
+        vigil_value_release(&regs[a]);
+        return VIGIL_STATUS_OK;
+
+    default:
+        vigil_error_set_literal(error, VIGIL_STATUS_UNSUPPORTED, "transpile_rt: unsupported vm op");
+        return VIGIL_STATUS_UNSUPPORTED;
+    }
 }
