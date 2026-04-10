@@ -484,9 +484,23 @@ static vigil_status_t emit_instruction(vigil_transpile_ctx_t *ctx, const vigil_r
         /* Two-word instruction */
         if (*ip + 1 >= rc->code_count) { vigil_error_set_literal(ctx->error, VIGIL_STATUS_INTERNAL, "transpile: truncated CALL_VALUE"); return VIGIL_STATUS_INTERNAL; }
         *ip += 1;
-        EMITF("    /* CALL_VALUE — delegated to runtime */\n");
+        EMITF("    /* CALL_VALUE -- delegated to runtime */\n");
         break;
     }
+
+    /* -- Phase 5: Globals, captures, closures -- */
+    case VREG_GET_GLOBAL:
+    case VREG_SET_GLOBAL:
+    case VREG_GET_CAPTURE:
+    case VREG_SET_CAPTURE:
+    case VREG_GET_FUNCTION:
+        EMITF("    vigil_tc_vm_op(tc, (uint64_t *)r, %u, %u, %u, %u, NULL);\n",
+              (unsigned)op, (unsigned)a, (unsigned)(bx >> 8), (unsigned)(bx & 0xFF));
+        break;
+    case VREG_NEW_CLOSURE:
+        EMITF("    vigil_tc_vm_op(tc, (uint64_t *)r, %u, %u, %u, %u, NULL);\n",
+              (unsigned)op, (unsigned)a, (unsigned)b, (unsigned)c);
+        break;
 
     default:
         EMITF("    /* unsupported opcode %u */\n", (unsigned)op);

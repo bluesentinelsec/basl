@@ -237,6 +237,16 @@ class TranspileConformanceTest(unittest.TestCase):
             "}\n"
         )
 
+    def test_global_variable(self) -> None:
+        self._conformance(
+            "i32 counter = 0\n"
+            "fn get_counter() -> i32 { return counter }\n"
+            "fn main() -> i32 {\n"
+            "    counter = 5\n"
+            "    return get_counter() - 5\n"
+            "}\n"
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
