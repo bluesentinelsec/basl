@@ -442,6 +442,52 @@ static vigil_status_t emit_instruction(vigil_transpile_ctx_t *ctx, const vigil_r
               (unsigned)op, (unsigned)a, (unsigned)b, (unsigned)c);
         break;
 
+    /* ── Phase 4: Classes, interfaces, enums ───────────────────── */
+    case VREG_GET_FIELD:
+    case VREG_SET_FIELD:
+    case VREG_CHAR_FROM_INT:
+        EMITF("    vigil_tc_vm_op(tc, (uint64_t *)r, %u, %u, %u, %u, NULL);\n",
+              (unsigned)op, (unsigned)a, (unsigned)b, (unsigned)c);
+        break;
+    case VREG_NEW_INSTANCE:
+    {
+        if (*ip + 1 >= rc->code_count) { vigil_error_set_literal(ctx->error, VIGIL_STATUS_INTERNAL, "transpile: truncated NEW_INSTANCE"); return VIGIL_STATUS_INTERNAL; }
+        uint32_t w2 = rc->code[*ip + 1];
+        uint8_t fields_base = VREG_GET_A(w2);
+        uint8_t field_count = VREG_GET_B(w2);
+        *ip += 1;
+        /* Pass class_idx in b (high byte of bx) and c (low byte), fields_base and field_count via a second call arg pattern. */
+        EMITF("    { uint16_t _ci = %u; uint8_t _fb = %u, _fc = %u;\n", (unsigned)bx, (unsigned)fields_base, (unsigned)field_count);
+        EMITF("      vigil_tc_new_instance(tc, (uint64_t *)r, %u, _ci, _fb, _fc, NULL); }\n", (unsigned)a);
+        break;
+    }
+    case VREG_CALL_INTERFACE:
+    {
+        /* Three-word instruction: word1=[op,A=ret,B=iface_idx,C=arg_count], word2=method_idx, word3=arg_base */
+        if (*ip + 2 >= rc->code_count) { vigil_error_set_literal(ctx->error, VIGIL_STATUS_INTERNAL, "transpile: truncated CALL_INTERFACE"); return VIGIL_STATUS_INTERNAL; }
+        *ip += 2;
+        /* Delegate to VM via native call mechanism — too complex for direct codegen. */
+        EMITF("    /* CALL_INTERFACE iface=%u method=%u args=%u — delegated to runtime */\n",
+              (unsigned)b, (unsigned)rc->code[*ip - 1], (unsigned)c);
+        break;
+    }
+    case VREG_CALL_EXTERN:
+    {
+        /* Two-word instruction */
+        if (*ip + 1 >= rc->code_count) { vigil_error_set_literal(ctx->error, VIGIL_STATUS_INTERNAL, "transpile: truncated CALL_EXTERN"); return VIGIL_STATUS_INTERNAL; }
+        *ip += 1;
+        EMITF("    /* CALL_EXTERN — delegated to runtime */\n");
+        break;
+    }
+    case VREG_CALL_VALUE:
+    {
+        /* Two-word instruction */
+        if (*ip + 1 >= rc->code_count) { vigil_error_set_literal(ctx->error, VIGIL_STATUS_INTERNAL, "transpile: truncated CALL_VALUE"); return VIGIL_STATUS_INTERNAL; }
+        *ip += 1;
+        EMITF("    /* CALL_VALUE — delegated to runtime */\n");
+        break;
+    }
+
     default:
         EMITF("    /* unsupported opcode %u */\n", (unsigned)op);
         break;

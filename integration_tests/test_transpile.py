@@ -225,6 +225,18 @@ class TranspileConformanceTest(unittest.TestCase):
             "}\n"
         )
 
+    def test_class_field(self) -> None:
+        self._conformance(
+            "class Point {\n"
+            "    i32 x\n"
+            "    i32 y\n"
+            "}\n"
+            "fn main() -> i32 {\n"
+            "    Point p = Point(10, 20)\n"
+            "    return p.x - 10\n"
+            "}\n"
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
