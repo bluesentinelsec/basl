@@ -592,7 +592,7 @@ vigil_status_t vigil_tc_vm_op(vigil_tc_t *tc, vigil_value_t *regs, uint8_t opcod
     }
     case VREG_GET_CAPTURE:
     case VREG_SET_CAPTURE:
-        /* Captures require a closure callable — stub for now. */
+        /* Captures require a closure callable -- stub for now. */
         return VIGIL_STATUS_OK;
 
     default:
@@ -629,5 +629,112 @@ vigil_status_t vigil_tc_new_instance(vigil_tc_t *tc, vigil_value_t *regs, uint8_
 
     vigil_value_release(&regs[dest]);
     vigil_value_init_object(&regs[dest], &inst);
+    return VIGIL_STATUS_OK;
+}
+
+vigil_status_t vigil_tc_call_value(vigil_tc_t *tc, vigil_value_t *regs, uint8_t ret,
+                                   uint16_t arg_count, uint8_t arg_base, vigil_error_t *error)
+{
+    vigil_vm_t *vm = tc->vm;
+    vigil_status_t status;
+    size_t total = (size_t)arg_count + 1U;
+    size_t i;
+
+    status = tc_ensure_frame(tc, error);
+    if (status != VIGIL_STATUS_OK)
+        return status;
+
+    if (vm->stack_capacity < (size_t)arg_base + total)
+    {
+        status = vigil_vm_grow_stack(vm, (size_t)arg_base + total, error);
+        if (status != VIGIL_STATUS_OK)
+            return status;
+    }
+
+    /* Sync registers: callee at arg_base, then args. */
+    for (i = 0; i < total; i++)
+    {
+        uint64_t v = regs[arg_base + i];
+        vm->stack[arg_base + i] = (v == 0 || vigil_nanbox_has_object(v)) ? v : vigil_nanbox_encode_int((int64_t)v);
+    }
+    vm->stack_count = (size_t)arg_base + total;
+
+    /* Extract callee, shift args down. */
+    vigil_value_t callee_val = vm->stack[arg_base];
+    if (!vigil_nanbox_is_object(callee_val))
+    {
+        vigil_error_set_literal(error, VIGIL_STATUS_INVALID_ARGUMENT, "call_value: not a callable");
+        return VIGIL_STATUS_INVALID_ARGUMENT;
+    }
+    vigil_object_t *callee = (vigil_object_t *)vigil_nanbox_decode_ptr(callee_val);
+    vigil_value_release(&vm->stack[arg_base]);
+    if (arg_count > 0)
+        memmove(&vm->stack[arg_base], &vm->stack[arg_base + 1], (size_t)arg_count * sizeof(vigil_value_t));
+    vm->stack_count -= 1U;
+
+    status = vigil_vm_execute_call(vm, callee, (size_t)arg_count, error);
+    if (status != VIGIL_STATUS_OK)
+        return status;
+
+    /* Copy results back. */
+    for (i = (size_t)arg_base; i < vm->stack_count && i < (size_t)arg_base + total; i++)
+    {
+        vigil_value_t rv = vm->stack[i];
+        regs[ret + (i - (size_t)arg_base)] = vigil_nanbox_is_int(rv) ? (uint64_t)vigil_nanbox_decode_int(rv) : rv;
+    }
+    return VIGIL_STATUS_OK;
+}
+
+vigil_status_t vigil_tc_call_extern(vigil_tc_t *tc, vigil_value_t *regs, uint8_t ret,
+                                    uint8_t const_idx, uint8_t arg_count, uint8_t arg_base,
+                                    vigil_error_t *error)
+{
+    vigil_vm_t *vm = tc->vm;
+    vigil_status_t status;
+    size_t i;
+
+    if ((size_t)const_idx >= tc->constant_count)
+    {
+        vigil_error_set_literal(error, VIGIL_STATUS_INTERNAL, "call_extern: invalid constant index");
+        return VIGIL_STATUS_INTERNAL;
+    }
+
+    status = tc_ensure_frame(tc, error);
+    if (status != VIGIL_STATUS_OK)
+        return status;
+
+    if (vm->stack_capacity < (size_t)arg_base + (size_t)arg_count)
+    {
+        status = vigil_vm_grow_stack(vm, (size_t)arg_base + (size_t)arg_count, error);
+        if (status != VIGIL_STATUS_OK)
+            return status;
+    }
+
+    for (i = 0; i < (size_t)arg_count; i++)
+    {
+        uint64_t v = regs[arg_base + i];
+        vm->stack[arg_base + i] = (v == 0 || vigil_nanbox_has_object(v)) ? v : vigil_nanbox_encode_int((int64_t)v);
+    }
+    vm->stack_count = (size_t)arg_base + (size_t)arg_count;
+
+    const vigil_value_t *desc_val = &tc->constants[const_idx];
+    if (!vigil_nanbox_has_object(*desc_val))
+    {
+        vigil_error_set_literal(error, VIGIL_STATUS_UNSUPPORTED, "call_extern: not an object constant");
+        return VIGIL_STATUS_UNSUPPORTED;
+    }
+    vigil_object_t *desc_obj = (vigil_object_t *)vigil_nanbox_decode_ptr(*desc_val);
+    const char *desc = vigil_string_object_c_str(desc_obj);
+    size_t desc_len = vigil_string_object_length(desc_obj);
+
+    status = vigil_vm_call_extern_fn(vm, desc, desc_len, (size_t)arg_count, error);
+    if (status != VIGIL_STATUS_OK)
+        return status;
+
+    for (i = (size_t)arg_base; i < vm->stack_count; i++)
+    {
+        vigil_value_t rv = vm->stack[i];
+        regs[ret + (i - (size_t)arg_base)] = vigil_nanbox_is_int(rv) ? (uint64_t)vigil_nanbox_decode_int(rv) : rv;
+    }
     return VIGIL_STATUS_OK;
 }

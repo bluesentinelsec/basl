@@ -247,6 +247,17 @@ class TranspileConformanceTest(unittest.TestCase):
             "}\n"
         )
 
+    def test_function_value(self) -> None:
+        self._conformance(
+            "fn add(i32 a, i32 b) -> i32 { return a + b }\n"
+            "fn apply(fn(i32, i32) -> i32 f, i32 x, i32 y) -> i32 {\n"
+            "    return f(x, y)\n"
+            "}\n"
+            "fn main() -> i32 {\n"
+            "    return apply(add, 10, 20) - 30\n"
+            "}\n"
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

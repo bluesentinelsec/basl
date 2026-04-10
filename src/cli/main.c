@@ -3694,6 +3694,7 @@ static int transpile_write_project(const char *output_dir, const vigil_string_t 
             "    if (vigil_runtime_open(&runtime, NULL, &error) != 0) return 1;\n"
             "    if (vigil_vm_open(&vm, runtime, NULL, &error) != 0)\n"
             "    { vigil_runtime_close(&runtime); return 1; }\n"
+            "    vigil_vm_set_aot_enabled(vm, 0);\n"
             "    vigil_source_registry_init(&registry, runtime);\n"
             "    vigil_diagnostic_list_init(&diagnostics, runtime);\n"
             "    vigil_source_registry_register_cstr(&registry, \"main.vigil\", vigil_source, &sid, &error);\n"

@@ -84,6 +84,15 @@ extern "C"
                                          uint16_t class_idx, uint8_t fields_base, uint8_t field_count,
                                          vigil_error_t *error);
 
+    /* Call a function value (closure/function object in a register). */
+    vigil_status_t vigil_tc_call_value(vigil_tc_t *tc, vigil_value_t *regs, uint8_t ret,
+                                       uint16_t arg_count, uint8_t arg_base, vigil_error_t *error);
+
+    /* Call an extern function by descriptor constant index. */
+    vigil_status_t vigil_tc_call_extern(vigil_tc_t *tc, vigil_value_t *regs, uint8_t ret,
+                                        uint8_t const_idx, uint8_t arg_count, uint8_t arg_base,
+                                        vigil_error_t *error);
+
 #ifdef __cplusplus
 }
 #endif
