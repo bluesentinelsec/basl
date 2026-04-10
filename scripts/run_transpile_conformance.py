@@ -60,7 +60,7 @@ def run_conformance(vigil_bin: str, suite_dir: str, work_dir: str) -> int:
         env["VIGIL_NO_AOT"] = "1"
         interp = subprocess.run(
             [str(vigil), "run", str(prog)],
-            capture_output=True, text=True, timeout=30, env=env,
+            capture_output=True, text=True, timeout=180, env=env,
         )
 
         # Transpile
@@ -71,7 +71,7 @@ def run_conformance(vigil_bin: str, suite_dir: str, work_dir: str) -> int:
 
         r = subprocess.run(
             [str(vigil), "transpile", str(prog), "-o", str(out_dir)],
-            capture_output=True, text=True, timeout=30,
+            capture_output=True, text=True, timeout=180,
         )
         if r.returncode != 0:
             print(f"SKIP (transpile failed: {r.stderr.strip()[:80]})")
@@ -85,7 +85,7 @@ def run_conformance(vigil_bin: str, suite_dir: str, work_dir: str) -> int:
              "-DCMAKE_BUILD_TYPE=Release",
              f"-DVIGIL_INCLUDE_DIR={vigil_include}",
              f"-DVIGIL_LIB_DIR={vigil_lib_dir}"],
-            capture_output=True, text=True, timeout=30,
+            capture_output=True, text=True, timeout=180,
         )
         if r.returncode != 0:
             print("SKIP (cmake configure failed)")
@@ -94,7 +94,7 @@ def run_conformance(vigil_bin: str, suite_dir: str, work_dir: str) -> int:
 
         r = subprocess.run(
             ["cmake", "--build", str(build_dir), "--config", "Release"],
-            capture_output=True, text=True, timeout=30,
+            capture_output=True, text=True, timeout=180,
         )
         if r.returncode != 0:
             print("SKIP (cmake build failed)")

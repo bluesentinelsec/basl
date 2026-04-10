@@ -3621,6 +3621,9 @@ static const char *transpile_cmake_template =
     "if(WIN32)\n"
     "    target_link_libraries(vigil_rt PRIVATE crypt32)\n"
     "endif()\n"
+    "if(APPLE)\n"
+    "    target_link_libraries(vigil_rt PRIVATE \"-framework Security\" \"-framework CoreFoundation\")\n"
+    "endif()\n"
     "\n"
     "# Vendored deps bundled with vigil_rt\n"
     "if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/vigil_rt/deps/miniz)\n"
@@ -3817,6 +3820,14 @@ static int transpile_write_project(const char *output_dir, const vigil_string_t 
              write_transpile_file(output_dir, "vigil_main.c", vigil_string_c_str(&main_src), vigil_string_length(&main_src), error) &&
              write_transpile_file(output_dir, "CMakeLists.txt", transpile_cmake_template, strlen(transpile_cmake_template), error);
 
+    /* Write embedded runtime sources to vigil_rt/. */
+    if (result)
+    {
+        vigil_status_t st = vigil_transpile_write_runtime(output_dir, error);
+        if (st != VIGIL_STATUS_OK)
+            result = 0;
+    }
+
     vigil_string_free(&main_src);
     return result;
 }
@@ -3888,15 +3899,6 @@ static int cmd_transpile(const char *script_path, const char *output_dir)
 
     if (!transpile_write_project(output_dir, &source, function, &registry, runtime, &error))
     {
-        exit_code = 1;
-        goto cleanup;
-    }
-
-    /* Write embedded runtime/plugin sources to vigil_rt/. */
-    status = vigil_transpile_write_runtime(output_dir, &error);
-    if (status != VIGIL_STATUS_OK)
-    {
-        fprintf(stderr, "failed to write runtime sources: %s\n", vigil_error_message(&error));
         exit_code = 1;
         goto cleanup;
     }
