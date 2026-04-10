@@ -1,0 +1,9 @@
+class Point {
+    i32 x
+    i32 y
+}
+
+fn main() -> i32 {
+    Point p = Point(10, 20)
+    return p.x - 10
+}
