@@ -157,7 +157,7 @@ static vigil_status_t emit_cmp_jmp_i32(vigil_transpile_ctx_t *ctx, const char *o
                                         uint8_t a, uint8_t b, size_t ip)
 {
     vigil_status_t status;
-    EMITF("    if ((int32_t)r[%u].i %s (int32_t)r[%u].i) goto L_%zu;\n", a, b, op_str, ip + 2);
+    EMITF("    if ((int32_t)r[%u].i %s (int32_t)r[%u].i) goto L_%zu;\n", a, op_str, b, ip + 2);
     return VIGIL_STATUS_OK;
 }
 
@@ -165,7 +165,7 @@ static vigil_status_t emit_cmp_jmp_i64(vigil_transpile_ctx_t *ctx, const char *o
                                         uint8_t a, uint8_t b, size_t ip)
 {
     vigil_status_t status;
-    EMITF("    if (r[%u].i %s r[%u].i) goto L_%zu;\n", a, b, op_str, ip + 2);
+    EMITF("    if (r[%u].i %s r[%u].i) goto L_%zu;\n", a, op_str, b, ip + 2);
     return VIGIL_STATUS_OK;
 }
 

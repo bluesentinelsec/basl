@@ -3578,6 +3578,10 @@ static const char *transpile_cmake_template =
     "    list(FILTER VIGIL_PLUGIN_SOURCES EXCLUDE REGEX \"sysquery_linux\\.c$\")\n"
     "    list(FILTER VIGIL_PLUGIN_SOURCES EXCLUDE REGEX \"gui_gtk\\.c$\")\n"
     "endif()\n"
+    "# Exclude stubs when real platform impl is available\n"
+    "if(WIN32 OR APPLE OR UNIX)\n"
+    "    list(FILTER VIGIL_PLUGIN_SOURCES EXCLUDE REGEX \"sysquery_stub\\.c$\")\n"
+    "endif()\n"
     "# Exclude complex sources not needed for basic transpilation\n"
     "list(FILTER VIGIL_RT_SOURCES EXCLUDE REGEX \"(dap|debugger|lsp|editor|embed|package|pkg|coverage|cli_test)\\.c$\")\n"
     "list(FILTER VIGIL_PLUGIN_SOURCES EXCLUDE REGEX \"gui_sdl\\.c$\")\n"
@@ -3607,7 +3611,9 @@ static const char *transpile_cmake_template =
     "add_executable(vigil_app vigil_main.c vigil_generated.c)\n"
     "target_link_libraries(vigil_app PRIVATE vigil_rt)\n"
     "target_include_directories(vigil_app PRIVATE vigil_rt/include vigil_rt/src)\n"
-    "\n"
+    "\n";
+
+static const char *transpile_cmake_template_2 =
     "# System libraries\n"
     "include(CheckLibraryExists)\n"
     "check_library_exists(m floor \"\" NEEDS_LIBM)\n"
@@ -3724,7 +3730,8 @@ static int transpile_write_project(const char *output_dir, const vigil_string_t 
         "#include \"vigil/transpile_rt.h\"\n"
         "#include \"vigil/vigil.h\"\n"
         "#include \"vigil/stdlib.h\"\n"
-        "#include \"vigil/compiler.h\"\n\n", error);
+        "#include \"vigil/compiler.h\"\n"
+        "#include \"plugin_registry.h\"\n\n", error);
 
     /* Embed all source files as C string literals. */
     for (size_t i = 0; i < src_count; i++)
@@ -3788,6 +3795,7 @@ static int transpile_write_project(const char *output_dir, const vigil_string_t 
             "    { vigil_native_registry_t natives;\n"
             "      vigil_native_registry_init(&natives);\n"
             "      vigil_stdlib_register_all(&natives, &error);\n"
+            "      vigil_plugin_register_all(&natives, &error);\n"
             "      vigil_compile_source_with_natives(&registry, sid, &natives, &function, &diagnostics, &error);\n"
             "      vigil_native_registry_free(&natives); }\n"
             "    if (!function) { vigil_diagnostic_list_free(&diagnostics);\n"
@@ -3798,10 +3806,10 @@ static int transpile_write_project(const char *output_dir, const vigil_string_t 
             "    tc.constants = vigil_chunk_constant(vigil_function_object_chunk(function), 0);\n"
             "    tc.constant_count = vigil_chunk_constant_count(vigil_function_object_chunk(function));\n"
             "    vigil_reg_t result = vigil_fn_%zu(&tc);\n"
+            "    vigil_vm_close(&vm);\n"
             "    vigil_object_release(&function);\n"
             "    vigil_diagnostic_list_free(&diagnostics);\n"
             "    vigil_source_registry_free(&registry);\n"
-            "    vigil_vm_close(&vm);\n"
             "    vigil_runtime_close(&runtime);\n"
             "    return (int)result.i;\n"
             "}\n",
@@ -3817,8 +3825,19 @@ static int transpile_write_project(const char *output_dir, const vigil_string_t 
 
     result = write_transpile_file(output_dir, "vigil_generated.c", vigil_string_c_str(transpiled), vigil_string_length(transpiled), error) &&
              write_transpile_file(output_dir, "vigil_generated.h", hdr, strlen(hdr), error) &&
-             write_transpile_file(output_dir, "vigil_main.c", vigil_string_c_str(&main_src), vigil_string_length(&main_src), error) &&
-             write_transpile_file(output_dir, "CMakeLists.txt", transpile_cmake_template, strlen(transpile_cmake_template), error);
+             write_transpile_file(output_dir, "vigil_main.c", vigil_string_c_str(&main_src), vigil_string_length(&main_src), error);
+
+    /* Write CMakeLists.txt from two template parts. */
+    if (result)
+    {
+        vigil_string_t cmake_buf;
+        vigil_string_init(&cmake_buf, runtime);
+        vigil_string_append_cstr(&cmake_buf, transpile_cmake_template, error);
+        vigil_string_append_cstr(&cmake_buf, transpile_cmake_template_2, error);
+        result = write_transpile_file(output_dir, "CMakeLists.txt",
+                                      vigil_string_c_str(&cmake_buf), vigil_string_length(&cmake_buf), error);
+        vigil_string_free(&cmake_buf);
+    }
 
     /* Write embedded runtime sources to vigil_rt/. */
     if (result)

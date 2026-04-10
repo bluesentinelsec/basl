@@ -79,11 +79,15 @@ vigil_status_t vigil_tc_call_native(vigil_tc_t *tc, vigil_value_t *regs, uint8_t
     if (status != VIGIL_STATUS_OK)
         return status;
 
-    /* Copy return values back to registers. */
+    /* Copy return values back to registers and clear stack slots
+       to prevent double-release during vigil_vm_close. */
     {
         size_t ri;
         for (ri = (size_t)arg_base; ri < vm->stack_count; ri++)
+        {
             regs[ri] = vm->stack[ri];
+            vm->stack[ri] = 0;
+        }
     }
 
     return VIGIL_STATUS_OK;
@@ -297,8 +301,18 @@ static vigil_status_t tc_sync_and_call(vigil_tc_t *tc, vigil_value_t *regs, uint
         for (uint8_t i = 0; i < ret_count; i++)
         {
             if (result_base + i < vm->stack_count)
+            {
                 regs[dst_reg + i] = vm->stack[result_base + i];
+                vm->stack[result_base + i] = 0;
+            }
         }
+    }
+
+    /* Clear remaining stack slots to prevent stale references. */
+    {
+        size_t si;
+        for (si = 0; si <= (size_t)top_reg && si < vm->stack_count; si++)
+            vm->stack[si] = 0;
     }
 
     return VIGIL_STATUS_OK;
@@ -450,7 +464,7 @@ vigil_status_t vigil_tc_vm_op(vigil_tc_t *tc, vigil_value_t *regs, uint8_t opcod
           frame->ip = 0;
           status = vigil_vm_op_map_keys_values(vm, frame, &keys_op, error); }
         if (status != VIGIL_STATUS_OK) return status;
-        { size_t rb = (size_t)b; if (rb < vm->stack_count) regs[a] = vm->stack[rb]; }
+        { size_t rb = (size_t)b; if (rb < vm->stack_count) { regs[a] = vm->stack[rb]; vm->stack[rb] = 0; } }
         return VIGIL_STATUS_OK;
     }
     case VREG_MAP_VALUES:
@@ -467,7 +481,7 @@ vigil_status_t vigil_tc_vm_op(vigil_tc_t *tc, vigil_value_t *regs, uint8_t opcod
           frame->ip = 0;
           status = vigil_vm_op_map_keys_values(vm, frame, &vals_op, error); }
         if (status != VIGIL_STATUS_OK) return status;
-        { size_t rb = (size_t)b; if (rb < vm->stack_count) regs[a] = vm->stack[rb]; }
+        { size_t rb = (size_t)b; if (rb < vm->stack_count) { regs[a] = vm->stack[rb]; vm->stack[rb] = 0; } }
         return VIGIL_STATUS_OK;
     }
     case VREG_MAP_KEY_AT:
@@ -676,11 +690,12 @@ vigil_status_t vigil_tc_call_value(vigil_tc_t *tc, vigil_value_t *regs, uint8_t 
     if (status != VIGIL_STATUS_OK)
         return status;
 
-    /* Copy results back. */
+    /* Copy results back and clear stack to prevent double-release. */
     for (i = (size_t)arg_base; i < vm->stack_count && i < (size_t)arg_base + total; i++)
     {
         vigil_value_t rv = vm->stack[i];
         regs[ret + (i - (size_t)arg_base)] = vigil_nanbox_is_int(rv) ? (uint64_t)vigil_nanbox_decode_int(rv) : rv;
+        vm->stack[i] = 0;
     }
     return VIGIL_STATUS_OK;
 }
@@ -735,6 +750,7 @@ vigil_status_t vigil_tc_call_extern(vigil_tc_t *tc, vigil_value_t *regs, uint8_t
     {
         vigil_value_t rv = vm->stack[i];
         regs[ret + (i - (size_t)arg_base)] = vigil_nanbox_is_int(rv) ? (uint64_t)vigil_nanbox_decode_int(rv) : rv;
+        vm->stack[i] = 0;
     }
     return VIGIL_STATUS_OK;
 }
