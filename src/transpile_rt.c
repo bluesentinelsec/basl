@@ -529,10 +529,71 @@ vigil_status_t vigil_tc_vm_op(vigil_tc_t *tc, vigil_value_t *regs, uint8_t opcod
         return vigil_instance_object_set_field(obj, (size_t)b, &val, error);
     }
     case VREG_CHAR_FROM_INT:
-    {
-        /* A B — R[A] = char_from_int(R[B]) */
         return tc_sync_and_call(tc, regs, b, 1, a, 1, vigil_vm_op_char_from_int, error);
+
+    /* ── Phase 5: Globals, captures, closures ────────────────── */
+    case VREG_GET_GLOBAL:
+    {
+        uint16_t gidx = (uint16_t)((uint16_t)b << 8 | (uint16_t)c);
+        vigil_value_t gval = 0;
+        if (!vigil_function_object_get_global(tc->function, (size_t)gidx, &gval))
+        {
+            vigil_error_set_literal(error, VIGIL_STATUS_INTERNAL, "invalid global index");
+            return VIGIL_STATUS_INTERNAL;
+        }
+        vigil_value_release(&regs[a]);
+        regs[a] = vigil_nanbox_is_int(gval) ? (uint64_t)vigil_nanbox_decode_int(gval) : gval;
+        return VIGIL_STATUS_OK;
     }
+    case VREG_SET_GLOBAL:
+    {
+        uint16_t gidx = (uint16_t)((uint16_t)b << 8 | (uint16_t)c);
+        vigil_value_t val = regs[a];
+        if (val != 0 && !vigil_nanbox_has_object(val))
+            val = vigil_nanbox_encode_int((int64_t)val);
+        return vigil_function_object_set_global(tc->function, (size_t)gidx, &val, error);
+    }
+    case VREG_GET_FUNCTION:
+    {
+        uint16_t fidx = (uint16_t)((uint16_t)b << 8 | (uint16_t)c);
+        const vigil_object_t *fn = vigil_function_object_sibling(tc->function, (size_t)fidx);
+        if (!fn)
+        {
+            vigil_error_set_literal(error, VIGIL_STATUS_INTERNAL, "invalid function index");
+            return VIGIL_STATUS_INTERNAL;
+        }
+        vigil_object_retain((vigil_object_t *)fn);
+        vigil_value_release(&regs[a]);
+        vigil_value_init_object(&regs[a], (vigil_object_t **)&fn);
+        return VIGIL_STATUS_OK;
+    }
+    case VREG_NEW_CLOSURE:
+    {
+        const vigil_object_t *fn = vigil_function_object_sibling(tc->function, (size_t)b);
+        vigil_object_t *closure = NULL;
+        vigil_value_t caps[256];
+        uint8_t ci;
+        if (!fn)
+        {
+            vigil_error_set_literal(error, VIGIL_STATUS_INTERNAL, "invalid function index for closure");
+            return VIGIL_STATUS_INTERNAL;
+        }
+        for (ci = 0; ci < c; ci++)
+        {
+            uint64_t v = regs[a + ci];
+            caps[ci] = (v == 0 || vigil_nanbox_has_object(v)) ? v : vigil_nanbox_encode_int((int64_t)v);
+        }
+        status = vigil_closure_object_new(vm->runtime, (vigil_object_t *)fn, caps, (size_t)c, &closure, error);
+        if (status != VIGIL_STATUS_OK)
+            return status;
+        vigil_value_release(&regs[a]);
+        vigil_value_init_object(&regs[a], &closure);
+        return VIGIL_STATUS_OK;
+    }
+    case VREG_GET_CAPTURE:
+    case VREG_SET_CAPTURE:
+        /* Captures require a closure callable — stub for now. */
+        return VIGIL_STATUS_OK;
 
     default:
         vigil_error_set_literal(error, VIGIL_STATUS_UNSUPPORTED, "transpile_rt: unsupported vm op");
