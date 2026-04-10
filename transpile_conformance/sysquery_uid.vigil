@@ -1,0 +1,9 @@
+import "sysquery"
+
+fn main() -> i32 {
+    string uid = sysquery.getuid()
+    if uid.len() > 0 {
+        return 0
+    }
+    return 1
+}

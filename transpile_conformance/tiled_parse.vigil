@@ -1,0 +1,12 @@
+import "tiled"
+
+fn main() -> i32 {
+    string tmj = "{\"width\":10,\"height\":10,\"tilewidth\":16,\"tileheight\":16,\"layers\":[],\"tilesets\":[]}"
+    i32 handle, err e = tiled.parse(tmj, "json")
+    if e.kind() != 0 {
+        return 1
+    }
+    i32 w = tiled.map_width(handle)
+    tiled.close(handle)
+    return w - 10
+}
