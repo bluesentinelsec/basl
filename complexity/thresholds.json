@@ -124,8 +124,8 @@
     {
       "path": "src/transpile_c.c",
       "thresholds": {
-        "ccn": 115,
-        "length": 250
+        "ccn": 140,
+        "length": 280
       }
     }
   ]

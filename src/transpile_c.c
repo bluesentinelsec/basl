@@ -402,6 +402,46 @@ static vigil_status_t emit_instruction(vigil_transpile_ctx_t *ctx, const vigil_r
         break;
     }
 
+    /* ── Phase 3: Collections, arrays, maps ────────────────────── */
+    case VREG_NEW_ARRAY:
+        EMITF("    vigil_tc_vm_op(tc, (uint64_t *)r, %u, %u, %u, %u, NULL);\n",
+              (unsigned)op, (unsigned)a, (unsigned)(bx >> 8), (unsigned)(bx & 0xFF));
+        break;
+    case VREG_NEW_MAP:
+        EMITF("    vigil_tc_vm_op(tc, (uint64_t *)r, %u, %u, %u, %u, NULL);\n",
+              (unsigned)op, (unsigned)a, (unsigned)(bx >> 8), (unsigned)(bx & 0xFF));
+        break;
+    case VREG_GET_INDEX:
+    case VREG_SET_INDEX:
+    case VREG_COLLECTION_SIZE:
+    case VREG_ARRAY_PUSH:
+    case VREG_ARRAY_POP:
+    case VREG_ARRAY_GET_SAFE:
+    case VREG_ARRAY_SET_SAFE:
+    case VREG_ARRAY_SLICE:
+    case VREG_ARRAY_CONTAINS:
+    case VREG_ARRAY_SORT:
+    case VREG_ARRAY_SORT_DESC:
+    case VREG_ARRAY_REVERSE:
+    case VREG_ARRAY_INDEX_OF:
+    case VREG_ARRAY_REMOVE_AT:
+    case VREG_ARRAY_INSERT_AT:
+    case VREG_ARRAY_CLEAR:
+    case VREG_MAP_KEY_AT:
+    case VREG_MAP_VALUE_AT:
+    case VREG_MAP_GET_SAFE:
+    case VREG_MAP_SET_SAFE:
+    case VREG_MAP_REMOVE_SAFE:
+    case VREG_MAP_HAS:
+    case VREG_MAP_KEYS:
+    case VREG_MAP_VALUES:
+    case VREG_MAP_CLEAR:
+    case VREG_DUP:
+    case VREG_RELEASE:
+        EMITF("    vigil_tc_vm_op(tc, (uint64_t *)r, %u, %u, %u, %u, NULL);\n",
+              (unsigned)op, (unsigned)a, (unsigned)b, (unsigned)c);
+        break;
+
     default:
         EMITF("    /* unsupported opcode %u */\n", (unsigned)op);
         break;

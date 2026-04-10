@@ -217,6 +217,14 @@ class TranspileConformanceTest(unittest.TestCase):
                              msg=f"Compiled: {compiled.stderr}")
             self.assertEqual(compiled.stdout.strip(), "hello")
 
+    def test_array_len(self) -> None:
+        self._conformance(
+            "fn main() -> i32 {\n"
+            "    i32 a = [1, 2, 3].len()\n"
+            "    return a - 3\n"
+            "}\n"
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
