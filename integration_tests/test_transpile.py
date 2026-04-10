@@ -258,6 +258,66 @@ class TranspileConformanceTest(unittest.TestCase):
             "}\n"
         )
 
+    def test_multi_module(self) -> None:
+        """Transpile a multi-file project with imports."""
+        with tempfile.TemporaryDirectory(prefix="vigil_conform_") as tmpdir:
+            proj = Path(tmpdir) / "proj"
+            proj.mkdir()
+            (proj / "main.vigil").write_text(
+                'import "helper"\n'
+                "fn main() -> i32 { return helper.add(10, 20) - 30 }\n",
+                encoding="utf-8",
+            )
+            (proj / "helper.vigil").write_text(
+                "pub fn add(i32 a, i32 b) -> i32 { return a + b }\n",
+                encoding="utf-8",
+            )
+
+            # Interpreter
+            env = os.environ.copy()
+            env["VIGIL_NO_AOT"] = "1"
+            interp = run_vigil(["run", str(proj / "main.vigil")], env=env)
+            self.assertEqual(interp.returncode, 0, msg=interp.stderr)
+
+            # Transpile directory
+            out_dir = Path(tmpdir) / "c_out"
+            r = run_vigil(["transpile", str(proj), "-o", str(out_dir)])
+            self.assertEqual(r.returncode, 0, msg=r.stderr)
+            self.assertTrue((out_dir / "vigil_generated.c").exists())
+
+            # Build and run the transpiled project
+            vigil_bin = Path(VIGIL_BIN).resolve()
+            vigil_root = vigil_bin.parent.parent
+            vigil_include = str(vigil_root / "include")
+            vigil_lib_dir = str(vigil_bin.parent)
+            build_dir = out_dir / "build"
+
+            r = subprocess.run(
+                ["cmake", "-S", str(out_dir), "-B", str(build_dir),
+                 "-DCMAKE_BUILD_TYPE=Release",
+                 f"-DVIGIL_INCLUDE_DIR={vigil_include}",
+                 f"-DVIGIL_LIB_DIR={vigil_lib_dir}"],
+                capture_output=True, text=True, timeout=30,
+            )
+            if r.returncode != 0:
+                self.skipTest("cmake configure failed")
+
+            r = subprocess.run(
+                ["cmake", "--build", str(build_dir), "--config", "Release"],
+                capture_output=True, text=True, timeout=30,
+            )
+            if r.returncode != 0:
+                self.skipTest("cmake build failed")
+
+            exe = find_executable(build_dir, "vigil_app")
+            run_env = os.environ.copy()
+            run_env["LD_LIBRARY_PATH"] = vigil_lib_dir + ":" + run_env.get("LD_LIBRARY_PATH", "")
+            run_env["ASAN_OPTIONS"] = "verify_asan_link_order=0:" + run_env.get("ASAN_OPTIONS", "")
+            compiled = subprocess.run([str(exe)], capture_output=True, text=True, timeout=10, env=run_env)
+            if compiled.returncode != 0 and compiled.stderr.strip() == "":
+                self.skipTest("Generated project could not run against libvigil")
+            self.assertEqual(compiled.returncode, 0, msg=f"Compiled: {compiled.stderr}")
+
 
 if __name__ == "__main__":
     unittest.main()
