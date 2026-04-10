@@ -685,3 +685,83 @@ size_t vigil_transpile_entry_index(const vigil_object_t *function)
         return 0;
     return find_entry_index(function, count_siblings(function));
 }
+
+/* ── Embedded runtime extraction ─────────────────────────────────── */
+
+/* Use forward declaration to avoid miniz include path issues. */
+extern int mz_uncompress(unsigned char *pDest, unsigned long *pDest_len,
+                         const unsigned char *pSource, unsigned long source_len);
+#define MZ_OK 0
+
+#include <stdlib.h>
+#include "platform/platform.h"
+
+/* Include the generated embedded sources table. */
+#ifdef VIGIL_HAS_EMBEDDED_SOURCES
+#include "embedded_sources.c"
+#endif
+
+vigil_status_t vigil_transpile_write_runtime(const char *output_dir, vigil_error_t *error)
+{
+#ifndef VIGIL_HAS_EMBEDDED_SOURCES
+    (void)output_dir;
+    vigil_error_set_literal(error, VIGIL_STATUS_UNSUPPORTED, "transpile: no embedded sources available");
+    return VIGIL_STATUS_UNSUPPORTED;
+#else
+    char path_buf[4096];
+    size_t i;
+
+    for (i = 0; i < vigil_embedded_file_count; i++)
+    {
+        const vigil_embedded_file_t *ef = &vigil_embedded_files[i];
+        unsigned char *decompressed;
+        unsigned long dest_len;
+        int mz_status;
+
+        snprintf(path_buf, sizeof(path_buf), "%s/vigil_rt/%s", output_dir, ef->path);
+
+        /* Create parent directories. */
+        {
+            char dir_buf[4096];
+            size_t len;
+            snprintf(dir_buf, sizeof(dir_buf), "%s", path_buf);
+            len = strlen(dir_buf);
+            while (len > 0 && dir_buf[len - 1] != '/' && dir_buf[len - 1] != '\\')
+                len--;
+            if (len > 0)
+            {
+                dir_buf[len - 1] = '\0';
+                vigil_platform_mkdir_p(dir_buf, error);
+            }
+        }
+
+        dest_len = (unsigned long)ef->original_size;
+        {
+            vigil_allocator_t alloc = vigil_default_allocator();
+            decompressed = (unsigned char *)alloc.allocate(alloc.user_data, ef->original_size + 1);
+            if (!decompressed)
+            {
+                vigil_error_set_literal(error, VIGIL_STATUS_OUT_OF_MEMORY, "transpile: out of memory decompressing");
+                return VIGIL_STATUS_OUT_OF_MEMORY;
+            }
+
+            mz_status = mz_uncompress(decompressed, &dest_len, ef->data, (unsigned long)ef->compressed_size);
+            if (mz_status != MZ_OK)
+            {
+                alloc.deallocate(alloc.user_data, decompressed);
+                vigil_error_set_literal(error, VIGIL_STATUS_INTERNAL, "transpile: decompression failed");
+                return VIGIL_STATUS_INTERNAL;
+            }
+
+            {
+                vigil_status_t st = vigil_platform_write_file(path_buf, decompressed, (size_t)dest_len, error);
+                alloc.deallocate(alloc.user_data, decompressed);
+                if (st != VIGIL_STATUS_OK)
+                    return st;
+            }
+        }
+    }
+
+    return VIGIL_STATUS_OK;
+#endif /* VIGIL_HAS_EMBEDDED_SOURCES */
+}

@@ -35,6 +35,13 @@ extern "C"
      */
     VIGIL_API size_t vigil_transpile_entry_index(const vigil_object_t *function);
 
+    /**
+     * Write all embedded runtime/plugin sources to the given output directory.
+     * Creates vigil_rt/ subdirectory with decompressed source files.
+     * Returns VIGIL_STATUS_OK on success.
+     */
+    VIGIL_API vigil_status_t vigil_transpile_write_runtime(const char *output_dir, vigil_error_t *error);
+
 #ifdef __cplusplus
 }
 #endif
