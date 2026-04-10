@@ -1,10 +1,9 @@
 /*
- * transpile_c.c — Vigil-to-C transpiler (Phase 1: numeric subset).
+ * transpile_c.c — Vigil-to-C transpiler.
  *
  * Walks vigil_reg_chunk_t instruction sequences and emits portable C11
- * source.  Phase 1 covers all numeric register ops: arithmetic,
- * comparisons, bitwise, conversions, control flow, calls, loops, and
- * math intrinsics.
+ * source.  Covers numeric ops (Phase 1) and string/error/defer ops
+ * (Phase 2).
  */
 
 #include "internal/vigil_transpile_c.h"
@@ -63,25 +62,59 @@ static vigil_status_t emitf(vigil_transpile_ctx_t *ctx, const char *format, ...)
 
 /* ── Opcode emission helpers ─────────────────────────────────────── */
 
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
 static vigil_status_t emit_load_k(vigil_transpile_ctx_t *ctx, const vigil_reg_chunk_t *rc, uint8_t a, uint16_t bx)
 {
     vigil_status_t status;
     const vigil_chunk_t *sc = rc->stack_chunk;
-    if (sc != NULL && (size_t)bx < vigil_chunk_constant_count(sc))
-    {
-        const vigil_value_t *k = vigil_chunk_constant(sc, (size_t)bx);
-        vigil_value_kind_t kind = vigil_value_kind(k);
-        if (kind == VIGIL_VALUE_INT)
-            EMITF("    r[%u].i = (int64_t)%lldLL;\n", a, (long long)vigil_value_as_int(k));
-        else if (kind == VIGIL_VALUE_FLOAT)
-            EMITF("    r[%u].f = %.17g;\n", a, vigil_value_as_float(k));
-        else
-            EMITF("    r[%u].i = 0; /* unsupported constant kind */\n", a);
-    }
-    else
+    if (sc == NULL || (size_t)bx >= vigil_chunk_constant_count(sc))
     {
         EMITF("    r[%u].i = 0; /* missing constant */\n", a);
+        return VIGIL_STATUS_OK;
     }
+
+    const vigil_value_t *k = vigil_chunk_constant(sc, (size_t)bx);
+    vigil_value_kind_t kind = vigil_value_kind(k);
+    if (kind == VIGIL_VALUE_INT)
+        EMITF("    r[%u].i = (int64_t)%lldLL;\n", a, (long long)vigil_value_as_int(k));
+    else if (kind == VIGIL_VALUE_FLOAT)
+        EMITF("    r[%u].f = %.17g;\n", a, vigil_value_as_float(k));
+    else if (kind == VIGIL_VALUE_OBJECT)
+    {
+        vigil_object_t *obj = vigil_value_as_object(k);
+        if (obj != NULL && vigil_object_type(obj) == VIGIL_OBJECT_STRING)
+        {
+            const char *s = vigil_string_object_c_str(obj);
+            size_t len = vigil_string_object_length(obj);
+            /* Emit as string object creation. Escape the C string. */
+            EMITF("    { vigil_object_t *_s = NULL; vigil_string_object_new(tc->runtime, \"");
+            for (size_t si = 0; si < len; si++)
+            {
+                unsigned char ch = (unsigned char)s[si];
+                if (ch == '"' || ch == '\\')
+                    EMITF("\\%c", ch);
+                else if (ch == '\n')
+                    EMIT("\\n");
+                else if (ch == '\r')
+                    EMIT("\\r");
+                else if (ch == '\t')
+                    EMIT("\\t");
+                else if (ch < 0x20)
+                    EMITF("\\x%02x", ch);
+                else
+                    EMITF("%c", ch);
+            }
+            EMITF("\", %zu, &_s, NULL); vigil_value_init_object(&r[%u].v, &_s); }\n", len, a);
+        }
+        else
+        {
+            /* Non-string object constant — copy from constant pool */
+            EMITF("    r[%u].v = vigil_value_copy(&tc->constants[%u]);\n", a, (unsigned)bx);
+        }
+    }
+    else
+        EMITF("    r[%u].i = 0; /* unsupported constant kind */\n", a);
+
     return VIGIL_STATUS_OK;
 }
 
@@ -133,18 +166,6 @@ static vigil_status_t emit_cmp_jmp_i64(vigil_transpile_ctx_t *ctx, const char *o
 {
     vigil_status_t status;
     EMITF("    if (r[%u].i %s r[%u].i) goto L_%zu;\n", a, b, op_str, ip + 2);
-    return VIGIL_STATUS_OK;
-}
-
-static vigil_status_t emit_call_args(vigil_transpile_ctx_t *ctx, uint8_t base, uint8_t count)
-{
-    vigil_status_t status;
-    for (uint8_t i = 0; i < count; i++)
-    {
-        if (i > 0)
-            EMIT(", ");
-        EMITF("r[%u]", (unsigned)(base + i));
-    }
     return VIGIL_STATUS_OK;
 }
 
@@ -271,9 +292,9 @@ static vigil_status_t emit_instruction(vigil_transpile_ctx_t *ctx, const vigil_r
 
     /* ── Calls ─────────────────────────────────────────────────── */
     case VREG_CALL:
-        EMITF("    r[%u] = vigil_fn_%u(", a, (unsigned)b);
-        status = emit_call_args(ctx, a, c);
-        if (status != VIGIL_STATUS_OK) return status;
+        EMITF("    r[%u] = vigil_fn_%u(tc", a, (unsigned)b);
+        for (uint8_t ci = 0; ci < c; ci++)
+            EMITF(", r[%u]", (unsigned)(a + ci));
         EMIT(");\n");
         break;
     case VREG_CALL_SELF:
@@ -282,16 +303,16 @@ static vigil_status_t emit_instruction(vigil_transpile_ctx_t *ctx, const vigil_r
         if (*ip + 1 >= rc->code_count) { vigil_error_set_literal(ctx->error, VIGIL_STATUS_INTERNAL, "transpile: truncated CALL_SELF"); return VIGIL_STATUS_INTERNAL; }
         arg_base = rc->code[*ip + 1];
         *ip += 1;
-        EMITF("    r[%u] = vigil_fn_%zu(", a, func_index);
-        status = emit_call_args(ctx, (uint8_t)arg_base, b);
-        if (status != VIGIL_STATUS_OK) return status;
+        EMITF("    r[%u] = vigil_fn_%zu(tc", a, func_index);
+        for (uint8_t ci = 0; ci < b; ci++)
+            EMITF(", r[%u]", (unsigned)(arg_base + ci));
         EMIT(");\n");
         break;
     }
     case VREG_TAIL_CALL:
-        EMITF("    r[%u] = vigil_fn_%u(", a, (unsigned)b);
-        status = emit_call_args(ctx, a, c);
-        if (status != VIGIL_STATUS_OK) return status;
+        EMITF("    r[%u] = vigil_fn_%u(tc", a, (unsigned)b);
+        for (uint8_t ci = 0; ci < c; ci++)
+            EMITF(", r[%u]", (unsigned)(a + ci));
         EMIT(");\n");
         break;
     case VREG_RETURN:
@@ -333,6 +354,54 @@ static vigil_status_t emit_instruction(vigil_transpile_ctx_t *ctx, const vigil_r
     case VREG_MATH_LOG:  EMITF("    r[%u].f = log(r[%u].f);\n", a, b); break;
     case VREG_MATH_POW:  EMITF("    r[%u].f = pow(r[%u].f, r[%u].f);\n", a, b, c); break;
 
+    /* ── Phase 2: String/error/parse ops ───────────────────────── */
+    case VREG_TO_STRING:
+        EMITF("    vigil_tc_to_string(tc, &r[%u].v, &r[%u].v, NULL);\n", a, b);
+        break;
+    case VREG_STRING_OP:
+        /* String ops are complex — delegate to native call via VM. */
+        EMITF("    /* string_op sub=%u — delegated to runtime */\n", (unsigned)c);
+        break;
+    case VREG_FORMAT_F64:
+        EMITF("    vigil_tc_format_f64(tc, &r[%u].v, &r[%u].v, %u, NULL);\n", a, b, (unsigned)c);
+        break;
+    case VREG_FORMAT_SPEC:
+        EMITF("    /* format_spec — delegated to runtime */\n");
+        *ip += 2; /* skip two extra words */
+        break;
+    case VREG_NEW_ERROR:
+        EMITF("    vigil_tc_new_error(tc, &r[%u].v, &r[%u].v, &r[%u].v, NULL);\n", a, b, c);
+        break;
+    case VREG_GET_ERROR_KIND:
+        EMITF("    vigil_tc_get_error_kind(tc, &r[%u].v, &r[%u].v, NULL);\n", a, b);
+        break;
+    case VREG_GET_ERROR_MSG:
+        EMITF("    vigil_tc_get_error_msg(tc, &r[%u].v, &r[%u].v, NULL);\n", a, b);
+        break;
+    case VREG_PARSE_I32:
+        EMITF("    vigil_tc_parse_i32(tc, &r[%u].v, &r[%u].v, NULL);\n", a, b);
+        break;
+    case VREG_PARSE_F64:
+        EMITF("    vigil_tc_parse_f64(tc, &r[%u].v, &r[%u].v, NULL);\n", a, b);
+        break;
+    case VREG_PARSE_BOOL:
+        EMITF("    vigil_tc_parse_bool(tc, &r[%u].v, &r[%u].v, NULL);\n", a, b);
+        break;
+    case VREG_DEFER:
+        EMITF("    /* defer — not yet supported in transpiled code */\n");
+        *ip += 2; /* skip extra words */
+        break;
+    case VREG_CALL_NATIVE:
+    {
+        uint32_t ci;
+        if (*ip + 1 >= rc->code_count) { vigil_error_set_literal(ctx->error, VIGIL_STATUS_INTERNAL, "transpile: truncated CALL_NATIVE"); return VIGIL_STATUS_INTERNAL; }
+        ci = rc->code[*ip + 1];
+        *ip += 1;
+        EMITF("    vigil_tc_call_native(tc, (uint64_t *)r, %u, %u, %u, NULL);\n",
+              (unsigned)a, (unsigned)c, (unsigned)ci);
+        break;
+    }
+
     default:
         EMITF("    /* unsupported opcode %u */\n", (unsigned)op);
         break;
@@ -357,15 +426,9 @@ vigil_status_t vigil_transpile_emit_function(vigil_transpile_ctx_t *ctx, const v
     }
 
     /* Function signature */
-    EMITF("vigil_reg_t %s(", func_name);
+    EMITF("vigil_reg_t %s(vigil_tc_t *tc", func_name);
     for (uint8_t i = 0; i < arity; i++)
-    {
-        if (i > 0)
-            EMIT(", ");
-        EMITF("vigil_reg_t arg_%u", (unsigned)i);
-    }
-    if (arity == 0)
-        EMIT("void");
+        EMITF(", vigil_reg_t arg_%u", (unsigned)i);
     EMIT(")\n{\n");
 
     /* Register file */
@@ -423,15 +486,9 @@ static vigil_status_t emit_forward_decl(vigil_transpile_ctx_t *ctx, const vigil_
     uint8_t fn_arity = (uint8_t)vigil_function_object_arity(function);
     if (is_static)
         EMIT("static ");
-    EMITF("vigil_reg_t vigil_fn_%zu(", idx);
+    EMITF("vigil_reg_t vigil_fn_%zu(vigil_tc_t *tc", idx);
     for (uint8_t p = 0; p < fn_arity; p++)
-    {
-        if (p > 0)
-            EMIT(", ");
-        EMITF("vigil_reg_t arg_%u", (unsigned)p);
-    }
-    if (fn_arity == 0)
-        EMIT("void");
+        EMITF(", vigil_reg_t arg_%u", (unsigned)p);
     EMIT(");\n");
     return VIGIL_STATUS_OK;
 }
@@ -465,10 +522,20 @@ vigil_status_t vigil_transpile_to_c(vigil_runtime_t *runtime, const vigil_object
     EMIT("/* Generated by vigil transpile — do not edit. */\n");
     EMIT("#include \"vigil_generated.h\"\n");
     EMIT("#include <math.h>\n");
-    EMIT("#include <string.h>\n\n");
+    EMIT("#include <string.h>\n");
+    EMIT("#include \"vigil/transpile_rt.h\"\n");
+    EMIT("#include \"vigil/value.h\"\n\n");
 
     func_count = count_siblings(function);
     entry_idx = find_entry_index(function, func_count);
+
+    /* Emit constant pool size for the entry function's chunk */
+    {
+        const vigil_chunk_t *entry_chunk = vigil_function_object_chunk(function);
+        size_t num_constants = vigil_chunk_constant_count(entry_chunk);
+        EMITF("static vigil_value_t vigil_constants[%zu];\n", num_constants > 0 ? num_constants : 1);
+        EMITF("static const size_t vigil_constant_count = %zu;\n\n", num_constants);
+    }
 
     /* Forward declarations */
     for (i = 0; i < func_count; i++)

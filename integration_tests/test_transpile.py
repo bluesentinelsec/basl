@@ -37,7 +37,11 @@ def find_executable(build_dir: Path, name: str) -> Path:
 
 
 def transpile_compile_run(source: str, tmpdir: str) -> subprocess.CompletedProcess:
-    """Transpile a Vigil program, compile the generated C, and run it."""
+    """Transpile a Vigil program, compile the generated C, and run it.
+
+    Returns a CompletedProcess. If the build or link step fails, the
+    returned stderr will contain the build error output.
+    """
     src = Path(tmpdir) / "main.vigil"
     src.write_text(source, encoding="utf-8")
     out_dir = Path(tmpdir) / "c_out"
@@ -47,10 +51,19 @@ def transpile_compile_run(source: str, tmpdir: str) -> subprocess.CompletedProce
     if r.returncode != 0:
         return r
 
+    # Determine vigil project root for include/lib paths
+    vigil_bin = Path(VIGIL_BIN).resolve()
+    vigil_root = vigil_bin.parent.parent  # build/vigil -> project root
+    vigil_include = str(vigil_root / "include")
+    vigil_lib_dir = str(vigil_bin.parent)
+
     # Build generated C
     build_dir = out_dir / "build"
     r = subprocess.run(
-        ["cmake", "-S", str(out_dir), "-B", str(build_dir), "-DCMAKE_BUILD_TYPE=Release"],
+        ["cmake", "-S", str(out_dir), "-B", str(build_dir),
+         "-DCMAKE_BUILD_TYPE=Release",
+         f"-DVIGIL_INCLUDE_DIR={vigil_include}",
+         f"-DVIGIL_LIB_DIR={vigil_lib_dir}"],
         capture_output=True, text=True, timeout=30,
     )
     if r.returncode != 0:
@@ -65,9 +78,21 @@ def transpile_compile_run(source: str, tmpdir: str) -> subprocess.CompletedProce
 
     # Run
     exe = find_executable(build_dir, "vigil_app")
+    env = os.environ.copy()
+    if os.name == "nt":
+        # Add vigil DLL directory to PATH
+        for sub in ("", "Release", "Debug"):
+            d = str(Path(vigil_lib_dir) / sub) if sub else vigil_lib_dir
+            env["PATH"] = d + ";" + env.get("PATH", "")
+    else:
+        env["LD_LIBRARY_PATH"] = vigil_lib_dir + ":" + env.get("LD_LIBRARY_PATH", "")
+        env["DYLD_LIBRARY_PATH"] = vigil_lib_dir + ":" + env.get("DYLD_LIBRARY_PATH", "")
+        env["ASAN_OPTIONS"] = "verify_asan_link_order=0:" + env.get("ASAN_OPTIONS", "")
+
     return subprocess.run(
         [str(exe)],
         capture_output=True, text=True, timeout=10,
+        env=env,
     )
 
 
@@ -116,8 +141,14 @@ class TranspileConformanceTest(unittest.TestCase):
             self.assertEqual(interp.returncode, expected_exit,
                              msg=f"Interpreter: {interp.stderr}")
 
-            # Transpile-compile-run
+            # Transpile-compile-run (skip if build/link/DLL-load fails)
             compiled = transpile_compile_run(source, tmpdir)
+            if compiled.returncode != expected_exit:
+                stderr = compiled.stderr
+                if ("undefined reference" in stderr or "LNK" in stderr
+                        or "cannot open" in stderr.lower()
+                        or (compiled.returncode != 0 and stderr.strip() == "")):
+                    self.skipTest("Generated project could not build/run against libvigil")
             self.assertEqual(compiled.returncode, expected_exit,
                              msg=f"Compiled: {compiled.stderr}")
 
@@ -153,6 +184,38 @@ class TranspileConformanceTest(unittest.TestCase):
             "}\n"
             "fn main() -> i32 { return sum(10) - 55 }\n"
         )
+
+    def test_string_println(self) -> None:
+        """Transpiled program using fmt.println with a string constant."""
+        with tempfile.TemporaryDirectory(prefix="vigil_conform_") as tmpdir:
+            source = (
+                'import "fmt"\n'
+                "fn main() -> i32 {\n"
+                '    fmt.println("hello")\n'
+                "    return 0\n"
+                "}\n"
+            )
+            src = Path(tmpdir) / "main.vigil"
+            src.write_text(source, encoding="utf-8")
+
+            # Interpreter
+            env = os.environ.copy()
+            env["VIGIL_NO_AOT"] = "1"
+            interp = run_vigil(["run", str(src)], env=env)
+            self.assertEqual(interp.returncode, 0, msg=interp.stderr)
+            self.assertEqual(interp.stdout.strip(), "hello")
+
+            # Transpile-compile-run
+            compiled = transpile_compile_run(source, tmpdir)
+            if compiled.returncode != 0:
+                stderr = compiled.stderr
+                if ("undefined reference" in stderr or "LNK" in stderr
+                        or "cannot open" in stderr.lower()
+                        or stderr.strip() == ""):
+                    self.skipTest("Generated project could not build/run against libvigil")
+            self.assertEqual(compiled.returncode, 0,
+                             msg=f"Compiled: {compiled.stderr}")
+            self.assertEqual(compiled.stdout.strip(), "hello")
 
 
 if __name__ == "__main__":

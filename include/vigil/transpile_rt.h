@@ -1,0 +1,71 @@
+/*
+ * vigil_transpile_rt.h — Runtime helpers for transpiled C code.
+ *
+ * These functions bridge between the transpiler's register-based code
+ * and the Vigil runtime.  They are linked into the generated project
+ * alongside libvigil.
+ */
+#ifndef VIGIL_TRANSPILE_RT_H
+#define VIGIL_TRANSPILE_RT_H
+
+#include "vigil/runtime.h"
+#include "vigil/status.h"
+#include "vigil/value.h"
+#include "vigil/vm.h"
+
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
+    /* Execution context passed to every transpiled function. */
+    typedef struct vigil_tc
+    {
+        vigil_vm_t *vm;
+        vigil_runtime_t *runtime;
+        const vigil_value_t *constants;
+        size_t constant_count;
+        const vigil_object_t *function;
+    } vigil_tc_t;
+
+    /* Convert a value to its string representation. */
+    vigil_status_t vigil_tc_to_string(vigil_tc_t *tc, vigil_value_t *dst, const vigil_value_t *src,
+                                      vigil_error_t *error);
+
+    /* Call a native function by constant-pool index. */
+    vigil_status_t vigil_tc_call_native(vigil_tc_t *tc, vigil_value_t *regs, uint8_t arg_base,
+                                        uint8_t arg_count, uint32_t const_idx, vigil_error_t *error);
+
+    /* Create a new error object. */
+    vigil_status_t vigil_tc_new_error(vigil_tc_t *tc, vigil_value_t *dst, const vigil_value_t *msg,
+                                      const vigil_value_t *kind, vigil_error_t *error);
+
+    /* Get error kind (i64). */
+    vigil_status_t vigil_tc_get_error_kind(vigil_tc_t *tc, vigil_value_t *dst, const vigil_value_t *err_val,
+                                           vigil_error_t *error);
+
+    /* Get error message (string). */
+    vigil_status_t vigil_tc_get_error_msg(vigil_tc_t *tc, vigil_value_t *dst, const vigil_value_t *err_val,
+                                          vigil_error_t *error);
+
+    /* Format f64 with precision. */
+    vigil_status_t vigil_tc_format_f64(vigil_tc_t *tc, vigil_value_t *dst, const vigil_value_t *val,
+                                       uint8_t precision, vigil_error_t *error);
+
+    /* Parse string to i32 (returns value + error in dst[0], dst[1]). */
+    vigil_status_t vigil_tc_parse_i32(vigil_tc_t *tc, vigil_value_t *dst, const vigil_value_t *src,
+                                      vigil_error_t *error);
+
+    /* Parse string to f64 (returns value + error in dst[0], dst[1]). */
+    vigil_status_t vigil_tc_parse_f64(vigil_tc_t *tc, vigil_value_t *dst, const vigil_value_t *src,
+                                      vigil_error_t *error);
+
+    /* Parse string to bool (returns value + error in dst[0], dst[1]). */
+    vigil_status_t vigil_tc_parse_bool(vigil_tc_t *tc, vigil_value_t *dst, const vigil_value_t *src,
+                                       vigil_error_t *error);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* VIGIL_TRANSPILE_RT_H */
