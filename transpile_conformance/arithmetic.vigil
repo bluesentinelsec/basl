@@ -1,0 +1,5 @@
+fn main() -> i32 {
+    i32 a = 10
+    i32 b = 3
+    return (a + b) - 13
+}

@@ -1,0 +1,4 @@
+fn main() -> i32 {
+    i32 a = [1, 2, 3].len()
+    return a - 3
+}
