@@ -62,6 +62,7 @@ static vigil_status_t emitf(vigil_transpile_ctx_t *ctx, const char *format, ...)
 
 /* ── Opcode emission helpers ─────────────────────────────────────── */
 
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
 static vigil_status_t emit_load_k(vigil_transpile_ctx_t *ctx, const vigil_reg_chunk_t *rc, uint8_t a, uint16_t bx)
 {
     vigil_status_t status;

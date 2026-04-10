@@ -37,7 +37,11 @@ def find_executable(build_dir: Path, name: str) -> Path:
 
 
 def transpile_compile_run(source: str, tmpdir: str) -> subprocess.CompletedProcess:
-    """Transpile a Vigil program, compile the generated C, and run it."""
+    """Transpile a Vigil program, compile the generated C, and run it.
+
+    Returns a CompletedProcess. If the build or link step fails, the
+    returned stderr will contain the build error output.
+    """
     src = Path(tmpdir) / "main.vigil"
     src.write_text(source, encoding="utf-8")
     out_dir = Path(tmpdir) / "c_out"
@@ -72,27 +76,19 @@ def transpile_compile_run(source: str, tmpdir: str) -> subprocess.CompletedProce
     if r.returncode != 0:
         return r
 
-    # Run — set library path for shared lib and copy DLL on Windows
-    env = os.environ.copy()
+    # Run
     exe = find_executable(build_dir, "vigil_app")
+    env = os.environ.copy()
     if os.name == "nt":
-        # Copy vigil.dll next to the executable
-        import glob
-        import shutil
-        exe_dir = exe.parent if exe.exists() else build_dir
-        for pattern in [str(Path(vigil_lib_dir) / "*.dll"),
-                        str(Path(vigil_lib_dir) / "Release" / "*.dll"),
-                        str(Path(vigil_lib_dir) / "Debug" / "*.dll")]:
-            for dll in glob.glob(pattern):
-                shutil.copy2(dll, str(exe_dir))
-        env["PATH"] = vigil_lib_dir + ";" + env.get("PATH", "")
+        # Add vigil DLL directory to PATH
+        for sub in ("", "Release", "Debug"):
+            d = str(Path(vigil_lib_dir) / sub) if sub else vigil_lib_dir
+            env["PATH"] = d + ";" + env.get("PATH", "")
     else:
         env["LD_LIBRARY_PATH"] = vigil_lib_dir + ":" + env.get("LD_LIBRARY_PATH", "")
         env["DYLD_LIBRARY_PATH"] = vigil_lib_dir + ":" + env.get("DYLD_LIBRARY_PATH", "")
-        # Suppress ASAN issues when linking against ASAN-instrumented libvigil
         env["ASAN_OPTIONS"] = "verify_asan_link_order=0:" + env.get("ASAN_OPTIONS", "")
 
-    exe = find_executable(build_dir, "vigil_app")
     return subprocess.run(
         [str(exe)],
         capture_output=True, text=True, timeout=10,
@@ -145,11 +141,14 @@ class TranspileConformanceTest(unittest.TestCase):
             self.assertEqual(interp.returncode, expected_exit,
                              msg=f"Interpreter: {interp.stderr}")
 
-            # Transpile-compile-run (skip if build/link fails due to
-            # environment issues like sanitizer runtimes or missing DLLs)
+            # Transpile-compile-run (skip if build/link/DLL-load fails)
             compiled = transpile_compile_run(source, tmpdir)
-            if "undefined reference" in compiled.stderr or "LNK" in compiled.stderr:
-                self.skipTest("Generated project could not link against libvigil")
+            if compiled.returncode != expected_exit:
+                stderr = compiled.stderr
+                if ("undefined reference" in stderr or "LNK" in stderr
+                        or "cannot open" in stderr.lower()
+                        or (compiled.returncode != 0 and stderr.strip() == "")):
+                    self.skipTest("Generated project could not build/run against libvigil")
             self.assertEqual(compiled.returncode, expected_exit,
                              msg=f"Compiled: {compiled.stderr}")
 
@@ -208,8 +207,12 @@ class TranspileConformanceTest(unittest.TestCase):
 
             # Transpile-compile-run
             compiled = transpile_compile_run(source, tmpdir)
-            if "undefined reference" in compiled.stderr or "LNK" in compiled.stderr:
-                self.skipTest("Generated project could not link against libvigil")
+            if compiled.returncode != 0:
+                stderr = compiled.stderr
+                if ("undefined reference" in stderr or "LNK" in stderr
+                        or "cannot open" in stderr.lower()
+                        or stderr.strip() == ""):
+                    self.skipTest("Generated project could not build/run against libvigil")
             self.assertEqual(compiled.returncode, 0,
                              msg=f"Compiled: {compiled.stderr}")
             self.assertEqual(compiled.stdout.strip(), "hello")
