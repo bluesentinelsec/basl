@@ -127,6 +127,14 @@
         "ccn": 140,
         "length": 280
       }
+    },
+    {
+      "path": "src/transpile_rt.c",
+      "thresholds": {
+        "ccn": 80,
+        "length": 200,
+        "param": 8
+      }
     }
   ]
 }
