@@ -3806,10 +3806,10 @@ static int transpile_write_project(const char *output_dir, const vigil_string_t 
             "    tc.constants = vigil_chunk_constant(vigil_function_object_chunk(function), 0);\n"
             "    tc.constant_count = vigil_chunk_constant_count(vigil_function_object_chunk(function));\n"
             "    vigil_reg_t result = vigil_fn_%zu(&tc);\n"
+            "    vigil_vm_close(&vm);\n"
             "    vigil_object_release(&function);\n"
             "    vigil_diagnostic_list_free(&diagnostics);\n"
             "    vigil_source_registry_free(&registry);\n"
-            "    vigil_vm_close(&vm);\n"
             "    vigil_runtime_close(&runtime);\n"
             "    return (int)result.i;\n"
             "}\n",
