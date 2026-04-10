@@ -3587,9 +3587,6 @@ static const char *transpile_cmake_template =
     "list(FILTER VIGIL_PLUGIN_SOURCES EXCLUDE REGEX \"gui_sdl\\.c$\")\n"
     "# Exclude plugins that need external deps not yet available\n"
     "list(FILTER VIGIL_PLUGIN_SOURCES EXCLUDE REGEX \"audio\\.c$\")\n"
-    "list(FILTER VIGIL_PLUGIN_SOURCES EXCLUDE REGEX \"sdl\\.c$\")\n"
-    "list(FILTER VIGIL_PLUGIN_SOURCES EXCLUDE REGEX \"vigil_image\\.c$\")\n"
-    "list(FILTER VIGIL_PLUGIN_SOURCES EXCLUDE REGEX \"vigil_font\\.c$\")\n"
     "list(FILTER VIGIL_PLUGIN_SOURCES EXCLUDE REGEX \"gui\")\n"
     "# Exclude stdlib modules with complex deps\n"
     "list(FILTER VIGIL_RT_STDLIB EXCLUDE REGEX \"(ffi|thread|http|net|readline)\\.c$\")\n"
@@ -3644,6 +3641,24 @@ static const char *transpile_cmake_template_2 =
     "    add_subdirectory(vigil_rt/deps/crypto)\n"
     "    target_link_libraries(vigil_rt PRIVATE vigil_crypto)\n"
     "endif()\n";
+
+static const char *transpile_cmake_template_3 =
+    "\n# SDL3 via FetchContent (for sdl plugin)\n"
+    "include(FetchContent)\n"
+    "set(SDL_SHARED OFF CACHE BOOL \"\" FORCE)\n"
+    "set(SDL_STATIC ON CACHE BOOL \"\" FORCE)\n"
+    "set(SDL_TEST_LIBRARY OFF CACHE BOOL \"\" FORCE)\n"
+    "set(SDL_INSTALL OFF CACHE BOOL \"\" FORCE)\n"
+    "set(SDL_PIPEWIRE OFF CACHE BOOL \"\" FORCE)\n"
+    "FetchContent_Declare(SDL3\n"
+    "    GIT_REPOSITORY https://github.com/libsdl-org/SDL.git\n"
+    "    GIT_TAG release-3.4.2\n"
+    "    GIT_SHALLOW TRUE\n"
+    ")\n"
+    "FetchContent_MakeAvailable(SDL3)\n"
+    "target_link_libraries(vigil_rt PRIVATE SDL3::SDL3-static)\n"
+    "# stb headers for image/font loading\n"
+    "target_include_directories(vigil_rt PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/vigil_rt/deps)\n";
 
 static void write_transpile_header(char *buf, size_t buf_size, size_t entry_idx, size_t arity)
 {
@@ -3834,6 +3849,7 @@ static int transpile_write_project(const char *output_dir, const vigil_string_t 
         vigil_string_init(&cmake_buf, runtime);
         vigil_string_append_cstr(&cmake_buf, transpile_cmake_template, error);
         vigil_string_append_cstr(&cmake_buf, transpile_cmake_template_2, error);
+        vigil_string_append_cstr(&cmake_buf, transpile_cmake_template_3, error);
         result = write_transpile_file(output_dir, "CMakeLists.txt",
                                       vigil_string_c_str(&cmake_buf), vigil_string_length(&cmake_buf), error);
         vigil_string_free(&cmake_buf);
