@@ -78,7 +78,15 @@ add_library(vigil_core OBJECT
     src/pkg.c
     src/transpile_c.c
     src/transpile_rt.c
+    ${CMAKE_BINARY_DIR}/generated/embedded_sources.c
 )
+
+# Suppress warnings for the auto-generated embedded sources file.
+set_source_files_properties(
+    ${CMAKE_BINARY_DIR}/generated/embedded_sources.c
+    PROPERTIES COMPILE_OPTIONS "-w"
+)
+target_compile_definitions(vigil_core PRIVATE VIGIL_HAS_EMBEDDED_SOURCES)
 
 target_include_directories(vigil_core
     PUBLIC
@@ -102,3 +110,23 @@ endif()
 
 # Objects may end up in a shared library, so they need PIC on Linux.
 set_target_properties(vigil_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
+# ── Embedded sources for transpiler ──────────────────────────────────
+find_package(Python3 COMPONENTS Interpreter QUIET)
+if(Python3_FOUND)
+    add_custom_command(
+        OUTPUT ${CMAKE_BINARY_DIR}/generated/embedded_sources.c
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/scripts/embed_plugin_sources.py
+                --root ${CMAKE_CURRENT_SOURCE_DIR}
+                --output ${CMAKE_BINARY_DIR}/generated/embedded_sources.c
+        DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/scripts/embed_plugin_sources.py
+        COMMENT "Generating embedded plugin/runtime sources"
+        VERBATIM
+    )
+else()
+    # Fallback: use pre-generated file if Python3 not available
+    if(NOT EXISTS ${CMAKE_BINARY_DIR}/generated/embedded_sources.c)
+        file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/generated/embedded_sources.c
+             DESTINATION ${CMAKE_BINARY_DIR}/generated/)
+    endif()
+endif()

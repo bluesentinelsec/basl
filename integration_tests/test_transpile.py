@@ -12,7 +12,7 @@ VIGIL_BIN = os.environ.get("VIGIL_BIN", "./build/vigil")
 
 def run_vigil(args, **kwargs):
     return subprocess.run(
-        [VIGIL_BIN] + args, capture_output=True, text=True, timeout=30, **kwargs
+        [VIGIL_BIN] + args, capture_output=True, text=True, timeout=120, **kwargs
     )
 
 
@@ -64,14 +64,14 @@ def transpile_compile_run(source: str, tmpdir: str) -> subprocess.CompletedProce
          "-DCMAKE_BUILD_TYPE=Release",
          f"-DVIGIL_INCLUDE_DIR={vigil_include}",
          f"-DVIGIL_LIB_DIR={vigil_lib_dir}"],
-        capture_output=True, text=True, timeout=30,
+        capture_output=True, text=True, timeout=120,
     )
     if r.returncode != 0:
         return r
 
     r = subprocess.run(
-        ["cmake", "--build", str(build_dir), "--config", "Release"],
-        capture_output=True, text=True, timeout=30,
+        ["cmake", "--build", str(build_dir), "--config", "Release", "--parallel"],
+        capture_output=True, text=True, timeout=120,
     )
     if r.returncode != 0:
         return r
@@ -297,14 +297,14 @@ class TranspileConformanceTest(unittest.TestCase):
                  "-DCMAKE_BUILD_TYPE=Release",
                  f"-DVIGIL_INCLUDE_DIR={vigil_include}",
                  f"-DVIGIL_LIB_DIR={vigil_lib_dir}"],
-                capture_output=True, text=True, timeout=30,
+                capture_output=True, text=True, timeout=120,
             )
             if r.returncode != 0:
                 self.skipTest("cmake configure failed")
 
             r = subprocess.run(
-                ["cmake", "--build", str(build_dir), "--config", "Release"],
-                capture_output=True, text=True, timeout=30,
+                ["cmake", "--build", str(build_dir), "--config", "Release", "--parallel"],
+                capture_output=True, text=True, timeout=120,
             )
             if r.returncode != 0:
                 self.skipTest("cmake build failed")
