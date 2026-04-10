@@ -79,6 +79,11 @@ extern "C"
     vigil_status_t vigil_tc_vm_op(vigil_tc_t *tc, vigil_value_t *regs, uint8_t opcode,
                                   uint8_t a, uint8_t b, uint8_t c, vigil_error_t *error);
 
+    /* Create a new class instance with nanbox-encoded field values. */
+    vigil_status_t vigil_tc_new_instance(vigil_tc_t *tc, vigil_value_t *regs, uint8_t dest,
+                                         uint16_t class_idx, uint8_t fields_base, uint8_t field_count,
+                                         vigil_error_t *error);
+
 #ifdef __cplusplus
 }
 #endif

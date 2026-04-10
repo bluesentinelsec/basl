@@ -273,12 +273,13 @@ static vigil_status_t tc_sync_and_call(vigil_tc_t *tc, vigil_value_t *regs, uint
             return status;
     }
 
-    /* Sync registers to VM stack, nanbox-encoding raw integers. */
+    /* Sync registers to VM stack, nanbox-encoding raw integers.
+       Only object pointers and nil (0) are already nanboxed; everything
+       else is a raw int64_t or double from Phase 1 arithmetic. */
     for (size_t i = 0; i <= (size_t)top_reg; i++)
     {
         uint64_t v = regs[i];
-        if (vigil_nanbox_has_object(v) || vigil_nanbox_is_bool(v) || vigil_nanbox_is_int(v) ||
-            vigil_nanbox_is_uint(v) || vigil_nanbox_is_double(v) || v == 0)
+        if (v == 0 || vigil_nanbox_has_object(v))
             vm->stack[i] = v;
         else
             vm->stack[i] = vigil_nanbox_encode_int((int64_t)v);
@@ -331,11 +332,10 @@ vigil_status_t vigil_tc_vm_op(vigil_tc_t *tc, vigil_value_t *regs, uint8_t opcod
             for (uint16_t idx = 0; idx < count; idx++)
             {
                 uint64_t v = regs[a + idx];
-                if (vigil_nanbox_has_object(v) || vigil_nanbox_is_bool(v) || vigil_nanbox_is_int(v) ||
-                    vigil_nanbox_is_uint(v) || v == 0)
-                    items_buf[idx] = v; /* already nanboxed */
+                if (v == 0 || vigil_nanbox_has_object(v))
+                    items_buf[idx] = v;
                 else
-                    items_buf[idx] = vigil_nanbox_encode_int((int64_t)v); /* raw int → nanbox */
+                    items_buf[idx] = vigil_nanbox_encode_int((int64_t)v);
             }
             items = items_buf;
         }
@@ -358,11 +358,9 @@ vigil_status_t vigil_tc_vm_op(vigil_tc_t *tc, vigil_value_t *regs, uint8_t opcod
             vigil_value_t key = regs[a + idx * 2];
             vigil_value_t val = regs[a + idx * 2 + 1];
             /* Nanbox-encode raw integers if needed. */
-            if (!vigil_nanbox_has_object(key) && !vigil_nanbox_is_bool(key) &&
-                !vigil_nanbox_is_int(key) && !vigil_nanbox_is_uint(key) && key != 0)
+            if (key != 0 && !vigil_nanbox_has_object(key))
                 key = vigil_nanbox_encode_int((int64_t)key);
-            if (!vigil_nanbox_has_object(val) && !vigil_nanbox_is_bool(val) &&
-                !vigil_nanbox_is_int(val) && !vigil_nanbox_is_uint(val) && val != 0)
+            if (val != 0 && !vigil_nanbox_has_object(val))
                 val = vigil_nanbox_encode_int((int64_t)val);
             status = vigil_map_object_set(map, &key, &val, error);
             if (status != VIGIL_STATUS_OK)
@@ -487,8 +485,88 @@ vigil_status_t vigil_tc_vm_op(vigil_tc_t *tc, vigil_value_t *regs, uint8_t opcod
         vigil_value_release(&regs[a]);
         return VIGIL_STATUS_OK;
 
+    /* ── Phase 4: Classes, interfaces ────────────────────────── */
+    case VREG_NEW_INSTANCE:
+        /* Handled specially by the transpiler (two-word instruction). */
+        vigil_error_set_literal(error, VIGIL_STATUS_UNSUPPORTED, "transpile_rt: NEW_INSTANCE via vm_op not supported");
+        return VIGIL_STATUS_UNSUPPORTED;
+    case VREG_GET_FIELD:
+    {
+        vigil_object_t *obj;
+        vigil_value_t fv = 0;
+        if (!vigil_nanbox_is_object(regs[b]))
+        {
+            vigil_error_set_literal(error, VIGIL_STATUS_INVALID_ARGUMENT, "field access requires instance");
+            return VIGIL_STATUS_INVALID_ARGUMENT;
+        }
+        obj = (vigil_object_t *)vigil_nanbox_decode_ptr(regs[b]);
+        if (!vigil_instance_object_get_field(obj, (size_t)c, &fv))
+        {
+            vigil_error_set_literal(error, VIGIL_STATUS_INVALID_ARGUMENT, "invalid field index");
+            return VIGIL_STATUS_INVALID_ARGUMENT;
+        }
+        vigil_value_release(&regs[a]);
+        /* Decode nanboxed integers to raw int64_t for arithmetic compatibility. */
+        if (vigil_nanbox_is_int(fv))
+            regs[a] = (uint64_t)vigil_nanbox_decode_int(fv);
+        else
+            regs[a] = fv;
+        return VIGIL_STATUS_OK;
+    }
+    case VREG_SET_FIELD:
+    {
+        vigil_object_t *obj;
+        vigil_value_t val = regs[c];
+        if (!vigil_nanbox_is_object(regs[a]))
+        {
+            vigil_error_set_literal(error, VIGIL_STATUS_INVALID_ARGUMENT, "field assignment requires instance");
+            return VIGIL_STATUS_INVALID_ARGUMENT;
+        }
+        /* Nanbox-encode raw integer if needed. */
+        if (val != 0 && !vigil_nanbox_has_object(val))
+            val = vigil_nanbox_encode_int((int64_t)val);
+        obj = (vigil_object_t *)vigil_nanbox_decode_ptr(regs[a]);
+        return vigil_instance_object_set_field(obj, (size_t)b, &val, error);
+    }
+    case VREG_CHAR_FROM_INT:
+    {
+        /* A B — R[A] = char_from_int(R[B]) */
+        return tc_sync_and_call(tc, regs, b, 1, a, 1, vigil_vm_op_char_from_int, error);
+    }
+
     default:
         vigil_error_set_literal(error, VIGIL_STATUS_UNSUPPORTED, "transpile_rt: unsupported vm op");
         return VIGIL_STATUS_UNSUPPORTED;
     }
+}
+
+vigil_status_t vigil_tc_new_instance(vigil_tc_t *tc, vigil_value_t *regs, uint8_t dest,
+                                     uint16_t class_idx, uint8_t fields_base, uint8_t field_count,
+                                     vigil_error_t *error)
+{
+    vigil_object_t *inst = NULL;
+    vigil_value_t fields_buf[256];
+    vigil_value_t *fields = NULL;
+    vigil_status_t status;
+
+    if (field_count > 0)
+    {
+        for (uint8_t i = 0; i < field_count; i++)
+        {
+            uint64_t v = regs[fields_base + i];
+            if (v == 0 || vigil_nanbox_has_object(v))
+                fields_buf[i] = v;
+            else
+                fields_buf[i] = vigil_nanbox_encode_int((int64_t)v);
+        }
+        fields = fields_buf;
+    }
+
+    status = vigil_instance_object_new(tc->runtime, (size_t)class_idx, fields, (size_t)field_count, &inst, error);
+    if (status != VIGIL_STATUS_OK)
+        return status;
+
+    vigil_value_release(&regs[dest]);
+    vigil_value_init_object(&regs[dest], &inst);
+    return VIGIL_STATUS_OK;
 }

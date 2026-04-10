@@ -414,6 +414,35 @@ TEST(TranspileTest, ArrayNewEmitsVmOp)
     vigil_runtime_close(&runtime);
 }
 
+TEST(TranspileTest, ClassFieldEmitsVmOp)
+{
+    vigil_runtime_t *runtime = NULL;
+    vigil_string_t out;
+    vigil_error_t error = {0};
+
+    ASSERT_EQ(vigil_runtime_open(&runtime, NULL, &error), VIGIL_STATUS_OK);
+    vigil_string_init(&out, runtime);
+
+    ASSERT_EQ(CompileAndTranspile(runtime,
+                                  "class Point {\n"
+                                  "    i32 x\n"
+                                  "    i32 y\n"
+                                  "}\n"
+                                  "fn main() -> i32 {\n"
+                                  "    Point p = Point(10, 20)\n"
+                                  "    return p.x - 10\n"
+                                  "}\n",
+                                  &out, &error),
+              VIGIL_STATUS_OK);
+
+    const char *c = vigil_string_c_str(&out);
+    EXPECT_TRUE(strstr(c, "vigil_tc_new_instance") != NULL);
+    EXPECT_TRUE(strstr(c, "vigil_tc_vm_op") != NULL);
+
+    vigil_string_free(&out);
+    vigil_runtime_close(&runtime);
+}
+
 /* ── Registration ────────────────────────────────────────────────── */
 
 void register_transpile_tests(void)
@@ -434,4 +463,5 @@ void register_transpile_tests(void)
     REGISTER_TEST(TranspileTest, NativeCallEmitsTcCallNative);
     REGISTER_TEST(TranspileTest, GeneratedCodeIncludesTranspileRt);
     REGISTER_TEST(TranspileTest, ArrayNewEmitsVmOp);
+    REGISTER_TEST(TranspileTest, ClassFieldEmitsVmOp);
 }
