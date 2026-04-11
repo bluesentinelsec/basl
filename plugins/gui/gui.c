@@ -27,32 +27,7 @@
 
 const gui_backend_t *gui_backend_select(void)
 {
-#ifdef VIGIL_GUI_SDL_BACKEND
-    const char *force = getenv("VIGIL_GUI_BACKEND");
-    if (force && strcmp(force, "sdl") == 0)
-        return &gui_backend_sdl;
-#endif
-
-/* Mobile/web: SDL is the primary backend. */
-#if defined(__EMSCRIPTEN__) || defined(__ANDROID__) || (defined(__APPLE__) && TARGET_OS_IPHONE)
-#ifdef VIGIL_GUI_SDL_BACKEND
     return &gui_backend_sdl;
-#else
-    return &gui_backend_stub;
-#endif
-#elif defined(__APPLE__)
-    return &gui_backend_cocoa;
-#elif defined(_WIN32)
-    return &gui_backend_win32;
-#elif defined(__linux__)
-    return &gui_backend_gtk;
-#else
-#ifdef VIGIL_GUI_SDL_BACKEND
-    return &gui_backend_sdl;
-#else
-    return &gui_backend_stub;
-#endif
-#endif
 }
 
 /* SDL fallback — tried if the native backend's init() fails. */

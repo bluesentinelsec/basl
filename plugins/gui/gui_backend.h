@@ -225,20 +225,8 @@ extern "C"
     /* Returns the best available backend for this platform, or NULL. */
     const gui_backend_t *gui_backend_select(void);
 
-/* Platform backends — defined in backends/ */
-#if defined(__APPLE__)
-    extern const gui_backend_t gui_backend_cocoa;
-#elif defined(_WIN32)
-extern const gui_backend_t gui_backend_win32;
-#elif defined(__linux__)
-extern const gui_backend_t gui_backend_gtk;
-#endif
-
-#ifdef VIGIL_GUI_SDL_BACKEND
+/* Platform backends — SDL is the sole backend. */
     extern const gui_backend_t gui_backend_sdl;
-#endif
-
-    extern const gui_backend_t gui_backend_stub;
 
 #ifdef __cplusplus
 }

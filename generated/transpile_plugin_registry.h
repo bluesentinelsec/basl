@@ -18,7 +18,8 @@ extern VIGIL_API const vigil_native_module_t vigil_plugin_tiled;
 extern VIGIL_API const vigil_native_module_t vigil_plugin_sysquery;
 #ifdef VIGIL_PLUGIN_SDL_ENABLED
 extern VIGIL_API const vigil_native_module_t vigil_plugin_sdl;
-#define VIGIL_PLUGIN_COUNT (4U)
+extern VIGIL_API const vigil_native_module_t vigil_plugin_gui;
+#define VIGIL_PLUGIN_COUNT (5U)
 #else
 #define VIGIL_PLUGIN_COUNT (3U)
 #endif
@@ -38,6 +39,7 @@ static inline void vigil_plugin_fill_table_(vigil_plugin_entry_t *table)
     table[i].name = "sysquery"; table[i].name_length = 8U; table[i].module = &vigil_plugin_sysquery; i++;
 #ifdef VIGIL_PLUGIN_SDL_ENABLED
     table[i].name = "sdl"; table[i].name_length = 3U; table[i].module = &vigil_plugin_sdl; i++;
+    table[i].name = "gui"; table[i].name_length = 3U; table[i].module = &vigil_plugin_gui; i++;
 #endif
     (void)i;
 }
