@@ -71,7 +71,18 @@ vigil_status_t vigil_tc_call_native(vigil_tc_t *tc, vigil_value_t *regs, uint8_t
                 return status;
         }
         for (i = 0; i < arg_count; i++)
-            vm->stack[arg_base + i] = regs[arg_base + i];
+        {
+            vigil_value_t v = regs[arg_base + i];
+            if (vigil_nanbox_is_object(v))
+            {
+                vigil_object_retain((vigil_object_t *)vigil_nanbox_decode_ptr(v));
+                vm->stack[arg_base + i] = v;
+            }
+            else if (v == 0 || vigil_nanbox_is_int(v) || vigil_nanbox_is_bool(v))
+                vm->stack[arg_base + i] = v;
+            else
+                vm->stack[arg_base + i] = vigil_nanbox_encode_int((int64_t)v);
+        }
         vm->stack_count = needed;
     }
 
@@ -163,14 +174,14 @@ vigil_status_t vigil_tc_parse_i32(vigil_tc_t *tc, vigil_value_t *dst, const vigi
         long val = strtol(s, &end, 10);
         if (errno == 0 && end != s && *end == '\0' && val >= INT32_MIN && val <= INT32_MAX)
         {
-            vigil_value_init_int(&dst[0], (int64_t)val);
+            dst[0] = (uint64_t)(int64_t)val;
             dst[1] = vigil_runtime_ok_error_value(tc->runtime);
             return VIGIL_STATUS_OK;
         }
     }
 
     /* Parse failed — return error. */
-    vigil_value_init_int(&dst[0], 0);
+    dst[0] = 0;
     {
         vigil_object_t *err_obj = NULL;
         vigil_status_t st = vigil_error_object_new_cstr(tc->runtime, "parse_i32: invalid input", 1, &err_obj, error);
@@ -258,6 +269,16 @@ static vigil_status_t tc_ensure_frame(vigil_tc_t *tc, vigil_error_t *error)
     return VIGIL_STATUS_OK;
 }
 
+/* Convert a raw register value to a proper nanbox value for the VM stack.
+   Returns the value unchanged if it's already a valid nanbox encoding,
+   otherwise nanbox-encodes it as an integer. */
+static inline uint64_t tc_to_nanbox(uint64_t v)
+{
+    if (vigil_nanbox_is_object(v) || vigil_nanbox_is_int(v) || vigil_nanbox_is_bool(v) || v == VIGIL_NANBOX_NIL)
+        return v;
+    return vigil_nanbox_encode_int((int64_t)v);
+}
+
 static vigil_status_t tc_sync_and_call(vigil_tc_t *tc, vigil_value_t *regs, uint8_t top_reg,
                                         uint8_t pop_count, uint8_t dst_reg, uint8_t ret_count,
                                         vm_op_fn op, vigil_error_t *error)
@@ -278,15 +299,22 @@ static vigil_status_t tc_sync_and_call(vigil_tc_t *tc, vigil_value_t *regs, uint
     }
 
     /* Sync registers to VM stack, nanbox-encoding raw integers.
-       Only object pointers and nil (0) are already nanboxed; everything
-       else is a raw int64_t or double from Phase 1 arithmetic. */
+       Registers contain a mix of raw int64_t (from Phase 1 arithmetic)
+       and nanboxed values (objects, tagged ints, bools).  We use strict
+       nanbox type checks to identify already-encoded values; everything
+       else is nanbox-encoded as int.  Objects are retained so the VM op
+       can safely release its stack copy without freeing the register's
+       reference. */
     for (size_t i = 0; i <= (size_t)top_reg; i++)
     {
         uint64_t v = regs[i];
-        if (v == 0 || vigil_nanbox_has_object(v))
+        if (vigil_nanbox_is_object(v))
+        {
+            vigil_object_retain((vigil_object_t *)vigil_nanbox_decode_ptr(v));
             vm->stack[i] = v;
+        }
         else
-            vm->stack[i] = vigil_nanbox_encode_int((int64_t)v);
+            vm->stack[i] = tc_to_nanbox(v);
     }
     vm->stack_count = needed;
 
@@ -346,10 +374,7 @@ vigil_status_t vigil_tc_vm_op(vigil_tc_t *tc, vigil_value_t *regs, uint8_t opcod
             for (uint16_t idx = 0; idx < count; idx++)
             {
                 uint64_t v = regs[a + idx];
-                if (v == 0 || vigil_nanbox_has_object(v))
-                    items_buf[idx] = v;
-                else
-                    items_buf[idx] = vigil_nanbox_encode_int((int64_t)v);
+                items_buf[idx] = tc_to_nanbox(v);
             }
             items = items_buf;
         }
@@ -372,10 +397,8 @@ vigil_status_t vigil_tc_vm_op(vigil_tc_t *tc, vigil_value_t *regs, uint8_t opcod
             vigil_value_t key = regs[a + idx * 2];
             vigil_value_t val = regs[a + idx * 2 + 1];
             /* Nanbox-encode raw integers if needed. */
-            if (key != 0 && !vigil_nanbox_has_object(key))
-                key = vigil_nanbox_encode_int((int64_t)key);
-            if (val != 0 && !vigil_nanbox_has_object(val))
-                val = vigil_nanbox_encode_int((int64_t)val);
+            key = tc_to_nanbox(key);
+            val = tc_to_nanbox(val);
             status = vigil_map_object_set(map, &key, &val, error);
             if (status != VIGIL_STATUS_OK)
             {
@@ -458,7 +481,16 @@ vigil_status_t vigil_tc_vm_op(vigil_tc_t *tc, vigil_value_t *regs, uint8_t opcod
         if (status != VIGIL_STATUS_OK) return status;
         if (vm->stack_capacity < needed)
         { status = vigil_vm_grow_stack(vm, needed, error); if (status != VIGIL_STATUS_OK) return status; }
-        for (size_t i = 0; i <= (size_t)b; i++) vm->stack[i] = regs[i];
+        for (size_t i = 0; i <= (size_t)b; i++)
+        {
+            uint64_t v = regs[i];
+            if (v == 0 || vigil_nanbox_is_int(v) || vigil_nanbox_is_bool(v))
+                vm->stack[i] = v;
+            else if (vigil_nanbox_is_object(v))
+            { vigil_object_retain((vigil_object_t *)vigil_nanbox_decode_ptr(v)); vm->stack[i] = v; }
+            else
+                vm->stack[i] = vigil_nanbox_encode_int((int64_t)v);
+        }
         vm->stack_count = needed;
         { vigil_vm_frame_t *frame = &vm->frames[vm->frame_count - 1U];
           frame->ip = 0;
@@ -475,7 +507,16 @@ vigil_status_t vigil_tc_vm_op(vigil_tc_t *tc, vigil_value_t *regs, uint8_t opcod
         if (status != VIGIL_STATUS_OK) return status;
         if (vm->stack_capacity < needed)
         { status = vigil_vm_grow_stack(vm, needed, error); if (status != VIGIL_STATUS_OK) return status; }
-        for (size_t i = 0; i <= (size_t)b; i++) vm->stack[i] = regs[i];
+        for (size_t i = 0; i <= (size_t)b; i++)
+        {
+            uint64_t v = regs[i];
+            if (v == 0 || vigil_nanbox_is_int(v) || vigil_nanbox_is_bool(v))
+                vm->stack[i] = v;
+            else if (vigil_nanbox_is_object(v))
+            { vigil_object_retain((vigil_object_t *)vigil_nanbox_decode_ptr(v)); vm->stack[i] = v; }
+            else
+                vm->stack[i] = vigil_nanbox_encode_int((int64_t)v);
+        }
         vm->stack_count = needed;
         { vigil_vm_frame_t *frame = &vm->frames[vm->frame_count - 1U];
           frame->ip = 0;
@@ -537,8 +578,7 @@ vigil_status_t vigil_tc_vm_op(vigil_tc_t *tc, vigil_value_t *regs, uint8_t opcod
             return VIGIL_STATUS_INVALID_ARGUMENT;
         }
         /* Nanbox-encode raw integer if needed. */
-        if (val != 0 && !vigil_nanbox_has_object(val))
-            val = vigil_nanbox_encode_int((int64_t)val);
+        val = tc_to_nanbox(val);
         obj = (vigil_object_t *)vigil_nanbox_decode_ptr(regs[a]);
         return vigil_instance_object_set_field(obj, (size_t)b, &val, error);
     }
@@ -563,8 +603,7 @@ vigil_status_t vigil_tc_vm_op(vigil_tc_t *tc, vigil_value_t *regs, uint8_t opcod
     {
         uint16_t gidx = (uint16_t)((uint16_t)b << 8 | (uint16_t)c);
         vigil_value_t val = regs[a];
-        if (val != 0 && !vigil_nanbox_has_object(val))
-            val = vigil_nanbox_encode_int((int64_t)val);
+        val = tc_to_nanbox(val);
         return vigil_function_object_set_global(tc->function, (size_t)gidx, &val, error);
     }
     case VREG_GET_FUNCTION:
@@ -595,7 +634,7 @@ vigil_status_t vigil_tc_vm_op(vigil_tc_t *tc, vigil_value_t *regs, uint8_t opcod
         for (ci = 0; ci < c; ci++)
         {
             uint64_t v = regs[a + ci];
-            caps[ci] = (v == 0 || vigil_nanbox_has_object(v)) ? v : vigil_nanbox_encode_int((int64_t)v);
+            caps[ci] = tc_to_nanbox(v);
         }
         status = vigil_closure_object_new(vm->runtime, (vigil_object_t *)fn, caps, (size_t)c, &closure, error);
         if (status != VIGIL_STATUS_OK)
@@ -629,10 +668,7 @@ vigil_status_t vigil_tc_new_instance(vigil_tc_t *tc, vigil_value_t *regs, uint8_
         for (uint8_t i = 0; i < field_count; i++)
         {
             uint64_t v = regs[fields_base + i];
-            if (v == 0 || vigil_nanbox_has_object(v))
-                fields_buf[i] = v;
-            else
-                fields_buf[i] = vigil_nanbox_encode_int((int64_t)v);
+            fields_buf[i] = tc_to_nanbox(v);
         }
         fields = fields_buf;
     }
@@ -669,7 +705,15 @@ vigil_status_t vigil_tc_call_value(vigil_tc_t *tc, vigil_value_t *regs, uint8_t 
     for (i = 0; i < total; i++)
     {
         uint64_t v = regs[arg_base + i];
-        vm->stack[arg_base + i] = (v == 0 || vigil_nanbox_has_object(v)) ? v : vigil_nanbox_encode_int((int64_t)v);
+        if (vigil_nanbox_is_object(v))
+        {
+            vigil_object_retain((vigil_object_t *)vigil_nanbox_decode_ptr(v));
+            vm->stack[arg_base + i] = v;
+        }
+        else if (v == 0 || vigil_nanbox_is_int(v) || vigil_nanbox_is_bool(v))
+            vm->stack[arg_base + i] = v;
+        else
+            vm->stack[arg_base + i] = vigil_nanbox_encode_int((int64_t)v);
     }
     vm->stack_count = (size_t)arg_base + total;
 
@@ -728,7 +772,15 @@ vigil_status_t vigil_tc_call_extern(vigil_tc_t *tc, vigil_value_t *regs, uint8_t
     for (i = 0; i < (size_t)arg_count; i++)
     {
         uint64_t v = regs[arg_base + i];
-        vm->stack[arg_base + i] = (v == 0 || vigil_nanbox_has_object(v)) ? v : vigil_nanbox_encode_int((int64_t)v);
+        if (vigil_nanbox_is_object(v))
+        {
+            vigil_object_retain((vigil_object_t *)vigil_nanbox_decode_ptr(v));
+            vm->stack[arg_base + i] = v;
+        }
+        else if (v == 0 || vigil_nanbox_is_int(v) || vigil_nanbox_is_bool(v))
+            vm->stack[arg_base + i] = v;
+        else
+            vm->stack[arg_base + i] = vigil_nanbox_encode_int((int64_t)v);
     }
     vm->stack_count = (size_t)arg_base + (size_t)arg_count;
 
@@ -779,7 +831,15 @@ vigil_status_t vigil_tc_call_interface(vigil_tc_t *tc, vigil_value_t *regs, uint
     for (i = 0; i < total; i++)
     {
         uint64_t v = regs[arg_base + i];
-        vm->stack[arg_base + i] = (v == 0 || vigil_nanbox_has_object(v)) ? v : vigil_nanbox_encode_int((int64_t)v);
+        if (vigil_nanbox_is_object(v))
+        {
+            vigil_object_retain((vigil_object_t *)vigil_nanbox_decode_ptr(v));
+            vm->stack[arg_base + i] = v;
+        }
+        else if (v == 0 || vigil_nanbox_is_int(v) || vigil_nanbox_is_bool(v))
+            vm->stack[arg_base + i] = v;
+        else
+            vm->stack[arg_base + i] = vigil_nanbox_encode_int((int64_t)v);
     }
     vm->stack_count = (size_t)arg_base + total;
 
@@ -821,8 +881,7 @@ vigil_status_t vigil_tc_format_spec(vigil_tc_t *tc, vigil_value_t *dst, const vi
     vigil_status_t status;
 
     /* Nanbox-encode raw integer if needed. */
-    if (nanboxed != 0 && !vigil_nanbox_has_object(nanboxed))
-        nanboxed = vigil_nanbox_encode_int((int64_t)nanboxed);
+    nanboxed = tc_to_nanbox(nanboxed);
 
     status = vigil_vm_format_spec_value(tc->vm, &nanboxed, word1, word2, &result, error);
     if (status != VIGIL_STATUS_OK)
@@ -831,4 +890,17 @@ vigil_status_t vigil_tc_format_spec(vigil_tc_t *tc, vigil_value_t *dst, const vi
     vigil_value_release(dst);
     *dst = result;
     return VIGIL_STATUS_OK;
+}
+
+int vigil_tc_values_equal(const vigil_value_t *regs, uint8_t b, uint8_t c)
+{
+    uint64_t lhs = regs[b], rhs = regs[c];
+    /* Fast path: identical bits (covers same-pointer objects and equal ints). */
+    if (lhs == rhs)
+        return 1;
+    /* If both are objects, use value equality. */
+    if (vigil_nanbox_has_object(lhs) && vigil_nanbox_has_object(rhs))
+        return vigil_vm_values_equal(&lhs, &rhs);
+    /* Raw int comparison (Phase 1 arithmetic stores raw int64_t). */
+    return 0;
 }
