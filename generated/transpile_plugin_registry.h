@@ -19,7 +19,17 @@ extern VIGIL_API const vigil_native_module_t vigil_plugin_sysquery;
 #ifdef VIGIL_PLUGIN_SDL_ENABLED
 extern VIGIL_API const vigil_native_module_t vigil_plugin_sdl;
 extern VIGIL_API const vigil_native_module_t vigil_plugin_gui;
+#endif
+#ifdef VIGIL_PLUGIN_AUDIO_ENABLED
+extern VIGIL_API const vigil_native_module_t vigil_plugin_audio;
+#endif
+
+#if defined(VIGIL_PLUGIN_SDL_ENABLED) && defined(VIGIL_PLUGIN_AUDIO_ENABLED)
+#define VIGIL_PLUGIN_COUNT (6U)
+#elif defined(VIGIL_PLUGIN_SDL_ENABLED)
 #define VIGIL_PLUGIN_COUNT (5U)
+#elif defined(VIGIL_PLUGIN_AUDIO_ENABLED)
+#define VIGIL_PLUGIN_COUNT (4U)
 #else
 #define VIGIL_PLUGIN_COUNT (3U)
 #endif
@@ -40,6 +50,9 @@ static inline void vigil_plugin_fill_table_(vigil_plugin_entry_t *table)
 #ifdef VIGIL_PLUGIN_SDL_ENABLED
     table[i].name = "sdl"; table[i].name_length = 3U; table[i].module = &vigil_plugin_sdl; i++;
     table[i].name = "gui"; table[i].name_length = 3U; table[i].module = &vigil_plugin_gui; i++;
+#endif
+#ifdef VIGIL_PLUGIN_AUDIO_ENABLED
+    table[i].name = "audio"; table[i].name_length = 5U; table[i].module = &vigil_plugin_audio; i++;
 #endif
     (void)i;
 }
