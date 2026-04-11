@@ -12,6 +12,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "internal/vigil_internal.h"
@@ -167,6 +168,228 @@ static vigil_status_t emit_cmp_jmp_i64(vigil_transpile_ctx_t *ctx, const char *o
     vigil_status_t status;
     EMITF("    if (r[%u].i %s r[%u].i) goto L_%zu;\n", a, op_str, b, ip + 2);
     return VIGIL_STATUS_OK;
+}
+
+/* ── Peephole: eliminate redundant VREG_MOVE ─────────────────────── */
+
+/* Return the number of extra words consumed by an opcode (multi-word instructions). */
+static size_t opcode_extra_words(uint8_t op)
+{
+    switch ((vigil_reg_op_t)op)
+    {
+    case VREG_CALL_NATIVE:
+    case VREG_CALL_SELF:
+    case VREG_CALL_EXTERN:
+    case VREG_CALL_VALUE:
+    case VREG_NEW_INSTANCE:
+        return 1;
+    case VREG_CALL_INTERFACE:
+    case VREG_FORMAT_SPEC:
+    case VREG_DEFER:
+        return 2;
+    default:
+        return 0;
+    }
+}
+
+/*
+ * For a given opcode, return which of the A/B/C fields are *source* (read)
+ * operands.  Bit 0 = A is source, bit 1 = B is source, bit 2 = C is source.
+ * Returns 0 for opcodes we don't want to optimize (complex/multi-word/fallback).
+ */
+static unsigned opcode_src_mask(uint8_t op)
+{
+    switch ((vigil_reg_op_t)op)
+    {
+    /* A B C  — A = dest, B and C are sources */
+    case VREG_ADD: case VREG_SUB: case VREG_MUL: case VREG_DIV: case VREG_MOD:
+    case VREG_ADD_I32: case VREG_SUB_I32: case VREG_MUL_I32: case VREG_DIV_I32: case VREG_MOD_I32:
+    case VREG_ADD_I64: case VREG_SUB_I64: case VREG_MUL_I64: case VREG_DIV_I64: case VREG_MOD_I64:
+    case VREG_ADD_F64: case VREG_SUB_F64: case VREG_MUL_F64: case VREG_DIV_F64:
+    case VREG_LT_I32: case VREG_LE_I32: case VREG_GT_I32: case VREG_GE_I32:
+    case VREG_EQ_I32: case VREG_NE_I32:
+    case VREG_LT_I64: case VREG_LE_I64: case VREG_GT_I64: case VREG_GE_I64:
+    case VREG_EQ_I64: case VREG_NE_I64:
+    case VREG_EQ: case VREG_LT: case VREG_LE:
+    case VREG_BAND: case VREG_BOR: case VREG_BXOR: case VREG_SHL: case VREG_SHR:
+    case VREG_MATH_POW:
+        return 0x6; /* B, C */
+
+    /* A B — A = dest, B is source */
+    case VREG_NEG: case VREG_NOT: case VREG_BNOT:
+    case VREG_TO_I32: case VREG_TO_I64: case VREG_TO_U8: case VREG_TO_U32: case VREG_TO_U64:
+    case VREG_TO_F64:
+    case VREG_MATH_SIN: case VREG_MATH_COS: case VREG_MATH_SQRT: case VREG_MATH_LOG:
+        return 0x2; /* B */
+
+    /* Fused compare-jump: A and B are both sources (no dest) */
+    case VREG_LT_I32_JMP: case VREG_LE_I32_JMP: case VREG_GT_I32_JMP: case VREG_GE_I32_JMP:
+    case VREG_EQ_I32_JMP: case VREG_NE_I32_JMP:
+    case VREG_LT_I64_JMP: case VREG_LE_I64_JMP: case VREG_GT_I64_JMP: case VREG_GE_I64_JMP:
+    case VREG_EQ_I64_JMP: case VREG_NE_I64_JMP:
+        return 0x3; /* A, B */
+
+    /* TEST: A is source */
+    case VREG_TEST:
+        return 0x1; /* A */
+
+    /* RETURN: A is source when B != 0 */
+    case VREG_RETURN:
+        return 0x1; /* A (caller checks B) */
+
+    /* Immediate arith: A = dest, B = source */
+    case VREG_ADDI: case VREG_SUBI: case VREG_ADDI_I64: case VREG_SUBI_I64:
+        return 0x2; /* B */
+
+    /* LT_I32_IMM_JMP: A is source */
+    case VREG_LT_I32_IMM_JMP:
+        return 0x1; /* A */
+
+    default:
+        return 0; /* don't optimize */
+    }
+}
+
+/*
+ * Rewrite the instruction at code[ip] by substituting register `old_reg`
+ * with `new_reg` in source operand positions.  Returns 1 if a substitution
+ * was made.
+ */
+static int substitute_src_reg(vigil_reg_instr_t *code, size_t ip, uint8_t old_reg, uint8_t new_reg)
+{
+    vigil_reg_instr_t instr = code[ip];
+    uint8_t op = VREG_GET_OP(instr);
+    uint8_t a = VREG_GET_A(instr);
+    uint8_t b = VREG_GET_B(instr);
+    uint8_t c = VREG_GET_C(instr);
+    unsigned mask = opcode_src_mask(op);
+    int changed = 0;
+
+    if (!mask)
+        return 0;
+
+    if ((mask & 0x1) && a == old_reg) { a = new_reg; changed = 1; }
+    if ((mask & 0x2) && b == old_reg) { b = new_reg; changed = 1; }
+    if ((mask & 0x4) && c == old_reg) { c = new_reg; changed = 1; }
+
+    if (changed)
+        code[ip] = vigil_reg_abc(op, a, b, c);
+    return changed;
+}
+
+/*
+ * Build a bitset of instruction indices that are jump targets.
+ * Caller must free the returned array.
+ */
+static uint8_t *build_jump_targets(const vigil_reg_instr_t *code, size_t count)
+{
+    size_t bytes = (count + 7) / 8;
+    uint8_t *targets = (uint8_t *)calloc(bytes, 1);
+    if (!targets)
+        return NULL;
+
+    for (size_t ip = 0; ip < count; ip++)
+    {
+        vigil_reg_instr_t instr = code[ip];
+        uint8_t op = VREG_GET_OP(instr);
+        int16_t sbx = VREG_GET_sBx(instr);
+        size_t extra = opcode_extra_words(op);
+
+        switch ((vigil_reg_op_t)op)
+        {
+        case VREG_JMP:
+        {
+            int64_t target = (int64_t)ip + 1 + (int64_t)sbx;
+            if (target >= 0 && (size_t)target < count)
+                targets[(size_t)target / 8] |= (uint8_t)(1U << ((size_t)target % 8));
+            break;
+        }
+        case VREG_TEST:
+        case VREG_TESTSET:
+        case VREG_LT_I32_IMM_JMP:
+            /* These skip the next instruction on condition */
+            if (ip + 2 < count)
+                targets[(ip + 2) / 8] |= (uint8_t)(1U << ((ip + 2) % 8));
+            break;
+        case VREG_LT_I32_JMP: case VREG_LE_I32_JMP: case VREG_GT_I32_JMP: case VREG_GE_I32_JMP:
+        case VREG_EQ_I32_JMP: case VREG_NE_I32_JMP:
+        case VREG_LT_I64_JMP: case VREG_LE_I64_JMP: case VREG_GT_I64_JMP: case VREG_GE_I64_JMP:
+        case VREG_EQ_I64_JMP: case VREG_NE_I64_JMP:
+            /* Fused compare-jump: skip next on true */
+            if (ip + 2 < count)
+                targets[(ip + 2) / 8] |= (uint8_t)(1U << ((ip + 2) % 8));
+            break;
+        case VREG_FORLOOP_I32:
+        case VREG_FORLOOP_I64:
+        {
+            int64_t target = (int64_t)ip + 1 + (int64_t)sbx;
+            if (target >= 0 && (size_t)target < count)
+                targets[(size_t)target / 8] |= (uint8_t)(1U << ((size_t)target % 8));
+            break;
+        }
+        default:
+            break;
+        }
+
+        ip += extra;
+    }
+
+    return targets;
+}
+
+#define IS_JUMP_TARGET(targets, ip) ((targets)[(ip) / 8] & (1U << ((ip) % 8)))
+
+/*
+ * Peephole pass: eliminate VREG_MOVE A B where the next instruction
+ * reads A as a source and ip+1 is not a jump target.  We NOP the MOVE
+ * by rewriting it to VREG_MOVE A A (identity, skipped during emission).
+ */
+static void peephole_eliminate_moves(vigil_reg_instr_t *code, size_t count, const uint8_t *targets)
+{
+    for (size_t ip = 0; ip + 1 < count; ip++)
+    {
+        uint8_t op = VREG_GET_OP(code[ip]);
+        size_t extra = opcode_extra_words(op);
+
+        if (op != VREG_MOVE)
+        {
+            ip += extra;
+            continue;
+        }
+
+        uint8_t move_dst = VREG_GET_A(code[ip]);
+        uint8_t move_src = VREG_GET_B(code[ip]);
+        size_t next = ip + 1;
+
+        if (move_dst == move_src)
+            continue; /* already identity */
+
+        /* Don't optimize if next instruction is a jump target */
+        if (IS_JUMP_TARGET(targets, next))
+            continue;
+
+        /* Don't optimize multi-word or complex next instructions */
+        uint8_t next_op = VREG_GET_OP(code[next]);
+        if (opcode_extra_words(next_op) > 0)
+            continue;
+
+        /* Don't optimize if next instruction writes to move_src
+           (would change semantics if we substitute) */
+        unsigned next_mask = opcode_src_mask(next_op);
+        if (!next_mask)
+            continue;
+        uint8_t next_a = VREG_GET_A(code[next]);
+        /* For instructions where A is a dest (mask doesn't include bit 0),
+           check if dest == move_src */
+        if (!(next_mask & 0x1) && next_a == move_src)
+            continue;
+
+        if (substitute_src_reg(code, next, move_dst, move_src))
+        {
+            /* NOP the move by making it identity */
+            code[ip] = vigil_reg_abc(VREG_MOVE, move_dst, move_dst, 0);
+        }
+    }
 }
 
 /* ── Main instruction dispatch ───────────────────────────────────── */
@@ -530,12 +753,37 @@ vigil_status_t vigil_transpile_emit_function(vigil_transpile_ctx_t *ctx, const v
                                              size_t func_index, size_t func_count)
 {
     vigil_status_t status;
+    vigil_reg_instr_t *code = NULL;
+    uint8_t *targets = NULL;
 
     if (rc == NULL || rc->code == NULL || rc->code_count == 0)
     {
         vigil_error_set_literal(ctx->error, VIGIL_STATUS_INVALID_ARGUMENT, "transpile: empty register chunk");
         return VIGIL_STATUS_INVALID_ARGUMENT;
     }
+
+    /* Work on a copy so the peephole pass doesn't mutate the original. */
+    code = (vigil_reg_instr_t *)malloc(rc->code_count * sizeof(vigil_reg_instr_t));
+    if (!code)
+    {
+        vigil_error_set_literal(ctx->error, VIGIL_STATUS_OUT_OF_MEMORY, "transpile: alloc failed");
+        return VIGIL_STATUS_OUT_OF_MEMORY;
+    }
+    memcpy(code, rc->code, rc->code_count * sizeof(vigil_reg_instr_t));
+
+    targets = build_jump_targets(code, rc->code_count);
+    if (!targets)
+    {
+        free(code);
+        vigil_error_set_literal(ctx->error, VIGIL_STATUS_OUT_OF_MEMORY, "transpile: alloc failed");
+        return VIGIL_STATUS_OUT_OF_MEMORY;
+    }
+
+    peephole_eliminate_moves(code, rc->code_count, targets);
+
+    /* Build a modified reg_chunk that points to our optimized code. */
+    vigil_reg_chunk_t opt_rc = *rc;
+    opt_rc.code = code;
 
     /* Function signature */
     EMITF("vigil_reg_t %s(vigil_tc_t *tc", func_name);
@@ -555,18 +803,30 @@ vigil_status_t vigil_transpile_emit_function(vigil_transpile_ctx_t *ctx, const v
     EMIT("\n");
 
     /* Emit instructions with labels */
-    for (size_t ip = 0; ip < rc->code_count; ip++)
+    for (size_t ip = 0; ip < opt_rc.code_count; ip++)
     {
         EMITF("L_%zu:;\n", ip);
-        status = emit_instruction(ctx, rc, &ip, func_index, func_count);
+
+        /* Skip identity moves (NOPped by peephole) */
+        uint8_t op = VREG_GET_OP(opt_rc.code[ip]);
+        if (op == VREG_MOVE && VREG_GET_A(opt_rc.code[ip]) == VREG_GET_B(opt_rc.code[ip]))
+            continue;
+
+        status = emit_instruction(ctx, &opt_rc, &ip, func_index, func_count);
         if (status != VIGIL_STATUS_OK)
+        {
+            free(targets);
+            free(code);
             return status;
+        }
     }
 
     /* Fallthrough return */
     EMIT("    return (vigil_reg_t){0};\n");
     EMIT("}\n\n");
 
+    free(targets);
+    free(code);
     return VIGIL_STATUS_OK;
 }
 
