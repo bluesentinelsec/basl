@@ -3587,12 +3587,12 @@ static const char *transpile_cmake_template =
     "list(FILTER VIGIL_PLUGIN_SOURCES EXCLUDE REGEX \"gui_sdl\\.c$\")\n"
     "# Exclude plugins that need external deps not yet available\n"
     "list(FILTER VIGIL_PLUGIN_SOURCES EXCLUDE REGEX \"audio\\.c$\")\n"
-    "list(FILTER VIGIL_PLUGIN_SOURCES EXCLUDE REGEX \"gui\")\n"
     "# Exclude SDL if not needed\n"
     "if(NOT EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/vigil_rt/NEEDS_SDL)\n"
     "    list(FILTER VIGIL_PLUGIN_SOURCES EXCLUDE REGEX \"sdl\\\\.c$\")\n"
     "    list(FILTER VIGIL_PLUGIN_SOURCES EXCLUDE REGEX \"vigil_image\\\\.c$\")\n"
     "    list(FILTER VIGIL_PLUGIN_SOURCES EXCLUDE REGEX \"vigil_font\\\\.c$\")\n"
+    "    list(FILTER VIGIL_PLUGIN_SOURCES EXCLUDE REGEX \"gui\")\n"
     "endif()\n"
     "# Exclude stdlib modules with complex deps\n"
     "list(FILTER VIGIL_RT_STDLIB EXCLUDE REGEX \"(ffi|thread|http|net|readline)\\.c$\")\n"
@@ -3796,7 +3796,8 @@ static int transpile_write_project(const char *output_dir, const vigil_string_t 
     for (size_t si = 0; si < src_count; si++)
     {
         const vigil_source_file_t *sf = vigil_source_registry_get(registry, (vigil_source_id_t)(si + 1));
-        if (sf && strstr(vigil_string_c_str(&sf->text), "import \"sdl\""))
+        if (sf && (strstr(vigil_string_c_str(&sf->text), "import \"sdl\"") ||
+                   strstr(vigil_string_c_str(&sf->text), "import \"gui\"")))
         {
             needs_sdl = 1;
             break;

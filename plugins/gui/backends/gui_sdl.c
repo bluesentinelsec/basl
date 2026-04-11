@@ -16,7 +16,6 @@
  * Text is rendered using vigil_font.h (stb_truetype) which produces
  * grayscale bitmaps that are uploaded as SDL textures.
  */
-#ifdef VIGIL_GUI_SDL_BACKEND
 
 #include "../gui_backend.h"
 
@@ -1198,4 +1197,3 @@ const gui_backend_t gui_backend_sdl = {
     .ask_yes_no = sdl_stub_yesno,
 };
 
-#endif /* VIGIL_GUI_SDL_BACKEND */

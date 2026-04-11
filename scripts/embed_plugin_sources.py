@@ -118,9 +118,7 @@ for f in ["stb_image.h", "stb_truetype.h"]:
 # Plugin sources
 _PLUGINS = {
     "sdl": ["sdl.c", "vigil_image.c", "vigil_font.c", "vigil_image.h", "vigil_font.h"],
-    "gui": ["gui.c", "gui_backend.h",
-            "backends/gui_cocoa.m", "backends/gui_gtk.c", "backends/gui_sdl.c",
-            "backends/gui_stub.c", "backends/gui_win32.c"],
+    "gui": ["gui.c", "gui_backend.h", "backends/gui_sdl.c"],
     "audio": ["audio.c"],
     "sysquery": ["sysquery.c", "sysquery_common.c", "sysquery_platform.h",
                  "sysquery_linux.c", "sysquery_darwin.c", "sysquery_win32.c", "sysquery_stub.c"],
