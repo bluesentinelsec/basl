@@ -3595,7 +3595,7 @@ static const char *transpile_cmake_template =
     "    list(FILTER VIGIL_PLUGIN_SOURCES EXCLUDE REGEX \"gui\")\n"
     "endif()\n"
     "# Exclude stdlib modules with complex deps\n"
-    "list(FILTER VIGIL_RT_STDLIB EXCLUDE REGEX \"(ffi|thread|http|net|readline)\\.c$\")\n"
+    "list(FILTER VIGIL_RT_STDLIB EXCLUDE REGEX \"(ffi)\\.c$\")\n"
     "add_library(vigil_rt STATIC ${VIGIL_RT_SOURCES} ${VIGIL_RT_STDLIB}\n"
     "    ${VIGIL_RT_PLATFORM} ${VIGIL_PLUGIN_SOURCES})\n"
     "target_include_directories(vigil_rt PUBLIC\n"

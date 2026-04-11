@@ -93,6 +93,16 @@ extern "C"
                                         uint8_t const_idx, uint8_t arg_count, uint8_t arg_base,
                                         vigil_error_t *error);
 
+    /* Call an interface method on a receiver object. */
+    vigil_status_t vigil_tc_call_interface(vigil_tc_t *tc, vigil_value_t *regs, uint8_t ret,
+                                           uint8_t iface_idx, uint8_t arg_count,
+                                           uint32_t method_idx, uint8_t arg_base,
+                                           vigil_error_t *error);
+
+    /* Format a value with a format specifier (f-string {x:spec}). */
+    vigil_status_t vigil_tc_format_spec(vigil_tc_t *tc, vigil_value_t *dst, const vigil_value_t *val,
+                                        uint32_t word1, uint32_t word2, vigil_error_t *error);
+
 #ifdef __cplusplus
 }
 #endif
