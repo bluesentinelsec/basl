@@ -407,26 +407,35 @@ static int new_validate_platforms(const char *platforms)
     if (platforms == NULL || platforms[0] == '\0')
         return 1;
     snprintf(buf, sizeof(buf), "%s", platforms);
-    char *tok = strtok(buf, ",");
-    while (tok)
+    char *p = buf;
+    while (*p)
     {
-        while (*tok == ' ')
-            tok++;
-        char *end = tok + strlen(tok) - 1;
-        while (end > tok && *end == ' ')
-            *end-- = '\0';
+        while (*p == ' ' || *p == ',')
+            p++;
+        if (*p == '\0')
+            break;
+        char *end = p;
+        while (*end && *end != ',')
+            end++;
+        /* Trim trailing spaces. */
+        char *trim = end - 1;
+        while (trim > p && *trim == ' ')
+            trim--;
+        char saved = *(trim + 1);
+        *(trim + 1) = '\0';
         int found = 0;
         for (size_t i = 0; i < sizeof(valid) / sizeof(valid[0]); i++)
         {
-            if (strcmp(tok, valid[i]) == 0)
+            if (strcmp(p, valid[i]) == 0)
             {
                 found = 1;
                 break;
             }
         }
+        *(trim + 1) = saved;
         if (!found)
             return 0;
-        tok = strtok(NULL, ",");
+        p = (*end) ? end + 1 : end;
     }
     return 1;
 }
@@ -452,18 +461,26 @@ static void new_format_platforms(const char *input, char *out, size_t out_size)
     char buf[256];
     size_t pos = 0;
     snprintf(buf, sizeof(buf), "%s", input);
-    char *tok = strtok(buf, ",");
-    while (tok && pos < out_size - 10)
+    char *p = buf;
+    while (*p && pos < out_size - 10)
     {
-        while (*tok == ' ')
-            tok++;
-        char *end = tok + strlen(tok) - 1;
-        while (end > tok && *end == ' ')
-            *end-- = '\0';
+        while (*p == ' ' || *p == ',')
+            p++;
+        if (*p == '\0')
+            break;
+        char *end = p;
+        while (*end && *end != ',')
+            end++;
+        char *trim = end - 1;
+        while (trim > p && *trim == ' ')
+            trim--;
+        char saved = *(trim + 1);
+        *(trim + 1) = '\0';
         if (pos > 0)
             pos += (size_t)snprintf(out + pos, out_size - pos, ", ");
-        pos += (size_t)snprintf(out + pos, out_size - pos, "\"%s\"", tok);
-        tok = strtok(NULL, ",");
+        pos += (size_t)snprintf(out + pos, out_size - pos, "\"%s\"", p);
+        *(trim + 1) = saved;
+        p = (*end) ? end + 1 : end;
     }
     out[pos] = '\0';
 }
@@ -804,6 +821,10 @@ static int new_glob_match(const char *pattern, const char *name, char *prefix, s
 /* Determine where to create a new member inside a workspace.
    Sets create_path (relative to workspace root) and returns 1 if the member
    should be auto-registered (explicit list case). */
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wformat-truncation"
+#endif
 static int new_workspace_resolve_path(const workspace_info_t *ws, const char *dir_name,
                                        char *create_path, size_t create_path_size,
                                        int *needs_registration, vigil_error_t *error)
@@ -866,6 +887,9 @@ cleanup:
     free(file_data);
     return result;
 }
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic pop
+#endif
 
 /* Append a member name to the workspace vigil.toml [workspace] members list. */
 static int new_workspace_register_member(const workspace_info_t *ws, const char *member_path,
@@ -941,7 +965,7 @@ static void new_workspace_inherit_metadata(const workspace_info_t *ws, new_opts_
         {
             const char *s = vigil_toml_string_value(v);
             if (s && s[0])
-                opts->org = strdup(s);
+                opts->org = cli_strdup(s);
         }
     }
     /* Inherit version if not explicitly provided. */
@@ -952,7 +976,7 @@ static void new_workspace_inherit_metadata(const workspace_info_t *ws, new_opts_
         {
             const char *s = vigil_toml_string_value(v);
             if (s && s[0])
-                opts->version = strdup(s);
+                opts->version = cli_strdup(s);
         }
     }
 
@@ -1059,7 +1083,7 @@ static int cmd_new(const new_opts_t *opts)
 
     /* Workspace detection: if we're inside a workspace, create relative to its root. */
     workspace_info_t ws = {0};
-    char ws_create_path[4096];
+    char ws_create_path[8192];
     int ws_needs_registration = 0;
 
     if (resolved.type != NEW_TYPE_WORKSPACE)
