@@ -103,6 +103,9 @@ extern "C"
     vigil_status_t vigil_tc_format_spec(vigil_tc_t *tc, vigil_value_t *dst, const vigil_value_t *val,
                                         uint32_t word1, uint32_t word2, vigil_error_t *error);
 
+    /* Compare two register values for equality (handles objects). */
+    int vigil_tc_values_equal(const vigil_value_t *regs, uint8_t b, uint8_t c);
+
 #ifdef __cplusplus
 }
 #endif

@@ -239,7 +239,9 @@ static vigil_status_t emit_instruction(vigil_transpile_ctx_t *ctx, const vigil_r
     case VREG_NE_I64: return emit_i64_cmp(ctx, "!=", a, b, c);
 
     /* ── Generic comparisons ───────────────────────────────────── */
-    case VREG_EQ: return emit_i64_cmp(ctx, "==", a, b, c);
+    case VREG_EQ:
+        EMITF("    r[%u].i = vigil_tc_values_equal((uint64_t *)r, %u, %u);\n", a, b, c);
+        break;
     case VREG_LT: return emit_i64_cmp(ctx, "<",  a, b, c);
     case VREG_LE: return emit_i64_cmp(ctx, "<=", a, b, c);
 

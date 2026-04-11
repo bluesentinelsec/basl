@@ -163,14 +163,14 @@ vigil_status_t vigil_tc_parse_i32(vigil_tc_t *tc, vigil_value_t *dst, const vigi
         long val = strtol(s, &end, 10);
         if (errno == 0 && end != s && *end == '\0' && val >= INT32_MIN && val <= INT32_MAX)
         {
-            vigil_value_init_int(&dst[0], (int64_t)val);
+            dst[0] = (uint64_t)(int64_t)val;
             dst[1] = vigil_runtime_ok_error_value(tc->runtime);
             return VIGIL_STATUS_OK;
         }
     }
 
     /* Parse failed — return error. */
-    vigil_value_init_int(&dst[0], 0);
+    dst[0] = 0;
     {
         vigil_object_t *err_obj = NULL;
         vigil_status_t st = vigil_error_object_new_cstr(tc->runtime, "parse_i32: invalid input", 1, &err_obj, error);
@@ -831,4 +831,17 @@ vigil_status_t vigil_tc_format_spec(vigil_tc_t *tc, vigil_value_t *dst, const vi
     vigil_value_release(dst);
     *dst = result;
     return VIGIL_STATUS_OK;
+}
+
+int vigil_tc_values_equal(const vigil_value_t *regs, uint8_t b, uint8_t c)
+{
+    uint64_t lhs = regs[b], rhs = regs[c];
+    /* Fast path: identical bits (covers same-pointer objects and equal ints). */
+    if (lhs == rhs)
+        return 1;
+    /* If both are objects, use value equality. */
+    if (vigil_nanbox_has_object(lhs) && vigil_nanbox_has_object(rhs))
+        return vigil_vm_values_equal(&lhs, &rhs);
+    /* Raw int comparison (Phase 1 arithmetic stores raw int64_t). */
+    return 0;
 }
