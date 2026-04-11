@@ -200,14 +200,14 @@ static vigil_status_t emit_instruction(vigil_transpile_ctx_t *ctx, const vigil_r
     case VREG_SUB_I32: return emit_i32_arith(ctx, "-", a, b, c);
     case VREG_MUL_I32: return emit_i32_arith(ctx, "*", a, b, c);
     case VREG_DIV_I32: return emit_i32_arith(ctx, "/", a, b, c);
-    case VREG_MOD_I32: return emit_i32_arith(ctx, "%%", a, b, c);
+    case VREG_MOD_I32: return emit_i32_arith(ctx, "%", a, b, c);
 
     /* ── Typed i64 arithmetic ──────────────────────────────────── */
     case VREG_ADD_I64: return emit_i64_arith(ctx, "+", a, b, c);
     case VREG_SUB_I64: return emit_i64_arith(ctx, "-", a, b, c);
     case VREG_MUL_I64: return emit_i64_arith(ctx, "*", a, b, c);
     case VREG_DIV_I64: return emit_i64_arith(ctx, "/", a, b, c);
-    case VREG_MOD_I64: return emit_i64_arith(ctx, "%%", a, b, c);
+    case VREG_MOD_I64: return emit_i64_arith(ctx, "%", a, b, c);
 
     /* ── Typed f64 arithmetic ──────────────────────────────────── */
     case VREG_ADD_F64: return emit_f64_arith(ctx, "+", a, b, c);
@@ -220,7 +220,7 @@ static vigil_status_t emit_instruction(vigil_transpile_ctx_t *ctx, const vigil_r
     case VREG_SUB: return emit_i64_arith(ctx, "-", a, b, c);
     case VREG_MUL: return emit_i64_arith(ctx, "*", a, b, c);
     case VREG_DIV: return emit_i64_arith(ctx, "/", a, b, c);
-    case VREG_MOD: return emit_i64_arith(ctx, "%%", a, b, c);
+    case VREG_MOD: return emit_i64_arith(ctx, "%", a, b, c);
 
     /* ── Typed i32 comparisons ─────────────────────────────────── */
     case VREG_LT_I32: return emit_i32_cmp(ctx, "<",  a, b, c);
