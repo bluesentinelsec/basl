@@ -44,7 +44,9 @@
         {
             "path": "src/cli/main.c",
             "thresholds": {
-                "ccn": 10
+                "ccn": 45,
+                "length": 190,
+                "param": 8
             }
         },
         {
@@ -136,10 +138,5 @@
                 "param": 8
             }
         }
-    ],
-    "src/cli/main.c": {
-        "ccn": 45,
-        "length": 190,
-        "param": 8
-    }
+    ]
 }

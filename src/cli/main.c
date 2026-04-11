@@ -759,7 +759,7 @@ static void new_find_workspace_root(workspace_info_t *ws, vigil_error_t *error)
     for (;;)
     {
         char toml[4096 + 16];
-        snprintf(toml, sizeof(toml), "%s/vigil.toml", candidate);
+        vigil_platform_path_join(candidate, "vigil.toml", toml, sizeof(toml), error);
 
         int exists = 0;
         if (vigil_platform_file_exists(toml, &exists) == VIGIL_STATUS_OK && exists)
@@ -787,6 +787,11 @@ static void new_find_workspace_root(workspace_info_t *ws, vigil_error_t *error)
 
         /* Move up one directory. */
         char *slash = strrchr(candidate, '/');
+#ifdef _WIN32
+        char *bslash = strrchr(candidate, '\\');
+        if (bslash && (!slash || bslash > slash))
+            slash = bslash;
+#endif
         if (slash == NULL || slash == candidate)
             break;
         *slash = '\0';

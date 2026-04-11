@@ -311,6 +311,7 @@ class TestNewInteractive(unittest.TestCase):
         child.expect("Project name:")
         child.sendline("prompted_app")
         child.expect(pexpect.EOF)
+        child.close()
         self.assertEqual(child.exitstatus, 0)
         self.assertTrue(os.path.isdir(os.path.join(self.tmpdir, "prompted_app")))
 
