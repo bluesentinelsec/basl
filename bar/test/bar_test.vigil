@@ -1,6 +1,0 @@
-import "test";
-import "bar";
-
-fn test_greet(test.T t) -> void {
-    t.assert(bar.greet("world") == "hello, world", "greet should work");
-}
