@@ -754,3 +754,81 @@ vigil_status_t vigil_tc_call_extern(vigil_tc_t *tc, vigil_value_t *regs, uint8_t
     }
     return VIGIL_STATUS_OK;
 }
+
+vigil_status_t vigil_tc_call_interface(vigil_tc_t *tc, vigil_value_t *regs, uint8_t ret,
+                                       uint8_t iface_idx, uint8_t arg_count,
+                                       uint32_t method_idx, uint8_t arg_base,
+                                       vigil_error_t *error)
+{
+    vigil_vm_t *vm = tc->vm;
+    vigil_status_t status;
+    size_t total = (size_t)arg_count + 1U;
+    size_t i;
+
+    status = tc_ensure_frame(tc, error);
+    if (status != VIGIL_STATUS_OK)
+        return status;
+
+    if (vm->stack_capacity < (size_t)arg_base + total)
+    {
+        status = vigil_vm_grow_stack(vm, (size_t)arg_base + total, error);
+        if (status != VIGIL_STATUS_OK)
+            return status;
+    }
+
+    for (i = 0; i < total; i++)
+    {
+        uint64_t v = regs[arg_base + i];
+        vm->stack[arg_base + i] = (v == 0 || vigil_nanbox_has_object(v)) ? v : vigil_nanbox_encode_int((int64_t)v);
+    }
+    vm->stack_count = (size_t)arg_base + total;
+
+    /* Resolve the interface method. */
+    vigil_value_t receiver = vm->stack[arg_base];
+    if (!vigil_nanbox_is_object(receiver))
+    {
+        vigil_error_set_literal(error, VIGIL_STATUS_INVALID_ARGUMENT, "interface call requires instance");
+        return VIGIL_STATUS_INVALID_ARGUMENT;
+    }
+    size_t class_index = vigil_instance_object_class_index(
+        (vigil_object_t *)vigil_nanbox_decode_ptr(receiver));
+    const vigil_object_t *callee = vigil_function_object_resolve_interface_method(
+        tc->function, class_index, (size_t)iface_idx, (size_t)method_idx);
+    if (!callee)
+    {
+        vigil_error_set_literal(error, VIGIL_STATUS_INTERNAL, "interface method not found");
+        return VIGIL_STATUS_INTERNAL;
+    }
+
+    status = vigil_vm_execute_call(vm, callee, total, error);
+    if (status != VIGIL_STATUS_OK)
+        return status;
+
+    for (i = (size_t)arg_base; i < vm->stack_count && i < (size_t)arg_base + total; i++)
+    {
+        vigil_value_t rv = vm->stack[i];
+        regs[ret + (i - (size_t)arg_base)] = vigil_nanbox_is_int(rv) ? (uint64_t)vigil_nanbox_decode_int(rv) : rv;
+        vm->stack[i] = 0;
+    }
+    return VIGIL_STATUS_OK;
+}
+
+vigil_status_t vigil_tc_format_spec(vigil_tc_t *tc, vigil_value_t *dst, const vigil_value_t *val,
+                                    uint32_t word1, uint32_t word2, vigil_error_t *error)
+{
+    vigil_value_t nanboxed = *val;
+    vigil_value_t result = 0;
+    vigil_status_t status;
+
+    /* Nanbox-encode raw integer if needed. */
+    if (nanboxed != 0 && !vigil_nanbox_has_object(nanboxed))
+        nanboxed = vigil_nanbox_encode_int((int64_t)nanboxed);
+
+    status = vigil_vm_format_spec_value(tc->vm, &nanboxed, word1, word2, &result, error);
+    if (status != VIGIL_STATUS_OK)
+        return status;
+
+    vigil_value_release(dst);
+    *dst = result;
+    return VIGIL_STATUS_OK;
+}

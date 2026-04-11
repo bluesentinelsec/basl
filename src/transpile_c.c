@@ -366,9 +366,15 @@ static vigil_status_t emit_instruction(vigil_transpile_ctx_t *ctx, const vigil_r
         EMITF("    vigil_tc_format_f64(tc, &r[%u].v, &r[%u].v, %u, NULL);\n", a, b, (unsigned)c);
         break;
     case VREG_FORMAT_SPEC:
-        EMITF("    /* format_spec — delegated to runtime */\n");
-        *ip += 2; /* skip two extra words */
+    {
+        if (*ip + 2 >= rc->code_count) { vigil_error_set_literal(ctx->error, VIGIL_STATUS_INTERNAL, "transpile: truncated FORMAT_SPEC"); return VIGIL_STATUS_INTERNAL; }
+        uint32_t w1 = rc->code[*ip + 1];
+        uint32_t w2 = rc->code[*ip + 2];
+        *ip += 2;
+        EMITF("    vigil_tc_format_spec(tc, &r[%u].v, &r[%u].v, %uU, %uU, NULL);\n",
+              a, b, (unsigned)w1, (unsigned)w2);
         break;
+    }
     case VREG_NEW_ERROR:
         EMITF("    vigil_tc_new_error(tc, &r[%u].v, &r[%u].v, &r[%u].v, NULL);\n", a, b, c);
         break;
@@ -463,13 +469,12 @@ static vigil_status_t emit_instruction(vigil_transpile_ctx_t *ctx, const vigil_r
     }
     case VREG_CALL_INTERFACE:
     {
-        /* Three-word: word1=[op,A=ret,B=iface_idx,C=arg_count], word2=method_idx, word3=arg_base */
         if (*ip + 2 >= rc->code_count) { vigil_error_set_literal(ctx->error, VIGIL_STATUS_INTERNAL, "transpile: truncated CALL_INTERFACE"); return VIGIL_STATUS_INTERNAL; }
         uint32_t method_idx = rc->code[*ip + 1];
         uint8_t arg_base_r = (uint8_t)(rc->code[*ip + 2] & 0xFF);
         *ip += 2;
-        EMITF("    /* CALL_INTERFACE iface=%u method=%u args=%u base=%u -- delegated to runtime */\n",
-              (unsigned)b, (unsigned)method_idx, (unsigned)c, (unsigned)arg_base_r);
+        EMITF("    vigil_tc_call_interface(tc, (uint64_t *)r, %u, %u, %u, %u, %u, NULL);\n",
+              (unsigned)a, (unsigned)b, (unsigned)c, (unsigned)method_idx, (unsigned)arg_base_r);
         break;
     }
     case VREG_CALL_EXTERN:
