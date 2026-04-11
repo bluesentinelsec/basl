@@ -48,15 +48,7 @@ static void log_cli_message(vigil_runtime_t *runtime, vigil_log_level_t level, c
     (void)vigil_logger_log(logger, level, message, NULL, 0U, NULL);
 }
 
-static void set_cli_error(vigil_error_t *error, vigil_status_t type, const char *message)
-{
-    if (error == NULL)
-        return;
-    vigil_error_clear(error);
-    error->type = type;
-    error->value = message;
-    error->length = message == NULL ? 0U : strlen(message);
-}
+/* (set_cli_error removed — new command uses fprintf directly) */
 
 static int print_diagnostics(const vigil_source_registry_t *registry, const vigil_diagnostic_list_t *diagnostics)
 {
@@ -291,131 +283,387 @@ static vigil_status_t make_subdir(const char *base, const char *name, vigil_erro
     return vigil_platform_mkdir(path, error);
 }
 
-static const char *new_resolve_project_name(const char *name, char *project_name, size_t project_name_size,
-                                            vigil_error_t *error)
+/* Project types for --type flag. */
+typedef enum
 {
-    if (name != NULL && name[0] != '\0')
+    NEW_TYPE_CLI = 0,
+    NEW_TYPE_GUI,
+    NEW_TYPE_LIBRARY,
+    NEW_TYPE_WORKSPACE
+} new_project_type_t;
+
+/* Parsed new-command options. */
+typedef struct
+{
+    const char *display_name;  /* Original name from user */
+    char dir_name[256];        /* Filesystem-safe derived name */
+    const char *description;
+    const char *org;
+    const char *version;
+    const char *type_str;
+    const char *platforms_str;
+    new_project_type_t type;
+} new_opts_t;
+
+/* Windows reserved device names (case-insensitive). */
+static int new_is_windows_reserved(const char *name)
+{
+    static const char *reserved[] = {"con",  "prn",  "aux",  "nul",  "com1", "com2", "com3",
+                                     "com4", "com5", "com6", "com7", "com8", "com9", "lpt1",
+                                     "lpt2", "lpt3", "lpt4", "lpt5", "lpt6", "lpt7", "lpt8", "lpt9"};
+    char lower[16];
+    size_t len = strlen(name);
+    if (len == 0 || len >= sizeof(lower))
+        return 0;
+    for (size_t i = 0; i < len; i++)
+        lower[i] = (char)(name[i] >= 'A' && name[i] <= 'Z' ? name[i] + 32 : name[i]);
+    lower[len] = '\0';
+    for (size_t i = 0; i < sizeof(reserved) / sizeof(reserved[0]); i++)
     {
-        return name;
+        if (strcmp(lower, reserved[i]) == 0)
+            return 1;
     }
-    if (vigil_platform_readline("Project name: ", project_name, project_name_size, error) != VIGIL_STATUS_OK)
-    {
-        return NULL;
-    }
-    if (project_name[0] == '\0')
-    {
-        set_cli_error(error, VIGIL_STATUS_INVALID_ARGUMENT, "project name cannot be empty");
-        return NULL;
-    }
-    return project_name;
+    return 0;
 }
 
-static const char *new_resolve_project_dir(const char *name, const char *output_dir, char *project_path,
-                                           size_t project_path_size)
+/* Validate reverse-domain org string: >=2 dot-separated segments, each [a-z0-9-]+. */
+static int new_validate_org(const char *org)
 {
-    if (output_dir != NULL && output_dir[0] != '\0')
+    int segments = 1;
+    int seg_len = 0;
+    for (const char *p = org; *p; p++)
     {
-        snprintf(project_path, project_path_size, "%s/%s", output_dir, name);
-        return project_path;
+        if (*p == '.')
+        {
+            if (seg_len == 0)
+                return 0;
+            segments++;
+            seg_len = 0;
+        }
+        else if ((*p >= 'a' && *p <= 'z') || (*p >= '0' && *p <= '9') || *p == '-')
+            seg_len++;
+        else
+            return 0;
     }
-    return name;
+    return segments >= 2 && seg_len > 0;
 }
 
-static int new_create_project_tree(const char *dir, vigil_error_t *error)
+/* Normalize display name to dir_name: lowercase, whitespace→_, keep [a-z0-9_-], strip rest. */
+static int new_normalize_name(const char *display, char *dir, size_t dir_size)
 {
-    if (vigil_platform_mkdir_p(dir, error) != VIGIL_STATUS_OK)
-        return 0;
-    if (make_subdir(dir, "lib", error) != VIGIL_STATUS_OK)
-        return 0;
-    if (make_subdir(dir, "test", error) != VIGIL_STATUS_OK)
-        return 0;
+    size_t j = 0;
+    for (size_t i = 0; display[i] && j < dir_size - 1; i++)
+    {
+        char c = display[i];
+        if (c >= 'A' && c <= 'Z')
+            dir[j++] = (char)(c + 32);
+        else if (c == ' ' || c == '\t')
+            dir[j++] = '_';
+        else if ((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_' || c == '-')
+            dir[j++] = c;
+        /* else: strip */
+    }
+    dir[j] = '\0';
+    return j > 0 && dir[0] != '-' && !(dir[0] >= '0' && dir[0] <= '9');
+}
+
+/* Check if name contains path separators or is absolute/relative. */
+static int new_name_has_path(const char *name)
+{
+    if (name[0] == '/' || name[0] == '\\')
+        return 1;
+    for (const char *p = name; *p; p++)
+    {
+        if (*p == '/' || *p == '\\')
+            return 1;
+        if (*p == '.' && p[1] == '.')
+            return 1;
+    }
+    /* Windows drive letter */
+    if (name[0] && name[1] == ':')
+        return 1;
+    return 0;
+}
+
+/* Parse --type string to enum. Returns -1 on invalid. */
+static int new_parse_type(const char *s)
+{
+    if (s == NULL || strcmp(s, "cli") == 0)
+        return NEW_TYPE_CLI;
+    if (strcmp(s, "gui") == 0)
+        return NEW_TYPE_GUI;
+    if (strcmp(s, "library") == 0)
+        return NEW_TYPE_LIBRARY;
+    if (strcmp(s, "workspace") == 0)
+        return NEW_TYPE_WORKSPACE;
+    return -1;
+}
+
+/* Validate --platforms comma-separated list. */
+static int new_validate_platforms(const char *platforms)
+{
+    static const char *valid[] = {"windows", "linux", "macos", "ios", "android", "web"};
+    char buf[256];
+    if (platforms == NULL || platforms[0] == '\0')
+        return 1;
+    snprintf(buf, sizeof(buf), "%s", platforms);
+    char *tok = strtok(buf, ",");
+    while (tok)
+    {
+        while (*tok == ' ')
+            tok++;
+        char *end = tok + strlen(tok) - 1;
+        while (end > tok && *end == ' ')
+            *end-- = '\0';
+        int found = 0;
+        for (size_t i = 0; i < sizeof(valid) / sizeof(valid[0]); i++)
+        {
+            if (strcmp(tok, valid[i]) == 0)
+            {
+                found = 1;
+                break;
+            }
+        }
+        if (!found)
+            return 0;
+        tok = strtok(NULL, ",");
+    }
     return 1;
 }
 
-static int new_write_manifest(const char *dir, const char *name, vigil_error_t *error)
+/* Get default platforms string for a type. */
+static const char *new_default_platforms(new_project_type_t type)
 {
-    vigil_toml_value_t *root = NULL;
-    vigil_toml_value_t *str_val = NULL;
-    char *toml_str = NULL;
-    size_t toml_len = 0;
-    int success = 0;
-
-    if (vigil_toml_table_new(NULL, &root, error) != VIGIL_STATUS_OK)
-        goto cleanup;
-    if (vigil_toml_string_new(NULL, name, strlen(name), &str_val, error) != VIGIL_STATUS_OK)
-        goto cleanup;
-    if (vigil_toml_table_set(root, "name", 4, str_val, error) != VIGIL_STATUS_OK)
-        goto cleanup;
-    str_val = NULL;
-    if (vigil_toml_string_new(NULL, "0.1.0", 5, &str_val, error) != VIGIL_STATUS_OK)
-        goto cleanup;
-    if (vigil_toml_table_set(root, "version", 7, str_val, error) != VIGIL_STATUS_OK)
-        goto cleanup;
-    str_val = NULL;
-    if (vigil_toml_emit(root, &toml_str, &toml_len, error) != VIGIL_STATUS_OK)
-        goto cleanup;
-    if (write_text_file(dir, "vigil.toml", toml_str, error) != VIGIL_STATUS_OK)
-        goto cleanup;
-    success = 1;
-
-cleanup:
-    free(toml_str);
-    vigil_toml_free(&str_val);
-    vigil_toml_free(&root);
-    return success;
-}
-
-static int new_write_lib_scaffold(const char *dir, const char *name, vigil_error_t *error)
-{
-    char lib_file[512];
-    char test_file[512];
-    char lib_content[1024];
-    char test_content[1024];
-
-    snprintf(lib_file, sizeof(lib_file), "lib/%s.vigil", name);
-    snprintf(test_file, sizeof(test_file), "test/%s_test.vigil", name);
-
-    snprintf(lib_content, sizeof(lib_content),
-             "/// %s library module.\n"
-             "\n"
-             "pub fn hello() -> string {\n"
-             "    return \"hello from %s\";\n"
-             "}\n",
-             name, name);
-
-    snprintf(test_content, sizeof(test_content),
-             "import \"test\";\n"
-             "import \"%s\";\n"
-             "\n"
-             "fn test_hello(test.T t) -> void {\n"
-             "    t.assert(%s.hello() == \"hello from %s\", \"hello should match\");\n"
-             "}\n",
-             name, name, name);
-
-    return write_text_file(dir, lib_file, lib_content, error) == VIGIL_STATUS_OK &&
-           write_text_file(dir, test_file, test_content, error) == VIGIL_STATUS_OK;
-}
-
-static int new_write_app_scaffold(const char *dir, const char *name, int scaffold, vigil_error_t *error)
-{
-    if (scaffold)
+    switch (type)
     {
-        char lib_file[512];
-        char test_file[512];
-        char lib_content[1024];
-        char test_content[1024];
-        char main_content[1024];
+    case NEW_TYPE_GUI:
+        return "\"windows\", \"linux\", \"macos\", \"ios\", \"android\", \"web\"";
+    case NEW_TYPE_CLI:
+    case NEW_TYPE_LIBRARY:
+        return "\"windows\", \"linux\", \"macos\"";
+    default:
+        return "";
+    }
+}
 
-        snprintf(lib_file, sizeof(lib_file), "lib/%s.vigil", name);
-        snprintf(test_file, sizeof(test_file), "test/%s_test.vigil", name);
+/* Format platforms from user input (comma-separated) to TOML array content. */
+static void new_format_platforms(const char *input, char *out, size_t out_size)
+{
+    char buf[256];
+    size_t pos = 0;
+    snprintf(buf, sizeof(buf), "%s", input);
+    char *tok = strtok(buf, ",");
+    while (tok && pos < out_size - 10)
+    {
+        while (*tok == ' ')
+            tok++;
+        char *end = tok + strlen(tok) - 1;
+        while (end > tok && *end == ' ')
+            *end-- = '\0';
+        if (pos > 0)
+            pos += (size_t)snprintf(out + pos, out_size - pos, ", ");
+        pos += (size_t)snprintf(out + pos, out_size - pos, "\"%s\"", tok);
+        tok = strtok(NULL, ",");
+    }
+    out[pos] = '\0';
+}
 
+static const char *new_type_string(new_project_type_t type)
+{
+    switch (type)
+    {
+    case NEW_TYPE_GUI:
+        return "gui";
+    case NEW_TYPE_LIBRARY:
+        return "library";
+    case NEW_TYPE_WORKSPACE:
+        return "workspace";
+    default:
+        return "cli";
+    }
+}
+/* Write the vigil.toml manifest with all fields and comments. */
+static int new_write_manifest(const char *dir, const new_opts_t *opts, vigil_error_t *error)
+{
+    char content[8192];
+    char platforms_buf[512];
+    const char *platforms;
+
+    if (opts->type == NEW_TYPE_WORKSPACE)
+    {
+        snprintf(content, sizeof(content),
+                 "# ── Project ──────────────────────────────────────────────\n"
+                 "name = \"%s\"\n"
+                 "description = \"%s\"\n"
+                 "version = \"%s\"\n"
+                 "type = \"workspace\"\n"
+                 "\n"
+                 "# ── Organization ─────────────────────────────────────────\n"
+                 "org = \"%s\"                   # Reverse-domain identifier, used for bundle IDs\n"
+                 "author = \"\"                           # Author or team name\n"
+                 "license = \"\"                          # SPDX license identifier (e.g. \"MIT\", \"Apache-2.0\")\n"
+                 "homepage = \"\"                         # Project homepage URL\n"
+                 "repository = \"\"                       # Source code repository URL\n"
+                 "readme = \"README.md\"                  # Path to README file\n"
+                 "keywords = []                         # Keywords for package registry search\n"
+                 "\n"
+                 "# ── Workspace ────────────────────────────────────────────\n"
+                 "[workspace]\n"
+                 "members = [\"*\"]                       # Glob patterns or explicit member paths\n"
+                 "\n"
+                 "# ── Dependencies ─────────────────────────────────────────\n"
+                 "[dependencies]\n",
+                 opts->display_name, opts->description, opts->version, opts->org);
+        return write_text_file(dir, "vigil.toml", content, error) == VIGIL_STATUS_OK;
+    }
+
+    if (opts->platforms_str && opts->platforms_str[0])
+    {
+        new_format_platforms(opts->platforms_str, platforms_buf, sizeof(platforms_buf));
+        platforms = platforms_buf;
+    }
+    else
+        platforms = new_default_platforms(opts->type);
+
+    snprintf(content, sizeof(content),
+             "# ── Project ──────────────────────────────────────────────\n"
+             "name = \"%s\"\n"
+             "description = \"%s\"\n"
+             "version = \"%s\"\n"
+             "type = \"%s\"                          # cli, gui, library, or workspace\n"
+             "\n"
+             "# ── Organization ─────────────────────────────────────────\n"
+             "org = \"%s\"                   # Reverse-domain identifier, used for bundle IDs\n"
+             "author = \"\"                           # Author or team name\n"
+             "license = \"\"                          # SPDX license identifier (e.g. \"MIT\", \"Apache-2.0\")\n"
+             "homepage = \"\"                         # Project homepage URL\n"
+             "repository = \"\"                       # Source code repository URL\n"
+             "readme = \"README.md\"                  # Path to README file\n"
+             "keywords = []                         # Keywords for package registry search\n"
+             "\n"
+             "# ── Platforms ────────────────────────────────────────────\n"
+             "platforms = [%s]\n"
+             "\n"
+             "# ── Icons ────────────────────────────────────────────────\n"
+             "# Platform-specific icon paths. Used by packager/transpiler for\n"
+             "# app bundles, desktop shortcuts, and store listings.\n"
+             "[icon]\n"
+             "windows = \"\"                          # .ico file for Windows executables and Explorer\n"
+             "macos = \"\"                            # .icns file for macOS app bundles\n"
+             "linux = \"\"                            # .png or .svg for .desktop files and AppImage\n"
+             "ios = \"\"                              # .png for iOS app icon (1024x1024 recommended)\n"
+             "android = \"\"                          # .png for Android launcher icon\n"
+             "\n"
+             "# ── macOS ────────────────────────────────────────────────\n"
+             "[platform.macos]\n"
+             "min-os-version = \"\"                   # Minimum macOS version (e.g. \"13.0\")\n"
+             "category = \"\"                         # LSApplicationCategoryType (e.g. \"public.app-category.utilities\")\n"
+             "entitlements = []                     # macOS entitlements (e.g. [\"com.apple.security.network.client\"])\n"
+             "\n"
+             "# ── iOS ──────────────────────────────────────────────────\n"
+             "[platform.ios]\n"
+             "min-os-version = \"\"                   # Minimum iOS version (e.g. \"16.0\")\n"
+             "orientation = \"both\"                  # portrait, landscape, or both\n"
+             "permissions = []                      # iOS permissions (e.g. [\"camera\", \"photos\", \"location\"])\n"
+             "\n"
+             "# ── Android ──────────────────────────────────────────────\n"
+             "[platform.android]\n"
+             "min-sdk-version = 26                  # Minimum Android SDK version\n"
+             "permissions = []                      # Android permissions (e.g. [\"CAMERA\", \"INTERNET\"])\n"
+             "\n"
+             "# ── Windows ──────────────────────────────────────────────\n"
+             "[platform.windows]\n"
+             "manifest = true                       # Embed a UAC application manifest\n"
+             "\n"
+             "# ── Linux ────────────────────────────────────────────────\n"
+             "[platform.linux]\n"
+             "category = \"\"                         # Freedesktop .desktop category (e.g. \"Utility\", \"Development\")\n"
+             "\n"
+             "# ── Dependencies ─────────────────────────────────────────\n"
+             "[dependencies]\n",
+             opts->display_name, opts->description, opts->version, new_type_string(opts->type),
+             opts->org, platforms);
+    return write_text_file(dir, "vigil.toml", content, error) == VIGIL_STATUS_OK;
+}
+
+/* Write scaffold files for cli/library/gui types. */
+static int new_write_scaffold(const char *dir, const new_opts_t *opts, vigil_error_t *error)
+{
+    char lib_file[512], test_file[512];
+    char lib_content[2048], test_content[1024], main_content[1024];
+    const char *mod = opts->dir_name;
+
+    snprintf(lib_file, sizeof(lib_file), "lib/%s.vigil", mod);
+    snprintf(test_file, sizeof(test_file), "test/%s_test.vigil", mod);
+
+    if (opts->type == NEW_TYPE_GUI)
+    {
+        snprintf(lib_content, sizeof(lib_content),
+                 "/// %s GUI module.\n"
+                 "///\n"
+                 "/// NOTE: GUI projects require SDL3. When running with `vigil run`, SDL is built-in.\n"
+                 "/// For transpiled builds, SDL3 is fetched automatically via CMake FetchContent.\n"
+                 "\n"
+                 "import \"sdl\";\n"
+                 "\n"
+                 "/// Create and show a window. Returns 0 on success.\n"
+                 "pub fn run() -> i32 {\n"
+                 "    sdl.init();\n"
+                 "    sdl.create_window(\"%s\", 800, 600);\n"
+                 "    sdl.delay(2000);\n"
+                 "    sdl.quit();\n"
+                 "    return 0;\n"
+                 "}\n",
+                 mod, opts->display_name);
+
+        snprintf(test_content, sizeof(test_content),
+                 "import \"test\";\n"
+                 "import \"sdl\";\n"
+                 "\n"
+                 "fn test_sdl_version(test.T t) -> void {\n"
+                 "    t.assert(sdl.get_version().len() > 0, \"SDL version should be non-empty\");\n"
+                 "}\n");
+
+        snprintf(main_content, sizeof(main_content),
+                 "import \"fmt\";\n"
+                 "import \"%s\";\n"
+                 "\n"
+                 "fn main() -> i32 {\n"
+                 "    fmt.println(\"starting %s...\");\n"
+                 "    return %s.run();\n"
+                 "}\n",
+                 mod, opts->display_name, mod);
+    }
+    else if (opts->type == NEW_TYPE_LIBRARY)
+    {
+        snprintf(lib_content, sizeof(lib_content),
+                 "/// %s library module.\n"
+                 "\n"
+                 "pub fn hello() -> string {\n"
+                 "    return \"hello from %s\";\n"
+                 "}\n",
+                 mod, mod);
+
+        snprintf(test_content, sizeof(test_content),
+                 "import \"test\";\n"
+                 "import \"%s\";\n"
+                 "\n"
+                 "fn test_hello(test.T t) -> void {\n"
+                 "    t.assert(%s.hello() == \"hello from %s\", \"hello should match\");\n"
+                 "}\n",
+                 mod, mod, mod);
+
+        main_content[0] = '\0'; /* no main for library */
+    }
+    else /* CLI */
+    {
         snprintf(lib_content, sizeof(lib_content),
                  "/// %s module.\n"
                  "\n"
                  "pub fn greet(string name) -> string {\n"
                  "    return \"hello, \" + name;\n"
                  "}\n",
-                 name);
+                 mod);
 
         snprintf(test_content, sizeof(test_content),
                  "import \"test\";\n"
@@ -424,7 +672,7 @@ static int new_write_app_scaffold(const char *dir, const char *name, int scaffol
                  "fn test_greet(test.T t) -> void {\n"
                  "    t.assert(%s.greet(\"world\") == \"hello, world\", \"greet should work\");\n"
                  "}\n",
-                 name, name);
+                 mod, mod);
 
         snprintf(main_content, sizeof(main_content),
                  "import \"fmt\";\n"
@@ -434,92 +682,184 @@ static int new_write_app_scaffold(const char *dir, const char *name, int scaffol
                  "    fmt.println(%s.greet(\"world\"));\n"
                  "    return 0;\n"
                  "}\n",
-                 name, name);
-
-        return write_text_file(dir, lib_file, lib_content, error) == VIGIL_STATUS_OK &&
-               write_text_file(dir, test_file, test_content, error) == VIGIL_STATUS_OK &&
-               write_text_file(dir, "main.vigil", main_content, error) == VIGIL_STATUS_OK;
+                 mod, mod);
     }
 
-    return write_text_file(dir, "main.vigil",
-                           "import \"fmt\";\n"
-                           "\n"
-                           "fn main() -> i32 {\n"
-                           "    fmt.println(\"hello, world!\");\n"
-                           "    return 0;\n"
-                           "}\n",
-                           error) == VIGIL_STATUS_OK;
+    if (write_text_file(dir, lib_file, lib_content, error) != VIGIL_STATUS_OK)
+        return 0;
+    if (write_text_file(dir, test_file, test_content, error) != VIGIL_STATUS_OK)
+        return 0;
+    if (main_content[0] && write_text_file(dir, "main.vigil", main_content, error) != VIGIL_STATUS_OK)
+        return 0;
+    return 1;
 }
 
-static void new_print_summary(const char *dir, const char *name, int is_lib, int scaffold)
+static void new_print_summary(const char *dir, const new_opts_t *opts)
 {
+    const char *mod = opts->dir_name;
     printf("created %s\n", dir);
     printf("  vigil.toml\n");
-    if (is_lib)
+    if (opts->type != NEW_TYPE_WORKSPACE)
     {
-        printf("  lib/%s.vigil\n", name);
-        printf("  test/%s_test.vigil\n", name);
+        if (opts->type != NEW_TYPE_LIBRARY)
+            printf("  main.vigil\n");
+        printf("  lib/%s.vigil\n", mod);
+        printf("  test/%s_test.vigil\n", mod);
+        printf("  lib/\n");
+        printf("  test/\n");
     }
-    else if (scaffold)
-    {
-        printf("  main.vigil\n");
-        printf("  lib/%s.vigil\n", name);
-        printf("  test/%s_test.vigil\n", name);
-    }
-    else
-    {
-        printf("  main.vigil\n");
-    }
-    printf("  lib/\n");
-    printf("  test/\n");
     printf("  .gitignore\n");
 }
 
-/* Maximum project name length. Scaffold templates embed the name into fixed
-   buffers, so we enforce a safe upper bound here rather than silently truncating. */
 #define NEW_MAX_PROJECT_NAME 100
 
-static int cmd_new(const char *name, int is_lib, int scaffold, const char *output_dir)
+static int cmd_new(const new_opts_t *opts)
 {
     vigil_error_t error = {0};
     int exists = 0;
-    char project_name[256];
-    char project_path[512];
+    char project_name_buf[256];
+    new_opts_t resolved;
     const char *dir;
 
-    name = new_resolve_project_name(name, project_name, sizeof(project_name), &error);
-    if (name == NULL)
+    memcpy(&resolved, opts, sizeof(resolved));
+
+    /* Resolve project name: from flag, positional, or interactive prompt. */
+    if (resolved.display_name == NULL || resolved.display_name[0] == '\0')
     {
-        fprintf(stderr, "error: %s\n", vigil_error_message(&error));
-        return 1;
+        if (!vigil_platform_is_terminal())
+        {
+            fprintf(stderr, "error: --project-name is required in non-interactive mode\n");
+            return 1;
+        }
+        if (vigil_platform_readline("Project name: ", project_name_buf, sizeof(project_name_buf), &error) !=
+            VIGIL_STATUS_OK)
+        {
+            fprintf(stderr, "error: %s\n", vigil_error_message(&error));
+            return 1;
+        }
+        if (project_name_buf[0] == '\0')
+        {
+            fprintf(stderr, "error: project name cannot be empty\n");
+            return 1;
+        }
+        resolved.display_name = project_name_buf;
     }
-    if (strlen(name) > NEW_MAX_PROJECT_NAME)
+
+    if (strlen(resolved.display_name) > NEW_MAX_PROJECT_NAME)
     {
         fprintf(stderr, "error: project name too long (max %d characters)\n", NEW_MAX_PROJECT_NAME);
         return 1;
     }
-    dir = new_resolve_project_dir(name, output_dir, project_path, sizeof(project_path));
+    if (new_name_has_path(resolved.display_name))
+    {
+        fprintf(stderr, "error: project name must not contain path separators\n");
+        return 1;
+    }
+    if (!new_normalize_name(resolved.display_name, resolved.dir_name, sizeof(resolved.dir_name)))
+    {
+        fprintf(stderr, "error: project name normalizes to an invalid identifier "
+                        "(must start with a letter, contain only [a-z0-9_-])\n");
+        return 1;
+    }
+    if (new_is_windows_reserved(resolved.dir_name))
+    {
+        fprintf(stderr, "error: project name '%s' conflicts with a Windows reserved device name\n",
+                resolved.dir_name);
+        return 1;
+    }
+
+    /* Parse and validate type. */
+    int type_val = new_parse_type(resolved.type_str);
+    if (type_val < 0)
+    {
+        fprintf(stderr, "error: unknown project type '%s' (expected: cli, gui, library, workspace)\n",
+                resolved.type_str);
+        return 1;
+    }
+    resolved.type = (new_project_type_t)type_val;
+
+    /* Validate workspace flag restrictions. */
+    if (resolved.type == NEW_TYPE_WORKSPACE && resolved.platforms_str && resolved.platforms_str[0])
+    {
+        fprintf(stderr, "error: --platforms is not allowed for workspace projects (platforms belong to members)\n");
+        return 1;
+    }
+
+    /* Validate org. */
+    if (resolved.org == NULL || resolved.org[0] == '\0')
+        resolved.org = "com.example";
+    if (!new_validate_org(resolved.org))
+    {
+        fprintf(stderr, "error: invalid --org '%s' (must be reverse-domain notation, e.g. com.example)\n",
+                resolved.org);
+        return 1;
+    }
+
+    /* Validate platforms. */
+    if (resolved.platforms_str && resolved.platforms_str[0] && !new_validate_platforms(resolved.platforms_str))
+    {
+        fprintf(stderr,
+                "error: invalid --platforms '%s' (valid: windows, linux, macos, ios, android, web)\n",
+                resolved.platforms_str);
+        return 1;
+    }
+
+    /* Defaults. */
+    if (resolved.description == NULL || resolved.description[0] == '\0')
+        resolved.description = "A new Vigil project";
+    if (resolved.version == NULL || resolved.version[0] == '\0')
+        resolved.version = "1.0.0";
+
+    dir = resolved.dir_name;
 
     /* Check if directory already exists. */
     if (vigil_platform_file_exists(dir, &exists) == VIGIL_STATUS_OK && exists)
     {
-        fprintf(stderr, "error: '%s' already exists\n", dir);
+        if (strcmp(resolved.display_name, resolved.dir_name) != 0)
+            fprintf(stderr, "error: '%s' already exists (normalized from '%s')\n", dir, resolved.display_name);
+        else
+            fprintf(stderr, "error: '%s' already exists\n", dir);
         return 1;
     }
 
-    if (!new_create_project_tree(dir, &error) || !new_write_manifest(dir, name, &error) ||
-        write_text_file(dir, ".gitignore", "deps/\n", &error) != VIGIL_STATUS_OK)
+    /* Create directory tree. */
+    if (vigil_platform_mkdir_p(dir, &error) != VIGIL_STATUS_OK)
     {
         fprintf(stderr, "error: %s\n", vigil_error_message(&error));
         return 1;
     }
-    if (is_lib ? !new_write_lib_scaffold(dir, name, &error) : !new_write_app_scaffold(dir, name, scaffold, &error))
+    if (resolved.type != NEW_TYPE_WORKSPACE)
+    {
+        if (make_subdir(dir, "lib", &error) != VIGIL_STATUS_OK ||
+            make_subdir(dir, "test", &error) != VIGIL_STATUS_OK)
+        {
+            fprintf(stderr, "error: %s\n", vigil_error_message(&error));
+            return 1;
+        }
+    }
+
+    /* Write manifest. */
+    if (!new_write_manifest(dir, &resolved, &error))
     {
         fprintf(stderr, "error: %s\n", vigil_error_message(&error));
         return 1;
     }
 
-    new_print_summary(dir, name, is_lib, scaffold);
+    /* Write .gitignore. */
+    if (write_text_file(dir, ".gitignore", "deps/\nbuild/\n", &error) != VIGIL_STATUS_OK)
+    {
+        fprintf(stderr, "error: %s\n", vigil_error_message(&error));
+        return 1;
+    }
+
+    /* Write scaffold (skip for workspace). */
+    if (resolved.type != NEW_TYPE_WORKSPACE && !new_write_scaffold(dir, &resolved, &error))
+    {
+        fprintf(stderr, "error: %s\n", vigil_error_message(&error));
+        return 1;
+    }
+
+    new_print_summary(dir, &resolved);
     return 0;
 }
 
@@ -4097,7 +4437,11 @@ typedef struct
 {
     const char *check_file;
     const char *new_name;
-    const char *new_output;
+    const char *new_description;
+    const char *new_org;
+    const char *new_version;
+    const char *new_type;
+    const char *new_platforms;
     const char *debug_file;
     int debug_interactive;
     const char *doc_file;
@@ -4108,8 +4452,7 @@ typedef struct
     const char *pkg_output;
     const char *pkg_key;
     int pkg_inspect;
-    int new_lib;
-    int new_scaffold;
+    /* new_lib and new_scaffold removed */
 } parsed_args_t;
 
 static int dispatch_check(const parsed_args_t *args)
@@ -4124,7 +4467,12 @@ static int dispatch_check(const parsed_args_t *args)
 
 static int dispatch_new(const parsed_args_t *args)
 {
-    return cmd_new(args->new_name, args->new_lib, args->new_scaffold, args->new_output);
+    return cmd_new(&(new_opts_t){.display_name = args->new_name,
+                                 .description = args->new_description,
+                                 .org = args->new_org,
+                                 .version = args->new_version,
+                                 .type_str = args->new_type,
+                                 .platforms_str = args->new_platforms});
 }
 
 static int dispatch_debug(const parsed_args_t *args)
@@ -4207,10 +4555,13 @@ static void register_cli_commands(vigil_cli_t *cli, parsed_args_t *args)
     vigil_cli_add_positional(cmd, "file", "Script file to check", &args->check_file);
 
     cmd = vigil_cli_add_command(cli, "new", "Create a new VIGIL project");
-    vigil_cli_add_positional(cmd, "name", "Project name", &args->new_name);
-    vigil_cli_add_bool_flag(cmd, "lib", 'l', "Create a library project", &args->new_lib);
-    vigil_cli_add_bool_flag(cmd, "scaffold", 's', "Include example module and test", &args->new_scaffold);
-    vigil_cli_add_string_flag(cmd, "output", 'o', "Output directory", &args->new_output);
+    vigil_cli_add_positional(cmd, "name", "Project name (shorthand for --project-name)", &args->new_name);
+    vigil_cli_add_string_flag(cmd, "project-name", 0, "Project name", &args->new_name);
+    vigil_cli_add_string_flag(cmd, "description", 'd', "Project description", &args->new_description);
+    vigil_cli_add_string_flag(cmd, "org", 0, "Organization (reverse-domain, e.g. com.example)", &args->new_org);
+    vigil_cli_add_string_flag(cmd, "version", 0, "Initial version (default: 1.0.0)", &args->new_version);
+    vigil_cli_add_string_flag(cmd, "type", 't', "Project type: cli, gui, library, workspace", &args->new_type);
+    vigil_cli_add_string_flag(cmd, "platforms", 'p', "Target platforms (comma-separated)", &args->new_platforms);
 
     cmd = vigil_cli_add_command(cli, "debug", "Debug a VIGIL script");
     vigil_cli_add_positional(cmd, "file", "Script file to debug", &args->debug_file);
