@@ -3586,7 +3586,9 @@ static const char *transpile_cmake_template =
     "list(FILTER VIGIL_RT_SOURCES EXCLUDE REGEX \"(dap|debugger|lsp|editor|embed|package|pkg|coverage|cli_test)\\.c$\")\n"
     "list(FILTER VIGIL_PLUGIN_SOURCES EXCLUDE REGEX \"gui_sdl\\.c$\")\n"
     "# Exclude plugins that need external deps not yet available\n"
-    "list(FILTER VIGIL_PLUGIN_SOURCES EXCLUDE REGEX \"audio\\.c$\")\n"
+    "if(NOT EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/vigil_rt/NEEDS_AUDIO)\n"
+    "    list(FILTER VIGIL_PLUGIN_SOURCES EXCLUDE REGEX \"audio\\.c$\")\n"
+    "endif()\n"
     "# Exclude SDL if not needed\n"
     "if(NOT EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/vigil_rt/NEEDS_SDL)\n"
     "    list(FILTER VIGIL_PLUGIN_SOURCES EXCLUDE REGEX \"sdl\\\\.c$\")\n"
@@ -3675,6 +3677,22 @@ static const char *transpile_cmake_template_3 =
     "# stb headers for image/font loading\n"
     "if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/vigil_rt/deps/stb)\n"
     "    target_include_directories(vigil_rt PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/vigil_rt/deps)\n"
+    "endif()\n"
+    "# miniaudio via FetchContent (for audio plugin)\n"
+    "if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/vigil_rt/NEEDS_AUDIO)\n"
+    "    include(FetchContent)\n"
+    "    FetchContent_Declare(miniaudio\n"
+    "        GIT_REPOSITORY https://github.com/mackron/miniaudio.git\n"
+    "        GIT_TAG 0.11.21\n"
+    "        GIT_SHALLOW TRUE\n"
+    "    )\n"
+    "    FetchContent_MakeAvailable(miniaudio)\n"
+    "    target_include_directories(vigil_rt PRIVATE ${miniaudio_SOURCE_DIR})\n"
+    "    target_include_directories(vigil_rt PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/vigil_rt/deps/stb)\n"
+    "    set_source_files_properties(\n"
+    "        ${CMAKE_CURRENT_SOURCE_DIR}/vigil_rt/plugins/audio/audio.c\n"
+    "        PROPERTIES COMPILE_OPTIONS \"-w\")\n"
+    "    target_compile_definitions(vigil_rt PUBLIC VIGIL_PLUGIN_AUDIO_ENABLED)\n"
     "endif()\n";
 
 static void write_transpile_header(char *buf, size_t buf_size, size_t entry_idx, size_t arity)
@@ -3791,17 +3809,18 @@ static int transpile_write_project(const char *output_dir, const vigil_string_t 
     int result;
     size_t src_count = vigil_source_registry_count(registry);
     int needs_sdl = 0;
+    int needs_audio = 0;
 
-    /* Check if any source imports SDL. */
+    /* Check if any source imports SDL/GUI/audio. */
     for (size_t si = 0; si < src_count; si++)
     {
         const vigil_source_file_t *sf = vigil_source_registry_get(registry, (vigil_source_id_t)(si + 1));
-        if (sf && (strstr(vigil_string_c_str(&sf->text), "import \"sdl\"") ||
-                   strstr(vigil_string_c_str(&sf->text), "import \"gui\"")))
-        {
+        if (!sf) continue;
+        const char *txt = vigil_string_c_str(&sf->text);
+        if (strstr(txt, "import \"sdl\"") || strstr(txt, "import \"gui\""))
             needs_sdl = 1;
-            break;
-        }
+        if (strstr(txt, "import \"audio\""))
+            needs_audio = 1;
     }
 
     write_transpile_header(hdr, sizeof(hdr), entry_idx, 0);
@@ -3901,6 +3920,13 @@ static int transpile_write_project(const char *output_dir, const vigil_string_t 
     {
         char marker[4096];
         snprintf(marker, sizeof(marker), "%s/vigil_rt/NEEDS_SDL", output_dir);
+        vigil_platform_write_file(marker, "1", 1, error);
+    }
+    /* Write audio marker file if needed. */
+    if (result && needs_audio)
+    {
+        char marker[4096];
+        snprintf(marker, sizeof(marker), "%s/vigil_rt/NEEDS_AUDIO", output_dir);
         vigil_platform_write_file(marker, "1", 1, error);
     }
 
