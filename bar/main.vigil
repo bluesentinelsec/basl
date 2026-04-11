@@ -1,0 +1,7 @@
+import "fmt";
+import "bar";
+
+fn main() -> i32 {
+    fmt.println(bar.greet("world"));
+    return 0;
+}

@@ -376,7 +376,7 @@ static int new_name_has_path(const char *name)
     {
         if (*p == '/' || *p == '\\')
             return 1;
-        if (*p == '.' && p[1] == '.')
+        if (*p == '.' && p[1] == '.' && (p[2] == '/' || p[2] == '\\' || p[2] == '\0'))
             return 1;
     }
     /* Windows drive letter */
@@ -713,6 +713,253 @@ static void new_print_summary(const char *dir, const new_opts_t *opts)
 
 #define NEW_MAX_PROJECT_NAME 100
 
+/* ── Workspace detection and member creation ─────────────────────── */
+
+/* Result of workspace root detection. */
+typedef struct
+{
+    char root_path[4096];       /* Absolute path to workspace root directory */
+    char toml_path[4096 + 16]; /* Absolute path to workspace vigil.toml */
+    int found;                  /* 1 if a workspace root was found */
+} workspace_info_t;
+
+/* Walk up from cwd to find the nearest vigil.toml containing [workspace]. */
+static void new_find_workspace_root(workspace_info_t *ws, vigil_error_t *error)
+{
+    char *cwd = NULL;
+    char candidate[4096];
+    char *file_data = NULL;
+    size_t file_len = 0;
+    vigil_toml_value_t *root = NULL;
+
+    ws->found = 0;
+    if (vigil_platform_getcwd(NULL, &cwd, error) != VIGIL_STATUS_OK || cwd == NULL)
+        return;
+
+    snprintf(candidate, sizeof(candidate), "%s", cwd);
+    free(cwd);
+
+    for (;;)
+    {
+        char toml[4096 + 16];
+        snprintf(toml, sizeof(toml), "%s/vigil.toml", candidate);
+
+        int exists = 0;
+        if (vigil_platform_file_exists(toml, &exists) == VIGIL_STATUS_OK && exists)
+        {
+            if (vigil_platform_read_file(NULL, toml, &file_data, &file_len, error) == VIGIL_STATUS_OK)
+            {
+                if (vigil_toml_parse(NULL, file_data, file_len, &root, error) == VIGIL_STATUS_OK)
+                {
+                    if (vigil_toml_table_get(root, "workspace") != NULL)
+                    {
+                        snprintf(ws->root_path, sizeof(ws->root_path), "%s", candidate);
+                        snprintf(ws->toml_path, sizeof(ws->toml_path), "%s", toml);
+                        ws->found = 1;
+                        vigil_toml_free(&root);
+                        free(file_data);
+                        return;
+                    }
+                    vigil_toml_free(&root);
+                    root = NULL;
+                }
+                free(file_data);
+                file_data = NULL;
+            }
+        }
+
+        /* Move up one directory. */
+        char *slash = strrchr(candidate, '/');
+        if (slash == NULL || slash == candidate)
+            break;
+        *slash = '\0';
+    }
+}
+
+/* Check if a glob pattern (e.g. "crates" with star) matches a name.
+   Only supports trailing slash-star glob. Returns the prefix path if matched. */
+static int new_glob_match(const char *pattern, const char *name, char *prefix, size_t prefix_size)
+{
+    size_t plen = strlen(pattern);
+    if (plen >= 2 && pattern[plen - 1] == '*' && pattern[plen - 2] == '/')
+    {
+        /* Pattern like "crates" + slash-star — prefix is "crates" */
+        size_t pfx_len = plen - 2;
+        if (pfx_len < prefix_size)
+        {
+            memcpy(prefix, pattern, pfx_len);
+            prefix[pfx_len] = '\0';
+            return 1;
+        }
+    }
+    else if (strcmp(pattern, "*") == 0)
+    {
+        prefix[0] = '\0';
+        return 1;
+    }
+    (void)name;
+    return 0;
+}
+
+/* Determine where to create a new member inside a workspace.
+   Sets create_path (relative to workspace root) and returns 1 if the member
+   should be auto-registered (explicit list case). */
+static int new_workspace_resolve_path(const workspace_info_t *ws, const char *dir_name,
+                                       char *create_path, size_t create_path_size,
+                                       int *needs_registration, vigil_error_t *error)
+{
+    char *file_data = NULL;
+    size_t file_len = 0;
+    vigil_toml_value_t *root = NULL;
+    int result = 0;
+
+    *needs_registration = 0;
+
+    if (vigil_platform_read_file(NULL, ws->toml_path, &file_data, &file_len, error) != VIGIL_STATUS_OK)
+        return 0;
+    if (vigil_toml_parse(NULL, file_data, file_len, &root, error) != VIGIL_STATUS_OK)
+    {
+        free(file_data);
+        return 0;
+    }
+
+    const vigil_toml_value_t *workspace = vigil_toml_table_get(root, "workspace");
+    const vigil_toml_value_t *members = workspace ? vigil_toml_table_get(workspace, "members") : NULL;
+
+    if (members == NULL)
+    {
+        /* No members field — create at root level. */
+        snprintf(create_path, create_path_size, "%s/%s", ws->root_path, dir_name);
+        *needs_registration = 1;
+        result = 1;
+        goto cleanup;
+    }
+
+    size_t count = vigil_toml_array_count(members);
+    char prefix[512];
+
+    /* Check globs first (first match wins). */
+    for (size_t i = 0; i < count; i++)
+    {
+        const vigil_toml_value_t *elem = vigil_toml_array_get(members, i);
+        const char *pat = vigil_toml_string_value(elem);
+        if (pat && new_glob_match(pat, dir_name, prefix, sizeof(prefix)))
+        {
+            if (prefix[0])
+                snprintf(create_path, create_path_size, "%s/%s/%s", ws->root_path, prefix, dir_name);
+            else
+                snprintf(create_path, create_path_size, "%s/%s", ws->root_path, dir_name);
+            /* Glob covers it — no explicit registration needed. */
+            *needs_registration = 0;
+            result = 1;
+            goto cleanup;
+        }
+    }
+
+    /* No glob matched — create at root level, needs explicit registration. */
+    snprintf(create_path, create_path_size, "%s/%s", ws->root_path, dir_name);
+    *needs_registration = 1;
+    result = 1;
+
+cleanup:
+    vigil_toml_free(&root);
+    free(file_data);
+    return result;
+}
+
+/* Append a member name to the workspace vigil.toml [workspace] members list. */
+static int new_workspace_register_member(const workspace_info_t *ws, const char *member_path,
+                                          vigil_error_t *error)
+{
+    char *file_data = NULL;
+    size_t file_len = 0;
+    vigil_toml_value_t *root = NULL;
+    char *out_str = NULL;
+    size_t out_len = 0;
+    int success = 0;
+
+    if (vigil_platform_read_file(NULL, ws->toml_path, &file_data, &file_len, error) != VIGIL_STATUS_OK)
+        return 0;
+    if (vigil_toml_parse(NULL, file_data, file_len, &root, error) != VIGIL_STATUS_OK)
+    {
+        free(file_data);
+        return 0;
+    }
+
+    const vigil_toml_value_t *workspace = vigil_toml_table_get(root, "workspace");
+    vigil_toml_value_t *members = (vigil_toml_value_t *)
+        (workspace ? vigil_toml_table_get(workspace, "members") : NULL);
+
+    if (members == NULL)
+        goto cleanup;
+
+    /* Add the new member. */
+    vigil_toml_value_t *new_entry = NULL;
+    if (vigil_toml_string_new(NULL, member_path, strlen(member_path), &new_entry, error) != VIGIL_STATUS_OK)
+        goto cleanup;
+    if (vigil_toml_array_push(members, new_entry, error) != VIGIL_STATUS_OK)
+    {
+        vigil_toml_free(&new_entry);
+        goto cleanup;
+    }
+
+    /* Re-emit and write back. */
+    if (vigil_toml_emit(root, &out_str, &out_len, error) != VIGIL_STATUS_OK)
+        goto cleanup;
+    if (vigil_platform_write_file(ws->toml_path, out_str, out_len, error) != VIGIL_STATUS_OK)
+        goto cleanup;
+    success = 1;
+
+cleanup:
+    free(out_str);
+    vigil_toml_free(&root);
+    free(file_data);
+    return success;
+}
+
+/* Read metadata from workspace root vigil.toml for inheritance. */
+static void new_workspace_inherit_metadata(const workspace_info_t *ws, new_opts_t *opts,
+                                            vigil_error_t *error)
+{
+    char *file_data = NULL;
+    size_t file_len = 0;
+    vigil_toml_value_t *root = NULL;
+
+    if (vigil_platform_read_file(NULL, ws->toml_path, &file_data, &file_len, error) != VIGIL_STATUS_OK)
+        return;
+    if (vigil_toml_parse(NULL, file_data, file_len, &root, error) != VIGIL_STATUS_OK)
+    {
+        free(file_data);
+        return;
+    }
+
+    /* Inherit org if not explicitly provided. */
+    if (opts->org == NULL || strcmp(opts->org, "com.example") == 0)
+    {
+        const vigil_toml_value_t *v = vigil_toml_table_get(root, "org");
+        if (v)
+        {
+            const char *s = vigil_toml_string_value(v);
+            if (s && s[0])
+                opts->org = strdup(s);
+        }
+    }
+    /* Inherit version if not explicitly provided. */
+    if (opts->version == NULL || strcmp(opts->version, "1.0.0") == 0)
+    {
+        const vigil_toml_value_t *v = vigil_toml_table_get(root, "version");
+        if (v)
+        {
+            const char *s = vigil_toml_string_value(v);
+            if (s && s[0])
+                opts->version = strdup(s);
+        }
+    }
+
+    vigil_toml_free(&root);
+    free(file_data);
+}
+
 static int cmd_new(const new_opts_t *opts)
 {
     vigil_error_t error = {0};
@@ -758,7 +1005,7 @@ static int cmd_new(const new_opts_t *opts)
     if (!new_normalize_name(resolved.display_name, resolved.dir_name, sizeof(resolved.dir_name)))
     {
         fprintf(stderr, "error: project name normalizes to an invalid identifier "
-                        "(must start with a letter, contain only [a-z0-9_-])\n");
+                        "(must start with a letter or underscore, contain only [a-z0-9_-])\n");
         return 1;
     }
     if (new_is_windows_reserved(resolved.dir_name))
@@ -810,7 +1057,33 @@ static int cmd_new(const new_opts_t *opts)
     if (resolved.version == NULL || resolved.version[0] == '\0')
         resolved.version = "1.0.0";
 
-    dir = resolved.dir_name;
+    /* Workspace detection: if we're inside a workspace, create relative to its root. */
+    workspace_info_t ws = {0};
+    char ws_create_path[4096];
+    int ws_needs_registration = 0;
+
+    if (resolved.type != NEW_TYPE_WORKSPACE)
+    {
+        new_find_workspace_root(&ws, &error);
+        if (ws.found)
+        {
+            /* Inherit metadata from workspace root. */
+            new_workspace_inherit_metadata(&ws, &resolved, &error);
+
+            /* Determine creation path (glob-aware). */
+            if (!new_workspace_resolve_path(&ws, resolved.dir_name, ws_create_path,
+                                             sizeof(ws_create_path), &ws_needs_registration, &error))
+            {
+                fprintf(stderr, "error: failed to resolve workspace member path\n");
+                return 1;
+            }
+            dir = ws_create_path;
+        }
+        else
+            dir = resolved.dir_name;
+    }
+    else
+        dir = resolved.dir_name;
 
     /* Check if directory already exists. */
     if (vigil_platform_file_exists(dir, &exists) == VIGIL_STATUS_OK && exists)
@@ -857,6 +1130,14 @@ static int cmd_new(const new_opts_t *opts)
     {
         fprintf(stderr, "error: %s\n", vigil_error_message(&error));
         return 1;
+    }
+
+    /* Auto-register in workspace if needed. */
+    if (ws.found && ws_needs_registration)
+    {
+        if (!new_workspace_register_member(&ws, resolved.dir_name, &error))
+            fprintf(stderr, "warning: failed to register member in workspace: %s\n",
+                    vigil_error_message(&error));
     }
 
     new_print_summary(dir, &resolved);

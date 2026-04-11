@@ -176,7 +176,7 @@ myapp/
 
 The project name is normalized for filesystem use:
 - Lowercase, whitespace → `_`, only `[a-z0-9_-]` kept
-- Must start with a letter (not a digit or `-`)
+- Must start with a letter or underscore (not a digit or `-`)
 - Windows reserved names (`con`, `prn`, `aux`, `nul`, `com1`–`com9`, `lpt1`–`lpt9`) are rejected
 - The original display name is preserved in `vigil.toml`
 

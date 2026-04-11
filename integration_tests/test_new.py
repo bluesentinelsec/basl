@@ -173,6 +173,58 @@ class TestNewWorkspace(unittest.TestCase):
         self.assertNotEqual(rc, 0)
         self.assertIn("not allowed for workspace", err)
 
+    def test_workspace_member_creation(self):
+        """Creating a project inside a workspace creates relative to workspace root."""
+        ws = os.path.join(self.tmpdir, "myws")
+        run_new("myws", "-t", "workspace", cwd=self.tmpdir)
+        run_new("cat", "-t", "cli", cwd=ws)
+        self.assertTrue(os.path.isdir(os.path.join(ws, "cat")))
+        self.assertTrue(os.path.isfile(os.path.join(ws, "cat", "vigil.toml")))
+        self.assertTrue(os.path.isfile(os.path.join(ws, "cat", "main.vigil")))
+
+    def test_workspace_glob_aware_creation(self):
+        """members = ['crates/*'] should create under crates/<name>/."""
+        ws = os.path.join(self.tmpdir, "myws")
+        run_new("myws", "-t", "workspace", cwd=self.tmpdir)
+        # Modify members to use crates/* glob
+        toml_path = os.path.join(ws, "vigil.toml")
+        content = open(toml_path).read()
+        content = content.replace('members = ["*"]', 'members = ["crates/*"]')
+        open(toml_path, "w").write(content)
+        os.makedirs(os.path.join(ws, "crates"), exist_ok=True)
+        run_new("mylib", "-t", "library", cwd=ws)
+        self.assertTrue(os.path.isdir(os.path.join(ws, "crates", "mylib")))
+
+    def test_workspace_explicit_list_append(self):
+        """Explicit member list gets new member appended."""
+        ws = os.path.join(self.tmpdir, "myws")
+        run_new("myws", "-t", "workspace", cwd=self.tmpdir)
+        toml_path = os.path.join(ws, "vigil.toml")
+        content = open(toml_path).read()
+        content = content.replace('members = ["*"]', 'members = ["cat"]')
+        open(toml_path, "w").write(content)
+        run_new("grep", "-t", "cli", cwd=ws)
+        toml = open(toml_path).read()
+        self.assertIn('"grep"', toml)
+
+    def test_workspace_metadata_inheritance(self):
+        """Members inherit org and version from workspace root."""
+        ws = os.path.join(self.tmpdir, "myws")
+        run_new("myws", "-t", "workspace", "--org", "com.myorg", "--version", "2.0.0", cwd=self.tmpdir)
+        run_new("svc", "-t", "cli", cwd=ws)
+        toml = open(os.path.join(ws, "svc", "vigil.toml")).read()
+        self.assertIn('org = "com.myorg"', toml)
+        self.assertIn('version = "2.0.0"', toml)
+
+    def test_workspace_member_from_subdir(self):
+        """Creating from a workspace subdirectory still creates relative to root."""
+        ws = os.path.join(self.tmpdir, "myws")
+        run_new("myws", "-t", "workspace", cwd=self.tmpdir)
+        subdir = os.path.join(ws, "subdir")
+        os.makedirs(subdir)
+        run_new("app", "-t", "cli", cwd=subdir)
+        self.assertTrue(os.path.isdir(os.path.join(ws, "app")))
+
 
 class TestNewValidation(unittest.TestCase):
     """Tests for input validation."""
