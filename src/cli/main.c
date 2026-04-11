@@ -3596,8 +3596,7 @@ static const char *transpile_cmake_template =
     "    list(FILTER VIGIL_PLUGIN_SOURCES EXCLUDE REGEX \"vigil_font\\\\.c$\")\n"
     "    list(FILTER VIGIL_PLUGIN_SOURCES EXCLUDE REGEX \"gui\")\n"
     "endif()\n"
-    "# Exclude stdlib modules with complex deps\n"
-    "list(FILTER VIGIL_RT_STDLIB EXCLUDE REGEX \"(ffi)\\.c$\")\n"
+    "# Exclude plugins that need external deps not yet available\n"
     "add_library(vigil_rt STATIC ${VIGIL_RT_SOURCES} ${VIGIL_RT_STDLIB}\n"
     "    ${VIGIL_RT_PLATFORM} ${VIGIL_PLUGIN_SOURCES})\n"
     "target_include_directories(vigil_rt PUBLIC\n"
@@ -3648,6 +3647,11 @@ static const char *transpile_cmake_template_2 =
     "if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/vigil_rt/deps/crypto)\n"
     "    add_subdirectory(vigil_rt/deps/crypto)\n"
     "    target_link_libraries(vigil_rt PRIVATE vigil_crypto)\n"
+    "endif()\n"
+    "if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/vigil_rt/deps/libffi/CMakeLists.txt)\n"
+    "    add_subdirectory(vigil_rt/deps/libffi)\n"
+    "    target_link_libraries(vigil_rt PRIVATE ffi_static)\n"
+    "    target_compile_definitions(vigil_rt PRIVATE VIGIL_HAS_LIBFFI)\n"
     "endif()\n";
 
 static const char *transpile_cmake_template_3 =

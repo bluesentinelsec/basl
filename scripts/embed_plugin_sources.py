@@ -111,6 +111,22 @@ for f in ["CMakeLists.txt", "lz4.c", "lz4.h"]:
 for f in ["CMakeLists.txt", "vigil_crypto.c", "vigil_crypto.h"]:
     _add("deps/crypto", f"deps/crypto/{f}")
 
+# libffi (vendored, needed by ffi stdlib module)
+_LIBFFI_FILES = [
+    "CMakeLists.txt", "preprocess_asm.cmake", "LICENSE",
+    "include/ffi_cfi.h", "include/ffi_common.h", "include/ffi.h.in", "include/tramp.h",
+    "src/closures.c", "src/debug.c", "src/dlmalloc.c", "src/java_raw_api.c",
+    "src/prep_cif.c", "src/raw_api.c", "src/tramp.c", "src/types.c",
+    "src/aarch64/ffi.c", "src/aarch64/ffitarget.h", "src/aarch64/internal.h", "src/aarch64/sysv.S",
+    "src/aarch64/win64_armasm.S",
+    "src/x86/ffi64.c", "src/x86/ffi.c", "src/x86/ffitarget.h", "src/x86/ffiw64.c",
+    "src/x86/internal64.h", "src/x86/internal.h", "src/x86/asmnames.h",
+    "src/x86/sysv_intel.S", "src/x86/sysv.S", "src/x86/unix64.S",
+    "src/x86/win64_intel.S", "src/x86/win64.S",
+]
+for f in _LIBFFI_FILES:
+    _add(f"deps/libffi/{os.path.dirname(f)}" if '/' in f else "deps/libffi", f"deps/libffi/{f}")
+
 # stb headers (needed by SDL plugin for image/font loading, audio for vorbis)
 for f in ["stb_image.h", "stb_truetype.h", "stb_vorbis.c"]:
     _add("deps/stb", f"deps/stb/{f}")
