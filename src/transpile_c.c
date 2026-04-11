@@ -12,7 +12,6 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 
 #include "internal/vigil_internal.h"
@@ -284,9 +283,11 @@ static int substitute_src_reg(vigil_reg_instr_t *code, size_t ip, uint8_t old_re
 static uint8_t *build_jump_targets(const vigil_reg_instr_t *code, size_t count)
 {
     size_t bytes = (count + 7) / 8;
-    uint8_t *targets = (uint8_t *)calloc(bytes, 1);
+    vigil_allocator_t alloc = vigil_default_allocator();
+    uint8_t *targets = (uint8_t *)alloc.allocate(alloc.user_data, bytes);
     if (!targets)
         return NULL;
+    memset(targets, 0, bytes);
 
     for (size_t ip = 0; ip < count; ip++)
     {
@@ -763,7 +764,10 @@ vigil_status_t vigil_transpile_emit_function(vigil_transpile_ctx_t *ctx, const v
     }
 
     /* Work on a copy so the peephole pass doesn't mutate the original. */
-    code = (vigil_reg_instr_t *)malloc(rc->code_count * sizeof(vigil_reg_instr_t));
+    {
+        vigil_allocator_t alloc = vigil_default_allocator();
+        code = (vigil_reg_instr_t *)alloc.allocate(alloc.user_data, rc->code_count * sizeof(vigil_reg_instr_t));
+    }
     if (!code)
     {
         vigil_error_set_literal(ctx->error, VIGIL_STATUS_OUT_OF_MEMORY, "transpile: alloc failed");
@@ -774,7 +778,8 @@ vigil_status_t vigil_transpile_emit_function(vigil_transpile_ctx_t *ctx, const v
     targets = build_jump_targets(code, rc->code_count);
     if (!targets)
     {
-        free(code);
+        vigil_allocator_t a = vigil_default_allocator();
+        a.deallocate(a.user_data, code);
         vigil_error_set_literal(ctx->error, VIGIL_STATUS_OUT_OF_MEMORY, "transpile: alloc failed");
         return VIGIL_STATUS_OUT_OF_MEMORY;
     }
@@ -815,8 +820,9 @@ vigil_status_t vigil_transpile_emit_function(vigil_transpile_ctx_t *ctx, const v
         status = emit_instruction(ctx, &opt_rc, &ip, func_index, func_count);
         if (status != VIGIL_STATUS_OK)
         {
-            free(targets);
-            free(code);
+            vigil_allocator_t a = vigil_default_allocator();
+            a.deallocate(a.user_data, targets);
+            a.deallocate(a.user_data, code);
             return status;
         }
     }
@@ -825,8 +831,11 @@ vigil_status_t vigil_transpile_emit_function(vigil_transpile_ctx_t *ctx, const v
     EMIT("    return (vigil_reg_t){0};\n");
     EMIT("}\n\n");
 
-    free(targets);
-    free(code);
+    {
+        vigil_allocator_t a = vigil_default_allocator();
+        a.deallocate(a.user_data, targets);
+        a.deallocate(a.user_data, code);
+    }
     return VIGIL_STATUS_OK;
 }
 
