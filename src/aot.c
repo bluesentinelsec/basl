@@ -871,7 +871,7 @@ static vigil_status_t vigil_aot_build_numeric(const vigil_reg_chunk_t *rc, vigil
         case VREG_ADD_I32:
         case VREG_SUB_I32:
         case VREG_MUL_I32: {
-            MIR_insn_code_t mo = (op == VREG_ADD_I32) ? MIR_ADDO : (op == VREG_SUB_I32) ? MIR_SUBO : MIR_MULO;
+            MIR_insn_code_t mo = (op == VREG_ADD_I32) ? MIR_ADDOS : (op == VREG_SUB_I32) ? MIR_SUBOS : MIR_MULOS;
             V_DEC_I32(tmp0_reg, VREG_GET_B(instr));
             V_DEC_I32(tmp1_reg, VREG_GET_C(instr));
             MIR_append_insn(ctx, func, MIR_new_insn(ctx, mo, MIR_new_reg_op(ctx, tmp2_reg),
@@ -895,7 +895,7 @@ static vigil_status_t vigil_aot_build_numeric(const vigil_reg_chunk_t *rc, vigil
         /* ── i32 immediate arithmetic ────────────────────────────── */
         case VREG_ADDI:
         case VREG_SUBI: {
-            MIR_insn_code_t mo = (op == VREG_ADDI) ? MIR_ADDO : MIR_SUBO;
+            MIR_insn_code_t mo = (op == VREG_ADDI) ? MIR_ADDOS : MIR_SUBOS;
             uint8_t a = VREG_GET_A(instr), b = VREG_GET_B(instr);
             if (v && promoted[a] && promoted[b])
             {
