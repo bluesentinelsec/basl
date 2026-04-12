@@ -295,6 +295,18 @@ class TestNewValidation(unittest.TestCase):
         self.assertNotEqual(rc, 0)
         self.assertIn("normalized from", err)
 
+    def test_removed_scaffold_flag(self):
+        rc, _, err = run_new("foo", "--scaffold", cwd=self.tmpdir)
+        self.assertNotEqual(rc, 0)
+
+    def test_removed_lib_flag(self):
+        rc, _, err = run_new("foo", "--lib", cwd=self.tmpdir)
+        self.assertNotEqual(rc, 0)
+
+    def test_removed_output_flag(self):
+        rc, _, err = run_new("foo", "--output", "/tmp", cwd=self.tmpdir)
+        self.assertNotEqual(rc, 0)
+
 
 @unittest.skipIf(pexpect is None, "pexpect not installed")
 class TestNewInteractive(unittest.TestCase):
