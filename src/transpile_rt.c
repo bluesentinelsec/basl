@@ -287,6 +287,11 @@ static inline uint64_t tc_to_nanbox(uint64_t v)
 {
     if (vigil_nanbox_is_object(v) || vigil_nanbox_is_int(v) || vigil_nanbox_is_bool(v) || v == VIGIL_NANBOX_NIL)
         return v;
+    /* Check if this is a raw double (not a small raw integer).
+       Doubles have exponent bits in the upper bytes. Raw ints from
+       Phase 1 arithmetic are small values with upper bytes zero. */
+    if (vigil_nanbox_is_double(v) && (v >> 48) != 0)
+        return v; /* Already a valid nanbox double */
     return vigil_nanbox_encode_int((int64_t)v);
 }
 
