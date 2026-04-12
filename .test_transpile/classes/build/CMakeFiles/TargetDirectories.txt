@@ -1,0 +1,16 @@
+/home/michael/projects/vigil/.test_transpile/classes/build/CMakeFiles/vigil_rt.dir
+/home/michael/projects/vigil/.test_transpile/classes/build/CMakeFiles/vigil_app.dir
+/home/michael/projects/vigil/.test_transpile/classes/build/CMakeFiles/edit_cache.dir
+/home/michael/projects/vigil/.test_transpile/classes/build/CMakeFiles/rebuild_cache.dir
+/home/michael/projects/vigil/.test_transpile/classes/build/vigil_rt/deps/miniz/CMakeFiles/miniz.dir
+/home/michael/projects/vigil/.test_transpile/classes/build/vigil_rt/deps/miniz/CMakeFiles/edit_cache.dir
+/home/michael/projects/vigil/.test_transpile/classes/build/vigil_rt/deps/miniz/CMakeFiles/rebuild_cache.dir
+/home/michael/projects/vigil/.test_transpile/classes/build/vigil_rt/deps/lz4/CMakeFiles/lz4.dir
+/home/michael/projects/vigil/.test_transpile/classes/build/vigil_rt/deps/lz4/CMakeFiles/edit_cache.dir
+/home/michael/projects/vigil/.test_transpile/classes/build/vigil_rt/deps/lz4/CMakeFiles/rebuild_cache.dir
+/home/michael/projects/vigil/.test_transpile/classes/build/vigil_rt/deps/crypto/CMakeFiles/vigil_crypto.dir
+/home/michael/projects/vigil/.test_transpile/classes/build/vigil_rt/deps/crypto/CMakeFiles/edit_cache.dir
+/home/michael/projects/vigil/.test_transpile/classes/build/vigil_rt/deps/crypto/CMakeFiles/rebuild_cache.dir
+/home/michael/projects/vigil/.test_transpile/classes/build/vigil_rt/deps/libffi/CMakeFiles/ffi_static.dir
+/home/michael/projects/vigil/.test_transpile/classes/build/vigil_rt/deps/libffi/CMakeFiles/edit_cache.dir
+/home/michael/projects/vigil/.test_transpile/classes/build/vigil_rt/deps/libffi/CMakeFiles/rebuild_cache.dir

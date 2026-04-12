@@ -1,0 +1,7 @@
+add_library(vigil_crypto STATIC vigil_crypto.c)
+target_include_directories(vigil_crypto PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_compile_options(vigil_crypto PRIVATE ${VIGIL_WARNING_FLAGS})
+set_target_properties(vigil_crypto PROPERTIES POSITION_INDEPENDENT_CODE ON)
+if(WIN32)
+    target_link_libraries(vigil_crypto PRIVATE bcrypt)
+endif()
