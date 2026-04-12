@@ -1,1 +1,0 @@
-/usr/bin/cc -O3 -DNDEBUG -Wl,--dependency-file=CMakeFiles/vigil_app.dir/link.d CMakeFiles/vigil_app.dir/vigil_main.c.o CMakeFiles/vigil_app.dir/vigil_generated.c.o -o vigil_app  libvigil_rt.a -lm -ldl vigil_rt/deps/miniz/libminiz.a vigil_rt/deps/lz4/liblz4.a vigil_rt/deps/crypto/libvigil_crypto.a vigil_rt/deps/libffi/libffi_static.a

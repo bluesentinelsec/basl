@@ -1,2 +1,0 @@
-/usr/bin/ar qc libvigil_crypto.a CMakeFiles/vigil_crypto.dir/vigil_crypto.c.o
-/usr/bin/ranlib libvigil_crypto.a
