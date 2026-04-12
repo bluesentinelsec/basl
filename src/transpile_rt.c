@@ -914,8 +914,33 @@ vigil_status_t vigil_tc_generic_add(vigil_tc_t *tc, vigil_value_t *dst, const vi
     /* String concatenation when both are objects. */
     if (vigil_nanbox_is_object(*lhs) && vigil_nanbox_is_object(*rhs))
     {
-        vigil_value_t result;
+        vigil_value_t result = 0;
         vigil_status_t st = vigil_vm_concat_strings(tc->vm, lhs, rhs, &result, error);
+        if (st != VIGIL_STATUS_OK)
+        {
+            /* Fallback: convert both to string and concat. */
+            vigil_value_t ls = 0, rs = 0;
+            vigil_vm_stringify_value(tc->vm, lhs, &ls, error);
+            vigil_vm_stringify_value(tc->vm, rhs, &rs, error);
+            st = vigil_vm_concat_strings(tc->vm, &ls, &rs, &result, error);
+            vigil_value_release(&ls);
+            vigil_value_release(&rs);
+            if (st != VIGIL_STATUS_OK)
+                return st;
+        }
+        *dst = result;
+        return VIGIL_STATUS_OK;
+    }
+    /* If one is an object, stringify both and concat. */
+    if (vigil_nanbox_is_object(*lhs) || vigil_nanbox_is_object(*rhs))
+    {
+        vigil_value_t ls = 0, rs = 0, result = 0;
+        vigil_value_t lenc = tc_to_nanbox(*lhs), renc = tc_to_nanbox(*rhs);
+        vigil_vm_stringify_value(tc->vm, &lenc, &ls, error);
+        vigil_vm_stringify_value(tc->vm, &renc, &rs, error);
+        vigil_status_t st = vigil_vm_concat_strings(tc->vm, &ls, &rs, &result, error);
+        vigil_value_release(&ls);
+        vigil_value_release(&rs);
         if (st != VIGIL_STATUS_OK)
             return st;
         *dst = result;
@@ -924,4 +949,80 @@ vigil_status_t vigil_tc_generic_add(vigil_tc_t *tc, vigil_value_t *dst, const vi
     /* Integer addition. */
     *dst = (uint64_t)((int64_t)*lhs + (int64_t)*rhs);
     return VIGIL_STATUS_OK;
+}
+
+int vigil_tc_is_truthy(vigil_value_t v)
+{
+    /* Nanboxed false and nil are falsy. */
+    if (v == VIGIL_NANBOX_FALSE || v == VIGIL_NANBOX_NIL)
+        return 0;
+    /* Nanboxed true is truthy. */
+    if (v == VIGIL_NANBOX_TRUE)
+        return 1;
+    /* Raw int 0 is falsy. */
+    if (v == 0)
+        return 0;
+    /* Everything else (objects, non-zero ints, nanboxed ints) is truthy. */
+    return 1;
+}
+
+vigil_status_t vigil_tc_call_self(vigil_tc_t *tc, vigil_value_t *regs, uint8_t ret,
+                                   size_t func_idx, uint16_t arg_count, uint8_t arg_base,
+                                   vigil_error_t *error)
+{
+    /* Save and restore per-function constants around the call. */
+    const vigil_value_t *saved_constants = tc->constants;
+    size_t saved_count = tc->constant_count;
+
+    /* Look up the compiled function object for this sibling. */
+    const vigil_object_t *fn = vigil_function_object_sibling(tc->function, func_idx);
+    if (!fn)
+        fn = tc->function;
+
+    /* Use the VM to execute the call — this handles multi-return correctly. */
+    vigil_vm_t *vm = tc->vm;
+    vigil_status_t status;
+    size_t i;
+
+    status = tc_ensure_frame(tc, error);
+    if (status != VIGIL_STATUS_OK)
+        goto restore;
+
+    if (vm->stack_capacity < (size_t)arg_base + (size_t)arg_count)
+    {
+        status = vigil_vm_grow_stack(vm, (size_t)arg_base + (size_t)arg_count, error);
+        if (status != VIGIL_STATUS_OK)
+            goto restore;
+    }
+
+    for (i = 0; i < (size_t)arg_count; i++)
+    {
+        uint64_t v = regs[arg_base + i];
+        if (vigil_nanbox_is_object(v))
+        {
+            vigil_object_retain((vigil_object_t *)vigil_nanbox_decode_ptr(v));
+            vm->stack[arg_base + i] = v;
+        }
+        else if (vigil_nanbox_is_int(v) || vigil_nanbox_is_bool(v) || v == VIGIL_NANBOX_NIL)
+            vm->stack[arg_base + i] = v;
+        else
+            vm->stack[arg_base + i] = vigil_nanbox_encode_int((int64_t)v);
+    }
+    vm->stack_count = (size_t)arg_base + (size_t)arg_count;
+
+    status = vigil_vm_execute_call(vm, (vigil_object_t *)fn, (size_t)arg_count, error);
+    if (status != VIGIL_STATUS_OK)
+        goto restore;
+
+    /* Copy results back. */
+    for (i = (size_t)arg_base; i < vm->stack_count; i++)
+    {
+        regs[ret + (i - (size_t)arg_base)] = vm->stack[i];
+        vm->stack[i] = 0;
+    }
+
+restore:
+    tc->constants = saved_constants;
+    tc->constant_count = saved_count;
+    return status;
 }

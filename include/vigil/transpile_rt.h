@@ -26,6 +26,8 @@ extern "C"
         const vigil_value_t *constants;
         size_t constant_count;
         const vigil_object_t *function;
+        uint64_t ret_buf[8]; /* Multi-return buffer for VREG_CALL */
+        uint8_t ret_count;        /* Number of return values in ret_buf */
     } vigil_tc_t;
 
     /* Convert a value to its string representation. */
@@ -105,6 +107,14 @@ extern "C"
 
     /* Compare two register values for equality (handles objects). */
     int vigil_tc_values_equal(const vigil_value_t *regs, uint8_t b, uint8_t c);
+
+    /* Test if a register value is truthy (handles nanboxed bools, nil, raw ints). */
+    int vigil_tc_is_truthy(vigil_value_t v);
+
+    /* Call a sibling transpiled function with multi-return support. */
+    vigil_status_t vigil_tc_call_self(vigil_tc_t *tc, vigil_value_t *regs, uint8_t ret,
+                                       size_t func_idx, uint16_t arg_count, uint8_t arg_base,
+                                       vigil_error_t *error);
 
     /* Generic add: string concatenation if both objects, integer add otherwise. */
     vigil_status_t vigil_tc_generic_add(vigil_tc_t *tc, vigil_value_t *dst, const vigil_value_t *lhs,

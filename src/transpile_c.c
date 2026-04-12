@@ -503,12 +503,12 @@ static vigil_status_t emit_instruction(vigil_transpile_ctx_t *ctx, const vigil_r
         EMITF("    goto L_%zu;\n", (size_t)((int64_t)(*ip) + 1 + (int64_t)sbx));
         break;
     case VREG_TEST:
-        if (c) EMITF("    if (!r[%u].i) goto L_%zu;\n", a, *ip + 2);
-        else   EMITF("    if (r[%u].i) goto L_%zu;\n", a, *ip + 2);
+        if (c) EMITF("    if (!vigil_tc_is_truthy(r[%u].v)) goto L_%zu;\n", a, *ip + 2);
+        else   EMITF("    if (vigil_tc_is_truthy(r[%u].v)) goto L_%zu;\n", a, *ip + 2);
         break;
     case VREG_TESTSET:
-        if (c) EMITF("    if (r[%u].i) { r[%u] = r[%u]; } else { goto L_%zu; }\n", b, a, b, *ip + 2);
-        else   EMITF("    if (!r[%u].i) { r[%u] = r[%u]; } else { goto L_%zu; }\n", b, a, b, *ip + 2);
+        if (c) EMITF("    if (vigil_tc_is_truthy(r[%u].v)) { r[%u] = r[%u]; } else { goto L_%zu; }\n", b, a, b, *ip + 2);
+        else   EMITF("    if (!vigil_tc_is_truthy(r[%u].v)) { r[%u] = r[%u]; } else { goto L_%zu; }\n", b, a, b, *ip + 2);
         break;
 
     /* ── Fused compare-jump ────────────────────────────────────── */
@@ -527,32 +527,48 @@ static vigil_status_t emit_instruction(vigil_transpile_ctx_t *ctx, const vigil_r
 
     /* ── Calls ─────────────────────────────────────────────────── */
     case VREG_CALL:
-        EMITF("    r[%u] = vigil_fn_%u(tc", a, (unsigned)b);
+    {
+        /* A=arg_base (also return base), B=func_idx, C=arg_count.
+           Save/restore constants since callee sets its own. */
+        EMIT("    { const vigil_value_t *_sc = tc->constants; size_t _sn = tc->constant_count;\n");
+        EMITF("    r[%u] = vigil_fn_%u(tc", (unsigned)a, (unsigned)b);
         for (uint8_t ci = 0; ci < c; ci++)
             EMITF(", r[%u]", (unsigned)(a + ci));
-        EMIT(");\n");
+        EMITF(");\n");
+        /* Copy additional return values from tc->ret_buf. */
+        EMITF("    { uint8_t _ri; for (_ri = 1; _ri < tc->ret_count; _ri++) r[%u + _ri].v = tc->ret_buf[_ri]; }\n",
+              (unsigned)a);
+        EMIT("    tc->constants = _sc; tc->constant_count = _sn; }\n");
         break;
+    }
     case VREG_CALL_SELF:
     {
-        uint32_t arg_base;
         if (*ip + 1 >= rc->code_count) { vigil_error_set_literal(ctx->error, VIGIL_STATUS_INTERNAL, "transpile: truncated CALL_SELF"); return VIGIL_STATUS_INTERNAL; }
-        arg_base = rc->code[*ip + 1];
+        uint8_t arg_base_r = (uint8_t)(rc->code[*ip + 1] & 0xFF);
         *ip += 1;
-        EMITF("    r[%u] = vigil_fn_%zu(tc", a, func_index);
-        for (uint8_t ci = 0; ci < b; ci++)
-            EMITF(", r[%u]", (unsigned)(arg_base + ci));
-        EMIT(");\n");
+        /* Use call_extern for correct multi-return handling. */
+        EMITF("    vigil_tc_call_self(tc, (uint64_t *)r, %u, %zu, %u, %u, NULL);\n",
+              (unsigned)a, func_index, (unsigned)b, (unsigned)arg_base_r);
         break;
     }
     case VREG_TAIL_CALL:
-        EMITF("    r[%u] = vigil_fn_%u(tc", a, (unsigned)b);
-        for (uint8_t ci = 0; ci < c; ci++)
-            EMITF(", r[%u]", (unsigned)(a + ci));
-        EMIT(");\n");
+    {
+        /* Tail calls also need multi-return support. */
+        EMITF("    vigil_tc_call_self(tc, (uint64_t *)r, %u, %u, %u, %u, NULL);\n",
+              (unsigned)a, (unsigned)b, (unsigned)c, (unsigned)a);
+        EMITF("    return r[%u];\n", (unsigned)a);
+        break;
+    }
         break;
     case VREG_RETURN:
-        if (b == 0) EMIT("    return (vigil_reg_t){0};\n");
-        else        EMITF("    return r[%u];\n", a);
+        if (b == 0) { EMIT("    tc->ret_count = 0;\n    return (vigil_reg_t){0};\n"); }
+        else if (b == 1) { EMITF("    tc->ret_count = 1;\n    return r[%u];\n", a); }
+        else {
+            EMITF("    tc->ret_count = %u;\n", (unsigned)b);
+            for (uint8_t ri = 1; ri < b; ri++)
+                EMITF("    tc->ret_buf[%u] = r[%u].v;\n", (unsigned)ri, (unsigned)(a + ri));
+            EMITF("    return r[%u];\n", a);
+        }
         break;
 
     /* ── Loop superinstructions ────────────────────────────────── */
@@ -825,6 +841,10 @@ vigil_status_t vigil_transpile_emit_function(vigil_transpile_ctx_t *ctx, const v
     for (uint8_t i = 0; i < arity; i++)
         EMITF("    r[%u] = arg_%u;\n", (unsigned)i, (unsigned)i);
 
+    /* Set per-function constant pool */
+    EMITF("    tc->constants = vigil_fn_constants[%zu];\n", func_index);
+    EMITF("    tc->constant_count = vigil_fn_constant_counts[%zu];\n", func_index);
+
     EMIT("\n");
 
     /* Emit instructions with labels */
@@ -930,12 +950,10 @@ vigil_status_t vigil_transpile_to_c(vigil_runtime_t *runtime, const vigil_object
     func_count = count_siblings(function);
     entry_idx = find_entry_index(function, func_count);
 
-    /* Emit constant pool size for the entry function's chunk */
+    /* Emit constant pool sizes for all functions */
     {
-        const vigil_chunk_t *entry_chunk = vigil_function_object_chunk(function);
-        size_t num_constants = vigil_chunk_constant_count(entry_chunk);
-        EMITF("static vigil_value_t vigil_constants[%zu];\n", num_constants > 0 ? num_constants : 1);
-        EMITF("static const size_t vigil_constant_count = %zu;\n\n", num_constants);
+        EMITF("vigil_value_t *vigil_fn_constants[%zu];\n", func_count > 0 ? func_count : 1);
+        EMITF("size_t vigil_fn_constant_counts[%zu];\n\n", func_count > 0 ? func_count : 1);
     }
 
     /* Forward declarations */
