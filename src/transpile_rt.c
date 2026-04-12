@@ -18,6 +18,8 @@
 #include "vm_ops_string.h"
 
 static inline uint64_t tc_to_nanbox(uint64_t v);
+static inline int tc_is_runtime_double(vigil_value_t v);
+static inline int tc_compare_strings(vigil_value_t lhs, vigil_value_t rhs, int *out_cmp);
 
 /* Safely release a register value (only if it's a nanboxed object). */
 static inline void tc_safe_release(vigil_value_t *v)
@@ -30,8 +32,26 @@ static inline void tc_safe_release(vigil_value_t *v)
 vigil_status_t vigil_tc_to_string(vigil_tc_t *tc, vigil_value_t *dst, const vigil_value_t *src,
                                   vigil_error_t *error)
 {
-    vigil_value_t encoded = tc_to_nanbox(*src);
-    return vigil_vm_stringify_value(tc->vm, &encoded, dst, error);
+    vigil_value_t encoded = *src;
+    int owns_encoded = 0;
+    vigil_status_t status;
+
+    if (!vigil_nanbox_is_object(encoded) && !vigil_nanbox_is_int(encoded) && !vigil_nanbox_is_uint(encoded) &&
+        !vigil_nanbox_is_bool(encoded) && encoded != VIGIL_NANBOX_NIL &&
+        !(vigil_nanbox_is_double(encoded) && (encoded >> 48) != 0U))
+    {
+        status = vigil_value_init_int_rt(&encoded, (int64_t)*src, tc->runtime, error);
+        if (status != VIGIL_STATUS_OK)
+            return status;
+        owns_encoded = 1;
+    }
+    else
+        encoded = tc_to_nanbox(*src);
+
+    status = vigil_vm_stringify_value(tc->vm, &encoded, dst, error);
+    if (owns_encoded)
+        vigil_value_release(&encoded);
+    return status;
 }
 
 vigil_status_t vigil_tc_call_native(vigil_tc_t *tc, vigil_value_t *regs, uint8_t arg_base,
@@ -124,12 +144,14 @@ vigil_status_t vigil_tc_new_error(vigil_tc_t *tc, vigil_value_t *dst, const vigi
     vigil_object_t *err_obj = NULL;
     const char *msg_str;
     size_t msg_len;
+    vigil_value_t kind_val_boxed;
     int64_t kind_val;
 
     msg_obj = vigil_value_as_object(msg);
     msg_str = vigil_string_object_c_str(msg_obj);
     msg_len = vigil_string_object_length(msg_obj);
-    kind_val = vigil_value_as_int(kind);
+    kind_val_boxed = tc_to_nanbox(*kind);
+    kind_val = vigil_value_as_int(&kind_val_boxed);
 
     vigil_status_t st = vigil_error_object_new(tc->runtime, msg_str, msg_len, kind_val, &err_obj, error);
     if (st != VIGIL_STATUS_OK)
@@ -145,7 +167,7 @@ vigil_status_t vigil_tc_get_error_kind(vigil_tc_t *tc, vigil_value_t *dst, const
     vigil_object_t *obj = vigil_value_as_object(err_val);
     (void)tc;
     (void)error;
-    vigil_value_init_int(dst, vigil_error_object_kind(obj));
+    *dst = (uint64_t)vigil_error_object_kind(obj);
     return VIGIL_STATUS_OK;
 }
 
@@ -282,6 +304,211 @@ static vigil_status_t tc_ensure_frame(vigil_tc_t *tc, vigil_error_t *error)
     return VIGIL_STATUS_OK;
 }
 
+vigil_status_t vigil_tc_defer(vigil_tc_t *tc, vigil_value_t *regs, uint8_t defer_op,
+                              uint8_t top_reg, uint32_t operand_a, uint32_t operand_b,
+                              uint32_t operand_c, vigil_error_t *error)
+{
+    vigil_vm_t *vm = tc->vm;
+    vigil_vm_frame_t *frame;
+    vigil_vm_defer_kind_t kind;
+    vigil_value_t *vals = NULL;
+    size_t val_count = (size_t)operand_b;
+    vigil_status_t status;
+
+    status = tc_ensure_frame(tc, error);
+    if (status != VIGIL_STATUS_OK)
+        return status;
+
+    frame = &vm->frames[vm->frame_count - 1U];
+    switch (defer_op)
+    {
+    case VIGIL_OPCODE_DEFER_CALL:
+        kind = VIGIL_VM_DEFER_CALL;
+        break;
+    case VIGIL_OPCODE_DEFER_CALL_VALUE:
+        kind = VIGIL_VM_DEFER_CALL_VALUE;
+        break;
+    case VIGIL_OPCODE_DEFER_NEW_INSTANCE:
+        kind = VIGIL_VM_DEFER_NEW_INSTANCE;
+        break;
+    case VIGIL_OPCODE_DEFER_CALL_INTERFACE:
+        kind = VIGIL_VM_DEFER_CALL_INTERFACE;
+        break;
+    case VIGIL_OPCODE_DEFER_CALL_NATIVE:
+        kind = VIGIL_VM_DEFER_CALL_NATIVE;
+        break;
+    default:
+        vigil_error_set_literal(error, VIGIL_STATUS_UNSUPPORTED, "unsupported defer opcode");
+        return VIGIL_STATUS_UNSUPPORTED;
+    }
+
+    if (val_count > 0U)
+    {
+        size_t start = (size_t)top_reg + 1U - val_count;
+        vals = malloc(val_count * sizeof(*vals));
+        if (vals == NULL)
+        {
+            vigil_error_set_literal(error, VIGIL_STATUS_OUT_OF_MEMORY, "defer capture alloc failed");
+            return VIGIL_STATUS_OUT_OF_MEMORY;
+        }
+        for (size_t i = 0; i < val_count; i++)
+        {
+            vals[i] = tc_to_nanbox(regs[start + i]);
+            if (vigil_nanbox_is_object(vals[i]))
+                vigil_object_retain((vigil_object_t *)vigil_nanbox_decode_ptr(vals[i]));
+        }
+    }
+
+    if (frame->defer_count >= frame->defer_capacity)
+    {
+        size_t new_cap = frame->defer_capacity < 4U ? 4U : frame->defer_capacity * 2U;
+        vigil_vm_defer_action_t *nd = realloc(frame->defers, new_cap * sizeof(*nd));
+        if (nd == NULL)
+        {
+            if (vals != NULL)
+            {
+                for (size_t i = 0; i < val_count; i++)
+                    tc_safe_release(&vals[i]);
+                free(vals);
+            }
+            vigil_error_set_literal(error, VIGIL_STATUS_OUT_OF_MEMORY, "defer array grow failed");
+            return VIGIL_STATUS_OUT_OF_MEMORY;
+        }
+        frame->defers = nd;
+        frame->defer_capacity = new_cap;
+    }
+
+    {
+        vigil_vm_defer_action_t *da = &frame->defers[frame->defer_count++];
+        memset(da, 0, sizeof(*da));
+        da->kind = kind;
+        da->operand_a = operand_a;
+        da->operand_b = (kind == VIGIL_VM_DEFER_CALL_INTERFACE) ? operand_c : operand_b;
+        da->arg_count = (uint32_t)val_count;
+        da->values = vals;
+        da->value_count = val_count;
+    }
+
+    return VIGIL_STATUS_OK;
+}
+
+vigil_status_t vigil_tc_drain_defers(vigil_tc_t *tc, vigil_error_t *error)
+{
+    vigil_vm_t *vm = tc->vm;
+
+    if (vm->frame_count == 0U)
+        return VIGIL_STATUS_OK;
+
+    while (vm->frames[vm->frame_count - 1U].defer_count > 0U)
+    {
+        vigil_vm_frame_t *frame = &vm->frames[vm->frame_count - 1U];
+        vigil_vm_defer_action_t action = frame->defers[frame->defer_count - 1U];
+        vigil_status_t status = VIGIL_STATUS_OK;
+
+        memset(&frame->defers[frame->defer_count - 1U], 0, sizeof(action));
+        frame->defer_count -= 1U;
+
+        for (size_t i = 0; i < action.value_count; i++)
+        {
+            status = vigil_vm_push(vm, &action.values[i], error);
+            if (status != VIGIL_STATUS_OK)
+                break;
+        }
+
+        if (status == VIGIL_STATUS_OK)
+        {
+            switch (action.kind)
+            {
+            case VIGIL_VM_DEFER_CALL:
+            {
+                const vigil_object_t *callee =
+                    vigil_vm_function_sibling(frame->function, (size_t)action.operand_a);
+                if (callee != NULL)
+                    status = vigil_vm_execute_call(vm, callee, action.arg_count, error);
+                break;
+            }
+            case VIGIL_VM_DEFER_CALL_NATIVE:
+            {
+                const vigil_value_t *nval = &tc->constants[action.operand_a];
+                vigil_object_t *nobj = (nval != NULL && vigil_nanbox_has_object(*nval))
+                                           ? (vigil_object_t *)vigil_nanbox_decode_ptr(*nval)
+                                           : NULL;
+                vigil_native_fn_t nfn = nobj != NULL ? vigil_native_function_get(nobj) : NULL;
+                if (nfn != NULL)
+                    status = nfn(vm, action.arg_count, error);
+                else
+                {
+                    vigil_error_set_literal(error, VIGIL_STATUS_INTERNAL,
+                                            "deferred call target is not a native function");
+                    status = VIGIL_STATUS_INTERNAL;
+                }
+                break;
+            }
+            case VIGIL_VM_DEFER_CALL_VALUE:
+            {
+                size_t total = action.arg_count;
+                if (total > 0U && vm->stack_count >= total)
+                {
+                    size_t callee_slot = vm->stack_count - total;
+                    vigil_value_t cv = vm->stack[callee_slot];
+                    if (vigil_nanbox_is_object(cv))
+                    {
+                        vigil_object_t *callee_obj = (vigil_object_t *)vigil_nanbox_decode_ptr(cv);
+                        size_t real_args = total - 1U;
+                        vigil_value_release(&vm->stack[callee_slot]);
+                        if (real_args > 0U)
+                            memmove(&vm->stack[callee_slot], &vm->stack[callee_slot + 1U],
+                                    real_args * sizeof(vigil_value_t));
+                        vm->stack[callee_slot + real_args] = VIGIL_NANBOX_NIL;
+                        vm->stack_count -= 1U;
+                        status = vigil_vm_execute_call(vm, callee_obj, real_args, error);
+                    }
+                }
+                break;
+            }
+            case VIGIL_VM_DEFER_CALL_INTERFACE:
+            {
+                size_t total = action.arg_count;
+                if (total > 0U && vm->stack_count >= total)
+                {
+                    size_t recv_slot = vm->stack_count - total;
+                    vigil_value_t rv = vm->stack[recv_slot];
+                    if (vigil_nanbox_is_object(rv))
+                    {
+                        vigil_object_t *recv_obj = (vigil_object_t *)vigil_nanbox_decode_ptr(rv);
+                        if (vigil_object_type(recv_obj) == VIGIL_OBJECT_INSTANCE)
+                        {
+                            size_t ci = vigil_instance_object_class_index(recv_obj);
+                            const vigil_object_t *callee = vigil_function_object_resolve_interface_method(
+                                frame->function, ci, (size_t)action.operand_a, (size_t)action.operand_b);
+                            if (callee != NULL)
+                                status = vigil_vm_execute_call(vm, callee, total, error);
+                        }
+                    }
+                }
+                break;
+            }
+            case VIGIL_VM_DEFER_NEW_INSTANCE:
+            default:
+                break;
+            }
+        }
+
+        for (size_t i = 0; i < action.value_count; i++)
+            tc_safe_release(&action.values[i]);
+        free(action.values);
+
+        for (size_t i = 0; i < vm->stack_count; i++)
+            tc_safe_release(&vm->stack[i]);
+        vm->stack_count = 0U;
+
+        if (status != VIGIL_STATUS_OK)
+            return status;
+    }
+
+    return VIGIL_STATUS_OK;
+}
+
 /* Convert a raw register value to a proper nanbox value for the VM stack.
    Returns the value unchanged if it's already a valid nanbox encoding,
    otherwise nanbox-encodes it as an integer. */
@@ -295,6 +522,43 @@ static inline uint64_t tc_to_nanbox(uint64_t v)
     if (vigil_nanbox_is_double(v) && (v >> 48) != 0)
         return v; /* Already a valid nanbox double */
     return vigil_nanbox_encode_int((int64_t)v);
+}
+
+static inline int tc_is_runtime_double(vigil_value_t v)
+{
+    return vigil_nanbox_is_double(v) && ((v >> 48) != 0U || v == UINT64_C(0x8000000000000000));
+}
+
+static inline int tc_compare_strings(vigil_value_t lhs, vigil_value_t rhs, int *out_cmp)
+{
+    vigil_object_t *lobj;
+    vigil_object_t *robj;
+    const char *ls;
+    const char *rs;
+    size_t llen;
+    size_t rlen;
+    size_t prefix_len;
+    int cmp;
+
+    if (!vigil_nanbox_is_object(lhs) || !vigil_nanbox_is_object(rhs))
+        return 0;
+
+    lobj = vigil_value_as_object(&lhs);
+    robj = vigil_value_as_object(&rhs);
+    if (lobj == NULL || robj == NULL || vigil_object_type(lobj) != VIGIL_OBJECT_STRING ||
+        vigil_object_type(robj) != VIGIL_OBJECT_STRING)
+        return 0;
+
+    ls = vigil_string_object_c_str(lobj);
+    rs = vigil_string_object_c_str(robj);
+    llen = vigil_string_object_length(lobj);
+    rlen = vigil_string_object_length(robj);
+    prefix_len = llen < rlen ? llen : rlen;
+    cmp = memcmp(ls, rs, prefix_len);
+    if (cmp == 0)
+        cmp = (llen > rlen) - (llen < rlen);
+    *out_cmp = cmp;
+    return 1;
 }
 
 static vigil_status_t tc_sync_and_call(vigil_tc_t *tc, vigil_value_t *regs, uint8_t top_reg,
@@ -348,7 +612,8 @@ static vigil_status_t tc_sync_and_call(vigil_tc_t *tc, vigil_value_t *regs, uint
         {
             if (result_base + i < vm->stack_count)
             {
-                regs[dst_reg + i] = vm->stack[result_base + i];
+                vigil_value_t rv = vm->stack[result_base + i];
+                regs[dst_reg + i] = vigil_nanbox_is_int(rv) ? (uint64_t)vigil_nanbox_decode_int(rv) : rv;
                 vm->stack[result_base + i] = 0;
             }
         }
@@ -898,12 +1163,26 @@ vigil_status_t vigil_tc_format_spec(vigil_tc_t *tc, vigil_value_t *dst, const vi
 {
     vigil_value_t nanboxed = *val;
     vigil_value_t result = 0;
+    unsigned int fmt_type = (word1 >> 10U) & 0xFU;
+    int owns_nanboxed = 0;
     vigil_status_t status;
 
-    /* Nanbox-encode raw integer if needed. */
-    nanboxed = tc_to_nanbox(nanboxed);
+    if (fmt_type >= 1U && fmt_type <= 5U)
+    {
+        if (!vigil_nanbox_is_int(nanboxed) && !vigil_nanbox_is_uint(nanboxed))
+        {
+            status = vigil_value_init_int_rt(&nanboxed, (int64_t)*val, tc->runtime, error);
+            if (status != VIGIL_STATUS_OK)
+                return status;
+            owns_nanboxed = 1;
+        }
+    }
+    else if (fmt_type != 6U)
+        nanboxed = tc_to_nanbox(nanboxed);
 
     status = vigil_vm_format_spec_value(tc->vm, &nanboxed, word1, word2, &result, error);
+    if (owns_nanboxed)
+        vigil_value_release(&nanboxed);
     if (status != VIGIL_STATUS_OK)
         return status;
 
@@ -924,6 +1203,48 @@ int vigil_tc_values_equal(const vigil_value_t *regs, uint8_t b, uint8_t c)
     if (vigil_nanbox_has_object(lhs) && vigil_nanbox_has_object(rhs))
         return vigil_vm_values_equal(&lhs, &rhs);
     /* Raw int comparison (Phase 1 arithmetic stores raw int64_t). */
+    return 0;
+}
+
+int vigil_tc_values_lt(const vigil_value_t *regs, uint8_t b, uint8_t c)
+{
+    vigil_value_t lhs = regs[b], rhs = regs[c];
+    int compared;
+
+    if (tc_is_runtime_double(lhs) || tc_is_runtime_double(rhs))
+        return vigil_nanbox_decode_double(lhs) < vigil_nanbox_decode_double(rhs);
+
+    lhs = tc_to_nanbox(lhs);
+    rhs = tc_to_nanbox(rhs);
+    if (vigil_nanbox_is_uint(lhs) || vigil_nanbox_is_uint(rhs))
+        return vigil_value_as_uint(&lhs) < vigil_value_as_uint(&rhs);
+    if (vigil_nanbox_is_int(lhs) && vigil_nanbox_is_int(rhs))
+        return vigil_value_as_int(&lhs) < vigil_value_as_int(&rhs);
+    if (vigil_nanbox_is_double(lhs) && vigil_nanbox_is_double(rhs))
+        return vigil_nanbox_decode_double(lhs) < vigil_nanbox_decode_double(rhs);
+    if (tc_compare_strings(lhs, rhs, &compared))
+        return compared < 0;
+    return 0;
+}
+
+int vigil_tc_values_le(const vigil_value_t *regs, uint8_t b, uint8_t c)
+{
+    vigil_value_t lhs = regs[b], rhs = regs[c];
+    int compared;
+
+    if (tc_is_runtime_double(lhs) || tc_is_runtime_double(rhs))
+        return vigil_nanbox_decode_double(lhs) <= vigil_nanbox_decode_double(rhs);
+
+    lhs = tc_to_nanbox(lhs);
+    rhs = tc_to_nanbox(rhs);
+    if (vigil_nanbox_is_uint(lhs) || vigil_nanbox_is_uint(rhs))
+        return vigil_value_as_uint(&lhs) <= vigil_value_as_uint(&rhs);
+    if (vigil_nanbox_is_int(lhs) && vigil_nanbox_is_int(rhs))
+        return vigil_value_as_int(&lhs) <= vigil_value_as_int(&rhs);
+    if (vigil_nanbox_is_double(lhs) && vigil_nanbox_is_double(rhs))
+        return vigil_nanbox_decode_double(lhs) <= vigil_nanbox_decode_double(rhs);
+    if (tc_compare_strings(lhs, rhs, &compared))
+        return compared <= 0;
     return 0;
 }
 
@@ -983,6 +1304,36 @@ int vigil_tc_is_truthy(vigil_value_t v)
         return 0;
     /* Everything else (objects, non-zero ints, nanboxed ints) is truthy. */
     return 1;
+}
+
+int64_t vigil_tc_to_i32_value(vigil_value_t src)
+{
+    vigil_value_t v = tc_to_nanbox(src);
+
+    if (vigil_nanbox_is_int(v))
+        return (int64_t)(int32_t)vigil_nanbox_decode_int(v);
+    if (vigil_nanbox_is_uint(v))
+        return (int64_t)(int32_t)vigil_nanbox_decode_uint(v);
+    if (vigil_nanbox_is_double(v))
+        return (int64_t)(int32_t)vigil_nanbox_decode_double(v);
+    return (int64_t)(int32_t)src;
+}
+
+vigil_value_t vigil_tc_negate(vigil_value_t src)
+{
+    vigil_value_t v = src;
+
+    if (tc_is_runtime_double(v))
+        return vigil_nanbox_encode_double(-vigil_nanbox_decode_double(v));
+
+    v = tc_to_nanbox(v);
+    if (vigil_nanbox_is_double(v))
+        return vigil_nanbox_encode_double(-vigil_nanbox_decode_double(v));
+    if (vigil_nanbox_is_uint(v))
+        return (uint64_t)(-(int64_t)vigil_nanbox_decode_uint(v));
+    if (vigil_nanbox_is_int(v))
+        return (uint64_t)(-vigil_nanbox_decode_int(v));
+    return (uint64_t)(-(int64_t)src);
 }
 
 vigil_status_t vigil_tc_call_self(vigil_tc_t *tc, vigil_value_t *regs, uint8_t ret,
@@ -1169,14 +1520,17 @@ vigil_status_t vigil_tc_string_op(vigil_tc_t *tc, vigil_value_t *regs, uint8_t d
         size_t sc = vm->stack_count;
         /* Determine result count from sub-opcode. */
         size_t n_results = 1;
-        if (sub_op == 72 || sub_op == 73 || sub_op == 75 || sub_op == 146 || sub_op == 189)
-            n_results = 2; /* INDEX_OF, SUBSTR, CHAR_AT, CUT, NEXT_CHAR */
+        if (sub_op == 72 || sub_op == 73 || sub_op == 75 || sub_op == 189)
+            n_results = 2; /* INDEX_OF, SUBSTR, CHAR_AT, NEXT_CHAR */
+        else if (sub_op == 146)
+            n_results = 3; /* CUT */
         for (size_t ri = 0; ri < n_results && ri < sc; ri++)
         {
             size_t si = sc - n_results + ri;
             if (si < sc)
             {
-                regs[dest + ri] = vm->stack[si];
+                vigil_value_t rv = vm->stack[si];
+                regs[dest + ri] = vigil_nanbox_is_int(rv) ? (uint64_t)vigil_nanbox_decode_int(rv) : rv;
                 vm->stack[si] = 0;
             }
         }
