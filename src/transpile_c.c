@@ -576,24 +576,34 @@ static vigil_status_t emit_instruction(vigil_transpile_ctx_t *ctx, const vigil_r
     {
         /* 3-word instruction: word1=op+A+B+C, word2=limit const idx, word3=JMP */
         int8_t delta = (int8_t)b;
+        uint8_t cmp = c;
+        vigil_reg_instr_t w2 = rc->code[*ip + 1];
+        uint16_t ci = VREG_GET_Bx(w2);
         vigil_reg_instr_t jmp_word = rc->code[*ip + 2];
         int16_t jmp_sbx = VREG_GET_sBx(jmp_word);
-        size_t jmp_ip = *ip + 2; /* ip of the JMP word */
+        size_t jmp_ip = *ip + 2;
         size_t target = (size_t)((int64_t)jmp_ip + 1 + (int64_t)jmp_sbx);
+        const char *cmp_op = cmp == 0 ? "<" : cmp == 1 ? "<=" : cmp == 2 ? ">" : ">=";
         EMITF("    r[%u].i = (int64_t)((int32_t)r[%u].i + (int32_t)%d);\n", a, a, (int)delta);
-        EMITF("    if ((int32_t)r[%u].i < (int32_t)r[%u].i) goto L_%zu;\n", a, a + 1, target);
+        EMITF("    if ((int32_t)r[%u].i %s (int32_t)vigil_nanbox_decode_i32(tc->constants[%u])) goto L_%zu;\n",
+              a, cmp_op, (unsigned)ci, target);
         *ip += 2; /* skip word2 and word3 */
         break;
     }
     case VREG_FORLOOP_I64:
     {
         int8_t delta = (int8_t)b;
+        uint8_t cmp = c;
+        vigil_reg_instr_t w2 = rc->code[*ip + 1];
+        uint16_t ci = VREG_GET_Bx(w2);
         vigil_reg_instr_t jmp_word = rc->code[*ip + 2];
         int16_t jmp_sbx = VREG_GET_sBx(jmp_word);
         size_t jmp_ip = *ip + 2;
         size_t target = (size_t)((int64_t)jmp_ip + 1 + (int64_t)jmp_sbx);
+        const char *cmp_op = cmp == 0 ? "<" : cmp == 1 ? "<=" : cmp == 2 ? ">" : ">=";
         EMITF("    r[%u].i = r[%u].i + (int64_t)%d;\n", a, a, (int)delta);
-        EMITF("    if (r[%u].i < r[%u].i) goto L_%zu;\n", a, a + 1, target);
+        EMITF("    if (r[%u].i %s vigil_nanbox_decode_int(tc->constants[%u])) goto L_%zu;\n",
+              a, cmp_op, (unsigned)ci, target);
         *ip += 2;
         break;
     }
@@ -947,7 +957,8 @@ vigil_status_t vigil_transpile_to_c(vigil_runtime_t *runtime, const vigil_object
     EMIT("#include <math.h>\n");
     EMIT("#include <string.h>\n");
     EMIT("#include \"vigil/transpile_rt.h\"\n");
-    EMIT("#include \"vigil/value.h\"\n\n");
+    EMIT("#include \"vigil/value.h\"\n");
+    EMIT("#include \"internal/vigil_nanbox.h\"\n\n");
 
     func_count = count_siblings(function);
     entry_idx = find_entry_index(function, func_count);
