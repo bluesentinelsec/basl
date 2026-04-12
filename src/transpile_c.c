@@ -480,7 +480,7 @@ static vigil_status_t emit_instruction(vigil_transpile_ctx_t *ctx, const vigil_r
 
     /* ── Unary ─────────────────────────────────────────────────── */
     case VREG_NEG:  EMITF("    r[%u].i = -r[%u].i;\n", a, b); break;
-    case VREG_NOT:  EMITF("    r[%u].i = !r[%u].i;\n", a, b); break;
+    case VREG_NOT:  EMITF("    r[%u].i = !vigil_tc_is_truthy(r[%u].v);\n", a, b); break;
     case VREG_BNOT: EMITF("    r[%u].i = ~r[%u].i;\n", a, b); break;
 
     /* ── Bitwise ───────────────────────────────────────────────── */
