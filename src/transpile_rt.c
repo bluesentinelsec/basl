@@ -1163,21 +1163,23 @@ vigil_status_t vigil_tc_string_op(vigil_tc_t *tc, vigil_value_t *regs, uint8_t d
     if (status != VIGIL_STATUS_OK)
         return status;
 
-    /* Copy results back from VM stack. */
-    if (vm->stack_count > (size_t)top_reg)
+    /* Copy results back from VM stack.
+       The string op popped arguments and pushed results. */
     {
-        size_t result_start = (size_t)top_reg;
-        size_t ri = 0;
-        for (size_t i = result_start; i < vm->stack_count; i++, ri++)
+        size_t sc = vm->stack_count;
+        /* Determine result count from sub-opcode. */
+        size_t n_results = 1;
+        if (sub_op == 72 || sub_op == 73 || sub_op == 75 || sub_op == 146 || sub_op == 189)
+            n_results = 2; /* INDEX_OF, SUBSTR, CHAR_AT, CUT, NEXT_CHAR */
+        for (size_t ri = 0; ri < n_results && ri < sc; ri++)
         {
-            regs[dest + ri] = vm->stack[i];
-            vm->stack[i] = 0;
+            size_t si = sc - n_results + ri;
+            if (si < sc)
+            {
+                regs[dest + ri] = vm->stack[si];
+                vm->stack[si] = 0;
+            }
         }
-    }
-    else if (vm->stack_count > 0)
-    {
-        regs[dest] = vm->stack[vm->stack_count - 1];
-        vm->stack[vm->stack_count - 1] = 0;
     }
 
     /* Clear remaining stack slots. */
