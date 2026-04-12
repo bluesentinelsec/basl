@@ -420,7 +420,7 @@ static vigil_status_t emit_instruction(vigil_transpile_ctx_t *ctx, const vigil_r
     switch ((vigil_reg_op_t)op)
     {
     /* ── Data movement ─────────────────────────────────────────── */
-    case VREG_MOVE:      EMITF("    r[%u] = r[%u];\n", a, b); break;
+    case VREG_MOVE:      EMITF("    vigil_tc_move_reg(&r[%u].v, r[%u].v);\n", a, b); break;
     case VREG_LOAD_K:    return emit_load_k(ctx, rc, a, bx);
     case VREG_LOAD_NIL:  EMITF("    r[%u].i = 0;\n", a); break;
     case VREG_LOAD_TRUE: EMITF("    r[%u].i = 1;\n", a); break;

@@ -111,6 +111,9 @@ extern "C"
     /* Test if a register value is truthy (handles nanboxed bools, nil, raw ints). */
     int vigil_tc_is_truthy(vigil_value_t v);
 
+    /* Move a value between registers, retaining objects and releasing the old value. */
+    void vigil_tc_move_reg(vigil_value_t *dst, vigil_value_t src);
+
     /* Call a sibling transpiled function with multi-return support. */
     vigil_status_t vigil_tc_call_self(vigil_tc_t *tc, vigil_value_t *regs, uint8_t ret,
                                        size_t func_idx, uint16_t arg_count, uint8_t arg_base,

@@ -1038,3 +1038,14 @@ restore:
     tc->constant_count = saved_count;
     return status;
 }
+
+void vigil_tc_move_reg(vigil_value_t *dst, vigil_value_t src)
+{
+    if (*dst == src)
+        return;
+    if (vigil_nanbox_is_object(src))
+        vigil_object_retain((vigil_object_t *)vigil_nanbox_decode_ptr(src));
+    if (vigil_nanbox_is_object(*dst))
+        vigil_value_release(dst);
+    *dst = src;
+}
