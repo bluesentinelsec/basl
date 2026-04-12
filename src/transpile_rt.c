@@ -19,6 +19,14 @@
 
 static inline uint64_t tc_to_nanbox(uint64_t v);
 
+/* Safely release a register value (only if it's a nanboxed object). */
+static inline void tc_safe_release(vigil_value_t *v)
+{
+    if (vigil_nanbox_is_object(*v))
+        vigil_value_release(v);
+    *v = 0;
+}
+
 vigil_status_t vigil_tc_to_string(vigil_tc_t *tc, vigil_value_t *dst, const vigil_value_t *src,
                                   vigil_error_t *error)
 {
@@ -384,7 +392,7 @@ vigil_status_t vigil_tc_vm_op(vigil_tc_t *tc, vigil_value_t *regs, uint8_t opcod
         status = vigil_array_object_new(vm->runtime, items, (size_t)count, &arr, error);
         if (status != VIGIL_STATUS_OK)
             return status;
-        vigil_value_release(&regs[a]);
+        tc_safe_release(&regs[a]);
         vigil_value_init_object(&regs[a], &arr);
         return VIGIL_STATUS_OK;
     }
@@ -409,7 +417,7 @@ vigil_status_t vigil_tc_vm_op(vigil_tc_t *tc, vigil_value_t *regs, uint8_t opcod
                 return status;
             }
         }
-        vigil_value_release(&regs[a]);
+        tc_safe_release(&regs[a]);
         vigil_value_init_object(&regs[a], &map);
         return VIGIL_STATUS_OK;
     }
@@ -540,7 +548,9 @@ vigil_status_t vigil_tc_vm_op(vigil_tc_t *tc, vigil_value_t *regs, uint8_t opcod
         regs[a] = vigil_value_copy(&regs[b]);
         return VIGIL_STATUS_OK;
     case VREG_RELEASE:
-        vigil_value_release(&regs[a]);
+        if (vigil_nanbox_is_object(regs[a]))
+            tc_safe_release(&regs[a]);
+        regs[a] = 0;
         return VIGIL_STATUS_OK;
 
     /* ── Phase 4: Classes, interfaces ────────────────────────── */
@@ -563,7 +573,7 @@ vigil_status_t vigil_tc_vm_op(vigil_tc_t *tc, vigil_value_t *regs, uint8_t opcod
             vigil_error_set_literal(error, VIGIL_STATUS_INVALID_ARGUMENT, "invalid field index");
             return VIGIL_STATUS_INVALID_ARGUMENT;
         }
-        vigil_value_release(&regs[a]);
+        tc_safe_release(&regs[a]);
         /* Decode nanboxed integers to raw int64_t for arithmetic compatibility. */
         if (vigil_nanbox_is_int(fv))
             regs[a] = (uint64_t)vigil_nanbox_decode_int(fv);
@@ -598,7 +608,7 @@ vigil_status_t vigil_tc_vm_op(vigil_tc_t *tc, vigil_value_t *regs, uint8_t opcod
             vigil_error_set_literal(error, VIGIL_STATUS_INTERNAL, "invalid global index");
             return VIGIL_STATUS_INTERNAL;
         }
-        vigil_value_release(&regs[a]);
+        tc_safe_release(&regs[a]);
         regs[a] = vigil_nanbox_is_int(gval) ? (uint64_t)vigil_nanbox_decode_int(gval) : gval;
         return VIGIL_STATUS_OK;
     }
@@ -619,7 +629,7 @@ vigil_status_t vigil_tc_vm_op(vigil_tc_t *tc, vigil_value_t *regs, uint8_t opcod
             return VIGIL_STATUS_INTERNAL;
         }
         vigil_object_retain((vigil_object_t *)fn);
-        vigil_value_release(&regs[a]);
+        tc_safe_release(&regs[a]);
         vigil_value_init_object(&regs[a], (vigil_object_t **)&fn);
         return VIGIL_STATUS_OK;
     }
@@ -642,7 +652,7 @@ vigil_status_t vigil_tc_vm_op(vigil_tc_t *tc, vigil_value_t *regs, uint8_t opcod
         status = vigil_closure_object_new(vm->runtime, (vigil_object_t *)fn, caps, (size_t)c, &closure, error);
         if (status != VIGIL_STATUS_OK)
             return status;
-        vigil_value_release(&regs[a]);
+        tc_safe_release(&regs[a]);
         vigil_value_init_object(&regs[a], &closure);
         return VIGIL_STATUS_OK;
     }
@@ -680,7 +690,7 @@ vigil_status_t vigil_tc_new_instance(vigil_tc_t *tc, vigil_value_t *regs, uint8_
     if (status != VIGIL_STATUS_OK)
         return status;
 
-    vigil_value_release(&regs[dest]);
+    tc_safe_release(&regs[dest]);
     vigil_value_init_object(&regs[dest], &inst);
     return VIGIL_STATUS_OK;
 }
@@ -890,8 +900,10 @@ vigil_status_t vigil_tc_format_spec(vigil_tc_t *tc, vigil_value_t *dst, const vi
     if (status != VIGIL_STATUS_OK)
         return status;
 
-    vigil_value_release(dst);
+    vigil_value_t old = *dst;
     *dst = result;
+    if (vigil_nanbox_is_object(old))
+        vigil_value_release(&old);
     return VIGIL_STATUS_OK;
 }
 
