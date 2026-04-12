@@ -323,9 +323,16 @@ static uint8_t *build_jump_targets(const vigil_reg_instr_t *code, size_t count)
         case VREG_FORLOOP_I32:
         case VREG_FORLOOP_I64:
         {
-            int64_t target = (int64_t)ip + 1 + (int64_t)sbx;
-            if (target >= 0 && (size_t)target < count)
-                targets[(size_t)target / 8] |= (uint8_t)(1U << ((size_t)target % 8));
+            /* 3-word instruction: word3 is the JMP */
+            if (ip + 2 < count)
+            {
+                vigil_reg_instr_t jmp_word = code[ip + 2];
+                int16_t jmp_sbx = VREG_GET_sBx(jmp_word);
+                int64_t target = (int64_t)(ip + 2) + 1 + (int64_t)jmp_sbx;
+                if (target >= 0 && (size_t)target < count)
+                    targets[(size_t)target / 8] |= (uint8_t)(1U << ((size_t)target % 8));
+            }
+            ip += 2; /* skip word2 and word3 */
             break;
         }
         default:
@@ -551,16 +558,27 @@ static vigil_status_t emit_instruction(vigil_transpile_ctx_t *ctx, const vigil_r
     /* ── Loop superinstructions ────────────────────────────────── */
     case VREG_FORLOOP_I32:
     {
-        size_t target = (size_t)((int64_t)(*ip) + 1 + (int64_t)sbx);
-        EMITF("    r[%u].i = (int64_t)((int32_t)r[%u].i + (int32_t)r[%u].i);\n", a, a, a + 2);
+        /* 3-word instruction: word1=op+A+B+C, word2=limit const idx, word3=JMP */
+        int8_t delta = (int8_t)b;
+        vigil_reg_instr_t jmp_word = rc->code[*ip + 2];
+        int16_t jmp_sbx = VREG_GET_sBx(jmp_word);
+        size_t jmp_ip = *ip + 2; /* ip of the JMP word */
+        size_t target = (size_t)((int64_t)jmp_ip + 1 + (int64_t)jmp_sbx);
+        EMITF("    r[%u].i = (int64_t)((int32_t)r[%u].i + (int32_t)%d);\n", a, a, (int)delta);
         EMITF("    if ((int32_t)r[%u].i < (int32_t)r[%u].i) goto L_%zu;\n", a, a + 1, target);
+        *ip += 2; /* skip word2 and word3 */
         break;
     }
     case VREG_FORLOOP_I64:
     {
-        size_t target = (size_t)((int64_t)(*ip) + 1 + (int64_t)sbx);
-        EMITF("    r[%u].i = r[%u].i + r[%u].i;\n", a, a, a + 2);
+        int8_t delta = (int8_t)b;
+        vigil_reg_instr_t jmp_word = rc->code[*ip + 2];
+        int16_t jmp_sbx = VREG_GET_sBx(jmp_word);
+        size_t jmp_ip = *ip + 2;
+        size_t target = (size_t)((int64_t)jmp_ip + 1 + (int64_t)jmp_sbx);
+        EMITF("    r[%u].i = r[%u].i + (int64_t)%d;\n", a, a, (int)delta);
         EMITF("    if (r[%u].i < r[%u].i) goto L_%zu;\n", a, a + 1, target);
+        *ip += 2;
         break;
     }
     case VREG_INC_I32:  EMITF("    r[%u].i = (int64_t)((int32_t)r[%u].i + (int32_t)%d);\n", a, a, (int)(int8_t)b); break;
