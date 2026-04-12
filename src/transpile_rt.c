@@ -124,12 +124,19 @@ vigil_status_t vigil_tc_call_native(vigil_tc_t *tc, vigil_value_t *regs, uint8_t
         return status;
 
     /* Copy return values back to registers and clear stack slots
-       to prevent double-release during vigil_vm_close. */
+       to prevent double-release during vigil_vm_close.
+       Decode nanboxed integers to raw int64_t for arithmetic compatibility. */
     {
         size_t ri;
         for (ri = (size_t)arg_base; ri < vm->stack_count; ri++)
         {
-            regs[ri] = vm->stack[ri];
+            vigil_value_t v = vm->stack[ri];
+            if (vigil_nanbox_is_int(v))
+                regs[ri] = (uint64_t)vigil_nanbox_decode_int(v);
+            else if (vigil_nanbox_is_uint(v))
+                regs[ri] = (uint64_t)vigil_nanbox_decode_uint(v);
+            else
+                regs[ri] = v;
             vm->stack[ri] = 0;
         }
     }
@@ -1196,14 +1203,20 @@ vigil_status_t vigil_tc_format_spec(vigil_tc_t *tc, vigil_value_t *dst, const vi
 int vigil_tc_values_equal(const vigil_value_t *regs, uint8_t b, uint8_t c)
 {
     uint64_t lhs = regs[b], rhs = regs[c];
-    /* Fast path: identical bits (covers same-pointer objects and equal ints). */
+    /* Fast path: identical bits. */
     if (lhs == rhs)
         return 1;
     /* If both are objects, use value equality. */
     if (vigil_nanbox_has_object(lhs) && vigil_nanbox_has_object(rhs))
         return vigil_vm_values_equal(&lhs, &rhs);
-    /* Raw int comparison (Phase 1 arithmetic stores raw int64_t). */
-    return 0;
+    /* Nanbox-encode both and compare via VM equality. */
+    {
+        vigil_value_t le = tc_to_nanbox(lhs);
+        vigil_value_t re = tc_to_nanbox(rhs);
+        if (le == re)
+            return 1;
+        return vigil_vm_values_equal(&le, &re);
+    }
 }
 
 int vigil_tc_values_lt(const vigil_value_t *regs, uint8_t b, uint8_t c)
@@ -1384,10 +1397,16 @@ vigil_status_t vigil_tc_call_self(vigil_tc_t *tc, vigil_value_t *regs, uint8_t r
     if (status != VIGIL_STATUS_OK)
         goto restore;
 
-    /* Copy results back. */
+    /* Copy results back, decoding nanboxed ints to raw. */
     for (i = (size_t)arg_base; i < vm->stack_count; i++)
     {
-        regs[ret + (i - (size_t)arg_base)] = vm->stack[i];
+        vigil_value_t v = vm->stack[i];
+        if (vigil_nanbox_is_int(v))
+            regs[ret + (i - (size_t)arg_base)] = (uint64_t)vigil_nanbox_decode_int(v);
+        else if (vigil_nanbox_is_uint(v))
+            regs[ret + (i - (size_t)arg_base)] = (uint64_t)vigil_nanbox_decode_uint(v);
+        else
+            regs[ret + (i - (size_t)arg_base)] = v;
         vm->stack[i] = 0;
     }
 
