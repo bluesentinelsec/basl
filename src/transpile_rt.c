@@ -17,10 +17,13 @@
 #include "vm_ops_collection.h"
 #include "vm_ops_string.h"
 
+static inline uint64_t tc_to_nanbox(uint64_t v);
+
 vigil_status_t vigil_tc_to_string(vigil_tc_t *tc, vigil_value_t *dst, const vigil_value_t *src,
                                   vigil_error_t *error)
 {
-    return vigil_vm_stringify_value(tc->vm, src, dst, error);
+    vigil_value_t encoded = tc_to_nanbox(*src);
+    return vigil_vm_stringify_value(tc->vm, &encoded, dst, error);
 }
 
 vigil_status_t vigil_tc_call_native(vigil_tc_t *tc, vigil_value_t *regs, uint8_t arg_base,
@@ -78,7 +81,7 @@ vigil_status_t vigil_tc_call_native(vigil_tc_t *tc, vigil_value_t *regs, uint8_t
                 vigil_object_retain((vigil_object_t *)vigil_nanbox_decode_ptr(v));
                 vm->stack[arg_base + i] = v;
             }
-            else if (v == 0 || vigil_nanbox_is_int(v) || vigil_nanbox_is_bool(v))
+            else if (vigil_nanbox_is_int(v) || vigil_nanbox_is_bool(v) || v == VIGIL_NANBOX_NIL)
                 vm->stack[arg_base + i] = v;
             else
                 vm->stack[arg_base + i] = vigil_nanbox_encode_int((int64_t)v);
