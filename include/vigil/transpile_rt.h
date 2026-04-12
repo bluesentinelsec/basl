@@ -106,6 +106,10 @@ extern "C"
     /* Compare two register values for equality (handles objects). */
     int vigil_tc_values_equal(const vigil_value_t *regs, uint8_t b, uint8_t c);
 
+    /* Generic add: string concatenation if both objects, integer add otherwise. */
+    vigil_status_t vigil_tc_generic_add(vigil_tc_t *tc, vigil_value_t *dst, const vigil_value_t *lhs,
+                                         const vigil_value_t *rhs, vigil_error_t *error);
+
 #ifdef __cplusplus
 }
 #endif

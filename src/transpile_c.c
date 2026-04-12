@@ -440,7 +440,9 @@ static vigil_status_t emit_instruction(vigil_transpile_ctx_t *ctx, const vigil_r
     case VREG_DIV_F64: return emit_f64_arith(ctx, "/", a, b, c);
 
     /* ── Generic arithmetic ────────────────────────────────────── */
-    case VREG_ADD: return emit_i64_arith(ctx, "+", a, b, c);
+    case VREG_ADD:
+        EMITF("    vigil_tc_generic_add(tc, &r[%u].v, &r[%u].v, &r[%u].v, NULL);\n", a, b, c);
+        break;
     case VREG_SUB: return emit_i64_arith(ctx, "-", a, b, c);
     case VREG_MUL: return emit_i64_arith(ctx, "*", a, b, c);
     case VREG_DIV: return emit_i64_arith(ctx, "/", a, b, c);
