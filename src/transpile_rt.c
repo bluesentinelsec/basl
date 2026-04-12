@@ -904,3 +904,21 @@ int vigil_tc_values_equal(const vigil_value_t *regs, uint8_t b, uint8_t c)
     /* Raw int comparison (Phase 1 arithmetic stores raw int64_t). */
     return 0;
 }
+
+vigil_status_t vigil_tc_generic_add(vigil_tc_t *tc, vigil_value_t *dst, const vigil_value_t *lhs,
+                                     const vigil_value_t *rhs, vigil_error_t *error)
+{
+    /* String concatenation when both are objects. */
+    if (vigil_nanbox_is_object(*lhs) && vigil_nanbox_is_object(*rhs))
+    {
+        vigil_value_t result;
+        vigil_status_t st = vigil_vm_concat_strings(tc->vm, lhs, rhs, &result, error);
+        if (st != VIGIL_STATUS_OK)
+            return st;
+        *dst = result;
+        return VIGIL_STATUS_OK;
+    }
+    /* Integer addition. */
+    *dst = (uint64_t)((int64_t)*lhs + (int64_t)*rhs);
+    return VIGIL_STATUS_OK;
+}
