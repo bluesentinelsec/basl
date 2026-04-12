@@ -132,45 +132,70 @@ vigil check main.vigil
 
 ## `new`
 
+Create a new Vigil project.
+
 Usage:
 
 ```text
-vigil new [options] <name>
+vigil new [name] [options]
 ```
 
-Arguments:
+The positional `name` argument is shorthand for `--project-name`. If omitted and stdin is a terminal, Vigil prompts interactively. In non-interactive mode (piped stdin, CI), `--project-name` is required.
 
-- `name`: project name
+### Options
 
-Options:
+| Flag | Short | Default | Description |
+|---|---|---|---|
+| `--project-name` | — | *(prompted)* | Project name. Used as directory name (normalized) and stored in `vigil.toml`. |
+| `--description` | `-d` | `"A new Vigil project"` | Project description. |
+| `--org` | — | `"com.example"` | Organization in reverse-domain notation (e.g. `com.example`). Strictly validated. |
+| `--version` | — | `"1.0.0"` | Initial version string. |
+| `--type` | `-t` | `"cli"` | Project type: `cli`, `gui`, `library`, or `workspace`. |
+| `--platforms` | `-p` | *(depends on type)* | Comma-separated target platforms: `windows`, `linux`, `macos`, `ios`, `android`, `web`. |
 
-- `-l`, `--lib`: create a library project instead of an app project
-- `-s`, `--scaffold`: for app projects, include an example library module and test
-- `-o`, `--output <dir>`: create the project inside `<dir>/<name>`
+### Project types
 
-Behavior:
+**`cli`** (default) — Creates an executable project with `main.vigil`, a library module, and a test:
 
-- If `name` is omitted, Vigil prompts interactively for a project name.
-- Rejects project names longer than 100 characters.
-- Fails if the destination directory already exists.
-- Always creates:
-  - `vigil.toml`
-  - `lib/`
-  - `test/`
-  - `.gitignore`
-- Default app layout creates `main.vigil`.
-- Library layout creates `lib/<name>.vigil` plus `test/<name>_test.vigil`.
-- App scaffold mode creates:
-  - `main.vigil`
-  - `lib/<name>.vigil`
-  - `test/<name>_test.vigil`
+```
+myapp/
+├── vigil.toml
+├── main.vigil
+├── lib/myapp.vigil
+├── test/myapp_test.vigil
+└── .gitignore
+```
 
-Examples:
+**`gui`** — Like `cli` but with SDL imports and a minimal window scaffold. Default platforms include all six.
+
+**`library`** — No `main.vigil`. Creates `lib/` and `test/` only.
+
+**`workspace`** — Creates a workspace root with `vigil.toml` containing `[workspace]` and `.gitignore`. No source files or subdirectories. Use `vigil new` inside the workspace to add members.
+
+### Name normalization
+
+The project name is normalized for filesystem use:
+- Lowercase, whitespace → `_`, only `[a-z0-9_-]` kept
+- Must start with a letter or underscore (not a digit or `-`)
+- Windows reserved names (`con`, `prn`, `aux`, `nul`, `com1`–`com9`, `lpt1`–`lpt9`) are rejected
+- The original display name is preserved in `vigil.toml`
+
+### `--org` validation
+
+Must be valid reverse-domain notation: at least two dot-separated segments, each containing only `[a-z0-9-]`. Examples: `com.example`, `org.vigil-lang`, `io.github.user`.
+
+### `vigil.toml`
+
+All fields are always written with TOML comments explaining each one. The generated manifest includes project metadata, organization info, platform-specific sections (`[icon]`, `[platform.macos]`, `[platform.ios]`, `[platform.android]`, `[platform.windows]`, `[platform.linux]`), and `[dependencies]`.
+
+### Examples
 
 ```text
 vigil new hello
-vigil new mylib --lib
-vigil new app --scaffold --output examples
+vigil new mylib -t library
+vigil new mygui -t gui -d "My GUI App" --org com.mycompany
+vigil new myws -t workspace
+vigil new --project-name "My Cool App" --version 2.0.0
 ```
 
 ## `debug`

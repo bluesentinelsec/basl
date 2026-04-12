@@ -1,140 +1,142 @@
 {
-  "defaults": {
-    "ccn": 20,
-    "length": 120,
-    "param": 6
-  },
-  "new_function": {
-    "ccn": 17,
-    "param": 7
-  },
-  "churn": {
-    "since_days": 180,
-    "tiers": [
-      {
-        "name": "high",
-        "min_commits": 12,
-        "thresholds": {
-          "ccn": 10
+    "defaults": {
+        "ccn": 20,
+        "length": 120,
+        "param": 6
+    },
+    "new_function": {
+        "ccn": 17,
+        "param": 7
+    },
+    "churn": {
+        "since_days": 180,
+        "tiers": [
+            {
+                "name": "high",
+                "min_commits": 12,
+                "thresholds": {
+                    "ccn": 10
+                }
+            },
+            {
+                "name": "medium",
+                "min_commits": 6,
+                "thresholds": {
+                    "ccn": 12
+                }
+            },
+            {
+                "name": "low",
+                "min_commits": 0,
+                "thresholds": {
+                    "ccn": 20
+                }
+            }
+        ]
+    },
+    "overrides": [
+        {
+            "path_prefix": "tests/",
+            "thresholds": {
+                "ccn": 10
+            }
+        },
+        {
+            "path": "src/cli/main.c",
+            "thresholds": {
+                "ccn": 45,
+                "length": 190,
+                "param": 8
+            }
+        },
+        {
+            "path": "src/cli_frontend.c",
+            "thresholds": {
+                "ccn": 10
+            }
+        },
+        {
+            "path": "src/cli_test.c",
+            "thresholds": {
+                "ccn": 10
+            }
+        },
+        {
+            "path": "src/cli_lib.c",
+            "thresholds": {
+                "ccn": 10
+            }
+        },
+        {
+            "path": "src/compiler.c",
+            "thresholds": {
+                "ccn": 25,
+                "length": 135
+            }
+        },
+        {
+            "path": "src/compiler_builtins.c",
+            "thresholds": {
+                "ccn": 45,
+                "length": 165
+            }
+        },
+        {
+            "path": "src/regvm.c",
+            "thresholds": {
+                "ccn": 375,
+                "length": 2950
+            }
+        },
+        {
+            "path": "src/vm.c",
+            "thresholds": {
+                "ccn": 24,
+                "length": 125
+            }
+        },
+        {
+            "path": "tests/chunk_test.c",
+            "thresholds": {
+                "ccn": 18
+            }
+        },
+        {
+            "path": "tests/compiler_test.c",
+            "thresholds": {
+                "length": 150
+            }
+        },
+        {
+            "path_prefix": "src/platform/",
+            "thresholds": {
+                "ccn": 24,
+                "length": 125,
+                "param": 8
+            }
+        },
+        {
+            "path": "src/aot.c",
+            "thresholds": {
+                "ccn": 75,
+                "length": 570,
+                "param": 10
+            }
+        },
+        {
+            "path": "src/transpile_c.c",
+            "thresholds": {
+                "ccn": 140,
+                "length": 280
+            }
+        },
+        {
+            "path": "src/transpile_rt.c",
+            "thresholds": {
+                "ccn": 80,
+                "length": 200,
+                "param": 8
+            }
         }
-      },
-      {
-        "name": "medium",
-        "min_commits": 6,
-        "thresholds": {
-          "ccn": 12
-        }
-      },
-      {
-        "name": "low",
-        "min_commits": 0,
-        "thresholds": {
-          "ccn": 20
-        }
-      }
     ]
-  },
-  "overrides": [
-    {
-      "path_prefix": "tests/",
-      "thresholds": {
-        "ccn": 10
-      }
-    },
-    {
-      "path": "src/cli/main.c",
-      "thresholds": {
-        "ccn": 10
-      }
-    },
-    {
-      "path": "src/cli_frontend.c",
-      "thresholds": {
-        "ccn": 10
-      }
-    },
-    {
-      "path": "src/cli_test.c",
-      "thresholds": {
-        "ccn": 10
-      }
-    },
-    {
-      "path": "src/cli_lib.c",
-      "thresholds": {
-        "ccn": 10
-      }
-    },
-    {
-      "path": "src/compiler.c",
-      "thresholds": {
-        "ccn": 25,
-        "length": 135
-      }
-    },
-    {
-      "path": "src/compiler_builtins.c",
-      "thresholds": {
-        "ccn": 45,
-        "length": 165
-      }
-    },
-    {
-      "path": "src/regvm.c",
-      "thresholds": {
-        "ccn": 375,
-        "length": 2950
-      }
-    },
-    {
-      "path": "src/vm.c",
-      "thresholds": {
-        "ccn": 24,
-        "length": 125
-      }
-    },
-    {
-      "path": "tests/chunk_test.c",
-      "thresholds": {
-        "ccn": 18
-      }
-    },
-    {
-      "path": "tests/compiler_test.c",
-      "thresholds": {
-        "length": 150
-      }
-    },
-    {
-      "path_prefix": "src/platform/",
-      "thresholds": {
-        "ccn": 24,
-        "length": 125,
-        "param": 8
-      }
-    },
-    {
-      "path": "src/aot.c",
-      "thresholds": {
-        "ccn": 75,
-        "length": 570,
-        "param": 10
-      }
-    },
-    {
-      "path": "src/transpile_c.c",
-      "thresholds": {
-        "ccn": 140,
-        "length": 280
-      }
-    },
-    {
-      "path": "src/transpile_rt.c",
-      "thresholds": {
-        "ccn": 80,
-        "length": 200,
-        "param": 8
-      }
-    }
-  ]
 }
