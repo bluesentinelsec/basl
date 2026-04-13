@@ -1,16 +1,5 @@
 import "fmt"
 
-fn test_err_ok() -> void {
-    err e = err("test error", err.arg)
-    fmt.println(f"err msg: {e.message()}")
-    fmt.println(f"err kind: {e.kind()}")
-}
-
-fn test_err_compare() -> void {
-    err e = ok
-    fmt.println(f"err ok: {e == ok}")
-}
-
 fn main() -> i32 {
     fmt.println("===== TEST 01_PRIMITIVES START =====")
 
@@ -47,9 +36,12 @@ fn main() -> i32 {
     // void function
     print_void()
 
-    // err values (in separate scopes to avoid VM register bug)
-    test_err_compare()
-    test_err_ok()
+    // err values — same scope, no workaround needed (P1 register fix)
+    err e = ok
+    fmt.println(f"err ok: {e == ok}")
+    err e2 = err("test error", err.arg)
+    fmt.println(f"err msg: {e2.message()}")
+    fmt.println(f"err kind: {e2.kind()}")
 
     fmt.println("===== TEST 01_PRIMITIVES END - EXPECTED OUTPUT ABOVE =====")
     return 0

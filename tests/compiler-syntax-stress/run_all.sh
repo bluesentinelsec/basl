@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VIGIL="$(realpath /home/michael/projects/vigil/build/vigil)"
+VIGIL="$(realpath /Users/michaellong/projects/vigil/tests/compiler-syntax-stress/../../build/vigil)"
 STRESS_DIR="$(cd "$(dirname "$0")" && pwd)"
 RESULTS_FILE="$STRESS_DIR/RESULTS.md"
 
@@ -90,10 +90,10 @@ run_test() {
     # Step 5: find and run executable
     echo "  [5/6] running C binary..."
     local exe
-    exe=$(find "$c_dir/build" -type f -executable ! -name '*.cmake' ! -name 'Makefile' ! -path '*/CMakeFiles/*' -print -quit 2>/dev/null || true)
+    exe=$(find "$c_dir/build" -type f -perm +111 ! -name '*.cmake' ! -name 'Makefile' ! -path '*/CMakeFiles/*' -print -quit 2>/dev/null || true)
     if [ -z "$exe" ]; then
         # Try common names
-        for candidate in "$c_dir/build/${test_name}" "$c_dir/build/Release/${test_name}" "$c_dir/build/main"; do
+        for candidate in "$c_dir/build/vigil_app" "$c_dir/build/${test_name}" "$c_dir/build/Release/${test_name}" "$c_dir/build/main"; do
             if [ -x "$candidate" ]; then
                 exe="$candidate"
                 break

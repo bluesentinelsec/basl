@@ -240,6 +240,7 @@ typedef struct
     uint8_t need_release;    /* 255 = none, else register to release before write */
     uint8_t last_pop[2];     /* last two popped registers (inputs to current op) */
     uint32_t obj_written[8]; /* bitmap: registers that may hold objects */
+    uint8_t local_reg[256];  /* actual register holding each local's current value */
 } vstack_t;
 
 static void vs_init(vstack_t *vs, uint8_t lc)
@@ -253,6 +254,8 @@ static void vs_init(vstack_t *vs, uint8_t lc)
     vs->last_pop[1] = 255;
     memset(vs->regs, 0, sizeof(vs->regs));
     memset(vs->obj_written, 0, sizeof(vs->obj_written));
+    for (uint8_t i = 0; i < lc; i++)
+        vs->local_reg[i] = i;
 }
 
 static int vs_is_obj(const vstack_t *vs, uint8_t reg)
@@ -279,6 +282,9 @@ static uint8_t vs_push(vstack_t *vs)
         r = (uint8_t)vs->top; /* local slot or frontier: identity */
     else
         r = vs->next_reg; /* below frontier: fresh */
+    /* Track which register actually holds each local's value. */
+    if (vs->top < (int)vs->local_count)
+        vs->local_reg[vs->top] = r;
     vs->regs[vs->top] = r;
     vs->top++;
     if (r >= vs->next_reg)
@@ -297,6 +303,9 @@ static uint8_t vs_push(vstack_t *vs)
 
 static uint8_t vs_push_at(vstack_t *vs, uint8_t reg)
 {
+    /* Track which register actually holds each local's value. */
+    if (vs->top < (int)vs->local_count)
+        vs->local_reg[vs->top] = reg;
     vs->regs[vs->top] = reg;
     vs->top++;
     if (reg >= vs->next_reg)
@@ -1794,9 +1803,13 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
         }
         case VIGIL_OPCODE_GET_LOCAL: {
             uint32_t idx = rd_u32(code, &ip);
+            /* Read from the register that actually holds this local's value,
+               which may differ from the identity register after SYNC_PACK or
+               when a void call drops top below local_count. */
+            uint8_t src_reg = vs.local_reg[idx];
             uint8_t dst = vs_push(&vs);
-            if (dst != (uint8_t)idx)
-                TR_EMIT(vigil_reg_abc(VREG_MOVE, dst, (uint8_t)idx, 0));
+            if (dst != src_reg)
+                TR_EMIT(vigil_reg_abc(VREG_MOVE, dst, src_reg, 0));
             break;
         }
         case VIGIL_OPCODE_SET_LOCAL: {
@@ -1804,6 +1817,8 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
             uint8_t src = vs_peek(&vs, 0);
             if (src != (uint8_t)idx)
                 TR_EMIT(vigil_reg_abc(VREG_MOVE, (uint8_t)idx, src, 0));
+            /* Update local_reg so subsequent GET_LOCAL reads from the right place. */
+            vs.local_reg[idx] = (uint8_t)idx;
             /* SET_LOCAL doesn't pop — the value stays on the virtual stack.
                The subsequent POP will handle cleanup. */
             break;
