@@ -34,13 +34,11 @@ fn main() -> i32 {
     fmt.println(f"le: {a <= b}")
     fmt.println(f"ge: {a >= b}")
 
-    // Logical (using ternary to ensure correct bool formatting in transpiled C)
+    // Logical — direct f-string formatting (P2 peephole fix)
     bool t = true
     bool f = false
-    string and_str = (t && f) ? "true" : "false"
-    fmt.println(f"and: {and_str}")
-    string or_str = (t || f) ? "true" : "false"
-    fmt.println(f"or: {or_str}")
+    fmt.println(f"and: {t && f}")
+    fmt.println(f"or: {t || f}")
     string not_str = (!t) ? "true" : "false"
     fmt.println(f"not: {not_str}")
 

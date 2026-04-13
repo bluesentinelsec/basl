@@ -1774,6 +1774,14 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
         /* Record offset mapping (after any normalization MOV). */
         omap_add(&omap, start_ip, rc->code_count);
 
+#ifdef REGVM_TRACE
+        fprintf(stderr, "[REGVM] ip=%zu op=%u top=%d lc=%u nr=%u regs=[", start_ip, op, vs.top, vs.local_count, vs.next_reg);
+        for (int _di = 0; _di < vs.top; _di++) fprintf(stderr, "%s%u", _di ? "," : "", vs.regs[_di]);
+        fprintf(stderr, "] lr=[");
+        for (uint8_t _li = 0; _li < vs.local_count; _li++) fprintf(stderr, "%s%u", _li ? "," : "", vs.local_reg[_li]);
+        fprintf(stderr, "]\n");
+#endif
+
         switch (op)
         {
         /* ── Data movement ─────────────────────────────────────── */
@@ -5214,14 +5222,21 @@ r_dispatch_switch_check:
         uint8_t b = VREG_GET_B(i);
         uint8_t c = VREG_GET_C(i);
         int falsey = (R[b] == VIGIL_NANBOX_NIL || R[b] == VIGIL_NANBOX_FALSE);
-        if (c == 0 ? !falsey : falsey)
-        {
-            ip += 2; /* skip next instruction */
-        }
-        else
+        /* Always copy the tested value to the result register so the
+           result is available on both the short-circuit and fall-through
+           paths.  Without this, || in expression contexts (e.g. f-strings)
+           leaves the result register unset when the jump is taken. */
+        if (a != b)
         {
             RRELEASE(a);
             VIGIL_VM_VALUE_COPY(&R[a], &R[b]);
+        }
+        if (c == 0 ? !falsey : falsey)
+        {
+            ip += 2; /* skip next instruction (the JMP) — short-circuit */
+        }
+        else
+        {
             ip++;
         }
         RDISPATCH();

@@ -386,6 +386,12 @@ static void peephole_eliminate_moves(vigil_reg_instr_t *code, size_t count, cons
         if (opcode_extra_words(next_op) > 0)
             continue;
 
+        /* Don't eliminate MOVEs before TEST/TESTSET — the destination
+           register may be needed on the conditional jump path where the
+           next instruction is skipped (e.g. || short-circuit in f-strings). */
+        if (next_op == VREG_TEST || next_op == VREG_TESTSET)
+            continue;
+
         /* Don't optimize if next instruction writes to move_src
            (would change semantics if we substitute) */
         unsigned next_mask = opcode_src_mask(next_op);
