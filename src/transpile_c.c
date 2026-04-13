@@ -566,10 +566,8 @@ static vigil_status_t emit_instruction(vigil_transpile_ctx_t *ctx, const vigil_r
         /* Use vigil_tc_call_self for correct defer/frame handling.
            Direct C calls skip VM frame setup, which breaks defers
            registered inside the callee. */
-        if (*ip + 1 >= rc->code_count) { vigil_error_set_literal(ctx->error, VIGIL_STATUS_INTERNAL, "transpile: truncated CALL"); return VIGIL_STATUS_INTERNAL; }
-        uint8_t arg_base_r = a; /* CALL uses A as both arg_base and return base */
         EMITF("    vigil_tc_call_self(tc, (uint64_t *)r, %u, %u, %u, %u, NULL);\n",
-              (unsigned)a, (unsigned)b, (unsigned)c, (unsigned)arg_base_r);
+              (unsigned)a, (unsigned)b, (unsigned)c, (unsigned)a);
         break;
     }
     case VREG_CALL_SELF:
@@ -591,7 +589,6 @@ static vigil_status_t emit_instruction(vigil_transpile_ctx_t *ctx, const vigil_r
         EMITF("    return r[%u];\n", (unsigned)a);
         break;
     }
-        break;
     case VREG_RETURN:
         if (b == 0) { EMIT("    vigil_tc_drain_defers(tc, NULL);\n    tc->ret_count = 0;\n    return (vigil_reg_t){0};\n"); }
         else if (b == 1) { EMIT("    vigil_tc_drain_defers(tc, NULL);\n"); EMITF("    tc->ret_count = 1;\n    return r[%u];\n", a); }
