@@ -80,7 +80,13 @@ static vigil_status_t emit_load_k(vigil_transpile_ctx_t *ctx, const vigil_reg_ch
     else if (kind == VIGIL_VALUE_BOOL)
         EMITF("    r[%u].v = %s;\n", a, vigil_value_as_bool(k) ? "VIGIL_NANBOX_TRUE" : "VIGIL_NANBOX_FALSE");
     else if (kind == VIGIL_VALUE_UINT)
-        EMITF("    r[%u].v = vigil_nanbox_encode_uint(%lluULL);\n", a, (unsigned long long)vigil_value_as_uint(k));
+    {
+        uint64_t uval = vigil_value_as_uint(k);
+        if (vigil_nanbox_uint_fits_inline(uval))
+            EMITF("    r[%u].v = vigil_nanbox_encode_uint(%lluULL);\n", a, (unsigned long long)uval);
+        else
+            EMITF("    vigil_value_init_uint_rt(&r[%u].v, %lluULL, tc->runtime, NULL);\n", a, (unsigned long long)uval);
+    }
     else if (kind == VIGIL_VALUE_FLOAT)
         EMITF("    r[%u].f = %.17g;\n", a, vigil_value_as_float(k));
     else if (kind == VIGIL_VALUE_OBJECT)

@@ -535,7 +535,8 @@ vigil_status_t vigil_tc_drain_defers(vigil_tc_t *tc, vigil_error_t *error)
    otherwise nanbox-encodes it as an integer. */
 static inline uint64_t tc_to_nanbox(uint64_t v)
 {
-    if (vigil_nanbox_is_object(v) || vigil_nanbox_is_int(v) || vigil_nanbox_is_bool(v) || v == VIGIL_NANBOX_NIL)
+    if (vigil_nanbox_is_object(v) || vigil_nanbox_is_int(v) || vigil_nanbox_is_uint(v) ||
+        vigil_nanbox_is_bool(v) || v == VIGIL_NANBOX_NIL)
         return v;
     /* Check if this is a raw double (not a small raw integer).
        Doubles have exponent bits in the upper bytes. Raw ints from
