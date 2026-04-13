@@ -77,6 +77,10 @@ static vigil_status_t emit_load_k(vigil_transpile_ctx_t *ctx, const vigil_reg_ch
     vigil_value_kind_t kind = vigil_value_kind(k);
     if (kind == VIGIL_VALUE_INT)
         EMITF("    r[%u].i = (int64_t)%lldLL;\n", a, (long long)vigil_value_as_int(k));
+    else if (kind == VIGIL_VALUE_BOOL)
+        EMITF("    r[%u].v = %s;\n", a, vigil_value_as_bool(k) ? "VIGIL_NANBOX_TRUE" : "VIGIL_NANBOX_FALSE");
+    else if (kind == VIGIL_VALUE_UINT)
+        EMITF("    r[%u].v = vigil_nanbox_encode_uint(%lluULL);\n", a, (unsigned long long)vigil_value_as_uint(k));
     else if (kind == VIGIL_VALUE_FLOAT)
         EMITF("    r[%u].f = %.17g;\n", a, vigil_value_as_float(k));
     else if (kind == VIGIL_VALUE_OBJECT)
@@ -142,14 +146,15 @@ static vigil_status_t emit_f64_arith(vigil_transpile_ctx_t *ctx, const char *op_
 static vigil_status_t emit_i32_cmp(vigil_transpile_ctx_t *ctx, const char *op_str, uint8_t a, uint8_t b, uint8_t c)
 {
     vigil_status_t status;
-    EMITF("    r[%u].i = ((int32_t)r[%u].i %s (int32_t)r[%u].i);\n", a, b, op_str, c);
+    EMITF("    r[%u].v = ((int32_t)r[%u].i %s (int32_t)r[%u].i) ? VIGIL_NANBOX_TRUE : VIGIL_NANBOX_FALSE;\n",
+          a, b, op_str, c);
     return VIGIL_STATUS_OK;
 }
 
 static vigil_status_t emit_i64_cmp(vigil_transpile_ctx_t *ctx, const char *op_str, uint8_t a, uint8_t b, uint8_t c)
 {
     vigil_status_t status;
-    EMITF("    r[%u].i = (r[%u].i %s r[%u].i);\n", a, b, op_str, c);
+    EMITF("    r[%u].v = (r[%u].i %s r[%u].i) ? VIGIL_NANBOX_TRUE : VIGIL_NANBOX_FALSE;\n", a, b, op_str, c);
     return VIGIL_STATUS_OK;
 }
 
@@ -323,9 +328,16 @@ static uint8_t *build_jump_targets(const vigil_reg_instr_t *code, size_t count)
         case VREG_FORLOOP_I32:
         case VREG_FORLOOP_I64:
         {
-            int64_t target = (int64_t)ip + 1 + (int64_t)sbx;
-            if (target >= 0 && (size_t)target < count)
-                targets[(size_t)target / 8] |= (uint8_t)(1U << ((size_t)target % 8));
+            /* 3-word instruction: word3 is the JMP */
+            if (ip + 2 < count)
+            {
+                vigil_reg_instr_t jmp_word = code[ip + 2];
+                int16_t jmp_sbx = VREG_GET_sBx(jmp_word);
+                int64_t target = (int64_t)(ip + 2) + 1 + (int64_t)jmp_sbx;
+                if (target >= 0 && (size_t)target < count)
+                    targets[(size_t)target / 8] |= (uint8_t)(1U << ((size_t)target % 8));
+            }
+            ip += 2; /* skip word2 and word3 */
             break;
         }
         default:
@@ -413,11 +425,11 @@ static vigil_status_t emit_instruction(vigil_transpile_ctx_t *ctx, const vigil_r
     switch ((vigil_reg_op_t)op)
     {
     /* ── Data movement ─────────────────────────────────────────── */
-    case VREG_MOVE:      EMITF("    r[%u] = r[%u];\n", a, b); break;
+    case VREG_MOVE:      EMITF("    vigil_tc_move_reg(&r[%u].v, r[%u].v);\n", a, b); break;
     case VREG_LOAD_K:    return emit_load_k(ctx, rc, a, bx);
-    case VREG_LOAD_NIL:  EMITF("    r[%u].i = 0;\n", a); break;
-    case VREG_LOAD_TRUE: EMITF("    r[%u].i = 1;\n", a); break;
-    case VREG_LOAD_FALSE:EMITF("    r[%u].i = 0;\n", a); break;
+    case VREG_LOAD_NIL:  EMITF("    r[%u].v = VIGIL_NANBOX_NIL;\n", a); break;
+    case VREG_LOAD_TRUE: EMITF("    r[%u].v = VIGIL_NANBOX_TRUE;\n", a); break;
+    case VREG_LOAD_FALSE:EMITF("    r[%u].v = VIGIL_NANBOX_FALSE;\n", a); break;
 
     /* ── Typed i32 arithmetic ──────────────────────────────────── */
     case VREG_ADD_I32: return emit_i32_arith(ctx, "+", a, b, c);
@@ -466,14 +478,40 @@ static vigil_status_t emit_instruction(vigil_transpile_ctx_t *ctx, const vigil_r
 
     /* ── Generic comparisons ───────────────────────────────────── */
     case VREG_EQ:
-        EMITF("    r[%u].i = vigil_tc_values_equal((uint64_t *)r, %u, %u);\n", a, b, c);
+        EMITF("    r[%u].v = vigil_tc_values_equal((uint64_t *)r, %u, %u) ? VIGIL_NANBOX_TRUE : VIGIL_NANBOX_FALSE;\n",
+              a, b, c);
         break;
-    case VREG_LT: return emit_i64_cmp(ctx, "<",  a, b, c);
-    case VREG_LE: return emit_i64_cmp(ctx, "<=", a, b, c);
+    case VREG_LT:
+        EMITF("    r[%u].v = vigil_tc_values_lt((uint64_t *)r, %u, %u) ? VIGIL_NANBOX_TRUE : VIGIL_NANBOX_FALSE;\n",
+              a, b, c);
+        break;
+    case VREG_LE:
+        EMITF("    r[%u].v = vigil_tc_values_le((uint64_t *)r, %u, %u) ? VIGIL_NANBOX_TRUE : VIGIL_NANBOX_FALSE;\n",
+              a, b, c);
+        break;
 
     /* ── Unary ─────────────────────────────────────────────────── */
-    case VREG_NEG:  EMITF("    r[%u].i = -r[%u].i;\n", a, b); break;
-    case VREG_NOT:  EMITF("    r[%u].i = !r[%u].i;\n", a, b); break;
+    case VREG_NEG:
+        if (*ip > 0)
+        {
+            vigil_reg_instr_t prev = rc->code[*ip - 1];
+            if (VREG_GET_OP(prev) == VREG_LOAD_K && VREG_GET_A(prev) == b && rc->stack_chunk != NULL)
+            {
+                uint16_t prev_bx = (uint16_t)VREG_GET_Bx(prev);
+                if ((size_t)prev_bx < vigil_chunk_constant_count(rc->stack_chunk))
+                {
+                    const vigil_value_t *prev_k = vigil_chunk_constant(rc->stack_chunk, (size_t)prev_bx);
+                    if (vigil_value_kind(prev_k) == VIGIL_VALUE_FLOAT)
+                    {
+                        EMITF("    r[%u].f = -r[%u].f;\n", a, b);
+                        break;
+                    }
+                }
+            }
+        }
+        EMITF("    r[%u].v = vigil_tc_negate(r[%u].v);\n", a, b);
+        break;
+    case VREG_NOT:  EMITF("    r[%u].v = !vigil_tc_is_truthy(r[%u].v) ? VIGIL_NANBOX_TRUE : VIGIL_NANBOX_FALSE;\n", a, b); break;
     case VREG_BNOT: EMITF("    r[%u].i = ~r[%u].i;\n", a, b); break;
 
     /* ── Bitwise ───────────────────────────────────────────────── */
@@ -484,7 +522,7 @@ static vigil_status_t emit_instruction(vigil_transpile_ctx_t *ctx, const vigil_r
     case VREG_SHR:  return emit_i64_arith(ctx, ">>", a, b, c);
 
     /* ── Type conversions ──────────────────────────────────────── */
-    case VREG_TO_I32: EMITF("    r[%u].i = (int64_t)(int32_t)r[%u].i;\n", a, b); break;
+    case VREG_TO_I32: EMITF("    r[%u].i = vigil_tc_to_i32_value(r[%u].v);\n", a, b); break;
     case VREG_TO_I64: EMITF("    r[%u].i = r[%u].i;\n", a, b); break;
     case VREG_TO_U8:  EMITF("    r[%u].i = (int64_t)(uint8_t)r[%u].i;\n", a, b); break;
     case VREG_TO_U32: EMITF("    r[%u].i = (int64_t)(uint32_t)r[%u].i;\n", a, b); break;
@@ -496,12 +534,12 @@ static vigil_status_t emit_instruction(vigil_transpile_ctx_t *ctx, const vigil_r
         EMITF("    goto L_%zu;\n", (size_t)((int64_t)(*ip) + 1 + (int64_t)sbx));
         break;
     case VREG_TEST:
-        if (c) EMITF("    if (!r[%u].i) goto L_%zu;\n", a, *ip + 2);
-        else   EMITF("    if (r[%u].i) goto L_%zu;\n", a, *ip + 2);
+        if (c) EMITF("    if (!vigil_tc_is_truthy(r[%u].v)) goto L_%zu;\n", a, *ip + 2);
+        else   EMITF("    if (vigil_tc_is_truthy(r[%u].v)) goto L_%zu;\n", a, *ip + 2);
         break;
     case VREG_TESTSET:
-        if (c) EMITF("    if (r[%u].i) { r[%u] = r[%u]; } else { goto L_%zu; }\n", b, a, b, *ip + 2);
-        else   EMITF("    if (!r[%u].i) { r[%u] = r[%u]; } else { goto L_%zu; }\n", b, a, b, *ip + 2);
+        if (c) EMITF("    if (vigil_tc_is_truthy(r[%u].v)) { r[%u] = r[%u]; } else { goto L_%zu; }\n", b, a, b, *ip + 2);
+        else   EMITF("    if (!vigil_tc_is_truthy(r[%u].v)) { r[%u] = r[%u]; } else { goto L_%zu; }\n", b, a, b, *ip + 2);
         break;
 
     /* ── Fused compare-jump ────────────────────────────────────── */
@@ -520,47 +558,86 @@ static vigil_status_t emit_instruction(vigil_transpile_ctx_t *ctx, const vigil_r
 
     /* ── Calls ─────────────────────────────────────────────────── */
     case VREG_CALL:
-        EMITF("    r[%u] = vigil_fn_%u(tc", a, (unsigned)b);
+    {
+        /* A=arg_base (also return base), B=func_idx, C=arg_count.
+           Save/restore constants since callee sets its own. */
+        EMIT("    { const vigil_value_t *_sc = tc->constants; size_t _sn = tc->constant_count;\n");
+        EMITF("    r[%u] = vigil_fn_%u(tc", (unsigned)a, (unsigned)b);
         for (uint8_t ci = 0; ci < c; ci++)
             EMITF(", r[%u]", (unsigned)(a + ci));
-        EMIT(");\n");
+        EMITF(");\n");
+        /* Copy additional return values from tc->ret_buf. */
+        EMITF("    { uint8_t _ri; for (_ri = 1; _ri < tc->ret_count; _ri++) r[%u + _ri].v = tc->ret_buf[_ri]; }\n",
+              (unsigned)a);
+        EMIT("    tc->constants = _sc; tc->constant_count = _sn; }\n");
         break;
+    }
     case VREG_CALL_SELF:
     {
-        uint32_t arg_base;
         if (*ip + 1 >= rc->code_count) { vigil_error_set_literal(ctx->error, VIGIL_STATUS_INTERNAL, "transpile: truncated CALL_SELF"); return VIGIL_STATUS_INTERNAL; }
-        arg_base = rc->code[*ip + 1];
+        uint8_t arg_base_r = (uint8_t)(rc->code[*ip + 1] & 0xFF);
         *ip += 1;
-        EMITF("    r[%u] = vigil_fn_%zu(tc", a, func_index);
-        for (uint8_t ci = 0; ci < b; ci++)
-            EMITF(", r[%u]", (unsigned)(arg_base + ci));
-        EMIT(");\n");
+        /* Use call_extern for correct multi-return handling. */
+        EMITF("    vigil_tc_call_self(tc, (uint64_t *)r, %u, %zu, %u, %u, NULL);\n",
+              (unsigned)a, func_index, (unsigned)b, (unsigned)arg_base_r);
         break;
     }
     case VREG_TAIL_CALL:
-        EMITF("    r[%u] = vigil_fn_%u(tc", a, (unsigned)b);
-        for (uint8_t ci = 0; ci < c; ci++)
-            EMITF(", r[%u]", (unsigned)(a + ci));
-        EMIT(");\n");
+    {
+        /* Tail calls also need multi-return support. */
+        EMITF("    vigil_tc_call_self(tc, (uint64_t *)r, %u, %u, %u, %u, NULL);\n",
+              (unsigned)a, (unsigned)b, (unsigned)c, (unsigned)a);
+        EMIT("    vigil_tc_drain_defers(tc, NULL);\n");
+        EMITF("    return r[%u];\n", (unsigned)a);
+        break;
+    }
         break;
     case VREG_RETURN:
-        if (b == 0) EMIT("    return (vigil_reg_t){0};\n");
-        else        EMITF("    return r[%u];\n", a);
+        if (b == 0) { EMIT("    vigil_tc_drain_defers(tc, NULL);\n    tc->ret_count = 0;\n    return (vigil_reg_t){0};\n"); }
+        else if (b == 1) { EMIT("    vigil_tc_drain_defers(tc, NULL);\n"); EMITF("    tc->ret_count = 1;\n    return r[%u];\n", a); }
+        else {
+            EMIT("    vigil_tc_drain_defers(tc, NULL);\n");
+            EMITF("    tc->ret_count = %u;\n", (unsigned)b);
+            for (uint8_t ri = 1; ri < b; ri++)
+                EMITF("    tc->ret_buf[%u] = r[%u].v;\n", (unsigned)ri, (unsigned)(a + ri));
+            EMITF("    return r[%u];\n", a);
+        }
         break;
 
     /* ── Loop superinstructions ────────────────────────────────── */
     case VREG_FORLOOP_I32:
     {
-        size_t target = (size_t)((int64_t)(*ip) + 1 + (int64_t)sbx);
-        EMITF("    r[%u].i = (int64_t)((int32_t)r[%u].i + (int32_t)r[%u].i);\n", a, a, a + 2);
-        EMITF("    if ((int32_t)r[%u].i < (int32_t)r[%u].i) goto L_%zu;\n", a, a + 1, target);
+        /* 3-word instruction: word1=op+A+B+C, word2=limit const idx, word3=JMP */
+        int8_t delta = (int8_t)b;
+        uint8_t cmp = c;
+        vigil_reg_instr_t w2 = rc->code[*ip + 1];
+        uint16_t ci = VREG_GET_Bx(w2);
+        vigil_reg_instr_t jmp_word = rc->code[*ip + 2];
+        int16_t jmp_sbx = VREG_GET_sBx(jmp_word);
+        size_t jmp_ip = *ip + 2;
+        size_t target = (size_t)((int64_t)jmp_ip + 1 + (int64_t)jmp_sbx);
+        const char *cmp_op = cmp == 0 ? "<" : cmp == 1 ? "<=" : cmp == 2 ? ">" : ">=";
+        EMITF("    r[%u].i = (int64_t)((int32_t)r[%u].i + (int32_t)%d);\n", a, a, (int)delta);
+        EMITF("    if ((int32_t)r[%u].i %s (int32_t)vigil_nanbox_decode_i32(tc->constants[%u])) goto L_%zu;\n",
+              a, cmp_op, (unsigned)ci, target);
+        *ip += 2; /* skip word2 and word3 */
         break;
     }
     case VREG_FORLOOP_I64:
     {
-        size_t target = (size_t)((int64_t)(*ip) + 1 + (int64_t)sbx);
-        EMITF("    r[%u].i = r[%u].i + r[%u].i;\n", a, a, a + 2);
-        EMITF("    if (r[%u].i < r[%u].i) goto L_%zu;\n", a, a + 1, target);
+        int8_t delta = (int8_t)b;
+        uint8_t cmp = c;
+        vigil_reg_instr_t w2 = rc->code[*ip + 1];
+        uint16_t ci = VREG_GET_Bx(w2);
+        vigil_reg_instr_t jmp_word = rc->code[*ip + 2];
+        int16_t jmp_sbx = VREG_GET_sBx(jmp_word);
+        size_t jmp_ip = *ip + 2;
+        size_t target = (size_t)((int64_t)jmp_ip + 1 + (int64_t)jmp_sbx);
+        const char *cmp_op = cmp == 0 ? "<" : cmp == 1 ? "<=" : cmp == 2 ? ">" : ">=";
+        EMITF("    r[%u].i = r[%u].i + (int64_t)%d;\n", a, a, (int)delta);
+        EMITF("    if (r[%u].i %s vigil_nanbox_decode_int(tc->constants[%u])) goto L_%zu;\n",
+              a, cmp_op, (unsigned)ci, target);
+        *ip += 2;
         break;
     }
     case VREG_INC_I32:  EMITF("    r[%u].i = (int64_t)((int32_t)r[%u].i + (int32_t)%d);\n", a, a, (int)(int8_t)b); break;
@@ -587,8 +664,10 @@ static vigil_status_t emit_instruction(vigil_transpile_ctx_t *ctx, const vigil_r
         EMITF("    vigil_tc_to_string(tc, &r[%u].v, &r[%u].v, NULL);\n", a, b);
         break;
     case VREG_STRING_OP:
-        /* String ops are complex — delegate to native call via VM. */
-        EMITF("    /* string_op sub=%u — delegated to runtime */\n", (unsigned)c);
+        /* String ops: A=dest, B=top_reg (string), C=sub_opcode.
+           Delegate to runtime helper that dispatches the string operation. */
+        EMITF("    vigil_tc_string_op(tc, (uint64_t *)r, %u, %u, %u, NULL);\n",
+              (unsigned)a, (unsigned)b, (unsigned)c);
         break;
     case VREG_FORMAT_F64:
         EMITF("    vigil_tc_format_f64(tc, &r[%u].v, &r[%u].v, %u, NULL);\n", a, b, (unsigned)c);
@@ -622,9 +701,33 @@ static vigil_status_t emit_instruction(vigil_transpile_ctx_t *ctx, const vigil_r
         EMITF("    vigil_tc_parse_bool(tc, &r[%u].v, &r[%u].v, NULL);\n", a, b);
         break;
     case VREG_DEFER:
-        EMITF("    /* defer — not yet supported in transpiled code */\n");
-        *ip += 2; /* skip extra words */
+    {
+        uint32_t operand_a;
+        uint32_t operand_b;
+        uint32_t operand_c = 0;
+        if (*ip + 2 >= rc->code_count)
+        {
+            vigil_error_set_literal(ctx->error, VIGIL_STATUS_INTERNAL, "transpile: truncated DEFER");
+            return VIGIL_STATUS_INTERNAL;
+        }
+        operand_a = rc->code[*ip + 1];
+        operand_b = rc->code[*ip + 2];
+        if (a == VIGIL_OPCODE_DEFER_CALL_INTERFACE)
+        {
+            if (*ip + 3 >= rc->code_count)
+            {
+                vigil_error_set_literal(ctx->error, VIGIL_STATUS_INTERNAL, "transpile: truncated DEFER_CALL_INTERFACE");
+                return VIGIL_STATUS_INTERNAL;
+            }
+            operand_c = rc->code[*ip + 3];
+            *ip += 3;
+        }
+        else
+            *ip += 2;
+        EMITF("    vigil_tc_defer(tc, (uint64_t *)r, %u, %u, %uU, %uU, %uU, NULL);\n",
+              (unsigned)a, (unsigned)c, (unsigned)operand_a, (unsigned)operand_b, (unsigned)operand_c);
         break;
+    }
     case VREG_CALL_NATIVE:
     {
         uint32_t ci;
@@ -807,6 +910,10 @@ vigil_status_t vigil_transpile_emit_function(vigil_transpile_ctx_t *ctx, const v
     for (uint8_t i = 0; i < arity; i++)
         EMITF("    r[%u] = arg_%u;\n", (unsigned)i, (unsigned)i);
 
+    /* Set per-function constant pool */
+    EMITF("    tc->constants = vigil_fn_constants[%zu];\n", func_index);
+    EMITF("    tc->constant_count = vigil_fn_constant_counts[%zu];\n", func_index);
+
     EMIT("\n");
 
     /* Emit instructions with labels */
@@ -830,6 +937,7 @@ vigil_status_t vigil_transpile_emit_function(vigil_transpile_ctx_t *ctx, const v
     }
 
     /* Fallthrough return */
+    EMIT("    vigil_tc_drain_defers(tc, NULL);\n");
     EMIT("    return (vigil_reg_t){0};\n");
     EMIT("}\n\n");
 
@@ -907,17 +1015,20 @@ vigil_status_t vigil_transpile_to_c(vigil_runtime_t *runtime, const vigil_object
     EMIT("#include <math.h>\n");
     EMIT("#include <string.h>\n");
     EMIT("#include \"vigil/transpile_rt.h\"\n");
-    EMIT("#include \"vigil/value.h\"\n\n");
+    EMIT("#include \"vigil/value.h\"\n");
+    EMIT("#include \"internal/vigil_nanbox.h\"\n\n");
+    EMIT("vigil_status_t vigil_tc_defer(vigil_tc_t *tc, vigil_value_t *regs, uint8_t defer_op,\n");
+    EMIT("                                  uint8_t top_reg, uint32_t operand_a, uint32_t operand_b,\n");
+    EMIT("                                  uint32_t operand_c, vigil_error_t *error);\n");
+    EMIT("vigil_status_t vigil_tc_drain_defers(vigil_tc_t *tc, vigil_error_t *error);\n\n");
 
     func_count = count_siblings(function);
     entry_idx = find_entry_index(function, func_count);
 
-    /* Emit constant pool size for the entry function's chunk */
+    /* Emit constant pool sizes for all functions */
     {
-        const vigil_chunk_t *entry_chunk = vigil_function_object_chunk(function);
-        size_t num_constants = vigil_chunk_constant_count(entry_chunk);
-        EMITF("static vigil_value_t vigil_constants[%zu];\n", num_constants > 0 ? num_constants : 1);
-        EMITF("static const size_t vigil_constant_count = %zu;\n\n", num_constants);
+        EMITF("vigil_value_t *vigil_fn_constants[%zu];\n", func_count > 0 ? func_count : 1);
+        EMITF("size_t vigil_fn_constant_counts[%zu];\n\n", func_count > 0 ? func_count : 1);
     }
 
     /* Forward declarations */
@@ -962,6 +1073,13 @@ size_t vigil_transpile_entry_index(const vigil_object_t *function)
     if (function == NULL)
         return 0;
     return find_entry_index(function, count_siblings(function));
+}
+
+size_t vigil_transpile_func_count(const vigil_object_t *function)
+{
+    if (function == NULL)
+        return 1;
+    return count_siblings(function);
 }
 
 /* ── Embedded runtime extraction ─────────────────────────────────── */

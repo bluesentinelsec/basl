@@ -26,6 +26,8 @@ extern "C"
         const vigil_value_t *constants;
         size_t constant_count;
         const vigil_object_t *function;
+        uint64_t ret_buf[8]; /* Multi-return buffer for VREG_CALL */
+        uint8_t ret_count;        /* Number of return values in ret_buf */
     } vigil_tc_t;
 
     /* Convert a value to its string representation. */
@@ -105,6 +107,39 @@ extern "C"
 
     /* Compare two register values for equality (handles objects). */
     int vigil_tc_values_equal(const vigil_value_t *regs, uint8_t b, uint8_t c);
+
+    /* Compare two register values for ordering, mirroring generic VM comparisons. */
+    int vigil_tc_values_lt(const vigil_value_t *regs, uint8_t b, uint8_t c);
+    int vigil_tc_values_le(const vigil_value_t *regs, uint8_t b, uint8_t c);
+
+    /* Test if a register value is truthy (handles nanboxed bools, nil, raw ints). */
+    int vigil_tc_is_truthy(vigil_value_t v);
+
+    /* Coerce a raw or nanboxed value to an i32, following VM conversion rules. */
+    int64_t vigil_tc_to_i32_value(vigil_value_t src);
+
+    /* Negate a raw or nanboxed numeric value, preserving f64 operands. */
+    vigil_value_t vigil_tc_negate(vigil_value_t src);
+
+    /* Move a value between registers, retaining objects and releasing the old value. */
+    void vigil_tc_move_reg(vigil_value_t *dst, vigil_value_t src);
+
+    /* Call a sibling transpiled function with multi-return support. */
+    vigil_status_t vigil_tc_call_self(vigil_tc_t *tc, vigil_value_t *regs, uint8_t ret,
+                                       size_t func_idx, uint16_t arg_count, uint8_t arg_base,
+                                       vigil_error_t *error);
+
+    /* Execute a string operation (to_upper, reverse, trim, etc.). */
+    vigil_status_t vigil_tc_string_op(vigil_tc_t *tc, vigil_value_t *regs, uint8_t dest,
+                                       uint8_t top_reg, uint8_t sub_op, vigil_error_t *error);
+
+    /* Capture a deferred action for execution when the current function returns. */
+    vigil_status_t vigil_tc_defer(vigil_tc_t *tc, vigil_value_t *regs, uint8_t defer_op,
+                                  uint8_t top_reg, uint32_t operand_a, uint32_t operand_b,
+                                  uint32_t operand_c, vigil_error_t *error);
+
+    /* Drain deferred actions for the current VM frame in LIFO order. */
+    vigil_status_t vigil_tc_drain_defers(vigil_tc_t *tc, vigil_error_t *error);
 
     /* Generic add: string concatenation if both objects, integer add otherwise. */
     vigil_status_t vigil_tc_generic_add(vigil_tc_t *tc, vigil_value_t *dst, const vigil_value_t *lhs,
