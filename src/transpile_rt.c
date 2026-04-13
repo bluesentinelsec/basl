@@ -111,10 +111,8 @@ vigil_status_t vigil_tc_call_native(vigil_tc_t *tc, vigil_value_t *regs, uint8_t
                 vigil_object_retain((vigil_object_t *)vigil_nanbox_decode_ptr(v));
                 vm->stack[arg_base + i] = v;
             }
-            else if (vigil_nanbox_is_int(v) || vigil_nanbox_is_bool(v) || v == VIGIL_NANBOX_NIL)
-                vm->stack[arg_base + i] = v;
             else
-                vm->stack[arg_base + i] = vigil_nanbox_encode_int((int64_t)v);
+                vm->stack[arg_base + i] = tc_to_nanbox(v);
         }
         vm->stack_count = needed;
     }
@@ -779,7 +777,7 @@ vigil_status_t vigil_tc_vm_op(vigil_tc_t *tc, vigil_value_t *regs, uint8_t opcod
             else if (vigil_nanbox_is_object(v))
             { vigil_object_retain((vigil_object_t *)vigil_nanbox_decode_ptr(v)); vm->stack[i] = v; }
             else
-                vm->stack[i] = vigil_nanbox_encode_int((int64_t)v);
+                vm->stack[i] = tc_to_nanbox(v);
         }
         vm->stack_count = needed;
         { vigil_vm_frame_t *frame = &vm->frames[vm->frame_count - 1U];
@@ -805,7 +803,7 @@ vigil_status_t vigil_tc_vm_op(vigil_tc_t *tc, vigil_value_t *regs, uint8_t opcod
             else if (vigil_nanbox_is_object(v))
             { vigil_object_retain((vigil_object_t *)vigil_nanbox_decode_ptr(v)); vm->stack[i] = v; }
             else
-                vm->stack[i] = vigil_nanbox_encode_int((int64_t)v);
+                vm->stack[i] = tc_to_nanbox(v);
         }
         vm->stack_count = needed;
         { vigil_vm_frame_t *frame = &vm->frames[vm->frame_count - 1U];
@@ -1005,7 +1003,7 @@ vigil_status_t vigil_tc_call_value(vigil_tc_t *tc, vigil_value_t *regs, uint8_t 
         else if (v == 0 || vigil_nanbox_is_int(v) || vigil_nanbox_is_bool(v))
             vm->stack[arg_base + i] = v;
         else
-            vm->stack[arg_base + i] = vigil_nanbox_encode_int((int64_t)v);
+            vm->stack[arg_base + i] = tc_to_nanbox(v);
     }
     vm->stack_count = (size_t)arg_base + total;
 
@@ -1072,7 +1070,7 @@ vigil_status_t vigil_tc_call_extern(vigil_tc_t *tc, vigil_value_t *regs, uint8_t
         else if (v == 0 || vigil_nanbox_is_int(v) || vigil_nanbox_is_bool(v))
             vm->stack[arg_base + i] = v;
         else
-            vm->stack[arg_base + i] = vigil_nanbox_encode_int((int64_t)v);
+            vm->stack[arg_base + i] = tc_to_nanbox(v);
     }
     vm->stack_count = (size_t)arg_base + (size_t)arg_count;
 
@@ -1131,7 +1129,7 @@ vigil_status_t vigil_tc_call_interface(vigil_tc_t *tc, vigil_value_t *regs, uint
         else if (v == 0 || vigil_nanbox_is_int(v) || vigil_nanbox_is_bool(v))
             vm->stack[arg_base + i] = v;
         else
-            vm->stack[arg_base + i] = vigil_nanbox_encode_int((int64_t)v);
+            vm->stack[arg_base + i] = tc_to_nanbox(v);
     }
     vm->stack_count = (size_t)arg_base + total;
 
@@ -1389,7 +1387,7 @@ vigil_status_t vigil_tc_call_self(vigil_tc_t *tc, vigil_value_t *regs, uint8_t r
         else if (vigil_nanbox_is_int(v) || vigil_nanbox_is_bool(v) || v == VIGIL_NANBOX_NIL)
             vm->stack[arg_base + i] = v;
         else
-            vm->stack[arg_base + i] = vigil_nanbox_encode_int((int64_t)v);
+            vm->stack[arg_base + i] = tc_to_nanbox(v);
     }
     vm->stack_count = (size_t)arg_base + (size_t)arg_count;
 
