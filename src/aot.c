@@ -1633,10 +1633,27 @@ void vigil_aot_cache_free(vigil_aot_cache_t *cache)
 int vigil_aot_supported(void)
 {
 #if defined(VIGIL_ENABLE_AOT)
-    /* MIR's aarch64 code generator has a pattern-matching bug in
-       target_translate (out_insn) that crashes on SUB instructions
-       generated during prolog/epilog emission.  Disable AOT on
-       aarch64 until the MIR backend is fixed. */
+    /* MIR's aarch64 code generator (mir-gen-aarch64.c) crashes in
+       target_translate/out_insn during MIR_gen for functions that
+       require register spilling or backward branches.  The crash is
+       a SIGSEGV inside the pattern-matching/encoding logic, not an
+       assertion failure, making it impossible to catch reliably.
+
+       Root cause: MIR_gen on aarch64 produces invalid memory accesses
+       when encoding certain instruction sequences (SUB with large
+       immediates, branch fixups for loops, complex register allocation).
+       This is an upstream MIR bug — the x86-64 backend does not have
+       this issue.
+
+       AOT still works on x86-64 and other platforms.  On aarch64,
+       functions fall back to the register VM interpreter, which is
+       correct and performant.  AOT is a pure optimization — disabling
+       it on aarch64 does not affect functionality.
+
+       To fix: the MIR aarch64 backend (deps/mir/mir-gen-aarch64.c)
+       needs fixes in out_insn for SUB/ADD immediate encoding and in
+       the branch offset calculation for backward jumps.  This requires
+       upstream MIR changes. */
 #if defined(__aarch64__) || defined(_M_ARM64)
     return 0;
 #else
