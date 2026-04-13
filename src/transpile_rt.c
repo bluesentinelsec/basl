@@ -350,7 +350,7 @@ vigil_status_t vigil_tc_defer(vigil_tc_t *tc, vigil_value_t *regs, uint8_t defer
     if (val_count > 0U)
     {
         size_t start = (size_t)top_reg + 1U - val_count;
-        vals = malloc(val_count * sizeof(*vals));
+        { void *_m = NULL; vigil_runtime_alloc(tc->runtime, val_count * sizeof(*vals), &_m, error); vals = (vigil_value_t *)_m; }
         if (vals == NULL)
         {
             vigil_error_set_literal(error, VIGIL_STATUS_OUT_OF_MEMORY, "defer capture alloc failed");
@@ -367,14 +367,17 @@ vigil_status_t vigil_tc_defer(vigil_tc_t *tc, vigil_value_t *regs, uint8_t defer
     if (frame->defer_count >= frame->defer_capacity)
     {
         size_t new_cap = frame->defer_capacity < 4U ? 4U : frame->defer_capacity * 2U;
-        vigil_vm_defer_action_t *nd = realloc(frame->defers, new_cap * sizeof(*nd));
+        void *_rm = (void *)frame->defers;
+        if (vigil_runtime_realloc(tc->runtime, &_rm, new_cap * sizeof(vigil_vm_defer_action_t), error) != VIGIL_STATUS_OK)
+            _rm = NULL;
+        vigil_vm_defer_action_t *nd = (vigil_vm_defer_action_t *)_rm;
         if (nd == NULL)
         {
             if (vals != NULL)
             {
                 for (size_t i = 0; i < val_count; i++)
                     tc_safe_release(&vals[i]);
-                free(vals);
+                { void *_f = (void *)vals; vigil_runtime_free(tc->runtime, &_f); vals = NULL; }
             }
             vigil_error_set_literal(error, VIGIL_STATUS_OUT_OF_MEMORY, "defer array grow failed");
             return VIGIL_STATUS_OUT_OF_MEMORY;
@@ -501,7 +504,7 @@ vigil_status_t vigil_tc_drain_defers(vigil_tc_t *tc, vigil_error_t *error)
 
         for (size_t i = 0; i < action.value_count; i++)
             tc_safe_release(&action.values[i]);
-        free(action.values);
+        { void *_f = (void *)action.values; vigil_runtime_free(tc->runtime, &_f); }
 
         for (size_t i = 0; i < vm->stack_count; i++)
             tc_safe_release(&vm->stack[i]);

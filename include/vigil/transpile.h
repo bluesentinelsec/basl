@@ -34,6 +34,7 @@ extern "C"
      * correct header and main wrapper.
      */
     VIGIL_API size_t vigil_transpile_entry_index(const vigil_object_t *function);
+    VIGIL_API size_t vigil_transpile_func_count(const vigil_object_t *function);
 
     /**
      * Write all embedded runtime/plugin sources to the given output directory.

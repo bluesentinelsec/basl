@@ -26,7 +26,6 @@
 #include "vigil/toml.h"
 #include "vigil/transpile.h"
 #include "vigil/vigil.h"
-#include "internal/vigil_internal.h"
 
 #include "plugin_registry.h"
 
@@ -4465,8 +4464,7 @@ static int transpile_write_project(const char *output_dir, const vigil_string_t 
                                     vigil_runtime_t *runtime, vigil_error_t *error)
 {
     size_t entry_idx = vigil_transpile_entry_index(function);
-    size_t func_count = 0;
-    { size_t _i; for (_i = 0; vigil_function_object_sibling(function, _i); _i++) {} func_count = _i; if (func_count == 0) func_count = 1; }
+    size_t func_count = vigil_transpile_func_count(function);
     char hdr[512];
     vigil_string_t main_src;
     int result;

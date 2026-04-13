@@ -1075,6 +1075,13 @@ size_t vigil_transpile_entry_index(const vigil_object_t *function)
     return find_entry_index(function, count_siblings(function));
 }
 
+size_t vigil_transpile_func_count(const vigil_object_t *function)
+{
+    if (function == NULL)
+        return 1;
+    return count_siblings(function);
+}
+
 /* ── Embedded runtime extraction ─────────────────────────────────── */
 
 /* Use forward declaration to avoid miniz include path issues. */
