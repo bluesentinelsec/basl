@@ -538,8 +538,12 @@ static vigil_status_t emit_instruction(vigil_transpile_ctx_t *ctx, const vigil_r
         else   EMITF("    if (vigil_tc_is_truthy(r[%u].v)) goto L_%zu;\n", a, *ip + 2);
         break;
     case VREG_TESTSET:
-        if (c) EMITF("    if (vigil_tc_is_truthy(r[%u].v)) { r[%u] = r[%u]; } else { goto L_%zu; }\n", b, a, b, *ip + 2);
-        else   EMITF("    if (!vigil_tc_is_truthy(r[%u].v)) { r[%u] = r[%u]; } else { goto L_%zu; }\n", b, a, b, *ip + 2);
+        /* Short-circuit logical operators: copy the tested value to the
+           result register on BOTH branches.  The original code only set
+           the result on the fall-through path, leaving it uninitialized
+           when the jump (short-circuit) path was taken. */
+        if (c) EMITF("    if (vigil_tc_is_truthy(r[%u].v)) { r[%u] = r[%u]; } else { r[%u] = r[%u]; goto L_%zu; }\n", b, a, b, a, b, *ip + 2);
+        else   EMITF("    if (!vigil_tc_is_truthy(r[%u].v)) { r[%u] = r[%u]; } else { r[%u] = r[%u]; goto L_%zu; }\n", b, a, b, a, b, *ip + 2);
         break;
 
     /* ── Fused compare-jump ────────────────────────────────────── */
