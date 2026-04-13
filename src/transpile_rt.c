@@ -350,7 +350,6 @@ vigil_status_t vigil_tc_defer(vigil_tc_t *tc, vigil_value_t *regs, uint8_t defer
     if (val_count > 0U)
     {
         size_t start = (size_t)top_reg + 1U - val_count;
-        { void *_m = NULL; vigil_runtime_alloc(tc->runtime, val_count * sizeof(*vals), &_m, error); vals = (vigil_value_t *)_m; }
         if (vals == NULL)
         {
             vigil_error_set_literal(error, VIGIL_STATUS_OUT_OF_MEMORY, "defer capture alloc failed");
@@ -367,10 +366,22 @@ vigil_status_t vigil_tc_defer(vigil_tc_t *tc, vigil_value_t *regs, uint8_t defer
     if (frame->defer_count >= frame->defer_capacity)
     {
         size_t new_cap = frame->defer_capacity < 4U ? 4U : frame->defer_capacity * 2U;
-        void *_rm = (void *)frame->defers;
-        if (vigil_runtime_realloc(tc->runtime, &_rm, new_cap * sizeof(vigil_vm_defer_action_t), error) != VIGIL_STATUS_OK)
-            _rm = NULL;
-        vigil_vm_defer_action_t *nd = (vigil_vm_defer_action_t *)_rm;
+        vigil_vm_defer_action_t *nd = NULL;
+        if (frame->defers == NULL)
+        {
+            /* Initial allocation — realloc rejects NULL input. */
+            void *_m = NULL;
+            if (vigil_runtime_alloc(tc->runtime, new_cap * sizeof(vigil_vm_defer_action_t), &_m, error) != VIGIL_STATUS_OK)
+                _m = NULL;
+            nd = (vigil_vm_defer_action_t *)_m;
+        }
+        else
+        {
+            void *_rm = (void *)frame->defers;
+            if (vigil_runtime_realloc(tc->runtime, &_rm, new_cap * sizeof(vigil_vm_defer_action_t), error) != VIGIL_STATUS_OK)
+                _rm = NULL;
+            nd = (vigil_vm_defer_action_t *)_rm;
+        }
         if (nd == NULL)
         {
             if (vals != NULL)
@@ -405,7 +416,9 @@ vigil_status_t vigil_tc_drain_defers(vigil_tc_t *tc, vigil_error_t *error)
     vigil_vm_t *vm = tc->vm;
 
     if (vm->frame_count == 0U)
+    {
         return VIGIL_STATUS_OK;
+    }
 
     while (vm->frames[vm->frame_count - 1U].defer_count > 0U)
     {

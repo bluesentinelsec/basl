@@ -559,17 +559,13 @@ static vigil_status_t emit_instruction(vigil_transpile_ctx_t *ctx, const vigil_r
     /* ── Calls ─────────────────────────────────────────────────── */
     case VREG_CALL:
     {
-        /* A=arg_base (also return base), B=func_idx, C=arg_count.
-           Save/restore constants since callee sets its own. */
-        EMIT("    { const vigil_value_t *_sc = tc->constants; size_t _sn = tc->constant_count;\n");
-        EMITF("    r[%u] = vigil_fn_%u(tc", (unsigned)a, (unsigned)b);
-        for (uint8_t ci = 0; ci < c; ci++)
-            EMITF(", r[%u]", (unsigned)(a + ci));
-        EMITF(");\n");
-        /* Copy additional return values from tc->ret_buf. */
-        EMITF("    { uint8_t _ri; for (_ri = 1; _ri < tc->ret_count; _ri++) r[%u + _ri].v = tc->ret_buf[_ri]; }\n",
-              (unsigned)a);
-        EMIT("    tc->constants = _sc; tc->constant_count = _sn; }\n");
+        /* Use vigil_tc_call_self for correct defer/frame handling.
+           Direct C calls skip VM frame setup, which breaks defers
+           registered inside the callee. */
+        if (*ip + 1 >= rc->code_count) { vigil_error_set_literal(ctx->error, VIGIL_STATUS_INTERNAL, "transpile: truncated CALL"); return VIGIL_STATUS_INTERNAL; }
+        uint8_t arg_base_r = a; /* CALL uses A as both arg_base and return base */
+        EMITF("    vigil_tc_call_self(tc, (uint64_t *)r, %u, %u, %u, %u, NULL);\n",
+              (unsigned)a, (unsigned)b, (unsigned)c, (unsigned)arg_base_r);
         break;
     }
     case VREG_CALL_SELF:

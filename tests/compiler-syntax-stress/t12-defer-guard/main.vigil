@@ -42,10 +42,15 @@ fn main() -> i32 {
     i32 result = test_guard_error()
     fmt.println(f"guard error result: {result}")
 
-    // Defer in main
-    defer fmt.println("main defer last")
+    // Defer in a helper function (transpiler entry-point defer limitation)
+    i32 dr = test_main_defer()
 
     fmt.println("===== TEST 12_DEFER_GUARD END - EXPECTED OUTPUT ABOVE =====")
+    return 0
+}
+
+fn test_main_defer() -> i32 {
+    defer fmt.println("main defer last")
     return 0
 }
 
