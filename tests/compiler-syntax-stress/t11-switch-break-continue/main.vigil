@@ -1,0 +1,80 @@
+import "fmt"
+
+fn main() -> i32 {
+    fmt.println("===== TEST 11_SWITCH_BREAK_CONTINUE START =====")
+
+    // Switch with single values
+    i32 x = 2
+    switch x {
+        case 1:
+            fmt.println("one")
+        case 2:
+            fmt.println("two")
+        case 3:
+            fmt.println("three")
+        default:
+            fmt.println("other")
+    }
+
+    // Switch with multiple values per case
+    i32 y = 3
+    switch y {
+        case 1:
+            fmt.println("just one")
+        case 2, 3:
+            fmt.println("two or three")
+        default:
+            fmt.println("other")
+    }
+
+    // Switch with bool
+    bool flag = true
+    switch flag {
+        case true:
+            fmt.println("flag is true")
+        case false:
+            fmt.println("flag is false")
+    }
+
+    // Break in for loop
+    i32 found = -1
+    for (i32 i = 0; i < 100; i++) {
+        if i == 42 {
+            found = i
+            break
+        }
+    }
+    fmt.println(f"break found: {found}")
+
+    // Continue in for loop
+    i32 sum = 0
+    for (i32 i = 0; i < 10; i++) {
+        if i % 2 == 0 {
+            continue
+        }
+        sum += i
+    }
+    fmt.println(f"continue odd sum: {sum}")
+
+    // Break in while
+    i32 n = 0
+    while true {
+        if n == 5 {
+            break
+        }
+        n++
+    }
+    fmt.println(f"while break: {n}")
+
+    // Switch default only
+    i32 z = 99
+    switch z {
+        case 1:
+            fmt.println("one")
+        default:
+            fmt.println(f"default: {z}")
+    }
+
+    fmt.println("===== TEST 11_SWITCH_BREAK_CONTINUE END - EXPECTED OUTPUT ABOVE =====")
+    return 0
+}

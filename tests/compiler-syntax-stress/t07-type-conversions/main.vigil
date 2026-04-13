@@ -1,0 +1,56 @@
+import "fmt"
+
+fn main() -> i32 {
+    fmt.println("===== TEST 07_TYPE_CONVERSIONS START =====")
+
+    // i32 to f64
+    i32 x = 42
+    f64 y = f64(x)
+    fmt.println(f"i32->f64: {y}")
+
+    // i32 to string
+    string s = string(x)
+    fmt.println(f"i32->string: {s}")
+
+    // i32 to i64
+    i64 big = i64(x)
+    fmt.println(f"i32->i64: {big}")
+
+    // i64 to i32
+    i32 back = i32(big)
+    fmt.println(f"i64->i32: {back}")
+
+    // f64 to i32
+    f64 pi = 3.14
+    i32 truncated = i32(pi)
+    fmt.println(f"f64->i32: {truncated}")
+
+    // f64 to string
+    string fs = string(pi)
+    fmt.println(f"f64->string: {fs}")
+
+    // bool to string
+    string bs = string(true)
+    fmt.println(f"bool->string: {bs}")
+
+    // i32 to u8
+    u8 byte = u8(65)
+    fmt.println(f"i32->u8: {byte}")
+
+    // i32 to u32
+    u32 u = u32(100)
+    fmt.println(f"i32->u32: {u}")
+
+    // i32 to u64
+    u64 u6 = u64(100)
+    fmt.println(f"i32->u64: {u6}")
+
+    // Mixed-type comparison with explicit cast
+    i32 a = 10
+    i64 b = i64(20)
+    bool cmp = i64(a) < b
+    fmt.println(f"mixed cmp: {cmp}")
+
+    fmt.println("===== TEST 07_TYPE_CONVERSIONS END - EXPECTED OUTPUT ABOVE =====")
+    return 0
+}

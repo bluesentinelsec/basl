@@ -1,0 +1,6 @@
+import "test";
+import "t20-function-types";
+
+fn test_greet(test.T t) -> void {
+    t.assert(t20-function-types.greet("world") == "hello, world", "greet should work");
+}

@@ -1,0 +1,6 @@
+import "test";
+import "t13-error-handling";
+
+fn test_greet(test.T t) -> void {
+    t.assert(t13-error-handling.greet("world") == "hello, world", "greet should work");
+}

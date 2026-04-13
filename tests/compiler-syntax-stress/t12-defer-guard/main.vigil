@@ -1,0 +1,59 @@
+import "fmt"
+
+fn cleanup() -> void {
+    fmt.println("cleanup called")
+}
+
+fn close_file() -> void {
+    fmt.println("close_file called")
+}
+
+fn read_data() -> (string, err) {
+    return "config data", ok
+}
+
+fn bad_read() -> (string, err) {
+    return "", err("file not found", err.not_found)
+}
+
+fn process_with_defer() -> i32 {
+    defer cleanup()
+    defer close_file()
+    fmt.println("processing")
+    return 0
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 12_DEFER_GUARD START =====")
+
+    // Defer - LIFO order
+    fmt.println("before defer fn")
+    i32 r = process_with_defer()
+    fmt.println(f"after defer fn: {r}")
+
+    // Guard - success case
+    guard string data, err e = read_data() {
+        fmt.eprintln(f"read failed: {e.message()}")
+        return 1
+    }
+    fmt.println(f"guard success: {data}")
+
+    // Guard - error case (in a helper)
+    i32 result = test_guard_error()
+    fmt.println(f"guard error result: {result}")
+
+    // Defer in main
+    defer fmt.println("main defer last")
+
+    fmt.println("===== TEST 12_DEFER_GUARD END - EXPECTED OUTPUT ABOVE =====")
+    return 0
+}
+
+fn test_guard_error() -> i32 {
+    guard string data, err e = bad_read() {
+        fmt.println(f"guard caught: {e.message()}")
+        return 1
+    }
+    fmt.println(f"should not reach: {data}")
+    return 0
+}

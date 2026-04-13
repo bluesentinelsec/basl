@@ -1,0 +1,42 @@
+import "fmt"
+
+struct Point {
+    f64 x
+    f64 y
+}
+
+struct Color {
+    i32 r
+    i32 g
+    i32 b
+    i32 a
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 14_STRUCTS START =====")
+
+    // Construct with positional args
+    Point p = Point(1.0, 2.0)
+    fmt.println(f"point: {p.x}, {p.y}")
+
+    // Field mutation
+    p.x = 10.0
+    p.y = 20.0
+    fmt.println(f"mutated: {p.x}, {p.y}")
+
+    // Another struct
+    Color red = Color(255, 0, 0, 255)
+    fmt.println(f"color: {red.r}, {red.g}, {red.b}, {red.a}")
+
+    // Struct in expression
+    Point q = Point(3.0, 4.0)
+    f64 dist = q.x * q.x + q.y * q.y
+    fmt.println(f"dist sq: {dist}")
+
+    // Multiple structs
+    Color green = Color(0, 255, 0, 128)
+    fmt.println(f"green alpha: {green.a}")
+
+    fmt.println("===== TEST 14_STRUCTS END - EXPECTED OUTPUT ABOVE =====")
+    return 0
+}

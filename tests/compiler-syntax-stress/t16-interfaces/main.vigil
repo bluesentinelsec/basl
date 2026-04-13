@@ -1,0 +1,73 @@
+import "fmt"
+
+interface Named {
+    fn name() -> string
+}
+
+interface Sized {
+    fn size() -> i32
+}
+
+class Circle implements Named {
+    pub string label
+
+    fn init(string label) -> void {
+        self.label = label
+    }
+
+    fn name() -> string {
+        return self.label
+    }
+}
+
+class Box implements Named, Sized {
+    pub string label
+    pub i32 dim
+
+    fn init(string label, i32 dim) -> void {
+        self.label = label
+        self.dim = dim
+    }
+
+    fn name() -> string {
+        return self.label
+    }
+
+    fn size() -> i32 {
+        return self.dim
+    }
+}
+
+fn describe(Named n) -> string {
+    return n.name()
+}
+
+fn measure(Sized s) -> i32 {
+    return s.size()
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 16_INTERFACES START =====")
+
+    // Single interface
+    Circle c = Circle("my circle")
+    fmt.println(f"circle name: {c.name()}")
+
+    // Polymorphic dispatch
+    string d = describe(c)
+    fmt.println(f"describe circle: {d}")
+
+    // Multiple interfaces
+    Box b = Box("my box", 42)
+    fmt.println(f"box name: {b.name()}")
+    fmt.println(f"box size: {b.size()}")
+
+    // Polymorphic dispatch with both interfaces
+    string d2 = describe(b)
+    fmt.println(f"describe box: {d2}")
+    i32 s = measure(b)
+    fmt.println(f"measure box: {s}")
+
+    fmt.println("===== TEST 16_INTERFACES END - EXPECTED OUTPUT ABOVE =====")
+    return 0
+}

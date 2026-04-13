@@ -1,0 +1,61 @@
+import "fmt"
+
+fn main() -> i32 {
+    fmt.println("===== TEST 06_OPERATORS START =====")
+
+    // Arithmetic
+    i32 a = 10
+    i32 b = 3
+    fmt.println(f"add: {a + b}")
+    fmt.println(f"sub: {a - b}")
+    fmt.println(f"mul: {a * b}")
+    fmt.println(f"div: {a / b}")
+    fmt.println(f"mod: {a % b}")
+
+    // String concatenation
+    string s = "hello" + " " + "world"
+    fmt.println(f"str concat: {s}")
+
+    // Bitwise
+    i32 x = 0xFF
+    i32 y = 0x0F
+    fmt.println(f"and: {x & y}")
+    fmt.println(f"or: {x | y}")
+    fmt.println(f"xor: {x ^ y}")
+    fmt.println(f"not: {~y}")
+    fmt.println(f"shl: {1 << 4}")
+    fmt.println(f"shr: {256 >> 4}")
+
+    // Comparison
+    fmt.println(f"eq: {a == b}")
+    fmt.println(f"ne: {a != b}")
+    fmt.println(f"lt: {a < b}")
+    fmt.println(f"gt: {a > b}")
+    fmt.println(f"le: {a <= b}")
+    fmt.println(f"ge: {a >= b}")
+
+    // Logical
+    bool t = true
+    bool f = false
+    fmt.println(f"and: {t && f}")
+    fmt.println(f"or: {t || f}")
+    fmt.println(f"not: {!t}")
+
+    // Short-circuit
+    fmt.println(f"short-circuit and: {f && true}")
+    fmt.println(f"short-circuit or: {t || false}")
+
+    // Ternary
+    i32 max = a > b ? a : b
+    fmt.println(f"ternary max: {max}")
+
+    i32 delta = 10 + (t ? 1 : 2)
+    fmt.println(f"ternary in expr: {delta}")
+
+    // Unary minus
+    i32 neg = -a
+    fmt.println(f"unary minus: {neg}")
+
+    fmt.println("===== TEST 06_OPERATORS END - EXPECTED OUTPUT ABOVE =====")
+    return 0
+}

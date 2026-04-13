@@ -1,0 +1,93 @@
+import "fmt"
+
+fn main() -> i32 {
+    fmt.println("===== TEST 19_ARRAY_MAP_METHODS START =====")
+
+    // Array methods
+    array<i32> a = [1, 2, 3]
+
+    // len
+    fmt.println(f"arr len: {a.len()}")
+
+    // push
+    a.push(4)
+    fmt.println(f"after push: {a.len()}")
+
+    // get
+    i32 v, err ge = a.get(0)
+    fmt.println(f"get[0]: {v}")
+
+    // get out of bounds
+    i32 v2, err ge2 = a.get(99)
+    fmt.println(f"get[99] err: {ge2 != ok}")
+
+    // set
+    err se = a.set(0, 99)
+    fmt.println(f"set ok: {se == ok}")
+    i32 v3, err _ = a.get(0)
+    fmt.println(f"after set: {v3}")
+
+    // pop
+    i32 popped, err pe = a.pop()
+    fmt.println(f"popped: {popped}")
+    fmt.println(f"after pop len: {a.len()}")
+
+    // slice
+    array<i32> b = [10, 20, 30, 40, 50]
+    array<i32> sl = b.slice(1, 4)
+    fmt.println(f"slice len: {sl.len()}")
+    fmt.println(f"slice[0]: {sl[0]}")
+    fmt.println(f"slice[2]: {sl[2]}")
+
+    // contains
+    fmt.println(f"contains 20: {b.contains(20)}")
+    fmt.println(f"contains 99: {b.contains(99)}")
+
+    // Index syntax
+    fmt.println(f"b[0]: {b[0]}")
+    b[0] = 100
+    fmt.println(f"b[0] after: {b[0]}")
+
+    // Map methods
+    map<string, i32> m = {"a": 1, "b": 2}
+
+    // len
+    fmt.println(f"map len: {m.len()}")
+
+    // get
+    i32 mv, bool mf = m.get("a")
+    fmt.println(f"map get a: {mv}, {mf}")
+
+    i32 mv2, bool mf2 = m.get("z")
+    fmt.println(f"map get z: {mv2}, {mf2}")
+
+    // set
+    err mse = m.set("c", 3)
+    fmt.println(f"map set ok: {mse == ok}")
+    fmt.println(f"map len after set: {m.len()}")
+
+    // has
+    fmt.println(f"has a: {m.has("a")}")
+    fmt.println(f"has z: {m.has("z")}")
+
+    // remove
+    i32 rv, bool rf = m.remove("b")
+    fmt.println(f"remove b: {rv}, {rf}")
+    fmt.println(f"map len after remove: {m.len()}")
+
+    // keys
+    array<string> keys = m.keys()
+    fmt.println(f"keys len: {keys.len()}")
+
+    // values
+    array<i32> vals = m.values()
+    fmt.println(f"values len: {vals.len()}")
+
+    // Index syntax
+    m["d"] = 4
+    i32 dv, bool df = m.get("d")
+    fmt.println(f"map index set: {dv}")
+
+    fmt.println("===== TEST 19_ARRAY_MAP_METHODS END - EXPECTED OUTPUT ABOVE =====")
+    return 0
+}

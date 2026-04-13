@@ -1,0 +1,51 @@
+import "fmt"
+
+fn add(i32 a, i32 b) -> i32 {
+    return a + b
+}
+
+fn sub(i32 a, i32 b) -> i32 {
+    return a - b
+}
+
+fn mul(i32 a, i32 b) -> i32 {
+    return a * b
+}
+
+fn apply(fn(i32, i32) -> i32 op, i32 a, i32 b) -> i32 {
+    return op(a, b)
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 20_FUNCTION_TYPES START =====")
+
+    // Store function in typed variable
+    fn(i32, i32) -> i32 op = add
+    i32 result = op(2, 3)
+    fmt.println(f"fn var add: {result}")
+
+    // Reassign
+    op = sub
+    fmt.println(f"fn var sub: {op(10, 3)}")
+
+    op = mul
+    fmt.println(f"fn var mul: {op(4, 5)}")
+
+    // Pass function as argument
+    fmt.println(f"apply add: {apply(add, 10, 20)}")
+    fmt.println(f"apply sub: {apply(sub, 10, 20)}")
+    fmt.println(f"apply mul: {apply(mul, 10, 20)}")
+
+    // Lambda stored in function type
+    fn(i32) -> i32 doubler = |x| x * 2
+    fmt.println(f"lambda: {doubler(5)}")
+
+    // Array of function calls via indirect
+    array<fn(i32, i32) -> i32> ops = [add, sub, mul]
+    for op_fn in ops {
+        fmt.println(f"op result: {op_fn(6, 3)}")
+    }
+
+    fmt.println("===== TEST 20_FUNCTION_TYPES END - EXPECTED OUTPUT ABOVE =====")
+    return 0
+}

@@ -1,0 +1,6 @@
+import "test";
+import "t15-classes";
+
+fn test_greet(test.T t) -> void {
+    t.assert(t15-classes.greet("world") == "hello, world", "greet should work");
+}

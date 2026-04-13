@@ -1,0 +1,98 @@
+import "fmt"
+
+fn main() -> i32 {
+    fmt.println("===== TEST 18_STRING_METHODS START =====")
+
+    string s = "Hello, World!"
+
+    // len
+    fmt.println(f"len: {s.len()}")
+
+    // contains
+    fmt.println(f"contains World: {s.contains("World")}")
+    fmt.println(f"contains xyz: {s.contains("xyz")}")
+
+    // starts_with / ends_with
+    fmt.println(f"starts_with Hello: {s.starts_with("Hello")}")
+    fmt.println(f"ends_with !: {s.ends_with("!")}")
+
+    // trim variants
+    string padded = "  hello  "
+    fmt.println(f"trim: [{padded.trim()}]")
+    fmt.println(f"trim_left: [{padded.trim_left()}]")
+    fmt.println(f"trim_right: [{padded.trim_right()}]")
+
+    string prefixed = "prefix-data"
+    fmt.println(f"trim_prefix: {prefixed.trim_prefix("prefix-")}")
+    string suffixed = "data-suffix"
+    fmt.println(f"trim_suffix: {suffixed.trim_suffix("-suffix")}")
+
+    // case
+    fmt.println(f"upper: {s.to_upper()}")
+    fmt.println(f"lower: {s.to_lower()}")
+
+    // replace
+    fmt.println(f"replace: {s.replace("World", "Vigil")}")
+
+    // split
+    array<string> parts = "a,b,c".split(",")
+    fmt.println(f"split len: {parts.len()}")
+    fmt.println(f"split[0]: {parts[0]}")
+    fmt.println(f"split[2]: {parts[2]}")
+
+    // fields
+    array<string> words = "  hello   world  ".fields()
+    fmt.println(f"fields len: {words.len()}")
+    fmt.println(f"fields[0]: {words[0]}")
+
+    // join
+    string joined = ", ".join(parts)
+    fmt.println(f"join: {joined}")
+
+    // index_of
+    i32 idx, bool found = s.index_of("World")
+    fmt.println(f"index_of: {idx}, {found}")
+
+    // last_index_of
+    i32 lidx, bool lfound = "abcabc".last_index_of("abc")
+    fmt.println(f"last_index_of: {lidx}, {lfound}")
+
+    // substr
+    string sub, err se = s.substr(0, 5)
+    fmt.println(f"substr: {sub}")
+
+    // char_at
+    string ch, err ce = s.char_at(0)
+    fmt.println(f"char_at: {ch}")
+
+    // char_count
+    fmt.println(f"char_count: {s.char_count()}")
+
+    // bytes
+    array<u8> bytes = "AB".bytes()
+    fmt.println(f"bytes len: {bytes.len()}")
+    fmt.println(f"bytes[0]: {bytes[0]}")
+
+    // reverse
+    fmt.println(f"reverse: {"abc".reverse()}")
+
+    // none (is_empty deprecated)
+    fmt.println(f"none: {"".none()}")
+    fmt.println(f"none: {"x".none()}")
+
+    // repeat
+    fmt.println(f"repeat: {"ab".repeat(3)}")
+
+    // count
+    fmt.println(f"count: {"abcabc".count("abc")}")
+
+    // cut
+    string before, string after, bool ok = "key=value".cut("=")
+    fmt.println(f"cut: {before}, {after}, {ok}")
+
+    // equal_fold
+    fmt.println(f"equal_fold: {"Hello".equal_fold("hello")}")
+
+    fmt.println("===== TEST 18_STRING_METHODS END - EXPECTED OUTPUT ABOVE =====")
+    return 0
+}

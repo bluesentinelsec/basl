@@ -1,0 +1,6 @@
+import "test";
+import "t12-defer-guard";
+
+fn test_greet(test.T t) -> void {
+    t.assert(t12-defer-guard.greet("world") == "hello, world", "greet should work");
+}

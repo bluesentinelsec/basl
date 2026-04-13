@@ -1,0 +1,6 @@
+import "test";
+import "t01-primitives";
+
+fn test_greet(test.T t) -> void {
+    t.assert(t01-primitives.greet("world") == "hello, world", "greet should work");
+}

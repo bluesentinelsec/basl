@@ -1,0 +1,6 @@
+import "test";
+import "t14-structs";
+
+fn test_greet(test.T t) -> void {
+    t.assert(t14-structs.greet("world") == "hello, world", "greet should work");
+}

@@ -1,0 +1,6 @@
+import "test";
+import "t19-array-map-methods";
+
+fn test_greet(test.T t) -> void {
+    t.assert(t19-array-map-methods.greet("world") == "hello, world", "greet should work");
+}

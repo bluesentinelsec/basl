@@ -1,0 +1,67 @@
+import "fmt"
+
+class Person {
+    pub string name
+    pub i32 age
+
+    fn init(string name, i32 age) -> void {
+        self.name = name
+        self.age = age
+    }
+
+    pub fn greet() -> void {
+        fmt.println(f"Hello, I'm {self.name}, age {self.age}")
+    }
+
+    pub fn get_name() -> string {
+        return self.name
+    }
+}
+
+class Connection {
+    pub string host
+
+    fn init(string host) -> err {
+        if host == "" {
+            return err("empty host", err.arg)
+        }
+        self.host = host
+        return ok
+    }
+
+    pub fn describe() -> string {
+        return f"connected to {self.host}"
+    }
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 15_CLASSES START =====")
+
+    // Basic construction and method call
+    Person p = Person("Alice", 30)
+    p.greet()
+    fmt.println(f"name: {p.get_name()}")
+
+    // Field access
+    fmt.println(f"age: {p.age}")
+
+    // Field mutation
+    p.age = 31
+    fmt.println(f"mutated age: {p.age}")
+
+    // Another instance
+    Person p2 = Person("Bob", 25)
+    p2.greet()
+
+    // Fallible construction - success
+    Connection c, err e = Connection("localhost")
+    fmt.println(f"conn ok: {e == ok}, host: {c.host}")
+    fmt.println(f"describe: {c.describe()}")
+
+    // Fallible construction - failure
+    Connection c2, err e2 = Connection("")
+    fmt.println(f"conn err: {e2.message()}")
+
+    fmt.println("===== TEST 15_CLASSES END - EXPECTED OUTPUT ABOVE =====")
+    return 0
+}

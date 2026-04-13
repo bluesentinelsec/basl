@@ -1,0 +1,54 @@
+import "fmt"
+
+fn main() -> i32 {
+    fmt.println("===== TEST 04_ARRAYS_MAPS START =====")
+
+    // Array literal
+    array<i32> nums = [10, 20, 30]
+    fmt.println(f"array len: {nums.len()}")
+    fmt.println(f"array[0]: {nums[0]}")
+    fmt.println(f"array[2]: {nums[2]}")
+
+    // Array of strings
+    array<string> names = ["alice", "bob", "charlie"]
+    fmt.println(f"names: {names[0]}, {names[1]}, {names[2]}")
+
+    // Empty array
+    array<i32> empty = []
+    fmt.println(f"empty len: {empty.len()}")
+
+    // Map literal
+    map<string, i32> scores = {"alice": 95, "bob": 87}
+    fmt.println(f"map len: {scores.len()}")
+
+    // Map access
+    i32 alice_score, bool found = scores.get("alice")
+    fmt.println(f"alice: {alice_score}, found: {found}")
+
+    // Empty map
+    map<string, string> empty_map = {}
+    fmt.println(f"empty map len: {empty_map.len()}")
+
+    // Nested: array of arrays
+    array<array<i32>> matrix = [[1, 2], [3, 4], [5, 6]]
+    fmt.println(f"matrix[0][0]: {matrix[0][0]}")
+    fmt.println(f"matrix[1][1]: {matrix[1][1]}")
+    fmt.println(f"matrix[2][0]: {matrix[2][0]}")
+
+    // Nested: map of arrays
+    map<string, array<i32>> groups = {"evens": [2, 4, 6], "odds": [1, 3, 5]}
+    array<i32> evens, bool ef = groups.get("evens")
+    fmt.println(f"evens[0]: {evens[0]}")
+
+    // Array index assignment
+    nums[0] = 99
+    fmt.println(f"after set: {nums[0]}")
+
+    // Map index assignment
+    scores["charlie"] = 100
+    i32 cs, bool cf = scores.get("charlie")
+    fmt.println(f"charlie: {cs}")
+
+    fmt.println("===== TEST 04_ARRAYS_MAPS END - EXPECTED OUTPUT ABOVE =====")
+    return 0
+}

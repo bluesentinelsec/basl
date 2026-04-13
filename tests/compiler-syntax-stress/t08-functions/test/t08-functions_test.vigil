@@ -1,0 +1,6 @@
+import "test";
+import "t08-functions";
+
+fn test_greet(test.T t) -> void {
+    t.assert(t08-functions.greet("world") == "hello, world", "greet should work");
+}

@@ -1,0 +1,70 @@
+import "fmt"
+
+fn main() -> i32 {
+    fmt.println("===== TEST 03_STRING_LITERALS START =====")
+
+    // Normal string with escapes
+    string s1 = "hello\nworld"
+    fmt.println(f"newline: {s1}")
+
+    string s2 = "tab\there"
+    fmt.println(f"tab: {s2}")
+
+    string s3 = "backslash: \\"
+    fmt.println(s3)
+
+    string s4 = "quote: \""
+    fmt.println(s4)
+
+    string s5 = "null byte: \0 end"
+    fmt.println(f"null byte len: {s5.len()}")
+
+    // Raw string
+    string raw = `no escapes \n \t here`
+    fmt.println(f"raw: {raw}")
+
+    // Character literals
+    string ch = 'a'
+    fmt.println(f"char: {ch}")
+
+    string nl = '\n'
+    fmt.println(f"char newline len: {nl.len()}")
+
+    // F-strings
+    string name = "Alice"
+    i32 age = 30
+    f64 pi = 3.14159
+
+    fmt.println(f"Name: {name}, Age: {age}")
+    fmt.println(f"Next year: {age + 1}")
+    fmt.println(f"pi={pi:.2f}")
+
+    // F-string format specifiers
+    fmt.println(f"left:  [{name:<10}]")
+    fmt.println(f"right: [{name:>10}]")
+    fmt.println(f"center:[{name:^10}]")
+    fmt.println(f"hex: {age:x}")
+    fmt.println(f"HEX: {age:X}")
+    fmt.println(f"bin: {age:b}")
+    fmt.println(f"oct: {age:o}")
+    fmt.println(f"thousands: {1234567:,}")
+    fmt.println(f"precision: {pi:.4f}")
+    fmt.println(f"zero-pad: {age:0>8d}")
+
+    // Literal braces in f-string
+    fmt.println(f"braces: {{ok}}")
+
+    // Expression in f-string
+    fmt.println(f"expr: {"hello".to_upper()}")
+
+    // String concatenation
+    string concat = "hello" + " " + "world"
+    fmt.println(f"concat: {concat}")
+
+    // Empty string
+    string empty = ""
+    fmt.println(f"empty len: {empty.len()}")
+
+    fmt.println("===== TEST 03_STRING_LITERALS END - EXPECTED OUTPUT ABOVE =====")
+    return 0
+}
