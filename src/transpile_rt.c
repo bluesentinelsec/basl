@@ -1554,8 +1554,8 @@ vigil_status_t vigil_tc_string_op(vigil_tc_t *tc, vigil_value_t *regs, uint8_t d
         size_t sc = vm->stack_count;
         /* Determine result count from sub-opcode. */
         size_t n_results = 1;
-        if (sub_op == 72 || sub_op == 73 || sub_op == 75 || sub_op == 189)
-            n_results = 2; /* INDEX_OF, SUBSTR, CHAR_AT, NEXT_CHAR */
+        if (sub_op == 72 || sub_op == 73 || sub_op == 75 || sub_op == 140 || sub_op == 189)
+            n_results = 2; /* INDEX_OF, SUBSTR, CHAR_AT, LAST_INDEX_OF, NEXT_CHAR */
         else if (sub_op == 146)
             n_results = 3; /* CUT */
         for (size_t ri = 0; ri < n_results && ri < sc; ri++)
