@@ -1,0 +1,46 @@
+import "fmt"
+
+fn main() -> i32 {
+    fmt.println("===== TEST 05_F_STRINGS_EDGE_CASES START =====")
+
+    // Literal braces
+    fmt.println(f"{{literal braces}}")
+
+    // Empty string interpolation
+    string empty = ""
+    fmt.println(f"[{empty}]")
+
+    // Escape sequences in surrounding text
+    fmt.println(f"tab:\there")
+    fmt.println(f"newline:\nhere")
+
+    // Very long interpolated string
+    string long_str = "abcdefghij"
+    string built = ""
+    for (i32 i = 0; i < 10; i++) {
+        built = built + long_str
+    }
+    fmt.println(f"len: {built.len()}")
+
+    // Unicode
+    fmt.println(f"emoji: ❤")
+    fmt.println(f"accented: café")
+
+    // Interpolation of zero
+    fmt.println(f"{0}")
+    fmt.println(f"{0.0}")
+    fmt.println(f"{false}")
+
+    // Deeply nested string building
+    string a = "a"
+    string b = f"{a}b"
+    string c = f"{b}c"
+    string d = f"{c}d"
+    fmt.println(d)
+
+    // Multiple f-strings in sequence
+    fmt.println(f"{"one"}" + " " + f"{"two"}" + " " + f"{"three"}")
+
+    fmt.println("===== TEST 05_F_STRINGS_EDGE_CASES END =====")
+    return 0
+}

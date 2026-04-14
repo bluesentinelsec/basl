@@ -1,0 +1,91 @@
+import "fmt"
+
+fn fib(i32 n) -> i32 {
+    if n <= 1 {
+        return n
+    }
+    return fib(n - 1) + fib(n - 2)
+}
+
+fn safe_div(i32 a, i32 b) -> (i32, err) {
+    if b == 0 {
+        return 0, err("division by zero", err.arg)
+    }
+    return a / b, ok
+}
+
+class Point {
+    pub f64 x
+    pub f64 y
+
+    fn init(f64 px, f64 py) -> void {
+        self.x = px
+        self.y = py
+    }
+
+    pub fn to_string() -> string {
+        return f"({self.x:.2f}, {self.y:.2f})"
+    }
+
+    pub fn dist_sq(Point other) -> f64 {
+        f64 dx = self.x - other.x
+        f64 dy = self.y - other.y
+        return dx * dx + dy * dy
+    }
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST LARGE_FMT_COMPREHENSIVE_1 START =====")
+
+    // Mixed type formatting
+    fmt.println(f"int={42} float={3.14:.2f} bool={true} str={"hello"}")
+
+    // Format specifiers combined
+    fmt.println(f"hex={255:x} HEX={255:X} bin={10:b} oct={8:o}")
+    fmt.println(f"padded=[{42:>8}] left=[{42:<8}] center=[{42:^8}]")
+    fmt.println(f"zero=[{42:08}] fill=[{42:*>8}]")
+    fmt.println(f"thousands={1234567:,}")
+
+    // Fibonacci with formatting
+    for (i32 i = 0; i < 10; i++) {
+        fmt.println(f"fib({i:2}) = {fib(i)}")
+    }
+
+    // Error handling with formatting
+    i32 r1, err e1 = safe_div(100, 3)
+    fmt.println(f"100/3 = {r1}, ok={e1 == ok}")
+    i32 r2, err e2 = safe_div(10, 0)
+    if e2 != ok {
+        fmt.println(f"10/0 = {r2}, ok={e2 == ok}, msg={e2.message()}")
+    }
+
+    // Class formatting
+    Point p1 = Point(1.5, 2.5)
+    Point p2 = Point(4.5, 6.5)
+    fmt.println(f"p1={p1.to_string()} p2={p2.to_string()}")
+    fmt.println(f"dist_sq={p1.dist_sq(p2):.2f}")
+
+    // Array iteration with formatting
+    array<i32> nums = [10, 20, 30, 40, 50]
+    i32 sum = 0
+    for n in nums {
+        sum += n
+    }
+    fmt.println(f"sum={sum} count={nums.len()}")
+
+    // Nested f-strings via variables
+    string inner = f"{255:x}"
+    fmt.println(f"nested: [{inner}]")
+
+    // Large u64
+    u64 big = u64(18446744073709551615)
+    fmt.println(f"u64_max={big}")
+
+    // Bool logic in f-strings
+    bool a = true
+    bool b = false
+    fmt.println(f"or={a || b} and={a && b} not={!b}")
+
+    fmt.println("===== TEST LARGE_FMT_COMPREHENSIVE_1 END =====")
+    return 0
+}

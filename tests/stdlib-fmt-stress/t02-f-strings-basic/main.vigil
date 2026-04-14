@@ -1,0 +1,43 @@
+import "fmt"
+
+fn main() -> i32 {
+    fmt.println("===== TEST 02_F_STRINGS_BASIC START =====")
+
+    // Simple variable interpolation
+    string name = "world"
+    fmt.println(f"Hello {name}")
+
+    // Integer interpolation
+    i32 x = 42
+    fmt.println(f"Value: {x}")
+
+    // Bool interpolation
+    bool flag = true
+    fmt.println(f"Flag: {flag}")
+
+    // Float interpolation
+    f64 pi = 3.14159
+    fmt.println(f"Pi: {pi}")
+
+    // Multiple interpolations
+    string first = "Jane"
+    string last = "Doe"
+    i32 age = 30
+    fmt.println(f"{first} {last}, age {age}")
+
+    // Adjacent interpolations
+    fmt.println(f"{1}{2}{3}")
+
+    // Interpolation with surrounding text
+    fmt.println(f"[{x}]")
+    fmt.println(f"start-{name}-end")
+
+    // String concatenation in f-string
+    fmt.println(f"{"hello" + " " + "world"}")
+
+    // Nested quotes
+    fmt.println(f"name is: {name}")
+
+    fmt.println("===== TEST 02_F_STRINGS_BASIC END =====")
+    return 0
+}

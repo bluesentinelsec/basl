@@ -1,0 +1,34 @@
+import "fmt"
+
+fn main() -> i32 {
+    fmt.println("===== TEST 08_MULTI_LINE_LARGE_OUTPUT START =====")
+
+    // Many lines
+    for (i32 i = 0; i < 20; i++) {
+        fmt.println(f"line {i}")
+    }
+
+    // Long single line
+    string seg = "ABCDEFGHIJ"
+    string line = ""
+    for (i32 j = 0; j < 10; j++) {
+        line = line + seg
+    }
+    fmt.println(line)
+    fmt.println(f"len: {line.len()}")
+
+    // Repeated formatted output
+    for (i32 k = 0; k < 5; k++) {
+        fmt.println(f"[{k:03}] item-{k}")
+    }
+
+    // Multi-line string building
+    string report = ""
+    for (i32 m = 1; m <= 5; m++) {
+        report = report + f"row {m}: value={m * 10}\n"
+    }
+    fmt.print(report)
+
+    fmt.println("===== TEST 08_MULTI_LINE_LARGE_OUTPUT END =====")
+    return 0
+}

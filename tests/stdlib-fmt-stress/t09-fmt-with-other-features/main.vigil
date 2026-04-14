@@ -1,0 +1,92 @@
+import "fmt"
+
+fn cleanup() -> void {
+    fmt.println("cleanup ran")
+}
+
+fn format_item(i32 idx, string val) -> string {
+    return f"[{idx}] {val}"
+}
+
+class Counter {
+    pub i32 count
+
+    fn init(i32 start) -> void {
+        self.count = start
+    }
+
+    pub fn increment() -> Counter {
+        Counter c = Counter(self.count + 1)
+        return c
+    }
+
+    pub fn display() -> void {
+        fmt.println(f"Counter: {self.count}")
+    }
+}
+
+fn maybe_fail(bool fail) -> (string, err) {
+    if fail {
+        return "", err("failed", err.arg)
+    }
+    return "success", ok
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 09_FMT_WITH_OTHER_FEATURES START =====")
+
+    // fmt inside for-in
+    array<string> items = ["alpha", "beta", "gamma"]
+    for item in items {
+        fmt.println(f"item: {item}")
+    }
+
+    // fmt with index loop
+    for (i32 i = 0; i < 3; i++) {
+        fmt.println(format_item(i, items[i]))
+    }
+
+    // fmt inside defer
+    defer cleanup()
+    fmt.println("before defer fires")
+
+    // fmt with guard
+    guard string data, err e = maybe_fail(false) {
+        fmt.println(f"guard failed: {e.message()}")
+        return 1
+    }
+    fmt.println(f"guard ok: {data}")
+
+    // fmt with class
+    Counter c = Counter(0)
+    c = c.increment()
+    c = c.increment()
+    c = c.increment()
+    c.display()
+
+    // fmt inside switch
+    i32 code = 2
+    switch code {
+        case 1:
+            fmt.println("one")
+        case 2:
+            fmt.println("two")
+        case 3:
+            fmt.println("three")
+        default:
+            fmt.println("other")
+    }
+
+    // fmt with closure
+    fn(i32) -> string formatter = |n| f"formatted: {n}"
+    fmt.println(formatter(99))
+
+    // fmt with map
+    map<string, i32> scores = {"alice": 95, "bob": 87}
+    for key, val in scores {
+        fmt.println(f"{key}: {val}")
+    }
+
+    fmt.println("===== TEST 09_FMT_WITH_OTHER_FEATURES END =====")
+    return 0
+}

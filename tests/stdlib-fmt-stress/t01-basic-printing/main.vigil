@@ -1,0 +1,41 @@
+import "fmt"
+
+fn main() -> i32 {
+    fmt.println("===== TEST 01_BASIC_PRINTING START =====")
+
+    // String
+    fmt.println("hello world")
+    fmt.print("no ")
+    fmt.println("newline")
+
+    // Integers
+    fmt.println(f"{i32(42)}")
+    fmt.println(f"{i64(9999999999)}")
+    fmt.println(f"{u32(4294967295)}")
+    fmt.println(f"{u64(18446744073709551615)}")
+
+    // Negative
+    fmt.println(f"{i32(-1)}")
+    fmt.println(f"{i64(-9999999999)}")
+
+    // Float
+    fmt.println(f"{3.14}")
+    fmt.println(f"{0.0}")
+    fmt.println(f"{-1.5}")
+
+    // Bool
+    fmt.println(f"{true}")
+    fmt.println(f"{false}")
+
+    // Empty string
+    fmt.println(f"{""}")
+
+    // Multiple prints on same line
+    fmt.print("a")
+    fmt.print("b")
+    fmt.print("c")
+    fmt.println("")
+
+    fmt.println("===== TEST 01_BASIC_PRINTING END =====")
+    return 0
+}
