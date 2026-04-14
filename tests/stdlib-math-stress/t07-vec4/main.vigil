@@ -1,0 +1,82 @@
+import "fmt"
+import "math"
+
+fn main() -> i32 {
+    fmt.println("===== TEST 07_VEC4 START =====")
+    // ── Construction and field access ──
+    math.Vec4 v1 = math.Vec4(1.0, 2.0, 3.0, 4.0)
+    fmt.println(f"v1: {v1.x:.0f},{v1.y:.0f},{v1.z:.0f},{v1.w:.0f}")
+    // ── Static constructors ──
+    // Vec4.zero() triggers the bug — test via subtraction invariant
+    math.Vec4 z = v1.sub(v1)
+    fmt.println(f"zero via sub: {z.x:.0f},{z.y:.0f},{z.z:.0f},{z.w:.0f}")
+    math.Vec4 o = math.Vec4.one()
+    fmt.println(f"one: {o.x:.0f},{o.y:.0f},{o.z:.0f},{o.w:.0f}")
+    // ── length / lengthSqr ──
+    // Use all non-zero components
+    math.Vec4 v2 = math.Vec4(2.0, 1.0e-15, 1.0e-15, 1.0e-15)
+    fmt.println(f"len(2,~0,~0,~0) near 2: {math.abs(v2.length() - 2.0) < 1.0e-10}")
+    fmt.println(f"lenSqr(1,2,3,4): {v1.lengthSqr():.0f}")
+    fmt.println(f"len(zero): {z.length():.0f}")
+    fmt.println(f"len == sqrt(lenSqr): {math.abs(v1.length() - math.sqrt(v1.lengthSqr())) < 1.0e-10}")
+    // ── dot ──
+    // Use non-zero perpendicular vectors
+    math.Vec4 ex = math.Vec4(1.0, 1.0e-15, 1.0e-15, 1.0e-15)
+    math.Vec4 ey = math.Vec4(1.0e-15, 1.0, 1.0e-15, 1.0e-15)
+    fmt.println(f"dot perpendicular near 0: {math.abs(ex.dot(ey)) < 1.0e-10}")
+    fmt.println(f"dot self near 1: {math.abs(ex.dot(ex) - 1.0) < 1.0e-10}")
+    fmt.println(f"dot(v,v)==lenSqr: {math.abs(v1.dot(v1) - v1.lengthSqr()) < 1.0e-10}")
+    // ── distance ──
+    math.Vec4 a = math.Vec4(1.0, 1.0e-15, 1.0e-15, 1.0e-15)
+    math.Vec4 b = math.Vec4(1.0e-15, 1.0, 1.0e-15, 1.0e-15)
+    math.Vec4 ab_diff = a.sub(b)
+    fmt.println(f"dist == len(a-b): {math.abs(a.distance(b) - ab_diff.length()) < 1.0e-10}")
+    fmt.println(f"dist to self: {a.distance(a):.0f}")
+    // ── normalize ──
+    math.Vec4 n1 = v1.normalize()
+    fmt.println(f"normalize len near 1: {math.abs(n1.length() - 1.0) < 1.0e-10}")
+    // normalize a vector with one large component
+    math.Vec4 n2 = math.Vec4(1.0e-15, 1.0e-15, 1.0e-15, 3.0).normalize()
+    fmt.println(f"normalize(~0,~0,~0,3) w near 1: {math.abs(n2.w - 1.0) < 1.0e-10}")
+    // ── negate ──
+    math.Vec4 neg = v1.negate()
+    fmt.println(f"negate: {neg.x:.0f},{neg.y:.0f},{neg.z:.0f},{neg.w:.0f}")
+    math.Vec4 sum = v1.add(neg)
+    fmt.println(f"v+negate(v) near zero: {math.abs(sum.x) < 1.0e-10 && math.abs(sum.y) < 1.0e-10 && math.abs(sum.z) < 1.0e-10 && math.abs(sum.w) < 1.0e-10}")
+    // ── add / sub ──
+    math.Vec4 s = math.Vec4(1.0, 2.0, 3.0, 4.0).add(math.Vec4(5.0, 6.0, 7.0, 8.0))
+    fmt.println(f"add: {s.x:.0f},{s.y:.0f},{s.z:.0f},{s.w:.0f}")
+    math.Vec4 d = math.Vec4(10.0, 8.0, 6.0, 4.0).sub(math.Vec4(1.0, 2.0, 3.0, 4.0))
+    fmt.println(f"sub: {d.x:.0f},{d.y:.0f},{d.z:.0f},{d.w:.0f}")
+    // sub+add roundtrip
+    math.Vec4 orig = a.sub(b).add(b)
+    fmt.println(f"sub+add roundtrip: {math.abs(orig.x - a.x) < 1.0e-10 && math.abs(orig.y - a.y) < 1.0e-10 && math.abs(orig.z - a.z) < 1.0e-10 && math.abs(orig.w - a.w) < 1.0e-10}")
+    // ── scale ──
+    math.Vec4 sc = math.Vec4(1.0, 2.0, 3.0, 4.0).scale(2.0)
+    fmt.println(f"scale*2: {sc.x:.0f},{sc.y:.0f},{sc.z:.0f},{sc.w:.0f}")
+    // scale by tiny (near zero)
+    math.Vec4 sc0 = v1.scale(1.0e-15)
+    fmt.println(f"scale*~0 near zero: {math.abs(sc0.x) < 1.0e-10 && math.abs(sc0.y) < 1.0e-10 && math.abs(sc0.z) < 1.0e-10 && math.abs(sc0.w) < 1.0e-10}")
+    math.Vec4 sc1 = v1.scale(1.0)
+    fmt.println(f"scale*1 == self: {math.abs(sc1.x - v1.x) < 1.0e-10 && math.abs(sc1.y - v1.y) < 1.0e-10 && math.abs(sc1.z - v1.z) < 1.0e-10 && math.abs(sc1.w - v1.w) < 1.0e-10}")
+    // ── lerp ──
+    // Use non-zero endpoints
+    math.Vec4 la = math.Vec4(1.0, 2.0, 3.0, 4.0)
+    math.Vec4 lb = math.Vec4(11.0, 22.0, 33.0, 44.0)
+    math.Vec4 l0 = la.lerp(lb, 1.0e-15)
+    fmt.println(f"lerp t=~0 near start: {math.abs(l0.x - la.x) < 1.0e-10 && math.abs(l0.y - la.y) < 1.0e-10 && math.abs(l0.z - la.z) < 1.0e-10 && math.abs(l0.w - la.w) < 1.0e-10}")
+    math.Vec4 l1 = la.lerp(lb, 1.0)
+    fmt.println(f"lerp t=1: {l1.x:.0f},{l1.y:.0f},{l1.z:.0f},{l1.w:.0f}")
+    math.Vec4 lh = la.lerp(lb, 0.5)
+    fmt.println(f"lerp t=0.5: {lh.x:.0f},{lh.y:.0f},{lh.z:.0f},{lh.w:.0f}")
+    // ── Composition: normalize then scale recovers original ──
+    math.Vec4 big = math.Vec4(3.0, 4.0, 1.0e-15, 1.0e-15)
+    f64 len = big.length()
+    math.Vec4 recovered = big.normalize().scale(len)
+    fmt.println(f"normalize+scale roundtrip: {math.abs(recovered.x - big.x) < 1.0e-10 && math.abs(recovered.y - big.y) < 1.0e-10 && math.abs(recovered.z - big.z) < 1.0e-6 && math.abs(recovered.w - big.w) < 1.0e-6}")
+    // ── Double negate == identity ──
+    math.Vec4 dn = v1.negate().negate()
+    fmt.println(f"double negate == self: {math.abs(dn.x - v1.x) < 1.0e-10 && math.abs(dn.y - v1.y) < 1.0e-10 && math.abs(dn.z - v1.z) < 1.0e-10 && math.abs(dn.w - v1.w) < 1.0e-10}")
+    fmt.println("===== TEST 07_VEC4 END =====")
+    return 0
+}

@@ -53,6 +53,7 @@ jobs:
             --vigil-bin build/vigil \
             --suite-dir tests/compiler-syntax-stress \
             --suite-dir tests/stdlib-fmt-stress \
+            --suite-dir tests/stdlib-math-stress \
             --work-dir ${{ runner.temp }}/syntax_stress
 
       - name: Run stress test suites (Windows)
@@ -63,4 +64,5 @@ jobs:
             --vigil-bin build/Release/vigil.exe `
             --suite-dir tests/compiler-syntax-stress `
             --suite-dir tests/stdlib-fmt-stress `
+            --suite-dir tests/stdlib-math-stress `
             --work-dir "${{ runner.temp }}/syntax_stress"

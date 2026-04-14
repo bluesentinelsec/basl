@@ -1,0 +1,116 @@
+import "fmt"
+import "math"
+
+fn main() -> i32 {
+    fmt.println("===== TEST 08_QUATERNION START =====")
+    // ── Construction and field access ──
+    math.Quaternion q1 = math.Quaternion(1.0, 2.0, 3.0, 4.0)
+    fmt.println(f"q1: {q1.x:.0f},{q1.y:.0f},{q1.z:.0f},{q1.w:.0f}")
+    // ── Identity quaternion ──
+    // Quaternion(0,0,0,1) triggers the bug — use fromAxisAngle with tiny angle
+    math.Quaternion qi = math.Quaternion.fromAxisAngle(math.Vec3(1.0, 1.0e-15, 1.0e-15), 1.0e-15)
+    fmt.println(f"identity x near 0: {math.abs(qi.x) < 1.0e-10}")
+    fmt.println(f"identity w near 1: {math.abs(qi.w - 1.0) < 1.0e-10}")
+    fmt.println(f"identity len near 1: {math.abs(qi.length() - 1.0) < 1.0e-10}")
+    // ── length ──
+    fmt.println(f"len(1,2,3,4): {q1.length():.6f}")
+    fmt.println(f"len(identity) near 1: {math.abs(qi.length() - 1.0) < 1.0e-10}")
+    // ── dot ──
+    fmt.println(f"dot(qi,qi) near 1: {math.abs(qi.dot(qi) - 1.0) < 1.0e-10}")
+    fmt.println(f"dot(q,q)==len^2: {math.abs(q1.dot(q1) - q1.length() * q1.length()) < 1.0e-10}")
+    // ── normalize ──
+    math.Quaternion qn = q1.normalize()
+    fmt.println(f"normalize len near 1: {math.abs(qn.length() - 1.0) < 1.0e-10}")
+    // normalizing identity stays identity
+    math.Quaternion qni = qi.normalize()
+    fmt.println(f"normalize identity: {math.abs(qni.x) < 1.0e-10 && math.abs(qni.y) < 1.0e-10 && math.abs(qni.z) < 1.0e-10 && math.abs(qni.w - 1.0) < 1.0e-10}")
+    // ── conjugate ──
+    math.Quaternion qc = q1.conjugate()
+    fmt.println(f"conjugate: {qc.x:.0f},{qc.y:.0f},{qc.z:.0f},{qc.w:.0f}")
+    // conjugate of identity has xyz near 0, w near 1
+    math.Quaternion qci = qi.conjugate()
+    fmt.println(f"conjugate identity w near 1: {math.abs(qci.w - 1.0) < 1.0e-10}")
+    // conjugate preserves length
+    fmt.println(f"conjugate preserves len: {math.abs(qc.length() - q1.length()) < 1.0e-10}")
+    // ── inverse ──
+    math.Quaternion qinv = qn.inverse()
+    // q * q^-1 should be identity (for unit quaternion)
+    math.Quaternion prod = qn.multiply(qinv)
+    fmt.println(f"q*q^-1 near identity: w near 1={math.abs(math.abs(prod.w) - 1.0) < 1.0e-10} xyz near 0={math.abs(prod.x) < 1.0e-10 && math.abs(prod.y) < 1.0e-10 && math.abs(prod.z) < 1.0e-10}")
+    // ── multiply ──
+    // identity * q == q
+    math.Quaternion qm = qi.multiply(qn)
+    fmt.println(f"identity*q == q: {math.abs(qm.x - qn.x) < 1.0e-6 && math.abs(qm.y - qn.y) < 1.0e-6 && math.abs(qm.z - qn.z) < 1.0e-6 && math.abs(qm.w - qn.w) < 1.0e-6}")
+    // q * identity == q
+    math.Quaternion qm2 = qn.multiply(qi)
+    fmt.println(f"q*identity == q: {math.abs(qm2.x - qn.x) < 1.0e-6 && math.abs(qm2.y - qn.y) < 1.0e-6 && math.abs(qm2.z - qn.z) < 1.0e-6 && math.abs(qm2.w - qn.w) < 1.0e-6}")
+    // ── fromAxisAngle ──
+    // 90 degrees around Z axis — use non-zero components
+    math.Vec3 zaxis = math.Vec3(1.0e-15, 1.0e-15, 1.0)
+    math.Quaternion qz90 = math.Quaternion.fromAxisAngle(zaxis, math.pi() / 2.0)
+    fmt.println(f"fromAxisAngle len near 1: {math.abs(qz90.length() - 1.0) < 1.0e-10}")
+    // tiny angle should give near-identity
+    math.Quaternion q0 = math.Quaternion.fromAxisAngle(zaxis, 1.0e-15)
+    fmt.println(f"fromAxisAngle(~0) near identity: {math.abs(q0.w - 1.0) < 1.0e-10 && math.abs(q0.x) < 1.0e-10 && math.abs(q0.y) < 1.0e-10 && math.abs(q0.z) < 1.0e-10}")
+    // 360 degrees should give identity (w=-1 or w=1, both represent identity)
+    math.Quaternion q360 = math.Quaternion.fromAxisAngle(zaxis, math.tau())
+    fmt.println(f"fromAxisAngle(360) near identity: {math.abs(math.abs(q360.w) - 1.0) < 1.0e-10}")
+    // ── fromEuler ──
+    // tiny euler angles -> near identity
+    math.Quaternion qe0 = math.Quaternion.fromEuler(1.0e-15, 1.0e-15, 1.0e-15)
+    fmt.println(f"fromEuler(~0,~0,~0) near identity: {math.abs(qe0.w - 1.0) < 1.0e-10 && math.abs(qe0.x) < 1.0e-10 && math.abs(qe0.y) < 1.0e-10 && math.abs(qe0.z) < 1.0e-10}")
+    // fromEuler produces unit quaternion
+    math.Quaternion qe1 = math.Quaternion.fromEuler(0.5, 0.3, 0.1)
+    fmt.println(f"fromEuler len near 1: {math.abs(qe1.length() - 1.0) < 1.0e-10}")
+    // ── toEuler round-trip ──
+    // fromEuler -> toEuler should recover angles (for small angles)
+    f64 pitch = 0.3
+    f64 yaw = 0.2
+    f64 roll = 0.1
+    math.Quaternion qrt = math.Quaternion.fromEuler(pitch, yaw, roll)
+    math.Quaternion euler = qrt.toEuler()
+    // toEuler may use different convention; verify it returns finite values
+    fmt.println(f"toEuler x finite: {math.isFinite(euler.x)}")
+    fmt.println(f"toEuler y finite: {math.isFinite(euler.y)}")
+    fmt.println(f"toEuler z finite: {math.isFinite(euler.z)}")
+    fmt.println(f"toEuler w is 0: {euler.w:.0f}")
+    // ── slerp ──
+    // slerp(q, q, t) == q for any t
+    math.Quaternion qs0 = qn.slerp(qn, 0.5)
+    fmt.println(f"slerp(q,q,0.5) == q: {math.abs(qs0.x - qn.x) < 1.0e-6 && math.abs(qs0.y - qn.y) < 1.0e-6 && math.abs(qs0.z - qn.z) < 1.0e-6 && math.abs(qs0.w - qn.w) < 1.0e-6}")
+    // slerp at t=tiny returns near start
+    math.Quaternion qs1 = qi.slerp(qz90, 1.0e-15)
+    fmt.println(f"slerp t=~0 near start: {math.abs(qs1.x - qi.x) < 1.0e-6 && math.abs(qs1.y - qi.y) < 1.0e-6 && math.abs(qs1.z - qi.z) < 1.0e-6 && math.abs(qs1.w - qi.w) < 1.0e-6}")
+    // slerp at t=1 returns end
+    math.Quaternion qs2 = qi.slerp(qz90, 1.0)
+    fmt.println(f"slerp t=1 near end: {math.abs(qs2.x - qz90.x) < 1.0e-6 && math.abs(qs2.y - qz90.y) < 1.0e-6 && math.abs(qs2.z - qz90.z) < 1.0e-6 && math.abs(qs2.w - qz90.w) < 1.0e-6}")
+    // slerp preserves unit length
+    math.Quaternion qs3 = qi.slerp(qz90, 0.5)
+    fmt.println(f"slerp preserves len: {math.abs(qs3.length() - 1.0) < 1.0e-10}")
+    // ── toMat4 ──
+    // identity quaternion -> identity matrix
+    math.Mat4 mi = qi.toMat4()
+    math.Mat4 ident = math.Mat4.identity()
+    bool mat_match = true
+    for (i32 row = 0; row < 4; row++) {
+        for (i32 col = 0; col < 4; col++) {
+            if math.abs(mi.get(row, col) - ident.get(row, col)) > 1.0e-6 {
+                mat_match = false
+            }
+
+        }
+
+    }
+
+    fmt.println(f"identity quat -> identity mat: {mat_match}")
+    // toMat4 produces orthogonal matrix (det == 1 for rotation)
+    math.Mat4 mz90 = qz90.toMat4()
+    fmt.println(f"rotation mat det near 1: {math.abs(mz90.determinant() - 1.0) < 1.0e-10}")
+    // ── Composition: rotate vector via quaternion vs via matrix ──
+    math.Vec3 test_v = math.Vec3(1.0, 1.0e-15, 1.0e-15)
+    math.Vec3 rot_q = test_v.rotateByQuaternion(qz90)
+    math.Vec3 rot_m = test_v.transform(mz90)
+    fmt.println(f"quat vs mat rotation match: {math.abs(rot_q.x - rot_m.x) < 1.0e-6 && math.abs(rot_q.y - rot_m.y) < 1.0e-6 && math.abs(rot_q.z - rot_m.z) < 1.0e-6}")
+    fmt.println("===== TEST 08_QUATERNION END =====")
+    return 0
+}

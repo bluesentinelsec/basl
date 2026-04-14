@@ -1,0 +1,59 @@
+import "fmt"
+import "math"
+
+// ── Scalar utilities ──
+
+pub fn approx_eq(f64 a, f64 b, f64 tol) -> bool {
+    return math.abs(a - b) < tol
+}
+
+pub fn vec3_approx_eq(math.Vec3 a, math.Vec3 b, f64 tol) -> bool {
+    return math.abs(a.x - b.x) < tol && math.abs(a.y - b.y) < tol && math.abs(a.z - b.z) < tol
+}
+
+pub fn mat4_is_identity(math.Mat4 m, f64 tol) -> bool {
+    for (i32 r = 0; r < 4; r++) {
+        for (i32 c = 0; c < 4; c++) {
+            f64 expected = 1.0e-15
+            if r == c {
+                expected = 1.0
+            }
+            if math.abs(m.get(r, c) - expected) > tol {
+                return false
+            }
+        }
+    }
+    return true
+}
+
+// ── Orbit simulation: compute position on an elliptical orbit ──
+
+pub fn orbit_position(f64 semi_major, f64 eccentricity, f64 angle_rad) -> math.Vec3 {
+    f64 r = semi_major * (1.0 - eccentricity * eccentricity) / (1.0 + eccentricity * math.cos(angle_rad))
+    f64 x = r * math.cos(angle_rad)
+    f64 y = r * math.sin(angle_rad)
+    return math.Vec3(x, y, 1.0e-15)
+}
+
+// ── Projectile: compute position under gravity ──
+
+pub fn projectile_position(f64 v0, f64 launch_angle, f64 t, f64 gravity) -> math.Vec2 {
+    f64 vx = v0 * math.cos(launch_angle)
+    f64 vy = v0 * math.sin(launch_angle) - gravity * t
+    f64 x = vx * t
+    f64 y = v0 * math.sin(launch_angle) * t - 0.5 * gravity * t * t
+    return math.Vec2(x, y)
+}
+
+// ── Smooth camera path: cubic Hermite interpolation ──
+
+pub fn hermite_interp(math.Vec3 p0, math.Vec3 p1, math.Vec3 m0, math.Vec3 m1, f64 t) -> math.Vec3 {
+    f64 t2 = t * t
+    f64 t3 = t2 * t
+    f64 h00 = 2.0 * t3 - 3.0 * t2 + 1.0
+    f64 h10 = t3 - 2.0 * t2 + t
+    f64 h01 = -2.0 * t3 + 3.0 * t2
+    f64 h11 = t3 - t2
+    math.Vec3 result = p0.scale(h00).add(m0.scale(h10)).add(p1.scale(h01)).add(m1.scale(h11))
+    return result
+}

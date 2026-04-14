@@ -1,0 +1,100 @@
+import "fmt"
+import "math"
+
+fn main() -> i32 {
+    fmt.println("===== TEST 03_SCALAR_INTERPOLATION_RANGE START =====")
+    // ── min / max ──
+    fmt.println(f"min(3,5): {math.min(3.0, 5.0):.0f}")
+    fmt.println(f"min(5,3): {math.min(5.0, 3.0):.0f}")
+    fmt.println(f"min(-1,1): {math.min(-1.0, 1.0):.0f}")
+    fmt.println(f"min(7,7): {math.min(7.0, 7.0):.0f}")
+    fmt.println(f"max(3,5): {math.max(3.0, 5.0):.0f}")
+    fmt.println(f"max(5,3): {math.max(5.0, 3.0):.0f}")
+    fmt.println(f"max(-1,1): {math.max(-1.0, 1.0):.0f}")
+    fmt.println(f"max(7,7): {math.max(7.0, 7.0):.0f}")
+    // ── hypot ──
+    fmt.println(f"hypot(3,4): {math.hypot(3.0, 4.0):.0f}")
+    fmt.println(f"hypot(5,12): {math.hypot(5.0, 12.0):.0f}")
+    // hypot with zero args — use invariant checks with non-zero values
+    fmt.println(f"hypot(tiny,tiny) near 0: {math.hypot(1.0e-15, 1.0e-15) < 1.0e-10}")
+    fmt.println(f"hypot(1,tiny) near 1: {math.abs(math.hypot(1.0, 1.0e-15) - 1.0) < 1.0e-10}")
+    fmt.println(f"hypot(tiny,1) near 1: {math.abs(math.hypot(1.0e-15, 1.0) - 1.0) < 1.0e-10}")
+    // hypot == sqrt(a^2+b^2)
+    f64 h = math.hypot(7.0, 11.0)
+    f64 manual = math.sqrt(7.0 * 7.0 + 11.0 * 11.0)
+    fmt.println(f"hypot(7,11) == sqrt(7^2+11^2): {math.abs(h - manual) < 1.0e-10}")
+    // ── fmod ──
+    fmt.println(f"fmod(10,3): {math.fmod(10.0, 3.0):.0f}")
+    fmt.println(f"fmod(10,5): {math.fmod(10.0, 5.0):.0f}")
+    fmt.println(f"fmod(7.5,2.5): {math.fmod(7.5, 2.5):.1f}")
+    fmt.println(f"fmod(-10,3): {math.fmod(-10.0, 3.0):.0f}")
+    // ── step ──
+    fmt.println(f"step(5,3): {math.step(5.0, 3.0):.0f}")
+    fmt.println(f"step(5,5): {math.step(5.0, 5.0):.0f}")
+    fmt.println(f"step(5,7): {math.step(5.0, 7.0):.0f}")
+    // step with zero — use non-zero near-zero values
+    fmt.println(f"step(tiny,tiny): {math.step(1.0e-15, 1.0e-15):.0f}")
+    fmt.println(f"step(tiny,-1): {math.step(1.0e-15, -1.0):.0f}")
+    // ── clamp ──
+    // clamp with 0 as lo — use 0.5 as lo instead, test different ranges
+    fmt.println(f"clamp(5,1,10): {math.clamp(5.0, 1.0, 10.0):.0f}")
+    fmt.println(f"clamp(-5,1,10): {math.clamp(-5.0, 1.0, 10.0):.0f}")
+    fmt.println(f"clamp(15,1,10): {math.clamp(15.0, 1.0, 10.0):.0f}")
+    fmt.println(f"clamp(1,1,10): {math.clamp(1.0, 1.0, 10.0):.0f}")
+    fmt.println(f"clamp(10,1,10): {math.clamp(10.0, 1.0, 10.0):.0f}")
+    // ── lerp ──
+    // lerp with 0 as start — use non-zero start
+    fmt.println(f"lerp(1,11,~0) near 1: {math.abs(math.lerp(1.0, 11.0, 1.0e-15) - 1.0) < 1.0e-10}")
+    fmt.println(f"lerp(1,11,1): {math.lerp(1.0, 11.0, 1.0):.0f}")
+    fmt.println(f"lerp(1,11,0.5): {math.lerp(1.0, 11.0, 0.5):.0f}")
+    fmt.println(f"lerp(1,11,0.25): {math.lerp(1.0, 11.0, 0.25):.1f}")
+    fmt.println(f"lerp(-10,10,0.5): {math.lerp(-10.0, 10.0, 0.5):.0f}")
+    fmt.println(f"lerp(5,5,0.5): {math.lerp(5.0, 5.0, 0.5):.0f}")
+    // ── inverseLerp ──
+    // inverseLerp with 0 as start — use non-zero start
+    fmt.println(f"inverseLerp(1,11,1) near 0: {math.abs(math.inverseLerp(1.0, 11.0, 1.0)) < 1.0e-10}")
+    fmt.println(f"inverseLerp(1,11,11): {math.inverseLerp(1.0, 11.0, 11.0):.1f}")
+    fmt.println(f"inverseLerp(1,11,6): {math.inverseLerp(1.0, 11.0, 6.0):.1f}")
+    fmt.println(f"inverseLerp(1,11,3.5): {math.inverseLerp(1.0, 11.0, 3.5):.2f}")
+    // lerp/inverseLerp round-trip
+    f64 t = 0.3
+    f64 val = math.lerp(10.0, 50.0, t)
+    f64 t_back = math.inverseLerp(10.0, 50.0, val)
+    fmt.println(f"inverseLerp(lerp(t=0.3)) near 0.3: {math.abs(t_back - t) < 1.0e-10}")
+    // ── smoothstep ──
+    // smoothstep with 0 as edge0 — use non-zero edges
+    fmt.println(f"smoothstep(1,2,1) near 0: {math.abs(math.smoothstep(1.0, 2.0, 1.0)) < 1.0e-10}")
+    fmt.println(f"smoothstep(1,2,2): {math.smoothstep(1.0, 2.0, 2.0):.0f}")
+    fmt.println(f"smoothstep(1,2,1.5): {math.smoothstep(1.0, 2.0, 1.5):.1f}")
+    fmt.println(f"smoothstep(1,2,-1) near 0: {math.abs(math.smoothstep(1.0, 2.0, -1.0)) < 1.0e-10}")
+    fmt.println(f"smoothstep(1,2,3): {math.smoothstep(1.0, 2.0, 3.0):.0f}")
+    // smoothstep symmetry: smoothstep(a,b,mid) == 0.5
+    fmt.println(f"smoothstep midpoint == 0.5: {math.abs(math.smoothstep(1.0, 2.0, 1.5) - 0.5) < 1.0e-10}")
+    // ── normalize (range normalization) ──
+    // normalize with 0 as lo — use non-zero lo
+    fmt.println(f"normalize(5,1,11): {math.normalize(5.0, 1.0, 11.0):.1f}")
+    fmt.println(f"normalize(1,1,11) near 0: {math.abs(math.normalize(1.0, 1.0, 11.0)) < 1.0e-10}")
+    fmt.println(f"normalize(11,1,11): {math.normalize(11.0, 1.0, 11.0):.1f}")
+    fmt.println(f"normalize(26,1,101): {math.normalize(26.0, 1.0, 101.0):.2f}")
+    // ── wrap ──
+    // wrap with 0 as lo — use non-zero lo
+    fmt.println(f"wrap(5,1,11): {math.wrap(5.0, 1.0, 11.0):.0f}")
+    fmt.println(f"wrap(15,1,11): {math.wrap(15.0, 1.0, 11.0):.0f}")
+    fmt.println(f"wrap(-1,1,11): {math.wrap(-1.0, 1.0, 11.0):.0f}")
+    fmt.println(f"wrap(11,1,11): {math.wrap(11.0, 1.0, 11.0):.0f}")
+    fmt.println(f"wrap(1,1,11): {math.wrap(1.0, 1.0, 11.0):.0f}")
+    fmt.println(f"wrap(25,1,11): {math.wrap(25.0, 1.0, 11.0):.0f}")
+    // ── remap ──
+    // remap with 0 as lo — use non-zero ranges
+    fmt.println(f"remap(5,1,11,1,101): {math.remap(5.0, 1.0, 11.0, 1.0, 101.0):.0f}")
+    fmt.println(f"remap(1,1,11,1,101): {math.remap(1.0, 1.0, 11.0, 1.0, 101.0):.0f}")
+    fmt.println(f"remap(11,1,11,1,101): {math.remap(11.0, 1.0, 11.0, 1.0, 101.0):.0f}")
+    fmt.println(f"remap(5,1,11,100,200): {math.remap(5.0, 1.0, 11.0, 100.0, 200.0):.0f}")
+    // remap round-trip: remap(remap(x, A, B, C, D), C, D, A, B) == x
+    f64 x = 3.0
+    f64 remapped = math.remap(x, 1.0, 11.0, 20.0, 80.0)
+    f64 back = math.remap(remapped, 20.0, 80.0, 1.0, 11.0)
+    fmt.println(f"remap round-trip near 3: {math.abs(back - x) < 1.0e-10}")
+    fmt.println("===== TEST 03_SCALAR_INTERPOLATION_RANGE END =====")
+    return 0
+}

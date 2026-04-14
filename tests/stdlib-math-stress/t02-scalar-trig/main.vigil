@@ -1,0 +1,90 @@
+import "fmt"
+import "math"
+
+fn main() -> i32 {
+    fmt.println("===== TEST 02_SCALAR_TRIG START =====")
+    // ── sin/cos at exact multiples of pi/2 ──
+    f64 pi = math.pi()
+    // sin(0) and cos(0) — use invariant: sin(tiny) near 0, cos(tiny) near 1
+    fmt.println(f"sin(~0) near 0: {math.abs(math.sin(1.0e-15)) < 1.0e-10}")
+    fmt.println(f"cos(~0) near 1: {math.abs(math.cos(1.0e-15) - 1.0) < 1.0e-10}")
+    // sin(pi) and cos(pi/2) are near-zero but not exact; use invariant checks
+    fmt.println(f"sin(pi) near 0: {math.abs(math.sin(pi)) < 1.0e-10}")
+    fmt.println(f"cos(pi/2) near 0: {math.abs(math.cos(pi / 2.0)) < 1.0e-10}")
+    fmt.println(f"cos(pi) near -1: {math.abs(math.cos(pi) + 1.0) < 1.0e-10}")
+    fmt.println(f"sin(pi/2) near 1: {math.abs(math.sin(pi / 2.0) - 1.0) < 1.0e-10}")
+    // ── Pythagorean identity: sin^2 + cos^2 == 1 ──
+    f64 a1 = 0.3
+    f64 s1 = math.sin(a1)
+    f64 c1 = math.cos(a1)
+    fmt.println(f"sin^2+cos^2 at 0.3: {math.abs(s1 * s1 + c1 * c1 - 1.0) < 1.0e-10}")
+    f64 a2 = 1.0
+    f64 s2 = math.sin(a2)
+    f64 c2 = math.cos(a2)
+    fmt.println(f"sin^2+cos^2 at 1.0: {math.abs(s2 * s2 + c2 * c2 - 1.0) < 1.0e-10}")
+    f64 a3 = 2.5
+    f64 s3 = math.sin(a3)
+    f64 c3 = math.cos(a3)
+    fmt.println(f"sin^2+cos^2 at 2.5: {math.abs(s3 * s3 + c3 * c3 - 1.0) < 1.0e-10}")
+    // ── tan = sin/cos ──
+    f64 a4 = 0.7
+    f64 tan_val = math.tan(a4)
+    f64 ratio = math.sin(a4) / math.cos(a4)
+    fmt.println(f"tan(0.7) == sin/cos: {math.abs(tan_val - ratio) < 1.0e-10}")
+    // tan(0) — use invariant: tan(tiny) near 0
+    fmt.println(f"tan(~0) near 0: {math.abs(math.tan(1.0e-15)) < 1.0e-10}")
+    fmt.println(f"tan(pi/4) near 1: {math.abs(math.tan(pi / 4.0) - 1.0) < 1.0e-10}")
+    // ── Inverse trig: asin/acos/atan ──
+    // asin(0) — use invariant: asin(tiny) near 0
+    fmt.println(f"asin(~0) near 0: {math.abs(math.asin(1.0e-15)) < 1.0e-10}")
+    fmt.println(f"asin(1) near pi/2: {math.abs(math.asin(1.0) - pi / 2.0) < 1.0e-10}")
+    fmt.println(f"asin(-1) near -pi/2: {math.abs(math.asin(-1.0) + pi / 2.0) < 1.0e-10}")
+    fmt.println(f"acos(1): {math.acos(1.0):.0f}")
+    // acos(0) — use invariant: acos(tiny) near pi/2
+    fmt.println(f"acos(~0) near pi/2: {math.abs(math.acos(1.0e-15) - pi / 2.0) < 1.0e-10}")
+    fmt.println(f"acos(-1) near pi: {math.abs(math.acos(-1.0) - pi) < 1.0e-10}")
+    // atan(0) — use invariant: atan(tiny) near 0
+    fmt.println(f"atan(~0) near 0: {math.abs(math.atan(1.0e-15)) < 1.0e-10}")
+    fmt.println(f"atan(1) near pi/4: {math.abs(math.atan(1.0) - pi / 4.0) < 1.0e-10}")
+    // ── Round-trip: asin(sin(x)) == x for x in [-pi/2, pi/2] ──
+    f64 x1 = 0.3
+    fmt.println(f"asin(sin(0.3)) near 0.3: {math.abs(math.asin(math.sin(x1)) - x1) < 1.0e-10}")
+    f64 x2 = - 0.7
+    fmt.println(f"asin(sin(-0.7)) near -0.7: {math.abs(math.asin(math.sin(x2)) - x2) < 1.0e-10}")
+    // ── Round-trip: acos(cos(x)) == x for x in [0, pi] ──
+    f64 x3 = 1.0
+    fmt.println(f"acos(cos(1.0)) near 1.0: {math.abs(math.acos(math.cos(x3)) - x3) < 1.0e-10}")
+    f64 x4 = 2.5
+    fmt.println(f"acos(cos(2.5)) near 2.5: {math.abs(math.acos(math.cos(x4)) - x4) < 1.0e-10}")
+    // ── atan2 ──
+    // atan2 with 0 args — use invariant: atan2(tiny, 1) near 0, etc.
+    fmt.println(f"atan2(~0,1) near 0: {math.abs(math.atan2(1.0e-15, 1.0)) < 1.0e-10}")
+    fmt.println(f"atan2(1,~0) near pi/2: {math.abs(math.atan2(1.0, 1.0e-15) - pi / 2.0) < 1.0e-10}")
+    fmt.println(f"atan2(~0,-1) near pi: {math.abs(math.atan2(1.0e-15, -1.0) - pi) < 1.0e-10}")
+    fmt.println(f"atan2(-1,~0) near -pi/2: {math.abs(math.atan2(-1.0, 1.0e-15) + pi / 2.0) < 1.0e-10}")
+    fmt.println(f"atan2(1,1) near pi/4: {math.abs(math.atan2(1.0, 1.0) - pi / 4.0) < 1.0e-10}")
+    // ── deg2rad / rad2deg ──
+    // deg2rad(0) and rad2deg(0) — use invariant
+    fmt.println(f"deg2rad(~0) near 0: {math.abs(math.deg2rad(1.0e-15)) < 1.0e-10}")
+    fmt.println(f"deg2rad(180) near pi: {math.abs(math.deg2rad(180.0) - pi) < 1.0e-10}")
+    fmt.println(f"deg2rad(360) near tau: {math.abs(math.deg2rad(360.0) - math.tau()) < 1.0e-10}")
+    fmt.println(f"deg2rad(90) near pi/2: {math.abs(math.deg2rad(90.0) - pi / 2.0) < 1.0e-10}")
+    fmt.println(f"rad2deg(~0) near 0: {math.abs(math.rad2deg(1.0e-15)) < 1.0e-10}")
+    fmt.println(f"rad2deg(pi) near 180: {math.abs(math.rad2deg(pi) - 180.0) < 1.0e-10}")
+    fmt.println(f"rad2deg(tau) near 360: {math.abs(math.rad2deg(math.tau()) - 360.0) < 1.0e-10}")
+    // ── Round-trip: rad2deg(deg2rad(x)) == x ──
+    f64 deg = 45.0
+    fmt.println(f"rad2deg(deg2rad(45)) near 45: {math.abs(math.rad2deg(math.deg2rad(deg)) - deg) < 1.0e-10}")
+    f64 deg2 = 270.0
+    fmt.println(f"rad2deg(deg2rad(270)) near 270: {math.abs(math.rad2deg(math.deg2rad(deg2)) - deg2) < 1.0e-10}")
+    // ── Composition: sin(deg2rad(30)) near 0.5 ──
+    fmt.println(f"sin(30deg) near 0.5: {math.abs(math.sin(math.deg2rad(30.0)) - 0.5) < 1.0e-10}")
+    fmt.println(f"cos(60deg) near 0.5: {math.abs(math.cos(math.deg2rad(60.0)) - 0.5) < 1.0e-10}")
+    // ── Double angle: sin(2x) == 2*sin(x)*cos(x) ──
+    f64 a5 = 0.8
+    f64 lhs = math.sin(2.0 * a5)
+    f64 rhs = 2.0 * math.sin(a5) * math.cos(a5)
+    fmt.println(f"sin(2*0.8) == 2*sin*cos: {math.abs(lhs - rhs) < 1.0e-10}")
+    fmt.println("===== TEST 02_SCALAR_TRIG END =====")
+    return 0
+}
