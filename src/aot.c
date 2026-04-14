@@ -871,11 +871,7 @@ static vigil_status_t vigil_aot_build_numeric(const vigil_reg_chunk_t *rc, vigil
         case VREG_ADD_I32:
         case VREG_SUB_I32:
         case VREG_MUL_I32: {
-            /* Use unsigned-overflow variants (MIR_ADDO/SUBO/MULO) which are
-               supported on all backends including aarch64.  The signed variants
-               (MIR_ADDOS/SUBOS/MULOS) lack pattern definitions in the aarch64
-               MIR backend and cause a crash during code generation. */
-            MIR_insn_code_t mo = (op == VREG_ADD_I32) ? MIR_ADDO : (op == VREG_SUB_I32) ? MIR_SUBO : MIR_MULO;
+            MIR_insn_code_t mo = (op == VREG_ADD_I32) ? MIR_ADDOS : (op == VREG_SUB_I32) ? MIR_SUBOS : MIR_MULOS;
             V_DEC_I32(tmp0_reg, VREG_GET_B(instr));
             V_DEC_I32(tmp1_reg, VREG_GET_C(instr));
             MIR_append_insn(ctx, func, MIR_new_insn(ctx, mo, MIR_new_reg_op(ctx, tmp2_reg),
@@ -899,7 +895,7 @@ static vigil_status_t vigil_aot_build_numeric(const vigil_reg_chunk_t *rc, vigil
         /* ── i32 immediate arithmetic ────────────────────────────── */
         case VREG_ADDI:
         case VREG_SUBI: {
-            MIR_insn_code_t mo = (op == VREG_ADDI) ? MIR_ADDO : MIR_SUBO;
+            MIR_insn_code_t mo = (op == VREG_ADDI) ? MIR_ADDOS : MIR_SUBOS;
             uint8_t a = VREG_GET_A(instr), b = VREG_GET_B(instr);
             if (v && promoted[a] && promoted[b])
             {
@@ -1633,15 +1629,7 @@ void vigil_aot_cache_free(vigil_aot_cache_t *cache)
 int vigil_aot_supported(void)
 {
 #if defined(VIGIL_ENABLE_AOT)
-    /* MIR's aarch64 code generator has a pattern-matching bug in
-       target_translate (out_insn) that crashes on SUB instructions
-       generated during prolog/epilog emission.  Disable AOT on
-       aarch64 until the MIR backend is fixed. */
-#if defined(__aarch64__) || defined(_M_ARM64)
-    return 0;
-#else
     return 1;
-#endif
 #else
     return 0;
 #endif
