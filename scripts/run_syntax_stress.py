@@ -140,7 +140,7 @@ def main():
     for suite_name, test_dir in tests:
         if suite_name != current_suite:
             current_suite = suite_name
-            print(f"\n── {suite_name} ──")
+            print(f"\n-- {suite_name} --")
 
         name = os.path.basename(test_dir)
         try:
