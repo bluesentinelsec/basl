@@ -1,5 +1,0 @@
-/// t20-function-types module.
-
-pub fn greet(string name) -> string {
-    return "hello, " + name;
-}

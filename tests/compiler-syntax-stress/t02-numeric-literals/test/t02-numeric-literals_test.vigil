@@ -1,6 +1,0 @@
-import "test";
-import "t02-numeric-literals";
-
-fn test_greet(test.T t) -> void {
-    t.assert(t02-numeric-literals.greet("world") == "hello, world", "greet should work");
-}

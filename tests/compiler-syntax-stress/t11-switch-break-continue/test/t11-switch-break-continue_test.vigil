@@ -1,6 +1,0 @@
-import "test";
-import "t11-switch-break-continue";
-
-fn test_greet(test.T t) -> void {
-    t.assert(t11-switch-break-continue.greet("world") == "hello, world", "greet should work");
-}

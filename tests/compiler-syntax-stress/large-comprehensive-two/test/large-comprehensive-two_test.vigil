@@ -1,6 +1,0 @@
-import "test";
-import "large-comprehensive-two";
-
-fn test_greet(test.T t) -> void {
-    t.assert(large-comprehensive-two.greet("world") == "hello, world", "greet should work");
-}

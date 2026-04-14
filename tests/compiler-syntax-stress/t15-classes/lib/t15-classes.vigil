@@ -1,5 +1,0 @@
-/// t15-classes module.
-
-pub fn greet(string name) -> string {
-    return "hello, " + name;
-}

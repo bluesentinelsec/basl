@@ -1,5 +1,0 @@
-/// t14-structs module.
-
-pub fn greet(string name) -> string {
-    return "hello, " + name;
-}

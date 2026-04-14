@@ -1,5 +1,0 @@
-/// t03-string-literals module.
-
-pub fn greet(string name) -> string {
-    return "hello, " + name;
-}

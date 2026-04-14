@@ -1,6 +1,0 @@
-import "test";
-import "t07-type-conversions";
-
-fn test_greet(test.T t) -> void {
-    t.assert(t07-type-conversions.greet("world") == "hello, world", "greet should work");
-}

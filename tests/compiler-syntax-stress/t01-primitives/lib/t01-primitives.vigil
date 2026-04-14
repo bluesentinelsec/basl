@@ -1,5 +1,0 @@
-/// t01-primitives module.
-
-pub fn greet(string name) -> string {
-    return "hello, " + name;
-}

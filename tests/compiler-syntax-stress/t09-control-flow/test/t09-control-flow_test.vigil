@@ -1,6 +1,0 @@
-import "test";
-import "t09-control-flow";
-
-fn test_greet(test.T t) -> void {
-    t.assert(t09-control-flow.greet("world") == "hello, world", "greet should work");
-}
