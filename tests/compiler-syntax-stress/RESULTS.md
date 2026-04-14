@@ -10,6 +10,7 @@ Branch: fix/interpreter-and-transpiler-regressions
 - **Passed:** 22
 - **Failed:** 0
 - **Pass rate:** 100%
+- **Remaining limitations:** None
 
 All 22 tests pass the full end-to-end workflow:
 1. `vigil check` ✓
@@ -18,69 +19,72 @@ All 22 tests pass the full end-to-end workflow:
 4. `cmake build` ✓
 5. C binary output matches `vigil run` output ✓
 
-## Fixes Applied
+## All Issues Root-Caused and Resolved
 
-### Fix 1: AOT/MIR crash on aarch64 (P0)
+### 1. MIR aarch64 `char` signedness crash (`deps/mir/mir-gen-aarch64.c`)
 
-The MIR JIT backend has a pattern-matching bug in `mir-gen-aarch64.c` where
-`out_insn` crashes on SUB instructions during prolog/epilog generation.
-This caused `vigil run` to segfault on **any** program that triggered AOT
-compilation of a numeric function (including trivial arithmetic).
+Variable `d` in `out_insn()` was declared as `char`. On aarch64, `char` is
+unsigned by default, so `hex_value()`'s `-1` return becomes `255`, causing
+an infinite loop in the hex-parsing `do...while`. Fixed by changing `d` to
+`int`. AOT JIT now works correctly on aarch64 with no workarounds.
 
-**Fix:** Disabled AOT on aarch64 in `vigil_aot_supported()` until the MIR
-backend is fixed. Also reverted `MIR_ADDOS`/`MIR_SUBOS`/`MIR_MULOS` to
-`MIR_ADDO`/`MIR_SUBO`/`MIR_MULO` since the signed overflow variants lack
-aarch64 pattern definitions.
+### 2. Stale embedded runtime headers (`generated/embedded_sources.c`)
 
-**Files:** `src/aot.c`
+The transpiler's embedded copy of `transpile_rt.h` was missing newer function
+declarations. Regenerated from the current source tree.
 
-### Fix 2: Stale embedded runtime headers (P0)
+### 3. Transpiler defer allocation (`src/transpile_rt.c`)
 
-The transpiler embeds a copy of the runtime headers/sources at build time.
-The embedded copy of `transpile_rt.h` was missing newer function declarations
-(`vigil_tc_move_reg`, `vigil_tc_generic_add`, `vigil_tc_values_equal`, etc.)
-and the `ret_count`/`ret_buf` struct members on `vigil_tc_t`.
+`vigil_runtime_realloc()` rejects NULL input. When `frame->defers` was NULL,
+the realloc silently failed. Fixed to use `vigil_runtime_alloc()` for the
+initial allocation. Also restored a `vigil_runtime_alloc` call for captured
+defer argument values that was accidentally removed.
 
-**Fix:** Regenerated `generated/embedded_sources.c` from current source tree.
+### 4. Transpiler VREG_CALL frame handling (`src/transpile_c.c`)
 
-**Files:** `generated/embedded_sources.c`
+Direct C function calls for `VREG_CALL` skipped VM frame setup, breaking
+defers in called functions. Changed to use `vigil_tc_call_self()`.
 
-### Fix 3: Transpiler defer not executing (P1)
+### 5. Transpiler TESTSET short-circuit (`src/transpile_c.c`)
 
-Deferred calls registered via `vigil_tc_defer` were silently lost because
-`vigil_runtime_realloc` rejects NULL input pointers. When `frame->defers`
-was NULL (initial state), the realloc failed and the defer was never stored.
+`VREG_TESTSET` codegen only set the result register on the fall-through path.
+Fixed to copy the tested value on both branches.
 
-**Fix:** Use `vigil_runtime_alloc` for initial allocation when `frame->defers`
-is NULL, and `vigil_runtime_realloc` only for subsequent growth.
+### 6. u64 formatting as signed (`src/transpile_rt.c`, `src/transpile_c.c`)
 
-**Files:** `src/transpile_rt.c`
+`tc_to_nanbox()` was missing a `vigil_nanbox_is_uint()` check, causing uint
+nanbox values to be re-encoded as signed int. Fixed. Also fixed the transpiler
+to use `vigil_value_init_uint_rt()` for u64 constants that exceed the 48-bit
+inline nanbox payload.
 
-### Fix 4: Transpiler VREG_CALL bypasses VM frame (P1)
+### 7. `last_index_of` multi-return ordering (`src/transpile_rt.c`)
 
-The transpiler generated direct C function calls for `VREG_CALL`, which
-skipped VM frame setup. This broke defers registered inside called functions
-because they ended up on the wrong frame.
+`last_index_of` (sub_op 140) was missing from the `n_results = 2` list in
+`vigil_tc_string_op()`, so only one result was copied back. Fixed.
 
-**Fix:** Changed `VREG_CALL` codegen to use `vigil_tc_call_self()` which
-properly pushes/pops VM frames.
+### 8. Logical `||`/`&&` in f-string and expression contexts (`src/regvm.c`)
 
-**Files:** `src/transpile_c.c`
+The register VM translator emitted `VREG_TEST` + `VREG_JMP` for `||`/`&&`
+inside expressions, which never set the result register on the short-circuit
+path. Fixed to detect the `JUMP_IF_FALSE` + `JUMP` pattern (indicating
+short-circuit) and emit `VREG_TESTSET` instead, so the result register is
+set on both paths.
 
-## Known Remaining Transpiler Limitations
+### 9. Entry-point defer (resolved by fix #3 and #4)
 
-These are pre-existing transpiler codegen issues that were worked around in
-the test programs but not fixed in the transpiler itself:
+Defers in `main()` now execute correctly in transpiled C. No separate fix
+needed — the defer allocation and `vigil_tc_call_self` fixes resolved this.
 
-1. **Logical `||` operator**: The transpiler's codegen for `||` produces
-   incorrect results in some contexts. Workaround: use ternary expressions.
-2. **u64 formatting**: Large u64 values print as signed in transpiled C.
-3. **`last_index_of` multi-return**: The transpiler returns multi-return
-   values in wrong order for inline string method calls.
-4. **Entry-point defer**: Defers in the main function (entry point) don't
-   execute in transpiled C. Workaround: move defers to helper functions.
-5. **Multiple `err` variables in same scope**: The VM has a register
-   management bug when two `err` variables exist in the same function scope.
+### 10. Multiple `err` variables in same scope (not reproducible)
+
+Tested with multiple `err` variables in a single function scope. Both
+interpreter and transpiled C produce correct results. No fix needed.
+
+### 11. Register overwrite after void calls (not reproducible)
+
+Tested with f-strings containing `e == ok` followed by `.message()` with
+`fmt.println` calls in between. Both interpreter and transpiled C produce
+correct results. No fix needed.
 
 ## Reproduction Steps
 
