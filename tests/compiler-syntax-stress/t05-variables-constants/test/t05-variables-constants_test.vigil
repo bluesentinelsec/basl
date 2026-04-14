@@ -1,6 +1,0 @@
-import "test";
-import "t05-variables-constants";
-
-fn test_greet(test.T t) -> void {
-    t.assert(t05-variables-constants.greet("world") == "hello, world", "greet should work");
-}

@@ -1,6 +1,0 @@
-import "test";
-import "t06-operators";
-
-fn test_greet(test.T t) -> void {
-    t.assert(t06-operators.greet("world") == "hello, world", "greet should work");
-}

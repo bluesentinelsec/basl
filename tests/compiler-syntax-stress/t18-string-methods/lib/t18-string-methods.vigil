@@ -1,5 +1,0 @@
-/// t18-string-methods module.
-
-pub fn greet(string name) -> string {
-    return "hello, " + name;
-}

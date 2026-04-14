@@ -1,6 +1,0 @@
-import "test";
-import "t18-string-methods";
-
-fn test_greet(test.T t) -> void {
-    t.assert(t18-string-methods.greet("world") == "hello, world", "greet should work");
-}
