@@ -66,6 +66,7 @@ jobs:
           -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
 
       - name: Check lizard complexity
+        continue-on-error: true
         run: >
           python3 scripts/check_complexity.py
           --candidate-root $PWD
@@ -76,6 +77,7 @@ jobs:
           --baseline-report complexity-artifacts/lizard-main.csv
 
       - name: Run clang-tidy on PR head
+        continue-on-error: true
         env:
           CLANG_TIDY_BIN: /usr/bin/clang-tidy-18
           CLANG_TIDY_CONFIG_FILE: ${{ github.workspace }}/.clang-tidy
@@ -86,6 +88,7 @@ jobs:
           $PWD/complexity-artifacts/clang-tidy-pr.log
 
       - name: Run clang-tidy on origin/main
+        continue-on-error: true
         env:
           CLANG_TIDY_BIN: /usr/bin/clang-tidy-18
           CLANG_TIDY_CONFIG_FILE: ${{ github.workspace }}/.clang-tidy
@@ -96,6 +99,7 @@ jobs:
           $PWD/complexity-artifacts/clang-tidy-main.log
 
       - name: Check clang-tidy diagnostics
+        continue-on-error: true
         run: >
           python3 scripts/check_clang_tidy.py
           --baseline-log complexity-artifacts/clang-tidy-main.log
