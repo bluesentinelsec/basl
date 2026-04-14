@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Run the compiler syntax stress test suite.
+"""Run compiler/stdlib stress test suites.
 
-For each test project under --suite-dir:
+For each test project (directory containing main.vigil) under each suite dir:
   1. vigil check main.vigil
   2. vigil run main.vigil  (capture stdout)
   3. vigil transpile . -o <work-dir>/c-<name>
@@ -9,55 +9,40 @@ For each test project under --suite-dir:
   5. Run the C binary  (capture stdout)
   6. Compare interpreter vs C output (must match exactly)
 
+Suites are processed in the order given. Within each suite, tests are
+sorted alphabetically for deterministic execution.
+
 Exit code is the number of failed tests (0 = all pass).
 """
 
 import argparse
 import os
-import re
 import shutil
 import subprocess
 import sys
 import tempfile
 
 
-def cmake_parallelism():
-    """Return a stable parallel job count for CMake builds."""
-    cpu_count = os.cpu_count()
-    if cpu_count is None or cpu_count < 1:
-        return "1"
-    return str(cpu_count)
-
-
-def transpiled_executable_target(c_dir):
-    """Read the generated CMakeLists.txt to determine the app target name."""
-    cmake_lists = os.path.join(c_dir, "CMakeLists.txt")
-    with open(cmake_lists, "r", encoding="utf-8") as f:
-        content = f.read()
-    match = re.search(r"add_executable\(\s*([A-Za-z0-9_+-]+)\b", content)
-    if match is None:
-        raise ValueError(f"no add_executable target found in {cmake_lists}")
-    return match.group(1)
-
-
-def find_executable(build_dir, target_name):
-    """Find the built executable for a known CMake target."""
-    exe_name = f"{target_name}.exe" if os.name == "nt" else target_name
+def find_executable(build_dir, name):
+    """Find the built executable inside a CMake build directory."""
     candidates = [
-        os.path.join(build_dir, exe_name),
-        os.path.join(build_dir, "Release", exe_name),
-        os.path.join(build_dir, "Debug", exe_name),
+        os.path.join(build_dir, name),
+        os.path.join(build_dir, f"{name}.exe"),
+        os.path.join(build_dir, "Release", name),
+        os.path.join(build_dir, "Release", f"{name}.exe"),
+        os.path.join(build_dir, "Debug", name),
+        os.path.join(build_dir, "Debug", f"{name}.exe"),
     ]
     for c in candidates:
-        if os.path.isfile(c):
+        if os.path.isfile(c) and os.access(c, os.X_OK):
             return c
-
     for root, _dirs, files in os.walk(build_dir):
         if "CMakeFiles" in root:
             continue
         for f in files:
-            if f == exe_name:
-                return os.path.join(root, f)
+            path = os.path.join(root, f)
+            if os.access(path, os.X_OK) and not f.endswith((".cmake", ".txt")):
+                return path
     return None
 
 
@@ -92,16 +77,14 @@ def run_test(vigil_bin, test_dir, work_dir):
     if r.returncode != 0:
         return False, f"cmake configure failed:\n{r.stdout}\n{r.stderr}"
 
-    r = subprocess.run(["cmake", "--build", build_dir, "--config", "Release",
-                        "--parallel", cmake_parallelism()],
+    r = subprocess.run(["cmake", "--build", build_dir, "--config", "Release"],
                        capture_output=True, text=True, timeout=120)
     if r.returncode != 0:
         return False, f"cmake build failed:\n{r.stdout}\n{r.stderr}"
 
-    target_name = transpiled_executable_target(c_dir)
-    exe = find_executable(build_dir, target_name)
+    exe = find_executable(build_dir, name)
     if exe is None:
-        return False, f"no executable found for target {target_name} in {build_dir}"
+        return False, f"no executable found in {build_dir}"
 
     r = subprocess.run([exe], capture_output=True, text=True, timeout=30)
     c_out = r.stdout
@@ -120,31 +103,45 @@ def run_test(vigil_bin, test_dir, work_dir):
     return True, f"{len(interp_lines)} lines match"
 
 
+def collect_tests(suite_dirs):
+    """Collect test directories from all suites, in order."""
+    tests = []
+    for suite_dir in suite_dirs:
+        suite_dir = os.path.abspath(suite_dir)
+        entries = sorted(
+            d for d in os.listdir(suite_dir)
+            if os.path.isfile(os.path.join(suite_dir, d, "main.vigil"))
+        )
+        for d in entries:
+            tests.append((os.path.basename(suite_dir), os.path.join(suite_dir, d)))
+    return tests
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--vigil-bin", required=True)
-    parser.add_argument("--suite-dir", required=True)
+    parser.add_argument("--suite-dir", required=True, action="append",
+                        help="Test suite directory (may be repeated; processed in order)")
     parser.add_argument("--work-dir", default=None)
     args = parser.parse_args()
 
     vigil_bin = os.path.abspath(args.vigil_bin)
-    suite_dir = os.path.abspath(args.suite_dir)
     work_dir = args.work_dir or tempfile.mkdtemp(prefix="syntax_stress_")
     os.makedirs(work_dir, exist_ok=True)
 
-    test_dirs = sorted(
-        os.path.join(suite_dir, d)
-        for d in os.listdir(suite_dir)
-        if os.path.isfile(os.path.join(suite_dir, d, "main.vigil"))
-    )
-    if not test_dirs:
-        print(f"ERROR: no test projects found in {suite_dir}", file=sys.stderr)
+    tests = collect_tests(args.suite_dir)
+    if not tests:
+        print("ERROR: no test projects found", file=sys.stderr)
         return 1
 
     passed = failed = 0
-    failures = []
+    current_suite = None
 
-    for test_dir in test_dirs:
+    for suite_name, test_dir in tests:
+        if suite_name != current_suite:
+            current_suite = suite_name
+            print(f"\n── {suite_name} ──")
+
         name = os.path.basename(test_dir)
         try:
             ok, detail = run_test(vigil_bin, test_dir, work_dir)
@@ -158,12 +155,11 @@ def main():
             print(f"  PASS  {name}  ({detail})")
         else:
             failed += 1
-            failures.append((name, detail))
             print(f"  FAIL  {name}")
             for line in detail.strip().splitlines():
                 print(f"        {line}")
 
-    print(f"\n{passed} passed, {failed} failed out of {len(test_dirs)}")
+    print(f"\n{passed} passed, {failed} failed out of {len(tests)}")
     return failed
 
 
