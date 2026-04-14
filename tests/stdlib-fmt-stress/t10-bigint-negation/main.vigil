@@ -1,0 +1,36 @@
+import "fmt"
+
+fn main() -> i32 {
+    fmt.println("===== TEST 10_BIGINT_NEGATION START =====")
+
+    // Values outside 48-bit inline range (magnitude > 2^47)
+    i64 big = i64(1000000000000000)
+    fmt.println(f"{big}")
+    fmt.println(f"{-big}")
+
+    i64 neg_big = i64(-1000000000000000)
+    fmt.println(f"{neg_big}")
+    fmt.println(f"{-neg_big}")
+
+    // Near i64 max
+    i64 large = i64(4611686018427387903)
+    fmt.println(f"{large}")
+    fmt.println(f"{-large}")
+
+    // Exactly at 48-bit boundary
+    i64 boundary = i64(140737488355328)
+    fmt.println(f"{boundary}")
+    fmt.println(f"{-boundary}")
+
+    // Just above 48-bit boundary
+    i64 above = i64(140737488355329)
+    fmt.println(f"{above}")
+    fmt.println(f"{-above}")
+
+    // Double negation round-trip
+    i64 trip = i64(999999999999999)
+    fmt.println(f"{-(-trip)}")
+
+    fmt.println("===== TEST 10_BIGINT_NEGATION END =====")
+    return 0
+}

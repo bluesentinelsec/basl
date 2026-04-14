@@ -1358,9 +1358,17 @@ vigil_value_t vigil_tc_negate(vigil_value_t src)
     if (vigil_nanbox_is_double(v))
         return vigil_nanbox_encode_double(-vigil_nanbox_decode_double(v));
     if (vigil_nanbox_is_uint(v))
-        return (uint64_t)(-(int64_t)vigil_nanbox_decode_uint(v));
+    {
+        vigil_value_t result;
+        vigil_value_init_int(&result, -(int64_t)vigil_value_as_uint(&v));
+        return result;
+    }
     if (vigil_nanbox_is_int(v))
-        return (uint64_t)(-vigil_nanbox_decode_int(v));
+    {
+        vigil_value_t result;
+        vigil_value_init_int(&result, -vigil_value_as_int(&v));
+        return result;
+    }
     return (uint64_t)(-(int64_t)src);
 }
 
