@@ -1,0 +1,75 @@
+import "fmt"
+
+fn repeat_str(string s, i32 n) -> string {
+    string result = ""
+    for (i32 i = 0; i < n; i++) {
+        result = result + s
+    }
+    return result
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST LARGE_FMT_COMPREHENSIVE_2 START =====")
+
+    // Unicode in f-strings
+    fmt.println(f"heart: ❤")
+    fmt.println(f"cafe: café")
+    fmt.println(f"check: ✓")
+
+    // Large numbers with formatting
+    fmt.println(f"{i64(9223372036854775807)}")
+    fmt.println(f"{i64(-140737488355327)}")
+    fmt.println(f"{u64(18446744073709551615)}")
+
+    // Alignment edge cases
+    fmt.println(f"[{1:>1}]")
+    fmt.println(f"[{1:>20}]")
+    fmt.println(f"[{"hello":^15}]")
+    fmt.println(f"[{"hi":<10}]")
+    fmt.println(f"[{0:05}]")
+
+    // Hex of large values
+    fmt.println(f"{i32(2147483647):x}")
+    fmt.println(f"{256:x}")
+    fmt.println(f"{65535:X}")
+
+    // Float edge cases
+    fmt.println(f"{0.0:.10f}")
+    fmt.println(f"{1.0:.0f}")
+    fmt.println(f"{99.999:.2f}")
+
+    // Map iteration with formatted output
+    map<string, i32> inventory = {"apples": 50, "bananas": 120, "cherries": 5}
+    for fruit, count in inventory {
+        fmt.println(f"  {fruit}: {count}")
+    }
+
+    // Array of strings with index formatting
+    array<string> colors = ["red", "green", "blue", "yellow", "cyan"]
+    i32 idx = 0
+    for c in colors {
+        fmt.println(f"  [{idx:02}] {c}")
+        idx += 1
+    }
+
+    // String building with f-strings in loop
+    string table = ""
+    for (i32 row = 1; row <= 5; row++) {
+        string line = ""
+        for (i32 col = 1; col <= 5; col++) {
+            line = line + f"{row * col:4}"
+        }
+        table = table + line + "\n"
+    }
+    fmt.print(table)
+
+    // Repeated string formatting
+    fmt.println(f"bar: {repeat_str("=", 20)}")
+    fmt.println(f"dots: {repeat_str(".", 30)}")
+
+    // Literal braces
+    fmt.println(f"json: {{\"key\": \"value\"}}")
+
+    fmt.println("===== TEST LARGE_FMT_COMPREHENSIVE_2 END =====")
+    return 0
+}

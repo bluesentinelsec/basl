@@ -1,0 +1,43 @@
+import "fmt"
+
+fn main() -> i32 {
+    fmt.println("===== TEST 06_NUMERIC_FORMATTING START =====")
+
+    // i32 boundaries
+    fmt.println(f"{i32(2147483647)}")
+    fmt.println(f"{i32(-2147483648)}")
+    fmt.println(f"{i32(0)}")
+
+    // i64 boundaries
+    fmt.println(f"{i64(9223372036854775807)}")
+    fmt.println(f"{i64(-140737488355327)}")
+
+    // u32
+    fmt.println(f"{u32(0)}")
+    fmt.println(f"{u32(4294967295)}")
+
+    // u64 large values (must not print as signed)
+    fmt.println(f"{u64(0)}")
+    fmt.println(f"{u64(18446744073709551615)}")
+    fmt.println(f"{u64(9999999999999999999)}")
+
+    // Float special cases
+    fmt.println(f"{1.0 / 3.0}")
+    fmt.println(f"{0.1 + 0.2}")
+
+    // Float precision formatting
+    fmt.println(f"{1.23456789:.2f}")
+    fmt.println(f"{1.23456789:.8f}")
+    fmt.println(f"{0.0:.3f}")
+    fmt.println(f"{-99.5:.1f}")
+
+    // Very small float
+    fmt.println(f"{0.000001:.6f}")
+
+    // Integer arithmetic results
+    fmt.println(f"{100 * 100 * 100}")
+    fmt.println(f"{i64(1000000) * i64(1000000)}")
+
+    fmt.println("===== TEST 06_NUMERIC_FORMATTING END =====")
+    return 0
+}

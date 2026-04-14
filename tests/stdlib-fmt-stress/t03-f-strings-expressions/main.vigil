@@ -1,0 +1,52 @@
+import "fmt"
+
+fn add(i32 a, i32 b) -> i32 {
+    return a + b
+}
+
+fn greet(string who) -> string {
+    return "hi " + who
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 03_F_STRINGS_EXPRESSIONS START =====")
+
+    // Arithmetic
+    fmt.println(f"{2 + 3}")
+    fmt.println(f"{10 - 4}")
+    fmt.println(f"{3 * 7}")
+    fmt.println(f"{20 / 4}")
+    fmt.println(f"{17 % 5}")
+
+    // Comparisons
+    fmt.println(f"{10 > 5}")
+    fmt.println(f"{3 == 3}")
+    fmt.println(f"{1 != 2}")
+    fmt.println(f"{4 <= 4}")
+
+    // Function calls
+    fmt.println(f"sum: {add(10, 20)}")
+    fmt.println(f"{greet("world")}")
+
+    // String methods
+    fmt.println(f"{"hello".to_upper()}")
+    fmt.println(f"{"HELLO".to_lower()}")
+    fmt.println(f"{"  trim  ".trim()}")
+    fmt.println(f"len: {"abc".len()}")
+
+    // Chained operations
+    i32 a = 5
+    i32 b = 10
+    fmt.println(f"{a + b + 100}")
+
+    // Bool expressions
+    bool t = true
+    bool fl = false
+    fmt.println(f"{t && t}")
+    fmt.println(f"{t || fl}")
+    fmt.println(f"{fl || fl}")
+    fmt.println(f"{!fl}")
+
+    fmt.println("===== TEST 03_F_STRINGS_EXPRESSIONS END =====")
+    return 0
+}

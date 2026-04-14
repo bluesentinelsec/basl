@@ -1,0 +1,52 @@
+import "fmt"
+
+fn main() -> i32 {
+    fmt.println("===== TEST 04_F_STRINGS_FORMAT_SPECIFIERS START =====")
+
+    // Width and alignment
+    fmt.println(f"[{42:>10}]")
+    fmt.println(f"[{42:<10}]")
+    fmt.println(f"[{42:^10}]")
+
+    // Fill character
+    fmt.println(f"[{42:*>10}]")
+    fmt.println(f"[{42:*<10}]")
+    fmt.println(f"[{42:*^10}]")
+
+    // Zero-pad
+    fmt.println(f"[{42:010}]")
+    fmt.println(f"[{7:05}]")
+
+    // Hex
+    fmt.println(f"{255:x}")
+    fmt.println(f"{255:X}")
+    fmt.println(f"{0:x}")
+    fmt.println(f"{4096:x}")
+
+    // Binary
+    fmt.println(f"{10:b}")
+    fmt.println(f"{255:b}")
+    fmt.println(f"{0:b}")
+
+    // Octal
+    fmt.println(f"{8:o}")
+    fmt.println(f"{255:o}")
+    fmt.println(f"{0:o}")
+
+    // Float precision
+    fmt.println(f"{3.14159:.2f}")
+    fmt.println(f"{3.14159:.4f}")
+    fmt.println(f"{1.0:.0f}")
+    fmt.println(f"{0.123456789:.6f}")
+
+    // Thousands separator
+    fmt.println(f"{1000000:,}")
+    fmt.println(f"{1234567890:,}")
+
+    // Combined: width + fill + type
+    fmt.println(f"[{255:>10x}]")
+    fmt.println(f"[{255:0>10x}]")
+
+    fmt.println("===== TEST 04_F_STRINGS_FORMAT_SPECIFIERS END =====")
+    return 0
+}

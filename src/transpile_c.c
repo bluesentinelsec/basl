@@ -76,7 +76,15 @@ static vigil_status_t emit_load_k(vigil_transpile_ctx_t *ctx, const vigil_reg_ch
     const vigil_value_t *k = vigil_chunk_constant(sc, (size_t)bx);
     vigil_value_kind_t kind = vigil_value_kind(k);
     if (kind == VIGIL_VALUE_INT)
-        EMITF("    r[%u].i = (int64_t)%lldLL;\n", a, (long long)vigil_value_as_int(k));
+    {
+        int64_t ival = vigil_value_as_int(k);
+        /* Values that fit in the 48-bit nanbox payload can be stored as raw i64.
+           Larger magnitudes need runtime bigint allocation. */
+        if (ival >= INT64_C(-140737488355328) && ival <= INT64_C(140737488355327))
+            EMITF("    r[%u].i = (int64_t)%lldLL;\n", a, (long long)ival);
+        else
+            EMITF("    vigil_value_init_int_rt(&r[%u].v, %lldLL, tc->runtime, NULL);\n", a, (long long)ival);
+    }
     else if (kind == VIGIL_VALUE_BOOL)
         EMITF("    r[%u].v = %s;\n", a, vigil_value_as_bool(k) ? "VIGIL_NANBOX_TRUE" : "VIGIL_NANBOX_FALSE");
     else if (kind == VIGIL_VALUE_UINT)

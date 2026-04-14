@@ -1,0 +1,60 @@
+import "fmt"
+
+fn risky_ok() -> (string, err) {
+    return "data", ok
+}
+
+fn risky_fail() -> (string, err) {
+    return "", err("something went wrong", err.arg)
+}
+
+fn risky_not_found() -> (string, err) {
+    return "", err("file missing", err.not_found)
+}
+
+fn test_constructed_error() -> void {
+    err manual = err("manual error", err.arg)
+    if manual != ok {
+        fmt.println(f"manual: {manual.message()}")
+    }
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 07_ERROR_FORMATTING START =====")
+
+    // ok error
+    string s1, err e1 = risky_ok()
+    fmt.println(f"e1 ok: {e1 == ok}")
+    fmt.println(f"s1: {s1}")
+
+    // Error with message
+    string s2, err e2 = risky_fail()
+    fmt.println(f"e2 ok: {e2 == ok}")
+    if e2 != ok {
+        fmt.println(f"e2 msg: {e2.message()}")
+    }
+
+    // Error not_found
+    string s3, err e3 = risky_not_found()
+    fmt.println(f"e3 ok: {e3 == ok}")
+    if e3 != ok {
+        fmt.println(f"e3 msg: {e3.message()}")
+    }
+
+    // Multiple error variables
+    string s4, err e4 = risky_ok()
+    string s5, err e5 = risky_fail()
+    string s6, err e6 = risky_ok()
+    fmt.println(f"{e4 == ok} {e5 == ok} {e6 == ok}")
+
+    // Error in conditional
+    if e5 != ok {
+        fmt.println(f"caught: {e5.message()}")
+    }
+
+    // Constructed error in helper
+    test_constructed_error()
+
+    fmt.println("===== TEST 07_ERROR_FORMATTING END =====")
+    return 0
+}

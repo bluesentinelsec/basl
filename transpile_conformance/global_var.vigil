@@ -1,8 +1,0 @@
-i32 counter = 0
-
-fn get_counter() -> i32 { return counter }
-
-fn main() -> i32 {
-    counter = 5
-    return get_counter() - 5
-}
