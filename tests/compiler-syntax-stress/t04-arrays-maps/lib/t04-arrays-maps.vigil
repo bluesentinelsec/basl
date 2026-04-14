@@ -1,0 +1,5 @@
+/// t04-arrays-maps module.
+
+pub fn greet(string name) -> string {
+    return "hello, " + name;
+}

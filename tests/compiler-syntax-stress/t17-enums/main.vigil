@@ -1,0 +1,87 @@
+import "fmt"
+
+enum Color {
+    Red,
+    Green,
+    Blue
+}
+
+enum HttpStatus {
+    Ok = 200,
+    NotFound = 404,
+    Error = 500
+}
+
+fn color_name(Color c) -> string {
+    switch c {
+        case Color.Red:
+            return "red"
+        case Color.Green:
+            return "green"
+        case Color.Blue:
+            return "blue"
+        default:
+            return "unknown"
+    }
+}
+
+fn status_code(HttpStatus s) -> string {
+    switch s {
+        case HttpStatus.Ok:
+            return "200"
+        case HttpStatus.NotFound:
+            return "404"
+        case HttpStatus.Error:
+            return "500"
+        default:
+            return "unknown"
+    }
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 17_ENUMS START =====")
+
+    // Plain enum
+    Color c = Color.Red
+    fmt.println(f"color: {color_name(c)}")
+
+    // Switch on enum
+    switch c {
+        case Color.Red:
+            fmt.println("matched red")
+        case Color.Green:
+            fmt.println("matched green")
+        case Color.Blue:
+            fmt.println("matched blue")
+    }
+
+    // Valued enum
+    HttpStatus s = HttpStatus.Ok
+    fmt.println(f"status: {status_code(s)}")
+
+    HttpStatus nf = HttpStatus.NotFound
+    fmt.println(f"not found: {status_code(nf)}")
+
+    // Switch on valued enum
+    switch nf {
+        case HttpStatus.Ok:
+            fmt.println("ok")
+        case HttpStatus.NotFound:
+            fmt.println("not found")
+        case HttpStatus.Error:
+            fmt.println("error")
+    }
+
+    // Enum comparison
+    fmt.println(f"eq: {c == Color.Red}")
+    fmt.println(f"ne: {c != Color.Blue}")
+
+    // All values
+    Color g = Color.Green
+    Color b = Color.Blue
+    fmt.println(f"green: {color_name(g)}")
+    fmt.println(f"blue: {color_name(b)}")
+
+    fmt.println("===== TEST 17_ENUMS END - EXPECTED OUTPUT ABOVE =====")
+    return 0
+}

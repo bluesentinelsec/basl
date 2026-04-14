@@ -1,0 +1,36 @@
+import "fmt"
+
+fn main() -> i32 {
+    fmt.println("===== TEST 10_FOR_IN START =====")
+
+    // for-in over array
+    array<i32> nums = [10, 20, 30]
+    for val in nums {
+        fmt.println(f"arr val: {val}")
+    }
+
+    // for-in over string (codepoints)
+    for ch in "hello" {
+        fmt.println(f"char: {ch}")
+    }
+
+    // for-in over map
+    map<string, i32> scores = {"alice": 95, "bob": 87}
+    for key, val in scores {
+        fmt.println(f"map: {key}={val}")
+    }
+
+    // for-in over string bytes
+    for b in "AB".bytes() {
+        fmt.println(f"byte: {b}")
+    }
+
+    // for-in with array of strings
+    array<string> words = ["hello", "world"]
+    for w in words {
+        fmt.println(f"word: {w}")
+    }
+
+    fmt.println("===== TEST 10_FOR_IN END - EXPECTED OUTPUT ABOVE =====")
+    return 0
+}

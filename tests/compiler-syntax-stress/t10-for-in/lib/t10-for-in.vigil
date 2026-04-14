@@ -1,0 +1,5 @@
+/// t10-for-in module.
+
+pub fn greet(string name) -> string {
+    return "hello, " + name;
+}

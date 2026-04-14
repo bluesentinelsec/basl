@@ -1,0 +1,88 @@
+import "fmt"
+
+fn divide(i32 a, i32 b) -> (i32, err) {
+    if b == 0 {
+        return 0, err("division by zero", err.arg)
+    }
+    return a / b, ok
+}
+
+fn validate(i32 age) -> err {
+    if age < 0 {
+        return err("negative age", err.arg)
+    }
+    return ok
+}
+
+fn get_file() -> (string, err) {
+    return "", err("file not found", err.not_found)
+}
+
+fn get_perm() -> (string, err) {
+    return "", err("access denied", err.permission)
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 13_ERROR_HANDLING START =====")
+
+    // ok check
+    err e1 = ok
+    fmt.println(f"ok check: {e1 == ok}")
+
+    // Error construction and inspection
+    err e2 = err("test error", err.arg)
+    fmt.println(f"err msg: {e2.message()}")
+    fmt.println(f"err kind: {e2.kind()}")
+    fmt.println(f"err != ok: {e2 != ok}")
+
+    // Multi-return with error
+    i32 r1, err e3 = divide(10, 2)
+    fmt.println(f"divide ok: {r1}, {e3 == ok}")
+
+    i32 r2, err e4 = divide(10, 0)
+    fmt.println(f"divide err: {r2}, {e4.message()}")
+
+    // Error-only return
+    err e5 = validate(10)
+    fmt.println(f"validate ok: {e5 == ok}")
+    err e6 = validate(-1)
+    fmt.println(f"validate err: {e6.message()}")
+
+    // All error kinds
+    fmt.println(f"not_found: {err("", err.not_found).kind()}")
+    fmt.println(f"permission: {err("", err.permission).kind()}")
+    fmt.println(f"exists: {err("", err.exists).kind()}")
+    fmt.println(f"eof: {err("", err.eof).kind()}")
+    fmt.println(f"io: {err("", err.io).kind()}")
+    fmt.println(f"parse: {err("", err.parse).kind()}")
+    fmt.println(f"bounds: {err("", err.bounds).kind()}")
+    fmt.println(f"type: {err("", err.type).kind()}")
+    fmt.println(f"arg: {err("", err.arg).kind()}")
+    fmt.println(f"timeout: {err("", err.timeout).kind()}")
+    fmt.println(f"closed: {err("", err.closed).kind()}")
+    fmt.println(f"state: {err("", err.state).kind()}")
+
+    // Switch on error kind
+    string d1, err fe = get_file()
+    switch fe.kind() {
+        case err.not_found:
+            fmt.println("routed: not_found")
+        case err.permission:
+            fmt.println("routed: permission")
+        default:
+            fmt.println("routed: other")
+    }
+
+    string d2, err pe = get_perm()
+    switch pe.kind() {
+        case err.not_found:
+            fmt.println("routed: not_found")
+        case err.permission:
+            fmt.println("routed: permission")
+        default:
+            fmt.println("routed: other")
+    }
+
+    fmt.println("===== TEST 13_ERROR_HANDLING END - EXPECTED OUTPUT ABOVE =====")
+    return 0
+}

@@ -2109,10 +2109,37 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
             uint32_t off = rd_u32(code, &ip);
             size_t target = ip + (size_t)off;
             NORMALIZE_TO_TARGET(target);
-            TR_EMIT(vigil_reg_abc(VREG_TEST, vs_peek(&vs, 0), 0, 0));
-            jpatch_add(&patches, rc->code_count, target, 0, vs.top);
-            RECORD_DEPTH(target, vs.top);
-            TR_EMIT(vigil_reg_asbx(VREG_JMP, 0, 0));
+            /* Detect ||/&& short-circuit: JUMP_IF_FALSE followed by JUMP
+               means the tested value is consumed as a result (not just
+               control flow).  Emit TESTSET so the result register gets
+               the LHS value on the short-circuit path. */
+            if (ip < code_size && code[ip] == VIGIL_OPCODE_JUMP)
+            {
+                uint8_t src = vs_peek(&vs, 0);
+                uint32_t jmp_off = rd_u32(code, &ip);
+                size_t end_target = ip + (size_t)jmp_off;
+                /* The destination register is the slot that the RHS will
+                   eventually write to — which is the current top after
+                   the POP that follows the JUMP target. */
+                uint8_t dst = src;
+                if (target < code_size && code[target] == VIGIL_OPCODE_POP)
+                    dst = (uint8_t)(vs.top - 1U);
+                NORMALIZE_TO_TARGET(end_target);
+                TR_EMIT(vigil_reg_abc(VREG_TESTSET, dst, src, 0));
+                jpatch_add(&patches, rc->code_count, target, 0, vs.top);
+                RECORD_DEPTH(target, vs.top);
+                TR_EMIT(vigil_reg_asbx(VREG_JMP, 0, 0));
+                jpatch_add(&patches, rc->code_count, end_target, 0, vs.top);
+                RECORD_DEPTH(end_target, vs.top);
+                TR_EMIT(vigil_reg_asbx(VREG_JMP, 0, 0));
+            }
+            else
+            {
+                TR_EMIT(vigil_reg_abc(VREG_TEST, vs_peek(&vs, 0), 0, 0));
+                jpatch_add(&patches, rc->code_count, target, 0, vs.top);
+                RECORD_DEPTH(target, vs.top);
+                TR_EMIT(vigil_reg_asbx(VREG_JMP, 0, 0));
+            }
             break;
         }
 

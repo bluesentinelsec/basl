@@ -1,0 +1,70 @@
+import "fmt"
+
+fn main() -> i32 {
+    fmt.println("===== TEST 09_CONTROL_FLOW START =====")
+
+    // if / else if / else
+    i32 x = 7
+    if x > 10 {
+        fmt.println("big")
+    } else if x > 5 {
+        fmt.println("medium")
+    } else {
+        fmt.println("small")
+    }
+
+    // while loop
+    i32 count = 0
+    while count < 5 {
+        count++
+    }
+    fmt.println(f"while count: {count}")
+
+    // C-style for
+    i32 sum = 0
+    for (i32 i = 0; i < 10; i++) {
+        sum += i
+    }
+    fmt.println(f"for sum: {sum}")
+
+    // Nested if
+    i32 a = 3
+    i32 b = 7
+    if a < b {
+        if a > 0 {
+            fmt.println("a positive and less than b")
+        }
+    }
+
+    // Nested loops
+    i32 total = 0
+    for (i32 i = 0; i < 3; i++) {
+        for (i32 j = 0; j < 3; j++) {
+            total += 1
+        }
+    }
+    fmt.println(f"nested loops: {total}")
+
+    // While with break
+    i32 n = 0
+    while true {
+        if n >= 5 {
+            break
+        }
+        n++
+    }
+    fmt.println(f"while break: {n}")
+
+    // For with continue
+    i32 odd_sum = 0
+    for (i32 i = 0; i < 10; i++) {
+        if i % 2 == 0 {
+            continue
+        }
+        odd_sum += i
+    }
+    fmt.println(f"odd sum: {odd_sum}")
+
+    fmt.println("===== TEST 09_CONTROL_FLOW END - EXPECTED OUTPUT ABOVE =====")
+    return 0
+}

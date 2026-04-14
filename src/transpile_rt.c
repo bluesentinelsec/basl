@@ -367,10 +367,22 @@ vigil_status_t vigil_tc_defer(vigil_tc_t *tc, vigil_value_t *regs, uint8_t defer
     if (frame->defer_count >= frame->defer_capacity)
     {
         size_t new_cap = frame->defer_capacity < 4U ? 4U : frame->defer_capacity * 2U;
-        void *_rm = (void *)frame->defers;
-        if (vigil_runtime_realloc(tc->runtime, &_rm, new_cap * sizeof(vigil_vm_defer_action_t), error) != VIGIL_STATUS_OK)
-            _rm = NULL;
-        vigil_vm_defer_action_t *nd = (vigil_vm_defer_action_t *)_rm;
+        vigil_vm_defer_action_t *nd = NULL;
+        if (frame->defers == NULL)
+        {
+            /* Initial allocation — realloc rejects NULL input. */
+            void *_m = NULL;
+            if (vigil_runtime_alloc(tc->runtime, new_cap * sizeof(vigil_vm_defer_action_t), &_m, error) != VIGIL_STATUS_OK)
+                _m = NULL;
+            nd = (vigil_vm_defer_action_t *)_m;
+        }
+        else
+        {
+            void *_rm = (void *)frame->defers;
+            if (vigil_runtime_realloc(tc->runtime, &_rm, new_cap * sizeof(vigil_vm_defer_action_t), error) != VIGIL_STATUS_OK)
+                _rm = NULL;
+            nd = (vigil_vm_defer_action_t *)_rm;
+        }
         if (nd == NULL)
         {
             if (vals != NULL)
@@ -405,7 +417,9 @@ vigil_status_t vigil_tc_drain_defers(vigil_tc_t *tc, vigil_error_t *error)
     vigil_vm_t *vm = tc->vm;
 
     if (vm->frame_count == 0U)
+    {
         return VIGIL_STATUS_OK;
+    }
 
     while (vm->frames[vm->frame_count - 1U].defer_count > 0U)
     {
@@ -522,7 +536,7 @@ vigil_status_t vigil_tc_drain_defers(vigil_tc_t *tc, vigil_error_t *error)
    otherwise nanbox-encodes it as an integer. */
 static inline uint64_t tc_to_nanbox(uint64_t v)
 {
-    if (vigil_nanbox_is_object(v) || vigil_nanbox_is_int(v) || vigil_nanbox_is_bool(v) || v == VIGIL_NANBOX_NIL)
+    if (vigil_nanbox_is_object(v) || vigil_nanbox_is_int(v) || vigil_nanbox_is_uint(v) || vigil_nanbox_is_bool(v) || v == VIGIL_NANBOX_NIL)
         return v;
     /* Check if this is a raw double (not a small raw integer).
        Doubles have exponent bits in the upper bytes. Raw ints from
@@ -1540,8 +1554,8 @@ vigil_status_t vigil_tc_string_op(vigil_tc_t *tc, vigil_value_t *regs, uint8_t d
         size_t sc = vm->stack_count;
         /* Determine result count from sub-opcode. */
         size_t n_results = 1;
-        if (sub_op == 72 || sub_op == 73 || sub_op == 75 || sub_op == 189)
-            n_results = 2; /* INDEX_OF, SUBSTR, CHAR_AT, NEXT_CHAR */
+        if (sub_op == 72 || sub_op == 73 || sub_op == 75 || sub_op == 140 || sub_op == 189)
+            n_results = 2; /* INDEX_OF, SUBSTR, CHAR_AT, LAST_INDEX_OF, NEXT_CHAR */
         else if (sub_op == 146)
             n_results = 3; /* CUT */
         for (size_t ri = 0; ri < n_results && ri < sc; ri++)

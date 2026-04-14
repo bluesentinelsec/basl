@@ -1,0 +1,48 @@
+import "fmt"
+
+fn main() -> i32 {
+    fmt.println("===== TEST 02_NUMERIC_LITERALS START =====")
+
+    // Decimal
+    i32 dec = 255
+    fmt.println(f"decimal: {dec}")
+
+    // Hexadecimal
+    i32 hex = 0xFF
+    fmt.println(f"hex: {hex}")
+
+    // Binary
+    i32 bin = 0b11111111
+    fmt.println(f"binary: {bin}")
+
+    // Octal
+    i32 oct = 0o377
+    fmt.println(f"octal: {oct}")
+
+    // All should be equal
+    fmt.println(f"all equal: {dec == hex && hex == bin && bin == oct}")
+
+    // Float
+    f64 pi = 3.14159
+    fmt.println(f"float: {pi}")
+
+    // Scientific notation
+    f64 large = 1e6
+    fmt.println(f"sci large: {large}")
+
+    f64 small = 5.0e-4
+    fmt.println(f"sci small: {small}")
+
+    // Negative
+    i32 neg = -42
+    fmt.println(f"negative: {neg}")
+
+    // Zero
+    i32 zero = 0
+    f64 fzero = 0.0
+    fmt.println(f"zero i32: {zero}")
+    fmt.println(f"zero f64: {fzero}")
+
+    fmt.println("===== TEST 02_NUMERIC_LITERALS END - EXPECTED OUTPUT ABOVE =====")
+    return 0
+}

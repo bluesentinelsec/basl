@@ -1,0 +1,65 @@
+import "fmt"
+
+fn main() -> i32 {
+    fmt.println("===== TEST 05_VARIABLES_CONSTANTS START =====")
+
+    // Typed variable declarations
+    i32 x = 10
+    string name = "vigil"
+    bool ready = true
+    f64 pi = 3.14
+    fmt.println(f"typed: {x}, {name}, {ready}, {pi}")
+
+    // Walrus operator := inference
+    a := 42
+    b := "hello"
+    c := 3.14
+    d := true
+    e := [1, 2, 3]
+    fmt.println(f"walrus: {a}, {b}, {c}, {d}, {e[0]}")
+
+    // Constants with explicit types
+    const i32 MAX = 100
+    const string VERSION = "1.0"
+    fmt.println(f"const: {MAX}, {VERSION}")
+
+    // Constants with inferred types
+    const LIMIT := 200
+    const GREETING := "hello"
+    fmt.println(f"const inferred: {LIMIT}, {GREETING}")
+
+    // Assignment operators
+    i32 v = 10
+    v = 42
+    fmt.println(f"assign: {v}")
+    v += 5
+    fmt.println(f"+=: {v}")
+    v -= 1
+    fmt.println(f"-=: {v}")
+    v *= 2
+    fmt.println(f"*=: {v}")
+    v /= 3
+    fmt.println(f"/=: {v}")
+    v %= 10
+    fmt.println(f"%%=: {v}")
+
+    // Increment/decrement
+    v++
+    fmt.println(f"++: {v}")
+    v--
+    fmt.println(f"--: {v}")
+
+    // Array index assignment
+    array<i32> arr = [1, 2, 3]
+    arr[0] = 99
+    fmt.println(f"arr[0]: {arr[0]}")
+
+    // Map key assignment
+    map<string, i32> m = {"a": 1}
+    m["b"] = 2
+    i32 bv, bool bf = m.get("b")
+    fmt.println(f"m[b]: {bv}")
+
+    fmt.println("===== TEST 05_VARIABLES_CONSTANTS END - EXPECTED OUTPUT ABOVE =====")
+    return 0
+}

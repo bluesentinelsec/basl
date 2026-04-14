@@ -1,0 +1,5 @@
+/// t08-functions module.
+
+pub fn greet(string name) -> string {
+    return "hello, " + name;
+}

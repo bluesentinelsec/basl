@@ -1,0 +1,217 @@
+import "fmt"
+
+// ── Fallible class ──
+class Config {
+    pub string host
+    pub i32 port
+
+    fn init(string host, i32 port) -> err {
+        if host == "" {
+            return err("empty host", err.arg)
+        }
+        if port <= 0 {
+            return err("invalid port", err.arg)
+        }
+        self.host = host
+        self.port = port
+        return ok
+    }
+
+    pub fn addr() -> string {
+        return f"{self.host}:{self.port}"
+    }
+}
+
+// ── Interface ──
+interface Validator {
+    fn validate() -> err
+}
+
+class RangeCheck implements Validator {
+    pub i32 val
+    pub i32 min_val
+    pub i32 max_val
+
+    fn init(i32 val, i32 min_val, i32 max_val) -> void {
+        self.val = val
+        self.min_val = min_val
+        self.max_val = max_val
+    }
+
+    fn validate() -> err {
+        if self.val < self.min_val {
+            return err("too low", err.bounds)
+        }
+        if self.val > self.max_val {
+            return err("too high", err.bounds)
+        }
+        return ok
+    }
+}
+
+// ── Multi-return with err ──
+fn parse_pair(string input) -> (string, string, err) {
+    string before, string after, bool found = input.cut("=")
+    if !found {
+        return "", "", err("no separator", err.parse)
+    }
+    return before, after, ok
+}
+
+fn run_validator(Validator v) -> err {
+    return v.validate()
+}
+
+fn deferred_a() -> void {
+    fmt.println("defer A")
+}
+
+fn deferred_b() -> void {
+    fmt.println("defer B")
+}
+
+fn do_work() -> i32 {
+    defer deferred_a()
+    defer deferred_b()
+    fmt.println("doing work")
+    return 42
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST LARGE_COMPREHENSIVE_2 START =====")
+
+    // ── Fallible init success ──
+    Config cfg, err e1 = Config("localhost", 8080)
+    fmt.println(f"config ok: {e1 == ok}")
+    fmt.println(f"addr: {cfg.addr()}")
+
+    // ── Fallible init failure ──
+    Config cfg2, err e2 = Config("", 8080)
+    fmt.println(f"config err: {e2.message()}")
+
+    Config cfg3, err e3 = Config("host", -1)
+    fmt.println(f"config err2: {e3.message()}")
+
+    // ── Multi-return with err ──
+    string k, string v, err pe = parse_pair("key=value")
+    fmt.println(f"parse ok: {k}, {v}")
+
+    string k2, string v2, err pe2 = parse_pair("nope")
+    fmt.println(f"parse err: {pe2.message()}")
+
+    // ── Guard with multi-return ──
+    guard string k3, string v3, err pe3 = parse_pair("host=localhost") {
+        fmt.eprintln(f"guard failed: {pe3.message()}")
+        return 1
+    }
+    fmt.println(f"guard parse: {k3}={v3}")
+
+    // ── Polymorphic validation ──
+    RangeCheck rc1 = RangeCheck(5, 1, 10)
+    err ve1 = run_validator(rc1)
+    fmt.println(f"range ok: {ve1 == ok}")
+
+    RangeCheck rc2 = RangeCheck(15, 1, 10)
+    err ve2 = run_validator(rc2)
+    fmt.println(f"range err: {ve2.message()}")
+
+    // ── Error kind routing ──
+    switch ve2.kind() {
+        case err.bounds:
+            fmt.println("kind: bounds")
+        case err.arg:
+            fmt.println("kind: arg")
+        default:
+            fmt.println("kind: other")
+    }
+
+    // ── Defer LIFO ──
+    i32 work_result = do_work()
+    fmt.println(f"work result: {work_result}")
+
+    // ── Complex nested data ──
+    map<string, array<i32>> data = {"primes": [2, 3, 5, 7], "fibs": [1, 1, 2, 3, 5]}
+    array<string> data_keys = data.keys()
+    for dk in data_keys {
+        array<i32> vals, bool found = data.get(dk)
+        if found {
+            fmt.println(f"key {dk} has {vals.len()} items")
+        }
+    }
+
+    // ── Array methods chain ──
+    array<i32> nums = [10, 20, 30, 40, 50]
+    nums.push(60)
+    fmt.println(f"pushed len: {nums.len()}")
+    i32 popped, err pop_e = nums.pop()
+    fmt.println(f"popped: {popped}")
+    array<i32> sl = nums.slice(1, 3)
+    fmt.println(f"slice: {sl[0]}, {sl[1]}")
+    fmt.println(f"contains 30: {nums.contains(30)}")
+
+    // ── String methods chain ──
+    string raw = "  Hello, World!  "
+    string trimmed = raw.trim()
+    string upper = trimmed.to_upper()
+    string replaced = upper.replace("WORLD", "VIGIL")
+    fmt.println(f"chain: {replaced}")
+
+    // ── Complex f-strings ──
+    i32 a = 42
+    f64 pi = 3.14159
+    fmt.println(f"complex: a={a}, pi={pi:.3f}, hex={a:x}")
+    // ── Ternary in variable then fstr ──
+    string tern_result = a > 40 ? "big" : "small"
+    fmt.println(f"ternary in fstr: {tern_result}")
+
+    // ── Nested control flow ──
+    i32 total = 0
+    for (i32 i = 0; i < 5; i++) {
+        for (i32 j = 0; j < 5; j++) {
+            if i == j {
+                continue
+            }
+            if i + j > 6 {
+                break
+            }
+            total++
+        }
+    }
+    fmt.println(f"nested total: {total}")
+
+    // ── Bytes iteration ──
+    i32 byte_sum = 0
+    for b in "ABC".bytes() {
+        byte_sum += i32(b)
+    }
+    fmt.println(f"byte sum ABC: {byte_sum}")
+
+    // ── Map remove and has ──
+    map<string, i32> m = {"x": 1, "y": 2, "z": 3}
+    i32 rv, bool rf = m.remove("y")
+    fmt.println(f"removed y: {rv}, {rf}")
+    fmt.println(f"has y: {m.has("y")}")
+    fmt.println(f"has x: {m.has("x")}")
+
+    // ── String cut, index_of, reverse ──
+    string before, string after, bool cut_ok = "path/to/file".cut("/")
+    fmt.println(f"cut: {before}, {after}")
+    i32 idx, bool idx_found = "abcdef".index_of("cd")
+    fmt.println(f"index_of: {idx}, {idx_found}")
+    fmt.println(f"reverse: {"hello".reverse()}")
+
+    // ── Walrus ──
+    count := 0
+    while count < 3 {
+        count++
+    }
+    fmt.println(f"walrus count: {count}")
+
+    // ── Const ──
+    const MAX := 100
+    const string LABEL = "test"
+    fmt.println(f"const: {MAX}, {LABEL}")
+
+    fmt.println("===== TEST LARGE_COMPREHENSIVE_2 END - EXPECTED OUTPUT ABOVE =====")
+    return 0
+}

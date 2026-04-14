@@ -1,0 +1,5 @@
+/// t12-defer-guard module.
+
+pub fn greet(string name) -> string {
+    return "hello, " + name;
+}

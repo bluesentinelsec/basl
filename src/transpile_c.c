@@ -80,7 +80,13 @@ static vigil_status_t emit_load_k(vigil_transpile_ctx_t *ctx, const vigil_reg_ch
     else if (kind == VIGIL_VALUE_BOOL)
         EMITF("    r[%u].v = %s;\n", a, vigil_value_as_bool(k) ? "VIGIL_NANBOX_TRUE" : "VIGIL_NANBOX_FALSE");
     else if (kind == VIGIL_VALUE_UINT)
-        EMITF("    r[%u].v = vigil_nanbox_encode_uint(%lluULL);\n", a, (unsigned long long)vigil_value_as_uint(k));
+    {
+        uint64_t uval = vigil_value_as_uint(k);
+        if (uval <= UINT64_C(0x0000FFFFFFFFFFFF))
+            EMITF("    r[%u].v = vigil_nanbox_encode_uint(%lluULL);\n", a, (unsigned long long)uval);
+        else
+            EMITF("    vigil_value_init_uint_rt(&r[%u].v, %lluULL, tc->runtime, NULL);\n", a, (unsigned long long)uval);
+    }
     else if (kind == VIGIL_VALUE_FLOAT)
         EMITF("    r[%u].f = %.17g;\n", a, vigil_value_as_float(k));
     else if (kind == VIGIL_VALUE_OBJECT)
@@ -538,8 +544,12 @@ static vigil_status_t emit_instruction(vigil_transpile_ctx_t *ctx, const vigil_r
         else   EMITF("    if (vigil_tc_is_truthy(r[%u].v)) goto L_%zu;\n", a, *ip + 2);
         break;
     case VREG_TESTSET:
-        if (c) EMITF("    if (vigil_tc_is_truthy(r[%u].v)) { r[%u] = r[%u]; } else { goto L_%zu; }\n", b, a, b, *ip + 2);
-        else   EMITF("    if (!vigil_tc_is_truthy(r[%u].v)) { r[%u] = r[%u]; } else { goto L_%zu; }\n", b, a, b, *ip + 2);
+        /* Short-circuit logical operators: copy the tested value to the
+           result register on BOTH branches.  The original code only set
+           the result on the fall-through path, leaving it uninitialized
+           when the jump (short-circuit) path was taken. */
+        if (c) EMITF("    if (vigil_tc_is_truthy(r[%u].v)) { r[%u] = r[%u]; } else { r[%u] = r[%u]; goto L_%zu; }\n", b, a, b, a, b, *ip + 2);
+        else   EMITF("    if (!vigil_tc_is_truthy(r[%u].v)) { r[%u] = r[%u]; } else { r[%u] = r[%u]; goto L_%zu; }\n", b, a, b, a, b, *ip + 2);
         break;
 
     /* ── Fused compare-jump ────────────────────────────────────── */
@@ -559,17 +569,11 @@ static vigil_status_t emit_instruction(vigil_transpile_ctx_t *ctx, const vigil_r
     /* ── Calls ─────────────────────────────────────────────────── */
     case VREG_CALL:
     {
-        /* A=arg_base (also return base), B=func_idx, C=arg_count.
-           Save/restore constants since callee sets its own. */
-        EMIT("    { const vigil_value_t *_sc = tc->constants; size_t _sn = tc->constant_count;\n");
-        EMITF("    r[%u] = vigil_fn_%u(tc", (unsigned)a, (unsigned)b);
-        for (uint8_t ci = 0; ci < c; ci++)
-            EMITF(", r[%u]", (unsigned)(a + ci));
-        EMITF(");\n");
-        /* Copy additional return values from tc->ret_buf. */
-        EMITF("    { uint8_t _ri; for (_ri = 1; _ri < tc->ret_count; _ri++) r[%u + _ri].v = tc->ret_buf[_ri]; }\n",
-              (unsigned)a);
-        EMIT("    tc->constants = _sc; tc->constant_count = _sn; }\n");
+        /* Use vigil_tc_call_self for correct defer/frame handling.
+           Direct C calls skip VM frame setup, which breaks defers
+           registered inside the callee. */
+        EMITF("    vigil_tc_call_self(tc, (uint64_t *)r, %u, %u, %u, %u, NULL);\n",
+              (unsigned)a, (unsigned)b, (unsigned)c, (unsigned)a);
         break;
     }
     case VREG_CALL_SELF:
@@ -591,7 +595,6 @@ static vigil_status_t emit_instruction(vigil_transpile_ctx_t *ctx, const vigil_r
         EMITF("    return r[%u];\n", (unsigned)a);
         break;
     }
-        break;
     case VREG_RETURN:
         if (b == 0) { EMIT("    vigil_tc_drain_defers(tc, NULL);\n    tc->ret_count = 0;\n    return (vigil_reg_t){0};\n"); }
         else if (b == 1) { EMIT("    vigil_tc_drain_defers(tc, NULL);\n"); EMITF("    tc->ret_count = 1;\n    return r[%u];\n", a); }

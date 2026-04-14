@@ -1,0 +1,5 @@
+/// t19-array-map-methods module.
+
+pub fn greet(string name) -> string {
+    return "hello, " + name;
+}

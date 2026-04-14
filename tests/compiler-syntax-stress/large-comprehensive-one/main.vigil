@@ -1,0 +1,245 @@
+import "fmt"
+
+// ── Interfaces ──
+interface Named {
+    fn name() -> string
+}
+
+interface Describable {
+    fn describe() -> string
+}
+
+// ── Enum ──
+enum Priority {
+    Low,
+    Medium,
+    High
+}
+
+// ── Struct ──
+struct Coord {
+    f64 x
+    f64 y
+}
+
+// ── Classes ──
+class Task implements Named, Describable {
+    pub string title
+    pub Priority prio
+    pub bool done
+
+    fn init(string title, Priority prio) -> void {
+        self.title = title
+        self.prio = prio
+        self.done = false
+    }
+
+    fn name() -> string {
+        return self.title
+    }
+
+    fn describe() -> string {
+        string status = self.done ? "done" : "pending"
+        return f"{self.title} [{status}]"
+    }
+
+    pub fn complete() -> void {
+        self.done = true
+    }
+}
+
+class TaskList {
+    pub array<string> titles
+    pub i32 count
+
+    fn init() -> void {
+        self.titles = []
+        self.count = 0
+    }
+
+    pub fn add(string title) -> void {
+        self.titles.push(title)
+        self.count++
+    }
+
+    pub fn summary() -> string {
+        return f"{self.count} tasks"
+    }
+}
+
+// ── Functions ──
+fn divide_safe(i32 a, i32 b) -> (i32, err) {
+    if b == 0 {
+        return 0, err("division by zero", err.arg)
+    }
+    return a / b, ok
+}
+
+fn priority_name(Priority p) -> string {
+    switch p {
+        case Priority.Low:
+            return "low"
+        case Priority.Medium:
+            return "medium"
+        case Priority.High:
+            return "high"
+        default:
+            return "unknown"
+    }
+}
+
+fn describe_named(Named n) -> string {
+    return n.name()
+}
+
+fn cleanup_msg() -> void {
+    fmt.println("cleanup done")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST LARGE_COMPREHENSIVE_1 START =====")
+
+    // ── Primitives and conversions ──
+    i32 x = 42
+    f64 y = f64(x)
+    string s = string(x)
+    i64 big = i64(x)
+    fmt.println(f"conversions: {x}, {y}, {s}, {big}")
+
+    // ── Struct ──
+    Coord c = Coord(1.5, 2.5)
+    fmt.println(f"coord: {c.x}, {c.y}")
+    c.x = 10.0
+    fmt.println(f"mutated coord: {c.x}")
+
+    // ── Class + interface ──
+    Task t1 = Task("Write tests", Priority.High)
+    fmt.println(f"task: {t1.name()}")
+    fmt.println(f"desc: {t1.describe()}")
+    t1.complete()
+    fmt.println(f"after complete: {t1.describe()}")
+
+    // ── Polymorphism ──
+    string named = describe_named(t1)
+    fmt.println(f"polymorphic: {named}")
+
+    // ── Enum switch ──
+    fmt.println(f"priority: {priority_name(t1.prio)}")
+
+    // ── TaskList with array methods ──
+    TaskList tl = TaskList()
+    tl.add("task A")
+    tl.add("task B")
+    tl.add("task C")
+    fmt.println(f"list: {tl.summary()}")
+    fmt.println(f"titles len: {tl.titles.len()}")
+
+    // ── Map with nested access ──
+    map<string, array<i32>> groups = {"evens": [2, 4, 6], "odds": [1, 3, 5]}
+    array<i32> evens, bool ef = groups.get("evens")
+    fmt.println(f"evens[0]: {evens[0]}, evens[2]: {evens[2]}")
+
+    // ── Array of arrays ──
+    array<array<string>> table = [["a1", "a2"], ["b1", "b2"]]
+    fmt.println(f"table[0][1]: {table[0][1]}")
+    fmt.println(f"table[1][0]: {table[1][0]}")
+
+    // ── Error handling ──
+    i32 r1, err e1 = divide_safe(10, 2)
+    fmt.println(f"divide ok: {r1}")
+    i32 r2, err e2 = divide_safe(10, 0)
+    fmt.println(f"divide err: {e2.message()}")
+
+    // ── Guard ──
+    guard i32 r3, err e3 = divide_safe(100, 5) {
+        fmt.eprintln(f"guard failed: {e3.message()}")
+        return 1
+    }
+    fmt.println(f"guard ok: {r3}")
+
+    // ── Defer ──
+    defer cleanup_msg()
+
+    // ── For-in over array ──
+    array<string> words = ["hello", "world", "vigil"]
+    for w in words {
+        fmt.println(f"word: {w}")
+    }
+
+    // ── For-in over map ──
+    map<string, i32> scores = {"a": 1, "b": 2}
+    for k, v in scores {
+        fmt.println(f"score: {k}={v}")
+    }
+
+    // ── For-in over string ──
+    for ch in "abc" {
+        fmt.println(f"ch: {ch}")
+    }
+
+    // ── C-style for with break/continue ──
+    i32 sum = 0
+    for (i32 i = 0; i < 20; i++) {
+        if i > 10 {
+            break
+        }
+        if i % 2 == 0 {
+            continue
+        }
+        sum += i
+    }
+    fmt.println(f"odd sum 1-10: {sum}")
+
+    // ── While ──
+    i32 n = 0
+    while n < 3 {
+        n++
+    }
+    fmt.println(f"while: {n}")
+
+    // ── Switch ──
+    i32 val = 2
+    switch val {
+        case 1:
+            fmt.println("one")
+        case 2, 3:
+            fmt.println("two or three")
+        default:
+            fmt.println("other")
+    }
+
+    // ── String methods ──
+    string msg = "  Hello, World!  "
+    fmt.println(f"trim: [{msg.trim()}]")
+    fmt.println(f"upper: {msg.trim().to_upper()}")
+    fmt.println(f"contains: {msg.contains("World")}")
+    fmt.println(f"replace: {msg.trim().replace("World", "Vigil")}")
+    array<string> parts = "a,b,c".split(",")
+    fmt.println(f"split: {parts[0]},{parts[1]},{parts[2]}")
+    fmt.println(f"join: {"-".join(parts)}")
+
+    // ── F-string formatting ──
+    f64 pi = 3.14159
+    fmt.println(f"pi: {pi:.2f}")
+    fmt.println(f"hex: {255:x}")
+    fmt.println(f"bin: {10:b}")
+    fmt.println(f"pad: [{42:0>6d}]")
+
+    // ── Ternary ──
+    bool flag = true
+    string result = flag ? "yes" : "no"
+    fmt.println(f"ternary: {result}")
+
+    // ── Lambda ──
+    fn(i32) -> i32 doubler = |x| x * 2
+    fmt.println(f"lambda: {doubler(21)}")
+
+    // ── Local function ──
+    fn square(i32 n) -> i32 {
+        return n * n
+    }
+    fmt.println(f"local fn: {square(7)}")
+
+    fmt.println("===== TEST LARGE_COMPREHENSIVE_1 END - EXPECTED OUTPUT ABOVE =====")
+    return 0
+}

@@ -1,0 +1,60 @@
+import "fmt"
+
+fn test_err_ok() -> void {
+    err e = err("test error", err.arg)
+    fmt.println(f"err msg: {e.message()}")
+    fmt.println(f"err kind: {e.kind()}")
+}
+
+fn test_err_compare() -> void {
+    err e = ok
+    fmt.println(f"err ok: {e == ok}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 01_PRIMITIVES START =====")
+
+    // bool
+    bool t = true
+    bool f = false
+    fmt.println(f"bool true: {t}")
+    fmt.println(f"bool false: {f}")
+
+    // i32
+    i32 x = 42
+    fmt.println(f"i32: {x}")
+
+    // i64
+    i64 big = 9223372036854775807
+    fmt.println(f"i64: {big}")
+
+    // u8
+    u8 byte = u8(255)
+    fmt.println(f"u8: {byte}")
+
+    // u32
+    u32 u = u32(4294967295)
+    fmt.println(f"u32: {u}")
+
+    // f64
+    f64 pi = 3.14159
+    fmt.println(f"f64: {pi}")
+
+    // string
+    string s = "hello world"
+    fmt.println(f"string: {s}")
+
+    // void function
+    print_void()
+
+    // err values (in separate scopes to avoid VM register bug)
+    test_err_compare()
+    test_err_ok()
+
+    fmt.println("===== TEST 01_PRIMITIVES END - EXPECTED OUTPUT ABOVE =====")
+    return 0
+}
+
+fn print_void() -> void {
+    fmt.println("void function called")
+}

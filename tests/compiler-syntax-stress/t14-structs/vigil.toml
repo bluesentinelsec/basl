@@ -1,0 +1,55 @@
+# ── Project ──────────────────────────────────────────────
+name = "t14-structs"
+description = "A new Vigil project"
+version = "1.0.0"
+type = "cli"                          # cli, gui, library, or workspace
+
+# ── Organization ─────────────────────────────────────────
+org = "com.example"                   # Reverse-domain identifier, used for bundle IDs
+author = ""                           # Author or team name
+license = ""                          # SPDX license identifier (e.g. "MIT", "Apache-2.0")
+homepage = ""                         # Project homepage URL
+repository = ""                       # Source code repository URL
+readme = "README.md"                  # Path to README file
+keywords = []                         # Keywords for package registry search
+
+# ── Platforms ────────────────────────────────────────────
+platforms = ["windows", "linux", "macos"]
+
+# ── Icons ────────────────────────────────────────────────
+# Platform-specific icon paths. Used by packager/transpiler for
+# app bundles, desktop shortcuts, and store listings.
+[icon]
+windows = ""                          # .ico file for Windows executables and Explorer
+macos = ""                            # .icns file for macOS app bundles
+linux = ""                            # .png or .svg for .desktop files and AppImage
+ios = ""                              # .png for iOS app icon (1024x1024 recommended)
+android = ""                          # .png for Android launcher icon
+
+# ── macOS ────────────────────────────────────────────────
+[platform.macos]
+min-os-version = ""                   # Minimum macOS version (e.g. "13.0")
+category = ""                         # LSApplicationCategoryType (e.g. "public.app-category.utilities")
+entitlements = []                     # macOS entitlements (e.g. ["com.apple.security.network.client"])
+
+# ── iOS ──────────────────────────────────────────────────
+[platform.ios]
+min-os-version = ""                   # Minimum iOS version (e.g. "16.0")
+orientation = "both"                  # portrait, landscape, or both
+permissions = []                      # iOS permissions (e.g. ["camera", "photos", "location"])
+
+# ── Android ──────────────────────────────────────────────
+[platform.android]
+min-sdk-version = 26                  # Minimum Android SDK version
+permissions = []                      # Android permissions (e.g. ["CAMERA", "INTERNET"])
+
+# ── Windows ──────────────────────────────────────────────
+[platform.windows]
+manifest = true                       # Embed a UAC application manifest
+
+# ── Linux ────────────────────────────────────────────────
+[platform.linux]
+category = ""                         # Freedesktop .desktop category (e.g. "Utility", "Development")
+
+# ── Dependencies ─────────────────────────────────────────
+[dependencies]

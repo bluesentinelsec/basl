@@ -1,0 +1,6 @@
+import "test";
+import "t03-string-literals";
+
+fn test_greet(test.T t) -> void {
+    t.assert(t03-string-literals.greet("world") == "hello, world", "greet should work");
+}

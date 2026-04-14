@@ -1,0 +1,92 @@
+import "fmt"
+
+fn add(i32 a, i32 b) -> i32 {
+    return a + b
+}
+
+fn greet(string name) -> void {
+    fmt.println("hello " + name)
+}
+
+fn divide(i32 a, i32 b) -> (i32, err) {
+    if b == 0 {
+        return 0, err("division by zero", err.arg)
+    }
+    return a / b, ok
+}
+
+fn multi() -> (string, string, bool) {
+    return "foo", "bar", true
+}
+
+fn validate(i32 age) -> err {
+    if age < 0 {
+        return err("negative age", err.arg)
+    }
+    return ok
+}
+
+fn process(i32 x) -> i32 {
+    i32 local = x
+    local += 10
+    return local
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 08_FUNCTIONS START =====")
+
+    // Basic function call
+    fmt.println(f"add: {add(3, 4)}")
+
+    // Void function
+    greet("world")
+
+    // Multi-return
+    i32 result, err e = divide(10, 2)
+    fmt.println(f"divide: {result}, err ok: {e == ok}")
+
+    // Multi-return with error
+    i32 result2, err e2 = divide(10, 0)
+    fmt.println(f"divide by zero: {result2}, err: {e2.message()}")
+
+    // Triple return
+    string a, string b, bool c = multi()
+    fmt.println(f"multi: {a}, {b}, {c}")
+
+    // Discard with _
+    i32 value, err _ = divide(10, 2)
+    fmt.println(f"discard err: {value}")
+
+    // Error-only return
+    err ve = validate(10)
+    fmt.println(f"validate 10: {ve == ok}")
+    err ve2 = validate(-1)
+    fmt.println(f"validate -1: {ve2.message()}")
+
+    // Immutable params - copy to modify
+    fmt.println(f"process: {process(5)}")
+
+    // Anonymous function / closure
+    fn(i32) -> i32 scale = |x| x * 10
+    fmt.println(f"closure: {scale(3)}")
+
+    // Multi-statement lambda
+    fn(i32, i32) -> i32 combine = |a, b| {
+        i32 sum = a + b
+        return sum * 2
+    }
+    fmt.println(f"multi-lambda: {combine(2, 3)}")
+
+    // Local function
+    fn helper(i32 x) -> i32 {
+        return x * 2
+    }
+    fmt.println(f"local fn: {helper(5)}")
+
+    // Multi-return with explicit types
+    i32 val2, err e3 = divide(20, 4)
+    fmt.println(f"multi return 2: {val2}, {e3 == ok}")
+
+    fmt.println("===== TEST 08_FUNCTIONS END - EXPECTED OUTPUT ABOVE =====")
+    return 0
+}
