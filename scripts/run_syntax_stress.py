@@ -20,6 +20,14 @@ import sys
 import tempfile
 
 
+def cmake_parallelism():
+    """Return a stable parallel job count for CMake builds."""
+    cpu_count = os.cpu_count()
+    if cpu_count is None or cpu_count < 1:
+        return "1"
+    return str(cpu_count)
+
+
 def find_executable(build_dir, name):
     """Find the built executable inside a CMake build directory."""
     # Try common locations first (faster than walking)
@@ -76,7 +84,8 @@ def run_test(vigil_bin, test_dir, work_dir):
     if r.returncode != 0:
         return False, f"cmake configure failed:\n{r.stdout}\n{r.stderr}"
 
-    r = subprocess.run(["cmake", "--build", build_dir, "--config", "Release"],
+    r = subprocess.run(["cmake", "--build", build_dir, "--config", "Release",
+                        "--parallel", cmake_parallelism()],
                        capture_output=True, text=True, timeout=120)
     if r.returncode != 0:
         return False, f"cmake build failed:\n{r.stdout}\n{r.stderr}"
