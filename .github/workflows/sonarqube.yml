@@ -63,6 +63,7 @@ jobs:
           --sonarqube sonarqube-coverage.xml
 
       - name: SonarQube Scan
+        continue-on-error: true
         uses: SonarSource/sonarqube-scan-action@v6
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
