@@ -25,24 +25,16 @@ import tempfile
 
 def find_executable(build_dir, name):
     """Find the built executable inside a CMake build directory."""
+    # On Windows, executables have .exe extension
+    exe_name = f"{name}.exe" if sys.platform == "win32" else name
     candidates = [
-        os.path.join(build_dir, name),
-        os.path.join(build_dir, f"{name}.exe"),
-        os.path.join(build_dir, "Release", name),
-        os.path.join(build_dir, "Release", f"{name}.exe"),
-        os.path.join(build_dir, "Debug", name),
-        os.path.join(build_dir, "Debug", f"{name}.exe"),
+        os.path.join(build_dir, exe_name),
+        os.path.join(build_dir, "Release", exe_name),
+        os.path.join(build_dir, "Debug", exe_name),
     ]
     for c in candidates:
-        if os.path.isfile(c) and os.access(c, os.X_OK):
+        if os.path.isfile(c):
             return c
-    for root, _dirs, files in os.walk(build_dir):
-        if "CMakeFiles" in root:
-            continue
-        for f in files:
-            path = os.path.join(root, f)
-            if os.access(path, os.X_OK) and not f.endswith((".cmake", ".txt")):
-                return path
     return None
 
 
@@ -52,12 +44,14 @@ def run_test(vigil_bin, test_dir, work_dir):
     main_vigil = os.path.join(test_dir, "main.vigil")
 
     r = subprocess.run([vigil_bin, "check", main_vigil],
-                       capture_output=True, text=True, timeout=30)
+                       capture_output=True, text=True, encoding="utf-8",
+                       errors="replace", timeout=30)
     if r.returncode != 0:
         return False, f"vigil check failed:\n{r.stderr}"
 
     r = subprocess.run([vigil_bin, "run", main_vigil],
-                       capture_output=True, text=True, timeout=60, cwd=test_dir)
+                       capture_output=True, text=True, encoding="utf-8",
+                       errors="replace", timeout=60, cwd=test_dir)
     if r.returncode != 0:
         return False, f"vigil run failed (exit {r.returncode}):\n{r.stderr}"
     interp_out = r.stdout
@@ -66,19 +60,22 @@ def run_test(vigil_bin, test_dir, work_dir):
     if os.path.exists(c_dir):
         shutil.rmtree(c_dir)
     r = subprocess.run([vigil_bin, "transpile", test_dir, "-o", c_dir],
-                       capture_output=True, text=True, timeout=60)
+                       capture_output=True, text=True, encoding="utf-8",
+                       errors="replace", timeout=60)
     if r.returncode != 0:
         return False, f"vigil transpile failed:\n{r.stderr}"
 
     build_dir = os.path.join(c_dir, "build")
     r = subprocess.run(["cmake", "-B", build_dir, "-S", c_dir,
                         "-DCMAKE_BUILD_TYPE=Release"],
-                       capture_output=True, text=True, timeout=120)
+                       capture_output=True, text=True, encoding="utf-8",
+                       errors="replace", timeout=120)
     if r.returncode != 0:
         return False, f"cmake configure failed:\n{r.stdout}\n{r.stderr}"
 
     r = subprocess.run(["cmake", "--build", build_dir, "--config", "Release"],
-                       capture_output=True, text=True, timeout=120)
+                       capture_output=True, text=True, encoding="utf-8",
+                       errors="replace", timeout=120)
     if r.returncode != 0:
         return False, f"cmake build failed:\n{r.stdout}\n{r.stderr}"
 
@@ -86,7 +83,8 @@ def run_test(vigil_bin, test_dir, work_dir):
     if exe is None:
         return False, f"no executable found in {build_dir}"
 
-    r = subprocess.run([exe], capture_output=True, text=True, timeout=30)
+    r = subprocess.run([exe], capture_output=True, text=True, encoding="utf-8",
+                       errors="replace", timeout=30)
     c_out = r.stdout
 
     interp_lines = interp_out.rstrip().splitlines()
