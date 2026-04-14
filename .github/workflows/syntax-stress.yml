@@ -25,6 +25,11 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
       - name: Install SDL3 build dependencies (Linux)
         if: runner.os == 'Linux'
         run: |
@@ -41,9 +46,20 @@ jobs:
           cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DVIGIL_BUILD_TESTS=OFF
           cmake --build build --config Release
 
-      - name: Run syntax stress suite
+      - name: Run syntax stress suite (POSIX)
+        if: runner.os != 'Windows'
+        shell: bash
         run: |
-          python3 scripts/run_syntax_stress.py \
+          python scripts/run_syntax_stress.py \
             --vigil-bin build/vigil \
             --suite-dir tests/compiler-syntax-stress \
             --work-dir ${{ runner.temp }}/syntax_stress
+
+      - name: Run syntax stress suite (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          python scripts/run_syntax_stress.py `
+            --vigil-bin build/Release/vigil.exe `
+            --suite-dir tests/compiler-syntax-stress `
+            --work-dir "${{ runner.temp }}/syntax_stress"
