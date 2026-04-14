@@ -14,6 +14,7 @@ Exit code is the number of failed tests (0 = all pass).
 
 import argparse
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -28,28 +29,35 @@ def cmake_parallelism():
     return str(cpu_count)
 
 
-def find_executable(build_dir, name):
-    """Find the built executable inside a CMake build directory."""
-    # Try common locations first (faster than walking)
+def transpiled_executable_target(c_dir):
+    """Read the generated CMakeLists.txt to determine the app target name."""
+    cmake_lists = os.path.join(c_dir, "CMakeLists.txt")
+    with open(cmake_lists, "r", encoding="utf-8") as f:
+        content = f.read()
+    match = re.search(r"add_executable\(\s*([A-Za-z0-9_+-]+)\b", content)
+    if match is None:
+        raise ValueError(f"no add_executable target found in {cmake_lists}")
+    return match.group(1)
+
+
+def find_executable(build_dir, target_name):
+    """Find the built executable for a known CMake target."""
+    exe_name = f"{target_name}.exe" if os.name == "nt" else target_name
     candidates = [
-        os.path.join(build_dir, name),
-        os.path.join(build_dir, f"{name}.exe"),
-        os.path.join(build_dir, "Release", name),
-        os.path.join(build_dir, "Release", f"{name}.exe"),
-        os.path.join(build_dir, "Debug", name),
-        os.path.join(build_dir, "Debug", f"{name}.exe"),
+        os.path.join(build_dir, exe_name),
+        os.path.join(build_dir, "Release", exe_name),
+        os.path.join(build_dir, "Debug", exe_name),
     ]
     for c in candidates:
-        if os.path.isfile(c) and os.access(c, os.X_OK):
+        if os.path.isfile(c):
             return c
-    # Fallback: walk
+
     for root, _dirs, files in os.walk(build_dir):
         if "CMakeFiles" in root:
             continue
         for f in files:
-            path = os.path.join(root, f)
-            if os.access(path, os.X_OK) and not f.endswith((".cmake", ".txt")):
-                return path
+            if f == exe_name:
+                return os.path.join(root, f)
     return None
 
 
@@ -90,9 +98,10 @@ def run_test(vigil_bin, test_dir, work_dir):
     if r.returncode != 0:
         return False, f"cmake build failed:\n{r.stdout}\n{r.stderr}"
 
-    exe = find_executable(build_dir, name)
+    target_name = transpiled_executable_target(c_dir)
+    exe = find_executable(build_dir, target_name)
     if exe is None:
-        return False, f"no executable found in {build_dir}"
+        return False, f"no executable found for target {target_name} in {build_dir}"
 
     r = subprocess.run([exe], capture_output=True, text=True, timeout=30)
     c_out = r.stdout
