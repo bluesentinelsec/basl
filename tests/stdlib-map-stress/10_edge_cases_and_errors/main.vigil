@@ -1,0 +1,87 @@
+import "fmt"
+
+fn test_empty_ops() -> void {
+    map<string, i32> m = {}
+    fmt.println(f"empty len: {m.len()}")
+    fmt.println(f"empty none: {m.none()}")
+    fmt.println(f"empty has a: {m.has("a")}")
+    i32 v, bool f = m.get("a")
+    fmt.println(f"empty get: {v}, {f}")
+    i32 rv, bool rf = m.remove("a")
+    fmt.println(f"empty remove: {rv}, {rf}")
+    array<string> k = m.keys()
+    fmt.println(f"empty keys: {k.len()}")
+    array<i32> vals = m.values()
+    fmt.println(f"empty values: {vals.len()}")
+    m.clear()
+    fmt.println(f"empty clear: {m.len()}")
+}
+
+fn test_duplicate_keys() -> void {
+    // Literal with same key — last wins
+    map<string, i32> m = {"a": 1, "b": 2, "a": 99}
+    fmt.println(f"dup key a: {m["a"]}")
+    fmt.println(f"dup len: {m.len()}")
+
+    // Set overwrites
+    map<string, i32> m2 = {}
+    m2["x"] = 1
+    m2["x"] = 2
+    m2["x"] = 3
+    fmt.println(f"overwrite: {m2["x"]}, len={m2.len()}")
+}
+
+fn test_large_map() -> void {
+    map<string, i32> big = {}
+    for (i32 i = 0; i < 200; i++) {
+        big[f"key_{i}"] = i
+    }
+    fmt.println(f"big len: {big.len()}")
+    fmt.println(f"big has key_0: {big.has("key_0")}")
+    fmt.println(f"big has key_199: {big.has("key_199")}")
+    fmt.println(f"big has key_200: {big.has("key_200")}")
+    i32 v0, bool f0 = big.get("key_0")
+    fmt.println(f"big get key_0: {v0}")
+    i32 v199, bool f199 = big.get("key_199")
+    fmt.println(f"big get key_199: {v199}")
+
+    // Remove half
+    for (i32 i = 0; i < 100; i++) {
+        i32 rv, bool rf = big.remove(f"key_{i}")
+    }
+    fmt.println(f"big after remove: {big.len()}")
+    fmt.println(f"big has key_0: {big.has("key_0")}")
+    fmt.println(f"big has key_100: {big.has("key_100")}")
+}
+
+fn test_clear_and_reuse() -> void {
+    map<string, i32> m = {"a": 1, "b": 2, "c": 3}
+    m.clear()
+    m["x"] = 10
+    m["y"] = 20
+    fmt.println(f"reuse len: {m.len()}")
+    fmt.println(f"reuse x: {m["x"]}")
+    m.clear()
+    m.clear()  // double clear
+    fmt.println(f"double clear: {m.len()}")
+}
+
+fn test_remove_all() -> void {
+    map<string, i32> m = {"a": 1, "b": 2, "c": 3}
+    array<string> keys = m.keys()
+    for k in keys {
+        i32 rv, bool rf = m.remove(k)
+    }
+    fmt.println(f"remove all: {m.len()}, none={m.none()}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 10_EDGE_CASES_AND_ERRORS START =====")
+    test_empty_ops()
+    test_duplicate_keys()
+    test_large_map()
+    test_clear_and_reuse()
+    test_remove_all()
+    fmt.println("===== TEST 10_EDGE_CASES_AND_ERRORS END =====")
+    return 0
+}

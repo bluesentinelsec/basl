@@ -1,0 +1,105 @@
+import "fmt"
+
+fn main() -> i32 {
+    fmt.println("===== TEST LARGE_MAP_COMPREHENSIVE_1 START =====")
+
+    // Configuration map
+    map<string, string> config = {}
+    config["host"] = "localhost"
+    config["port"] = "8080"
+    config["db_name"] = "myapp"
+    config["debug"] = "true"
+    config["log_level"] = "info"
+    array<string> ckeys = config.keys()
+    ckeys.sort()
+    for k in ckeys {
+        fmt.println(f"  config.{k} = {config[k]}")
+    }
+
+    // Word frequency counter
+    string text = "to be or not to be that is the question to be is to exist"
+    array<string> words = text.fields()
+    map<string, i32> freq = {}
+    for w in words {
+        if freq.has(w) {
+            i32 c, bool f = freq.get(w)
+            freq[w] = c + 1
+        } else {
+            freq[w] = 1
+        }
+    }
+    array<string> fkeys = freq.keys()
+    fkeys.sort()
+    for k in fkeys {
+        fmt.println(f"  freq[{k}] = {freq[k]}")
+    }
+
+    // Entity lookup table
+    map<i32, string> users = {1: "Alice", 2: "Bob", 3: "Charlie"}
+    array<i32> ids = [1, 3, 2, 1]
+    for id in ids {
+        fmt.println(f"  user[{id}] = {users[id]}")
+    }
+
+    // Invert a map (swap keys and values)
+    map<string, i32> original = {"a": 1, "b": 2, "c": 3}
+    map<i32, string> inverted = {}
+    for key, val in original {
+        inverted[val] = key
+    }
+    array<i32> ikeys = inverted.keys()
+    ikeys.sort()
+    for ik in ikeys {
+        fmt.println(f"  inverted[{ik}] = {inverted[ik]}")
+    }
+
+    // Merge two maps
+    map<string, i32> m1 = {"a": 1, "b": 2}
+    map<string, i32> m2 = {"b": 99, "c": 3}
+    map<string, i32> merged = {}
+    for k, v in m1 {
+        merged[k] = v
+    }
+    for k, v in m2 {
+        merged[k] = v
+    }
+    array<string> mkeys = merged.keys()
+    mkeys.sort()
+    for k in mkeys {
+        fmt.println(f"  merged[{k}] = {merged[k]}")
+    }
+
+    // Group by first letter
+    array<string> names = ["Alice", "Bob", "Charlie", "Anna", "Brian", "Carol"]
+    map<string, array<string>> groups = {}
+    for name in names {
+        string first, err fe = name.substr(0, 1)
+        if groups.has(first) {
+            array<string> g, bool gf = groups.get(first)
+            g.push(name)
+        } else {
+            array<string> g = [name]
+            err se = groups.set(first, g)
+        }
+    }
+    array<string> gkeys = groups.keys()
+    gkeys.sort()
+    for gk in gkeys {
+        array<string> gv, bool gf = groups.get(gk)
+        gv.sort()
+        fmt.println(f"  {gk}: {", ".join(gv)}")
+    }
+
+    // Count and sum via map
+    map<string, i32> data = {"math": 90, "science": 85, "english": 92, "history": 88}
+    i32 total = 0
+    i32 cnt = 0
+    for subj, score in data {
+        total = total + score
+        cnt = cnt + 1
+    }
+    fmt.println(f"subjects: {cnt}, total: {total}")
+
+    fmt.println("===== TEST LARGE_MAP_COMPREHENSIVE_1 END =====")
+    return 0
+}

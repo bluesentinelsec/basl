@@ -1,0 +1,83 @@
+import "fmt"
+
+fn main() -> i32 {
+    fmt.println("===== TEST 09_CROSS_MODULE_USAGE START =====")
+
+    // Map keys -> array -> sort -> join
+    map<string, i32> scores = {"charlie": 92, "alice": 95, "bob": 87}
+    array<string> names = scores.keys()
+    names.sort()
+    fmt.println(f"sorted names: {", ".join(names)}")
+
+    // Map values -> array -> sort
+    array<i32> vals = scores.values()
+    vals.sort()
+    fmt.print("sorted scores: ")
+    for v in vals {
+        fmt.print(f"{v} ")
+    }
+    fmt.println("")
+
+    // Build map from split string
+    map<string, string> parsed = {}
+    string config = "host=localhost;port=8080;debug=true"
+    array<string> pairs = config.split(";")
+    for pair in pairs {
+        string key, string value, bool ok = pair.cut("=")
+        if ok {
+            err se = parsed.set(key, value)
+        }
+    }
+    fmt.println(f"parsed len: {parsed.len()}")
+    fmt.println(f"parsed host: {parsed["host"]}")
+    fmt.println(f"parsed port: {parsed["port"]}")
+    fmt.println(f"parsed debug: {parsed["debug"]}")
+
+    // Word frequency counter using map + string.fields()
+    string text = "the cat sat on the mat the cat"
+    array<string> words = text.fields()
+    map<string, i32> freq = {}
+    for w in words {
+        if freq.has(w) {
+            i32 c, bool f = freq.get(w)
+            freq[w] = c + 1
+        } else {
+            freq[w] = 1
+        }
+    }
+    // Sort keys for deterministic output
+    array<string> fkeys = freq.keys()
+    fkeys.sort()
+    for k in fkeys {
+        fmt.println(f"  {k}: {freq[k]}")
+    }
+
+    // Map -> iteration -> build array
+    map<string, i32> m = {"a": 1, "b": 2, "c": 3}
+    array<string> entries = []
+    for key, val in m {
+        entries.push(f"{key}={val}")
+    }
+    entries.sort()
+    fmt.println(f"entries: {", ".join(entries)}")
+
+    // Map with array values -> flatten
+    map<string, array<i32>> groups = {"x": [1, 2], "y": [3, 4]}
+    array<i32> flat = []
+    array<string> gkeys = groups.keys()
+    gkeys.sort()
+    for gk in gkeys {
+        array<i32> gv, bool gf = groups.get(gk)
+        for v in gv {
+            flat.push(v)
+        }
+    }
+    fmt.print("flattened: ")
+    for v in flat {
+        fmt.print(f"{v} ")
+    }
+    fmt.println("")
+
+    fmt.println("===== TEST 09_CROSS_MODULE_USAGE END =====")
+    return 0
+}

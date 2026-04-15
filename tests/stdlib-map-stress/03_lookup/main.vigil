@@ -1,0 +1,60 @@
+import "fmt"
+
+fn test_get() -> void {
+    map<string, i32> m = {"a": 1, "b": 2, "c": 3}
+    i32 v1, bool f1 = m.get("a")
+    fmt.println(f"get a: {v1}, {f1}")
+    i32 v2, bool f2 = m.get("c")
+    fmt.println(f"get c: {v2}, {f2}")
+    i32 v3, bool f3 = m.get("z")
+    fmt.println(f"get z: {v3}, {f3}")
+    i32 v4, bool f4 = m.get("")
+    fmt.println(f"get empty: {v4}, {f4}")
+}
+
+fn test_has() -> void {
+    map<string, i32> m = {"a": 1, "b": 2}
+    fmt.println(f"has a: {m.has("a")}")
+    fmt.println(f"has b: {m.has("b")}")
+    fmt.println(f"has z: {m.has("z")}")
+    fmt.println(f"has empty: {m.has("")}")
+
+    map<string, i32> empty = {}
+    fmt.println(f"empty has a: {empty.has("a")}")
+}
+
+fn test_index() -> void {
+    map<string, i32> m = {"x": 10, "y": 20}
+    fmt.println(f"m[x]: {m["x"]}")
+    fmt.println(f"m[y]: {m["y"]}")
+
+    // Index write (upsert)
+    m["z"] = 30
+    fmt.println(f"m[z] after set: {m["z"]}")
+    fmt.println(f"len after set: {m.len()}")
+
+    // Overwrite existing
+    m["x"] = 99
+    fmt.println(f"m[x] after overwrite: {m["x"]}")
+    fmt.println(f"len after overwrite: {m.len()}")
+}
+
+fn test_string_values() -> void {
+    map<string, string> m = {"greeting": "hello", "target": "world"}
+    string v1, bool f1 = m.get("greeting")
+    fmt.println(f"str get: {v1}, {f1}")
+    string v2, bool f2 = m.get("missing")
+    fmt.println(f"str get missing: [{v2}], {f2}")
+    fmt.println(f"str has: {m.has("greeting")}")
+    fmt.println(f"str index: {m["target"]}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 03_LOOKUP START =====")
+    test_get()
+    test_has()
+    test_index()
+    test_string_values()
+    fmt.println("===== TEST 03_LOOKUP END =====")
+    return 0
+}

@@ -1,0 +1,72 @@
+import "fmt"
+
+fn test_primitive_values() -> void {
+    map<string, i32> mi = {"a": 42}
+    fmt.println(f"i32 val: {mi["a"]}")
+
+    map<string, f64> mf = {"pi": 3.14}
+    fmt.println(f"f64 val: {mf["pi"]}")
+
+    map<string, bool> mb = {"flag": true}
+    fmt.println(f"bool val: {mb["flag"]}")
+
+    map<string, string> ms = {"name": "vigil"}
+    fmt.println(f"str val: {ms["name"]}")
+}
+
+fn test_array_values() -> void {
+    map<string, array<i32>> m = {"nums": [1, 2, 3], "more": [4, 5]}
+    array<i32> nums, bool f = m.get("nums")
+    fmt.println(f"arr val len: {nums.len()}")
+    fmt.println(f"arr val[0]: {nums[0]}")
+    fmt.println(f"arr val[2]: {nums[2]}")
+
+    // Mutate array value
+    array<i32> more, bool f2 = m.get("more")
+    more.push(6)
+    fmt.println(f"arr mutated len: {more.len()}")
+
+    // String array values
+    map<string, array<string>> ms = {"words": ["hello", "world"]}
+    array<string> words, bool wf = ms.get("words")
+    fmt.println(f"str arr: {words[0]}, {words[1]}")
+}
+
+fn test_map_values() -> void {
+    map<string, map<string, i32>> m = {"alice": {"score": 95, "age": 30}, "bob": {"score": 87, "age": 25}}
+    map<string, i32> alice, bool af = m.get("alice")
+    fmt.println(f"nested alice score: {alice["score"]}")
+    fmt.println(f"nested alice age: {alice["age"]}")
+
+    map<string, i32> bob, bool bf = m.get("bob")
+    fmt.println(f"nested bob score: {bob["score"]}")
+}
+
+fn test_mixed_operations() -> void {
+    // Map with string values, heavy mutation
+    map<string, string> config = {}
+    config["host"] = "localhost"
+    config["port"] = "8080"
+    config["debug"] = "true"
+    fmt.println(f"config len: {config.len()}")
+    fmt.println(f"config host: {config["host"]}")
+
+    // Overwrite and verify
+    config["port"] = "9090"
+    fmt.println(f"config port: {config["port"]}")
+
+    // Remove and verify
+    string rv, bool rf = config.remove("debug")
+    fmt.println(f"removed debug: {rv}, {rf}")
+    fmt.println(f"config len after: {config.len()}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 08_VALUE_TYPES START =====")
+    test_primitive_values()
+    test_array_values()
+    test_map_values()
+    test_mixed_operations()
+    fmt.println("===== TEST 08_VALUE_TYPES END =====")
+    return 0
+}

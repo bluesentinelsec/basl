@@ -1,0 +1,72 @@
+import "fmt"
+
+fn main() -> i32 {
+    fmt.println("===== TEST 05_EXTRACTION START =====")
+
+    map<string, i32> m = {"c": 3, "a": 1, "b": 2}
+
+    // keys()
+    array<string> k = m.keys()
+    fmt.println(f"keys len: {k.len()}")
+    // Sort for deterministic output (map order may vary)
+    k.sort()
+    fmt.println(f"keys sorted: {k[0]}, {k[1]}, {k[2]}")
+
+    // values()
+    array<i32> v = m.values()
+    fmt.println(f"values len: {v.len()}")
+    v.sort()
+    fmt.println(f"values sorted: {v[0]}, {v[1]}, {v[2]}")
+
+    // Empty map
+    map<string, i32> empty = {}
+    array<string> ek = empty.keys()
+    array<i32> ev = empty.values()
+    fmt.println(f"empty keys: {ek.len()}")
+    fmt.println(f"empty values: {ev.len()}")
+
+    // Single entry
+    map<string, i32> single = {"only": 42}
+    array<string> sk = single.keys()
+    array<i32> sv = single.values()
+    fmt.println(f"single key: {sk[0]}")
+    fmt.println(f"single val: {sv[0]}")
+
+    // keys/values after mutation
+    map<string, i32> mut = {"a": 1, "b": 2}
+    mut["c"] = 3
+    array<string> mk = mut.keys()
+    mk.sort()
+    fmt.println(f"mut keys: {mk[0]}, {mk[1]}, {mk[2]}")
+
+    // keys/values are independent copies
+    map<string, i32> orig = {"x": 10}
+    array<string> ok2 = orig.keys()
+    ok2.push("y")
+    fmt.println(f"orig len after keys push: {orig.len()}")
+    fmt.println(f"keys arr len: {ok2.len()}")
+
+    // keys contain all entries
+    map<string, i32> big = {}
+    for (i32 i = 0; i < 10; i++) {
+        big[f"k{i}"] = i
+    }
+    array<string> bk = big.keys()
+    fmt.println(f"big keys len: {bk.len()}")
+    array<i32> bv = big.values()
+    bv.sort()
+    fmt.println(f"big values[0]: {bv[0]}")
+    fmt.println(f"big values[9]: {bv[9]}")
+
+    // i32 key map
+    map<i32, string> im = {1: "one", 2: "two", 3: "three"}
+    array<i32> ik = im.keys()
+    ik.sort()
+    fmt.println(f"i32 keys: {ik[0]}, {ik[1]}, {ik[2]}")
+    array<string> iv = im.values()
+    iv.sort()
+    fmt.println(f"i32 values: {iv[0]}, {iv[1]}, {iv[2]}")
+
+    fmt.println("===== TEST 05_EXTRACTION END =====")
+    return 0
+}

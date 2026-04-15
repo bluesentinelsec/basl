@@ -1,0 +1,74 @@
+import "fmt"
+
+fn test_set() -> void {
+    map<string, i32> m = {}
+    err e1 = m.set("a", 1)
+    fmt.println(f"set a: ok={e1 == ok}, len={m.len()}")
+    err e2 = m.set("b", 2)
+    fmt.println(f"set b: ok={e2 == ok}, len={m.len()}")
+    // Overwrite
+    err e3 = m.set("a", 99)
+    fmt.println(f"set a again: ok={e3 == ok}, len={m.len()}")
+    i32 v, bool f = m.get("a")
+    fmt.println(f"a after overwrite: {v}")
+}
+
+fn test_index_write() -> void {
+    map<string, i32> m = {}
+    m["x"] = 10
+    m["y"] = 20
+    m["z"] = 30
+    fmt.println(f"index write len: {m.len()}")
+    fmt.println(f"x: {m["x"]}, y: {m["y"]}, z: {m["z"]}")
+    // Overwrite via index
+    m["x"] = 99
+    fmt.println(f"x after overwrite: {m["x"]}")
+    fmt.println(f"len unchanged: {m.len()}")
+}
+
+fn test_remove() -> void {
+    map<string, i32> m = {"a": 1, "b": 2, "c": 3}
+    i32 rv1, bool rf1 = m.remove("b")
+    fmt.println(f"remove b: {rv1}, {rf1}, len={m.len()}")
+    i32 rv2, bool rf2 = m.remove("z")
+    fmt.println(f"remove z: {rv2}, {rf2}, len={m.len()}")
+    i32 rv3, bool rf3 = m.remove("a")
+    fmt.println(f"remove a: {rv3}, {rf3}, len={m.len()}")
+    // Remove last
+    i32 rv4, bool rf4 = m.remove("c")
+    fmt.println(f"remove c: {rv4}, {rf4}, len={m.len()}")
+    fmt.println(f"now empty: {m.none()}")
+}
+
+fn test_clear() -> void {
+    map<string, i32> m = {"a": 1, "b": 2, "c": 3}
+    fmt.println(f"before clear: {m.len()}")
+    m.clear()
+    fmt.println(f"after clear: {m.len()}, none={m.none()}")
+    // Reuse after clear
+    m["x"] = 42
+    fmt.println(f"after reuse: {m.len()}, x={m["x"]}")
+}
+
+fn test_string_mutation() -> void {
+    map<string, string> m = {}
+    err e = m.set("key", "value")
+    fmt.println(f"str set: ok={e == ok}")
+    string sv, bool sf = m.get("key")
+    fmt.println(f"str get: {sv}, {sf}")
+    m["key"] = "updated"
+    fmt.println(f"str updated: {m["key"]}")
+    string rv, bool rf = m.remove("key")
+    fmt.println(f"str remove: {rv}, {rf}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 04_MUTATION START =====")
+    test_set()
+    test_index_write()
+    test_remove()
+    test_clear()
+    test_string_mutation()
+    fmt.println("===== TEST 04_MUTATION END =====")
+    return 0
+}

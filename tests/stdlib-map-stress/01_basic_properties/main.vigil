@@ -1,0 +1,41 @@
+import "fmt"
+
+fn main() -> i32 {
+    fmt.println("===== TEST 01_BASIC_PROPERTIES START =====")
+
+    map<string, i32> m = {"a": 1, "b": 2, "c": 3}
+    fmt.println(f"len: {m.len()}")
+    fmt.println(f"any: {m.any()}")
+    fmt.println(f"none: {m.none()}")
+
+    map<string, i32> empty = {}
+    fmt.println(f"empty len: {empty.len()}")
+    fmt.println(f"empty any: {empty.any()}")
+    fmt.println(f"empty none: {empty.none()}")
+
+    // Single entry
+    map<string, i32> single = {"x": 42}
+    fmt.println(f"single len: {single.len()}")
+    fmt.println(f"single any: {single.any()}")
+    fmt.println(f"single none: {single.none()}")
+
+    // After mutation
+    map<string, i32> mut = {}
+    fmt.println(f"mut none: {mut.none()}")
+    mut["a"] = 1
+    fmt.println(f"mut after set: len={mut.len()}, any={mut.any()}, none={mut.none()}")
+    i32 rv, bool rf = mut.remove("a")
+    fmt.println(f"mut after remove: len={mut.len()}, any={mut.any()}, none={mut.none()}")
+
+    // After clear
+    map<string, i32> cl = {"a": 1, "b": 2}
+    cl.clear()
+    fmt.println(f"after clear: len={cl.len()}, none={cl.none()}")
+
+    // i32 key map
+    map<i32, string> im = {1: "one", 2: "two", 3: "three"}
+    fmt.println(f"i32 key len: {im.len()}")
+
+    fmt.println("===== TEST 01_BASIC_PROPERTIES END =====")
+    return 0
+}
