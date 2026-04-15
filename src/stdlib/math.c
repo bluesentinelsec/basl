@@ -13,11 +13,24 @@
 
 /* ── helpers ─────────────────────────────────────────────────────── */
 
+/* Decode a nanbox value to double, accepting both double and integer encodings.
+   The transpiler may pass integer-encoded 0 where the interpreter would pass
+   double 0.0, because both share the same raw bit pattern (0x0000000000000000)
+   and tc_to_nanbox encodes ambiguous zero as integer. */
+static inline double vigil_math_as_f64(vigil_value_t v)
+{
+    if (vigil_nanbox_is_int(v))
+        return (double)vigil_nanbox_decode_int(v);
+    if (vigil_nanbox_is_uint(v))
+        return (double)vigil_nanbox_decode_uint(v);
+    return vigil_nanbox_decode_double(v);
+}
+
 static double vigil_math_pop_f64(vigil_vm_t *vm)
 {
     vigil_value_t v = vigil_vm_stack_get(vm, vigil_vm_stack_depth(vm) - 1U);
     vigil_vm_stack_pop_n(vm, 1U);
-    return vigil_nanbox_decode_double(v);
+    return vigil_math_as_f64(v);
 }
 
 static vigil_status_t vigil_math_push_f64(vigil_vm_t *vm, double d, vigil_error_t *error)
@@ -480,7 +493,7 @@ static double vigil_vec_get_field(vigil_vm_t *vm, size_t slot, size_t idx)
     vigil_object_t *obj = (vigil_object_t *)vigil_nanbox_decode_ptr(val);
     vigil_value_t field;
     vigil_instance_object_get_field(obj, idx, &field);
-    double result = vigil_nanbox_decode_double(field);
+    double result = vigil_math_as_f64(field);
     vigil_value_release(&field);
     return result;
 }
@@ -581,7 +594,7 @@ static vigil_status_t vigil_vec2_scale(vigil_vm_t *vm, size_t arg_count, vigil_e
     double y = vigil_vec_get_field(vm, base, 1U);
     size_t ci = vigil_vec_self_class(vm, base);
     vigil_value_t sv = vigil_vm_stack_get(vm, base + 1U);
-    double s = vigil_nanbox_decode_double(sv);
+    double s = vigil_math_as_f64(sv);
     vigil_vm_stack_pop_n(vm, arg_count);
     return vigil_vec2_push_new(vm, x * s, y * s, ci, error);
 }
@@ -622,7 +635,7 @@ static vigil_status_t vigil_vec2_vlerp(vigil_vm_t *vm, size_t arg_count, vigil_e
     double x2 = vigil_vec_get_field(vm, base + 1U, 0U);
     double y2 = vigil_vec_get_field(vm, base + 1U, 1U);
     vigil_value_t tv = vigil_vm_stack_get(vm, base + 2U);
-    double t = vigil_nanbox_decode_double(tv);
+    double t = vigil_math_as_f64(tv);
     size_t ci = vigil_vec_self_class(vm, base);
     vigil_vm_stack_pop_n(vm, arg_count);
     return vigil_vec2_push_new(vm, x1 + (x2 - x1) * t, y1 + (y2 - y1) * t, ci, error);
@@ -821,7 +834,7 @@ static vigil_status_t vigil_vec2_rotate(vigil_vm_t *vm, size_t arg_count, vigil_
     double y = vigil_vec_get_field(vm, base, 1U);
     size_t ci = vigil_vec_self_class(vm, base);
     vigil_value_t av = vigil_vm_stack_get(vm, base + 1U);
-    double a = vigil_nanbox_decode_double(av);
+    double a = vigil_math_as_f64(av);
     double c = cos(a), s = sin(a);
     vigil_vm_stack_pop_n(vm, arg_count);
     return vigil_vec2_push_new(vm, x * c - y * s, x * s + y * c, ci, error);
@@ -996,7 +1009,7 @@ static vigil_status_t vigil_vec3_scale(vigil_vm_t *vm, size_t arg_count, vigil_e
     double z = vigil_vec_get_field(vm, base, 2U);
     size_t ci = vigil_vec_self_class(vm, base);
     vigil_value_t sv = vigil_vm_stack_get(vm, base + 1U);
-    double s = vigil_nanbox_decode_double(sv);
+    double s = vigil_math_as_f64(sv);
     vigil_vm_stack_pop_n(vm, arg_count);
     return vigil_vec3_push_new(vm, x * s, y * s, z * s, ci, error);
 }
@@ -1042,7 +1055,7 @@ static vigil_status_t vigil_vec3_vlerp(vigil_vm_t *vm, size_t arg_count, vigil_e
     double y2 = vigil_vec_get_field(vm, base + 1U, 1U);
     double z2 = vigil_vec_get_field(vm, base + 1U, 2U);
     vigil_value_t tv = vigil_vm_stack_get(vm, base + 2U);
-    double t = vigil_nanbox_decode_double(tv);
+    double t = vigil_math_as_f64(tv);
     size_t ci = vigil_vec_self_class(vm, base);
     vigil_vm_stack_pop_n(vm, arg_count);
     return vigil_vec3_push_new(vm, x1 + (x2 - x1) * t, y1 + (y2 - y1) * t, z1 + (z2 - z1) * t, ci, error);
@@ -1417,7 +1430,7 @@ static vigil_status_t vigil_vec4_scale(vigil_vm_t *vm, size_t arg_count, vigil_e
     double z = vigil_vec_get_field(vm, base, 2U);
     double w = vigil_vec_get_field(vm, base, 3U);
     vigil_value_t sv = vigil_vm_stack_get(vm, base + 1U);
-    double s = vigil_nanbox_decode_double(sv);
+    double s = vigil_math_as_f64(sv);
     vigil_vm_stack_pop_n(vm, arg_count);
     return vigil_vec4_push_new(vm, x * s, y * s, z * s, w * s, ci, error);
 }
@@ -1435,7 +1448,7 @@ static vigil_status_t vigil_vec4_vlerp(vigil_vm_t *vm, size_t arg_count, vigil_e
     double z2 = vigil_vec_get_field(vm, base + 1U, 2U);
     double w2 = vigil_vec_get_field(vm, base + 1U, 3U);
     vigil_value_t tv = vigil_vm_stack_get(vm, base + 2U);
-    double t = vigil_nanbox_decode_double(tv);
+    double t = vigil_math_as_f64(tv);
     vigil_vm_stack_pop_n(vm, arg_count);
     return vigil_vec4_push_new(vm, x1 + (x2 - x1) * t, y1 + (y2 - y1) * t, z1 + (z2 - z1) * t, w1 + (w2 - w1) * t, ci,
                                error);
@@ -1599,7 +1612,7 @@ static vigil_status_t vigil_quat_slerp(vigil_vm_t *vm, size_t arg_count, vigil_e
     double z2 = vigil_vec_get_field(vm, base + 1U, 2U);
     double w2 = vigil_vec_get_field(vm, base + 1U, 3U);
     vigil_value_t tv = vigil_vm_stack_get(vm, base + 2U);
-    double t = vigil_nanbox_decode_double(tv);
+    double t = vigil_math_as_f64(tv);
     size_t ci = vigil_vec_self_class(vm, base);
     double cosHalf = x1 * x2 + y1 * y2 + z1 * z2 + w1 * w2;
     double s1, s2, halfAngle, sinHalf;
@@ -1640,7 +1653,7 @@ static vigil_status_t vigil_quat_from_axis_angle(vigil_vm_t *vm, size_t arg_coun
     double ay = vigil_vec_get_field(vm, base + 1U, 1U);
     double az = vigil_vec_get_field(vm, base + 1U, 2U);
     vigil_value_t av = vigil_vm_stack_get(vm, base + 2U);
-    double angle = vigil_nanbox_decode_double(av);
+    double angle = vigil_math_as_f64(av);
     double half = angle * 0.5;
     double s = sin(half);
     double len = sqrt(ax * ax + ay * ay + az * az);
@@ -1668,18 +1681,30 @@ static vigil_status_t vigil_quat_to_euler(vigil_vm_t *vm, size_t arg_count, vigi
     size_t ci = vigil_vec_self_class(vm, base);
     double sinp, pitch, yaw, roll;
     vigil_vm_stack_pop_n(vm, arg_count);
-    /* pitch (x-axis rotation) */
-    sinp = 2.0 * (w * x - y * z);
-    if (sinp >= 1.0)
-        pitch = 3.14159265358979323846 * 0.5;
-    else if (sinp <= -1.0)
-        pitch = -3.14159265358979323846 * 0.5;
+    /* yaw (y-axis rotation): asin(clamp(2(wy - xz), -1, 1))
+       When |sinp| ≈ 1 the pitch/roll atan2 denominators vanish (gimbal lock).
+       Use a threshold so near-lock values on any platform take the stable path. */
+    sinp = 2.0 * (w * y - x * z);
+    if (sinp > 1.0)
+        sinp = 1.0;
+    else if (sinp < -1.0)
+        sinp = -1.0;
+    if (fabs(sinp) >= 1.0 - 1e-12)
+    {
+        /* Gimbal lock: pitch and roll share an axis.  By convention set
+           roll = 0 and absorb the remaining freedom into pitch. */
+        yaw = copysign(3.14159265358979323846 * 0.5, sinp);
+        pitch = 2.0 * atan2(x, w);
+        roll = 0.0;
+    }
     else
-        pitch = asin(sinp);
-    /* yaw (y-axis rotation) */
-    yaw = atan2(2.0 * (w * y + x * z), 1.0 - 2.0 * (x * x + y * y));
-    /* roll (z-axis rotation) */
-    roll = atan2(2.0 * (w * z + x * y), 1.0 - 2.0 * (x * x + z * z));
+    {
+        yaw = asin(sinp);
+        /* pitch (x-axis rotation): atan2(2(yz + wx), 1 - 2(x² + y²)) */
+        pitch = atan2(2.0 * (y * z + w * x), 1.0 - 2.0 * (x * x + y * y));
+        /* roll (z-axis rotation): atan2(2(xy + wz), 1 - 2(y² + z²)) */
+        roll = atan2(2.0 * (x * y + w * z), 1.0 - 2.0 * (y * y + z * z));
+    }
     return vigil_quat_push_new(vm, pitch, yaw, roll, 0.0, ci, error);
 }
 
@@ -1695,9 +1720,9 @@ static vigil_status_t vigil_quat_from_euler(vigil_vm_t *vm, size_t arg_count, vi
 {
     size_t base = vigil_vm_stack_depth(vm) - arg_count;
     size_t ci = vigil_static_class_index(vm, base);
-    double pitch = vigil_nanbox_decode_double(vigil_vm_stack_get(vm, base + 1U));
-    double yaw = vigil_nanbox_decode_double(vigil_vm_stack_get(vm, base + 2U));
-    double roll = vigil_nanbox_decode_double(vigil_vm_stack_get(vm, base + 3U));
+    double pitch = vigil_math_as_f64(vigil_vm_stack_get(vm, base + 1U));
+    double yaw = vigil_math_as_f64(vigil_vm_stack_get(vm, base + 2U));
+    double roll = vigil_math_as_f64(vigil_vm_stack_get(vm, base + 3U));
     double hp = pitch * 0.5, hy = yaw * 0.5, hr = roll * 0.5;
     double sp = sin(hp), cp = cos(hp);
     double sy = sin(hy), cy = cos(hy);
@@ -1805,7 +1830,7 @@ static double vigil_mat4_read(vigil_object_t *arr, size_t idx)
 {
     vigil_value_t v;
     vigil_array_object_get(arr, idx, &v);
-    return vigil_nanbox_decode_double(v);
+    return vigil_math_as_f64(v);
 }
 
 /* Helper: push a new Mat4 with 16 doubles. */
@@ -1876,7 +1901,7 @@ static vigil_status_t vigil_mat4_set(vigil_vm_t *vm, size_t arg_count, vigil_err
     size_t i;
     for (i = 0; i < 16; i++)
         m[i] = vigil_mat4_read(arr, i);
-    m[col * 4 + row] = vigil_nanbox_decode_double(vv);
+    m[col * 4 + row] = vigil_math_as_f64(vv);
     vigil_vm_stack_pop_n(vm, arg_count);
     return vigil_mat4_push_new(vm, m, ci, error);
 }
@@ -1965,7 +1990,7 @@ static vigil_status_t vigil_mat4_scale(vigil_vm_t *vm, size_t arg_count, vigil_e
     vigil_object_t *a = vigil_mat4_get_data(vm, base);
     size_t ci = vigil_vec_self_class(vm, base);
     vigil_value_t sv = vigil_vm_stack_get(vm, base + 1U);
-    double s = vigil_nanbox_decode_double(sv);
+    double s = vigil_math_as_f64(sv);
     double m[16];
     size_t i;
     for (i = 0; i < 16; i++)
@@ -2096,7 +2121,7 @@ static vigil_status_t vigil_mat4_rotate_x(vigil_vm_t *vm, size_t arg_count, vigi
     size_t base = vigil_vm_stack_depth(vm) - arg_count;
     vigil_object_t *a = vigil_mat4_get_data(vm, base);
     size_t ci = vigil_vec_self_class(vm, base);
-    double angle = vigil_nanbox_decode_double(vigil_vm_stack_get(vm, base + 1U));
+    double angle = vigil_math_as_f64(vigil_vm_stack_get(vm, base + 1U));
     double c = cos(angle), s = sin(angle);
     double m[16];
     size_t i;
@@ -2120,7 +2145,7 @@ static vigil_status_t vigil_mat4_rotate_y(vigil_vm_t *vm, size_t arg_count, vigi
     size_t base = vigil_vm_stack_depth(vm) - arg_count;
     vigil_object_t *a = vigil_mat4_get_data(vm, base);
     size_t ci = vigil_vec_self_class(vm, base);
-    double angle = vigil_nanbox_decode_double(vigil_vm_stack_get(vm, base + 1U));
+    double angle = vigil_math_as_f64(vigil_vm_stack_get(vm, base + 1U));
     double c = cos(angle), s = sin(angle);
     double m[16];
     size_t i;
@@ -2143,7 +2168,7 @@ static vigil_status_t vigil_mat4_rotate_z(vigil_vm_t *vm, size_t arg_count, vigi
     size_t base = vigil_vm_stack_depth(vm) - arg_count;
     vigil_object_t *a = vigil_mat4_get_data(vm, base);
     size_t ci = vigil_vec_self_class(vm, base);
-    double angle = vigil_nanbox_decode_double(vigil_vm_stack_get(vm, base + 1U));
+    double angle = vigil_math_as_f64(vigil_vm_stack_get(vm, base + 1U));
     double c = cos(angle), s = sin(angle);
     double m[16];
     size_t i;
@@ -2224,10 +2249,10 @@ static vigil_status_t vigil_mat4_perspective(vigil_vm_t *vm, size_t arg_count, v
 {
     size_t base = vigil_vm_stack_depth(vm) - arg_count;
     size_t ci = vigil_static_class_index(vm, base);
-    double fovy = vigil_nanbox_decode_double(vigil_vm_stack_get(vm, base + 1U));
-    double aspect = vigil_nanbox_decode_double(vigil_vm_stack_get(vm, base + 2U));
-    double near = vigil_nanbox_decode_double(vigil_vm_stack_get(vm, base + 3U));
-    double far = vigil_nanbox_decode_double(vigil_vm_stack_get(vm, base + 4U));
+    double fovy = vigil_math_as_f64(vigil_vm_stack_get(vm, base + 1U));
+    double aspect = vigil_math_as_f64(vigil_vm_stack_get(vm, base + 2U));
+    double near = vigil_math_as_f64(vigil_vm_stack_get(vm, base + 3U));
+    double far = vigil_math_as_f64(vigil_vm_stack_get(vm, base + 4U));
     double top = near * tan(fovy * 0.5);
     double right = top * aspect;
     double m[16] = {0};
@@ -2245,12 +2270,12 @@ static vigil_status_t vigil_mat4_ortho(vigil_vm_t *vm, size_t arg_count, vigil_e
 {
     size_t base = vigil_vm_stack_depth(vm) - arg_count;
     size_t ci = vigil_static_class_index(vm, base);
-    double l = vigil_nanbox_decode_double(vigil_vm_stack_get(vm, base + 1U));
-    double r = vigil_nanbox_decode_double(vigil_vm_stack_get(vm, base + 2U));
-    double b = vigil_nanbox_decode_double(vigil_vm_stack_get(vm, base + 3U));
-    double t = vigil_nanbox_decode_double(vigil_vm_stack_get(vm, base + 4U));
-    double n = vigil_nanbox_decode_double(vigil_vm_stack_get(vm, base + 5U));
-    double f = vigil_nanbox_decode_double(vigil_vm_stack_get(vm, base + 6U));
+    double l = vigil_math_as_f64(vigil_vm_stack_get(vm, base + 1U));
+    double r = vigil_math_as_f64(vigil_vm_stack_get(vm, base + 2U));
+    double b = vigil_math_as_f64(vigil_vm_stack_get(vm, base + 3U));
+    double t = vigil_math_as_f64(vigil_vm_stack_get(vm, base + 4U));
+    double n = vigil_math_as_f64(vigil_vm_stack_get(vm, base + 5U));
+    double f = vigil_math_as_f64(vigil_vm_stack_get(vm, base + 6U));
     double m[16] = {0};
     m[0] = 2.0 / (r - l);
     m[5] = 2.0 / (t - b);
@@ -2268,12 +2293,12 @@ static vigil_status_t vigil_mat4_frustum(vigil_vm_t *vm, size_t arg_count, vigil
 {
     size_t base = vigil_vm_stack_depth(vm) - arg_count;
     size_t ci = vigil_static_class_index(vm, base);
-    double l = vigil_nanbox_decode_double(vigil_vm_stack_get(vm, base + 1U));
-    double r = vigil_nanbox_decode_double(vigil_vm_stack_get(vm, base + 2U));
-    double b = vigil_nanbox_decode_double(vigil_vm_stack_get(vm, base + 3U));
-    double t = vigil_nanbox_decode_double(vigil_vm_stack_get(vm, base + 4U));
-    double n = vigil_nanbox_decode_double(vigil_vm_stack_get(vm, base + 5U));
-    double f = vigil_nanbox_decode_double(vigil_vm_stack_get(vm, base + 6U));
+    double l = vigil_math_as_f64(vigil_vm_stack_get(vm, base + 1U));
+    double r = vigil_math_as_f64(vigil_vm_stack_get(vm, base + 2U));
+    double b = vigil_math_as_f64(vigil_vm_stack_get(vm, base + 3U));
+    double t = vigil_math_as_f64(vigil_vm_stack_get(vm, base + 4U));
+    double n = vigil_math_as_f64(vigil_vm_stack_get(vm, base + 5U));
+    double f = vigil_math_as_f64(vigil_vm_stack_get(vm, base + 6U));
     double m[16] = {0};
     m[0] = 2.0 * n / (r - l);
     m[5] = 2.0 * n / (t - b);

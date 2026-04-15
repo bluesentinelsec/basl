@@ -1,0 +1,58 @@
+import "fmt"
+import "math"
+
+fn main() -> i32 {
+    fmt.println("===== TEST 04_SCALAR_CLASSIFICATION START =====")
+    // ── isNaN ──
+    f64 nan_val = math.sqrt(- 1.0)
+    fmt.println(f"isNaN(sqrt(-1)): {math.isNaN(nan_val)}")
+    fmt.println(f"isNaN(1.0): {math.isNaN(1.0)}")
+    fmt.println(f"isNaN(0.0): {math.isNaN(0.0)}")
+    fmt.println(f"isNaN(-1.0): {math.isNaN(-1.0)}")
+    fmt.println(f"isNaN(sqrt(-1)): {math.isNaN(math.sqrt(-1.0))}")
+    fmt.println(f"isNaN(log(-1)): {math.isNaN(math.log(-1.0))}")
+    fmt.println(f"isNaN(asin(2)): {math.isNaN(math.asin(2.0))}")
+    // ── isInf ──
+    f64 pos_inf = math.exp(1000.0)
+    f64 neg_inf = - 1.0 * math.exp(1000.0)
+    fmt.println(f"isInf(exp(1000)): {math.isInf(pos_inf)}")
+    fmt.println(f"isInf(-exp(1000)): {math.isInf(neg_inf)}")
+    fmt.println(f"isInf(0.0): {math.isInf(0.0)}")
+    fmt.println(f"isInf(1.0): {math.isInf(1.0)}")
+    fmt.println(f"isInf(NaN): {math.isInf(nan_val)}")
+    fmt.println(f"isInf(log(tiny)): {math.isInf(math.log(1.0e-308))}")
+    // ── isFinite ──
+    fmt.println(f"isFinite(1.0): {math.isFinite(1.0)}")
+    fmt.println(f"isFinite(0.0): {math.isFinite(0.0)}")
+    fmt.println(f"isFinite(-99.5): {math.isFinite(-99.5)}")
+    fmt.println(f"isFinite(inf): {math.isFinite(pos_inf)}")
+    fmt.println(f"isFinite(-inf): {math.isFinite(neg_inf)}")
+    fmt.println(f"isFinite(NaN): {math.isFinite(nan_val)}")
+    // ── Classification consistency ──
+    f64 v = 42.0
+    fmt.println(f"finite 42: fin={math.isFinite(v)} nan={math.isNaN(v)} inf={math.isInf(v)}")
+    fmt.println(f"NaN: fin={math.isFinite(nan_val)} nan={math.isNaN(nan_val)} inf={math.isInf(nan_val)}")
+    fmt.println(f"Inf: fin={math.isFinite(pos_inf)} nan={math.isNaN(pos_inf)} inf={math.isInf(pos_inf)}")
+    // ── NaN propagation ──
+    fmt.println(f"NaN + 1 is NaN: {math.isNaN(nan_val + 1.0)}")
+    fmt.println(f"NaN * 2 is NaN: {math.isNaN(nan_val * 2.0)}")
+    fmt.println(f"abs(NaN) is NaN: {math.isNaN(math.abs(nan_val))}")
+    fmt.println(f"sqrt(NaN) is NaN: {math.isNaN(math.sqrt(nan_val))}")
+    fmt.println(f"sin(NaN) is NaN: {math.isNaN(math.sin(nan_val))}")
+    fmt.println(f"floor(NaN) is NaN: {math.isNaN(math.floor(nan_val))}")
+    // ── Inf arithmetic ──
+    fmt.println(f"inf + 1 is inf: {math.isInf(pos_inf + 1.0)}")
+    fmt.println(f"inf * 2 is inf: {math.isInf(pos_inf * 2.0)}")
+    fmt.println(f"inf - inf is NaN: {math.isNaN(pos_inf - pos_inf)}")
+    fmt.println(f"inf / inf is NaN: {math.isNaN(pos_inf / pos_inf)}")
+    // ── Edge: operations that produce special values ──
+    fmt.println(f"exp(1000) is inf: {math.isInf(math.exp(1000.0))}")
+    fmt.println(f"log(tiny) is finite: {math.isFinite(math.log(1.0e-308))}")
+    fmt.println(f"isFinite(exp(1)): {math.isFinite(math.exp(1.0))}")
+    // ── sign/abs with special values ──
+    fmt.println(f"sign(inf): {math.sign(pos_inf):.0f}")
+    fmt.println(f"sign(-inf): {math.sign(neg_inf):.0f}")
+    fmt.println(f"abs(inf) is inf: {math.isInf(math.abs(neg_inf))}")
+    fmt.println("===== TEST 04_SCALAR_CLASSIFICATION END =====")
+    return 0
+}

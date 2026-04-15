@@ -1,0 +1,162 @@
+import "fmt"
+import "math"
+import "math_helpers"
+import "transform_pipeline"
+
+fn main() -> i32 {
+    fmt.println("===== TEST LARGE_MATH_COMPREHENSIVE START =====")
+    // ── Section 1: Scalar pipeline — signal processing simulation ──
+    fmt.println("-- scalar pipeline --")
+    // Generate a composite signal: sin + cos harmonic
+    f64 freq1 = 2.0
+    f64 freq2 = 5.0
+    f64 amplitude = 3.0
+    f64 phase = math.pi() / 4.0
+    f64 t = 0.25
+    f64 signal = amplitude * math.sin(freq1 * math.tau() * t + phase) + math.cos(freq2 * math.tau() * t)
+    fmt.println(f"signal at t=0.25: {signal:.6f}")
+    // RMS of a known signal: sin over one period sampled at 8 points
+    f64 rms_sum = 0.0
+    for (i32 i = 1; i <= 8; i++) {
+        f64 sample_t = f64(i) / 8.0
+        f64 val = math.sin(math.tau() * sample_t)
+        rms_sum = rms_sum + val * val
+    }
+
+    f64 rms = math.sqrt(rms_sum / 8.0)
+    fmt.println(f"sin RMS near 0.707: {math_helpers.approx_eq(rms, math.sqrt(0.5), 0.01)}")
+    // Interpolation pipeline: remap + clamp + smoothstep
+    f64 raw = 75.0
+    f64 normalized = math.remap(raw, 10.0, 90.0, 0.0, 1.0)
+    f64 clamped = math.clamp(normalized, 0.01, 0.99)
+    f64 smooth = math.smoothstep(0.01, 0.99, clamped)
+    fmt.println(f"pipeline smooth: {smooth:.6f}")
+    // ── Section 2: 2D physics — projectile trajectory ──
+    fmt.println("-- 2d projectile --")
+    f64 v0 = 20.0
+    f64 launch_angle = math.deg2rad(45.0)
+    f64 gravity = 9.81
+    // Sample trajectory at 3 time points
+    math.Vec2 p1 = math_helpers.projectile_position(v0, launch_angle, 0.5, gravity)
+    math.Vec2 p2 = math_helpers.projectile_position(v0, launch_angle, 1.0, gravity)
+    math.Vec2 p3 = math_helpers.projectile_position(v0, launch_angle, 1.5, gravity)
+    fmt.println(f"t=0.5 x: {p1.x:.4f}")
+    fmt.println(f"t=0.5 y: {p1.y:.4f}")
+    fmt.println(f"t=1.0 x: {p2.x:.4f}")
+    fmt.println(f"t=1.5 y: {p3.y:.4f}")
+    // Verify trajectory is parabolic: midpoint should be above line between endpoints
+    f64 mid_y = p2.y
+    f64 line_y = math.lerp(p1.y, p3.y, 0.5)
+    fmt.println(f"parabolic shape: {mid_y > line_y}")
+    // Distance traveled
+    f64 d12 = p1.distance(p2)
+    f64 d23 = p2.distance(p3)
+    fmt.println(f"d12: {d12:.4f}")
+    fmt.println(f"d23: {d23:.4f}")
+    // ── Section 3: 3D orbit simulation ──
+    fmt.println("-- 3d orbit --")
+    f64 semi_major = 10.0
+    f64 eccentricity = 0.3
+    // Sample 4 points on the orbit
+    math.Vec3 o1 = math_helpers.orbit_position(semi_major, eccentricity, math.pi() / 6.0)
+    math.Vec3 o2 = math_helpers.orbit_position(semi_major, eccentricity, math.pi() / 3.0)
+    math.Vec3 o3 = math_helpers.orbit_position(semi_major, eccentricity, math.pi() / 2.0)
+    math.Vec3 o4 = math_helpers.orbit_position(semi_major, eccentricity, math.pi())
+    // Verify orbit distances from origin vary (eccentricity > 0)
+    f64 r1 = math.sqrt(o1.x * o1.x + o1.y * o1.y)
+    f64 r4 = math.sqrt(o4.x * o4.x + o4.y * o4.y)
+    fmt.println(f"orbit r1: {r1:.4f}")
+    fmt.println(f"orbit r4: {r4:.4f}")
+    fmt.println(f"r4 > r1 (eccentric): {r4 > r1}")
+    // Hermite interpolation between orbit points
+    math.Vec3 tangent1 = o2.sub(o1).scale(2.0)
+    math.Vec3 tangent2 = o4.sub(o3).scale(2.0)
+    math.Vec3 interp = math_helpers.hermite_interp(o2, o3, tangent1, tangent2, 0.5)
+    fmt.println(f"hermite interp finite: {math.isFinite(interp.x) && math.isFinite(interp.y)}")
+    // ── Section 4: 3D transform pipeline ──
+    fmt.println("-- 3d transforms --")
+    math.Vec3 obj_pos = math.Vec3(5.0, 2.0, - 3.0)
+    math.Vec3 obj_scale = math.Vec3(1.0, 1.5, 1.0)
+    f64 obj_rot = math.deg2rad(30.0)
+    math.Mat4 model = transform_pipeline.build_model_matrix(obj_pos, obj_scale, obj_rot)
+    fmt.println(f"model det: {model.determinant():.4f}")
+    math.Vec3 eye = math.Vec3(0.0, 5.0, 10.0)
+    math.Vec3 target = math.Vec3(0.0, 0.0, 0.0)
+    math.Mat4 view = transform_pipeline.build_view_matrix(eye, target)
+    fmt.println(f"view det nonzero: {math.abs(view.determinant()) > 1.0e-10}")
+    math.Mat4 proj = transform_pipeline.build_projection(60.0, 1.5, 0.1, 100.0)
+    fmt.println(f"proj det nonzero: {math.abs(proj.determinant()) > 1.0e-10}")
+    // Full MVP pipeline
+    math.Mat4 mvp = proj.multiply(view).multiply(model)
+    fmt.println(f"mvp det nonzero: {math.abs(mvp.determinant()) > 1.0e-10}")
+    // Transform a local-space point through the full pipeline
+    math.Vec3 local_pt = math.Vec3(1.0, 1.0, 1.0)
+    math.Vec3 clip_pt = transform_pipeline.transform_point(local_pt, mvp)
+    fmt.println(f"clip point finite: {math.isFinite(clip_pt.x) && math.isFinite(clip_pt.y) && math.isFinite(clip_pt.z)}")
+    // Model * inverse(Model) == identity
+    math.Mat4 model_inv = model.invert()
+    math.Mat4 should_be_ident = model.multiply(model_inv)
+    fmt.println(f"model * inv near identity: {math.abs(should_be_ident.get(0, 0) - 1.0) < 1.0e-6 && math.abs(should_be_ident.get(1, 1) - 1.0) < 1.0e-6}")
+    // ── Section 5: Quaternion rotation pipeline ──
+    fmt.println("-- quaternion pipeline --")
+    math.Vec3 forward = math.Vec3(0.0, 0.0, - 1.0)
+    // Rotate forward vector by 90 degrees around Y
+    math.Vec3 rotated = transform_pipeline.rotate_around_axis(forward, math.Vec3(0.0, 1.0, 0.0), math.pi() / 2.0)
+    fmt.println(f"rotated preserves len: {math_helpers.approx_eq(rotated.length(), forward.length(), 1.0e-10)}")
+    fmt.println(f"rotated x near 1: {math_helpers.approx_eq(math.abs(rotated.x), 1.0, 1.0e-6)}")
+    // Compose yaw + pitch + roll
+    math.Quaternion composed = transform_pipeline.compose_rotations(math.deg2rad(45.0), math.deg2rad(30.0), math.deg2rad(15.0))
+    fmt.println(f"composed len near 1: {math_helpers.approx_eq(composed.length(), 1.0, 1.0e-10)}")
+    // Slerp between two rotations
+    math.Quaternion q_start = transform_pipeline.compose_rotations(math.deg2rad(10.0), math.deg2rad(5.0), math.deg2rad(2.0))
+    math.Quaternion q_end = transform_pipeline.compose_rotations(math.deg2rad(80.0), math.deg2rad(40.0), math.deg2rad(20.0))
+    math.Quaternion q_mid = transform_pipeline.slerp_rotation(q_start, q_end, 0.5)
+    fmt.println(f"slerp mid len near 1: {math_helpers.approx_eq(q_mid.length(), 1.0, 1.0e-10)}")
+    // Quaternion to matrix and back: rotate a point both ways
+    math.Mat4 rot_mat = composed.toMat4()
+    math.Vec3 test_pt = math.Vec3(1.0, 2.0, 3.0)
+    math.Vec3 via_quat = test_pt.rotateByQuaternion(composed)
+    math.Vec3 via_mat = test_pt.transform(rot_mat)
+    fmt.println(f"quat vs mat match: {math_helpers.vec3_approx_eq(via_quat, via_mat, 1.0e-10)}")
+    // Rotation matrix determinant should be 1
+    fmt.println(f"rot mat det near 1: {math_helpers.approx_eq(rot_mat.determinant(), 1.0, 1.0e-10)}")
+    // ── Section 6: Cross-subsystem composition ──
+    fmt.println("-- cross-subsystem --")
+    // Build a camera that orbits around a target
+    f64 orbit_radius = 8.0
+    f64 orbit_angle = math.deg2rad(60.0)
+    f64 cam_height = 4.0
+    math.Vec3 cam_pos = math.Vec3(
+        orbit_radius * math.cos(orbit_angle),
+        cam_height,
+        orbit_radius * math.sin(orbit_angle),
+    )
+    math.Vec3 look_target = math.Vec3(0.0, 1.0, 0.0)
+    math.Mat4 cam_view = transform_pipeline.build_view_matrix(cam_pos, look_target)
+    // Project a world-space point through the camera
+    math.Mat4 cam_proj = transform_pipeline.build_projection(45.0, 16.0 / 9.0, 0.1, 50.0)
+    math.Mat4 vp = cam_proj.multiply(cam_view)
+    math.Vec3 world_pt = math.Vec3(2.0, 1.0, - 1.0)
+    math.Vec3 screen_pt = world_pt.transform(vp)
+    fmt.println(f"screen point finite: {math.isFinite(screen_pt.x) && math.isFinite(screen_pt.y) && math.isFinite(screen_pt.z)}")
+    // Verify camera distance to target
+    f64 cam_dist = cam_pos.distance(look_target)
+    f64 dx = cam_pos.x - look_target.x
+    f64 dy = cam_pos.y - look_target.y
+    f64 dz = cam_pos.z - look_target.z
+    f64 expected_dist = math.sqrt(dx * dx + dy * dy + dz * dz)
+    fmt.println(f"cam dist correct: {math_helpers.approx_eq(cam_dist, expected_dist, 1.0e-10)}")
+    // Scalar math feeding into vector operations
+    f64 wave_phase = math.smoothstep(0.1, 0.9, 0.5)
+    f64 wave_x = math.lerp(1.0, 5.0, wave_phase)
+    f64 wave_y = amplitude * math.sin(wave_phase * math.pi())
+    math.Vec2 wave_pt = math.Vec2(wave_x, wave_y)
+    fmt.println(f"wave point len finite: {math.isFinite(wave_pt.length())}")
+    // Vec2 angle -> rotation -> verify
+    f64 angle = math.atan2(3.0, 4.0)
+    math.Vec2 dir = math.Vec2(4.0, 3.0).normalize()
+    f64 dir_angle = dir.angle()
+    fmt.println(f"atan2 matches vec angle: {math_helpers.approx_eq(angle, dir_angle, 1.0e-10)}")
+    fmt.println("===== TEST LARGE_MATH_COMPREHENSIVE END =====")
+    return 0
+}

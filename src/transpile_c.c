@@ -79,8 +79,13 @@ static vigil_status_t emit_load_k(vigil_transpile_ctx_t *ctx, const vigil_reg_ch
     {
         int64_t ival = vigil_value_as_int(k);
         /* Values that fit in the 48-bit nanbox payload can be stored as raw i64.
-           Larger magnitudes need runtime bigint allocation. */
-        if (ival >= INT64_C(-140737488355328) && ival <= INT64_C(140737488355327))
+           Larger magnitudes need runtime bigint allocation.
+           Special case: integer 0 must be nanbox-encoded because raw 0
+           is indistinguishable from IEEE 754 double 0.0 (both are
+           0x0000000000000000), and tc_to_nanbox cannot tell them apart. */
+        if (ival == 0)
+            EMITF("    r[%u].v = vigil_nanbox_encode_int(0);\n", a);
+        else if (ival >= INT64_C(-140737488355328) && ival <= INT64_C(140737488355327))
             EMITF("    r[%u].i = (int64_t)%lldLL;\n", a, (long long)ival);
         else
             EMITF("    vigil_value_init_int_rt(&r[%u].v, %lldLL, tc->runtime, NULL);\n", a, (long long)ival);

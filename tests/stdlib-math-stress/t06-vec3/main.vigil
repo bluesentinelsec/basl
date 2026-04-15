@@ -1,0 +1,112 @@
+import "fmt"
+import "math"
+
+fn main() -> i32 {
+    fmt.println("===== TEST 06_VEC3 START =====")
+    // ── Construction and field access ──
+    math.Vec3 v1 = math.Vec3(1.0, 2.0, 3.0)
+    fmt.println(f"v1: {v1.x:.0f},{v1.y:.0f},{v1.z:.0f}")
+    // ── Static constructors ──
+    math.Vec3 z = math.Vec3.zero()
+    fmt.println(f"zero: {z.x:.0f},{z.y:.0f},{z.z:.0f}")
+    math.Vec3 o = math.Vec3.one()
+    fmt.println(f"one: {o.x:.0f},{o.y:.0f},{o.z:.0f}")
+    // ── length / lengthSqr ──
+    math.Vec3 v345 = math.Vec3(2.0, 3.0, 6.0)
+    fmt.println(f"len(2,3,6): {v345.length():.0f}")
+    fmt.println(f"lenSqr(2,3,6): {v345.lengthSqr():.0f}")
+    fmt.println(f"len(zero): {z.length():.0f}")
+    fmt.println(f"len == sqrt(lenSqr): {math.abs(v345.length() - math.sqrt(v345.lengthSqr())) < 1.0e-10}")
+    // ── dot ──
+    math.Vec3 ex = math.Vec3(1.0, 0.0, 0.0)
+    math.Vec3 ey = math.Vec3(0.0, 1.0, 0.0)
+    math.Vec3 ez = math.Vec3(0.0, 0.0, 1.0)
+    fmt.println(f"dot(ex,ey) near 0: {math.abs(ex.dot(ey)) < 1.0e-10}")
+    fmt.println(f"dot(ex,ex) near 1: {math.abs(ex.dot(ex) - 1.0) < 1.0e-10}")
+    fmt.println(f"dot(v,v)==lenSqr: {math.abs(v1.dot(v1) - v1.lengthSqr()) < 1.0e-10}")
+    // ── distance ──
+    math.Vec3 a = math.Vec3(1.0, 0.0, 0.0)
+    math.Vec3 b = math.Vec3(0.0, 1.0, 0.0)
+    f64 dist = a.distance(b)
+    math.Vec3 ab_diff = a.sub(b)
+    fmt.println(f"dist == len(a-b): {math.abs(dist - ab_diff.length()) < 1.0e-10}")
+    fmt.println(f"dist to self: {a.distance(a):.0f}")
+    // ── angle ──
+    f64 angle_xy = ex.angle(ey)
+    fmt.println(f"angle(ex,ey) near pi/2: {math.abs(angle_xy - math.pi() / 2.0) < 1.0e-10}")
+    f64 angle_self = ex.angle(ex)
+    fmt.println(f"angle(ex,ex) near 0: {math.abs(angle_self) < 1.0e-10}")
+    // ── cross ──
+    math.Vec3 cx = ex.cross(ey)
+    fmt.println(f"ex cross ey z near 1: {math.abs(cx.z - 1.0) < 1.0e-10}")
+    math.Vec3 cy = ey.cross(ez)
+    fmt.println(f"ey cross ez x near 1: {math.abs(cy.x - 1.0) < 1.0e-10}")
+    math.Vec3 cz = ez.cross(ex)
+    fmt.println(f"ez cross ex y near 1: {math.abs(cz.y - 1.0) < 1.0e-10}")
+    // cross product is anti-commutative: a x b == -(b x a)
+    math.Vec3 ba = ey.cross(ex)
+    fmt.println(f"cross anti-commutative: {math.abs(ba.x + cx.x) < 1.0e-10 && math.abs(ba.y + cx.y) < 1.0e-10 && math.abs(ba.z + cx.z) < 1.0e-10}")
+    // cross product is perpendicular to both inputs
+    fmt.println(f"cross perp to a: {math.abs(ex.dot(cx)) < 1.0e-10}")
+    fmt.println(f"cross perp to b: {math.abs(ey.dot(cx)) < 1.0e-10}")
+    // self cross is zero
+    math.Vec3 self_cross = v1.cross(v1)
+    fmt.println(f"self cross zero: {math.abs(self_cross.length()) < 1.0e-10}")
+    // ── normalize ──
+    math.Vec3 n1 = v1.normalize()
+    fmt.println(f"normalize len near 1: {math.abs(n1.length() - 1.0) < 1.0e-10}")
+    math.Vec3 n2 = math.Vec3(0.0, 0.0, 5.0).normalize()
+    fmt.println(f"normalize(0,0,5) z near 1: {math.abs(n2.z - 1.0) < 1.0e-10}")
+    // ── negate ──
+    math.Vec3 neg = v1.negate()
+    fmt.println(f"negate: {neg.x:.0f},{neg.y:.0f},{neg.z:.0f}")
+    math.Vec3 sum = v1.add(neg)
+    fmt.println(f"v+negate(v) near zero: {math.abs(sum.x) < 1.0e-10 && math.abs(sum.y) < 1.0e-10 && math.abs(sum.z) < 1.0e-10}")
+    // ── add / sub ──
+    math.Vec3 s = math.Vec3(1.0, 2.0, 3.0).add(math.Vec3(4.0, 5.0, 6.0))
+    fmt.println(f"add: {s.x:.0f},{s.y:.0f},{s.z:.0f}")
+    math.Vec3 d = math.Vec3(10.0, 8.0, 6.0).sub(math.Vec3(3.0, 2.0, 1.0))
+    fmt.println(f"sub: {d.x:.0f},{d.y:.0f},{d.z:.0f}")
+    // sub+add roundtrip
+    math.Vec3 orig = a.sub(b).add(b)
+    fmt.println(f"sub+add roundtrip: {math.abs(orig.x - a.x) < 1.0e-10 && math.abs(orig.y - a.y) < 1.0e-10 && math.abs(orig.z - a.z) < 1.0e-10}")
+    // ── scale ──
+    math.Vec3 sc = math.Vec3(1.0, 2.0, 3.0).scale(3.0)
+    fmt.println(f"scale*3: {sc.x:.0f},{sc.y:.0f},{sc.z:.0f}")
+    math.Vec3 sc0 = v1.scale(0.0)
+    fmt.println(f"scale*0 near zero: {math.abs(sc0.x) < 1.0e-10 && math.abs(sc0.y) < 1.0e-10 && math.abs(sc0.z) < 1.0e-10}")
+    // ── lerp ──
+    math.Vec3 la = math.Vec3(0.0, 0.0, 0.0)
+    math.Vec3 lb = math.Vec3(10.0, 20.0, 30.0)
+    math.Vec3 lh = la.lerp(lb, 0.5)
+    fmt.println(f"lerp t=0.5: {lh.x:.0f},{lh.y:.0f},{lh.z:.0f}")
+    math.Vec3 l0 = la.lerp(lb, 0.0)
+    fmt.println(f"lerp t=0 near start: {math.abs(l0.x - la.x) < 1.0e-10 && math.abs(l0.y - la.y) < 1.0e-10 && math.abs(l0.z - la.z) < 1.0e-10}")
+    math.Vec3 l1 = la.lerp(lb, 1.0)
+    fmt.println(f"lerp t=1: {l1.x:.0f},{l1.y:.0f},{l1.z:.0f}")
+    // ── reflect ──
+    math.Vec3 incoming = math.Vec3(1.0, - 1.0, 0.0)
+    math.Vec3 normal = math.Vec3(0.0, 1.0, 0.0).normalize()
+    math.Vec3 refl = incoming.reflect(normal)
+    fmt.println(f"reflect y flipped: {math.abs(refl.x - 1.0) < 1.0e-6 && math.abs(refl.y - 1.0) < 1.0e-6}")
+    fmt.println(f"reflect preserves len: {math.abs(refl.length() - incoming.length()) < 1.0e-10}")
+    // ── transform by identity matrix ──
+    math.Mat4 ident = math.Mat4.identity()
+    math.Vec3 tv = v1.transform(ident)
+    fmt.println(f"transform by identity: {math.abs(tv.x - v1.x) < 1.0e-10 && math.abs(tv.y - v1.y) < 1.0e-10 && math.abs(tv.z - v1.z) < 1.0e-10}")
+    // ── rotateByQuaternion with identity ──
+    math.Quaternion qi = math.Quaternion(0.0, 0.0, 0.0, 1.0)
+    math.Vec3 rv = v1.rotateByQuaternion(qi)
+    fmt.println(f"rotate by identity quat: {math.abs(rv.x - v1.x) < 1.0e-6 && math.abs(rv.y - v1.y) < 1.0e-6 && math.abs(rv.z - v1.z) < 1.0e-6}")
+    // ── rotateByQuaternion: 90 degrees around Z axis ──
+    math.Quaternion qz90 = math.Quaternion.fromAxisAngle(math.Vec3(0.0, 0.0, 1.0), math.pi() / 2.0)
+    math.Vec3 rx = math.Vec3(1.0, 0.0, 0.0).rotateByQuaternion(qz90)
+    fmt.println(f"rotate ex by 90 around Z: x near 0={math.abs(rx.x) < 1.0e-6} y near 1={math.abs(rx.y - 1.0) < 1.0e-6} z near 0={math.abs(rx.z) < 1.0e-6}")
+    // ── Composition: normalize then scale recovers original ──
+    math.Vec3 big = math.Vec3(30.0, 40.0, 0.0)
+    f64 len = big.length()
+    math.Vec3 recovered = big.normalize().scale(len)
+    fmt.println(f"normalize+scale roundtrip: {math.abs(recovered.x - big.x) < 1.0e-10 && math.abs(recovered.y - big.y) < 1.0e-10 && math.abs(recovered.z - big.z) < 1.0e-6}")
+    fmt.println("===== TEST 06_VEC3 END =====")
+    return 0
+}

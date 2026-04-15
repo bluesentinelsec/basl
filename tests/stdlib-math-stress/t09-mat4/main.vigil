@@ -1,0 +1,137 @@
+import "fmt"
+import "math"
+
+fn mat4_eq(math.Mat4 a, math.Mat4 b) -> bool {
+    for (i32 r = 0; r < 4; r++) {
+        for (i32 c = 0; c < 4; c++) {
+            if math.abs(a.get(r, c) - b.get(r, c)) > 1.0e-10 {
+                return false
+            }
+
+        }
+
+    }
+
+    return true
+}
+
+
+fn mat4_is_identity(math.Mat4 m) -> bool {
+    for (i32 r = 0; r < 4; r++) {
+        for (i32 c = 0; c < 4; c++) {
+            if r != c {
+                if math.abs(m.get(r, c)) > 1.0e-10 {
+                    return false
+                }
+
+            }
+
+            if r == c {
+                if math.abs(m.get(r, c) - 1.0) > 1.0e-10 {
+                    return false
+                }
+
+            }
+
+        }
+
+    }
+
+    return true
+}
+
+
+fn main() -> i32 {
+    fmt.println("===== TEST 09_MAT4 START =====")
+    // ── identity ──
+    math.Mat4 ident = math.Mat4.identity()
+    fmt.println(f"identity trace: {ident.trace():.0f}")
+    fmt.println(f"identity det: {ident.determinant():.0f}")
+    fmt.println(f"identity diag: {ident.get(0, 0):.0f},{ident.get(1, 1):.0f},{ident.get(2, 2):.0f},{ident.get(3, 3):.0f}")
+    fmt.println(f"identity off-diag: {ident.get(0, 1):.0f},{ident.get(1, 0):.0f},{ident.get(2, 3):.0f}")
+    // ── get / set ──
+    math.Mat4 m1 = ident.set(0, 1, 5.0)
+    fmt.println(f"set(0,1,5): {m1.get(0, 1):.0f}")
+    fmt.println(f"set preserves (0,0): {m1.get(0, 0):.0f}")
+    math.Mat4 m2 = ident.set(2, 3, 7.0)
+    fmt.println(f"set(2,3,7) get: {m2.get(2, 3):.0f}")
+    // ── transpose ──
+    math.Mat4 t1 = m1.transpose()
+    fmt.println(f"transpose(0,1)->get(1,0): {t1.get(1, 0):.0f}")
+    fmt.println(f"transpose(1,0)->get(0,1): {t1.get(0, 1):.0f}")
+    fmt.println(f"transpose identity == identity: {mat4_eq(ident.transpose(), ident)}")
+    fmt.println(f"double transpose == original: {mat4_eq(m1.transpose().transpose(), m1)}")
+    // ── multiply ──
+    fmt.println(f"identity * M == M: {mat4_eq(ident.multiply(m1), m1)}")
+    fmt.println(f"M * identity == M: {mat4_eq(m1.multiply(ident), m1)}")
+    // ── determinant ──
+    fmt.println(f"det(identity): {ident.determinant():.0f}")
+    math.Mat4 sc = ident.scale(2.0)
+    fmt.println(f"det(scale*2): {sc.determinant():.0f}")
+    // ── trace ──
+    fmt.println(f"trace(identity): {ident.trace():.0f}")
+    fmt.println(f"trace(scale*2): {sc.trace():.0f}")
+    // ── invert ──
+    fmt.println(f"invert(identity) == identity: {mat4_is_identity(ident.invert())}")
+    // M * M^-1 == identity
+    math.Mat4 trans = ident.translate(math.Vec3(3.0, 4.0, 5.0))
+    fmt.println(f"translate * inv == identity: {mat4_is_identity(trans.multiply(trans.invert()))}")
+    // ── add ──
+    math.Mat4 sum = ident.add(ident)
+    fmt.println(f"I+I diag: {sum.get(0, 0):.0f},{sum.get(1, 1):.0f}")
+    fmt.println(f"I+I off: {sum.get(0, 1):.0f}")
+    // ── scale (uniform) ──
+    math.Mat4 s3 = ident.scale(3.0)
+    fmt.println(f"scale*3 diag: {s3.get(0, 0):.0f},{s3.get(1, 1):.0f},{s3.get(2, 2):.0f},{s3.get(3, 3):.0f}")
+    // ── scaleV (non-uniform) ──
+    math.Mat4 sv = ident.scaleV(math.Vec3(2.0, 3.0, 4.0))
+    fmt.println(f"scaleV diag: {sv.get(0, 0):.0f},{sv.get(1, 1):.0f},{sv.get(2, 2):.0f},{sv.get(3, 3):.0f}")
+    // ── translate ──
+    math.Mat4 t = ident.translate(math.Vec3(10.0, 20.0, 30.0))
+    fmt.println(f"translate col3: {t.get(0, 3):.0f},{t.get(1, 3):.0f},{t.get(2, 3):.0f}")
+    fmt.println(f"translate det: {t.determinant():.0f}")
+    // ── rotateX / rotateY / rotateZ ──
+    fmt.println(f"rotateX(0) near identity: {mat4_is_identity(ident.rotateX(0.0))}")
+    math.Mat4 rx90 = ident.rotateX(math.pi() / 2.0)
+    fmt.println(f"rotateX(90) det near 1: {math.abs(rx90.determinant() - 1.0) < 1.0e-10}")
+    math.Mat4 ry90 = ident.rotateY(math.pi() / 2.0)
+    fmt.println(f"rotateY(90) det near 1: {math.abs(ry90.determinant() - 1.0) < 1.0e-10}")
+    math.Mat4 rz90 = ident.rotateZ(math.pi() / 2.0)
+    fmt.println(f"rotateZ(90) det near 1: {math.abs(rz90.determinant() - 1.0) < 1.0e-10}")
+    // rotation inverse == transpose
+    fmt.println(f"rotateX inv == transpose: {mat4_eq(rx90.invert(), rx90.transpose())}")
+    // ── lookAt ──
+    math.Vec3 eye = math.Vec3(0.0, 0.0, 5.0)
+    math.Vec3 target = math.Vec3(0.0, 0.0, 0.0)
+    math.Vec3 up = math.Vec3(0.0, 1.0, 0.0)
+    math.Mat4 view = math.Mat4.lookAt(eye, target, up)
+    fmt.println(f"lookAt det nonzero: {math.abs(view.determinant()) > 1.0e-10}")
+    fmt.println(f"lookAt * inv == identity: {mat4_is_identity(view.multiply(view.invert()))}")
+    // ── perspective ──
+    math.Mat4 persp = math.Mat4.perspective(math.deg2rad(60.0), 1.0, 0.1, 100.0)
+    fmt.println(f"perspective det nonzero: {math.abs(persp.determinant()) > 1.0e-10}")
+    fmt.println(f"perspective (3,3): {persp.get(3, 3):.0f}")
+    // ── ortho ──
+    math.Mat4 orth = math.Mat4.ortho(- 1.0, 1.0, - 1.0, 1.0, 0.1, 100.0)
+    fmt.println(f"ortho det nonzero: {math.abs(orth.determinant()) > 1.0e-10}")
+    // ── frustum ──
+    math.Mat4 frust = math.Mat4.frustum(- 1.0, 1.0, - 1.0, 1.0, 0.1, 100.0)
+    fmt.println(f"frustum det nonzero: {math.abs(frust.determinant()) > 1.0e-10}")
+    // ── Composition: translate then invert recovers origin ──
+    math.Vec3 offset = math.Vec3(5.0, 10.0, 15.0)
+    math.Mat4 t_fwd = ident.translate(offset)
+    math.Mat4 t_back = t_fwd.invert()
+    math.Vec3 origin = math.Vec3(0.0, 0.0, 0.0)
+    math.Vec3 moved = origin.transform(t_fwd)
+    math.Vec3 returned = moved.transform(t_back)
+    fmt.println(f"translate+invert roundtrip: {math.abs(returned.x - origin.x) < 1.0e-10 && math.abs(returned.y - origin.y) < 1.0e-10 && math.abs(returned.z - origin.z) < 1.0e-10}")
+    // ── Composition: scale then invert ──
+    math.Mat4 s_fwd = ident.scaleV(math.Vec3(2.0, 3.0, 4.0))
+    math.Mat4 s_back = s_fwd.invert()
+    math.Vec3 sv_test = math.Vec3(1.0, 1.0, 1.0)
+    math.Vec3 scaled = sv_test.transform(s_fwd)
+    math.Vec3 unscaled = scaled.transform(s_back)
+    fmt.println(f"scaleV+invert roundtrip: {math.abs(unscaled.x - 1.0) < 1.0e-10 && math.abs(unscaled.y - 1.0) < 1.0e-10 && math.abs(unscaled.z - 1.0) < 1.0e-10}")
+    fmt.println("===== TEST 09_MAT4 END =====")
+    return 0
+}
