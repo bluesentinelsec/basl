@@ -1,0 +1,77 @@
+import "fmt"
+
+fn main() -> i32 {
+    fmt.println("===== TEST 01_BASIC_PROPERTIES START =====")
+
+    // len() on various strings
+    fmt.println(f"len empty: {"".len()}")
+    fmt.println(f"len a: {"a".len()}")
+    fmt.println(f"len hello: {"hello".len()}")
+    fmt.println(f"len spaces: {"   ".len()}")
+
+    // len() method on variable
+    string hw = "hello"
+    fmt.println(f"len method var: {hw.len()}")
+    string emp = ""
+    fmt.println(f"len method empty: {emp.len()}")
+
+    // char_count() - ASCII
+    fmt.println(f"char_count empty: {"".char_count()}")
+    fmt.println(f"char_count abc: {"abc".char_count()}")
+    fmt.println(f"char_count hello: {"hello world".char_count()}")
+
+    // char_count() - multibyte UTF-8
+    string utf8_2byte = "café"
+    fmt.println(f"len café: {utf8_2byte.len()}")
+    fmt.println(f"char_count café: {utf8_2byte.char_count()}")
+
+    string utf8_3byte = "日本語"
+    fmt.println(f"len 日本語: {utf8_3byte.len()}")
+    fmt.println(f"char_count 日本語: {utf8_3byte.char_count()}")
+
+    string emoji = "😀🎉"
+    fmt.println(f"len emoji: {emoji.len()}")
+    fmt.println(f"char_count emoji: {emoji.char_count()}")
+
+    // none() and any()
+    fmt.println(f"none empty: {"".none()}")
+    fmt.println(f"none x: {"x".none()}")
+    fmt.println(f"any empty: {"".any()}")
+    fmt.println(f"any x: {"x".any()}")
+    fmt.println(f"any space: {" ".any()}")
+
+    // is_empty() (deprecated but must still work)
+    fmt.println(f"is_empty empty: {"".is_empty()}")
+    fmt.println(f"is_empty x: {"x".is_empty()}")
+
+    // len/char_count on strings with escape sequences
+    string escaped = "a\tb\nc"
+    fmt.println(f"len escaped: {escaped.len()}")
+    fmt.println(f"char_count escaped: {escaped.char_count()}")
+
+    // len on null byte string
+    string with_null = "ab\0cd"
+    fmt.println(f"len with_null: {with_null.len()}")
+
+    // Variable-based tests
+    string s = "Hello, World!"
+    fmt.println(f"var len: {s.len()}")
+    fmt.println(f"var char_count: {s.char_count()}")
+    fmt.println(f"var none: {s.none()}")
+    fmt.println(f"var any: {s.any()}")
+
+    // Chaining: len on result of other operations
+    string trimmed = "  hi  ".trim()
+    fmt.println(f"trimmed len: {trimmed.len()}")
+    fmt.println(f"trimmed none: {trimmed.none()}")
+
+    // Single character
+    string ch = "Z"
+    fmt.println(f"single len: {ch.len()}")
+    fmt.println(f"single char_count: {ch.char_count()}")
+    fmt.println(f"single none: {ch.none()}")
+    fmt.println(f"single any: {ch.any()}")
+
+    fmt.println("===== TEST 01_BASIC_PROPERTIES END =====")
+    return 0
+}

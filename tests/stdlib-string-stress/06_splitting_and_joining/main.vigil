@@ -1,0 +1,102 @@
+import "fmt"
+
+fn main() -> i32 {
+    fmt.println("===== TEST 06_SPLITTING_AND_JOINING START =====")
+
+    // split - basic
+    array<string> parts = "a,b,c".split(",")
+    fmt.println(f"split len: {parts.len()}")
+    fmt.println(f"split[0]: {parts[0]}")
+    fmt.println(f"split[1]: {parts[1]}")
+    fmt.println(f"split[2]: {parts[2]}")
+
+    // split - multi-char separator
+    array<string> parts2 = "a::b::c".split("::")
+    fmt.println(f"split :: len: {parts2.len()}")
+    fmt.println(f"split ::[0]: {parts2[0]}")
+    fmt.println(f"split ::[1]: {parts2[1]}")
+    fmt.println(f"split ::[2]: {parts2[2]}")
+
+    // split - no separator found
+    array<string> parts3 = "hello".split(",")
+    fmt.println(f"split no sep len: {parts3.len()}")
+    fmt.println(f"split no sep[0]: {parts3[0]}")
+
+    // split - empty parts
+    array<string> parts4 = "a,,b".split(",")
+    fmt.println(f"split empty parts len: {parts4.len()}")
+    fmt.println(f"split empty parts[0]: [{parts4[0]}]")
+    fmt.println(f"split empty parts[1]: [{parts4[1]}]")
+    fmt.println(f"split empty parts[2]: [{parts4[2]}]")
+
+    // split - separator at edges
+    array<string> parts5 = ",a,b,".split(",")
+    fmt.println(f"split edges len: {parts5.len()}")
+    fmt.println(f"split edges[0]: [{parts5[0]}]")
+    fmt.println(f"split edges[3]: [{parts5[3]}]")
+
+    // split - empty string by char
+    array<string> chars = "abc".split("")
+    fmt.println(f"split chars len: {chars.len()}")
+    fmt.println(f"split chars[0]: {chars[0]}")
+    fmt.println(f"split chars[1]: {chars[1]}")
+    fmt.println(f"split chars[2]: {chars[2]}")
+
+    // fields - basic
+    array<string> words = "  hello   world  ".fields()
+    fmt.println(f"fields len: {words.len()}")
+    fmt.println(f"fields[0]: {words[0]}")
+    fmt.println(f"fields[1]: {words[1]}")
+
+    // fields - tabs and mixed whitespace
+    array<string> words2 = "a\tb\n c".fields()
+    fmt.println(f"fields mixed len: {words2.len()}")
+    fmt.println(f"fields mixed[0]: {words2[0]}")
+    fmt.println(f"fields mixed[1]: {words2[1]}")
+    fmt.println(f"fields mixed[2]: {words2[2]}")
+
+    // fields - no whitespace
+    array<string> words3 = "hello".fields()
+    fmt.println(f"fields single len: {words3.len()}")
+    fmt.println(f"fields single[0]: {words3[0]}")
+
+    // fields - all whitespace
+    array<string> words4 = "   ".fields()
+    fmt.println(f"fields all space len: {words4.len()}")
+
+    // fields - empty string
+    array<string> words5 = "".fields()
+    fmt.println(f"fields empty len: {words5.len()}")
+
+    // join - basic
+    array<string> items = ["a", "b", "c"]
+    fmt.println(f"join comma: {", ".join(items)}")
+    fmt.println(f"join dash: {"-".join(items)}")
+    fmt.println(f"join empty sep: {"".join(items)}")
+
+    // join - single element
+    array<string> single = ["hello"]
+    fmt.println(f"join single: {",".join(single)}")
+
+    // join - empty array
+    array<string> empty = []
+    fmt.println(f"join empty arr: [{",".join(empty)}]")
+
+    // join - multi-char separator
+    array<string> nums = ["1", "2", "3"]
+    fmt.println(f"join multi sep: {" :: ".join(nums)}")
+
+    // Round-trip: split then join
+    string original = "hello world foo bar"
+    string roundtrip = " ".join(original.split(" "))
+    fmt.println(f"roundtrip: {roundtrip}")
+    fmt.println(f"roundtrip eq: {original == roundtrip}")
+
+    // Split and rejoin with different separator
+    string csv = "a,b,c,d"
+    string tsv = "\t".join(csv.split(","))
+    fmt.println(f"csv to tsv: [{tsv}]")
+
+    fmt.println("===== TEST 06_SPLITTING_AND_JOINING END =====")
+    return 0
+}

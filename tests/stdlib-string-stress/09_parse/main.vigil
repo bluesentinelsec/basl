@@ -1,0 +1,88 @@
+import "fmt"
+import "parse"
+
+fn main() -> i32 {
+    fmt.println("===== TEST 09_PARSE START =====")
+
+    // parse.i32 - success
+    i32 v1, err e1 = parse.i32("42")
+    fmt.println(f"parse.i32 42: {v1}, ok={e1 == ok}")
+    i32 v2, err e2 = parse.i32("0")
+    fmt.println(f"parse.i32 0: {v2}, ok={e2 == ok}")
+    i32 v3, err e3 = parse.i32("-100")
+    fmt.println(f"parse.i32 -100: {v3}, ok={e3 == ok}")
+    i32 v4, err e4 = parse.i32("2147483647")
+    fmt.println(f"parse.i32 max: {v4}, ok={e4 == ok}")
+    i32 v5, err e5 = parse.i32("-2147483648")
+    fmt.println(f"parse.i32 min: {v5}, ok={e5 == ok}")
+
+    // parse.i32 - failure
+    i32 v6, err e6 = parse.i32("")
+    fmt.println(f"parse.i32 empty: {v6}, ok={e6 == ok}")
+    i32 v7, err e7 = parse.i32("abc")
+    fmt.println(f"parse.i32 abc: {v7}, ok={e7 == ok}")
+    i32 v8, err e8 = parse.i32("12.5")
+    fmt.println(f"parse.i32 12.5: {v8}, ok={e8 == ok}")
+    i32 v9, err e9 = parse.i32("  42  ")
+    fmt.println(f"parse.i32 spaces: {v9}, ok={e9 == ok}")
+
+    // parse.i64 - success
+    i64 l1, err le1 = parse.i64("9999999999")
+    fmt.println(f"parse.i64 big: {l1}, ok={le1 == ok}")
+    i64 l2, err le2 = parse.i64("0")
+    fmt.println(f"parse.i64 0: {l2}, ok={le2 == ok}")
+    i64 l3, err le3 = parse.i64("-9999999999")
+    fmt.println(f"parse.i64 neg: {l3}, ok={le3 == ok}")
+
+    // parse.i64 - failure
+    i64 l4, err le4 = parse.i64("abc")
+    fmt.println(f"parse.i64 abc: {l4}, ok={le4 == ok}")
+    i64 l5, err le5 = parse.i64("")
+    fmt.println(f"parse.i64 empty: {l5}, ok={le5 == ok}")
+
+    // parse.f64 - success
+    f64 f1, err fe1 = parse.f64("3.14")
+    fmt.println(f"parse.f64 3.14: {f1}, ok={fe1 == ok}")
+    f64 f2, err fe2 = parse.f64("0.0")
+    fmt.println(f"parse.f64 0.0: {f2}, ok={fe2 == ok}")
+    f64 f3, err fe3 = parse.f64("-1.5")
+    fmt.println(f"parse.f64 -1.5: {f3}, ok={fe3 == ok}")
+    f64 f4, err fe4 = parse.f64("100")
+    fmt.println(f"parse.f64 100: {f4}, ok={fe4 == ok}")
+
+    // parse.f64 - failure
+    f64 f5, err fe5 = parse.f64("abc")
+    fmt.println(f"parse.f64 abc: {f5}, ok={fe5 == ok}")
+    f64 f6, err fe6 = parse.f64("")
+    fmt.println(f"parse.f64 empty: {f6}, ok={fe6 == ok}")
+
+    // parse.bool - success
+    bool b1, err be1 = parse.bool("true")
+    fmt.println(f"parse.bool true: {b1}, ok={be1 == ok}")
+    bool b2, err be2 = parse.bool("false")
+    fmt.println(f"parse.bool false: {b2}, ok={be2 == ok}")
+    bool b3, err be3 = parse.bool("1")
+    fmt.println(f"parse.bool 1: {b3}, ok={be3 == ok}")
+    bool b4, err be4 = parse.bool("0")
+    fmt.println(f"parse.bool 0: {b4}, ok={be4 == ok}")
+
+    // parse.bool - failure
+    bool b5, err be5 = parse.bool("yes")
+    fmt.println(f"parse.bool yes: {b5}, ok={be5 == ok}")
+    bool b6, err be6 = parse.bool("")
+    fmt.println(f"parse.bool empty: {b6}, ok={be6 == ok}")
+    bool b7, err be7 = parse.bool("TRUE")
+    fmt.println(f"parse.bool TRUE: {b7}, ok={be7 == ok}")
+
+    // Round-trip: string -> parse -> format
+    string num_str = "12345"
+    i32 parsed, err pe = parse.i32(num_str)
+    fmt.println(f"roundtrip: {f"{parsed}" == num_str}")
+
+    string float_str = "3.14"
+    f64 fparsed, err fpe = parse.f64(float_str)
+    fmt.println(f"float parsed: {fparsed:.2f}")
+
+    fmt.println("===== TEST 09_PARSE END =====")
+    return 0
+}

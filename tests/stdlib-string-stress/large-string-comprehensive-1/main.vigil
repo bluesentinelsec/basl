@@ -1,0 +1,191 @@
+import "fmt"
+import "strings"
+import "parse"
+
+// Simulate CSV parsing
+fn parse_csv_line(string line) -> array<string> {
+    return line.split(",")
+}
+
+// Simulate log message building
+fn build_log(string level, string msg) -> string {
+    strings.Builder b = strings.Builder.new()
+    b.write("[")
+    b.write(level.to_upper())
+    b.write("] ")
+    b.write(msg)
+    string result = b.to_string()
+    b.destroy()
+    return result
+}
+
+// Simple tokenizer
+fn tokenize(string input) -> array<string> {
+    return input.trim().fields()
+}
+
+// Key-value parser
+fn parse_kv(string line) -> (string, string, bool) {
+    string key, string value, bool found = line.trim().cut("=")
+    if found {
+        return key.trim(), value.trim(), true
+    }
+    return "", "", false
+}
+
+// Data cleaner
+fn clean_data(string raw) -> string {
+    string result = raw.trim()
+    result = result.to_lower()
+    result = result.replace("  ", " ")
+    return result
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST LARGE_STRING_COMPREHENSIVE_1 START =====")
+
+    // CSV parsing simulation
+    string csv_header = "name,age,city,country"
+    string csv_row1 = "Alice,30,New York,USA"
+    string csv_row2 = "Bob,25,London,UK"
+    string csv_row3 = "Charlie,35,Tokyo,Japan"
+
+    array<string> headers = parse_csv_line(csv_header)
+    fmt.println(f"headers: {headers.len()} columns")
+    for h in headers {
+        fmt.print(f"  [{h}]")
+    }
+    fmt.println("")
+
+    array<string> row1 = parse_csv_line(csv_row1)
+    for (i32 i = 0; i < headers.len(); i++) {
+        fmt.println(f"  {headers[i]}: {row1[i]}")
+    }
+
+    // Log message building
+    fmt.println(build_log("info", "Application started"))
+    fmt.println(build_log("warn", "Low memory"))
+    fmt.println(build_log("error", "Connection failed"))
+
+    // Tokenization
+    array<string> tokens = tokenize("  hello   world   foo   bar  ")
+    fmt.println(f"tokens: {tokens.len()}")
+    for t in tokens {
+        fmt.print(f"[{t}]")
+    }
+    fmt.println("")
+
+    // Key-value parsing
+    array<string> config_lines = [
+        "host = localhost",
+        "port = 8080",
+        "debug = true",
+        "name = My App"
+    ]
+    for line in config_lines {
+        string key, string value, bool found = parse_kv(line)
+        if found {
+            fmt.println(f"config: {key} => {value}")
+        }
+    }
+
+    // Data cleaning pipeline
+    array<string> dirty_data = [
+        "  Hello  World  ",
+        "  FOO  BAR  BAZ  ",
+        "  Test  Data  "
+    ]
+    for raw in dirty_data {
+        fmt.println(f"cleaned: [{clean_data(raw)}]")
+    }
+
+    // String search and extraction
+    string url = "https://example.com/path/to/resource?key=value&foo=bar"
+    string protocol, string rest, bool has_proto = url.cut("://")
+    fmt.println(f"protocol: {protocol}")
+    string host_path, string query, bool has_query = rest.cut("?")
+    fmt.println(f"host_path: {host_path}")
+    fmt.println(f"has_query: {has_query}")
+
+    // Parse query parameters
+    if has_query {
+        array<string> params = query.split("&")
+        for p in params {
+            string pk, string pv, bool pok = p.cut("=")
+            if pok {
+                fmt.println(f"  param: {pk}={pv}")
+            }
+        }
+    }
+
+    // Building a table with padding
+    array<string> names = ["Alice", "Bob", "Charlie", "Diana"]
+    array<string> scores = ["95", "87", "92", "88"]
+    fmt.println(f"{"Name":>10} | {"Score":>5}")
+    fmt.println(f"{"-".repeat(10)} | {"-".repeat(5)}")
+    for (i32 i = 0; i < names.len(); i++) {
+        fmt.println(f"{names[i]:>10} | {scores[i]:>5}")
+    }
+
+    // String builder for large output
+    strings.Builder report = strings.Builder.new()
+    report.write("=== Report ===\n")
+    for (i32 i = 0; i < 5; i++) {
+        report.write(f"Item {i}: value={i * 10}\n")
+    }
+    report.write("=== End ===")
+    fmt.println(report.to_string())
+    report.destroy()
+
+    // Path manipulation
+    string filepath = "/home/user/documents/report.txt"
+    i32 last_slash, bool found_slash = filepath.last_index_of("/")
+    if found_slash {
+        string dir, err de = filepath.substr(0, last_slash)
+        string filename, err fe = filepath.substr(last_slash + 1, filepath.len() - last_slash - 1)
+        fmt.println(f"dir: {dir}")
+        fmt.println(f"file: {filename}")
+    }
+
+    // Extension extraction
+    string fname = "report.final.txt"
+    i32 dot_idx, bool has_dot = fname.last_index_of(".")
+    if has_dot {
+        string base, err be = fname.substr(0, dot_idx)
+        string ext, err ee = fname.substr(dot_idx, fname.len() - dot_idx)
+        fmt.println(f"base: {base}")
+        fmt.println(f"ext: {ext}")
+    }
+
+    // Word frequency counting (simplified)
+    string text = "the cat sat on the mat the cat"
+    array<string> text_words = text.fields()
+    fmt.println(f"word count: {text_words.len()}")
+    fmt.println(f"the count: {text.count("the")}")
+
+    // String validation
+    array<string> test_inputs = ["12345", "hello", "abc123", "   ", ""]
+    for input in test_inputs {
+        string label = input
+        if input.none() {
+            label = "(empty)"
+        }
+        fmt.println(f"[{label}] digit={input.is_digit()} alpha={input.is_alpha()} alnum={input.is_alnum()} space={input.is_space()}")
+    }
+
+    // Numeric string processing
+    array<string> num_strings = ["42", "3.14", "-100", "abc", "0"]
+    for ns in num_strings {
+        i32 iv, err ie = parse.i32(ns)
+        if ie == ok {
+            fmt.println(f"  {ns} -> i32: {iv}")
+        }
+        f64 fv, err fe = parse.f64(ns)
+        if fe == ok {
+            fmt.println(f"  {ns} -> f64: {fv}")
+        }
+    }
+
+    fmt.println("===== TEST LARGE_STRING_COMPREHENSIVE_1 END =====")
+    return 0
+}

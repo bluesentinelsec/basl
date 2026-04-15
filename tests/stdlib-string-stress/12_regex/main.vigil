@@ -1,0 +1,90 @@
+import "fmt"
+import "regex"
+
+fn main() -> i32 {
+    fmt.println("===== TEST 12_REGEX START =====")
+
+    // regex.match - anchored full match
+    fmt.println(f"match digits: {regex.match("[0-9]+", "12345")}")
+    fmt.println(f"match digits partial: {regex.match("[0-9]+", "123abc")}")
+    fmt.println(f"match alpha: {regex.match("[a-z]+", "hello")}")
+    fmt.println(f"match empty: {regex.match("", "")}")
+    fmt.println(f"match any: {regex.match(".*", "anything")}")
+    fmt.println(f"match word: {regex.match("[a-zA-Z]+", "Hello")}")
+    fmt.println(f"match email: {regex.match(`[a-z]+@[a-z]+\.[a-z]+`, "user@example.com")}")
+
+    // regex.find - first match
+    string f1, bool ok1 = regex.find("[0-9]+", "abc123def456")
+    fmt.println(f"find digits: {f1}, {ok1}")
+    string f2, bool ok2 = regex.find("[0-9]+", "no digits here")
+    fmt.println(f"find no digits: [{f2}], {ok2}")
+    string f3, bool ok3 = regex.find("[A-Z][a-z]+", "Hello World")
+    fmt.println(f"find word: {f3}, {ok3}")
+
+    // regex.find_all
+    array<string> all1 = regex.find_all("[0-9]+", "abc123def456ghi789")
+    fmt.println(f"find_all len: {all1.len()}")
+    fmt.println(f"find_all[0]: {all1[0]}")
+    fmt.println(f"find_all[1]: {all1[1]}")
+    fmt.println(f"find_all[2]: {all1[2]}")
+
+    array<string> all2 = regex.find_all("[a-z]+", "ABC")
+    fmt.println(f"find_all none: {all2.len()}")
+
+    array<string> all3 = regex.find_all("[A-Z]", "Hello World")
+    fmt.println(f"find_all caps len: {all3.len()}")
+    fmt.println(f"find_all caps[0]: {all3[0]}")
+    fmt.println(f"find_all caps[1]: {all3[1]}")
+
+    // regex.replace - first match only
+    string r1 = regex.replace("[0-9]+", "abc123def456", "NUM")
+    fmt.println(f"replace first: {r1}")
+
+    string r2 = regex.replace("[0-9]+", "no digits", "NUM")
+    fmt.println(f"replace none: {r2}")
+
+    // regex.replace_all
+    string ra1 = regex.replace_all("[0-9]+", "abc123def456ghi789", "N")
+    fmt.println(f"replace_all: {ra1}")
+
+    string ra2 = regex.replace_all(`\s+`, "hello   world   foo", " ")
+    fmt.println(f"replace_all spaces: {ra2}")
+
+    string ra3 = regex.replace_all("[aeiou]", "hello world", "*")
+    fmt.println(f"replace_all vowels: {ra3}")
+
+    // regex.split
+    array<string> sp1 = regex.split("[,;]+", "a,b;;c,d")
+    fmt.println(f"split len: {sp1.len()}")
+    fmt.println(f"split[0]: {sp1[0]}")
+    fmt.println(f"split[1]: {sp1[1]}")
+    fmt.println(f"split[2]: {sp1[2]}")
+    fmt.println(f"split[3]: {sp1[3]}")
+
+    array<string> sp2 = regex.split(`\s+`, "hello   world   foo")
+    fmt.println(f"split ws len: {sp2.len()}")
+    fmt.println(f"split ws[0]: {sp2[0]}")
+    fmt.println(f"split ws[1]: {sp2[1]}")
+    fmt.println(f"split ws[2]: {sp2[2]}")
+
+    array<string> sp3 = regex.split("[0-9]+", "abc")
+    fmt.println(f"split no match len: {sp3.len()}")
+    fmt.println(f"split no match[0]: {sp3[0]}")
+
+    // Complex patterns
+    fmt.println(f"match ip: {regex.match(`[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+`, "192.168.1.1")}")
+    fmt.println(f"match date: {regex.match(`[0-9]{4}-[0-9]{2}-[0-9]{2}`, "2024-01-15")}")
+
+    // Regex with special characters
+    string cleaned = regex.replace_all("[^a-zA-Z0-9]", "hello, world! 123", "")
+    fmt.println(f"cleaned: {cleaned}")
+
+    // Extract all words
+    array<string> words = regex.find_all("[a-zA-Z]+", "Hello, World! How are you?")
+    fmt.println(f"words len: {words.len()}")
+    string word_list = ", ".join(words)
+    fmt.println(f"words: {word_list}")
+
+    fmt.println("===== TEST 12_REGEX END =====")
+    return 0
+}

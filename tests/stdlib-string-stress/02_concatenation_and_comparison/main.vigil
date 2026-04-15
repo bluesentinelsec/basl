@@ -1,0 +1,80 @@
+import "fmt"
+
+fn main() -> i32 {
+    fmt.println("===== TEST 02_CONCATENATION_AND_COMPARISON START =====")
+
+    // Basic concatenation
+    fmt.println("hello" + " " + "world")
+    fmt.println("" + "abc")
+    fmt.println("abc" + "")
+    fmt.println("" + "")
+
+    // Multi-part concatenation
+    string a = "foo"
+    string b = "bar"
+    string c = "baz"
+    fmt.println(a + b + c)
+    fmt.println(a + " " + b + " " + c)
+
+    // Concatenation with single chars
+    fmt.println("x" + "y" + "z")
+    fmt.println('a' + "bc")
+
+    // Equality
+    fmt.println(f"eq same: {"abc" == "abc"}")
+    fmt.println(f"eq diff: {"abc" == "def"}")
+    fmt.println(f"eq empty: {"" == ""}")
+    fmt.println(f"eq empty vs non: {"" == "a"}")
+    fmt.println(f"eq case: {"ABC" == "abc"}")
+
+    // Inequality
+    fmt.println(f"ne same: {"abc" != "abc"}")
+    fmt.println(f"ne diff: {"abc" != "def"}")
+
+    // Less than
+    fmt.println(f"lt a<b: {"a" < "b"}")
+    fmt.println(f"lt b<a: {"b" < "a"}")
+    fmt.println(f"lt abc<abd: {"abc" < "abd"}")
+    fmt.println(f"lt abc<abcd: {"abc" < "abcd"}")
+    fmt.println(f"lt empty<a: {"" < "a"}")
+    fmt.println(f"lt a<empty: {"a" < ""}")
+
+    // Greater than
+    fmt.println(f"gt b>a: {"b" > "a"}")
+    fmt.println(f"gt a>b: {"a" > "b"}")
+    fmt.println(f"gt abd>abc: {"abd" > "abc"}")
+
+    // Less than or equal
+    fmt.println(f"le a<=a: {"a" <= "a"}")
+    fmt.println(f"le a<=b: {"a" <= "b"}")
+    fmt.println(f"le b<=a: {"b" <= "a"}")
+
+    // Greater than or equal
+    fmt.println(f"ge a>=a: {"a" >= "a"}")
+    fmt.println(f"ge b>=a: {"b" >= "a"}")
+    fmt.println(f"ge a>=b: {"a" >= "b"}")
+
+    // Comparison with numbers as strings
+    fmt.println(f"num lt: {"1" < "2"}")
+    fmt.println(f"num gt: {"9" > "10"}")  // lexicographic: "9" > "1"
+    fmt.println(f"num eq: {"42" == "42"}")
+
+    // Comparison with special characters
+    fmt.println(f"special lt: {"!" < "A"}")
+    fmt.println(f"special gt: {"z" > "Z"}")
+
+    // Concatenation result comparison
+    string x = "hel" + "lo"
+    string y = "hello"
+    fmt.println(f"concat eq: {x == y}")
+
+    // Variable equality
+    string p = "test"
+    string q = "test"
+    fmt.println(f"var eq: {p == q}")
+    q = "other"
+    fmt.println(f"var ne: {p != q}")
+
+    fmt.println("===== TEST 02_CONCATENATION_AND_COMPARISON END =====")
+    return 0
+}

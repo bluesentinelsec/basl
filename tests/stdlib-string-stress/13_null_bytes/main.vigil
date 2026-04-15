@@ -1,0 +1,120 @@
+import "fmt"
+import "strings"
+
+fn main() -> i32 {
+    fmt.println("===== NULL BYTE DEEP TEST START =====")
+
+    string s = "ab\0cd"
+
+    // Properties
+    fmt.println(f"len: {s.len()}")
+    fmt.println(f"char_count: {s.char_count()}")
+    fmt.println(f"none: {s.none()}")
+    fmt.println(f"any: {s.any()}")
+
+    // Search
+    fmt.println(f"contains cd: {s.contains("cd")}")
+    fmt.println(f"contains ab: {s.contains("ab")}")
+    fmt.println(f"starts ab: {s.starts_with("ab")}")
+    fmt.println(f"ends cd: {s.ends_with("cd")}")
+    i32 idx1, bool f1 = s.index_of("cd")
+    fmt.println(f"index_of cd: {idx1}, {f1}")
+    i32 idx2, bool f2 = s.index_of("\0")
+    fmt.println(f"index_of null: {idx2}, {f2}")
+    i32 li1, bool lf1 = s.last_index_of("cd")
+    fmt.println(f"last_index_of cd: {li1}, {lf1}")
+    fmt.println(f"count a: {s.count("a")}")
+    fmt.println(f"count null: {s.count("\0")}")
+    fmt.println(f"equal_fold AB_CD: {s.equal_fold("AB\0CD")}")
+
+    // Extraction
+    string sub1, err e1 = s.substr(0, 5)
+    fmt.println(f"substr 0,5 len: {sub1.len()}")
+    string sub2, err e2 = s.substr(3, 2)
+    fmt.println(f"substr 3,2: {sub2.len()}")
+    string ch1, err ce1 = s.char_at(2)
+    fmt.println(f"char_at 2 len: {ch1.len()}")
+    string ch2, err ce2 = s.char_at(3)
+    fmt.println(f"char_at 3: {ch2}")
+    string before, string after, bool cutok = s.cut("\0")
+    fmt.println(f"cut null: [{before}] [{after}] {cutok}")
+    array<u8> b = s.bytes()
+    fmt.println(f"bytes: {b[0]} {b[1]} {b[2]} {b[3]} {b[4]}")
+
+    // Transform
+    fmt.println(f"upper len: {s.to_upper().len()}")
+    fmt.println(f"lower len: {s.to_lower().len()}")
+    fmt.println(f"trim len: {s.trim().len()}")
+    fmt.println(f"replace null: {s.replace("\0", "-").len()}")
+    string replaced = s.replace("\0", "-")
+    fmt.println(f"replace null val: {replaced}")
+    fmt.println(f"reverse len: {s.reverse().len()}")
+    fmt.println(f"repeat 2 len: {s.repeat(2).len()}")
+    fmt.println(f"pad_left 8 len: {s.pad_left(8, ".").len()}")
+    fmt.println(f"pad_right 8 len: {s.pad_right(8, ".").len()}")
+
+    // Split/Join
+    array<string> parts = s.split("\0")
+    fmt.println(f"split null parts: {parts.len()}")
+    fmt.println(f"split[0]: {parts[0]}")
+    fmt.println(f"split[0] len: {parts[0].len()}")
+    fmt.println(f"split[1]: {parts[1]}")
+    fmt.println(f"split[1] len: {parts[1].len()}")
+    string joined = "\0".join(parts)
+    fmt.println(f"rejoin len: {joined.len()}")
+    fmt.println(f"rejoin eq: {joined == s}")
+
+    // Classification
+    fmt.println(f"is_digit: {s.is_digit()}")
+    fmt.println(f"is_alpha: {s.is_alpha()}")
+    fmt.println(f"is_alnum: {s.is_alnum()}")
+    fmt.println(f"is_space: {s.is_space()}")
+
+    // Builder with null bytes
+    strings.Builder nb = strings.Builder.new()
+    nb.write("ab")
+    nb.write("\0")
+    nb.write("cd")
+    string built = nb.to_string()
+    fmt.println(f"builder len: {built.len()}")
+    fmt.println(f"builder eq: {built == s}")
+    nb.destroy()
+
+    // Null at start
+    string ns = "\0hello"
+    fmt.println(f"null start len: {ns.len()}")
+    fmt.println(f"null start contains hello: {ns.contains("hello")}")
+    fmt.println(f"null start ends hello: {ns.ends_with("hello")}")
+
+    // Null at end
+    string ne = "hello\0"
+    fmt.println(f"null end len: {ne.len()}")
+    fmt.println(f"null end starts hello: {ne.starts_with("hello")}")
+    fmt.println(f"null end contains null: {ne.contains("\0")}")
+
+    // Multiple nulls
+    string mn = "a\0b\0c"
+    fmt.println(f"multi null len: {mn.len()}")
+    fmt.println(f"multi null count null: {mn.count("\0")}")
+    array<string> mnparts = mn.split("\0")
+    fmt.println(f"multi split parts: {mnparts.len()}")
+    fmt.println(f"multi split: {mnparts[0]},{mnparts[1]},{mnparts[2]}")
+
+    // All null
+    string allnull = "\0\0\0"
+    fmt.println(f"all null len: {allnull.len()}")
+    fmt.println(f"all null count: {allnull.count("\0")}")
+
+    // for-in over null
+    i32 count = 0
+    for ch in s {
+        count = count + 1
+    }
+    fmt.println(f"for-in count: {count}")
+
+    // to_c with null
+    fmt.println(f"to_c: {s.to_c()}")
+
+    fmt.println("===== NULL BYTE DEEP TEST END =====")
+    return 0
+}
