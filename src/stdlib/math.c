@@ -1681,18 +1681,30 @@ static vigil_status_t vigil_quat_to_euler(vigil_vm_t *vm, size_t arg_count, vigi
     size_t ci = vigil_vec_self_class(vm, base);
     double sinp, pitch, yaw, roll;
     vigil_vm_stack_pop_n(vm, arg_count);
-    /* yaw (y-axis rotation): asin(2(wy - xz)) */
+    /* yaw (y-axis rotation): asin(clamp(2(wy - xz), -1, 1))
+       When |sinp| ≈ 1 the pitch/roll atan2 denominators vanish (gimbal lock).
+       Use a threshold so near-lock values on any platform take the stable path. */
     sinp = 2.0 * (w * y - x * z);
-    if (sinp >= 1.0)
-        yaw = 3.14159265358979323846 * 0.5;
-    else if (sinp <= -1.0)
-        yaw = -3.14159265358979323846 * 0.5;
+    if (sinp > 1.0)
+        sinp = 1.0;
+    else if (sinp < -1.0)
+        sinp = -1.0;
+    if (fabs(sinp) >= 1.0 - 1e-12)
+    {
+        /* Gimbal lock: pitch and roll share an axis.  By convention set
+           roll = 0 and absorb the remaining freedom into pitch. */
+        yaw = copysign(3.14159265358979323846 * 0.5, sinp);
+        pitch = 2.0 * atan2(x, w);
+        roll = 0.0;
+    }
     else
+    {
         yaw = asin(sinp);
-    /* pitch (x-axis rotation): atan2(2(yz + wx), 1 - 2(x² + y²)) */
-    pitch = atan2(2.0 * (y * z + w * x), 1.0 - 2.0 * (x * x + y * y));
-    /* roll (z-axis rotation): atan2(2(xy + wz), 1 - 2(y² + z²)) */
-    roll = atan2(2.0 * (x * y + w * z), 1.0 - 2.0 * (y * y + z * z));
+        /* pitch (x-axis rotation): atan2(2(yz + wx), 1 - 2(x² + y²)) */
+        pitch = atan2(2.0 * (y * z + w * x), 1.0 - 2.0 * (x * x + y * y));
+        /* roll (z-axis rotation): atan2(2(xy + wz), 1 - 2(y² + z²)) */
+        roll = atan2(2.0 * (x * y + w * z), 1.0 - 2.0 * (y * y + z * z));
+    }
     return vigil_quat_push_new(vm, pitch, yaw, roll, 0.0, ci, error);
 }
 
