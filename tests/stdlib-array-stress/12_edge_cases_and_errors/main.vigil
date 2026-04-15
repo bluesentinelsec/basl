@@ -1,0 +1,112 @@
+import "fmt"
+
+fn test_empty_ops() -> void {
+    array<i32> empty = []
+    fmt.println(f"empty len: {empty.len()}")
+    fmt.println(f"empty any: {empty.any()}")
+    fmt.println(f"empty none: {empty.none()}")
+    fmt.println(f"empty contains 1: {empty.contains(1)}")
+    fmt.println(f"empty index_of 1: {empty.index_of(1)}")
+
+    i32 pv, err pe = empty.pop()
+    fmt.println(f"pop empty: ok={pe == ok}")
+
+    i32 gv, err ge = empty.get(0)
+    fmt.println(f"get empty: ok={ge == ok}")
+
+    err se = empty.set(0, 1)
+    fmt.println(f"set empty: ok={se == ok}")
+
+    i32 rv, err re = empty.remove(0)
+    fmt.println(f"remove empty: ok={re == ok}")
+
+    empty.sort()
+    empty.sort_desc()
+    empty.reverse()
+    fmt.println(f"sort/rev empty: len={empty.len()}")
+
+    empty.clear()
+    fmt.println(f"clear empty: len={empty.len()}")
+
+    array<i32> es = empty.slice(0, 0)
+    fmt.println(f"slice empty: len={es.len()}")
+}
+
+fn test_oob() -> void {
+    array<i32> a = [1, 2, 3]
+    i32 v2, err e2 = a.get(3)
+    fmt.println(f"get(3): ok={e2 == ok}")
+    i32 v3, err e3 = a.get(1000)
+    fmt.println(f"get(1000): ok={e3 == ok}")
+
+    err se2 = a.set(3, 0)
+    fmt.println(f"set(3): ok={se2 == ok}")
+
+    err ie2 = a.insert(100, 0)
+    fmt.println(f"insert(100): ok={ie2 == ok}")
+
+    // Insert at len (valid - appends)
+    err ie3 = a.insert(a.len(), 99)
+    fmt.println(f"insert(len): ok={ie3 == ok}, len={a.len()}")
+
+    i32 rv3, err re3 = a.remove(100)
+    fmt.println(f"remove(100): ok={re3 == ok}")
+}
+
+fn test_large() -> void {
+    array<i32> big = []
+    for (i32 i = 0; i < 1000; i++) {
+        big.push(i)
+    }
+    fmt.println(f"big len: {big.len()}")
+    fmt.println(f"big[0]: {big[0]}")
+    fmt.println(f"big[999]: {big[999]}")
+    fmt.println(f"big contains 500: {big.contains(500)}")
+    fmt.println(f"big index_of 999: {big.index_of(999)}")
+}
+
+fn test_large_sort() -> void {
+    array<i32> big2 = []
+    for (i32 i = 100; i > 0; i--) {
+        big2.push(i)
+    }
+    big2.sort()
+    fmt.println(f"big sort[0]: {big2[0]}")
+    fmt.println(f"big sort[99]: {big2[99]}")
+}
+
+fn test_cycles() -> void {
+    array<i32> cycle = []
+    for (i32 i = 0; i < 50; i++) {
+        cycle.push(i)
+    }
+    for (i32 i = 0; i < 50; i++) {
+        i32 cv, err ce = cycle.pop()
+    }
+    fmt.println(f"cycle empty: {cycle.none()}")
+
+    array<i32> cc = [1, 2, 3]
+    cc.clear()
+    cc.push(10)
+    cc.push(20)
+    fmt.println(f"clear+push: {cc[0]}, {cc[1]}, len={cc.len()}")
+
+    array<i32> s = [42]
+    s.sort()
+    s.reverse()
+    fmt.println(f"single sort+rev: {s[0]}")
+    i32 sv, err sve = s.pop()
+    i32 sv_val = sv + 0
+    fmt.println(f"single pop: {sv_val}, now empty={s.none()}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 12_EDGE_CASES_AND_ERRORS START =====")
+    test_empty_ops()
+    test_oob()
+    test_large()
+    test_large_sort()
+    test_cycles()
+    fmt.println("===== TEST 12_EDGE_CASES_AND_ERRORS END =====")
+    return 0
+}

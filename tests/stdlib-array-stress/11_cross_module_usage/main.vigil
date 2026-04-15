@@ -1,0 +1,87 @@
+import "fmt"
+import "regex"
+
+fn main() -> i32 {
+    fmt.println("===== TEST 11_CROSS_MODULE_USAGE START =====")
+
+    // string.split() -> array<string>
+    array<string> parts = "a,b,c,d,e".split(",")
+    fmt.println(f"split len: {parts.len()}")
+    fmt.println(f"split[0]: {parts[0]}")
+    fmt.println(f"split[4]: {parts[4]}")
+    fmt.println(f"split contains c: {parts.contains("c")}")
+    fmt.println(f"split index_of d: {parts.index_of("d")}")
+
+    // Mutate split result
+    parts.push("f")
+    fmt.println(f"split+push len: {parts.len()}")
+    parts.sort()
+    fmt.print("split sorted: ")
+    for v in parts { fmt.print(f"{v} ") }
+    fmt.println("")
+
+    // string.fields() -> array<string>
+    array<string> words = "  hello   world   foo  ".fields()
+    fmt.println(f"fields len: {words.len()}")
+    fmt.println(f"fields[0]: {words[0]}")
+    fmt.println(f"fields[2]: {words[2]}")
+
+    // string.bytes() -> array<u8>
+    array<u8> bytes = "ABC".bytes()
+    fmt.println(f"bytes len: {bytes.len()}")
+    fmt.println(f"bytes[0]: {bytes[0]}")
+    fmt.println(f"bytes[1]: {bytes[1]}")
+    fmt.println(f"bytes[2]: {bytes[2]}")
+
+    // Mutate bytes result
+    bytes.push(u8(68))
+    fmt.println(f"bytes+push len: {bytes.len()}")
+    fmt.println(f"bytes contains 65: {bytes.contains(u8(65))}")
+
+    // sep.join(array<string>)
+    array<string> items = ["x", "y", "z"]
+    string joined = ", ".join(items)
+    fmt.println(f"join: {joined}")
+
+    // join empty
+    array<string> empty_arr = []
+    fmt.println(f"join empty: [{",".join(empty_arr)}]")
+
+    // join single
+    array<string> single = ["only"]
+    fmt.println(f"join single: {",".join(single)}")
+
+    // Round-trip: split -> sort -> join
+    string csv = "banana,apple,cherry,date"
+    array<string> fruits = csv.split(",")
+    fruits.sort()
+    string sorted_csv = ",".join(fruits)
+    fmt.println(f"sorted csv: {sorted_csv}")
+
+    // regex.find_all -> array<string>
+    array<string> matches = regex.find_all("[0-9]+", "abc123def456ghi789")
+    fmt.println(f"regex matches: {matches.len()}")
+    fmt.println(f"regex[0]: {matches[0]}")
+    fmt.println(f"regex[1]: {matches[1]}")
+    fmt.println(f"regex[2]: {matches[2]}")
+
+    // regex.split -> array<string>
+    array<string> rsplit = regex.split("[,;]+", "a,b;;c,d")
+    fmt.println(f"regex split: {rsplit.len()}")
+    fmt.print("regex split vals: ")
+    for v in rsplit { fmt.print(f"[{v}] ") }
+    fmt.println("")
+
+    // Chain: split -> slice -> join
+    array<string> all = "1,2,3,4,5,6,7,8,9,10".split(",")
+    array<string> first5 = all.slice(0, 5)
+    fmt.println(f"first5: {",".join(first5)}")
+
+    // Fields -> reverse -> join
+    array<string> w2 = "the quick brown fox".fields()
+    w2.reverse()
+    fmt.println(f"reversed words: {" ".join(w2)}")
+
+    fmt.println("===== TEST 11_CROSS_MODULE_USAGE END =====")
+    return 0
+}

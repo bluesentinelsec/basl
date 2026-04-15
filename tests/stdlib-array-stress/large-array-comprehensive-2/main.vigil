@@ -1,0 +1,164 @@
+import "fmt"
+import "strings"
+
+fn main() -> i32 {
+    fmt.println("===== TEST LARGE_ARRAY_COMPREHENSIVE_2 START =====")
+
+    // Stress: large array build
+    array<i32> big = []
+    for (i32 i = 0; i < 500; i++) {
+        big.push(i)
+    }
+    fmt.println(f"big len: {big.len()}")
+    fmt.println(f"big[0]: {big[0]}")
+    fmt.println(f"big[499]: {big[499]}")
+
+    // Stress: sort large array (reverse order)
+    array<i32> rev = []
+    for (i32 i = 200; i > 0; i--) {
+        rev.push(i)
+    }
+    rev.sort()
+    fmt.println(f"sorted[0]: {rev[0]}")
+    fmt.println(f"sorted[199]: {rev[199]}")
+
+    // Stress: many push/pop cycles
+    array<i32> cycle = []
+    for (i32 round = 0; round < 10; round++) {
+        for (i32 i = 0; i < 20; i++) {
+            cycle.push(round * 20 + i)
+        }
+        for (i32 i = 0; i < 10; i++) {
+            i32 v, err e = cycle.pop()
+        }
+    }
+    fmt.println(f"cycle len: {cycle.len()}")
+
+    // Stress: nested array construction
+    array<array<i32>> matrix = []
+    for (i32 i = 0; i < 10; i++) {
+        array<i32> row = []
+        for (i32 j = 0; j < 10; j++) {
+            row.push(i * 10 + j)
+        }
+        matrix.push(row)
+    }
+    fmt.println(f"matrix size: {matrix.len()}x{matrix[0].len()}")
+    fmt.println(f"matrix[0][0]: {matrix[0][0]}")
+    fmt.println(f"matrix[9][9]: {matrix[9][9]}")
+    fmt.println(f"matrix[5][5]: {matrix[5][5]}")
+
+    // Stress: matrix sum
+    i32 msum = 0
+    for row in matrix {
+        for v in row {
+            msum = msum + v
+        }
+    }
+    fmt.println(f"matrix sum: {msum}")
+
+    // Stress: repeated slicing
+    array<i32> src = []
+    for (i32 i = 0; i < 100; i++) {
+        src.push(i)
+    }
+    array<i32> s1 = src.slice(0, 50)
+    array<i32> s2 = src.slice(50, 100)
+    fmt.println(f"slice1 len: {s1.len()}, first={s1[0]}, last={s1[49]}")
+    fmt.println(f"slice2 len: {s2.len()}, first={s2[0]}, last={s2[49]}")
+
+    // Stress: insert at beginning repeatedly
+    array<i32> front = []
+    for (i32 i = 0; i < 20; i++) {
+        err ie = front.insert(0, i)
+    }
+    fmt.print("front inserts: ")
+    for (i32 i = 0; i < 5; i++) {
+        fmt.print(f"{front[i]} ")
+    }
+    fmt.println(f"... len={front.len()}")
+
+    // Stress: remove from beginning repeatedly
+    for (i32 i = 0; i < 10; i++) {
+        i32 rv, err re = front.remove(0)
+    }
+    fmt.println(f"after 10 removes: len={front.len()}, first={front[0]}")
+
+    // Stress: string array with builder
+    array<string> lines = []
+    for (i32 i = 0; i < 20; i++) {
+        lines.push(f"line {i}")
+    }
+    strings.Builder sb = strings.Builder.new()
+    for (i32 i = 0; i < lines.len(); i++) {
+        if i > 0 { sb.write(", ") }
+        sb.write(lines[i])
+    }
+    string joined = sb.to_string()
+    fmt.println(f"joined len: {joined.len()}")
+    fmt.println(f"joined starts: {joined.starts_with("line 0")}")
+    fmt.println(f"joined ends: {joined.ends_with("line 19")}")
+    sb.destroy()
+
+    // Stress: sort stability check (sort preserves order of equal elements)
+    array<i32> stable = [3, 1, 4, 1, 5, 9, 2, 6, 5, 3]
+    stable.sort()
+    fmt.print("stable sort: ")
+    for v in stable { fmt.print(f"{v} ") }
+    fmt.println("")
+
+    // Stress: alternating sort/reverse
+    array<i32> alt = [5, 3, 1, 4, 2]
+    alt.sort()
+    alt.reverse()
+    alt.sort()
+    fmt.print("alt sort: ")
+    for v in alt { fmt.print(f"{v} ") }
+    fmt.println("")
+
+    // Stress: contains on large array
+    fmt.println(f"big contains 0: {big.contains(0)}")
+    fmt.println(f"big contains 499: {big.contains(499)}")
+    fmt.println(f"big contains 500: {big.contains(500)}")
+
+    // Stress: index_of on large array
+    fmt.println(f"big index_of 0: {big.index_of(0)}")
+    fmt.println(f"big index_of 250: {big.index_of(250)}")
+    fmt.println(f"big index_of 500: {big.index_of(500)}")
+
+    // Stress: clear and rebuild
+    array<i32> rebuild = [1, 2, 3, 4, 5]
+    for (i32 round = 0; round < 3; round++) {
+        rebuild.clear()
+        for (i32 i = 0; i < 5; i++) {
+            rebuild.push((round + 1) * 10 + i)
+        }
+    }
+    fmt.print("rebuild: ")
+    for v in rebuild { fmt.print(f"{v} ") }
+    fmt.println("")
+
+    // Stress: nested array of strings
+    array<array<string>> table = []
+    for (i32 i = 0; i < 5; i++) {
+        array<string> row = []
+        for (i32 j = 0; j < 3; j++) {
+            row.push(f"r{i}c{j}")
+        }
+        table.push(row)
+    }
+    fmt.println(f"table: {table.len()}x{table[0].len()}")
+    fmt.println(f"table[0][0]: {table[0][0]}")
+    fmt.println(f"table[4][2]: {table[4][2]}")
+
+    // Stress: get/set error paths on large array
+    i32 gv, err ge = big.get(499)
+    fmt.println(f"big get(499): {gv}, ok={ge == ok}")
+    i32 gv2, err ge2 = big.get(500)
+    fmt.println(f"big get(500): ok={ge2 == ok}")
+    err bse = big.set(0, 999)
+    fmt.println(f"big set(0): ok={bse == ok}, val={big[0]}")
+
+    fmt.println("===== TEST LARGE_ARRAY_COMPREHENSIVE_2 END =====")
+    return 0
+}

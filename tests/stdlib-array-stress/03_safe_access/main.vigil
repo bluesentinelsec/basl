@@ -1,0 +1,67 @@
+import "fmt"
+
+fn main() -> i32 {
+    fmt.println("===== TEST 03_SAFE_ACCESS START =====")
+
+    array<i32> a = [10, 20, 30, 40, 50]
+
+    // Index operator read
+    fmt.println(f"a[0]: {a[0]}")
+    fmt.println(f"a[2]: {a[2]}")
+    fmt.println(f"a[4]: {a[4]}")
+
+    // Index operator write
+    a[0] = 99
+    fmt.println(f"after a[0]=99: {a[0]}")
+    a[4] = 55
+    fmt.println(f"after a[4]=55: {a[4]}")
+
+    // get() - success
+    i32 v1, err e1 = a.get(0)
+    fmt.println(f"get(0): {v1}, ok={e1 == ok}")
+    i32 v2, err e2 = a.get(4)
+    fmt.println(f"get(4): {v2}, ok={e2 == ok}")
+
+    // get() - error (out of bounds)
+    i32 v3, err e3 = a.get(5)
+    fmt.println(f"get(5): ok={e3 == ok}")
+    i32 v4, err e4 = a.get(100)
+    fmt.println(f"get(100): ok={e4 == ok}")
+
+    // set() - success
+    err se1 = a.set(0, 100)
+    fmt.println(f"set(0,100): ok={se1 == ok}")
+    i32 sv1, err _ = a.get(0)
+    fmt.println(f"after set: {sv1}")
+
+    // set() - error (out of bounds)
+    err se2 = a.set(100, 0)
+    fmt.println(f"set(100): ok={se2 == ok}")
+
+    // get/set on string array
+    array<string> s = ["hello", "world"]
+    string sv, err sse = s.get(0)
+    fmt.println(f"str get(0): {sv}, ok={sse == ok}")
+    err sse2 = s.set(1, "vigil")
+    string sv2, err sse3 = s.get(1)
+    fmt.println(f"str after set: {sv2}")
+
+    // get on empty array
+    array<i32> empty = []
+    i32 ev, err ee = empty.get(0)
+    fmt.println(f"empty get(0): ok={ee == ok}")
+
+    // Index read/write in loop
+    array<i32> b = [0, 0, 0, 0, 0]
+    for (i32 i = 0; i < b.len(); i++) {
+        b[i] = i * 10
+    }
+    fmt.print("loop set: ")
+    for (i32 i = 0; i < b.len(); i++) {
+        fmt.print(f"{b[i]} ")
+    }
+    fmt.println("")
+
+    fmt.println("===== TEST 03_SAFE_ACCESS END =====")
+    return 0
+}

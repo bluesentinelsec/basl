@@ -1,0 +1,66 @@
+import "fmt"
+
+fn main() -> i32 {
+    fmt.println("===== TEST 02_LITERALS_AND_INITIALIZATION START =====")
+
+    // i32 literal
+    array<i32> nums = [10, 20, 30]
+    fmt.println(f"i32: {nums[0]}, {nums[1]}, {nums[2]}")
+
+    // i64 literal
+    array<i64> longs = [i64(1000000000000), i64(2000000000000)]
+    fmt.println(f"i64: {longs[0]}, {longs[1]}")
+
+    // f64 literal
+    array<f64> floats = [1.5, 2.5, 3.5]
+    fmt.println(f"f64: {floats[0]}, {floats[1]}, {floats[2]}")
+
+    // bool literal
+    array<bool> bools = [true, false, true, false]
+    fmt.println(f"bool: {bools[0]}, {bools[1]}, {bools[2]}, {bools[3]}")
+
+    // string literal
+    array<string> strs = ["hello", "world", "vigil"]
+    fmt.println(f"str: {strs[0]}, {strs[1]}, {strs[2]}")
+
+    // u8 literal
+    array<u8> bytes = [u8(0), u8(127), u8(255)]
+    fmt.println(f"u8: {bytes[0]}, {bytes[1]}, {bytes[2]}")
+
+    // Empty arrays with type annotation
+    array<i32> ei = []
+    array<string> es = []
+    array<f64> ef = []
+    array<bool> eb = []
+    fmt.println(f"empty i32: {ei.len()}")
+    fmt.println(f"empty str: {es.len()}")
+    fmt.println(f"empty f64: {ef.len()}")
+    fmt.println(f"empty bool: {eb.len()}")
+
+    // Single element arrays
+    array<i32> si = [42]
+    array<string> ss = ["only"]
+    fmt.println(f"single i32: {si[0]}")
+    fmt.println(f"single str: {ss[0]}")
+
+    // Nested array literal
+    array<array<i32>> matrix = [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
+    fmt.println(f"matrix[0][0]: {matrix[0][0]}")
+    fmt.println(f"matrix[1][1]: {matrix[1][1]}")
+    fmt.println(f"matrix[2][2]: {matrix[2][2]}")
+    fmt.println(f"matrix rows: {matrix.len()}")
+    fmt.println(f"matrix cols: {matrix[0].len()}")
+
+    // Nested string arrays
+    array<array<string>> groups = [["a", "b"], ["c", "d", "e"]]
+    fmt.println(f"groups[0][1]: {groups[0][1]}")
+    fmt.println(f"groups[1][2]: {groups[1][2]}")
+
+    // Array built from expressions
+    i32 x = 10
+    array<i32> expr = [x, x + 1, x * 2, x - 5]
+    fmt.println(f"expr: {expr[0]}, {expr[1]}, {expr[2]}, {expr[3]}")
+
+    fmt.println("===== TEST 02_LITERALS_AND_INITIALIZATION END =====")
+    return 0
+}

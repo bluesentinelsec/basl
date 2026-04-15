@@ -1,0 +1,101 @@
+import "fmt"
+
+fn main() -> i32 {
+    fmt.println("===== TEST 08_ITERATION START =====")
+
+    // for-in over i32
+    array<i32> nums = [10, 20, 30, 40, 50]
+    fmt.print("i32: ")
+    for v in nums {
+        fmt.print(f"{v} ")
+    }
+    fmt.println("")
+
+    // for-in over string
+    array<string> strs = ["hello", "world", "vigil"]
+    fmt.print("str: ")
+    for s in strs {
+        fmt.print(f"{s} ")
+    }
+    fmt.println("")
+
+    // for-in over f64
+    array<f64> floats = [1.5, 2.5, 3.5]
+    fmt.print("f64: ")
+    for f in floats {
+        fmt.print(f"{f} ")
+    }
+    fmt.println("")
+
+    // for-in over bool
+    array<bool> bools = [true, false, true]
+    fmt.print("bool: ")
+    for b in bools {
+        fmt.print(f"{b} ")
+    }
+    fmt.println("")
+
+    // for-in over empty
+    array<i32> empty = []
+    i32 count = 0
+    for v in empty {
+        count = count + 1
+    }
+    fmt.println(f"empty iterations: {count}")
+
+    // for-in over single
+    array<i32> single = [42]
+    fmt.print("single: ")
+    for v in single {
+        fmt.print(f"{v} ")
+    }
+    fmt.println("")
+
+    // for-in accumulate
+    array<i32> vals = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    i32 sum = 0
+    for v in vals {
+        sum = sum + v
+    }
+    fmt.println(f"sum 1..10: {sum}")
+
+    // for-in with index (C-style for)
+    array<string> items = ["a", "b", "c", "d"]
+    for (i32 i = 0; i < items.len(); i++) {
+        fmt.println(f"  items[{i}]: {items[i]}")
+    }
+
+    // Nested for-in
+    array<array<i32>> matrix = [[1, 2], [3, 4], [5, 6]]
+    fmt.print("nested: ")
+    for row in matrix {
+        for v in row {
+            fmt.print(f"{v} ")
+        }
+    }
+    fmt.println("")
+
+    // for-in with mutation (push during iteration via index)
+    array<i32> src = [1, 2, 3]
+    array<i32> dst = []
+    for v in src {
+        dst.push(v * 10)
+    }
+    fmt.print("mapped: ")
+    for v in dst {
+        fmt.print(f"{v} ")
+    }
+    fmt.println("")
+
+    // for-in with string building
+    array<string> words = ["hello", "beautiful", "world"]
+    string result = ""
+    for (i32 i = 0; i < words.len(); i++) {
+        if i > 0 { result = result + " " }
+        result = result + words[i]
+    }
+    fmt.println(f"joined: {result}")
+
+    fmt.println("===== TEST 08_ITERATION END =====")
+    return 0
+}

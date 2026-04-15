@@ -755,6 +755,16 @@ int vigil_vm_values_equal(const vigil_value_t *left, const vigil_value_t *right)
 
     if (vigil_value_kind(left) != vigil_value_kind(right))
     {
+        /* Allow cross-kind numeric comparison (int vs uint). */
+        int lk = vigil_value_kind(left);
+        int rk = vigil_value_kind(right);
+        if ((lk == VIGIL_VALUE_INT || lk == VIGIL_VALUE_UINT) &&
+            (rk == VIGIL_VALUE_INT || rk == VIGIL_VALUE_UINT))
+        {
+            int64_t lv = (lk == VIGIL_VALUE_INT) ? vigil_value_as_int(left) : (int64_t)vigil_value_as_uint(left);
+            int64_t rv = (rk == VIGIL_VALUE_INT) ? vigil_value_as_int(right) : (int64_t)vigil_value_as_uint(right);
+            return lv == rv;
+        }
         return 0;
     }
 
