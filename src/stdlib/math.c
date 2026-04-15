@@ -1668,18 +1668,18 @@ static vigil_status_t vigil_quat_to_euler(vigil_vm_t *vm, size_t arg_count, vigi
     size_t ci = vigil_vec_self_class(vm, base);
     double sinp, pitch, yaw, roll;
     vigil_vm_stack_pop_n(vm, arg_count);
-    /* pitch (x-axis rotation) */
-    sinp = 2.0 * (w * x - y * z);
+    /* yaw (y-axis rotation): asin(2(wy - xz)) */
+    sinp = 2.0 * (w * y - x * z);
     if (sinp >= 1.0)
-        pitch = 3.14159265358979323846 * 0.5;
+        yaw = 3.14159265358979323846 * 0.5;
     else if (sinp <= -1.0)
-        pitch = -3.14159265358979323846 * 0.5;
+        yaw = -3.14159265358979323846 * 0.5;
     else
-        pitch = asin(sinp);
-    /* yaw (y-axis rotation) */
-    yaw = atan2(2.0 * (w * y + x * z), 1.0 - 2.0 * (x * x + y * y));
-    /* roll (z-axis rotation) */
-    roll = atan2(2.0 * (w * z + x * y), 1.0 - 2.0 * (x * x + z * z));
+        yaw = asin(sinp);
+    /* pitch (x-axis rotation): atan2(2(yz + wx), 1 - 2(x² + y²)) */
+    pitch = atan2(2.0 * (y * z + w * x), 1.0 - 2.0 * (x * x + y * y));
+    /* roll (z-axis rotation): atan2(2(xy + wz), 1 - 2(y² + z²)) */
+    roll = atan2(2.0 * (x * y + w * z), 1.0 - 2.0 * (y * y + z * z));
     return vigil_quat_push_new(vm, pitch, yaw, roll, 0.0, ci, error);
 }
 

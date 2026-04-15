@@ -540,15 +540,17 @@ static inline uint64_t tc_to_nanbox(uint64_t v)
         return v;
     /* Check if this is a raw double (not a small raw integer).
        Doubles have exponent bits in the upper bytes. Raw ints from
-       Phase 1 arithmetic are small values with upper bytes zero. */
-    if (vigil_nanbox_is_double(v) && (v >> 48) != 0)
+       Phase 1 arithmetic are small values with upper bytes zero.
+       Special case: v == 0 is IEEE 754 positive zero (0.0), not
+       integer 0 — the transpiler emits r[N].f = 0 for float 0.0. */
+    if (vigil_nanbox_is_double(v) && ((v >> 48) != 0 || v == 0))
         return v; /* Already a valid nanbox double */
     return vigil_nanbox_encode_int((int64_t)v);
 }
 
 static inline int tc_is_runtime_double(vigil_value_t v)
 {
-    return vigil_nanbox_is_double(v) && ((v >> 48) != 0U || v == UINT64_C(0x8000000000000000));
+    return vigil_nanbox_is_double(v) && ((v >> 48) != 0U || v == UINT64_C(0x8000000000000000) || v == 0);
 }
 
 static inline int tc_compare_strings(vigil_value_t lhs, vigil_value_t rhs, int *out_cmp)

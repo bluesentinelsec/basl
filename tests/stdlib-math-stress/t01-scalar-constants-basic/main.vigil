@@ -24,25 +24,21 @@ fn main() -> i32 {
     fmt.println(f"round(2.7): {math.round(2.7):.0f}")
     fmt.println(f"trunc(3.9): {math.trunc(3.9):.0f}")
     fmt.println(f"trunc(-3.9): {math.trunc(-3.9):.0f}")
-    // trunc(0) — verify via invariant: trunc(x)-x for small x near 0
-    fmt.println(f"trunc near 0: {math.abs(math.trunc(0.1)) < 1.0e-10}")
+    fmt.println(f"trunc(0.0): {math.trunc(0.0):.0f}")
     // ── abs / sign ──
     fmt.println(f"abs(5.0): {math.abs(5.0):.0f}")
     fmt.println(f"abs(-5.0): {math.abs(-5.0):.0f}")
-    // abs(0) — verify via invariant: abs(tiny) near tiny
-    fmt.println(f"abs near 0: {math.abs(math.abs(1.0e-15) - 1.0e-15) < 1.0e-20}")
+    fmt.println(f"abs(0.0): {math.abs(0.0):.0f}")
     fmt.println(f"sign(-42.0): {math.sign(-42.0):.0f}")
-    // sign(0) — verify via invariant: sign(tiny) == 1
-    fmt.println(f"sign near 0: {math.sign(1.0e-15):.0f}")
+    fmt.println(f"sign(0.0): {math.sign(0.0):.0f}")
     fmt.println(f"sign(42.0): {math.sign(42.0):.0f}")
     // ── sqrt / cbrt ──
-    // sqrt(0) and cbrt(0) — verify via invariant
-    fmt.println(f"sqrt near 0: {math.sqrt(1.0e-20) < 1.0e-9}")
+    fmt.println(f"sqrt(0.0): {math.sqrt(0.0):.0f}")
     fmt.println(f"sqrt(1.0): {math.sqrt(1.0):.0f}")
     fmt.println(f"sqrt(4.0): {math.sqrt(4.0):.0f}")
     fmt.println(f"sqrt(9.0): {math.sqrt(9.0):.0f}")
     fmt.println(f"sqrt(100.0): {math.sqrt(100.0):.0f}")
-    fmt.println(f"cbrt near 0: {math.abs(math.cbrt(1.0e-30)) < 1.0e-9}")
+    fmt.println(f"cbrt(0.0): {math.cbrt(0.0):.0f}")
     fmt.println(f"cbrt(1.0): {math.cbrt(1.0):.0f}")
     fmt.println(f"cbrt(8.0): {math.cbrt(8.0):.0f}")
     fmt.println(f"cbrt(27.0): {math.cbrt(27.0):.0f}")
@@ -54,16 +50,13 @@ fn main() -> i32 {
     f64 sqrt_val = math.sqrt(7.0)
     fmt.println(f"sqrt(7)^2 close to 7: {math.abs(sqrt_val * sqrt_val - 7.0) < 1.0e-10}")
     // ── pow / exp / log ──
-    // pow(x,0) — use invariant: pow(x, tiny) near 1
-    fmt.println(f"pow(2,~0) near 1: {math.abs(math.pow(2.0, 1.0e-15) - 1.0) < 1.0e-10}")
+    fmt.println(f"pow(2,0): {math.pow(2.0, 0.0):.0f}")
     fmt.println(f"pow(2,1): {math.pow(2.0, 1.0):.0f}")
     fmt.println(f"pow(2,10): {math.pow(2.0, 10.0):.0f}")
     fmt.println(f"pow(3,3): {math.pow(3.0, 3.0):.0f}")
-    fmt.println(f"pow(10,~0) near 1: {math.abs(math.pow(10.0, 1.0e-15) - 1.0) < 1.0e-10}")
-    // pow(0,0) — mathematical convention is 1; test via invariant
-    fmt.println(f"pow(~0,~0) near 1: {math.abs(math.pow(1.0e-15, 1.0e-15) - 1.0) < 1.0e-10}")
-    // exp(0) — use invariant: exp(tiny) near 1
-    fmt.println(f"exp(~0) near 1: {math.abs(math.exp(1.0e-15) - 1.0) < 1.0e-10}")
+    fmt.println(f"pow(10,0): {math.pow(10.0, 0.0):.0f}")
+    fmt.println(f"pow(0,0): {math.pow(0.0, 0.0):.0f}")
+    fmt.println(f"exp(0.0): {math.exp(0.0):.0f}")
     fmt.println(f"exp(1) close to e: {math.abs(math.exp(1.0) - math.e()) < 1.0e-10}")
     fmt.println(f"log(1): {math.log(1.0):.0f}")
     fmt.println(f"log(e) close to 1: {math.abs(math.log(math.e()) - 1.0) < 1.0e-10}")

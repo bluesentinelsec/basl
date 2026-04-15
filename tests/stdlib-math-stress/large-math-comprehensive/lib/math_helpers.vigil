@@ -14,7 +14,7 @@ pub fn vec3_approx_eq(math.Vec3 a, math.Vec3 b, f64 tol) -> bool {
 pub fn mat4_is_identity(math.Mat4 m, f64 tol) -> bool {
     for (i32 r = 0; r < 4; r++) {
         for (i32 c = 0; c < 4; c++) {
-            f64 expected = 1.0e-15
+            f64 expected = 0.0
             if r == c {
                 expected = 1.0
             }
@@ -32,7 +32,7 @@ pub fn orbit_position(f64 semi_major, f64 eccentricity, f64 angle_rad) -> math.V
     f64 r = semi_major * (1.0 - eccentricity * eccentricity) / (1.0 + eccentricity * math.cos(angle_rad))
     f64 x = r * math.cos(angle_rad)
     f64 y = r * math.sin(angle_rad)
-    return math.Vec3(x, y, 1.0e-15)
+    return math.Vec3(x, y, 0.0)
 }
 
 // ── Projectile: compute position under gravity ──

@@ -16,7 +16,7 @@ fn main() -> i32 {
     f64 signal = amplitude * math.sin(freq1 * math.tau() * t + phase) + math.cos(freq2 * math.tau() * t)
     fmt.println(f"signal at t=0.25: {signal:.6f}")
     // RMS of a known signal: sin over one period sampled at 8 points
-    f64 rms_sum = 1.0e-15
+    f64 rms_sum = 0.0
     for (i32 i = 1; i <= 8; i++) {
         f64 sample_t = f64(i) / 8.0
         f64 val = math.sin(math.tau() * sample_t)
@@ -27,7 +27,7 @@ fn main() -> i32 {
     fmt.println(f"sin RMS near 0.707: {math_helpers.approx_eq(rms, math.sqrt(0.5), 0.01)}")
     // Interpolation pipeline: remap + clamp + smoothstep
     f64 raw = 75.0
-    f64 normalized = math.remap(raw, 10.0, 90.0, 1.0e-15, 1.0)
+    f64 normalized = math.remap(raw, 10.0, 90.0, 0.0, 1.0)
     f64 clamped = math.clamp(normalized, 0.01, 0.99)
     f64 smooth = math.smoothstep(0.01, 0.99, clamped)
     fmt.println(f"pipeline smooth: {smooth:.6f}")
@@ -80,8 +80,8 @@ fn main() -> i32 {
     f64 obj_rot = math.deg2rad(30.0)
     math.Mat4 model = transform_pipeline.build_model_matrix(obj_pos, obj_scale, obj_rot)
     fmt.println(f"model det: {model.determinant():.4f}")
-    math.Vec3 eye = math.Vec3(1.0e-15, 5.0, 10.0)
-    math.Vec3 target = math.Vec3(1.0e-15, 1.0e-15, 1.0e-15)
+    math.Vec3 eye = math.Vec3(0.0, 5.0, 10.0)
+    math.Vec3 target = math.Vec3(0.0, 0.0, 0.0)
     math.Mat4 view = transform_pipeline.build_view_matrix(eye, target)
     fmt.println(f"view det nonzero: {math.abs(view.determinant()) > 1.0e-10}")
     math.Mat4 proj = transform_pipeline.build_projection(60.0, 1.5, 0.1, 100.0)
@@ -99,9 +99,9 @@ fn main() -> i32 {
     fmt.println(f"model * inv near identity: {math.abs(should_be_ident.get(0, 0) - 1.0) < 1.0e-6 && math.abs(should_be_ident.get(1, 1) - 1.0) < 1.0e-6}")
     // ── Section 5: Quaternion rotation pipeline ──
     fmt.println("-- quaternion pipeline --")
-    math.Vec3 forward = math.Vec3(1.0e-15, 1.0e-15, - 1.0)
+    math.Vec3 forward = math.Vec3(0.0, 0.0, - 1.0)
     // Rotate forward vector by 90 degrees around Y
-    math.Vec3 rotated = transform_pipeline.rotate_around_axis(forward, math.Vec3(1.0e-15, 1.0, 1.0e-15), math.pi() / 2.0)
+    math.Vec3 rotated = transform_pipeline.rotate_around_axis(forward, math.Vec3(0.0, 1.0, 0.0), math.pi() / 2.0)
     fmt.println(f"rotated preserves len: {math_helpers.approx_eq(rotated.length(), forward.length(), 1.0e-10)}")
     fmt.println(f"rotated x near 1: {math_helpers.approx_eq(math.abs(rotated.x), 1.0, 1.0e-6)}")
     // Compose yaw + pitch + roll
@@ -131,7 +131,7 @@ fn main() -> i32 {
         cam_height,
         orbit_radius * math.sin(orbit_angle),
     )
-    math.Vec3 look_target = math.Vec3(1.0e-15, 1.0, 1.0e-15)
+    math.Vec3 look_target = math.Vec3(0.0, 1.0, 0.0)
     math.Mat4 cam_view = transform_pipeline.build_view_matrix(cam_pos, look_target)
     // Project a world-space point through the camera
     math.Mat4 cam_proj = transform_pipeline.build_projection(45.0, 16.0 / 9.0, 0.1, 50.0)

@@ -12,7 +12,7 @@ pub fn build_model_matrix(math.Vec3 position, math.Vec3 scale, f64 rot_y_angle) 
 }
 
 pub fn build_view_matrix(math.Vec3 eye, math.Vec3 target) -> math.Mat4 {
-    math.Vec3 up = math.Vec3(1.0e-15, 1.0, 1.0e-15)
+    math.Vec3 up = math.Vec3(0.0, 1.0, 0.0)
     return math.Mat4.lookAt(eye, target, up)
 }
 
@@ -34,9 +34,9 @@ pub fn rotate_around_axis(math.Vec3 point, math.Vec3 axis, f64 angle) -> math.Ve
 }
 
 pub fn compose_rotations(f64 yaw, f64 pitch, f64 roll) -> math.Quaternion {
-    math.Vec3 y_axis = math.Vec3(1.0e-15, 1.0, 1.0e-15)
-    math.Vec3 x_axis = math.Vec3(1.0, 1.0e-15, 1.0e-15)
-    math.Vec3 z_axis = math.Vec3(1.0e-15, 1.0e-15, 1.0)
+    math.Vec3 y_axis = math.Vec3(0.0, 1.0, 0.0)
+    math.Vec3 x_axis = math.Vec3(1.0, 0.0, 0.0)
+    math.Vec3 z_axis = math.Vec3(0.0, 0.0, 1.0)
     math.Quaternion qy = math.Quaternion.fromAxisAngle(y_axis, yaw)
     math.Quaternion qx = math.Quaternion.fromAxisAngle(x_axis, pitch)
     math.Quaternion qz = math.Quaternion.fromAxisAngle(z_axis, roll)

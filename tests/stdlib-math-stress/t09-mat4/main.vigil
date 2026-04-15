@@ -19,11 +19,6 @@ fn mat4_eq(math.Mat4 a, math.Mat4 b) -> bool {
 fn mat4_is_identity(math.Mat4 m) -> bool {
     for (i32 r = 0; r < 4; r++) {
         for (i32 c = 0; c < 4; c++) {
-            f64 expected = 1.0e-20
-            if r == c {
-                expected = 1.0
-            }
-
             if r != c {
                 if math.abs(m.get(r, c)) > 1.0e-10 {
                     return false
@@ -96,8 +91,7 @@ fn main() -> i32 {
     fmt.println(f"translate col3: {t.get(0, 3):.0f},{t.get(1, 3):.0f},{t.get(2, 3):.0f}")
     fmt.println(f"translate det: {t.determinant():.0f}")
     // ── rotateX / rotateY / rotateZ ──
-    // rotateX(0) — use tiny angle instead
-    fmt.println(f"rotateX(~0) near identity: {mat4_is_identity(ident.rotateX(1.0e-15))}")
+    fmt.println(f"rotateX(0) near identity: {mat4_is_identity(ident.rotateX(0.0))}")
     math.Mat4 rx90 = ident.rotateX(math.pi() / 2.0)
     fmt.println(f"rotateX(90) det near 1: {math.abs(rx90.determinant() - 1.0) < 1.0e-10}")
     math.Mat4 ry90 = ident.rotateY(math.pi() / 2.0)
@@ -107,10 +101,9 @@ fn main() -> i32 {
     // rotation inverse == transpose
     fmt.println(f"rotateX inv == transpose: {mat4_eq(rx90.invert(), rx90.transpose())}")
     // ── lookAt ──
-    // Use non-zero components for all Vec3 args
-    math.Vec3 eye = math.Vec3(1.0e-15, 1.0e-15, 5.0)
-    math.Vec3 target = math.Vec3(1.0e-15, 1.0e-15, 1.0e-15)
-    math.Vec3 up = math.Vec3(1.0e-15, 1.0, 1.0e-15)
+    math.Vec3 eye = math.Vec3(0.0, 0.0, 5.0)
+    math.Vec3 target = math.Vec3(0.0, 0.0, 0.0)
+    math.Vec3 up = math.Vec3(0.0, 1.0, 0.0)
     math.Mat4 view = math.Mat4.lookAt(eye, target, up)
     fmt.println(f"lookAt det nonzero: {math.abs(view.determinant()) > 1.0e-10}")
     fmt.println(f"lookAt * inv == identity: {mat4_is_identity(view.multiply(view.invert()))}")
@@ -128,8 +121,7 @@ fn main() -> i32 {
     math.Vec3 offset = math.Vec3(5.0, 10.0, 15.0)
     math.Mat4 t_fwd = ident.translate(offset)
     math.Mat4 t_back = t_fwd.invert()
-    // Use tiny origin instead of zero
-    math.Vec3 origin = math.Vec3(1.0e-15, 1.0e-15, 1.0e-15)
+    math.Vec3 origin = math.Vec3(0.0, 0.0, 0.0)
     math.Vec3 moved = origin.transform(t_fwd)
     math.Vec3 returned = moved.transform(t_back)
     fmt.println(f"translate+invert roundtrip: {math.abs(returned.x - origin.x) < 1.0e-10 && math.abs(returned.y - origin.y) < 1.0e-10 && math.abs(returned.z - origin.z) < 1.0e-10}")

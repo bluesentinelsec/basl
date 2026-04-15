@@ -8,9 +8,8 @@ fn main() -> i32 {
     fmt.println(f"v1.x: {v1.x:.0f}")
     fmt.println(f"v1.y: {v1.y:.0f}")
     // ── Static constructors ──
-    // Vec2.zero() triggers the bug — test via subtraction invariant
-    math.Vec2 z = v1.sub(v1)
-    fmt.println(f"zero via sub: {z.x:.0f},{z.y:.0f}")
+    math.Vec2 z = math.Vec2.zero()
+    fmt.println(f"zero: {z.x:.0f},{z.y:.0f}")
     math.Vec2 o = math.Vec2.one()
     fmt.println(f"one: {o.x:.0f},{o.y:.0f}")
     // ── length / lengthSqr ──
@@ -21,9 +20,8 @@ fn main() -> i32 {
     // length == sqrt(lengthSqr)
     fmt.println(f"len == sqrt(lenSqr): {math.abs(v1.length() - math.sqrt(v1.lengthSqr())) < 1.0e-10}")
     // ── dot ──
-    // Use non-zero perpendicular vectors instead of axis-aligned with zeros
-    math.Vec2 v2 = math.Vec2(1.0, 1.0)
-    math.Vec2 v3 = math.Vec2(1.0, - 1.0)
+    math.Vec2 v2 = math.Vec2(1.0, 0.0)
+    math.Vec2 v3 = math.Vec2(0.0, 1.0)
     fmt.println(f"dot perpendicular: {v2.dot(v3):.0f}")
     fmt.println(f"dot self: {o.dot(o):.0f}")
     fmt.println(f"dot(3,4).(1,2): {v1.dot(math.Vec2(1.0, 2.0)):.0f}")
@@ -40,9 +38,8 @@ fn main() -> i32 {
     // ── normalize ──
     math.Vec2 n1 = v1.normalize()
     fmt.println(f"normalize(3,4) len near 1: {math.abs(n1.length() - 1.0) < 1.0e-10}")
-    // normalize a vector with one large component
-    math.Vec2 n2 = math.Vec2(1.0e-15, 5.0).normalize()
-    fmt.println(f"normalize(~0,5) y near 1: {math.abs(n2.y - 1.0) < 1.0e-10}")
+    math.Vec2 n2 = math.Vec2(0.0, 5.0).normalize()
+    fmt.println(f"normalize(0,5) y near 1: {math.abs(n2.y - 1.0) < 1.0e-10}")
     // ── negate ──
     math.Vec2 neg = v1.negate()
     fmt.println(f"negate(3,4): {neg.x:.0f},{neg.y:.0f}")
@@ -60,39 +57,35 @@ fn main() -> i32 {
     // ── scale ──
     math.Vec2 sc = math.Vec2(2.0, 3.0).scale(4.0)
     fmt.println(f"scale(2,3)*4: {sc.x:.0f},{sc.y:.0f}")
-    // scale by tiny (near zero) — check result near zero
-    math.Vec2 sc0 = v1.scale(1.0e-15)
-    fmt.println(f"scale*~0 near zero: {math.abs(sc0.x) < 1.0e-10 && math.abs(sc0.y) < 1.0e-10}")
+    math.Vec2 sc0 = v1.scale(0.0)
+    fmt.println(f"scale*0 near zero: {math.abs(sc0.x) < 1.0e-10 && math.abs(sc0.y) < 1.0e-10}")
     // scale(1) == identity
     math.Vec2 sc1 = v1.scale(1.0)
     fmt.println(f"scale*1 == self: {math.abs(sc1.x - v1.x) < 1.0e-10 && math.abs(sc1.y - v1.y) < 1.0e-10}")
     // ── lerp ──
-    // Use non-zero endpoints
-    math.Vec2 la = math.Vec2(2.0, 4.0)
-    math.Vec2 lb = math.Vec2(12.0, 24.0)
-    math.Vec2 l0 = la.lerp(lb, 1.0e-15)
-    fmt.println(f"lerp t=~0 near start: {math.abs(l0.x - la.x) < 1.0e-10 && math.abs(l0.y - la.y) < 1.0e-10}")
+    math.Vec2 la = math.Vec2(0.0, 0.0)
+    math.Vec2 lb = math.Vec2(10.0, 20.0)
+    math.Vec2 l0 = la.lerp(lb, 0.0)
+    fmt.println(f"lerp t=0 near start: {math.abs(l0.x - la.x) < 1.0e-10 && math.abs(l0.y - la.y) < 1.0e-10}")
     math.Vec2 l1 = la.lerp(lb, 1.0)
     fmt.println(f"lerp t=1: {l1.x:.0f},{l1.y:.0f}")
     math.Vec2 lh = la.lerp(lb, 0.5)
     fmt.println(f"lerp t=0.5: {lh.x:.0f},{lh.y:.0f}")
     // ── reflect ──
     math.Vec2 incoming = math.Vec2(1.0, - 1.0)
-    // Use a non-axis-aligned normal (normalized (0.001, 1))
-    math.Vec2 normal = math.Vec2(1.0e-15, 1.0).normalize()
+    math.Vec2 normal = math.Vec2(0.0, 1.0).normalize()
     math.Vec2 refl = incoming.reflect(normal)
     fmt.println(f"reflect y flipped: {math.abs(refl.x - 1.0) < 1.0e-6 && math.abs(refl.y - 1.0) < 1.0e-6}")
     // reflect preserves length
     fmt.println(f"reflect preserves len: {math.abs(refl.length() - incoming.length()) < 1.0e-10}")
     // ── angle ──
-    // Use non-zero components for angle tests
-    fmt.println(f"angle(1,tiny) near 0: {math.abs(math.Vec2(1.0, 1.0e-15).angle()) < 1.0e-10}")
-    fmt.println(f"angle(tiny,1) near pi/2: {math.abs(math.Vec2(1.0e-15, 1.0).angle() - math.pi() / 2.0) < 1.0e-10}")
-    fmt.println(f"angle(-1,tiny) near pi: {math.abs(math.Vec2(-1.0, 1.0e-15).angle() - math.pi()) < 1.0e-10}")
+    fmt.println(f"angle(1,0) near 0: {math.abs(math.Vec2(1.0, 0.0).angle()) < 1.0e-10}")
+    fmt.println(f"angle(0,1) near pi/2: {math.abs(math.Vec2(0.0, 1.0).angle() - math.pi() / 2.0) < 1.0e-10}")
+    fmt.println(f"angle(-1,0) near pi: {math.abs(math.Vec2(-1.0, 0.0).angle() - math.pi()) < 1.0e-10}")
     // ── rotate ──
-    math.Vec2 rx = math.Vec2(1.0, 1.0e-15)
+    math.Vec2 rx = math.Vec2(1.0, 0.0)
     math.Vec2 r90 = rx.rotate(math.pi() / 2.0)
-    fmt.println(f"rotate(1,~0) by 90: x near 0={math.abs(r90.x) < 1.0e-10} y near 1={math.abs(r90.y - 1.0) < 1.0e-10}")
+    fmt.println(f"rotate(1,0) by 90: x near 0={math.abs(r90.x) < 1.0e-10} y near 1={math.abs(r90.y - 1.0) < 1.0e-10}")
     // rotate by 360 degrees returns to original
     math.Vec2 r360 = v1.rotate(math.tau())
     fmt.println(f"rotate 360 roundtrip: {math.abs(r360.x - v1.x) < 1.0e-10 && math.abs(r360.y - v1.y) < 1.0e-10}")
