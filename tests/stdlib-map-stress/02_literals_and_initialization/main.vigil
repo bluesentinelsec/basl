@@ -1,0 +1,53 @@
+import "fmt"
+
+fn main() -> i32 {
+    fmt.println("===== TEST 02_LITERALS_AND_INITIALIZATION START =====")
+
+    // String key, i32 value
+    map<string, i32> si = {"x": 10, "y": 20, "z": 30}
+    fmt.println(f"str-i32: {si["x"]}, {si["y"]}, {si["z"]}")
+
+    // String key, string value
+    map<string, string> ss = {"name": "vigil", "version": "1.0"}
+    fmt.println(f"str-str: {ss["name"]}, {ss["version"]}")
+
+    // String key, f64 value
+    map<string, f64> sf = {"pi": 3.14, "e": 2.71}
+    fmt.println(f"str-f64: {sf["pi"]}, {sf["e"]}")
+
+    // String key, bool value
+    map<string, bool> sb = {"debug": true, "verbose": false}
+    fmt.println(f"str-bool: {sb["debug"]}, {sb["verbose"]}")
+
+    // i32 key
+    map<i32, string> is2 = {1: "one", 2: "two", 3: "three"}
+    fmt.println(f"i32-str: {is2[1]}, {is2[2]}, {is2[3]}")
+
+    // bool key
+    map<bool, string> bs = {true: "yes", false: "no"}
+    fmt.println(f"bool-str: {bs[true]}, {bs[false]}")
+
+    // Empty maps
+    map<string, i32> ei = {}
+    map<string, string> es = {}
+    map<i32, string> eis = {}
+    fmt.println(f"empty: {ei.len()}, {es.len()}, {eis.len()}")
+
+    // Nested: map of arrays
+    map<string, array<i32>> ma = {"evens": [2, 4, 6], "odds": [1, 3, 5]}
+    array<i32> evens, bool ef = ma.get("evens")
+    fmt.println(f"map-arr: {evens[0]}, {evens[1]}, {evens[2]}")
+
+    // Nested: map of maps
+    map<string, map<string, i32>> mm = {"inner": {"a": 1, "b": 2}}
+    map<string, i32> inner, bool mf = mm.get("inner")
+    fmt.println(f"map-map: {inner["a"]}, {inner["b"]}")
+
+    // Map built from expressions
+    i32 x = 10
+    map<string, i32> expr = {"a": x, "b": x + 1, "c": x * 2}
+    fmt.println(f"expr: {expr["a"]}, {expr["b"]}, {expr["c"]}")
+
+    fmt.println("===== TEST 02_LITERALS_AND_INITIALIZATION END =====")
+    return 0
+}

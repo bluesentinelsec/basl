@@ -1,0 +1,126 @@
+import "fmt"
+import "strings"
+
+fn main() -> i32 {
+    fmt.println("===== TEST LARGE_MAP_COMPREHENSIVE_2 START =====")
+
+    // Stress: large map build
+    map<string, i32> big = {}
+    for (i32 i = 0; i < 500; i++) {
+        big[f"k{i}"] = i
+    }
+    fmt.println(f"big len: {big.len()}")
+    fmt.println(f"big has k0: {big.has("k0")}")
+    fmt.println(f"big has k499: {big.has("k499")}")
+    fmt.println(f"big has k500: {big.has("k500")}")
+
+    // Stress: lookup all entries
+    i32 found = 0
+    for (i32 i = 0; i < 500; i++) {
+        if big.has(f"k{i}") {
+            found = found + 1
+        }
+    }
+    fmt.println(f"found all: {found}")
+
+    // Stress: remove half
+    for (i32 i = 0; i < 250; i++) {
+        i32 rv, bool rf = big.remove(f"k{i}")
+    }
+    fmt.println(f"after remove half: {big.len()}")
+
+    // Stress: re-add removed entries
+    for (i32 i = 0; i < 250; i++) {
+        big[f"k{i}"] = i * 10
+    }
+    fmt.println(f"after re-add: {big.len()}")
+    i32 v0, bool f0 = big.get("k0")
+    fmt.println(f"k0 after re-add: {v0}")
+
+    // Stress: nested maps
+    map<string, map<string, i32>> nested = {}
+    for (i32 i = 0; i < 10; i++) {
+        map<string, i32> inner = {}
+        for (i32 j = 0; j < 5; j++) {
+            inner[f"v{j}"] = i * 10 + j
+        }
+        nested[f"row{i}"] = inner
+    }
+    fmt.println(f"nested len: {nested.len()}")
+    map<string, i32> row0, bool r0f = nested.get("row0")
+    fmt.println(f"row0 len: {row0.len()}")
+    fmt.println(f"row0.v0: {row0["v0"]}")
+    map<string, i32> row9, bool r9f = nested.get("row9")
+    fmt.println(f"row9.v4: {row9["v4"]}")
+
+    // Stress: map with array values
+    map<string, array<i32>> arr_map = {}
+    for (i32 i = 0; i < 10; i++) {
+        array<i32> vals = []
+        for (i32 j = 0; j < 5; j++) {
+            vals.push(i * 5 + j)
+        }
+        arr_map[f"g{i}"] = vals
+    }
+    fmt.println(f"arr_map len: {arr_map.len()}")
+    array<i32> g0, bool g0f = arr_map.get("g0")
+    fmt.println(f"g0 len: {g0.len()}, g0[0]: {g0[0]}")
+    array<i32> g9, bool g9f = arr_map.get("g9")
+    fmt.println(f"g9[4]: {g9[4]}")
+
+    // Stress: clear and rebuild
+    map<string, i32> cycle = {}
+    for (i32 round = 0; round < 3; round++) {
+        cycle.clear()
+        for (i32 i = 0; i < 10; i++) {
+            cycle[f"r{round}_k{i}"] = round * 10 + i
+        }
+    }
+    fmt.println(f"cycle len: {cycle.len()}")
+    fmt.println(f"cycle has r2_k0: {cycle.has("r2_k0")}")
+    fmt.println(f"cycle has r0_k0: {cycle.has("r0_k0")}")
+
+    // Stress: keys/values on large map
+    map<string, i32> kv_test = {}
+    for (i32 i = 0; i < 50; i++) {
+        kv_test[f"key{i}"] = i
+    }
+    array<string> all_keys = kv_test.keys()
+    fmt.println(f"keys count: {all_keys.len()}")
+    array<i32> all_vals = kv_test.values()
+    all_vals.sort()
+    fmt.println(f"vals[0]: {all_vals[0]}")
+    fmt.println(f"vals[49]: {all_vals[49]}")
+
+    // Stress: string builder from map
+    map<string, string> headers = {}
+    headers["Content-Type"] = "application/json"
+    headers["Authorization"] = "Bearer token123"
+    headers["Accept"] = "text/html"
+    strings.Builder sb = strings.Builder.new()
+    array<string> hkeys = headers.keys()
+    hkeys.sort()
+    for (i32 i = 0; i < hkeys.len(); i++) {
+        if i > 0 {
+            sb.write("; ")
+        }
+        sb.write(f"{hkeys[i]}: {headers[hkeys[i]]}")
+    }
+    fmt.println(f"headers: {sb.to_string()}")
+    sb.destroy()
+
+    // Stress: iteration count consistency
+    map<string, i32> ic = {}
+    for (i32 i = 0; i < 100; i++) {
+        ic[f"i{i}"] = i
+    }
+    i32 iter_sum = 0
+    for key, val in ic {
+        iter_sum = iter_sum + val
+    }
+    fmt.println(f"iter sum: {iter_sum}")
+    fmt.println(f"expected: {99 * 100 / 2}")
+
+    fmt.println("===== TEST LARGE_MAP_COMPREHENSIVE_2 END =====")
+    return 0
+}

@@ -1,0 +1,54 @@
+import "fmt"
+
+fn test_string_keys() -> void {
+    map<string, i32> m = {"hello": 1, "world": 2, "": 3}
+    fmt.println(f"str key hello: {m["hello"]}")
+    fmt.println(f"str key empty: {m[""]}")
+    fmt.println(f"str has hello: {m.has("hello")}")
+    fmt.println(f"str has missing: {m.has("xyz")}")
+}
+
+fn test_i32_keys() -> void {
+    map<i32, string> m = {0: "zero", 1: "one", -1: "neg"}
+    fmt.println(f"i32 key 0: {m[0]}")
+    fmt.println(f"i32 key 1: {m[1]}")
+    fmt.println(f"i32 key -1: {m[-1]}")
+    fmt.println(f"i32 has 0: {m.has(0)}")
+    fmt.println(f"i32 has 99: {m.has(99)}")
+    // Mutation
+    m[42] = "answer"
+    fmt.println(f"i32 set 42: {m[42]}")
+    string rv, bool rf = m.remove(0)
+    fmt.println(f"i32 remove 0: found={rf}")
+}
+
+fn test_i64_keys() -> void {
+    map<i64, string> m = {}
+    m[i64(1000000000000)] = "big"
+    m[i64(0)] = "zero"
+    string v, bool f = m.get(i64(1000000000000))
+    fmt.println(f"i64 key: {v}, {f}")
+    fmt.println(f"i64 len: {m.len()}")
+}
+
+fn test_bool_keys() -> void {
+    map<bool, string> m = {true: "yes", false: "no"}
+    fmt.println(f"bool true: {m[true]}")
+    fmt.println(f"bool false: {m[false]}")
+    fmt.println(f"bool has true: {m.has(true)}")
+    fmt.println(f"bool len: {m.len()}")
+    // Overwrite
+    m[true] = "affirmative"
+    fmt.println(f"bool overwrite: {m[true]}")
+    fmt.println(f"bool len after: {m.len()}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 07_SUPPORTED_KEY_TYPES START =====")
+    test_string_keys()
+    test_i32_keys()
+    test_i64_keys()
+    test_bool_keys()
+    fmt.println("===== TEST 07_SUPPORTED_KEY_TYPES END =====")
+    return 0
+}

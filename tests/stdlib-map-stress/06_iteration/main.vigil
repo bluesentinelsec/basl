@@ -1,0 +1,73 @@
+import "fmt"
+
+fn main() -> i32 {
+    fmt.println("===== TEST 06_ITERATION START =====")
+
+    // Basic for-in (sort output for determinism)
+    map<string, i32> m = {"a": 1, "b": 2, "c": 3}
+    array<string> pairs = []
+    for key, val in m {
+        pairs.push(f"{key}={val}")
+    }
+    pairs.sort()
+    for p in pairs {
+        fmt.println(f"  {p}")
+    }
+
+    // Empty map iteration
+    map<string, i32> empty = {}
+    i32 count = 0
+    for key, val in empty {
+        count = count + 1
+    }
+    fmt.println(f"empty iterations: {count}")
+
+    // Single entry
+    map<string, i32> single = {"only": 42}
+    for key, val in single {
+        fmt.println(f"single: {key}={val}")
+    }
+
+    // Accumulate values
+    map<string, i32> scores = {"alice": 95, "bob": 87, "charlie": 92}
+    i32 total = 0
+    for name, score in scores {
+        total = total + score
+    }
+    fmt.println(f"total: {total}")
+
+    // Collect keys via iteration
+    array<string> collected = []
+    for key, val in scores {
+        collected.push(key)
+    }
+    collected.sort()
+    fmt.println(f"collected: {", ".join(collected)}")
+
+    // i32 key iteration
+    map<i32, string> im = {1: "one", 2: "two", 3: "three"}
+    array<string> ipairs = []
+    for key, val in im {
+        ipairs.push(f"{key}:{val}")
+    }
+    ipairs.sort()
+    for p in ipairs {
+        fmt.println(f"  {p}")
+    }
+
+    // Iteration count matches len
+    map<string, i32> big = {}
+    for (i32 i = 0; i < 20; i++) {
+        big[f"k{i}"] = i
+    }
+    i32 iter_count = 0
+    for key, val in big {
+        iter_count = iter_count + 1
+    }
+    fmt.println(f"iter count: {iter_count}")
+    fmt.println(f"len: {big.len()}")
+    fmt.println(f"match: {iter_count == big.len()}")
+
+    fmt.println("===== TEST 06_ITERATION END =====")
+    return 0
+}
