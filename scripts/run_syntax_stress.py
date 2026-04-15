@@ -12,6 +12,8 @@ For each test project (directory containing main.vigil) under each suite dir:
 Suites are processed in the order given. Within each suite, tests are
 sorted alphabetically for deterministic execution.
 
+Use -j N to run tests in parallel (default: sequential).
+
 Exit code is the number of failed tests (0 = all pass).
 """
 
@@ -22,6 +24,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 
 def transpiled_executable_target(c_dir):
@@ -134,23 +137,20 @@ def collect_tests(suite_dirs):
     return tests
 
 
-def main():
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--vigil-bin", required=True)
-    parser.add_argument("--suite-dir", required=True, action="append",
-                        help="Test suite directory (may be repeated; processed in order)")
-    parser.add_argument("--work-dir", default=None)
-    args = parser.parse_args()
+def run_single(vigil_bin, suite_name, test_dir, work_dir):
+    """Wrapper for parallel execution. Returns (suite_name, test_name, ok, detail)."""
+    name = os.path.basename(test_dir)
+    try:
+        ok, detail = run_test(vigil_bin, test_dir, work_dir)
+    except subprocess.TimeoutExpired:
+        ok, detail = False, "timeout"
+    except Exception as e:
+        ok, detail = False, str(e)
+    return suite_name, name, ok, detail
 
-    vigil_bin = os.path.abspath(args.vigil_bin)
-    work_dir = args.work_dir or tempfile.mkdtemp(prefix="syntax_stress_")
-    os.makedirs(work_dir, exist_ok=True)
 
-    tests = collect_tests(args.suite_dir)
-    if not tests:
-        print("ERROR: no test projects found", file=sys.stderr)
-        return 1
-
+def run_sequential(vigil_bin, tests, work_dir):
+    """Run all tests sequentially (original behavior)."""
     passed = failed = 0
     current_suite = None
 
@@ -175,6 +175,74 @@ def main():
             print(f"  FAIL  {name}")
             for line in detail.strip().splitlines():
                 print(f"        {line}")
+
+    return passed, failed
+
+
+def run_parallel(vigil_bin, tests, work_dir, jobs):
+    """Run all tests in parallel, print results grouped by suite."""
+    results = []
+
+    with ThreadPoolExecutor(max_workers=jobs) as pool:
+        futures = {
+            pool.submit(run_single, vigil_bin, suite_name, test_dir, work_dir): (suite_name, test_dir)
+            for suite_name, test_dir in tests
+        }
+        for future in as_completed(futures):
+            results.append(future.result())
+
+    # Sort results to match the original deterministic order (suite then test name).
+    suite_order = {}
+    for i, (suite_name, _) in enumerate(tests):
+        if suite_name not in suite_order:
+            suite_order[suite_name] = i
+
+    results.sort(key=lambda r: (suite_order.get(r[0], 0), r[1]))
+
+    passed = failed = 0
+    current_suite = None
+
+    for suite_name, name, ok, detail in results:
+        if suite_name != current_suite:
+            current_suite = suite_name
+            print(f"\n-- {suite_name} --")
+
+        if ok:
+            passed += 1
+            print(f"  PASS  {name}  ({detail})")
+        else:
+            failed += 1
+            print(f"  FAIL  {name}")
+            for line in detail.strip().splitlines():
+                print(f"        {line}")
+
+    return passed, failed
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--vigil-bin", required=True)
+    parser.add_argument("--suite-dir", required=True, action="append",
+                        help="Test suite directory (may be repeated; processed in order)")
+    parser.add_argument("--work-dir", default=None)
+    parser.add_argument("-j", "--jobs", type=int, default=1,
+                        help="Number of parallel test workers (default: 1, sequential)")
+    args = parser.parse_args()
+
+    vigil_bin = os.path.abspath(args.vigil_bin)
+    work_dir = args.work_dir or tempfile.mkdtemp(prefix="syntax_stress_")
+    os.makedirs(work_dir, exist_ok=True)
+
+    tests = collect_tests(args.suite_dir)
+    if not tests:
+        print("ERROR: no test projects found", file=sys.stderr)
+        return 1
+
+    if args.jobs > 1:
+        print(f"Running {len(tests)} tests with {args.jobs} parallel workers")
+        passed, failed = run_parallel(vigil_bin, tests, work_dir, args.jobs)
+    else:
+        passed, failed = run_sequential(vigil_bin, tests, work_dir)
 
     print(f"\n{passed} passed, {failed} failed out of {len(tests)}")
     return failed
