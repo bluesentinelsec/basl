@@ -271,13 +271,15 @@ vigil_status_t vigil_tc_parse_bool(vigil_tc_t *tc, vigil_value_t *dst, const vig
     size_t len = s ? vigil_string_object_length(obj) : 0;
 
     (void)error;
-    if (len == 4 && memcmp(s, "true", 4) == 0)
+    if ((len == 4 && memcmp(s, "true", 4) == 0) ||
+        (len == 1 && s[0] == '1'))
     {
         vigil_value_init_bool(&dst[0], 1);
         dst[1] = vigil_runtime_ok_error_value(tc->runtime);
         return VIGIL_STATUS_OK;
     }
-    if (len == 5 && memcmp(s, "false", 5) == 0)
+    if ((len == 5 && memcmp(s, "false", 5) == 0) ||
+        (len == 1 && s[0] == '0'))
     {
         vigil_value_init_bool(&dst[0], 0);
         dst[1] = vigil_runtime_ok_error_value(tc->runtime);
@@ -890,6 +892,8 @@ vigil_status_t vigil_tc_vm_op(vigil_tc_t *tc, vigil_value_t *regs, uint8_t opcod
         return vigil_instance_object_set_field(obj, (size_t)b, &val, error);
     }
     case VREG_CHAR_FROM_INT:
+        if (c == 1)
+            return tc_sync_and_call(tc, regs, b, 1, a, 1, vigil_vm_op_string_to_c, error);
         return tc_sync_and_call(tc, regs, b, 1, a, 1, vigil_vm_op_char_from_int, error);
 
     /* ── Phase 5: Globals, captures, closures ────────────────── */

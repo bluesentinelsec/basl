@@ -1,0 +1,91 @@
+import "fmt"
+import "strings"
+
+fn main() -> i32 {
+    fmt.println("===== TEST 08_BUILDER START =====")
+
+    // Basic builder usage
+    strings.Builder b = strings.Builder.new()
+    fmt.println(f"initial len: {b.len()}")
+    fmt.println(f"initial str: [{b.to_string()}]")
+
+    b.write("Hello")
+    fmt.println(f"after Hello len: {b.len()}")
+    fmt.println(f"after Hello str: {b.to_string()}")
+
+    b.write(", ")
+    b.write("World!")
+    fmt.println(f"full str: {b.to_string()}")
+    fmt.println(f"full len: {b.len()}")
+
+    // Clear
+    b.clear()
+    fmt.println(f"after clear len: {b.len()}")
+    fmt.println(f"after clear str: [{b.to_string()}]")
+
+    // Reuse after clear
+    b.write("Reused")
+    fmt.println(f"reused str: {b.to_string()}")
+
+    b.destroy()
+
+    // Build in a loop
+    strings.Builder b2 = strings.Builder.new()
+    for (i32 i = 0; i < 5; i++) {
+        if i > 0 {
+            b2.write(",")
+        }
+        b2.write(f"{i}")
+    }
+    fmt.println(f"loop build: {b2.to_string()}")
+    fmt.println(f"loop len: {b2.len()}")
+    b2.destroy()
+
+    // Build with empty writes
+    strings.Builder b3 = strings.Builder.new()
+    b3.write("")
+    b3.write("a")
+    b3.write("")
+    b3.write("b")
+    b3.write("")
+    fmt.println(f"empty writes: {b3.to_string()}")
+    fmt.println(f"empty writes len: {b3.len()}")
+    b3.destroy()
+
+    // Build large string
+    strings.Builder b4 = strings.Builder.new()
+    for (i32 i = 0; i < 100; i++) {
+        b4.write("x")
+    }
+    string big = b4.to_string()
+    fmt.println(f"big len: {big.len()}")
+    fmt.println(f"big starts: {big.starts_with("xxx")}")
+    fmt.println(f"big ends: {big.ends_with("xxx")}")
+    b4.destroy()
+
+    // Multiple to_string calls (non-destructive)
+    strings.Builder b5 = strings.Builder.new()
+    b5.write("test")
+    string r1 = b5.to_string()
+    string r2 = b5.to_string()
+    fmt.println(f"multi to_string eq: {r1 == r2}")
+    b5.write("more")
+    string r3 = b5.to_string()
+    fmt.println(f"after more: {r3}")
+    b5.destroy()
+
+    // Clear and rebuild multiple times
+    strings.Builder b6 = strings.Builder.new()
+    b6.write("first")
+    fmt.println(f"cycle 1: {b6.to_string()}")
+    b6.clear()
+    b6.write("second")
+    fmt.println(f"cycle 2: {b6.to_string()}")
+    b6.clear()
+    b6.write("third")
+    fmt.println(f"cycle 3: {b6.to_string()}")
+    b6.destroy()
+
+    fmt.println("===== TEST 08_BUILDER END =====")
+    return 0
+}

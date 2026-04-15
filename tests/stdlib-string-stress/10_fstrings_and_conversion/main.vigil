@@ -1,0 +1,119 @@
+import "fmt"
+import "parse"
+
+fn main() -> i32 {
+    fmt.println("===== TEST 10_FSTRINGS_AND_CONVERSION START =====")
+
+    // Basic f-string interpolation
+    string name = "Vigil"
+    i32 version = 1
+    fmt.println(f"Hello, {name}!")
+    fmt.println(f"Version: {version}")
+    fmt.println(f"{name} v{version}")
+
+    // Multiple expressions
+    i32 a = 10
+    i32 b = 20
+    fmt.println(f"{a} + {b} = {a + b}")
+    fmt.println(f"product: {a * b}")
+
+    // Nested string in f-string
+    fmt.println(f"nested: {"inner"}")
+    fmt.println(f"concat: {"a" + "b"}")
+
+    // Format specifiers - width and alignment
+    fmt.println(f"[{42:>10}]")
+    fmt.println(f"[{42:<10}]")
+    fmt.println(f"[{42:^10}]")
+
+    // Fill character
+    fmt.println(f"[{42:*>10}]")
+    fmt.println(f"[{42:*<10}]")
+    fmt.println(f"[{42:*^10}]")
+    fmt.println(f"[{42:0>10}]")
+
+    // Zero-pad
+    fmt.println(f"[{42:08}]")
+    fmt.println(f"[{7:05}]")
+
+    // Hex
+    fmt.println(f"hex: {255:x}")
+    fmt.println(f"HEX: {255:X}")
+    fmt.println(f"hex0: {0:x}")
+    fmt.println(f"hex big: {65535:x}")
+
+    // Binary
+    fmt.println(f"bin: {10:b}")
+    fmt.println(f"bin: {255:b}")
+    fmt.println(f"bin0: {0:b}")
+
+    // Octal
+    fmt.println(f"oct: {8:o}")
+    fmt.println(f"oct: {255:o}")
+    fmt.println(f"oct0: {0:o}")
+
+    // Float precision
+    fmt.println(f"pi2: {3.14159:.2f}")
+    fmt.println(f"pi4: {3.14159:.4f}")
+    fmt.println(f"pi0: {1.0:.0f}")
+    fmt.println(f"pi6: {0.123456789:.6f}")
+
+    // Thousands separator
+    fmt.println(f"thou: {1000000:,}")
+    fmt.println(f"thou: {1234567890:,}")
+    fmt.println(f"thou small: {999:,}")
+
+    // String alignment in f-strings
+    fmt.println(f"[{"hello":>10}]")
+    fmt.println(f"[{"hello":<10}]")
+    fmt.println(f"[{"hello":^10}]")
+    fmt.println(f"[{"hi":*>6}]")
+
+    // string() conversion function
+    fmt.println(f"string i32: {string(42)}")
+    fmt.println(f"string f64: {string(3.14)}")
+    fmt.println(f"string bool: {string(true)}")
+    fmt.println(f"string str: {string("hello")}")
+    fmt.println(f"string neg: {string(-1)}")
+
+    // char() function
+    fmt.println(f"char 65: {char(65)}")
+    fmt.println(f"char 97: {char(97)}")
+    fmt.println(f"char 48: {char(48)}")
+    fmt.println(f"char 32: [{char(32)}]")
+    fmt.println(f"char 10: [{char(10)}]")
+
+    // Conversion from string uses parse module (f64/bool builtins are numeric-only)
+    f64 fval, err fve = parse.f64("3.14")
+    fmt.println(f"parse f64 str: {fval:.2f}")
+    bool bval, err bve = parse.bool("true")
+    fmt.println(f"parse bool str: {bval}")
+
+    // Complex expressions in f-strings
+    i32 x = 42
+    fmt.println(f"expr: {x * 2 + 1}")
+    fmt.println(f"ternary: {x > 0}")
+    fmt.println(f"method: {"hello".len()}")
+    fmt.println(f"method: {"hello".to_upper()}")
+
+    // Empty f-string parts
+    fmt.println(f"")
+    fmt.println(f"before{42}after")
+    fmt.println(f"{42}")
+
+    // F-string with special characters
+    fmt.println(f"tab:\there")
+    fmt.println(f"newline done")
+
+    // Multiple format specifiers in one line
+    fmt.println(f"[{1:>5}|{2:>5}|{3:>5}]")
+    fmt.println(f"[{10:<5}|{20:^5}|{30:>5}]")
+
+    // Boolean formatting
+    fmt.println(f"bool: {true}")
+    fmt.println(f"bool: {false}")
+    fmt.println(f"not: {!true}")
+
+    fmt.println("===== TEST 10_FSTRINGS_AND_CONVERSION END =====")
+    return 0
+}

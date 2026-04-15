@@ -1,0 +1,82 @@
+import "fmt"
+
+fn main() -> i32 {
+    fmt.println("===== TEST 03_SEARCH_AND_MATCHING START =====")
+
+    string s = "Hello, World! Hello, Vigil!"
+
+    // contains
+    fmt.println(f"contains World: {s.contains("World")}")
+    fmt.println(f"contains xyz: {s.contains("xyz")}")
+    fmt.println(f"contains empty: {s.contains("")}")
+    fmt.println(f"contains self: {s.contains(s)}")
+    fmt.println(f"contains H: {s.contains("H")}")
+    fmt.println(f"empty contains empty: {"".contains("")}")
+    fmt.println(f"empty contains a: {"".contains("a")}")
+
+    // starts_with
+    fmt.println(f"starts Hello: {s.starts_with("Hello")}")
+    fmt.println(f"starts World: {s.starts_with("World")}")
+    fmt.println(f"starts empty: {s.starts_with("")}")
+    fmt.println(f"starts self: {s.starts_with(s)}")
+    fmt.println(f"empty starts empty: {"".starts_with("")}")
+
+    // ends_with
+    fmt.println(f"ends Vigil!: {s.ends_with("Vigil!")}")
+    fmt.println(f"ends Hello: {s.ends_with("Hello")}")
+    fmt.println(f"ends empty: {s.ends_with("")}")
+    fmt.println(f"ends self: {s.ends_with(s)}")
+    fmt.println(f"empty ends empty: {"".ends_with("")}")
+
+    // index_of
+    i32 idx1, bool f1 = s.index_of("Hello")
+    fmt.println(f"index_of Hello: {idx1}, {f1}")
+    i32 idx2, bool f2 = s.index_of("World")
+    fmt.println(f"index_of World: {idx2}, {f2}")
+    i32 idx3, bool f3 = s.index_of("xyz")
+    fmt.println(f"index_of xyz: {idx3}, {f3}")
+    i32 idx4, bool f4 = s.index_of("")
+    fmt.println(f"index_of empty: {idx4}, {f4}")
+    i32 idx5, bool f5 = "".index_of("")
+    fmt.println(f"empty index_of empty: {idx5}, {f5}")
+    i32 idx6, bool f6 = "".index_of("a")
+    fmt.println(f"empty index_of a: {idx6}, {f6}")
+
+    // last_index_of
+    i32 li1, bool lf1 = s.last_index_of("Hello")
+    fmt.println(f"last_index_of Hello: {li1}, {lf1}")
+    i32 li2, bool lf2 = s.last_index_of("xyz")
+    fmt.println(f"last_index_of xyz: {li2}, {lf2}")
+    i32 li3, bool lf3 = "abcabc".last_index_of("abc")
+    fmt.println(f"last_index_of abc in abcabc: {li3}, {lf3}")
+    i32 li4, bool lf4 = "aaa".last_index_of("a")
+    fmt.println(f"last_index_of a in aaa: {li4}, {lf4}")
+
+    // count
+    fmt.println(f"count abc in abcabcabc: {"abcabcabc".count("abc")}")
+    fmt.println(f"count a in aaa: {"aaa".count("a")}")
+    fmt.println(f"count x in hello: {"hello".count("x")}")
+    fmt.println(f"count ll in hello: {"hello".count("ll")}")
+    fmt.println(f"count empty in abc: {"abc".count("")}")
+
+    // equal_fold
+    fmt.println(f"equal_fold Hello/hello: {"Hello".equal_fold("hello")}")
+    fmt.println(f"equal_fold ABC/abc: {"ABC".equal_fold("abc")}")
+    fmt.println(f"equal_fold abc/ABC: {"abc".equal_fold("ABC")}")
+    fmt.println(f"equal_fold abc/def: {"abc".equal_fold("def")}")
+    fmt.println(f"equal_fold empty/empty: {"".equal_fold("")}")
+    fmt.println(f"equal_fold a/empty: {"a".equal_fold("")}")
+    fmt.println(f"equal_fold MiXeD/mIxEd: {"MiXeD".equal_fold("mIxEd")}")
+
+    // Chained searches
+    string csv = "name,age,city,country"
+    fmt.println(f"csv contains comma: {csv.contains(",")}")
+    fmt.println(f"csv count comma: {csv.count(",")}")
+    i32 ci, bool cf = csv.index_of(",")
+    fmt.println(f"csv first comma: {ci}, {cf}")
+    i32 cli, bool clf = csv.last_index_of(",")
+    fmt.println(f"csv last comma: {cli}, {clf}")
+
+    fmt.println("===== TEST 03_SEARCH_AND_MATCHING END =====")
+    return 0
+}

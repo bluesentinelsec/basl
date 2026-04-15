@@ -1,0 +1,200 @@
+import "fmt"
+import "strings"
+import "regex"
+
+fn main() -> i32 {
+    fmt.println("===== TEST LARGE_STRING_COMPREHENSIVE_2 START =====")
+
+    // Stress: repeated concatenation
+    string acc = ""
+    for (i32 i = 0; i < 50; i++) {
+        acc = acc + "x"
+    }
+    fmt.println(f"concat50 len: {acc.len()}")
+    fmt.println(f"concat50 eq: {acc == "x".repeat(50)}")
+
+    // Stress: builder vs concatenation
+    strings.Builder sb = strings.Builder.new()
+    for (i32 i = 0; i < 100; i++) {
+        sb.write("y")
+    }
+    string built = sb.to_string()
+    fmt.println(f"builder100 len: {built.len()}")
+    fmt.println(f"builder100 eq: {built == "y".repeat(100)}")
+    sb.destroy()
+
+    // Stress: large repeat
+    string big = "abc".repeat(200)
+    fmt.println(f"repeat600 len: {big.len()}")
+    fmt.println(f"repeat600 count abc: {big.count("abc")}")
+    fmt.println(f"repeat600 starts: {big.starts_with("abcabc")}")
+    fmt.println(f"repeat600 ends: {big.ends_with("abcabc")}")
+
+    // Stress: many splits and joins
+    string csv_line = "a,b,c,d,e,f,g,h,i,j"
+    array<string> parts = csv_line.split(",")
+    fmt.println(f"split10 len: {parts.len()}")
+    string rejoined = ",".join(parts)
+    fmt.println(f"rejoin eq: {rejoined == csv_line}")
+
+    // Reverse the parts and rejoin
+    strings.Builder rev_builder = strings.Builder.new()
+    for (i32 i = parts.len() - 1; i >= 0; i--) {
+        if i < parts.len() - 1 {
+            rev_builder.write(",")
+        }
+        rev_builder.write(parts[i])
+    }
+    fmt.println(f"reversed csv: {rev_builder.to_string()}")
+    rev_builder.destroy()
+
+    // Stress: nested replace
+    string s = "aabbccddee"
+    s = s.replace("aa", "A")
+    s = s.replace("bb", "B")
+    s = s.replace("cc", "C")
+    s = s.replace("dd", "D")
+    s = s.replace("ee", "E")
+    fmt.println(f"nested replace: {s}")
+
+    // Stress: chained transformations
+    string chain = "  Hello, World!  "
+    string result = chain.trim().to_lower().replace(",", "").replace("!", "")
+    fmt.println(f"chain result: {result}")
+
+    // Stress: search in large string
+    string haystack = "a".repeat(500) + "NEEDLE" + "a".repeat(500)
+    fmt.println(f"haystack len: {haystack.len()}")
+    fmt.println(f"haystack contains NEEDLE: {haystack.contains("NEEDLE")}")
+    i32 needle_idx, bool needle_found = haystack.index_of("NEEDLE")
+    fmt.println(f"needle at: {needle_idx}, {needle_found}")
+    fmt.println(f"haystack count a: {haystack.count("a")}")
+
+    // Stress: UTF-8 mixed operations
+    string utf8_mix = "Hello 世界 café 🎉"
+    fmt.println(f"utf8 len: {utf8_mix.len()}")
+    fmt.println(f"utf8 char_count: {utf8_mix.char_count()}")
+    fmt.println(f"utf8 contains 世界: {utf8_mix.contains("世界")}")
+    fmt.println(f"utf8 contains café: {utf8_mix.contains("café")}")
+    fmt.println(f"utf8 contains 🎉: {utf8_mix.contains("🎉")}")
+
+    // Iterate and count UTF-8 chars
+    i32 char_count = 0
+    for ch in utf8_mix {
+        char_count = char_count + 1
+    }
+    fmt.println(f"utf8 iterate count: {char_count}")
+
+    // Stress: many substr operations
+    string alpha = "abcdefghijklmnopqrstuvwxyz"
+    for (i32 i = 0; i < 5; i++) {
+        string sub, err e = alpha.substr(i * 5, 5)
+        if e == ok {
+            fmt.println(f"substr [{i}]: {sub}")
+        }
+    }
+
+    // Stress: char_at across string
+    fmt.print("char_at: ")
+    for (i32 i = 0; i < 5; i++) {
+        string ch, err e = alpha.char_at(i)
+        if e == ok {
+            fmt.print(ch)
+        }
+    }
+    fmt.println("")
+
+    // Stress: cut chain (parse key=value pairs from a query string)
+    string query = "name=Alice&age=30&city=NYC&active=true"
+    string remaining = query
+    bool has_more = true
+    while has_more {
+        string pair, string rest, bool found = remaining.cut("&")
+        string key, string value, bool kv_ok = pair.cut("=")
+        if kv_ok {
+            fmt.println(f"  qp: {key}={value}")
+        }
+        if found {
+            remaining = rest
+        } else {
+            has_more = false
+        }
+    }
+
+    // Stress: regex on large input
+    string log_data = "2024-01-15 INFO started\n2024-01-15 WARN low mem\n2024-01-15 ERROR crash"
+    array<string> dates = regex.find_all("[0-9]{4}-[0-9]{2}-[0-9]{2}", log_data)
+    fmt.println(f"dates found: {dates.len()}")
+    array<string> levels = regex.find_all("INFO|WARN|ERROR", log_data)
+    fmt.println(f"levels: {", ".join(levels)}")
+
+    // Stress: regex replace for data cleaning
+    string messy = "Hello,   World!   How   are   you?"
+    string clean = regex.replace_all(`\s+`, messy, " ")
+    fmt.println(f"cleaned: {clean}")
+
+    // Stress: building formatted table
+    strings.Builder table = strings.Builder.new()
+    table.write(f"{"ID":>4} {"Name":<10} {"Score":>6}\n")
+    table.write(f"{"-".repeat(4)} {"-".repeat(10)} {"-".repeat(6)}\n")
+    array<string> t_names = ["Alice", "Bob", "Charlie"]
+    array<i32> t_scores = [95, 87, 92]
+    for (i32 i = 0; i < t_names.len(); i++) {
+        table.write(f"{i + 1:>4} {t_names[i]:<10} {t_scores[i]:>6}\n")
+    }
+    fmt.print(table.to_string())
+    table.destroy()
+
+    // Stress: equal_fold comparisons
+    array<string> variants = ["hello", "HELLO", "Hello", "hElLo"]
+    for v in variants {
+        fmt.println(f"equal_fold {v}: {v.equal_fold("hello")}")
+    }
+
+    // Stress: pad_left and pad_right for alignment
+    array<i32> numbers = [1, 42, 100, 9999]
+    for n in numbers {
+        string ns = f"{n}"
+        fmt.println(f"padded: [{ns.pad_left(6, "0")}] [{ns.pad_right(6, " ")}]")
+    }
+
+    // Stress: bytes round-trip
+    string original = "Hello!"
+    array<u8> raw_bytes = original.bytes()
+    strings.Builder byte_builder = strings.Builder.new()
+    for b in raw_bytes {
+        byte_builder.write(char(i32(b)))
+    }
+    string reconstructed = byte_builder.to_string()
+    fmt.println(f"bytes roundtrip eq: {original == reconstructed}")
+    byte_builder.destroy()
+
+    // Stress: classification on generated strings
+    string digits = ""
+    for (i32 i = 0; i < 10; i++) {
+        digits = digits + f"{i}"
+    }
+    fmt.println(f"generated digits: {digits}")
+    fmt.println(f"is_digit: {digits.is_digit()}")
+
+    string alphas = ""
+    for (i32 i = 0; i < 26; i++) {
+        alphas = alphas + char(97 + i)
+    }
+    fmt.println(f"generated alphas: {alphas}")
+    fmt.println(f"is_alpha: {alphas.is_alpha()}")
+    fmt.println(f"is_lower: {alphas.is_lower()}")
+
+    string uppers = alphas.to_upper()
+    fmt.println(f"generated uppers: {uppers}")
+    fmt.println(f"is_upper: {uppers.is_upper()}")
+
+    // Final: complex f-string formatting
+    f64 pi = 3.14159265
+    fmt.println(f"pi formats: {pi:.0f} {pi:.2f} {pi:.4f} {pi:.6f}")
+    fmt.println(f"hex chain: {255:x} {255:X} {255:08x}")
+    fmt.println(f"bin: {42:b} oct: {42:o} dec: {42}")
+
+    fmt.println("===== TEST LARGE_STRING_COMPREHENSIVE_2 END =====")
+    return 0
+}

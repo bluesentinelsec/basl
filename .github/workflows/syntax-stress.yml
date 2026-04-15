@@ -54,6 +54,7 @@ jobs:
             --suite-dir tests/compiler-syntax-stress \
             --suite-dir tests/stdlib-fmt-stress \
             --suite-dir tests/stdlib-math-stress \
+            --suite-dir tests/stdlib-string-stress \
             --work-dir ${{ runner.temp }}/syntax_stress
 
       - name: Run stress test suites (Windows)
@@ -65,4 +66,5 @@ jobs:
             --suite-dir tests/compiler-syntax-stress `
             --suite-dir tests/stdlib-fmt-stress `
             --suite-dir tests/stdlib-math-stress `
+            --suite-dir tests/stdlib-string-stress `
             --work-dir "${{ runner.temp }}/syntax_stress"

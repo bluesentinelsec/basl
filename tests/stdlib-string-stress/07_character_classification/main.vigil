@@ -1,0 +1,72 @@
+import "fmt"
+
+fn main() -> i32 {
+    fmt.println("===== TEST 07_CHARACTER_CLASSIFICATION START =====")
+
+    // is_digit
+    fmt.println(f"is_digit 123: {"123".is_digit()}")
+    fmt.println(f"is_digit 0: {"0".is_digit()}")
+    fmt.println(f"is_digit 9: {"9".is_digit()}")
+    fmt.println(f"is_digit abc: {"abc".is_digit()}")
+    fmt.println(f"is_digit 12a: {"12a".is_digit()}")
+    fmt.println(f"is_digit empty: {"".is_digit()}")
+    fmt.println(f"is_digit space: {" ".is_digit()}")
+
+    // is_alpha
+    fmt.println(f"is_alpha abc: {"abc".is_alpha()}")
+    fmt.println(f"is_alpha ABC: {"ABC".is_alpha()}")
+    fmt.println(f"is_alpha aBc: {"aBc".is_alpha()}")
+    fmt.println(f"is_alpha a1: {"a1".is_alpha()}")
+    fmt.println(f"is_alpha 123: {"123".is_alpha()}")
+    fmt.println(f"is_alpha empty: {"".is_alpha()}")
+    fmt.println(f"is_alpha space: {" ".is_alpha()}")
+
+    // is_alnum
+    fmt.println(f"is_alnum abc123: {"abc123".is_alnum()}")
+    fmt.println(f"is_alnum abc: {"abc".is_alnum()}")
+    fmt.println(f"is_alnum 123: {"123".is_alnum()}")
+    fmt.println(f"is_alnum a!b: {"a!b".is_alnum()}")
+    fmt.println(f"is_alnum empty: {"".is_alnum()}")
+    fmt.println(f"is_alnum space: {" ".is_alnum()}")
+
+    // is_space
+    fmt.println(f"is_space spaces: {"   ".is_space()}")
+    fmt.println(f"is_space tab: {"\t".is_space()}")
+    fmt.println(f"is_space newline: {"\n".is_space()}")
+    fmt.println(f"is_space mixed: {" \t\n".is_space()}")
+    fmt.println(f"is_space a: {"a".is_space()}")
+    fmt.println(f"is_space empty: {"".is_space()}")
+    fmt.println(f"is_space space a: {" a".is_space()}")
+
+    // is_upper
+    fmt.println(f"is_upper ABC: {"ABC".is_upper()}")
+    fmt.println(f"is_upper A: {"A".is_upper()}")
+    fmt.println(f"is_upper abc: {"abc".is_upper()}")
+    fmt.println(f"is_upper aBc: {"aBc".is_upper()}")
+    fmt.println(f"is_upper 123: {"123".is_upper()}")
+    fmt.println(f"is_upper empty: {"".is_upper()}")
+
+    // is_lower
+    fmt.println(f"is_lower abc: {"abc".is_lower()}")
+    fmt.println(f"is_lower a: {"a".is_lower()}")
+    fmt.println(f"is_lower ABC: {"ABC".is_lower()}")
+    fmt.println(f"is_lower aBc: {"aBc".is_lower()}")
+    fmt.println(f"is_lower 123: {"123".is_lower()}")
+    fmt.println(f"is_lower empty: {"".is_lower()}")
+
+    // Single character tests
+    fmt.println(f"is_digit 5: {"5".is_digit()}")
+    fmt.println(f"is_alpha z: {"z".is_alpha()}")
+    fmt.println(f"is_alnum 0: {"0".is_alnum()}")
+    fmt.println(f"is_upper Z: {"Z".is_upper()}")
+    fmt.println(f"is_lower z: {"z".is_lower()}")
+
+    // Classification loop
+    array<string> test_strings = ["Hello", "123", "abc", "ABC", "  ", "a1B"]
+    for s in test_strings {
+        fmt.println(f"[{s}] digit={s.is_digit()} alpha={s.is_alpha()} alnum={s.is_alnum()} space={s.is_space()} upper={s.is_upper()} lower={s.is_lower()}")
+    }
+
+    fmt.println("===== TEST 07_CHARACTER_CLASSIFICATION END =====")
+    return 0
+}

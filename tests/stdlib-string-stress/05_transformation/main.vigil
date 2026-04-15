@@ -1,0 +1,98 @@
+import "fmt"
+
+fn main() -> i32 {
+    fmt.println("===== TEST 05_TRANSFORMATION START =====")
+
+    // trim
+    fmt.println(f"trim: [{"  hello  ".trim()}]")
+    fmt.println(f"trim tabs: [{"	hello	".trim()}]")
+    fmt.println(f"trim newlines: [{"\nhello\n".trim()}]")
+    fmt.println(f"trim mixed: [{" \t\n hello \t\n ".trim()}]")
+    fmt.println(f"trim none: [{"hello".trim()}]")
+    fmt.println(f"trim empty: [{"".trim()}]")
+    fmt.println(f"trim all spaces: [{"   ".trim()}]")
+
+    // trim_left
+    fmt.println(f"trim_left: [{"  hello  ".trim_left()}]")
+    fmt.println(f"trim_left none: [{"hello  ".trim_left()}]")
+    fmt.println(f"trim_left empty: [{"".trim_left()}]")
+
+    // trim_right
+    fmt.println(f"trim_right: [{"  hello  ".trim_right()}]")
+    fmt.println(f"trim_right none: [{"  hello".trim_right()}]")
+    fmt.println(f"trim_right empty: [{"".trim_right()}]")
+
+    // trim_prefix
+    fmt.println(f"trim_prefix: {"prefix-data".trim_prefix("prefix-")}")
+    fmt.println(f"trim_prefix miss: {"data".trim_prefix("prefix-")}")
+    fmt.println(f"trim_prefix empty: {"hello".trim_prefix("")}")
+    fmt.println(f"trim_prefix all: {"abc".trim_prefix("abc")}")
+
+    // trim_suffix
+    fmt.println(f"trim_suffix: {"data-suffix".trim_suffix("-suffix")}")
+    fmt.println(f"trim_suffix miss: {"data".trim_suffix("-suffix")}")
+    fmt.println(f"trim_suffix empty: {"hello".trim_suffix("")}")
+    fmt.println(f"trim_suffix all: {"abc".trim_suffix("abc")}")
+
+    // to_upper
+    fmt.println(f"upper: {"hello".to_upper()}")
+    fmt.println(f"upper mixed: {"Hello World".to_upper()}")
+    fmt.println(f"upper already: {"ABC".to_upper()}")
+    fmt.println(f"upper empty: {"".to_upper()}")
+    fmt.println(f"upper nums: {"abc123".to_upper()}")
+
+    // to_lower
+    fmt.println(f"lower: {"HELLO".to_lower()}")
+    fmt.println(f"lower mixed: {"Hello World".to_lower()}")
+    fmt.println(f"lower already: {"abc".to_lower()}")
+    fmt.println(f"lower empty: {"".to_lower()}")
+    fmt.println(f"lower nums: {"ABC123".to_lower()}")
+
+    // replace
+    fmt.println(f"replace: {"hello world".replace("world", "vigil")}")
+    fmt.println(f"replace all: {"aaa".replace("a", "bb")}")
+    fmt.println(f"replace none: {"hello".replace("xyz", "abc")}")
+    fmt.println(f"replace empty target: {"hello".replace("", "-")}")
+    fmt.println(f"replace to empty: {"hello".replace("l", "")}")
+    fmt.println(f"replace on empty: {"".replace("a", "b")}")
+
+    // reverse
+    fmt.println(f"reverse: {"abcdef".reverse()}")
+    fmt.println(f"reverse single: {"a".reverse()}")
+    fmt.println(f"reverse empty: {"".reverse()}")
+    fmt.println(f"reverse palindrome: {"racecar".reverse()}")
+
+    // repeat
+    fmt.println(f"repeat 3: {"ab".repeat(3)}")
+    fmt.println(f"repeat 1: {"hello".repeat(1)}")
+    fmt.println(f"repeat 0: {"hello".repeat(0)}")
+    fmt.println(f"repeat empty: {"".repeat(5)}")
+
+    // pad_left
+    fmt.println(f"pad_left: [{"42".pad_left(6, " ")}]")
+    fmt.println(f"pad_left zero: [{"42".pad_left(6, "0")}]")
+    fmt.println(f"pad_left exact: [{"hello".pad_left(5, " ")}]")
+    fmt.println(f"pad_left shorter: [{"hello".pad_left(3, " ")}]")
+    fmt.println(f"pad_left star: [{"x".pad_left(5, "*")}]")
+
+    // pad_right
+    fmt.println(f"pad_right: [{"42".pad_right(6, " ")}]")
+    fmt.println(f"pad_right dot: [{"hi".pad_right(6, ".")}]")
+    fmt.println(f"pad_right exact: [{"hello".pad_right(5, " ")}]")
+    fmt.println(f"pad_right shorter: [{"hello".pad_right(3, " ")}]")
+
+    // to_c
+    fmt.println(f"to_c simple: {"hello".to_c()}")
+    string with_quotes = "say \"hi\""
+    fmt.println(f"to_c quotes: {with_quotes.to_c()}")
+    fmt.println(f"to_c newline: {"line1\nline2".to_c()}")
+    fmt.println(f"to_c tab: {"a\tb".to_c()}")
+    fmt.println(f"to_c empty: {"".to_c()}")
+
+    // Chained transformations
+    string result = "  Hello, World!  ".trim().to_lower().replace("world", "vigil")
+    fmt.println(f"chained: {result}")
+
+    fmt.println("===== TEST 05_TRANSFORMATION END =====")
+    return 0
+}

@@ -123,7 +123,7 @@ static vigil_status_t emit_load_k(vigil_transpile_ctx_t *ctx, const vigil_reg_ch
                 else if (ch == '\t')
                     EMIT("\\t");
                 else if (ch < 0x20)
-                    EMITF("\\x%02x", ch);
+                    EMITF("\\%03o", ch);
                 else
                     EMITF("%c", ch);
             }

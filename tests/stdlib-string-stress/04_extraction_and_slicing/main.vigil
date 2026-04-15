@@ -1,0 +1,97 @@
+import "fmt"
+
+fn main() -> i32 {
+    fmt.println("===== TEST 04_EXTRACTION_AND_SLICING START =====")
+
+    string s = "Hello, World!"
+
+    // substr - success cases
+    string s1, err e1 = s.substr(0, 5)
+    fmt.println(f"substr 0,5: {s1}, ok={e1 == ok}")
+    string s2, err e2 = s.substr(7, 5)
+    fmt.println(f"substr 7,5: {s2}, ok={e2 == ok}")
+    string s3, err e3 = s.substr(0, 0)
+    fmt.println(f"substr 0,0: [{s3}], ok={e3 == ok}")
+    string s4, err e4 = s.substr(0, 13)
+    fmt.println(f"substr full: {s4}, ok={e4 == ok}")
+
+    // substr - error cases
+    string s5, err e5 = s.substr(-1, 5)
+    fmt.println(f"substr neg start: ok={e5 == ok}")
+    string s6, err e6 = s.substr(0, 100)
+    fmt.println(f"substr too long: ok={e6 == ok}")
+    string s7, err e7 = s.substr(20, 1)
+    fmt.println(f"substr past end: ok={e7 == ok}")
+
+    // substr on empty string
+    string s8, err e8 = "".substr(0, 0)
+    fmt.println(f"substr empty 0,0: [{s8}], ok={e8 == ok}")
+    string s9, err e9 = "".substr(0, 1)
+    fmt.println(f"substr empty 0,1: ok={e9 == ok}")
+
+    // char_at - success cases
+    string c1, err ce1 = s.char_at(0)
+    fmt.println(f"char_at 0: {c1}, ok={ce1 == ok}")
+    string c2, err ce2 = s.char_at(12)
+    fmt.println(f"char_at 12: {c2}, ok={ce2 == ok}")
+    string c3, err ce3 = s.char_at(7)
+    fmt.println(f"char_at 7: {c3}, ok={ce3 == ok}")
+
+    // char_at - error cases
+    string c4, err ce4 = s.char_at(-1)
+    fmt.println(f"char_at -1: ok={ce4 == ok}")
+    string c5, err ce5 = s.char_at(100)
+    fmt.println(f"char_at 100: ok={ce5 == ok}")
+    string c6, err ce6 = "".char_at(0)
+    fmt.println(f"char_at empty: ok={ce6 == ok}")
+
+    // cut - found
+    string before1, string after1, bool ok1 = "key=value".cut("=")
+    fmt.println(f"cut key=value: [{before1}] [{after1}] {ok1}")
+    string before2, string after2, bool ok2 = "a::b::c".cut("::")
+    fmt.println(f"cut a::b::c: [{before2}] [{after2}] {ok2}")
+
+    // cut - not found
+    string before3, string after3, bool ok3 = "hello".cut("=")
+    fmt.println(f"cut no sep: [{before3}] [{after3}] {ok3}")
+
+    // cut - edge cases
+    string before4, string after4, bool ok4 = "=value".cut("=")
+    fmt.println(f"cut start: [{before4}] [{after4}] {ok4}")
+    string before5, string after5, bool ok5 = "key=".cut("=")
+    fmt.println(f"cut end: [{before5}] [{after5}] {ok5}")
+    string before6, string after6, bool ok6 = "=".cut("=")
+    fmt.println(f"cut just sep: [{before6}] [{after6}] {ok6}")
+
+    // bytes
+    array<u8> b1 = "ABC".bytes()
+    fmt.println(f"bytes len: {b1.len()}")
+    fmt.println(f"bytes[0]: {b1[0]}")
+    fmt.println(f"bytes[1]: {b1[1]}")
+    fmt.println(f"bytes[2]: {b1[2]}")
+
+    // bytes on empty
+    array<u8> b2 = "".bytes()
+    fmt.println(f"bytes empty len: {b2.len()}")
+
+    // bytes on multibyte
+    array<u8> b3 = "é".bytes()
+    fmt.println(f"bytes é len: {b3.len()}")
+
+    // Iterate chars with for-in
+    fmt.print("for-in: ")
+    for ch in "abc" {
+        fmt.print(f"[{ch}]")
+    }
+    fmt.println("")
+
+    // for-in on UTF-8
+    fmt.print("for-in utf8: ")
+    for ch in "aé" {
+        fmt.print(f"[{ch}]")
+    }
+    fmt.println("")
+
+    fmt.println("===== TEST 04_EXTRACTION_AND_SLICING END =====")
+    return 0
+}

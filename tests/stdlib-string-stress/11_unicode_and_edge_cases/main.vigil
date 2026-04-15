@@ -1,0 +1,128 @@
+import "fmt"
+
+fn main() -> i32 {
+    fmt.println("===== TEST 11_UNICODE_AND_EDGE_CASES START =====")
+
+    // 2-byte UTF-8 (Latin extended)
+    string cafe = "café"
+    fmt.println(f"café len: {cafe.len()}")
+    fmt.println(f"café char_count: {cafe.char_count()}")
+    fmt.println(f"café contains é: {cafe.contains("é")}")
+
+    // 3-byte UTF-8 (CJK)
+    string jp = "日本語"
+    fmt.println(f"日本語 len: {jp.len()}")
+    fmt.println(f"日本語 char_count: {jp.char_count()}")
+
+    // 4-byte UTF-8 (emoji)
+    string emoji = "😀🎉🚀"
+    fmt.println(f"emoji len: {emoji.len()}")
+    fmt.println(f"emoji char_count: {emoji.char_count()}")
+
+    // Mixed ASCII and multibyte
+    string mixed = "Hello 世界!"
+    fmt.println(f"mixed len: {mixed.len()}")
+    fmt.println(f"mixed char_count: {mixed.char_count()}")
+    fmt.println(f"mixed contains 世界: {mixed.contains("世界")}")
+
+    // for-in iteration over multibyte
+    fmt.print("iterate café: ")
+    i32 count = 0
+    for ch in cafe {
+        fmt.print(f"[{ch}]")
+        count = count + 1
+    }
+    fmt.println("")
+    fmt.println(f"iterate café count: {count}")
+
+    fmt.print("iterate emoji: ")
+    i32 ecount = 0
+    for ch in emoji {
+        fmt.print(f"[{ch}]")
+        ecount = ecount + 1
+    }
+    fmt.println("")
+    fmt.println(f"iterate emoji count: {ecount}")
+
+    // UTF-8 string methods
+    fmt.println(f"café upper: {cafe.to_upper()}")
+    fmt.println(f"café lower: {cafe.to_lower()}")
+    fmt.println(f"café reverse: {cafe.reverse()}")
+
+    // UTF-8 split
+    array<string> jp_parts = "日-本-語".split("-")
+    fmt.println(f"jp split len: {jp_parts.len()}")
+    fmt.println(f"jp split[0]: {jp_parts[0]}")
+    fmt.println(f"jp split[1]: {jp_parts[1]}")
+    fmt.println(f"jp split[2]: {jp_parts[2]}")
+
+    // UTF-8 in f-strings
+    fmt.println(f"greeting: Hello, 世界!")
+    fmt.println(f"emoji in fstr: 🎉 done!")
+
+    // Edge case: empty string operations
+    string empty = ""
+    fmt.println(f"empty trim: [{empty.trim()}]")
+    fmt.println(f"empty upper: [{empty.to_upper()}]")
+    fmt.println(f"empty lower: [{empty.to_lower()}]")
+    fmt.println(f"empty reverse: [{empty.reverse()}]")
+    fmt.println(f"empty replace: [{empty.replace("a", "b")}]")
+    fmt.println(f"empty repeat: [{empty.repeat(10)}]")
+    fmt.println(f"empty split: {"".split(",").len()}")
+    fmt.println(f"empty fields: {"".fields().len()}")
+    fmt.println(f"empty contains empty: {empty.contains("")}")
+    fmt.println(f"empty starts empty: {empty.starts_with("")}")
+    fmt.println(f"empty ends empty: {empty.ends_with("")}")
+
+    // Edge case: single character
+    string one = "x"
+    fmt.println(f"single len: {one.len()}")
+    fmt.println(f"single reverse: {one.reverse()}")
+    fmt.println(f"single split: {one.split("").len()}")
+    fmt.println(f"single upper: {one.to_upper()}")
+
+    // Edge case: very long string
+    string long_str = "a".repeat(1000)
+    fmt.println(f"long len: {long_str.len()}")
+    fmt.println(f"long char_count: {long_str.char_count()}")
+    fmt.println(f"long contains: {long_str.contains("aaa")}")
+    fmt.println(f"long count a: {long_str.count("a")}")
+    fmt.println(f"long starts: {long_str.starts_with("aaa")}")
+    fmt.println(f"long ends: {long_str.ends_with("aaa")}")
+
+    // Edge case: string with only whitespace
+    string ws = "   \t\n  "
+    fmt.println(f"ws is_space: {ws.is_space()}")
+    fmt.println(f"ws trim: [{ws.trim()}]")
+    fmt.println(f"ws none: {ws.none()}")
+    fmt.println(f"ws any: {ws.any()}")
+    fmt.println(f"ws fields len: {ws.fields().len()}")
+
+    // Raw string literals
+    string raw = `hello\nworld`
+    fmt.println(f"raw len: {raw.len()}")
+    string backslash = "\\"
+    fmt.println(f"raw contains backslash: {raw.contains(backslash)}")
+
+    // Character literal
+    string ch = 'A'
+    fmt.println(f"char lit: {ch}")
+    fmt.println(f"char lit len: {ch.len()}")
+    fmt.println(f"char lit is_upper: {ch.is_upper()}")
+
+    // Escape sequences in strings
+    string esc = "a\tb\nc\rd\\e\"f"
+    fmt.println(f"esc len: {esc.len()}")
+    fmt.println(f"esc contains tab: {esc.contains("\t")}")
+
+    // Hex escape
+    string hex_esc = "\x41\x42\x43"
+    fmt.println(f"hex esc: {hex_esc}")
+
+    // Null byte
+    string with_null = "ab\0cd"
+    fmt.println(f"null len: {with_null.len()}")
+
+    fmt.println("===== TEST 11_UNICODE_AND_EDGE_CASES END =====")
+    return 0
+}

@@ -125,11 +125,11 @@ static vigil_status_t builder_write(vigil_vm_t *vm, size_t arg_count, vigil_erro
     const char *s = NULL;
     size_t len = 0;
     get_str(vm, base, 1, &s, &len);
-    vigil_vm_stack_pop_n(vm, arg_count);
     (void)error;
     builder_t *b = builder_get(h);
     if (b && s)
         builder_append(b, s, len);
+    vigil_vm_stack_pop_n(vm, arg_count);
     return VIGIL_STATUS_OK;
 }
 
