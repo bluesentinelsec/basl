@@ -1,0 +1,66 @@
+import "fmt"
+
+fn test_i32_search() -> void {
+    array<i32> a = [10, 20, 30, 40, 50]
+    fmt.println(f"contains 30: {a.contains(30)}")
+    fmt.println(f"contains 99: {a.contains(99)}")
+    fmt.println(f"contains 10: {a.contains(10)}")
+    fmt.println(f"contains 50: {a.contains(50)}")
+    fmt.println(f"index_of 10: {a.index_of(10)}")
+    fmt.println(f"index_of 30: {a.index_of(30)}")
+    fmt.println(f"index_of 50: {a.index_of(50)}")
+    fmt.println(f"index_of 99: {a.index_of(99)}")
+}
+
+fn test_empty_search() -> void {
+    array<i32> empty = []
+    fmt.println(f"empty contains 1: {empty.contains(1)}")
+    fmt.println(f"empty index_of 1: {empty.index_of(1)}")
+}
+
+fn test_string_search() -> void {
+    array<string> s = ["hello", "world", "vigil"]
+    fmt.println(f"contains hello: {s.contains("hello")}")
+    fmt.println(f"contains vigil: {s.contains("vigil")}")
+    fmt.println(f"contains xyz: {s.contains("xyz")}")
+    fmt.println(f"index_of hello: {s.index_of("hello")}")
+    fmt.println(f"index_of vigil: {s.index_of("vigil")}")
+    fmt.println(f"index_of xyz: {s.index_of("xyz")}")
+}
+
+fn test_other_types() -> void {
+    array<bool> b = [true, false]
+    fmt.println(f"bool contains true: {b.contains(true)}")
+    fmt.println(f"bool contains false: {b.contains(false)}")
+
+    array<f64> f = [1.5, 2.5, 3.5]
+    fmt.println(f"f64 contains 2.5: {f.contains(2.5)}")
+    fmt.println(f"f64 contains 9.9: {f.contains(9.9)}")
+}
+
+fn test_duplicates() -> void {
+    array<i32> dups = [1, 2, 3, 2, 1]
+    fmt.println(f"dup index_of 1: {dups.index_of(1)}")
+    fmt.println(f"dup index_of 2: {dups.index_of(2)}")
+    fmt.println(f"dup index_of 3: {dups.index_of(3)}")
+}
+
+fn test_mutation_search() -> void {
+    array<i32> m = [1, 2, 3]
+    fmt.println(f"before push contains 4: {m.contains(4)}")
+    m.push(4)
+    fmt.println(f"after push contains 4: {m.contains(4)}")
+    fmt.println(f"after push index_of 4: {m.index_of(4)}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 05_SEARCH START =====")
+    test_i32_search()
+    test_empty_search()
+    test_string_search()
+    test_other_types()
+    test_duplicates()
+    test_mutation_search()
+    fmt.println("===== TEST 05_SEARCH END =====")
+    return 0
+}

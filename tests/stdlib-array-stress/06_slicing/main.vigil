@@ -1,0 +1,76 @@
+import "fmt"
+
+fn print_arr(array<i32> a) -> void {
+    fmt.print("[")
+    for (i32 i = 0; i < a.len(); i++) {
+        if i > 0 { fmt.print(", ") }
+        fmt.print(f"{a[i]}")
+    }
+    fmt.println("]")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 06_SLICING START =====")
+
+    array<i32> a = [10, 20, 30, 40, 50]
+
+    // Basic slice
+    array<i32> s1 = a.slice(0, 3)
+    fmt.print("slice(0,3): ")
+    print_arr(s1)
+
+    array<i32> s2 = a.slice(2, 5)
+    fmt.print("slice(2,5): ")
+    print_arr(s2)
+
+    array<i32> s3 = a.slice(1, 4)
+    fmt.print("slice(1,4): ")
+    print_arr(s3)
+
+    // Full slice
+    array<i32> s4 = a.slice(0, a.len())
+    fmt.print("full slice: ")
+    print_arr(s4)
+    fmt.println(f"full slice len: {s4.len()}")
+
+    // Single element slice
+    array<i32> s5 = a.slice(2, 3)
+    fmt.print("single slice: ")
+    print_arr(s5)
+
+    // Empty slice
+    array<i32> s6 = a.slice(2, 2)
+    fmt.println(f"empty slice len: {s6.len()}")
+
+    // Slice is independent copy
+    array<i32> orig = [1, 2, 3, 4, 5]
+    array<i32> copy = orig.slice(0, orig.len())
+    copy[0] = 99
+    fmt.println(f"orig[0] after copy mod: {orig[0]}")
+    fmt.println(f"copy[0]: {copy[0]}")
+
+    // Slice of strings
+    array<string> strs = ["a", "b", "c", "d"]
+    array<string> ss = strs.slice(1, 3)
+    fmt.println(f"str slice: {ss[0]}, {ss[1]}")
+    fmt.println(f"str slice len: {ss.len()}")
+
+    // Slice from beginning
+    array<i32> front = a.slice(0, 2)
+    fmt.print("front: ")
+    print_arr(front)
+
+    // Slice to end
+    array<i32> back = a.slice(3, 5)
+    fmt.print("back: ")
+    print_arr(back)
+
+    // Chained operations on slice
+    array<i32> sl = a.slice(0, 3)
+    sl.push(99)
+    fmt.println(f"slice+push len: {sl.len()}")
+    fmt.println(f"slice+push last: {sl[3]}")
+
+    fmt.println("===== TEST 06_SLICING END =====")
+    return 0
+}

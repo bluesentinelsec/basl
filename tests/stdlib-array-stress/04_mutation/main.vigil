@@ -1,0 +1,97 @@
+import "fmt"
+
+fn test_push() -> void {
+    array<i32> a = []
+    a.push(1)
+    a.push(2)
+    a.push(3)
+    fmt.println(f"after 3 pushes: {a[0]}, {a[1]}, {a[2]}, len={a.len()}")
+
+    for (i32 i = 4; i <= 10; i++) {
+        a.push(i)
+    }
+    fmt.println(f"after push loop: len={a.len()}")
+}
+
+fn test_pop() -> void {
+    array<i32> a = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    i32 p1, err e1 = a.pop()
+    fmt.println(f"pop: {p1}, ok={e1 == ok}")
+    i32 p2, err e2 = a.pop()
+    fmt.println(f"pop: {p2}, ok={e2 == ok}")
+    fmt.println(f"after 2 pops: len={a.len()}")
+
+    // pop until empty
+    array<i32> b = [1, 2, 3]
+    i32 pv1, err pe1 = b.pop()
+    i32 pv2, err pe2 = b.pop()
+    i32 pv3, err pe3 = b.pop()
+    fmt.println(f"popped: {pv1}, {pv2}, {pv3}")
+    fmt.println(f"now empty: {b.none()}")
+
+    // pop on empty
+    i32 pv4, err pe4 = b.pop()
+    fmt.println(f"pop empty: ok={pe4 == ok}")
+}
+
+fn test_insert() -> void {
+    array<i32> c = [2, 3, 4]
+    err ie1 = c.insert(0, 1)
+    fmt.println(f"insert at 0: {c[0]}, {c[1]}, {c[2]}, {c[3]}")
+
+    err ie2 = c.insert(2, 99)
+    fmt.println(f"insert at 2: {c[0]}, {c[1]}, {c[2]}, {c[3]}, {c[4]}")
+
+    err ie3 = c.insert(c.len(), 5)
+    fmt.println(f"insert at end len: {c.len()}, last={c[c.len() - 1]}")
+
+    err ie4 = c.insert(100, 0)
+    fmt.println(f"insert(100): ok={ie4 == ok}")
+}
+
+fn test_remove() -> void {
+    array<i32> c = [1, 2, 99, 3, 4, 5]
+    i32 rv1, err re1 = c.remove(0)
+    fmt.println(f"remove(0): {rv1}, ok={re1 == ok}, len={c.len()}")
+
+    i32 rv2, err re2 = c.remove(1)
+    fmt.println(f"remove(1): {rv2}, ok={re2 == ok}")
+
+    i32 rv3, err re3 = c.remove(c.len() - 1)
+    fmt.println(f"remove last: {rv3}, ok={re3 == ok}")
+
+    i32 rv5, err re5 = c.remove(100)
+    fmt.println(f"remove(100): ok={re5 == ok}")
+}
+
+fn test_clear() -> void {
+    array<i32> d = [1, 2, 3, 4, 5]
+    fmt.println(f"before clear: {d.len()}")
+    d.clear()
+    fmt.println(f"after clear: {d.len()}")
+    fmt.println(f"after clear none: {d.none()}")
+    d.push(99)
+    fmt.println(f"push after clear: {d[0]}")
+}
+
+fn test_string_mutation() -> void {
+    array<string> s = ["a"]
+    s.push("b")
+    s.push("c")
+    fmt.println(f"str push: {s[0]}, {s[1]}, {s[2]}")
+    string sp, err spe = s.pop()
+    fmt.println(f"str pop: {sp}")
+    fmt.println(f"str len after pop: {s.len()}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 04_MUTATION START =====")
+    test_push()
+    test_pop()
+    test_insert()
+    test_remove()
+    test_clear()
+    test_string_mutation()
+    fmt.println("===== TEST 04_MUTATION END =====")
+    return 0
+}

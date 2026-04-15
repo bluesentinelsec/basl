@@ -1,0 +1,102 @@
+import "fmt"
+
+fn main() -> i32 {
+    fmt.println("===== TEST 10_GENERIC_ELEMENT_TYPES START =====")
+
+    // i32
+    array<i32> ai = [1, 2, 3]
+    ai.push(4)
+    ai.sort()
+    fmt.print("i32: ")
+    for v in ai { fmt.print(f"{v} ") }
+    fmt.println("")
+
+    // i64
+    array<i64> al = [i64(3000000000), i64(1000000000), i64(2000000000)]
+    al.sort()
+    fmt.print("i64: ")
+    for v in al { fmt.print(f"{v} ") }
+    fmt.println("")
+
+    // u8
+    array<u8> au = [u8(255), u8(0), u8(128)]
+    au.sort()
+    fmt.print("u8: ")
+    for v in au { fmt.print(f"{v} ") }
+    fmt.println("")
+
+    // u32
+    array<u32> au32 = [u32(300), u32(100), u32(200)]
+    au32.sort()
+    fmt.print("u32: ")
+    for v in au32 { fmt.print(f"{v} ") }
+    fmt.println("")
+
+    // u64
+    array<u64> au64 = [u64(3), u64(1), u64(2)]
+    au64.sort()
+    fmt.print("u64: ")
+    for v in au64 { fmt.print(f"{v} ") }
+    fmt.println("")
+
+    // f64
+    array<f64> af = [3.14, 1.0, 2.71]
+    af.sort()
+    fmt.print("f64: ")
+    for v in af { fmt.print(f"{v} ") }
+    fmt.println("")
+
+    // bool
+    array<bool> ab = [true, false, true, false]
+    fmt.print("bool: ")
+    for v in ab { fmt.print(f"{v} ") }
+    fmt.println("")
+    fmt.println(f"bool contains true: {ab.contains(true)}")
+    fmt.println(f"bool contains false: {ab.contains(false)}")
+
+    // string
+    array<string> as2 = ["cherry", "apple", "banana"]
+    as2.sort()
+    fmt.print("string sorted: ")
+    for v in as2 { fmt.print(f"{v} ") }
+    fmt.println("")
+
+    // All types: push, len, get, contains
+    array<i32> ti = []
+    ti.push(42)
+    i32 tiv, err tie = ti.get(0)
+    fmt.println(f"i32 push+get: {tiv}, contains={ti.contains(42)}")
+
+    array<f64> tf = []
+    tf.push(3.14)
+    f64 tfv, err tfe = tf.get(0)
+    fmt.println(f"f64 push+get: {tfv}, contains={tf.contains(3.14)}")
+
+    array<string> ts = []
+    ts.push("hello")
+    string tsv, err tse = ts.get(0)
+    fmt.println(f"str push+get: {tsv}, contains={ts.contains("hello")}")
+
+    array<bool> tb = []
+    tb.push(true)
+    bool tbv, err tbe = tb.get(0)
+    fmt.println(f"bool push+get: {tbv}, contains={tb.contains(true)}")
+
+    // Mixed operations on different types
+    array<i32> mix = [5, 3, 1, 4, 2]
+    mix.sort()
+    mix.reverse()
+    i32 mp, err mpe = mix.pop()
+    fmt.println(f"i32 sort+rev+pop: popped={mp}, len={mix.len()}")
+
+    array<string> smix = ["c", "a", "b"]
+    smix.sort()
+    smix.push("d")
+    smix.reverse()
+    fmt.print("str sort+push+rev: ")
+    for v in smix { fmt.print(f"{v} ") }
+    fmt.println("")
+
+    fmt.println("===== TEST 10_GENERIC_ELEMENT_TYPES END =====")
+    return 0
+}

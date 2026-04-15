@@ -1,0 +1,50 @@
+import "fmt"
+
+fn main() -> i32 {
+    fmt.println("===== TEST 01_BASIC_PROPERTIES START =====")
+
+    array<i32> a = [1, 2, 3, 4, 5]
+    fmt.println(f"len: {a.len()}")
+    fmt.println(f"any: {a.any()}")
+    fmt.println(f"none: {a.none()}")
+
+    array<i32> empty = []
+    fmt.println(f"empty len: {empty.len()}")
+    fmt.println(f"empty any: {empty.any()}")
+    fmt.println(f"empty none: {empty.none()}")
+
+    // Single element
+    array<i32> single = [42]
+    fmt.println(f"single len: {single.len()}")
+    fmt.println(f"single any: {single.any()}")
+    fmt.println(f"single none: {single.none()}")
+
+    // After mutation
+    array<i32> b = [1, 2, 3]
+    b.push(4)
+    fmt.println(f"after push len: {b.len()}")
+    fmt.println(f"after push any: {b.any()}")
+
+    i32 pv, err pe = b.pop()
+    i32 pv2, err pe2 = b.pop()
+    i32 pv3, err pe3 = b.pop()
+    i32 pv4, err pe4 = b.pop()
+    fmt.println(f"after 4 pops len: {b.len()}")
+    fmt.println(f"after 4 pops none: {b.none()}")
+
+    // String array
+    array<string> s = ["hello", "world"]
+    fmt.println(f"str len: {s.len()}")
+    fmt.println(f"str any: {s.any()}")
+
+    // f64 array
+    array<f64> f = [1.0, 2.0, 3.0]
+    fmt.println(f"f64 len: {f.len()}")
+
+    // bool array
+    array<bool> bools = [true, false, true]
+    fmt.println(f"bool len: {bools.len()}")
+
+    fmt.println("===== TEST 01_BASIC_PROPERTIES END =====")
+    return 0
+}

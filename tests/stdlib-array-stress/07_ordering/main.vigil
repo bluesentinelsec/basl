@@ -1,0 +1,127 @@
+import "fmt"
+
+fn print_i32(array<i32> a) -> void {
+    fmt.print("[")
+    for (i32 i = 0; i < a.len(); i++) {
+        if i > 0 { fmt.print(", ") }
+        fmt.print(f"{a[i]}")
+    }
+    fmt.println("]")
+}
+
+fn print_str(array<string> a) -> void {
+    fmt.print("[")
+    for (i32 i = 0; i < a.len(); i++) {
+        if i > 0 { fmt.print(", ") }
+        fmt.print(a[i])
+    }
+    fmt.println("]")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 07_ORDERING START =====")
+
+    // sort i32
+    array<i32> a = [5, 3, 8, 1, 9, 2, 7, 4, 6]
+    a.sort()
+    fmt.print("sort i32: ")
+    print_i32(a)
+
+    // sort_desc i32
+    a.sort_desc()
+    fmt.print("sort_desc i32: ")
+    print_i32(a)
+
+    // sort already sorted
+    array<i32> sorted = [1, 2, 3, 4, 5]
+    sorted.sort()
+    fmt.print("sort sorted: ")
+    print_i32(sorted)
+
+    // sort reverse sorted
+    array<i32> rev = [5, 4, 3, 2, 1]
+    rev.sort()
+    fmt.print("sort reversed: ")
+    print_i32(rev)
+
+    // sort with duplicates
+    array<i32> dups = [3, 1, 4, 1, 5, 9, 2, 6, 5, 3, 5]
+    dups.sort()
+    fmt.print("sort dups: ")
+    print_i32(dups)
+
+    // sort single element
+    array<i32> single = [42]
+    single.sort()
+    fmt.print("sort single: ")
+    print_i32(single)
+
+    // sort empty
+    array<i32> empty = []
+    empty.sort()
+    fmt.println(f"sort empty len: {empty.len()}")
+
+    // sort strings
+    array<string> strs = ["banana", "apple", "cherry", "date", "apricot"]
+    strs.sort()
+    fmt.print("sort str: ")
+    print_str(strs)
+
+    strs.sort_desc()
+    fmt.print("sort_desc str: ")
+    print_str(strs)
+
+    // sort f64
+    array<f64> floats = [3.14, 1.0, 2.71, 0.5, 1.41]
+    floats.sort()
+    fmt.print("sort f64: ")
+    for (i32 i = 0; i < floats.len(); i++) {
+        if i > 0 { fmt.print(", ") }
+        fmt.print(f"{floats[i]}")
+    }
+    fmt.println("")
+
+    // reverse
+    array<i32> r = [1, 2, 3, 4, 5]
+    r.reverse()
+    fmt.print("reverse: ")
+    print_i32(r)
+
+    // reverse single
+    array<i32> rs = [42]
+    rs.reverse()
+    fmt.print("reverse single: ")
+    print_i32(rs)
+
+    // reverse empty
+    array<i32> re = []
+    re.reverse()
+    fmt.println(f"reverse empty len: {re.len()}")
+
+    // reverse strings
+    array<string> rstr = ["a", "b", "c", "d"]
+    rstr.reverse()
+    fmt.print("reverse str: ")
+    print_str(rstr)
+
+    // sort then reverse = sort_desc
+    array<i32> sr = [3, 1, 4, 1, 5]
+    sr.sort()
+    sr.reverse()
+    fmt.print("sort+reverse: ")
+    print_i32(sr)
+
+    array<i32> sd = [3, 1, 4, 1, 5]
+    sd.sort_desc()
+    fmt.print("sort_desc:    ")
+    print_i32(sd)
+
+    // Negative numbers
+    array<i32> neg = [5, -3, 0, -1, 4, -2]
+    neg.sort()
+    fmt.print("sort neg: ")
+    print_i32(neg)
+
+    fmt.println("===== TEST 07_ORDERING END =====")
+    return 0
+}
