@@ -216,12 +216,10 @@ vigil_status_t vigil_vm_op_array_get_safe(vigil_vm_t *vm, vigil_vm_frame_t *fram
     }
     if (!vigil_nanbox_is_int(right) || vigil_value_as_int(&right) < 0)
     {
-        VIGIL_VM_VALUE_RELEASE(&left);
-        VIGIL_VM_VALUE_RELEASE(&right);
-        VIGIL_VM_VALUE_RELEASE(&value);
-        return vigil_vm_fail_at_ip(vm, VIGIL_STATUS_INVALID_ARGUMENT, "array get() index must be a non-negative i32",
-                                   error);
+        /* Negative or non-integer index: treat as out-of-bounds. */
+        status = vigil_vm_make_bounds_error_value(vm, "array index out of bounds", &right, error);
     }
+    else
     {
         vigil_value_t item;
         int found;
@@ -278,11 +276,16 @@ vigil_status_t vigil_vm_op_array_set_safe(vigil_vm_t *vm, vigil_vm_frame_t *fram
     }
     if (!vigil_nanbox_is_int(right) || vigil_value_as_int(&right) < 0)
     {
+        /* Negative or non-integer index: return bounds error. */
         VIGIL_VM_VALUE_RELEASE(&left);
         VIGIL_VM_VALUE_RELEASE(&right);
         VIGIL_VM_VALUE_RELEASE(&value);
-        return vigil_vm_fail_at_ip(vm, VIGIL_STATUS_INVALID_ARGUMENT, "array set() index must be a non-negative i32",
-                                   error);
+        status = vigil_vm_make_bounds_error_value(vm, "array index out of bounds", &value, error);
+        if (status != VIGIL_STATUS_OK)
+            return status;
+        status = vigil_vm_push(vm, &value, error);
+        VIGIL_VM_VALUE_RELEASE(&value);
+        return status;
     }
     status = vigil_array_object_set(arr, (size_t)vigil_value_as_int(&right), &value, error);
     VIGIL_VM_VALUE_RELEASE(&left);

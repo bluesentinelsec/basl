@@ -20,18 +20,21 @@ fn main() -> i32 {
 
     // u8
     array<u8> au = [u8(255), u8(0), u8(128)]
+    au.sort()
     fmt.print("u8: ")
     for v in au { fmt.print(f"{v} ") }
     fmt.println("")
 
     // u32
-    array<u32> au32 = [u32(100), u32(200), u32(300)]
+    array<u32> au32 = [u32(300), u32(100), u32(200)]
+    au32.sort()
     fmt.print("u32: ")
     for v in au32 { fmt.print(f"{v} ") }
     fmt.println("")
 
     // u64
-    array<u64> au64 = [u64(1), u64(2), u64(3)]
+    array<u64> au64 = [u64(3), u64(1), u64(2)]
+    au64.sort()
     fmt.print("u64: ")
     for v in au64 { fmt.print(f"{v} ") }
     fmt.println("")

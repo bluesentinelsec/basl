@@ -22,11 +22,13 @@ fn main() -> i32 {
     i32 v2, err e2 = a.get(4)
     fmt.println(f"get(4): {v2}, ok={e2 == ok}")
 
-    // get() - error (out of bounds)
-    i32 v3, err e3 = a.get(5)
-    fmt.println(f"get(5): ok={e3 == ok}")
-    i32 v4, err e4 = a.get(100)
-    fmt.println(f"get(100): ok={e4 == ok}")
+    // get() - error (out of bounds and negative)
+    i32 v3, err e3 = a.get(-1)
+    fmt.println(f"get(-1): ok={e3 == ok}")
+    i32 v4, err e4 = a.get(5)
+    fmt.println(f"get(5): ok={e4 == ok}")
+    i32 v5, err e5 = a.get(100)
+    fmt.println(f"get(100): ok={e5 == ok}")
 
     // set() - success
     err se1 = a.set(0, 100)
@@ -34,9 +36,11 @@ fn main() -> i32 {
     i32 sv1, err _ = a.get(0)
     fmt.println(f"after set: {sv1}")
 
-    // set() - error (out of bounds)
-    err se2 = a.set(100, 0)
-    fmt.println(f"set(100): ok={se2 == ok}")
+    // set() - error (out of bounds and negative)
+    err se2 = a.set(-1, 0)
+    fmt.println(f"set(-1): ok={se2 == ok}")
+    err se3 = a.set(100, 0)
+    fmt.println(f"set(100): ok={se3 == ok}")
 
     // get/set on string array
     array<string> s = ["hello", "world"]

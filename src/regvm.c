@@ -2906,11 +2906,9 @@ vigil_status_t vigil_reg_translate(const vigil_chunk_t *stack_chunk, vigil_reg_c
             SYNC_PACK(2);
             uint8_t def = vs_pop(&vs);
             uint8_t arr = vs_pop(&vs);
-            uint8_t r1 = vs_push_at(&vs, arr);
-            uint8_t r2 = vs_push_at(&vs, (uint8_t)(arr + 1));
-            (void)r1;
-            (void)r2;
-            TR_EMIT(vigil_reg_abc(VREG_ARRAY_POP, arr, arr, def));
+            uint8_t result_base;
+            PUSH_RESULT_REGS(arr, 2, result_base);
+            TR_EMIT(vigil_reg_abc(VREG_ARRAY_POP, result_base, arr, def));
             ip += 1;
             break;
         }

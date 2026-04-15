@@ -79,7 +79,9 @@ fn test_string_mutation() -> void {
     s.push("b")
     s.push("c")
     fmt.println(f"str push: {s[0]}, {s[1]}, {s[2]}")
-    fmt.println(f"str len: {s.len()}")
+    string sp, err spe = s.pop()
+    fmt.println(f"str pop: {sp}")
+    fmt.println(f"str len after pop: {s.len()}")
 }
 
 fn main() -> i32 {

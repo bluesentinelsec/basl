@@ -1670,6 +1670,11 @@ static int vigil_array_compare_asc(const void *a, const void *b)
         int64_t ia = vigil_value_as_int(va), ib = vigil_value_as_int(vb);
         return (ia > ib) - (ia < ib);
     }
+    if (vigil_value_kind(va) == VIGIL_VALUE_UINT && vigil_value_kind(vb) == VIGIL_VALUE_UINT)
+    {
+        uint64_t ua = vigil_value_as_uint(va), ub = vigil_value_as_uint(vb);
+        return (ua > ub) - (ua < ub);
+    }
     if (vigil_value_kind(va) == VIGIL_VALUE_FLOAT && vigil_value_kind(vb) == VIGIL_VALUE_FLOAT)
     {
         double fa = vigil_value_as_float(va), fb = vigil_value_as_float(vb);

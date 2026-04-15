@@ -34,6 +34,18 @@ fn test_empty_ops() -> void {
 
 fn test_oob() -> void {
     array<i32> a = [1, 2, 3]
+
+    // Negative indices return soft errors
+    i32 vn, err en = a.get(-1)
+    fmt.println(f"get(-1): ok={en == ok}")
+    err sn = a.set(-1, 0)
+    fmt.println(f"set(-1): ok={sn == ok}")
+    err in2 = a.insert(-1, 0)
+    fmt.println(f"insert(-1): ok={in2 == ok}")
+    i32 rn, err ren = a.remove(-1)
+    fmt.println(f"remove(-1): ok={ren == ok}")
+
+    // Positive out of bounds
     i32 v2, err e2 = a.get(3)
     fmt.println(f"get(3): ok={e2 == ok}")
     i32 v3, err e3 = a.get(1000)
@@ -96,8 +108,7 @@ fn test_cycles() -> void {
     s.reverse()
     fmt.println(f"single sort+rev: {s[0]}")
     i32 sv, err sve = s.pop()
-    i32 sv_val = sv + 0
-    fmt.println(f"single pop: {sv_val}, now empty={s.none()}")
+    fmt.println(f"single pop: {sv}, now empty={s.none()}")
 }
 
 fn main() -> i32 {
