@@ -1,0 +1,59 @@
+import "fmt"
+import "args"
+
+fn main() -> i32 {
+    fmt.println("===== TEST 08_NARGS_AND_POSITIONALS START =====")
+
+    // Required positional in help
+    args.Parser p1 = args.Parser.new("app", "desc")
+        .required_positional("input", "Input file")
+        .positional("output", "Output file")
+    string h1 = p1.help()
+    fmt.println(f"req pos in help: {h1.contains("<input>")}")
+    fmt.println(f"opt pos in help: {h1.contains("[output]")}")
+
+    // Nargs star
+    args.Parser p2 = args.Parser.new("app", "desc")
+        .positional_star("files", "Input files")
+    string h2 = p2.help()
+    fmt.println(f"star in help: {h2.contains("[files...]")}")
+
+    // Nargs plus
+    args.Parser p3 = args.Parser.new("app", "desc")
+        .positional_plus("files", "Input files")
+    string h3 = p3.help()
+    fmt.println(f"plus in help: {h3.contains("<files...>")}")
+
+    // Nargs optional
+    args.Parser p4 = args.Parser.new("app", "desc")
+        .positional_optional("config", "Config file")
+    string h4 = p4.help()
+    fmt.println(f"optional in help: {h4.contains("[config]")}")
+
+    // Required positional fails when missing
+    args.Parser p5 = args.Parser.new("app", "desc")
+        .required_positional("input", "Input")
+    err e5 = p5.parse()
+    fmt.println(f"req pos missing: {e5 != ok}")
+
+    // Nargs plus fails when missing
+    args.Parser p6 = args.Parser.new("app", "desc")
+        .positional_plus("files", "Files")
+    err e6 = p6.parse()
+    fmt.println(f"plus missing: {e6 != ok}")
+
+    // Optional positional succeeds when missing
+    args.Parser p7 = args.Parser.new("app", "desc")
+        .positional("file", "File")
+    err e7 = p7.parse()
+    fmt.println(f"opt pos ok: {e7 == ok}")
+
+    // Star succeeds when missing
+    args.Parser p8 = args.Parser.new("app", "desc")
+        .positional_star("files", "Files")
+    err e8 = p8.parse()
+    fmt.println(f"star ok: {e8 == ok}")
+
+    fmt.println("===== TEST 08_NARGS_AND_POSITIONALS END =====")
+    return 0
+}

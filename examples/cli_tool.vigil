@@ -3,7 +3,7 @@ import "fmt"
 
 fn main() -> i32 {
     // Create argument parser using the builder pattern
-    args.Parser parser = args.Parser.new("mytool", "A simple CLI tool example").flag("verbose", "v", "Enable verbose output").option("output", "o", "Output file path", "").option_int("count", "c", "Number of iterations", "1").positional("input", "Input file path")
+    args.Parser parser = args.Parser.new("mytool", "A simple CLI tool example").flag("verbose", "v", "Enable verbose output").option("output", "o", "Output file path", "").option_int("count", "c", "Number of iterations", 1).positional("input", "Input file path")
     // Check for --help before parsing
     for (i32 i = 0; i < args.count(); i++) {
         string a = args.at(i)
@@ -15,7 +15,7 @@ fn main() -> i32 {
     }
 
     // Parse arguments
-    err e = parser.parse(0)
+    err e = parser.parse()
     if e != ok {
         fmt.println(f"Error: {e.message()}")
         fmt.println(parser.help())

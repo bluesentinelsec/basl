@@ -1,0 +1,63 @@
+import "fmt"
+import "args"
+
+fn main() -> i32 {
+    fmt.println("===== TEST LARGE_ARGS_COMPREHENSIVE_2 START =====")
+
+    // Stress: many options
+    args.Parser p = args.Parser.new("stress", "Stress test")
+    for (i32 i = 0; i < 20; i++) {
+        p = p.option(f"opt{i}", "", f"Option {i}", f"default{i}")
+    }
+    string help = p.help()
+    fmt.println(f"many opts help len > 0: {help.len() > 0}")
+    fmt.println(f"has opt0: {help.contains("--opt0")}")
+    fmt.println(f"has opt19: {help.contains("--opt19")}")
+
+    err e = p.parse()
+    fmt.println(f"many opts parse: {e == ok}")
+    fmt.println(f"opt0 default: {p.get("opt0")}")
+    fmt.println(f"opt19 default: {p.get("opt19")}")
+
+    // Stress: many subcommands
+    args.Parser p2 = args.Parser.new("multi", "Multi-command tool")
+    for (i32 i = 0; i < 10; i++) {
+        p2 = p2.subcommand(f"cmd{i}", f"Command {i}")
+    }
+    string h2 = p2.help()
+    fmt.println(f"many cmds: {h2.contains("cmd0")}")
+    fmt.println(f"many cmds: {h2.contains("cmd9")}")
+
+    // Stress: all option types together
+    args.Parser p3 = args.Parser.new("all", "All types")
+        .flag("flag1", "f", "Flag 1")
+        .flag("flag2", "g", "Flag 2")
+        .option("str1", "s", "String 1", "hello")
+        .option("str2", "S", "String 2", "world")
+        .option_int("int1", "i", "Int 1", 42)
+        .option_int("int2", "I", "Int 2", 0)
+        .option_f64("f1", "d", "Float 1", 3.14)
+        .option_f64("f2", "D", "Float 2", 0.0)
+        .option_choice("ch1", "c", "Choice 1", "a|b|c", "a")
+        .option_multi("multi1", "m", "Multi 1")
+        .positional("pos1", "Pos 1")
+        .positional("pos2", "Pos 2")
+
+    err e3 = p3.parse()
+    fmt.println(f"all types parse: {e3 == ok}")
+    fmt.println(f"flag1: {p3.get_bool("flag1")}")
+    fmt.println(f"str1: {p3.get("str1")}")
+    fmt.println(f"int1: {p3.get_int("int1")}")
+    fmt.println(f"f1: {p3.get_f64("f1")}")
+    fmt.println(f"ch1: {p3.get("ch1")}")
+    fmt.println(f"multi1: {p3.get_multi("multi1").len()}")
+    fmt.println(f"positionals: {p3.get_positionals().len()}")
+
+    // Stress: help text formatting
+    string h3 = p3.help()
+    fmt.println(f"all types help: {h3.contains("Options:")}")
+    fmt.println(f"all types args: {h3.contains("Arguments:")}")
+
+    fmt.println("===== TEST LARGE_ARGS_COMPREHENSIVE_2 END =====")
+    return 0
+}

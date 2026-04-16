@@ -1,0 +1,36 @@
+import "fmt"
+import "args"
+
+fn main() -> i32 {
+    fmt.println("===== TEST 04_ERROR_HANDLING START =====")
+
+    // Required option missing (no CLI args provided)
+    args.Parser p1 = args.Parser.new("app", "desc")
+        .option("config", "c", "Config", "").mark_required()
+    err e1 = p1.parse()
+    fmt.println(f"required missing: {e1 != ok}")
+    fmt.println(f"required msg: {e1.message().contains("required")}")
+
+    // Required positional missing
+    args.Parser p2 = args.Parser.new("app", "desc")
+        .required_positional("input", "Input")
+    err e2 = p2.parse()
+    fmt.println(f"req pos missing: {e2 != ok}")
+    fmt.println(f"req pos msg: {e2.message().contains("required")}")
+
+    // No errors when no required options
+    args.Parser p3 = args.Parser.new("app", "desc")
+        .flag("verbose", "v", "Verbose")
+        .option("output", "o", "Output", "out.txt")
+    err e3 = p3.parse()
+    fmt.println(f"no required ok: {e3 == ok}")
+
+    // Error message is accessible
+    args.Parser p4 = args.Parser.new("app", "desc")
+        .option("name", "n", "Name", "").mark_required()
+    err e4 = p4.parse()
+    fmt.println(f"error has message: {e4.message().any()}")
+
+    fmt.println("===== TEST 04_ERROR_HANDLING END =====")
+    return 0
+}
