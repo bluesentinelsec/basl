@@ -1,0 +1,59 @@
+import "fmt"
+import "args"
+
+fn main() -> i32 {
+    fmt.println("===== TEST 08_POSITIONALS START =====")
+
+    // Optional positional in help
+    args.Parser p1 = args.Parser.new("app", "desc")
+        .positional("file", "Input file")
+    string h1 = p1.help()
+    fmt.println(f"opt pos: {h1.contains("[file]")}")
+    err e1 = p1.parse()
+    fmt.println(f"opt pos ok: {e1 == ok}")
+    fmt.println(f"positionals: {p1.get_positionals().len()}")
+
+    // Required positional
+    args.Parser p2 = args.Parser.new("app", "desc")
+        .required_positional("input", "Input file")
+    string h2 = p2.help()
+    fmt.println(f"req pos: {h2.contains("<input>")}")
+    err e2 = p2.parse()
+    fmt.println(f"req pos missing: {e2 != ok}")
+    fmt.println(f"req pos msg: {e2.message().contains("required")}")
+
+    // positional_star (zero or more)
+    args.Parser p3 = args.Parser.new("app", "desc")
+        .positional_star("files", "Input files")
+    string h3 = p3.help()
+    fmt.println(f"star: {h3.contains("[files...]")}")
+    err e3 = p3.parse()
+    fmt.println(f"star ok: {e3 == ok}")
+
+    // positional_plus (one or more)
+    args.Parser p4 = args.Parser.new("app", "desc")
+        .positional_plus("files", "Input files")
+    string h4 = p4.help()
+    fmt.println(f"plus: {h4.contains("<files...>")}")
+    err e4 = p4.parse()
+    fmt.println(f"plus missing: {e4 != ok}")
+
+    // positional_optional
+    args.Parser p5 = args.Parser.new("app", "desc")
+        .positional_optional("config", "Config file")
+    string h5 = p5.help()
+    fmt.println(f"optional: {h5.contains("[config]")}")
+    err e5 = p5.parse()
+    fmt.println(f"optional ok: {e5 == ok}")
+
+    // Mixed positionals
+    args.Parser p6 = args.Parser.new("app", "desc")
+        .required_positional("input", "Input")
+        .positional("output", "Output")
+    string h6 = p6.help()
+    fmt.println(f"mixed req: {h6.contains("<input>")}")
+    fmt.println(f"mixed opt: {h6.contains("[output]")}")
+
+    fmt.println("===== TEST 08_POSITIONALS END =====")
+    return 0
+}

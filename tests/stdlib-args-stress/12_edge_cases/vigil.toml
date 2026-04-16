@@ -1,4 +1,4 @@
-name = "04_error_handling"
+name = "12_edge_cases"
 description = "Args stress test"
 version = "1.0.0"
 type = "cli"

@@ -1,0 +1,39 @@
+import "fmt"
+import "args"
+
+fn main() -> i32 {
+    fmt.println("===== TEST 07_REQUIRED_OPTIONS START =====")
+
+    // Required option in help
+    args.Parser p1 = args.Parser.new("app", "desc")
+        .option("config", "c", "Config file", "").mark_required()
+        .option("output", "o", "Output", "out.txt")
+
+    string h = p1.help()
+    fmt.println(f"has required: {h.contains("(required)")}")
+    fmt.println(f"has output default: {h.contains("[default: out.txt]")}")
+
+    // Parse fails when required option missing
+    err e1 = p1.parse()
+    fmt.println(f"required missing: {e1 != ok}")
+    fmt.println(f"error msg: {e1.message().contains("required")}")
+    fmt.println(f"error msg has name: {e1.message().contains("config")}")
+
+    // Non-required options parse fine
+    args.Parser p2 = args.Parser.new("app", "desc")
+        .option("output", "o", "Output", "out.txt")
+    err e2 = p2.parse()
+    fmt.println(f"non-required ok: {e2 == ok}")
+
+    // mark_required on last option
+    args.Parser p3 = args.Parser.new("app", "desc")
+        .option("a", "", "A", "")
+        .option("b", "", "B", "").mark_required()
+        .option("c", "", "C", "default_c")
+    err e3 = p3.parse()
+    fmt.println(f"b required missing: {e3 != ok}")
+    fmt.println(f"b in error: {e3.message().contains("b")}")
+
+    fmt.println("===== TEST 07_REQUIRED_OPTIONS END =====")
+    return 0
+}

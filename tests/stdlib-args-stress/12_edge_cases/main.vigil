@@ -1,0 +1,76 @@
+import "fmt"
+import "args"
+
+fn test_many_options() -> void {
+    args.Parser p = args.Parser.new("stress", "Stress")
+    for (i32 i = 0; i < 20; i++) {
+        p = p.option(f"opt{i}", "", f"Option {i}", f"def{i}")
+    }
+    err e = p.parse()
+    fmt.println(f"many opts ok: {e == ok}")
+    fmt.println(f"opt0: {p.get("opt0")}")
+    fmt.println(f"opt19: {p.get("opt19")}")
+    string h = p.help()
+    fmt.println(f"help has opt0: {h.contains("--opt0")}")
+    fmt.println(f"help has opt19: {h.contains("--opt19")}")
+}
+
+fn test_many_subcommands() -> void {
+    args.Parser p = args.Parser.new("multi", "Multi")
+    for (i32 i = 0; i < 10; i++) {
+        p = p.subcommand(f"cmd{i}", f"Command {i}")
+    }
+    string h = p.help()
+    fmt.println(f"has cmd0: {h.contains("cmd0")}")
+    fmt.println(f"has cmd9: {h.contains("cmd9")}")
+}
+
+fn test_all_types_together() -> void {
+    args.Parser p = args.Parser.new("all", "All types")
+        .flag("f1", "f", "Flag")
+        .option("s1", "s", "String", "hello")
+        .option_int("i1", "i", "Int", 42)
+        .option_f64("d1", "d", "Float", 3.14)
+        .option_choice("c1", "c", "Choice", "a|b|c", "a")
+        .option_multi("m1", "m", "Multi")
+        .positional("p1", "Pos")
+
+    err e = p.parse()
+    fmt.println(f"all types ok: {e == ok}")
+    fmt.println(f"f1: {p.get_bool("f1")}")
+    fmt.println(f"s1: {p.get("s1")}")
+    fmt.println(f"i1: {p.get_int("i1")}")
+    fmt.println(f"d1: {p.get_f64("d1")}")
+    fmt.println(f"c1: {p.get("c1")}")
+    fmt.println(f"m1: {p.get_multi("m1").len()}")
+    fmt.println(f"pos: {p.get_positionals().len()}")
+}
+
+fn test_empty_defaults() -> void {
+    args.Parser p = args.Parser.new("app", "desc")
+        .option("a", "", "A", "")
+        .option_int("b", "", "B", 0)
+        .option_f64("c", "", "C", 0.0)
+    err e = p.parse()
+    fmt.println(f"empty defaults ok: {e == ok}")
+    fmt.println(f"a: [{p.get("a")}]")
+    fmt.println(f"b: {p.get_int("b")}")
+    fmt.println(f"c: {p.get_f64("c")}")
+}
+
+fn test_help_length() -> void {
+    // Help text should be non-empty for any parser
+    args.Parser p = args.Parser.new("x", "y")
+    fmt.println(f"min help: {p.help().len() > 0}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 12_EDGE_CASES START =====")
+    test_many_options()
+    test_many_subcommands()
+    test_all_types_together()
+    test_empty_defaults()
+    test_help_length()
+    fmt.println("===== TEST 12_EDGE_CASES END =====")
+    return 0
+}

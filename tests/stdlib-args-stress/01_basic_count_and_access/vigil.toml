@@ -1,4 +1,4 @@
-name = "03_parsing_and_access"
+name = "01_basic_count_and_access"
 description = "Args stress test"
 version = "1.0.0"
 type = "cli"

@@ -1,0 +1,46 @@
+import "fmt"
+import "args"
+
+fn main() -> i32 {
+    fmt.println("===== TEST 06_MULTI_AND_CHOICE_OPTIONS START =====")
+
+    // Multi option
+    args.Parser p1 = args.Parser.new("app", "desc")
+        .option_multi("include", "I", "Include path")
+        .option_multi("tag", "t", "Tag")
+
+    string h1 = p1.help()
+    fmt.println(f"has include: {h1.contains("--include, -I")}")
+    fmt.println(f"has tag: {h1.contains("--tag, -t")}")
+
+    err e1 = p1.parse()
+    fmt.println(f"parse ok: {e1 == ok}")
+
+    // get_multi with no values returns empty array
+    array<string> includes = p1.get_multi("include")
+    fmt.println(f"includes: {includes.len()}")
+    array<string> tags = p1.get_multi("tag")
+    fmt.println(f"tags: {tags.len()}")
+
+    // get_multi on nonexistent
+    array<string> missing = p1.get_multi("nope")
+    fmt.println(f"missing multi: {missing.len()}")
+
+    // Choice option
+    args.Parser p2 = args.Parser.new("app", "desc")
+        .option_choice("format", "f", "Output format", "json|csv|xml", "json")
+        .option_choice("level", "l", "Log level", "debug|info|warn|error", "info")
+
+    string h2 = p2.help()
+    fmt.println(f"has choices: {h2.contains("json|csv|xml")}")
+    fmt.println(f"has level choices: {h2.contains("debug|info|warn|error")}")
+    fmt.println(f"has default json: {h2.contains("[default: json]")}")
+
+    err e2 = p2.parse()
+    fmt.println(f"choice parse ok: {e2 == ok}")
+    fmt.println(f"format: {p2.get("format")}")
+    fmt.println(f"level: {p2.get("level")}")
+
+    fmt.println("===== TEST 06_MULTI_AND_CHOICE_OPTIONS END =====")
+    return 0
+}

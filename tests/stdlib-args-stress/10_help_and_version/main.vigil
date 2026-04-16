@@ -1,0 +1,55 @@
+import "fmt"
+import "args"
+
+fn main() -> i32 {
+    fmt.println("===== TEST 10_HELP_AND_VERSION START =====")
+
+    // Comprehensive help text
+    args.Parser p = args.Parser.new("myapp", "My application")
+        .version("3.0.0")
+        .flag("verbose", "v", "Verbose output")
+        .option("output", "o", "Output file", "result.txt")
+        .option_int("threads", "t", "Thread count", 4)
+        .option_f64("rate", "r", "Rate", 1.5)
+        .option_choice("level", "l", "Log level", "debug|info|warn|error", "info")
+        .option_multi("plugin", "p", "Load plugin")
+        .option("secret", "s", "Secret", "").mark_required()
+        .required_positional("input", "Input file")
+        .positional("extra", "Extra file")
+
+    string h = p.help()
+
+    // Structure
+    fmt.println(f"has usage: {h.contains("Usage: myapp")}")
+    fmt.println(f"has desc: {h.contains("My application")}")
+    fmt.println(f"has options: {h.contains("Options:")}")
+    fmt.println(f"has arguments: {h.contains("Arguments:")}")
+
+    // Options
+    fmt.println(f"has verbose: {h.contains("--verbose, -v")}")
+    fmt.println(f"has output: {h.contains("--output, -o VALUE")}")
+    fmt.println(f"has threads: {h.contains("--threads, -t VALUE")}")
+    fmt.println(f"has rate: {h.contains("--rate, -r VALUE")}")
+    fmt.println(f"has level: {h.contains("--level, -l VALUE")}")
+    fmt.println(f"has choices: {h.contains("debug|info|warn|error")}")
+    fmt.println(f"has default: {h.contains("[default: result.txt]")}")
+    fmt.println(f"has required: {h.contains("(required)")}")
+
+    // Positionals
+    fmt.println(f"has input: {h.contains("<input>")}")
+    fmt.println(f"has extra: {h.contains("[extra]")}")
+
+    // Subcommand help
+    args.Parser p2 = args.Parser.new("git", "VCS")
+        .subcommand("clone", "Clone repo")
+        .subcommand("push", "Push changes")
+        .flag("verbose", "v", "Verbose")
+    string h2 = p2.help()
+    fmt.println(f"subcmd usage: {h2.contains("<command>")}")
+    fmt.println(f"subcmd section: {h2.contains("Commands:")}")
+    fmt.println(f"subcmd clone: {h2.contains("clone")}")
+    fmt.println(f"subcmd push: {h2.contains("push")}")
+
+    fmt.println("===== TEST 10_HELP_AND_VERSION END =====")
+    return 0
+}

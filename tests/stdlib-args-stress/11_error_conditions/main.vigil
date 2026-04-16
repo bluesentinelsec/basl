@@ -1,0 +1,67 @@
+import "fmt"
+import "args"
+
+fn test_required_option_missing() -> void {
+    args.Parser p = args.Parser.new("app", "desc")
+        .option("config", "c", "Config", "").mark_required()
+    err e = p.parse()
+    fmt.println(f"req opt missing: {e != ok}")
+    fmt.println(f"msg has required: {e.message().contains("required")}")
+    fmt.println(f"msg has config: {e.message().contains("config")}")
+}
+
+fn test_required_positional_missing() -> void {
+    args.Parser p = args.Parser.new("app", "desc")
+        .required_positional("input", "Input")
+    err e = p.parse()
+    fmt.println(f"req pos missing: {e != ok}")
+    fmt.println(f"msg has required: {e.message().contains("required")}")
+    fmt.println(f"msg has input: {e.message().contains("input")}")
+}
+
+fn test_plus_positional_missing() -> void {
+    args.Parser p = args.Parser.new("app", "desc")
+        .positional_plus("files", "Files")
+    err e = p.parse()
+    fmt.println(f"plus missing: {e != ok}")
+    fmt.println(f"msg has files: {e.message().contains("files")}")
+}
+
+fn test_no_errors_when_optional() -> void {
+    args.Parser p = args.Parser.new("app", "desc")
+        .flag("v", "", "Verbose")
+        .option("out", "o", "Output", "default")
+        .positional("file", "File")
+        .positional_star("extras", "Extras")
+    err e = p.parse()
+    fmt.println(f"all optional ok: {e == ok}")
+}
+
+fn test_error_message_accessible() -> void {
+    args.Parser p = args.Parser.new("app", "desc")
+        .option("name", "n", "Name", "").mark_required()
+    err e = p.parse()
+    string msg = e.message()
+    fmt.println(f"msg any: {msg.any()}")
+    fmt.println(f"msg len > 0: {msg.len() > 0}")
+}
+
+fn test_multiple_required() -> void {
+    args.Parser p = args.Parser.new("app", "desc")
+        .option("a", "", "A", "").mark_required()
+        .option("b", "", "B", "").mark_required()
+    err e = p.parse()
+    fmt.println(f"multi req fail: {e != ok}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 11_ERROR_CONDITIONS START =====")
+    test_required_option_missing()
+    test_required_positional_missing()
+    test_plus_positional_missing()
+    test_no_errors_when_optional()
+    test_error_message_accessible()
+    test_multiple_required()
+    fmt.println("===== TEST 11_ERROR_CONDITIONS END =====")
+    return 0
+}

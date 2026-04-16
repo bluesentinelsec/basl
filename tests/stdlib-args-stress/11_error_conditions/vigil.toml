@@ -1,4 +1,4 @@
-name = "05_subcommands"
+name = "11_error_conditions"
 description = "Args stress test"
 version = "1.0.0"
 type = "cli"

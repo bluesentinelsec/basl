@@ -1,0 +1,38 @@
+import "fmt"
+import "args"
+
+fn main() -> i32 {
+    fmt.println("===== TEST 04_STRING_OPTIONS START =====")
+
+    args.Parser p = args.Parser.new("app", "desc")
+        .option("output", "o", "Output file", "out.txt")
+        .option("format", "f", "Format", "json")
+        .option("name", "n", "Name", "")
+
+    // Help shows options with defaults
+    string h = p.help()
+    fmt.println(f"has output: {h.contains("--output, -o")}")
+    fmt.println(f"has VALUE: {h.contains("VALUE")}")
+    fmt.println(f"has default: {h.contains("[default: out.txt]")}")
+
+    // Parse with no args — all defaults
+    err e = p.parse()
+    fmt.println(f"parse ok: {e == ok}")
+    fmt.println(f"output: {p.get("output")}")
+    fmt.println(f"format: {p.get("format")}")
+    fmt.println(f"name: [{p.get("name")}]")
+
+    // get on nonexistent option
+    fmt.println(f"missing: [{p.get("nonexistent")}]")
+
+    // Option without short name
+    args.Parser p2 = args.Parser.new("app", "desc")
+        .option("config-file", "", "Config", "/etc/app.conf")
+    string h2 = p2.help()
+    fmt.println(f"long only: {h2.contains("--config-file")}")
+    err e2 = p2.parse()
+    fmt.println(f"long default: {p2.get("config-file")}")
+
+    fmt.println("===== TEST 04_STRING_OPTIONS END =====")
+    return 0
+}

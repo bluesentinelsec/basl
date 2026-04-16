@@ -1,0 +1,32 @@
+import "fmt"
+import "args"
+
+fn main() -> i32 {
+    fmt.println("===== TEST 02_PARSER_CREATION START =====")
+
+    // Basic creation
+    args.Parser p = args.Parser.new("myapp", "My application")
+    fmt.println(f"created: true")
+
+    // Help contains prog and desc
+    string h = p.help()
+    fmt.println(f"has prog: {h.contains("myapp")}")
+    fmt.println(f"has desc: {h.contains("My application")}")
+    fmt.println(f"has usage: {h.contains("Usage:")}")
+
+    // Parse with no args succeeds (no required options)
+    err e = p.parse()
+    fmt.println(f"empty parse: {e == ok}")
+
+    // Multiple parsers
+    args.Parser p2 = args.Parser.new("other", "Other app")
+    string h2 = p2.help()
+    fmt.println(f"p2 has prog: {h2.contains("other")}")
+
+    // Chained creation
+    args.Parser p3 = args.Parser.new("chain", "Chained").flag("v", "", "Verbose")
+    fmt.println(f"chained: {p3.help().contains("--v")}")
+
+    fmt.println("===== TEST 02_PARSER_CREATION END =====")
+    return 0
+}
