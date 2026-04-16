@@ -5,30 +5,34 @@ fn main() -> i32 {
     fmt.println("===== TEST 10_ERROR_HANDLING START =====")
 
     string base = fs.join(fs.temp_dir(), "vigil_fs_10")
-    fs.remove_all(base)
-    fs.mkdir_all(base)
+    err _ = fs.remove_all(base)
+    err _ = fs.mkdir_all(base)
 
     // Read missing file
-    string missing = fs.read(fs.join(base, "nope.txt"))
+    string missing, err rme = fs.read(fs.join(base, "nope.txt"))
     fmt.println(f"read missing: [{missing}]")
 
     // Write to invalid path
-    bool wok = fs.write(fs.join(base, "no/such/dir/file.txt"), "data")
-    fmt.println(f"write bad path: {wok}")
+    err wok = fs.write(fs.join(base, "no/such/dir/file.txt"), "data")
+    fmt.println(f"write bad path: {wok != ok}")
 
     // Copy missing file
-    fmt.println(f"copy missing: {fs.copy(fs.join(base, "nope"), fs.join(base, "dst"))}")
+    err cpe = fs.copy(fs.join(base, "nope"), fs.join(base, "dst"))
+    fmt.println(f"copy missing: {cpe != ok}")
 
     // Move missing file
-    fmt.println(f"move missing: {fs.move(fs.join(base, "nope"), fs.join(base, "dst"))}")
+    err mve = fs.move(fs.join(base, "nope"), fs.join(base, "dst"))
+    fmt.println(f"move missing: {mve != ok}")
 
     // Remove missing file
-    fmt.println(f"remove missing: {fs.remove(fs.join(base, "nope"))}")
+    err rme2 = fs.remove(fs.join(base, "nope"))
+    fmt.println(f"remove missing: {rme2 != ok}")
 
     // mkdir on existing file
     string f = fs.join(base, "file.txt")
-    fs.write(f, "x")
-    fmt.println(f"mkdir on file: {fs.mkdir(f)}")
+    err _ = fs.write(f, "x")
+    err mke = fs.mkdir(f)
+    fmt.println(f"mkdir on file: {mke != ok}")
 
     // Reader open missing
     fs.Reader r, err re = fs.Reader.open(fs.join(base, "nope.txt"))
@@ -40,7 +44,7 @@ fn main() -> i32 {
 
     // Reader EOF handling
     string ef = fs.join(base, "eof.txt")
-    fs.write(ef, "one line")
+    err _ = fs.write(ef, "one line")
     fs.Reader r2, err re2 = fs.Reader.open(ef)
     string l1, err le1 = r2.read_line()
     fmt.println(f"first line: {l1}")
@@ -53,9 +57,9 @@ fn main() -> i32 {
 
     // read_bytes on empty
     string ef2 = fs.join(base, "empty.txt")
-    fs.write(ef2, "")
+    err _ = fs.write(ef2, "")
     fs.Reader r3, err re3 = fs.Reader.open(ef2)
-    string b, err be = r3.read_bytes(10)
+    array<u8> b, err be = r3.read_bytes(10)
     fmt.println(f"read_bytes empty eof: {be.kind() == err.eof}")
     r3.close()
 
@@ -65,7 +69,7 @@ fn main() -> i32 {
     fmt.println(f"is_dir missing: {fs.is_dir(fs.join(base, "nope"))}")
 
     // Cleanup
-    fs.remove_all(base)
+    err _ = fs.remove_all(base)
 
     fmt.println("===== TEST 10_ERROR_HANDLING END =====")
     return 0

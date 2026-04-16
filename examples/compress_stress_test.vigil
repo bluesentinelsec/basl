@@ -642,21 +642,21 @@ fn test_file_io(string workspace) -> void {
     string orig_path = fs.join(workspace, "original.log")
     string gz_path = fs.join(workspace, "original.log.gz")
     string restored_path = fs.join(workspace, "restored.log")
-    fs.write(orig_path, original)
+    err _ = fs.write(orig_path, original)
     check(fs.exists(orig_path), "wrote original file")
     // Compress and write
     string compressed = compress.gzip_compress(original)
-    fs.write(gz_path, compressed)
+    err _ = fs.write(gz_path, compressed)
     check(fs.exists(gz_path), "wrote compressed file")
     fmt.println("  Original: " + string(fs.size(orig_path)) + " bytes")
     fmt.println("  Compressed: " + string(fs.size(gz_path)) + " bytes")
     check(fs.size(gz_path) < fs.size(orig_path), "compressed file is smaller")
     // Read compressed, decompress, write restored
-    string read_compressed = fs.read(gz_path)
+    string read_compressed, err _ = fs.read(gz_path)
     string decompressed = compress.gzip_decompress(read_compressed)
-    fs.write(restored_path, decompressed)
+    err _ = fs.write(restored_path, decompressed)
     // Verify
-    string read_restored = fs.read(restored_path)
+    string read_restored, err _ = fs.read(restored_path)
     check(read_restored == original, "file round-trip: original == restored")
     // Create a project archive via tar.gz and write to disk
     array<string> proj_names = ["src/main.vigil", "README.md", "config.json"]
@@ -664,10 +664,10 @@ fn test_file_io(string workspace) -> void {
     string tar = compress.tar_create(proj_names, proj_contents)
     string tar_gz = compress.gzip_compress(tar)
     string archive_path = fs.join(workspace, "project.tar.gz")
-    fs.write(archive_path, tar_gz)
+    err _ = fs.write(archive_path, tar_gz)
     fmt.println("  Archive: " + string(fs.size(archive_path)) + " bytes")
     // Read back and extract
-    string read_archive = fs.read(archive_path)
+    string read_archive, err _ = fs.read(archive_path)
     string unzipped = compress.gzip_decompress(read_archive)
     array<string> entries = compress.tar_list(unzipped)
     check(entries.len() == 3, "tar.gz archive has 3 entries")
@@ -736,7 +736,7 @@ fn main() -> i32 {
     fmt.println("╚══════════════════════════════════════════════════════════╝")
     // Create workspace
     string workspace = fs.join(fs.temp_dir(), "vigil_compress_stress")
-    fs.mkdir_all(workspace)
+    err _ = fs.mkdir_all(workspace)
     i64 start = time.now_ms()
     test_roundtrip_all()
     test_format_comparison()
@@ -751,7 +751,7 @@ fn main() -> i32 {
     test_new_apis()
     i64 elapsed = time.now_ms() - start
     // Cleanup
-    fs.remove_all(workspace)
+    err _ = fs.remove_all(workspace)
     // Summary
     fmt.println("")
     fmt.println("════════════════════════════════════════")

@@ -5,60 +5,76 @@ fn main() -> i32 {
     fmt.println("===== TEST 02_FILE_OPERATIONS START =====")
 
     string base = fs.join(fs.temp_dir(), "vigil_fs_02")
-    fs.remove_all(base)
-    fs.mkdir_all(base)
+    err _ = fs.remove_all(base)
+    err _ = fs.mkdir_all(base)
 
     // write and read
     string f1 = fs.join(base, "hello.txt")
-    fmt.println(f"write: {fs.write(f1, "hello world")}")
-    fmt.println(f"read: {fs.read(f1)}")
+    err we1 = fs.write(f1, "hello world")
+    fmt.println(f"write: {we1 == ok}")
+    string content1, err re1 = fs.read(f1)
+    fmt.println(f"read: {content1}")
 
     // overwrite
-    fmt.println(f"overwrite: {fs.write(f1, "new content")}")
-    fmt.println(f"read after overwrite: {fs.read(f1)}")
+    err we2 = fs.write(f1, "new content")
+    fmt.println(f"overwrite: {we2 == ok}")
+    string content2, err re2 = fs.read(f1)
+    fmt.println(f"read after overwrite: {content2}")
 
     // write empty
     string f2 = fs.join(base, "empty.txt")
-    fmt.println(f"write empty: {fs.write(f2, "")}")
-    fmt.println(f"read empty: [{fs.read(f2)}]")
+    err we3 = fs.write(f2, "")
+    fmt.println(f"write empty: {we3 == ok}")
+    string content3, err re3 = fs.read(f2)
+    fmt.println(f"read empty: [{content3}]")
 
     // append
     string f3 = fs.join(base, "append.txt")
-    fs.write(f3, "line1")
-    fmt.println(f"append: {fs.append(f3, "\nline2")}")
-    fmt.println(f"read appended: {fs.read(f3)}")
+    err _ = fs.write(f3, "line1")
+    err ae1 = fs.append(f3, "\nline2")
+    fmt.println(f"append: {ae1 == ok}")
+    string content4, err re4 = fs.read(f3)
+    fmt.println(f"read appended: {content4}")
 
     // append to new file
     string f4 = fs.join(base, "append_new.txt")
-    fmt.println(f"append new: {fs.append(f4, "first")}")
-    fmt.println(f"read append new: {fs.read(f4)}")
+    err ae2 = fs.append(f4, "first")
+    fmt.println(f"append new: {ae2 == ok}")
+    string content5, err re5 = fs.read(f4)
+    fmt.println(f"read append new: {content5}")
 
     // copy
     string f5 = fs.join(base, "copy_dst.txt")
-    fmt.println(f"copy: {fs.copy(f1, f5)}")
-    fmt.println(f"copy content: {fs.read(f5)}")
+    err ce1 = fs.copy(f1, f5)
+    fmt.println(f"copy: {ce1 == ok}")
+    string content6, err re6 = fs.read(f5)
+    fmt.println(f"copy content: {content6}")
     fmt.println(f"original still exists: {fs.exists(f1)}")
 
     // move
     string f6 = fs.join(base, "moved.txt")
-    fmt.println(f"move: {fs.move(f5, f6)}")
-    fmt.println(f"moved content: {fs.read(f6)}")
+    err me1 = fs.move(f5, f6)
+    fmt.println(f"move: {me1 == ok}")
+    string content7, err re7 = fs.read(f6)
+    fmt.println(f"moved content: {content7}")
     fmt.println(f"old gone: {!fs.exists(f5)}")
 
     // remove file
-    fmt.println(f"remove: {fs.remove(f6)}")
+    err rme1 = fs.remove(f6)
+    fmt.println(f"remove: {rme1 == ok}")
     fmt.println(f"removed gone: {!fs.exists(f6)}")
 
     // remove_all directory
     string subdir = fs.join(base, "sub")
-    fs.mkdir(subdir)
-    fs.write(fs.join(subdir, "a.txt"), "a")
-    fs.write(fs.join(subdir, "b.txt"), "b")
-    fmt.println(f"remove_all: {fs.remove_all(subdir)}")
+    err _ = fs.mkdir(subdir)
+    err _ = fs.write(fs.join(subdir, "a.txt"), "a")
+    err _ = fs.write(fs.join(subdir, "b.txt"), "b")
+    err rae1 = fs.remove_all(subdir)
+    fmt.println(f"remove_all: {rae1 == ok}")
     fmt.println(f"subdir gone: {!fs.exists(subdir)}")
 
     // Cleanup
-    fs.remove_all(base)
+    err _ = fs.remove_all(base)
     fmt.println(f"cleanup: {!fs.exists(base)}")
 
     fmt.println("===== TEST 02_FILE_OPERATIONS END =====")

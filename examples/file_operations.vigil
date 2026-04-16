@@ -4,15 +4,19 @@ import "fs"
 fn main() -> i32 {
     // Write to a file
     string content = "Hello from VIGIL!\nThis is line 2.\n"
-    bool ok_write = fs.write("test.txt", content)
-    if ! ok_write {
+    err write_err = fs.write("test.txt", content)
+    if write_err != ok {
         fmt.println("Error writing file")
         return 1
     }
 
     fmt.println("File written successfully")
     // Read from a file
-    string data = fs.read("test.txt")
+    string data, err read_err = fs.read("test.txt")
+    if read_err != ok {
+        fmt.println("Error reading file")
+        return 1
+    }
     fmt.println(f"File contents:\n{data}")
     // Check if file exists
     bool exists = fs.exists("test.txt")
@@ -30,6 +34,6 @@ fn main() -> i32 {
     }
 
     // Clean up
-    fs.remove("test.txt")
+    err _ = fs.remove("test.txt")
     return 0
 }

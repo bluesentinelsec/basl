@@ -22,8 +22,8 @@ fn main() -> i32 {
         }
 
         // Remove (only works on empty directories)
-        bool ok2 = fs.remove(path)
-        if ! ok2 {
+        err e2 = fs.remove(path)
+        if e2 != ok {
             fmt.eprintln(f"vigil-rmdir: {path}: Directory not empty or cannot remove")
             return 1
         }

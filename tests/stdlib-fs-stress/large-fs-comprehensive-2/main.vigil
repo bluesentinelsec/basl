@@ -2,18 +2,24 @@ import "fmt"
 import "fs"
 import "strings"
 
+fn bytes_to_string(array<u8> b) -> string {
+    string s = ""
+    for v in b { s = s + char(i32(v)) }
+    return s
+}
+
 fn main() -> i32 {
     fmt.println("===== TEST LARGE_FS_COMPREHENSIVE_2 START =====")
 
     string base = fs.join(fs.temp_dir(), "vigil_fs_comp2")
-    fs.remove_all(base)
-    fs.mkdir_all(base)
+    err _ = fs.remove_all(base)
+    err _ = fs.mkdir_all(base)
 
     // Stress: many small files
     string small_dir = fs.join(base, "small")
-    fs.mkdir(small_dir)
+    err _ = fs.mkdir(small_dir)
     for (i32 i = 0; i < 100; i++) {
-        fs.write(fs.join(small_dir, f"f{i}.txt"), f"data{i}")
+        err _ = fs.write(fs.join(small_dir, f"f{i}.txt"), f"data{i}")
     }
     array<string> small_files = fs.list(small_dir)
     fmt.println(f"small files: {small_files.len()}")
@@ -42,9 +48,9 @@ fn main() -> i32 {
     // Stress: recursive directory structure
     for (i32 i = 0; i < 5; i++) {
         string d = fs.join(base, f"level1/level2_{i}")
-        fs.mkdir_all(d)
+        err _ = fs.mkdir_all(d)
         for (i32 j = 0; j < 3; j++) {
-            fs.write(fs.join(d, f"file_{j}.txt"), f"content_{i}_{j}")
+            err _ = fs.write(fs.join(d, f"file_{j}.txt"), f"content_{i}_{j}")
         }
     }
     array<string> walked = fs.walk(fs.join(base, "level1"))
@@ -78,39 +84,41 @@ fn main() -> i32 {
 
     // Stress: copy and verify
     string copy_dir = fs.join(base, "copies")
-    fs.mkdir(copy_dir)
+    err _ = fs.mkdir(copy_dir)
     for (i32 i = 0; i < 10; i++) {
         string src = fs.join(small_dir, f"f{i}.txt")
         string dst = fs.join(copy_dir, f"f{i}_copy.txt")
-        fs.copy(src, dst)
+        err _ = fs.copy(src, dst)
     }
     array<string> copies = fs.list(copy_dir)
     fmt.println(f"copies: {copies.len()}")
-    fmt.println(f"copy content: {fs.read(fs.join(copy_dir, "f0_copy.txt"))}")
+    string copy_content, err cre = fs.read(fs.join(copy_dir, "f0_copy.txt"))
+    fmt.println(f"copy content: {copy_content}")
 
     // Stress: remove and recreate
-    fs.remove_all(small_dir)
+    err _ = fs.remove_all(small_dir)
     fmt.println(f"removed small: {!fs.exists(small_dir)}")
-    fs.mkdir(small_dir)
-    fs.write(fs.join(small_dir, "new.txt"), "recreated")
-    fmt.println(f"recreated: {fs.read(fs.join(small_dir, "new.txt"))}")
+    err _ = fs.mkdir(small_dir)
+    err _ = fs.write(fs.join(small_dir, "new.txt"), "recreated")
+    string new_content, err nre = fs.read(fs.join(small_dir, "new.txt"))
+    fmt.println(f"recreated: {new_content}")
 
-    // Stress: read_bytes in chunks
+    // Stress: read_bytes in chunks (returns array<u8>)
     string chunk_file = fs.join(base, "chunks.txt")
-    fs.write(chunk_file, "abcdefghijklmnopqrstuvwxyz")
-    fs.Reader cr, err cre = fs.Reader.open(chunk_file)
+    err _ = fs.write(chunk_file, "abcdefghijklmnopqrstuvwxyz")
+    fs.Reader crd, err crde = fs.Reader.open(chunk_file)
     strings.Builder chunks = strings.Builder.new()
     while true {
-        string chunk, err ce = cr.read_bytes(5)
+        array<u8> chunk, err ce = crd.read_bytes(5)
         if ce != ok { break }
-        chunks.write(f"[{chunk}]")
+        chunks.write(f"[{bytes_to_string(chunk)}]")
     }
-    cr.close()
+    crd.close()
     fmt.println(f"chunks: {chunks.to_string()}")
     chunks.destroy()
 
     // Cleanup
-    fs.remove_all(base)
+    err _ = fs.remove_all(base)
     fmt.println(f"cleanup: {!fs.exists(base)}")
 
     fmt.println("===== TEST LARGE_FS_COMPREHENSIVE_2 END =====")

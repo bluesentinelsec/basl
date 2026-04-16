@@ -74,6 +74,6 @@ fn main() -> i32 {
     }
 
     fmt.println(f"\nFull file:\n{all}")
-    fs.remove("greetings.txt")
+    err _ = fs.remove("greetings.txt")
     return 0
 }

@@ -11,7 +11,7 @@ string DB_FILE = "users.csv"
 
 fn db_init() -> void {
     if ! fs.exists(DB_FILE) {
-        fs.write(DB_FILE, "id,name,age\n")
+        err _ = fs.write(DB_FILE, "id,name,age\n")
     }
 
 }
@@ -20,7 +20,7 @@ fn db_init() -> void {
 fn db_insert(string id, string name, string age) -> void {
     array<string> row = [id, name, age]
     string line = csv.stringify_row(row)
-    fs.append(DB_FILE, line + "\n")
+    err _ = fs.append(DB_FILE, line + "\n")
 }
 
 
@@ -33,7 +33,11 @@ fn main() -> i32 {
     db_insert("3", "Charlie", "35")
     fmt.println("Data inserted successfully")
     // Read all rows (split file by newlines, parse each line)
-    string raw = fs.read(DB_FILE)
+    string raw, err read_err = fs.read(DB_FILE)
+    if read_err != ok {
+        fmt.println("Error reading database")
+        return 1
+    }
     array<string> lines = raw.split("\n")
     fmt.println("\nUsers in database:")
     for (i32 i = 1; i < lines.len(); i++) {
@@ -75,6 +79,6 @@ fn main() -> i32 {
     }
 
     // Clean up
-    fs.remove(DB_FILE)
+    err _ = fs.remove(DB_FILE)
     return 0
 }

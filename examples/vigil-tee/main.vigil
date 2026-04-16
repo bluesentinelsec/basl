@@ -30,14 +30,14 @@ fn main() -> i32 {
     // Write to all files
     for (i32 i = 0; i < files.len(); i++) {
         string path = files[i]
-        bool ok2 = false
+        err e2 = ok
         if append_mode {
-            ok2 = fs.append(path, content)
+            e2 = fs.append(path, content)
         } else {
-            ok2 = fs.write(path, content)
+            e2 = fs.write(path, content)
         }
 
-        if ! ok2 {
+        if e2 != ok {
             fmt.eprintln(f"vigil-tee: {path}: write failed")
             return 1
         }

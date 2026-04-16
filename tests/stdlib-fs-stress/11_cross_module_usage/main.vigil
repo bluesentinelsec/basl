@@ -5,13 +5,13 @@ fn main() -> i32 {
     fmt.println("===== TEST 11_CROSS_MODULE_USAGE START =====")
 
     string base = fs.join(fs.temp_dir(), "vigil_fs_11")
-    fs.remove_all(base)
-    fs.mkdir_all(base)
+    err _ = fs.remove_all(base)
+    err _ = fs.mkdir_all(base)
 
     // Write CSV-like data, read back, parse with string methods
     string csv_file = fs.join(base, "data.csv")
-    fs.write(csv_file, "name,age,city\nAlice,30,NYC\nBob,25,LA")
-    string csv = fs.read(csv_file)
+    err _ = fs.write(csv_file, "name,age,city\nAlice,30,NYC\nBob,25,LA")
+    string csv, err csvre = fs.read(csv_file)
     array<string> lines = csv.split("\n")
     fmt.println(f"csv lines: {lines.len()}")
     array<string> headers = lines[0].split(",")
@@ -63,9 +63,9 @@ fn main() -> i32 {
     fmt.println(f"num lines: {num_lines.len()}")
 
     // fs.list + string operations
-    fs.write(fs.join(base, "report_2024.txt"), "r1")
-    fs.write(fs.join(base, "report_2025.txt"), "r2")
-    fs.write(fs.join(base, "notes.md"), "n")
+    err _ = fs.write(fs.join(base, "report_2024.txt"), "r1")
+    err _ = fs.write(fs.join(base, "report_2025.txt"), "r2")
+    err _ = fs.write(fs.join(base, "notes.md"), "n")
     array<string> all_files = fs.list(base)
     array<string> reports = []
     for f in all_files {
@@ -77,7 +77,7 @@ fn main() -> i32 {
     fmt.println(f"reports: {", ".join(reports)}")
 
     // Cleanup
-    fs.remove_all(base)
+    err _ = fs.remove_all(base)
 
     fmt.println("===== TEST 11_CROSS_MODULE_USAGE END =====")
     return 0

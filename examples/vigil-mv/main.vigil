@@ -11,8 +11,8 @@ fn main() -> i32 {
 
     string src = args.at(0)
     string dst = args.at(1)
-    bool ok2 = fs.move(src, dst)
-    if ! ok2 {
+    err e2 = fs.move(src, dst)
+    if e2 != ok {
         fmt.eprintln(f"vigil-mv: cannot move '{src}' to '{dst}'")
         return 1
     }
