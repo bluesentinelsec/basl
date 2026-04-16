@@ -1,0 +1,37 @@
+import "fmt"
+import "args"
+
+fn main() -> i32 {
+    fmt.println("===== TEST 03_FLAG_OPTIONS START =====")
+
+    args.Parser p = args.Parser.new("app", "desc")
+        .flag("verbose", "v", "Enable verbose output")
+        .flag("debug", "d", "Enable debug mode")
+        .flag("quiet", "q", "Quiet mode")
+
+    // Help shows flags
+    string h = p.help()
+    fmt.println(f"has verbose: {h.contains("--verbose, -v")}")
+    fmt.println(f"has debug: {h.contains("--debug, -d")}")
+    fmt.println(f"has quiet: {h.contains("--quiet, -q")}")
+    fmt.println(f"has desc: {h.contains("Enable verbose output")}")
+
+    // Parse with no args — all flags default to false
+    err e = p.parse()
+    fmt.println(f"parse ok: {e == ok}")
+    fmt.println(f"verbose: {p.get_bool("verbose")}")
+    fmt.println(f"debug: {p.get_bool("debug")}")
+    fmt.println(f"quiet: {p.get_bool("quiet")}")
+
+    // get_bool on nonexistent flag
+    fmt.println(f"missing: {p.get_bool("nonexistent")}")
+
+    // Flag without short name
+    args.Parser p2 = args.Parser.new("app", "desc")
+        .flag("long-only", "", "Long only flag")
+    string h2 = p2.help()
+    fmt.println(f"long only: {h2.contains("--long-only")}")
+
+    fmt.println("===== TEST 03_FLAG_OPTIONS END =====")
+    return 0
+}

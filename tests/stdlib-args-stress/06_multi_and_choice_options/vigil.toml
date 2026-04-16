@@ -1,4 +1,4 @@
-name = "08_nargs_and_positionals"
+name = "06_multi_and_choice_options"
 description = "Args stress test"
 version = "1.0.0"
 type = "cli"

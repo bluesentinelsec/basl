@@ -1,4 +1,4 @@
-name = "07_help_and_version"
+name = "04_string_options"
 description = "Args stress test"
 version = "1.0.0"
 type = "cli"

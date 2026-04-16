@@ -1,0 +1,23 @@
+import "fmt"
+import "args"
+
+fn main() -> i32 {
+    fmt.println("===== TEST 01_BASIC_COUNT_AND_ACCESS START =====")
+
+    // args.count() with no script args returns 0
+    fmt.println(f"count: {args.count()}")
+
+    // args.at() out of range returns empty string
+    fmt.println(f"at 0: [{args.at(0)}]")
+    fmt.println(f"at 1: [{args.at(1)}]")
+    fmt.println(f"at -1: [{args.at(-1)}]")
+    fmt.println(f"at 100: [{args.at(100)}]")
+
+    // at returns empty, not nil
+    string a = args.at(0)
+    fmt.println(f"at 0 none: {a.none()}")
+    fmt.println(f"at 0 len: {a.len()}")
+
+    fmt.println("===== TEST 01_BASIC_COUNT_AND_ACCESS END =====")
+    return 0
+}

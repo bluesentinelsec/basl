@@ -1,0 +1,44 @@
+import "fmt"
+import "args"
+
+fn main() -> i32 {
+    fmt.println("===== TEST 05_NUMERIC_OPTIONS START =====")
+
+    args.Parser p = args.Parser.new("app", "desc")
+        .option_int("jobs", "j", "Parallel jobs", 4)
+        .option_int("retries", "r", "Retry count", 0)
+        .option_int("port", "p", "Port", 8080)
+        .option_f64("threshold", "t", "Threshold", 0.5)
+        .option_f64("rate", "R", "Rate", 3.14)
+        .option_f64("scale", "s", "Scale", 1.0)
+
+    // Help shows numeric options
+    string h = p.help()
+    fmt.println(f"has jobs: {h.contains("--jobs, -j")}")
+    fmt.println(f"has default 4: {h.contains("[default: 4]")}")
+    fmt.println(f"has threshold: {h.contains("--threshold, -t")}")
+
+    // Parse with no args — all defaults
+    err e = p.parse()
+    fmt.println(f"parse ok: {e == ok}")
+
+    // get_int
+    fmt.println(f"jobs: {p.get_int("jobs")}")
+    fmt.println(f"retries: {p.get_int("retries")}")
+    fmt.println(f"port: {p.get_int("port")}")
+
+    // get_f64
+    fmt.println(f"threshold: {p.get_f64("threshold")}")
+    fmt.println(f"rate: {p.get_f64("rate")}")
+    fmt.println(f"scale: {p.get_f64("scale")}")
+
+    // get_int/get_f64 on nonexistent
+    fmt.println(f"missing int: {p.get_int("nope")}")
+    fmt.println(f"missing f64: {p.get_f64("nope")}")
+
+    // get_int also accessible via get() as string
+    fmt.println(f"jobs str: {p.get("jobs")}")
+
+    fmt.println("===== TEST 05_NUMERIC_OPTIONS END =====")
+    return 0
+}

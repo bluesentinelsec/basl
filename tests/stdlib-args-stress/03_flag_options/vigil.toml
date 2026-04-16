@@ -1,4 +1,4 @@
-name = "06_env_and_config"
+name = "03_flag_options"
 description = "Args stress test"
 version = "1.0.0"
 type = "cli"

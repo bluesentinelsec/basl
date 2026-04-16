@@ -1,4 +1,4 @@
-name = "01_module_functions"
+name = "10_help_and_version"
 description = "Args stress test"
 version = "1.0.0"
 type = "cli"

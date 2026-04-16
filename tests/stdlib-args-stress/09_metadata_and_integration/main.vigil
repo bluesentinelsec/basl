@@ -1,0 +1,70 @@
+import "fmt"
+import "args"
+import "fs"
+
+fn test_version() -> void {
+    args.Parser p = args.Parser.new("app", "desc").version("2.5.0")
+    string h = p.help()
+    fmt.println(f"version set: true")
+}
+
+fn test_subcommands() -> void {
+    args.Parser p = args.Parser.new("tool", "A tool")
+        .subcommand("init", "Initialize")
+        .subcommand("build", "Build project")
+        .subcommand("test", "Run tests")
+    string h = p.help()
+    fmt.println(f"has commands: {h.contains("Commands:")}")
+    fmt.println(f"has init: {h.contains("init")}")
+    fmt.println(f"has build: {h.contains("build")}")
+    fmt.println(f"has <command>: {h.contains("<command>")}")
+
+    err e = p.parse()
+    fmt.println(f"no subcmd ok: {e == ok}")
+    fmt.println(f"subcmd: [{p.get_subcommand()}]")
+}
+
+fn test_env() -> void {
+    args.Parser p = args.Parser.new("app", "desc")
+        .option("host", "H", "Host", "localhost").env("VIGIL_STRESS_TEST_HOST_XYZ")
+    string h = p.help()
+    fmt.println(f"env in help: {h.contains("VIGIL_STRESS_TEST_HOST_XYZ")}")
+
+    err e = p.parse()
+    fmt.println(f"env parse ok: {e == ok}")
+    fmt.println(f"env default: {p.get("host")}")
+}
+
+fn test_config() -> void {
+    string cfg = fs.join(fs.temp_dir(), "vigil_args_stress_09.conf")
+    err we = fs.write(cfg, "# Test config\ndatabase=postgres\nport=5432\n")
+
+    args.Parser p = args.Parser.new("app", "desc")
+        .option("db", "d", "Database", "sqlite").config("database")
+        .option_int("port", "p", "Port", 3000).config("port")
+
+    err le = p.load_config(cfg)
+    fmt.println(f"load ok: {le == ok}")
+
+    err e = p.parse()
+    fmt.println(f"config parse ok: {e == ok}")
+    fmt.println(f"db: {p.get("db")}")
+    fmt.println(f"port: {p.get_int("port")}")
+
+    // Load missing config
+    args.Parser p2 = args.Parser.new("app", "desc")
+    err le2 = p2.load_config("/nonexistent/config.conf")
+    fmt.println(f"load missing: {le2 != ok}")
+
+    fs.remove(cfg)
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 09_METADATA_AND_INTEGRATION START =====")
+    test_version()
+    test_subcommands()
+    test_env()
+    test_config()
+    fmt.println("===== TEST 09_METADATA_AND_INTEGRATION END =====")
+    return 0
+}
