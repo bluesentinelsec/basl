@@ -1,0 +1,84 @@
+import "fmt"
+import "fs"
+
+fn main() -> i32 {
+    fmt.println("===== TEST 11_CROSS_MODULE_USAGE START =====")
+
+    string base = fs.join(fs.temp_dir(), "vigil_fs_11")
+    fs.remove_all(base)
+    fs.mkdir_all(base)
+
+    // Write CSV-like data, read back, parse with string methods
+    string csv_file = fs.join(base, "data.csv")
+    fs.write(csv_file, "name,age,city\nAlice,30,NYC\nBob,25,LA")
+    string csv = fs.read(csv_file)
+    array<string> lines = csv.split("\n")
+    fmt.println(f"csv lines: {lines.len()}")
+    array<string> headers = lines[0].split(",")
+    fmt.println(f"headers: {", ".join(headers)}")
+    for (i32 i = 1; i < lines.len(); i++) {
+        array<string> cols = lines[i].split(",")
+        fmt.println(f"  {cols[0]}: age={cols[1]}, city={cols[2]}")
+    }
+
+    // Write config, read back, parse key=value pairs
+    string cfg_file = fs.join(base, "config.ini")
+    fs.Writer w, err we = fs.Writer.open(cfg_file)
+    w.write_line("host=localhost")
+    w.write_line("port=8080")
+    w.write_line("debug=true")
+    w.close()
+
+    map<string, string> config = {}
+    fs.Reader r, err re = fs.Reader.open(cfg_file)
+    while true {
+        string line, err le = r.read_line()
+        if le != ok { break }
+        string key, string val, bool ok2 = line.cut("=")
+        if ok2 {
+            config[key] = val
+        }
+    }
+    r.close()
+    array<string> ckeys = config.keys()
+    ckeys.sort()
+    for k in ckeys {
+        fmt.println(f"  config.{k} = {config[k]}")
+    }
+
+    // Write array data, read back
+    string arr_file = fs.join(base, "numbers.txt")
+    fs.Writer w2, err we2 = fs.Writer.open(arr_file)
+    array<i32> nums = [10, 20, 30, 40, 50]
+    for n in nums {
+        w2.write_line(f"{n}")
+    }
+    w2.close()
+
+    // Read back and sum
+    fs.Reader r2, err re2 = fs.Reader.open(arr_file)
+    string all, err ae = r2.read_all()
+    r2.close()
+    array<string> num_lines = all.trim().split("\n")
+    fmt.println(f"num lines: {num_lines.len()}")
+
+    // fs.list + string operations
+    fs.write(fs.join(base, "report_2024.txt"), "r1")
+    fs.write(fs.join(base, "report_2025.txt"), "r2")
+    fs.write(fs.join(base, "notes.md"), "n")
+    array<string> all_files = fs.list(base)
+    array<string> reports = []
+    for f in all_files {
+        if f.starts_with("report") {
+            reports.push(f)
+        }
+    }
+    reports.sort()
+    fmt.println(f"reports: {", ".join(reports)}")
+
+    // Cleanup
+    fs.remove_all(base)
+
+    fmt.println("===== TEST 11_CROSS_MODULE_USAGE END =====")
+    return 0
+}
