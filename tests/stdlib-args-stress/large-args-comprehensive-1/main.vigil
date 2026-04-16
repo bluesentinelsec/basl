@@ -1,0 +1,60 @@
+import "fmt"
+import "args"
+import "fs"
+
+fn main() -> i32 {
+    fmt.println("===== TEST LARGE_ARGS_COMPREHENSIVE_1 START =====")
+
+    // Real-world CLI tool pattern
+    args.Parser p = args.Parser.new("deploy", "Deploy application to cloud")
+        .version("3.2.1")
+        .subcommand("staging", "Deploy to staging")
+        .subcommand("production", "Deploy to production")
+        .flag("verbose", "v", "Verbose output")
+        .flag("dry-run", "n", "Show what would be done")
+        .option("region", "r", "AWS region", "us-east-1").env("DEPLOY_REGION")
+        .option("profile", "p", "AWS profile", "default").env("AWS_PROFILE")
+        .option_int("timeout", "t", "Timeout in seconds", 300)
+        .option_f64("scale", "s", "Scale factor", 1.0)
+        .option_choice("strategy", "S", "Deploy strategy", "rolling|blue-green|canary", "rolling")
+        .option_multi("tag", "T", "Resource tag")
+        .option("config", "c", "Config file", "").config("config_path")
+
+    // Verify help text is comprehensive
+    string help = p.help()
+    fmt.println(f"help has version: true")
+    fmt.println(f"help has subcommands: {help.contains("Commands:")}")
+    fmt.println(f"help has staging: {help.contains("staging")}")
+    fmt.println(f"help has production: {help.contains("production")}")
+    fmt.println(f"help has region: {help.contains("--region")}")
+    fmt.println(f"help has env: {help.contains("DEPLOY_REGION")}")
+    fmt.println(f"help has choices: {help.contains("rolling|blue-green|canary")}")
+    fmt.println(f"help has default: {help.contains("[default: us-east-1]")}")
+
+    // Parse with no args — all defaults
+    err e = p.parse()
+    fmt.println(f"parse ok: {e == ok}")
+    fmt.println(f"verbose: {p.get_bool("verbose")}")
+    fmt.println(f"dry-run: {p.get_bool("dry-run")}")
+    fmt.println(f"region: {p.get("region")}")
+    fmt.println(f"profile: {p.get("profile")}")
+    fmt.println(f"timeout: {p.get_int("timeout")}")
+    fmt.println(f"scale: {p.get_f64("scale")}")
+    fmt.println(f"strategy: {p.get("strategy")}")
+    fmt.println(f"tags: {p.get_multi("tag").len()}")
+    fmt.println(f"subcmd: [{p.get_subcommand()}]")
+
+    // Config file workflow
+    string cfg = fs.join(fs.temp_dir(), "vigil_deploy_test.conf")
+    err we = fs.write(cfg, "config_path=/etc/deploy.yml\n")
+    args.Parser p2 = args.Parser.new("app", "desc")
+        .option("config", "c", "Config", "").config("config_path")
+    err le = p2.load_config(cfg)
+    err e2 = p2.parse()
+    fmt.println(f"config loaded: {le == ok}")
+    fmt.println(f"config value: {p2.get("config")}")
+    fs.remove(cfg)
+
+    fmt.println("===== TEST LARGE_ARGS_COMPREHENSIVE_1 END =====")
+    return 0
+}

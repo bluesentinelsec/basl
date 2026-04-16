@@ -6,7 +6,7 @@ fn main() -> i32 {
     args.Parser parser = args.Parser.new("vigil-mkdir", "create directories")
     parser.flag("parents", "p", "make parent directories as needed")
     parser.positional("dir", "directory to create")
-    err e = parser.parse(0)
+    err e = parser.parse()
     if e != ok {
         fmt.eprintln(f"vigil-mkdir: {e.message()}")
         return 1

@@ -9,7 +9,7 @@ import "sdl"
 fn main() -> i32 {
     args.Parser p = args.Parser.new("sdl_audio", "Play a WAV file")
     args.Parser p2 = p.positional("file", "Path to a .wav file")
-    err pe = p.parse(args.count())
+    err pe = p.parse()
     if pe != ok {
         fmt.eprintln(p.help())
         return 1

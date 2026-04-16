@@ -1,0 +1,29 @@
+import "fmt"
+import "args"
+
+fn main() -> i32 {
+    fmt.println("===== TEST 05_SUBCOMMANDS START =====")
+
+    // Subcommand declaration
+    args.Parser p = args.Parser.new("tool", "A tool")
+        .subcommand("init", "Initialize project")
+        .subcommand("build", "Build project")
+        .subcommand("test", "Run tests")
+        .flag("verbose", "v", "Verbose")
+
+    // Help shows subcommands
+    string help = p.help()
+    fmt.println(f"has commands: {help.contains("Commands:")}")
+    fmt.println(f"has init: {help.contains("init")}")
+    fmt.println(f"has build: {help.contains("build")}")
+    fmt.println(f"has test: {help.contains("test")}")
+    fmt.println(f"has usage cmd: {help.contains("<command>")}")
+
+    // Parse with no args — no subcommand selected
+    err e = p.parse()
+    fmt.println(f"parse ok: {e == ok}")
+    fmt.println(f"subcmd: [{p.get_subcommand()}]")
+
+    fmt.println("===== TEST 05_SUBCOMMANDS END =====")
+    return 0
+}

@@ -6,7 +6,7 @@ fn main() -> i32 {
     args.Parser parser = args.Parser.new("cut", "Extract fields from lines")
     parser.option("f", "f", "field number (1-indexed)", "")
     parser.option("d", "d", "field delimiter", "\t")
-    err e = parser.parse(0)
+    err e = parser.parse()
     if e != ok {
         fmt.eprintln(f"cut: {e.message()}")
         return 1

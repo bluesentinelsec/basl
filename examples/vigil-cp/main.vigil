@@ -33,7 +33,7 @@ fn main() -> i32 {
     parser.flag("recursive", "r", "copy directories recursively")
     parser.positional("src", "source file")
     parser.positional("dst", "destination file")
-    err e = parser.parse(0)
+    err e = parser.parse()
     if e != ok {
         fmt.eprintln(f"vigil-cp: {e.message()}")
         return 1

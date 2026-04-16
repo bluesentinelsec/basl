@@ -58,6 +58,7 @@ jobs:
             --suite-dir tests/stdlib-array-stress \
             --suite-dir tests/stdlib-map-stress \
             --suite-dir tests/stdlib-fs-stress \
+            --suite-dir tests/stdlib-args-stress \
             --work-dir ${{ runner.temp }}/syntax_stress \
             -j 4
 
@@ -74,5 +75,6 @@ jobs:
             --suite-dir tests/stdlib-array-stress `
             --suite-dir tests/stdlib-map-stress `
             --suite-dir tests/stdlib-fs-stress `
+            --suite-dir tests/stdlib-args-stress `
             --work-dir "${{ runner.temp }}/syntax_stress" `
             -j 4

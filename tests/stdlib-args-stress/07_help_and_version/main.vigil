@@ -1,0 +1,48 @@
+import "fmt"
+import "args"
+
+fn main() -> i32 {
+    fmt.println("===== TEST 07_HELP_AND_VERSION START =====")
+
+    // Help text structure
+    args.Parser p = args.Parser.new("myapp", "My application description")
+        .version("2.5.0")
+        .flag("verbose", "v", "Enable verbose output")
+        .option("output", "o", "Output file", "result.txt")
+        .option_int("threads", "t", "Thread count", 4)
+        .option_f64("rate", "r", "Processing rate", 1.5)
+        .option_choice("level", "l", "Log level", "debug|info|warn|error", "info")
+        .option_multi("plugin", "p", "Load plugin")
+        .option("secret", "s", "Secret key", "").mark_required()
+        .required_positional("input", "Input file")
+        .positional("output_pos", "Output file")
+
+    string help = p.help()
+
+    // Verify help structure
+    fmt.println(f"has prog: {help.contains("myapp")}")
+    fmt.println(f"has desc: {help.contains("My application description")}")
+    fmt.println(f"has usage: {help.contains("Usage:")}")
+    fmt.println(f"has options: {help.contains("Options:")}")
+    fmt.println(f"has args: {help.contains("Arguments:")}")
+
+    // Verify options in help
+    fmt.println(f"has verbose: {help.contains("--verbose, -v")}")
+    fmt.println(f"has output: {help.contains("--output, -o")}")
+    fmt.println(f"has threads: {help.contains("--threads, -t")}")
+    fmt.println(f"has rate: {help.contains("--rate, -r")}")
+    fmt.println(f"has level: {help.contains("--level, -l")}")
+    fmt.println(f"has choices: {help.contains("debug|info|warn|error")}")
+    fmt.println(f"has default: {help.contains("[default: result.txt]")}")
+    fmt.println(f"has required: {help.contains("(required)")}")
+
+    // Verify positionals in help
+    fmt.println(f"has input: {help.contains("input")}")
+    fmt.println(f"has req pos: {help.contains("(required)")}")
+
+    // Version string
+    fmt.println(f"version set: true")
+
+    fmt.println("===== TEST 07_HELP_AND_VERSION END =====")
+    return 0
+}

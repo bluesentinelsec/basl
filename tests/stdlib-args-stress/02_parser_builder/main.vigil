@@ -1,0 +1,57 @@
+import "fmt"
+import "args"
+
+fn main() -> i32 {
+    fmt.println("===== TEST 02_PARSER_BUILDER START =====")
+
+    // Basic builder
+    args.Parser p = args.Parser.new("testapp", "A test application")
+    fmt.println(f"created: true")
+
+    // Chained builder
+    args.Parser p2 = args.Parser.new("app", "desc")
+        .version("1.0.0")
+        .flag("verbose", "v", "Verbose")
+        .flag("debug", "d", "Debug")
+        .option("output", "o", "Output", "out.txt")
+        .option_int("jobs", "j", "Jobs", 4)
+        .option_f64("threshold", "t", "Threshold", 0.5)
+        .option_choice("format", "f", "Format", "json|csv|xml", "json")
+        .option_multi("include", "I", "Include")
+        .option("config", "c", "Config", "").mark_required()
+        .required_positional("input", "Input file")
+        .positional("extra", "Extra file")
+    fmt.println(f"chained: true")
+
+    // Help text contains expected sections
+    string help = p2.help()
+    fmt.println(f"has usage: {help.contains("Usage:")}")
+    fmt.println(f"has options: {help.contains("Options:")}")
+    fmt.println(f"has arguments: {help.contains("Arguments:")}")
+    fmt.println(f"has verbose: {help.contains("--verbose")}")
+    fmt.println(f"has -v: {help.contains("-v")}")
+    fmt.println(f"has output: {help.contains("--output")}")
+    fmt.println(f"has default: {help.contains("[default:")}")
+    fmt.println(f"has required: {help.contains("required")}")
+    fmt.println(f"has choices: {help.contains("choices:")}")
+    fmt.println(f"has input: {help.contains("input")}")
+
+    // Subcommand builder
+    args.Parser p3 = args.Parser.new("git", "VCS")
+        .subcommand("clone", "Clone repo")
+        .subcommand("commit", "Commit changes")
+        .flag("verbose", "v", "Verbose")
+    string h3 = p3.help()
+    fmt.println(f"has commands: {h3.contains("Commands:")}")
+    fmt.println(f"has clone: {h3.contains("clone")}")
+    fmt.println(f"has commit: {h3.contains("commit")}")
+
+    // Env var builder
+    args.Parser p4 = args.Parser.new("app", "desc")
+        .option("host", "H", "Host", "localhost").env("APP_HOST")
+    string h4 = p4.help()
+    fmt.println(f"has env: {h4.contains("APP_HOST")}")
+
+    fmt.println("===== TEST 02_PARSER_BUILDER END =====")
+    return 0
+}
