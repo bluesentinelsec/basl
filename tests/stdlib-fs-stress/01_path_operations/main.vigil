@@ -1,0 +1,51 @@
+import "fmt"
+import "fs"
+
+fn main() -> i32 {
+    fmt.println("===== TEST 01_PATH_OPERATIONS START =====")
+
+    // join
+    fmt.println(f"join base: {fs.base(fs.join("dir", "file.txt"))}")
+    fmt.println(f"join nested base: {fs.base(fs.join("a/b", "c.txt"))}")
+    fmt.println(f"join empty: {fs.join("", "file.txt")}")
+
+    // dir
+    fmt.println(f"dir base: {fs.base(fs.dir(fs.join("parent", "child.txt")))}")
+    fmt.println(f"dir root file: {fs.dir("file.txt")}")
+
+    // base
+    fmt.println(f"base: {fs.base(fs.join("dir", "file.txt"))}")
+    fmt.println(f"base no dir: {fs.base("file.txt")}")
+    fmt.println(f"base nested: {fs.base(fs.join("a/b/c", "d.txt"))}")
+
+    // ext
+    fmt.println(f"ext .txt: {fs.ext("file.txt")}")
+    fmt.println(f"ext .tar.gz: {fs.ext("file.tar.gz")}")
+    fmt.println(f"ext none: {fs.ext("Makefile")}")
+    fmt.println(f"ext dot: {fs.ext(".hidden")}")
+
+    // stem
+    fmt.println(f"stem: {fs.stem("file.txt")}")
+    fmt.println(f"stem multi: {fs.stem("file.tar.gz")}")
+    fmt.println(f"stem no ext: {fs.stem("Makefile")}")
+
+    // is_abs
+    fmt.println(f"is_abs abs: {fs.is_abs(fs.temp_dir())}")
+    fmt.println(f"is_abs rel: {fs.is_abs("relative/path")}")
+    fmt.println(f"is_abs dot: {fs.is_abs("./here")}")
+    fmt.println(f"is_abs empty: {fs.is_abs("")}")
+
+    // clean
+    fmt.println(f"clean dots: {fs.base(fs.clean(fs.join("a/b/../c", "d.txt")))}")
+    fmt.println(f"clean slashes: {fs.base(fs.clean("a//b///c.txt"))}")
+
+    // Chained operations
+    string path = fs.join("project", "src/main.vigil")
+    fmt.println(f"chain dir: {fs.base(fs.dir(path))}")
+    fmt.println(f"chain base: {fs.base(path)}")
+    fmt.println(f"chain ext: {fs.ext(path)}")
+    fmt.println(f"chain stem: {fs.stem(path)}")
+
+    fmt.println("===== TEST 01_PATH_OPERATIONS END =====")
+    return 0
+}

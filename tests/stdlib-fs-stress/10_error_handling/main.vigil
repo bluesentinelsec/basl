@@ -1,0 +1,72 @@
+import "fmt"
+import "fs"
+
+fn main() -> i32 {
+    fmt.println("===== TEST 10_ERROR_HANDLING START =====")
+
+    string base = fs.join(fs.temp_dir(), "vigil_fs_10")
+    fs.remove_all(base)
+    fs.mkdir_all(base)
+
+    // Read missing file
+    string missing = fs.read(fs.join(base, "nope.txt"))
+    fmt.println(f"read missing: [{missing}]")
+
+    // Write to invalid path
+    bool wok = fs.write(fs.join(base, "no/such/dir/file.txt"), "data")
+    fmt.println(f"write bad path: {wok}")
+
+    // Copy missing file
+    fmt.println(f"copy missing: {fs.copy(fs.join(base, "nope"), fs.join(base, "dst"))}")
+
+    // Move missing file
+    fmt.println(f"move missing: {fs.move(fs.join(base, "nope"), fs.join(base, "dst"))}")
+
+    // Remove missing file
+    fmt.println(f"remove missing: {fs.remove(fs.join(base, "nope"))}")
+
+    // mkdir on existing file
+    string f = fs.join(base, "file.txt")
+    fs.write(f, "x")
+    fmt.println(f"mkdir on file: {fs.mkdir(f)}")
+
+    // Reader open missing
+    fs.Reader r, err re = fs.Reader.open(fs.join(base, "nope.txt"))
+    fmt.println(f"reader open missing: {re != ok}")
+
+    // Writer open in nonexistent dir
+    fs.Writer w, err we = fs.Writer.open(fs.join(base, "no/dir/file.txt"))
+    fmt.println(f"writer open bad: {we != ok}")
+
+    // Reader EOF handling
+    string ef = fs.join(base, "eof.txt")
+    fs.write(ef, "one line")
+    fs.Reader r2, err re2 = fs.Reader.open(ef)
+    string l1, err le1 = r2.read_line()
+    fmt.println(f"first line: {l1}")
+    string l2, err le2 = r2.read_line()
+    fmt.println(f"eof kind: {le2.kind() == err.eof}")
+    // Multiple reads after EOF
+    string l3, err le3 = r2.read_line()
+    fmt.println(f"eof again: {le3.kind() == err.eof}")
+    r2.close()
+
+    // read_bytes on empty
+    string ef2 = fs.join(base, "empty.txt")
+    fs.write(ef2, "")
+    fs.Reader r3, err re3 = fs.Reader.open(ef2)
+    string b, err be = r3.read_bytes(10)
+    fmt.println(f"read_bytes empty eof: {be.kind() == err.eof}")
+    r3.close()
+
+    // Exists/is_file/is_dir on missing
+    fmt.println(f"exists missing: {fs.exists(fs.join(base, "nope"))}")
+    fmt.println(f"is_file missing: {fs.is_file(fs.join(base, "nope"))}")
+    fmt.println(f"is_dir missing: {fs.is_dir(fs.join(base, "nope"))}")
+
+    // Cleanup
+    fs.remove_all(base)
+
+    fmt.println("===== TEST 10_ERROR_HANDLING END =====")
+    return 0
+}

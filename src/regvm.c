@@ -5142,6 +5142,20 @@ r_dispatch_switch_check:
         size_t arg_base = base + (size_t)arg_base_r;
         vm->stack_count = arg_base + (size_t)arg_count;
 
+        /* Retain object arguments so the native function's pop+release
+           doesn't free them while their data is still being read.
+           Save the original values so we can release the extra retain
+           after the call completes. */
+        vigil_value_t saved_args[8];
+        uint8_t saved_count = arg_count < 8 ? arg_count : 8;
+        for (uint8_t ai = 0; ai < saved_count; ai++)
+        {
+            vigil_value_t av = vm->stack[arg_base + ai];
+            saved_args[ai] = av;
+            if (vigil_nanbox_is_object(av))
+                vigil_object_retain((vigil_object_t *)vigil_nanbox_decode_ptr(av));
+        }
+
         const vigil_value_t *native_val = VIGIL_VM_CHUNK_CONSTANT(sc, (size_t)ci);
         if (VIGIL_UNLIKELY(!native_val || !vigil_nanbox_has_object(*native_val)))
         {
@@ -5156,6 +5170,11 @@ r_dispatch_switch_check:
         }
 
         status = native_fn(vm, (size_t)arg_count, error);
+
+        /* Release the extra retain on saved arguments. */
+        for (uint8_t ai = 0; ai < saved_count; ai++)
+            vigil_value_release(&saved_args[ai]);
+
         if (VIGIL_UNLIKELY(status != VIGIL_STATUS_OK))
             goto r_cleanup;
 

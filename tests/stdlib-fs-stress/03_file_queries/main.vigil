@@ -1,0 +1,40 @@
+import "fmt"
+import "fs"
+
+fn main() -> i32 {
+    fmt.println("===== TEST 03_FILE_QUERIES START =====")
+
+    string base = fs.join(fs.temp_dir(), "vigil_fs_03")
+    fs.remove_all(base)
+    fs.mkdir_all(base)
+
+    string f = fs.join(base, "test.txt")
+    fs.write(f, "content")
+    string d = fs.join(base, "subdir")
+    fs.mkdir(d)
+
+    // exists
+    fmt.println(f"exists file: {fs.exists(f)}")
+    fmt.println(f"exists dir: {fs.exists(d)}")
+    fmt.println(f"exists missing: {fs.exists(fs.join(base, "nope"))}")
+
+    // is_file
+    fmt.println(f"is_file file: {fs.is_file(f)}")
+    fmt.println(f"is_file dir: {fs.is_file(d)}")
+    fmt.println(f"is_file missing: {fs.is_file(fs.join(base, "nope"))}")
+
+    // is_dir
+    fmt.println(f"is_dir dir: {fs.is_dir(d)}")
+    fmt.println(f"is_dir file: {fs.is_dir(f)}")
+    fmt.println(f"is_dir missing: {fs.is_dir(fs.join(base, "nope"))}")
+
+    // is_valid_name
+    fmt.println(f"valid test.txt: {fs.is_valid_name("test.txt")}")
+    fmt.println(f"valid .hidden: {fs.is_valid_name(".hidden")}")
+    fmt.println(f"valid empty: {fs.is_valid_name("")}")
+
+    // Cleanup
+    fs.remove_all(base)
+    fmt.println("===== TEST 03_FILE_QUERIES END =====")
+    return 0
+}

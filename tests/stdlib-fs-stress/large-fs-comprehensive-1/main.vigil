@@ -1,0 +1,99 @@
+import "fmt"
+import "fs"
+
+fn main() -> i32 {
+    fmt.println("===== TEST LARGE_FS_COMPREHENSIVE_1 START =====")
+
+    string base = fs.join(fs.temp_dir(), "vigil_fs_comp1")
+    fs.remove_all(base)
+    fs.mkdir_all(base)
+
+    // Scenario: Config file workflow
+    string cfg = fs.join(base, "app.conf")
+    fs.Writer cw, err cwe = fs.Writer.open(cfg)
+    cw.write_line("# Application Config")
+    cw.write_line("host=localhost")
+    cw.write_line("port=8080")
+    cw.write_line("workers=4")
+    cw.close()
+
+    // Read config back
+    map<string, string> config = {}
+    fs.Reader cr, err cre = fs.Reader.open(cfg)
+    while true {
+        string line, err le = cr.read_line()
+        if le != ok { break }
+        if line.starts_with("#") { continue }
+        string key, string val, bool ok2 = line.cut("=")
+        if ok2 { config[key] = val }
+    }
+    cr.close()
+    fmt.println(f"config entries: {config.len()}")
+    array<string> ckeys = config.keys()
+    ckeys.sort()
+    for k in ckeys {
+        fmt.println(f"  {k}={config[k]}")
+    }
+
+    // Scenario: Log file with append
+    string logf = fs.join(base, "app.log")
+    for (i32 i = 0; i < 5; i++) {
+        fs.append(logf, f"[INFO] event {i}\n")
+    }
+    string log_content = fs.read(logf)
+    array<string> log_lines = log_content.trim().split("\n")
+    fmt.println(f"log lines: {log_lines.len()}")
+    fmt.println(f"first log: {log_lines[0]}")
+    fmt.println(f"last log: {log_lines[4]}")
+
+    // Scenario: Directory traversal
+    fs.mkdir_all(fs.join(base, "project/src"))
+    fs.mkdir_all(fs.join(base, "project/tests"))
+    fs.write(fs.join(base, "project/src/main.vigil"), "fn main() {}")
+    fs.write(fs.join(base, "project/src/utils.vigil"), "fn helper() {}")
+    fs.write(fs.join(base, "project/tests/test.vigil"), "fn test() {}")
+    fs.write(fs.join(base, "project/README.md"), "# Project")
+
+    array<string> all = fs.walk(fs.join(base, "project"))
+    array<string> vigil_files = []
+    for f in all {
+        if fs.ext(f) == ".vigil" {
+            vigil_files.push(fs.base(f))
+        }
+    }
+    vigil_files.sort()
+    fmt.println(f"vigil files: {", ".join(vigil_files)}")
+
+    // Scenario: File copy workflow
+    string src_dir = fs.join(base, "project/src")
+    string bak_dir = fs.join(base, "backup")
+    fs.mkdir_all(bak_dir)
+    array<string> src_files = fs.list(src_dir)
+    for sf in src_files {
+        fs.copy(fs.join(src_dir, sf), fs.join(bak_dir, sf))
+    }
+    array<string> bak_files = fs.list(bak_dir)
+    bak_files.sort()
+    fmt.println(f"backup files: {", ".join(bak_files)}")
+
+    // Scenario: Temp file workflow
+    string tmp = fs.temp_file("vigil_work_")
+    fs.write(tmp, "temporary data")
+    fmt.println(f"temp content: {fs.read(tmp)}")
+    fs.remove(tmp)
+    fmt.println(f"temp cleaned: {!fs.exists(tmp)}")
+
+    // Scenario: Path manipulation
+    string full_path = fs.join(base, "project/src/main.vigil")
+    fmt.println(f"dir: {fs.base(fs.dir(full_path))}")
+    fmt.println(f"base: {fs.base(full_path)}")
+    fmt.println(f"ext: {fs.ext(full_path)}")
+    fmt.println(f"stem: {fs.stem(full_path)}")
+
+    // Cleanup
+    fs.remove_all(base)
+    fmt.println(f"cleanup: {!fs.exists(base)}")
+
+    fmt.println("===== TEST LARGE_FS_COMPREHENSIVE_1 END =====")
+    return 0
+}

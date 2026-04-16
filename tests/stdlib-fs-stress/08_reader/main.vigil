@@ -1,0 +1,75 @@
+import "fmt"
+import "fs"
+
+fn main() -> i32 {
+    fmt.println("===== TEST 08_READER START =====")
+
+    string base = fs.join(fs.temp_dir(), "vigil_fs_08")
+    fs.remove_all(base)
+    fs.mkdir_all(base)
+
+    // read_line
+    string f1 = fs.join(base, "lines.txt")
+    fs.write(f1, "line one\nline two\nline three")
+
+    fs.Reader r1, err e1 = fs.Reader.open(f1)
+    fmt.println(f"open: {e1 == ok}")
+    string l1, err le1 = r1.read_line()
+    fmt.println(f"line 1: {l1}")
+    string l2, err le2 = r1.read_line()
+    fmt.println(f"line 2: {l2}")
+    string l3, err le3 = r1.read_line()
+    fmt.println(f"line 3: {l3}")
+    string l4, err le4 = r1.read_line()
+    fmt.println(f"eof: {le4.kind() == err.eof}")
+    err ce1 = r1.close()
+    fmt.println(f"close: {ce1 == ok}")
+
+    // read_all
+    fs.Reader r2, err e2 = fs.Reader.open(f1)
+    string all, err ae = r2.read_all()
+    fmt.println(f"read_all len: {all.len()}")
+    fmt.println(f"read_all ok: {ae == ok}")
+    r2.close()
+
+    // read_bytes
+    string f2 = fs.join(base, "bytes.txt")
+    fs.write(f2, "abcdefghij")
+    fs.Reader r3, err e3 = fs.Reader.open(f2)
+    string b1, err be1 = r3.read_bytes(3)
+    fmt.println(f"read_bytes 3: {b1}")
+    string b2, err be2 = r3.read_bytes(4)
+    fmt.println(f"read_bytes 4: {b2}")
+    string b3, err be3 = r3.read_bytes(100)
+    fmt.println(f"read_bytes rest: {b3}")
+    string b4, err be4 = r3.read_bytes(1)
+    fmt.println(f"read_bytes eof: {be4.kind() == err.eof}")
+    r3.close()
+
+    // Read empty file
+    string f3 = fs.join(base, "empty.txt")
+    fs.write(f3, "")
+    fs.Reader r4, err e4 = fs.Reader.open(f3)
+    string el, err ele = r4.read_line()
+    fmt.println(f"empty read_line eof: {ele.kind() == err.eof}")
+    r4.close()
+
+    // Read line by line in loop
+    string f4 = fs.join(base, "loop.txt")
+    fs.write(f4, "a\nb\nc\nd\ne")
+    fs.Reader r5, err e5 = fs.Reader.open(f4)
+    i32 count = 0
+    while true {
+        string line, err le = r5.read_line()
+        if le != ok { break }
+        count = count + 1
+    }
+    r5.close()
+    fmt.println(f"loop lines: {count}")
+
+    // Cleanup
+    fs.remove_all(base)
+
+    fmt.println("===== TEST 08_READER END =====")
+    return 0
+}

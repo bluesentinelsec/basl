@@ -173,7 +173,10 @@ static vigil_status_t emit_i32_cmp(vigil_transpile_ctx_t *ctx, const char *op_st
 static vigil_status_t emit_i64_cmp(vigil_transpile_ctx_t *ctx, const char *op_str, uint8_t a, uint8_t b, uint8_t c)
 {
     vigil_status_t status;
-    EMITF("    r[%u].v = (r[%u].i %s r[%u].i) ? VIGIL_NANBOX_TRUE : VIGIL_NANBOX_FALSE;\n", a, b, op_str, c);
+    EMITF("    { int64_t _l = vigil_nanbox_is_int(r[%u].v) ? vigil_nanbox_decode_int(r[%u].v) : r[%u].i;"
+          " int64_t _r = vigil_nanbox_is_int(r[%u].v) ? vigil_nanbox_decode_int(r[%u].v) : r[%u].i;"
+          " r[%u].v = (_l %s _r) ? VIGIL_NANBOX_TRUE : VIGIL_NANBOX_FALSE; }\n",
+          b, b, b, c, c, c, a, op_str);
     return VIGIL_STATUS_OK;
 }
 

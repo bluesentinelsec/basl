@@ -1,0 +1,65 @@
+import "fmt"
+import "fs"
+
+fn main() -> i32 {
+    fmt.println("===== TEST 07_STANDARD_LOCATIONS START =====")
+
+    // temp_dir
+    string td = fs.temp_dir()
+    fmt.println(f"temp_dir any: {td.any()}")
+    fmt.println(f"temp_dir is_abs: {fs.is_abs(td)}")
+    fmt.println(f"temp_dir is_dir: {fs.is_dir(td)}")
+
+    // home_dir
+    string hd = fs.home_dir()
+    fmt.println(f"home_dir any: {hd.any()}")
+    fmt.println(f"home_dir is_abs: {fs.is_abs(hd)}")
+
+    // config_dir
+    string cd = fs.config_dir()
+    fmt.println(f"config_dir any: {cd.any()}")
+    fmt.println(f"config_dir is_abs: {fs.is_abs(cd)}")
+
+    // cache_dir
+    string cad = fs.cache_dir()
+    fmt.println(f"cache_dir any: {cad.any()}")
+    fmt.println(f"cache_dir is_abs: {fs.is_abs(cad)}")
+
+    // data_dir
+    string dd = fs.data_dir()
+    fmt.println(f"data_dir any: {dd.any()}")
+    fmt.println(f"data_dir is_abs: {fs.is_abs(dd)}")
+
+    // cwd
+    string cwd = fs.cwd()
+    fmt.println(f"cwd any: {cwd.any()}")
+    fmt.println(f"cwd is_abs: {fs.is_abs(cwd)}")
+    fmt.println(f"cwd is_dir: {fs.is_dir(cwd)}")
+
+    // app_dir
+    string ad = fs.app_dir()
+    fmt.println(f"app_dir any: {ad.any()}")
+    fmt.println(f"app_dir is_abs: {fs.is_abs(ad)}")
+
+    // temp_file
+    string tf = fs.temp_file("vigil_test_")
+    fmt.println(f"temp_file exists: {fs.exists(tf)}")
+    fmt.println(f"temp_file is_abs: {fs.is_abs(tf)}")
+    fs.remove(tf)
+    fmt.println(f"temp_file removed: {!fs.exists(tf)}")
+
+    // chdir
+    string orig_cwd = fs.cwd()
+    string tdir = fs.join(fs.temp_dir(), "vigil_fs_07_chdir")
+    fs.mkdir_all(tdir)
+    fmt.println(f"chdir: {fs.chdir(tdir)}")
+    // Verify we changed (cwd should end with our dir name)
+    string new_cwd = fs.cwd()
+    fmt.println(f"chdir worked: {fs.base(new_cwd) == "vigil_fs_07_chdir"}")
+    // Restore
+    fs.chdir(orig_cwd)
+    fs.remove_all(tdir)
+
+    fmt.println("===== TEST 07_STANDARD_LOCATIONS END =====")
+    return 0
+}

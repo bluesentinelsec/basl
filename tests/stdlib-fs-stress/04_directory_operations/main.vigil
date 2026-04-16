@@ -1,0 +1,67 @@
+import "fmt"
+import "fs"
+
+fn main() -> i32 {
+    fmt.println("===== TEST 04_DIRECTORY_OPERATIONS START =====")
+
+    string base = fs.join(fs.temp_dir(), "vigil_fs_04")
+    fs.remove_all(base)
+    fs.mkdir_all(base)
+
+    // mkdir
+    string d1 = fs.join(base, "single")
+    fmt.println(f"mkdir: {fs.mkdir(d1)}")
+    fmt.println(f"mkdir exists: {fs.is_dir(d1)}")
+
+    // mkdir_all (nested)
+    string deep = fs.join(base, "a/b/c")
+    fmt.println(f"mkdir_all: {fs.mkdir_all(deep)}")
+    fmt.println(f"mkdir_all exists: {fs.is_dir(deep)}")
+
+    // list
+    fs.write(fs.join(base, "x.txt"), "x")
+    fs.write(fs.join(base, "y.txt"), "y")
+    array<string> entries = fs.list(base)
+    entries.sort()
+    fmt.print("list: ")
+    for e in entries { fmt.print(f"{e} ") }
+    fmt.println("")
+
+    // list empty dir
+    string empty_dir = fs.join(base, "empty")
+    fs.mkdir(empty_dir)
+    array<string> empty_list = fs.list(empty_dir)
+    fmt.println(f"list empty: {empty_list.len()}")
+
+    // walk (recursive)
+    fs.write(fs.join(base, "a/file_a.txt"), "a")
+    fs.write(fs.join(base, "a/b/file_b.txt"), "b")
+    fs.write(fs.join(base, "a/b/c/file_c.txt"), "c")
+    array<string> walked = fs.walk(base)
+    // Count files only (walk returns dirs too)
+    i32 file_count = 0
+    for w in walked {
+        if fs.is_file(w) { file_count = file_count + 1 }
+    }
+    fmt.println(f"walk file count: {file_count}")
+
+    // glob
+    array<string> txts = fs.glob(base, "*.txt")
+    array<string> txt_names = []
+    for t in txts { txt_names.push(fs.base(t)) }
+    txt_names.sort()
+    fmt.print("glob *.txt: ")
+    for n in txt_names { fmt.print(f"{n} ") }
+    fmt.println("")
+
+    // glob no match
+    array<string> no_match = fs.glob(base, "*.xyz")
+    fmt.println(f"glob no match: {no_match.len()}")
+
+    // Cleanup
+    fs.remove_all(base)
+    fmt.println(f"cleanup: {!fs.exists(base)}")
+
+    fmt.println("===== TEST 04_DIRECTORY_OPERATIONS END =====")
+    return 0
+}

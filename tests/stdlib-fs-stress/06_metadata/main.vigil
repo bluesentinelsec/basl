@@ -1,0 +1,51 @@
+import "fmt"
+import "fs"
+
+fn main() -> i32 {
+    fmt.println("===== TEST 06_METADATA START =====")
+
+    string base = fs.join(fs.temp_dir(), "vigil_fs_06")
+    fs.remove_all(base)
+    fs.mkdir_all(base)
+
+    // size
+    string f1 = fs.join(base, "sized.txt")
+    fs.write(f1, "hello")
+    fmt.println(f"size 5: {fs.size(f1)}")
+
+    fs.write(f1, "hello world!")
+    fmt.println(f"size 12: {fs.size(f1)}")
+
+    // empty file size
+    string f2 = fs.join(base, "empty.txt")
+    fs.write(f2, "")
+    fmt.println(f"size empty: {fs.size(f2)}")
+
+    // size of missing file
+    fmt.println(f"size missing: {fs.size(fs.join(base, "nope"))}")
+
+    // mtime
+    i64 mt = fs.mtime(f1)
+    fmt.println(f"mtime > 0: {mt > i64(0)}")
+    fmt.println(f"mtime reasonable: {mt > i64(1000000000)}")
+
+    // mtime of missing file
+    i64 mt2 = fs.mtime(fs.join(base, "nope"))
+    fmt.println(f"mtime missing: {mt2}")
+
+    // size of directory
+    i64 ds = fs.size(base)
+    fmt.println(f"dir size >= 0: {ds >= i64(0)}")
+
+    // Larger file
+    string f3 = fs.join(base, "large.txt")
+    string data = "x".repeat(1000)
+    fs.write(f3, data)
+    fmt.println(f"size 1000: {fs.size(f3)}")
+
+    // Cleanup
+    fs.remove_all(base)
+
+    fmt.println("===== TEST 06_METADATA END =====")
+    return 0
+}
