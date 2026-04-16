@@ -87,7 +87,7 @@ pub fn decompress_data(string data) -> string {
 
 // Save data to a file.
 pub fn save_to_file(string path, string data) -> void {
-    fs.write(path, data)
+    err _ = fs.write(path, data)
     fmt.println(f"  Saved to: {path}")
 }
 

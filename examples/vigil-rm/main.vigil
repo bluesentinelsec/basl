@@ -32,14 +32,14 @@ fn main() -> i32 {
             continue
         }
 
-        bool ok2 = false
+        err e2 = ok
         if recursive {
-            ok2 = fs.remove_all(path)
+            e2 = fs.remove_all(path)
         } else {
-            ok2 = fs.remove(path)
+            e2 = fs.remove(path)
         }
 
-        if ! ok2 &&! force {
+        if e2 != ok &&! force {
             fmt.eprintln(f"vigil-rm: {path}: cannot remove")
             return 1
         }

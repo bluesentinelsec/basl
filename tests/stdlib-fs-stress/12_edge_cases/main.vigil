@@ -3,48 +3,51 @@ import "fs"
 
 fn test_large_file() -> void {
     string base = fs.join(fs.temp_dir(), "vigil_fs_12")
-    fs.remove_all(base)
-    fs.mkdir_all(base)
+    err _ = fs.remove_all(base)
+    err _ = fs.mkdir_all(base)
 
     // Large file write/read
     string f = fs.join(base, "large.txt")
     string data = "x".repeat(10000)
-    fs.write(f, data)
+    err _ = fs.write(f, data)
     fmt.println(f"large size: {fs.size(f)}")
-    string content = fs.read(f)
+    string content, err re = fs.read(f)
     fmt.println(f"large read len: {content.len()}")
     fmt.println(f"large match: {content == data}")
 
-    fs.remove_all(base)
+    err _ = fs.remove_all(base)
 }
 
 fn test_many_files() -> void {
     string base = fs.join(fs.temp_dir(), "vigil_fs_12_many")
-    fs.remove_all(base)
-    fs.mkdir_all(base)
+    err _ = fs.remove_all(base)
+    err _ = fs.mkdir_all(base)
 
     for (i32 i = 0; i < 50; i++) {
-        fs.write(fs.join(base, f"file_{i}.txt"), f"content {i}")
+        err _ = fs.write(fs.join(base, f"file_{i}.txt"), f"content {i}")
     }
     array<string> files = fs.list(base)
     fmt.println(f"many files: {files.len()}")
 
     // Verify a few
-    fmt.println(f"file_0: {fs.read(fs.join(base, "file_0.txt"))}")
-    fmt.println(f"file_49: {fs.read(fs.join(base, "file_49.txt"))}")
+    string c0, err re0 = fs.read(fs.join(base, "file_0.txt"))
+    fmt.println(f"file_0: {c0}")
+    string c49, err re49 = fs.read(fs.join(base, "file_49.txt"))
+    fmt.println(f"file_49: {c49}")
 
-    fs.remove_all(base)
+    err _ = fs.remove_all(base)
 }
 
 fn test_deep_dirs() -> void {
     string base = fs.join(fs.temp_dir(), "vigil_fs_12_deep")
-    fs.remove_all(base)
+    err _ = fs.remove_all(base)
 
     string deep = fs.join(base, "a/b/c/d/e")
-    fs.mkdir_all(deep)
-    fs.write(fs.join(deep, "deep.txt"), "deep content")
+    err _ = fs.mkdir_all(deep)
+    err _ = fs.write(fs.join(deep, "deep.txt"), "deep content")
     fmt.println(f"deep exists: {fs.exists(fs.join(deep, "deep.txt"))}")
-    fmt.println(f"deep read: {fs.read(fs.join(deep, "deep.txt"))}")
+    string dc, err dre = fs.read(fs.join(deep, "deep.txt"))
+    fmt.println(f"deep read: {dc}")
 
     // Walk should find it
     array<string> walked = fs.walk(base)
@@ -54,44 +57,47 @@ fn test_deep_dirs() -> void {
     }
     fmt.println(f"deep walk files: {file_count}")
 
-    fs.remove_all(base)
+    err _ = fs.remove_all(base)
 }
 
 fn test_empty_file() -> void {
     string base = fs.join(fs.temp_dir(), "vigil_fs_12_empty")
-    fs.remove_all(base)
-    fs.mkdir_all(base)
+    err _ = fs.remove_all(base)
+    err _ = fs.mkdir_all(base)
 
     string f = fs.join(base, "empty.txt")
-    fs.write(f, "")
+    err _ = fs.write(f, "")
     fmt.println(f"empty size: {fs.size(f)}")
-    fmt.println(f"empty read: [{fs.read(f)}]")
+    string content, err re = fs.read(f)
+    fmt.println(f"empty read: [{content}]")
     fmt.println(f"empty exists: {fs.exists(f)}")
 
-    fs.remove_all(base)
+    err _ = fs.remove_all(base)
 }
 
 fn test_special_content() -> void {
     string base = fs.join(fs.temp_dir(), "vigil_fs_12_special")
-    fs.remove_all(base)
-    fs.mkdir_all(base)
+    err _ = fs.remove_all(base)
+    err _ = fs.mkdir_all(base)
 
     // Newlines
     string f1 = fs.join(base, "newlines.txt")
-    fs.write(f1, "a\nb\nc\n")
+    err _ = fs.write(f1, "a\nb\nc\n")
     fmt.println(f"newlines size: {fs.size(f1)}")
 
     // Tabs
     string f2 = fs.join(base, "tabs.txt")
-    fs.write(f2, "a\tb\tc")
-    fmt.println(f"tabs read: {fs.read(f2)}")
+    err _ = fs.write(f2, "a\tb\tc")
+    string tc, err tre = fs.read(f2)
+    fmt.println(f"tabs read: {tc}")
 
     // Unicode
     string f3 = fs.join(base, "unicode.txt")
-    fs.write(f3, "café 日本語 🎉")
-    fmt.println(f"unicode read: {fs.read(f3)}")
+    err _ = fs.write(f3, "café 日本語 🎉")
+    string uc, err ure = fs.read(f3)
+    fmt.println(f"unicode read: {uc}")
 
-    fs.remove_all(base)
+    err _ = fs.remove_all(base)
 }
 
 fn test_temp_file() -> void {
@@ -101,8 +107,8 @@ fn test_temp_file() -> void {
     fmt.println(f"temp unique: {t1 != t2}")
     fmt.println(f"temp1 exists: {fs.exists(t1)}")
     fmt.println(f"temp2 exists: {fs.exists(t2)}")
-    fs.remove(t1)
-    fs.remove(t2)
+    err _ = fs.remove(t1)
+    err _ = fs.remove(t2)
 }
 
 fn main() -> i32 {

@@ -5,22 +5,24 @@ fn main() -> i32 {
     fmt.println("===== TEST 04_DIRECTORY_OPERATIONS START =====")
 
     string base = fs.join(fs.temp_dir(), "vigil_fs_04")
-    fs.remove_all(base)
-    fs.mkdir_all(base)
+    err _ = fs.remove_all(base)
+    err _ = fs.mkdir_all(base)
 
     // mkdir
     string d1 = fs.join(base, "single")
-    fmt.println(f"mkdir: {fs.mkdir(d1)}")
+    err me1 = fs.mkdir(d1)
+    fmt.println(f"mkdir: {me1 == ok}")
     fmt.println(f"mkdir exists: {fs.is_dir(d1)}")
 
     // mkdir_all (nested)
     string deep = fs.join(base, "a/b/c")
-    fmt.println(f"mkdir_all: {fs.mkdir_all(deep)}")
+    err mae1 = fs.mkdir_all(deep)
+    fmt.println(f"mkdir_all: {mae1 == ok}")
     fmt.println(f"mkdir_all exists: {fs.is_dir(deep)}")
 
     // list
-    fs.write(fs.join(base, "x.txt"), "x")
-    fs.write(fs.join(base, "y.txt"), "y")
+    err _ = fs.write(fs.join(base, "x.txt"), "x")
+    err _ = fs.write(fs.join(base, "y.txt"), "y")
     array<string> entries = fs.list(base)
     entries.sort()
     fmt.print("list: ")
@@ -29,14 +31,14 @@ fn main() -> i32 {
 
     // list empty dir
     string empty_dir = fs.join(base, "empty")
-    fs.mkdir(empty_dir)
+    err _ = fs.mkdir(empty_dir)
     array<string> empty_list = fs.list(empty_dir)
     fmt.println(f"list empty: {empty_list.len()}")
 
     // walk (recursive)
-    fs.write(fs.join(base, "a/file_a.txt"), "a")
-    fs.write(fs.join(base, "a/b/file_b.txt"), "b")
-    fs.write(fs.join(base, "a/b/c/file_c.txt"), "c")
+    err _ = fs.write(fs.join(base, "a/file_a.txt"), "a")
+    err _ = fs.write(fs.join(base, "a/b/file_b.txt"), "b")
+    err _ = fs.write(fs.join(base, "a/b/c/file_c.txt"), "c")
     array<string> walked = fs.walk(base)
     // Count files only (walk returns dirs too)
     i32 file_count = 0
@@ -59,7 +61,7 @@ fn main() -> i32 {
     fmt.println(f"glob no match: {no_match.len()}")
 
     // Cleanup
-    fs.remove_all(base)
+    err _ = fs.remove_all(base)
     fmt.println(f"cleanup: {!fs.exists(base)}")
 
     fmt.println("===== TEST 04_DIRECTORY_OPERATIONS END =====")

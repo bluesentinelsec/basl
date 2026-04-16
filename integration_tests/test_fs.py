@@ -81,8 +81,9 @@ class FsFileTest(unittest.TestCase):
 fn main() -> i32 {
     string tmp = fs.temp_dir()
     string path = fs.join(tmp, "vigil_test_wr.txt")
-    fs.write(path, "hello")
-    if fs.read(path) == "hello" {
+    guard err we = fs.write(path, "hello") { return 1 }
+    guard string content, err re = fs.read(path) { return 1 }
+    if content == "hello" {
         fs.remove(path)
         return 0
     }
@@ -96,9 +97,9 @@ fn main() -> i32 {
 fn main() -> i32 {
     string tmp = fs.temp_dir()
     string path = fs.join(tmp, "vigil_test_ex.txt")
-    fs.write(path, "x")
+    guard err we = fs.write(path, "x") { return 1 }
     if fs.exists(path) {
-        fs.remove(path)
+        guard err re = fs.remove(path) { return 1 }
         if !fs.exists(path) { return 0 }
     }
     return 1
@@ -112,9 +113,10 @@ fn main() -> i32 {
     string tmp = fs.temp_dir()
     string src = fs.join(tmp, "vigil_test_cp1.txt")
     string dst = fs.join(tmp, "vigil_test_cp2.txt")
-    fs.write(src, "copy")
-    fs.copy(src, dst)
-    if fs.read(dst) == "copy" {
+    guard err we = fs.write(src, "copy") { return 1 }
+    guard err ce = fs.copy(src, dst) { return 1 }
+    guard string content, err re = fs.read(dst) { return 1 }
+    if content == "copy" {
         fs.remove(src)
         fs.remove(dst)
         return 0
@@ -133,7 +135,7 @@ class FsDirTest(unittest.TestCase):
 fn main() -> i32 {
     string tmp = fs.temp_dir()
     string path = fs.join(tmp, "vigil_test_mkdir")
-    fs.mkdir(path)
+    guard err me = fs.mkdir(path) { return 1 }
     if fs.is_dir(path) {
         fs.remove(path)
         return 0
@@ -149,7 +151,7 @@ fn main() -> i32 {
     string tmp = fs.temp_dir()
     string base = fs.join(tmp, "vigil_test_mkdirall")
     string path = fs.join(base, "a/b")
-    fs.mkdir_all(path)
+    guard err me = fs.mkdir_all(path) { return 1 }
     if fs.is_dir(path) {
         fs.remove(path)
         fs.remove(fs.join(base, "a"))
@@ -199,9 +201,9 @@ fn main() -> i32 {
         code = '''import "fs"
 fn main() -> i32 {
     string base = fs.join(fs.temp_dir(), "vigil_it_rmall")
-    fs.mkdir_all(fs.join(base, "a/b"))
-    fs.write(fs.join(base, "a/b/c.txt"), "x")
-    if !fs.remove_all(base) { return 1 }
+    guard err me = fs.mkdir_all(fs.join(base, "a/b")) { return 1 }
+    guard err we = fs.write(fs.join(base, "a/b/c.txt"), "x") { return 1 }
+    guard err re = fs.remove_all(base) { return 1 }
     if fs.exists(base) { return 2 }
     return 0
 }'''
@@ -213,10 +215,10 @@ fn main() -> i32 {
 import "fmt"
 fn main() -> i32 {
     string base = fs.join(fs.temp_dir(), "vigil_it_glob")
-    fs.mkdir_all(base)
-    fs.write(fs.join(base, "a.txt"), "a")
-    fs.write(fs.join(base, "b.txt"), "b")
-    fs.write(fs.join(base, "c.md"), "c")
+    guard err me = fs.mkdir_all(base) { return 1 }
+    guard err w1 = fs.write(fs.join(base, "a.txt"), "a") { return 1 }
+    guard err w2 = fs.write(fs.join(base, "b.txt"), "b") { return 1 }
+    guard err w3 = fs.write(fs.join(base, "c.md"), "c") { return 1 }
     array<string> matches = fs.glob(base, "*.txt")
     fs.remove_all(base)
     if matches.len() == 2 { return 0 }
@@ -257,8 +259,8 @@ fn main() -> i32 {
 fn main() -> i32 {
     string orig = fs.cwd()
     string tmp = fs.temp_dir()
-    if !fs.chdir(tmp) { return 1 }
-    if !fs.chdir(orig) { return 2 }
+    guard err e1 = fs.chdir(tmp) { return 1 }
+    guard err e2 = fs.chdir(orig) { return 2 }
     return 0
 }'''
         rc, out, err = run_vigil(code)

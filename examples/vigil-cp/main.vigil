@@ -4,11 +4,13 @@ import "fs"
 
 fn copy_recursive(string src, string dst) -> bool {
     if ! fs.is_dir(src) {
-        return fs.copy(src, dst)
+        err e = fs.copy(src, dst)
+        return e == ok
     }
 
     // Directory - create destination and copy contents
-    if ! fs.mkdir(dst) {
+    err mkdir_err = fs.mkdir(dst)
+    if mkdir_err != ok {
         return false
     }
 
@@ -50,7 +52,8 @@ fn main() -> i32 {
     if recursive {
         ok2 = copy_recursive(src, dst)
     } else {
-        ok2 = fs.copy(src, dst)
+        err e2 = fs.copy(src, dst)
+        ok2 = e2 == ok
     }
 
     if ! ok2 {

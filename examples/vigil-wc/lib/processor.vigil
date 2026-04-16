@@ -27,7 +27,10 @@ pub fn process_file(string path, bool show_lines, bool show_words, bool show_byt
         return 0, 0, 0, err("no such file or directory", err.not_found)
     }
 
-    string content = fs.read(path)
+    string content, err read_err = fs.read(path)
+    if read_err != ok {
+        return 0, 0, 0, read_err
+    }
     i32 lines, i32 words, i32 bytes, err e2 = counter.count_content(content)
     if e2 != ok {
         return 0, 0, 0, e2

@@ -5,23 +5,24 @@ fn main() -> i32 {
     fmt.println("===== TEST 05_SYMLINK_OPERATIONS START =====")
 
     string base = fs.join(fs.temp_dir(), "vigil_fs_05")
-    fs.remove_all(base)
-    fs.mkdir_all(base)
+    err _ = fs.remove_all(base)
+    err _ = fs.mkdir_all(base)
 
     string target = fs.join(base, "target.txt")
-    fs.write(target, "symlink target content")
+    err _ = fs.write(target, "symlink target content")
 
     string link = fs.join(base, "link.txt")
-    bool sok = fs.symlink(target, link)
+    err sok = fs.symlink(target, link)
 
-    if sok {
+    if sok == ok {
         fmt.println(f"symlink created: true")
         fmt.println(f"link exists: {fs.exists(link)}")
         fmt.println(f"is_symlink: {fs.is_symlink(link)}")
         fmt.println(f"is_symlink target: {fs.is_symlink(target)}")
         string link_target = fs.readlink(link)
         fmt.println(f"readlink base: {fs.base(link_target)}")
-        fmt.println(f"read via link: {fs.read(link)}")
+        string link_content, err re = fs.read(link)
+        fmt.println(f"read via link: {link_content}")
     } else {
         // Symlinks may not be available (Windows without privileges, Emscripten)
         fmt.println(f"symlink created: false")
@@ -33,7 +34,7 @@ fn main() -> i32 {
     }
 
     // Cleanup
-    fs.remove_all(base)
+    err _ = fs.remove_all(base)
     fmt.println(f"cleanup: {!fs.exists(base)}")
 
     fmt.println("===== TEST 05_SYMLINK_OPERATIONS END =====")

@@ -5,8 +5,8 @@ fn main() -> i32 {
     fmt.println("===== TEST 09_WRITER START =====")
 
     string base = fs.join(fs.temp_dir(), "vigil_fs_09")
-    fs.remove_all(base)
-    fs.mkdir_all(base)
+    err _ = fs.remove_all(base)
+    err _ = fs.mkdir_all(base)
 
     // Basic write
     string f1 = fs.join(base, "basic.txt")
@@ -18,7 +18,8 @@ fn main() -> i32 {
     fmt.println(f"write bytes: {n2}")
     err ce1 = w1.close()
     fmt.println(f"close: {ce1 == ok}")
-    fmt.println(f"content: {fs.read(f1)}")
+    string content1, err re1 = fs.read(f1)
+    fmt.println(f"content: {content1}")
 
     // write_line
     string f2 = fs.join(base, "lines.txt")
@@ -41,16 +42,18 @@ fn main() -> i32 {
     fs.Writer w3, err e3 = fs.Writer.open(f1)
     w3.write("replaced")
     w3.close()
-    fmt.println(f"truncated: {fs.read(f1)}")
+    string content2, err re2 = fs.read(f1)
+    fmt.println(f"truncated: {content2}")
 
     // open_append
     string f3 = fs.join(base, "appended.txt")
-    fs.write(f3, "original")
+    err _ = fs.write(f3, "original")
     fs.Writer w4, err e4 = fs.Writer.open_append(f3)
     fmt.println(f"open_append: {e4 == ok}")
     w4.write("+added")
     w4.close()
-    fmt.println(f"appended: {fs.read(f3)}")
+    string content3, err re3 = fs.read(f3)
+    fmt.println(f"appended: {content3}")
 
     // flush
     string f4 = fs.join(base, "flushed.txt")
@@ -58,8 +61,8 @@ fn main() -> i32 {
     w5.write("before flush")
     err fe = w5.flush()
     fmt.println(f"flush: {fe == ok}")
-    // File should have content after flush even before close
-    fmt.println(f"after flush: {fs.read(f4)}")
+    string content4, err re4 = fs.read(f4)
+    fmt.println(f"after flush: {content4}")
     w5.close()
 
     // Write in loop
@@ -71,8 +74,33 @@ fn main() -> i32 {
     w6.close()
     fmt.println(f"loop size: {fs.size(f5)}")
 
+    // write_bytes
+    string f6 = fs.join(base, "wbytes.txt")
+    fs.Writer w7, err e7 = fs.Writer.open(f6)
+    fmt.println(f"open wbytes: {e7 == ok}")
+    array<u8> bytes_data = [u8(72), u8(101), u8(108), u8(108), u8(111)]  // "Hello"
+    i32 nb, err wbe = w7.write_bytes(bytes_data)
+    fmt.println(f"write_bytes n: {nb}")
+    fmt.println(f"write_bytes ok: {wbe == ok}")
+    w7.close()
+    string content6, err re6 = fs.read(f6)
+    fmt.println(f"write_bytes content: {content6}")
+
+    // seek and tell
+    string f7 = fs.join(base, "wseek.txt")
+    fs.Writer w8, err e8 = fs.Writer.open(f7)
+    w8.write("abcdefghij")
+    i64 wpos, err wte = w8.tell()
+    fmt.println(f"writer tell: {wpos}")
+    err wse = w8.seek(i64(3))
+    fmt.println(f"writer seek: {wse == ok}")
+    w8.write("XYZ")
+    w8.close()
+    string content7, err re7 = fs.read(f7)
+    fmt.println(f"seek overwrite: {content7}")
+
     // Cleanup
-    fs.remove_all(base)
+    err _ = fs.remove_all(base)
 
     fmt.println("===== TEST 09_WRITER END =====")
     return 0

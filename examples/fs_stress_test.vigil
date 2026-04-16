@@ -43,7 +43,8 @@ fn make_path(string base, string child) -> string {
 
 fn ensure_dir(string path) -> bool {
     if ! fs.is_dir(path) {
-        return fs.mkdir_all(path)
+        err e = fs.mkdir_all(path)
+        return e == ok
     }
 
     return true
@@ -51,12 +52,14 @@ fn ensure_dir(string path) -> bool {
 
 
 fn write_file(string path, string content) -> bool {
-    return fs.write(path, content)
+    err e = fs.write(path, content)
+    return e == ok
 }
 
 
 fn read_file(string path) -> string {
-    return fs.read(path)
+    string data, err _ = fs.read(path)
+    return data
 }
 
 // ─── Mode 1: Recursive Directory Copy ──────────────────────────
@@ -85,14 +88,14 @@ fn copy_tree(string src, string dst, bool dry_run) -> i32 {
             if fs.exists(dst_path) {
                 string backup = dst_path + ".bak"
                 if ! dry_run {
-                    fs.copy(dst_path, backup)
+                    err _ = fs.copy(dst_path, backup)
                 }
 
             }
 
             if ! dry_run {
-                string content = fs.read(src_path)
-                fs.write(dst_path, content)
+                string content, err _ = fs.read(src_path)
+                err _ = fs.write(dst_path, content)
             }
 
             copied++
@@ -121,16 +124,16 @@ fn test_recursive_copy(string root) -> void {
     i32 count = copy_tree(src, dst, false)
     check(count == 5, "copied 5 files")
     // Verify copied content
-    check(fs.read(fs.join(dst, "root.txt")) == "root content", "root.txt content matches")
-    check(fs.read(fs.join(dst, "a/alpha.txt")) == "alpha", "alpha.txt content matches")
-    check(fs.read(fs.join(dst, "c/d/e/deep.txt")) == "deeply nested", "deep.txt content matches")
+    check(read_file(fs.join(dst, "root.txt")) == "root content", "root.txt content matches")
+    check(read_file(fs.join(dst, "a/alpha.txt")) == "alpha", "alpha.txt content matches")
+    check(read_file(fs.join(dst, "c/d/e/deep.txt")) == "deeply nested", "deep.txt content matches")
     check(fs.is_dir(fs.join(dst, "c/d/e")), "deep dir structure preserved")
     // Test conflict resolution: modify source, re-copy
     write_file(fs.join(src, "root.txt"), "updated root")
     copy_tree(src, dst, false)
     check(fs.exists(fs.join(dst, "root.txt.bak")), "backup created on conflict")
-    check(fs.read(fs.join(dst, "root.txt")) == "updated root", "overwritten with new content")
-    check(fs.read(fs.join(dst, "root.txt.bak")) == "root content", "backup has old content")
+    check(read_file(fs.join(dst, "root.txt")) == "updated root", "overwritten with new content")
+    check(read_file(fs.join(dst, "root.txt.bak")) == "root content", "backup has old content")
     // Dry run: count without writing
     string dst2 = fs.join(root, "copy_dry")
     i32 dry_count = copy_tree(src, dst2, true)
@@ -173,10 +176,10 @@ fn test_scaffolding(string root) -> void {
     check(fs.is_dir(fs.join(base, "lib")), "lib/ created")
     check(fs.is_dir(fs.join(base, "docs")), "docs/ created")
     // Verify template expansion
-    string main_content = fs.read(fs.join(base, "src/main.vigil"))
+    string main_content = read_file(fs.join(base, "src/main.vigil"))
     check(main_content.contains("myapp"), "template expanded project name in main")
     check(! main_content.contains("{{NAME}}"), "no unexpanded placeholders")
-    string toml_content = fs.read(fs.join(base, "vigil.toml"))
+    string toml_content = read_file(fs.join(base, "vigil.toml"))
     check(toml_content.contains("name = \"myapp\""), "toml has project name")
     // Verify file sizes are reasonable
     i64 main_size = fs.size(fs.join(base, "src/main.vigil"))
@@ -193,7 +196,7 @@ fn search_files(string dir, string pattern) -> array<string> {
     array<string> all_files = fs.walk(dir)
     for path in all_files {
         if fs.is_file(path) {
-            string content = fs.read(path)
+            string content, err _ = fs.read(path)
             if content.contains(pattern) {
                 matches.push(path)
             }
@@ -267,7 +270,8 @@ fn safe_delete(string path, string trash_dir) -> bool {
         trash_path = fs.join(trash_dir, name + "." + string(ts))
     }
 
-    return fs.move(path, trash_path)
+    err e = fs.move(path, trash_path)
+    return e == ok
 }
 
 
@@ -285,7 +289,7 @@ fn test_safe_delete(string root) -> void {
     check(! fs.exists(fs.join(work, "temp1.txt")), "temp1 gone from work dir")
     check(fs.exists(fs.join(trash, "temp1.txt")), "temp1 in trash")
     // Verify content preserved in trash
-    check(fs.read(fs.join(trash, "temp1.txt")) == "temporary 1", "trash content intact")
+    check(read_file(fs.join(trash, "temp1.txt")) == "temporary 1", "trash content intact")
     // Delete second file
     safe_delete(fs.join(work, "temp2.txt"), trash)
     check(fs.exists(fs.join(trash, "temp2.txt")), "temp2 in trash")
@@ -334,10 +338,10 @@ fn test_metadata(string root) -> void {
     i64 missing_size = fs.size(fs.join(meta_dir, "nope.txt"))
     check(missing_size == i64(- 1), "missing file size is -1")
     // Append and verify size grows
-    fs.append(fs.join(meta_dir, "small.txt"), " world")
+    err _ = fs.append(fs.join(meta_dir, "small.txt"), " world")
     i64 appended_size = fs.size(fs.join(meta_dir, "small.txt"))
     check(appended_size == i64(11), "appended file size is 11")
-    check(fs.read(fs.join(meta_dir, "small.txt")) == "hello world", "append content correct")
+    check(read_file(fs.join(meta_dir, "small.txt")) == "hello world", "append content correct")
     fmt.println("  Metadata tests done")
 }
 
@@ -382,15 +386,15 @@ fn test_path_ops(string root) -> void {
     check(! fs.is_file(fs.join(test_dir, "nope")), "is_file on nonexistent")
     // ── Error handling: operations on missing paths ──
     string missing = fs.join(root, "does_not_exist_at_all")
-    string content = fs.read(missing)
+    string content, err read_err = fs.read(missing)
     check(content == "", "read missing file returns empty string")
-    bool write_ok = fs.write(fs.join(missing, "sub/file.txt"), "x")
-    check(! write_ok, "write to nonexistent parent dir fails")
-    bool copy_ok = fs.copy(missing, fs.join(root, "dest.txt"))
-    check(! copy_ok, "copy from missing source fails")
-    bool move_ok = fs.move(missing, fs.join(root, "dest.txt"))
-    check(! move_ok, "move from missing source fails")
-    bool rm_ok = fs.remove(missing)
+    err write_err = fs.write(fs.join(missing, "sub/file.txt"), "x")
+    check(write_err != ok, "write to nonexistent parent dir fails")
+    err copy_err = fs.copy(missing, fs.join(root, "dest.txt"))
+    check(copy_err != ok, "copy from missing source fails")
+    err move_err = fs.move(missing, fs.join(root, "dest.txt"))
+    check(move_err != ok, "move from missing source fails")
+    err rm_err = fs.remove(missing)
     // remove of nonexistent may return true or false depending on impl
     // just verify it doesn't crash
     // ── mkdir_all with deep path ──
@@ -402,13 +406,13 @@ fn test_path_ops(string root) -> void {
     string copied = fs.join(test_dir, "copied.txt")
     string moved = fs.join(test_dir, "moved.txt")
     write_file(orig, "original data")
-    fs.copy(orig, copied)
-    check(fs.read(copied) == "original data", "copy preserves content")
+    err _ = fs.copy(orig, copied)
+    check(read_file(copied) == "original data", "copy preserves content")
     check(fs.exists(orig), "copy leaves source intact")
-    fs.move(copied, moved)
-    check(fs.read(moved) == "original data", "move preserves content")
+    err _ = fs.move(copied, moved)
+    check(read_file(moved) == "original data", "move preserves content")
     check(! fs.exists(copied), "move removes source")
-    fs.remove(moved)
+    err _ = fs.remove(moved)
     check(! fs.exists(moved), "remove deletes file")
     // ── Standard locations ──
     string home = fs.home_dir()
@@ -429,7 +433,7 @@ fn test_path_ops(string root) -> void {
     string tf = fs.temp_file("vigil_stress_")
     check(tf.len() > 0, "temp_file returns path")
     check(fs.exists(tf), "temp_file creates file")
-    fs.remove(tf)
+    err _ = fs.remove(tf)
     fmt.println("  Path + edge case tests done")
 }
 
@@ -465,7 +469,7 @@ fn test_performance(string root) -> void {
     i32 read_count = 0
     for path in all {
         if fs.is_file(path) {
-            string c = fs.read(path)
+            string c, err _ = fs.read(path)
             if c.len() > 0 {
                 read_count++
             }
@@ -498,7 +502,7 @@ fn test_performance(string root) -> void {
     i64 t9 = time.now_ms()
     fmt.println("  Created 50-deep nested dir in " + string(t9 - t8) + "ms")
     check(fs.is_dir(current), "50-deep dir exists")
-    check(fs.read(fs.join(current, "leaf.txt")) == "at depth 50", "leaf file at depth 50 readable")
+    check(read_file(fs.join(current, "leaf.txt")) == "at depth 50", "leaf file at depth 50 readable")
     // ── List performance on large directory ──
     i64 t10 = time.now_ms()
     i32 k = 0
@@ -520,7 +524,7 @@ fn cleanup_recursive(string path) -> void {
     }
 
     if fs.is_file(path) {
-        fs.remove(path)
+        err _ = fs.remove(path)
         return
     }
 
@@ -530,12 +534,12 @@ fn cleanup_recursive(string path) -> void {
         if fs.is_dir(child) {
             cleanup_recursive(child)
         } else {
-            fs.remove(child)
+            err _ = fs.remove(child)
         }
 
     }
 
-    fs.remove(path)
+    err _ = fs.remove(path)
 }
 
 // ─── Main Driver ────────────────────────────────────────────────

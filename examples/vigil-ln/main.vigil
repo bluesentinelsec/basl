@@ -23,8 +23,8 @@ fn main() -> i32 {
     string link = positionals[1]
     bool symbolic = parser.get_bool("symbolic")
     if symbolic {
-        bool ok2 = fs.symlink(target, link)
-        if ! ok2 {
+        err e2 = fs.symlink(target, link)
+        if e2 != ok {
             fmt.eprintln(f"vigil-ln: failed to create symlink {link} -> {target}")
             return 1
         }

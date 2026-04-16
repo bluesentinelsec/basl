@@ -78,6 +78,43 @@ static vigil_status_t push_i64(vigil_vm_t *vm, int64_t n, vigil_error_t *error)
     return vigil_vm_stack_push(vm, &val, error);
 }
 
+/* ── Error-kind constants (from compiler.c vigil_builtin_error_kind_by_name) */
+#define FS_ERR_NOT_FOUND 1
+#define FS_ERR_IO 5
+#define FS_ERR_EOF 4
+
+/* Push a Vigil err value with the given kind onto the stack. */
+static vigil_status_t push_err_kind(vigil_vm_t *vm, const char *msg, int64_t kind, vigil_error_t *error)
+{
+    vigil_object_t *obj = NULL;
+    vigil_status_t st = vigil_error_object_new_cstr(vigil_vm_runtime(vm), msg, kind, &obj, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    vigil_value_t v;
+    vigil_value_init_object(&v, &obj);
+    st = vigil_vm_stack_push(vm, &v, error);
+    vigil_value_release(&v);
+    return st;
+}
+
+/* Push an empty string followed by an error kind — for (string, err) fail paths. */
+static vigil_status_t push_empty_str_and_err(vigil_vm_t *vm, const char *msg, int64_t kind, vigil_error_t *error)
+{
+    vigil_status_t st = push_string(vm, "", 0, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return push_err_kind(vm, msg, kind, error);
+}
+
+/* Push a string result followed by ok — success path for (string, err). */
+static vigil_status_t push_str_and_ok(vigil_vm_t *vm, const char *str, size_t len, vigil_error_t *error)
+{
+    vigil_status_t st = push_string(vm, str, len, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return vigil_runtime_push_ok_error(vigil_vm_runtime(vm), vm, error);
+}
+
 /* ── Path operations ─────────────────────────────────────────────── */
 
 static vigil_status_t fs_join(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
@@ -372,7 +409,7 @@ static vigil_status_t fs_read(vigil_vm_t *vm, size_t arg_count, vigil_error_t *e
     if (!get_string_arg(vm, base, 0, &path, &path_len))
     {
         vigil_vm_stack_pop_n(vm, arg_count);
-        return push_string(vm, "", 0, error);
+        return push_empty_str_and_err(vm, "read: invalid arguments", FS_ERR_IO, error);
     }
 
     char pathbuf[4096];
@@ -386,8 +423,8 @@ static vigil_status_t fs_read(vigil_vm_t *vm, size_t arg_count, vigil_error_t *e
     vigil_vm_stack_pop_n(vm, arg_count);
 
     if (s != VIGIL_STATUS_OK)
-        return push_string(vm, "", 0, error);
-    s = push_string(vm, data, data_len, error);
+        return push_empty_str_and_err(vm, "read: operation failed", FS_ERR_IO, error);
+    s = push_str_and_ok(vm, data, data_len, error);
     memory = data;
     vigil_runtime_free(runtime, &memory);
     return s;
@@ -402,7 +439,7 @@ static vigil_status_t fs_write(vigil_vm_t *vm, size_t arg_count, vigil_error_t *
     if (!get_string_arg(vm, base, 0, &path, &path_len) || !get_string_arg(vm, base, 1, &data, &data_len))
     {
         vigil_vm_stack_pop_n(vm, arg_count);
-        return push_bool(vm, 0, error);
+        return push_err_kind(vm, "write: invalid arguments", FS_ERR_IO, error);
     }
 
     char pathbuf[4096];
@@ -410,7 +447,9 @@ static vigil_status_t fs_write(vigil_vm_t *vm, size_t arg_count, vigil_error_t *
 
     vigil_status_t s = vigil_platform_write_file(pathbuf, data, data_len, error);
     vigil_vm_stack_pop_n(vm, arg_count);
-    return push_bool(vm, s == VIGIL_STATUS_OK, error);
+    if (s == VIGIL_STATUS_OK)
+        return vigil_runtime_push_ok_error(vigil_vm_runtime(vm), vm, error);
+    return push_err_kind(vm, "write: operation failed", FS_ERR_IO, error);
 }
 
 static vigil_status_t fs_append(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
@@ -422,7 +461,7 @@ static vigil_status_t fs_append(vigil_vm_t *vm, size_t arg_count, vigil_error_t 
     if (!get_string_arg(vm, base, 0, &path, &path_len) || !get_string_arg(vm, base, 1, &data, &data_len))
     {
         vigil_vm_stack_pop_n(vm, arg_count);
-        return push_bool(vm, 0, error);
+        return push_err_kind(vm, "append: invalid arguments", FS_ERR_IO, error);
     }
 
     char pathbuf[4096];
@@ -430,7 +469,9 @@ static vigil_status_t fs_append(vigil_vm_t *vm, size_t arg_count, vigil_error_t 
 
     vigil_status_t s = vigil_platform_append_file(pathbuf, data, data_len, error);
     vigil_vm_stack_pop_n(vm, arg_count);
-    return push_bool(vm, s == VIGIL_STATUS_OK, error);
+    if (s == VIGIL_STATUS_OK)
+        return vigil_runtime_push_ok_error(vigil_vm_runtime(vm), vm, error);
+    return push_err_kind(vm, "append: operation failed", FS_ERR_IO, error);
 }
 
 static vigil_status_t fs_copy(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
@@ -442,7 +483,7 @@ static vigil_status_t fs_copy(vigil_vm_t *vm, size_t arg_count, vigil_error_t *e
     if (!get_string_arg(vm, base, 0, &src, &src_len) || !get_string_arg(vm, base, 1, &dst, &dst_len))
     {
         vigil_vm_stack_pop_n(vm, arg_count);
-        return push_bool(vm, 0, error);
+        return push_err_kind(vm, "copy: invalid arguments", FS_ERR_IO, error);
     }
 
     char srcbuf[4096], dstbuf[4096];
@@ -451,7 +492,9 @@ static vigil_status_t fs_copy(vigil_vm_t *vm, size_t arg_count, vigil_error_t *e
 
     vigil_status_t s = vigil_platform_copy_file(srcbuf, dstbuf, error);
     vigil_vm_stack_pop_n(vm, arg_count);
-    return push_bool(vm, s == VIGIL_STATUS_OK, error);
+    if (s == VIGIL_STATUS_OK)
+        return vigil_runtime_push_ok_error(vigil_vm_runtime(vm), vm, error);
+    return push_err_kind(vm, "copy: operation failed", FS_ERR_IO, error);
 }
 
 static vigil_status_t fs_move(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
@@ -463,7 +506,7 @@ static vigil_status_t fs_move(vigil_vm_t *vm, size_t arg_count, vigil_error_t *e
     if (!get_string_arg(vm, base, 0, &src, &src_len) || !get_string_arg(vm, base, 1, &dst, &dst_len))
     {
         vigil_vm_stack_pop_n(vm, arg_count);
-        return push_bool(vm, 0, error);
+        return push_err_kind(vm, "move: invalid arguments", FS_ERR_IO, error);
     }
 
     char srcbuf[4096], dstbuf[4096];
@@ -472,7 +515,9 @@ static vigil_status_t fs_move(vigil_vm_t *vm, size_t arg_count, vigil_error_t *e
 
     vigil_status_t s = vigil_platform_rename(srcbuf, dstbuf, error);
     vigil_vm_stack_pop_n(vm, arg_count);
-    return push_bool(vm, s == VIGIL_STATUS_OK, error);
+    if (s == VIGIL_STATUS_OK)
+        return vigil_runtime_push_ok_error(vigil_vm_runtime(vm), vm, error);
+    return push_err_kind(vm, "move: operation failed", FS_ERR_IO, error);
 }
 
 static vigil_status_t fs_remove(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
@@ -484,7 +529,7 @@ static vigil_status_t fs_remove(vigil_vm_t *vm, size_t arg_count, vigil_error_t 
     if (!get_string_arg(vm, base, 0, &path, &path_len))
     {
         vigil_vm_stack_pop_n(vm, arg_count);
-        return push_bool(vm, 0, error);
+        return push_err_kind(vm, "remove: invalid arguments", FS_ERR_IO, error);
     }
 
     char pathbuf[4096];
@@ -492,7 +537,9 @@ static vigil_status_t fs_remove(vigil_vm_t *vm, size_t arg_count, vigil_error_t 
 
     vigil_status_t s = vigil_platform_remove(pathbuf, error);
     vigil_vm_stack_pop_n(vm, arg_count);
-    return push_bool(vm, s == VIGIL_STATUS_OK, error);
+    if (s == VIGIL_STATUS_OK)
+        return vigil_runtime_push_ok_error(vigil_vm_runtime(vm), vm, error);
+    return push_err_kind(vm, "remove: operation failed", FS_ERR_IO, error);
 }
 
 static vigil_status_t fs_exists(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
@@ -569,7 +616,7 @@ static vigil_status_t fs_mkdir(vigil_vm_t *vm, size_t arg_count, vigil_error_t *
     if (!get_string_arg(vm, base, 0, &path, &path_len))
     {
         vigil_vm_stack_pop_n(vm, arg_count);
-        return push_bool(vm, 0, error);
+        return push_err_kind(vm, "mkdir: invalid arguments", FS_ERR_IO, error);
     }
 
     char pathbuf[4096];
@@ -577,7 +624,9 @@ static vigil_status_t fs_mkdir(vigil_vm_t *vm, size_t arg_count, vigil_error_t *
 
     vigil_status_t s = vigil_platform_mkdir(pathbuf, error);
     vigil_vm_stack_pop_n(vm, arg_count);
-    return push_bool(vm, s == VIGIL_STATUS_OK, error);
+    if (s == VIGIL_STATUS_OK)
+        return vigil_runtime_push_ok_error(vigil_vm_runtime(vm), vm, error);
+    return push_err_kind(vm, "mkdir: operation failed", FS_ERR_IO, error);
 }
 
 static vigil_status_t fs_mkdir_all(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
@@ -589,7 +638,7 @@ static vigil_status_t fs_mkdir_all(vigil_vm_t *vm, size_t arg_count, vigil_error
     if (!get_string_arg(vm, base, 0, &path, &path_len))
     {
         vigil_vm_stack_pop_n(vm, arg_count);
-        return push_bool(vm, 0, error);
+        return push_err_kind(vm, "mkdir_all: invalid arguments", FS_ERR_IO, error);
     }
 
     char pathbuf[4096];
@@ -597,7 +646,9 @@ static vigil_status_t fs_mkdir_all(vigil_vm_t *vm, size_t arg_count, vigil_error
 
     vigil_status_t s = vigil_platform_mkdir_p(pathbuf, error);
     vigil_vm_stack_pop_n(vm, arg_count);
-    return push_bool(vm, s == VIGIL_STATUS_OK, error);
+    if (s == VIGIL_STATUS_OK)
+        return vigil_runtime_push_ok_error(vigil_vm_runtime(vm), vm, error);
+    return push_err_kind(vm, "mkdir_all: operation failed", FS_ERR_IO, error);
 }
 
 /* Callback data for list_dir */
@@ -954,7 +1005,7 @@ static vigil_status_t fs_chdir(vigil_vm_t *vm, size_t arg_count, vigil_error_t *
     if (!get_string_arg(vm, base, 0, &path, &path_len))
     {
         vigil_vm_stack_pop_n(vm, arg_count);
-        return push_bool(vm, 0, error);
+        return push_err_kind(vm, "chdir: invalid arguments", FS_ERR_IO, error);
     }
 
     /* Need null-terminated copy since path may not be */
@@ -962,14 +1013,16 @@ static vigil_status_t fs_chdir(vigil_vm_t *vm, size_t arg_count, vigil_error_t *
     if (path_len >= sizeof(buf))
     {
         vigil_vm_stack_pop_n(vm, arg_count);
-        return push_bool(vm, 0, error);
+        return push_err_kind(vm, "chdir: path too long", FS_ERR_IO, error);
     }
     memcpy(buf, path, path_len);
     buf[path_len] = '\0';
 
     vigil_vm_stack_pop_n(vm, arg_count);
     vigil_status_t s = vigil_platform_chdir(buf, error);
-    return push_bool(vm, s == VIGIL_STATUS_OK, error);
+    if (s == VIGIL_STATUS_OK)
+        return vigil_runtime_push_ok_error(vigil_vm_runtime(vm), vm, error);
+    return push_err_kind(vm, "chdir: operation failed", FS_ERR_IO, error);
 }
 
 static int is_invalid_filename_char(char c)
@@ -1065,7 +1118,7 @@ static vigil_status_t fs_symlink(vigil_vm_t *vm, size_t arg_count, vigil_error_t
     if (!get_string_arg(vm, base, 0, &target, &target_len) || !get_string_arg(vm, base, 1, &linkpath, &link_len))
     {
         vigil_vm_stack_pop_n(vm, arg_count);
-        return push_bool(vm, 0, error);
+        return push_err_kind(vm, "symlink: invalid arguments", FS_ERR_IO, error);
     }
 
     char tbuf[4096], lbuf[4096];
@@ -1074,7 +1127,9 @@ static vigil_status_t fs_symlink(vigil_vm_t *vm, size_t arg_count, vigil_error_t
 
     vigil_status_t s = vigil_platform_symlink(tbuf, lbuf, error);
     vigil_vm_stack_pop_n(vm, arg_count);
-    return push_bool(vm, s == VIGIL_STATUS_OK, error);
+    if (s == VIGIL_STATUS_OK)
+        return vigil_runtime_push_ok_error(vigil_vm_runtime(vm), vm, error);
+    return push_err_kind(vm, "symlink: operation failed", FS_ERR_IO, error);
 }
 
 static vigil_status_t fs_readlink(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
@@ -1135,7 +1190,7 @@ static vigil_status_t fs_remove_all(vigil_vm_t *vm, size_t arg_count, vigil_erro
     if (!get_string_arg(vm, base, 0, &path, &path_len))
     {
         vigil_vm_stack_pop_n(vm, arg_count);
-        return push_bool(vm, 0, error);
+        return push_err_kind(vm, "remove_all: invalid arguments", FS_ERR_IO, error);
     }
 
     char pathbuf[4096];
@@ -1143,7 +1198,9 @@ static vigil_status_t fs_remove_all(vigil_vm_t *vm, size_t arg_count, vigil_erro
 
     vigil_status_t s = vigil_platform_remove_all(pathbuf, error);
     vigil_vm_stack_pop_n(vm, arg_count);
-    return push_bool(vm, s == VIGIL_STATUS_OK, error);
+    if (s == VIGIL_STATUS_OK)
+        return vigil_runtime_push_ok_error(vigil_vm_runtime(vm), vm, error);
+    return push_err_kind(vm, "remove_all: operation failed", FS_ERR_IO, error);
 }
 
 /* ── Glob matching ───────────────────────────────────────────────── */
@@ -1252,19 +1309,19 @@ static const vigil_native_symbol_doc_t vigil_fs_stem_doc = {
 static const vigil_native_symbol_doc_t vigil_fs_is_abs_doc = {
     "Check whether a path is absolute.", "Returns true when the path is absolute on the current platform.", NULL};
 static const vigil_native_symbol_doc_t vigil_fs_read_doc = {
-    "Read a file into a string.", "Reads the entire file contents and returns them as a string.", NULL};
+    "Read a file into a string.", "Reads the entire file contents and returns (string, err).", NULL};
 static const vigil_native_symbol_doc_t vigil_fs_write_doc = {
-    "Write a file.", "Creates or truncates a file and writes the supplied data.", NULL};
+    "Write a file.", "Creates or truncates a file and writes the supplied data. Returns err.", NULL};
 static const vigil_native_symbol_doc_t vigil_fs_append_doc = {"Append to a file.",
-                                                              "Appends the supplied data to the end of a file.", NULL};
-static const vigil_native_symbol_doc_t vigil_fs_copy_doc = {"Copy a file.", "Copies a file from one path to another.",
+                                                              "Appends the supplied data to the end of a file. Returns err.", NULL};
+static const vigil_native_symbol_doc_t vigil_fs_copy_doc = {"Copy a file.", "Copies a file from one path to another. Returns err.",
                                                             NULL};
 static const vigil_native_symbol_doc_t vigil_fs_move_doc = {"Move or rename a path.",
-                                                            "Moves or renames a file or directory.", NULL};
+                                                            "Moves or renames a file or directory. Returns err.", NULL};
 static const vigil_native_symbol_doc_t vigil_fs_remove_doc = {
-    "Remove a file or empty directory.", "Deletes the path when possible and returns success as a bool.", NULL};
+    "Remove a file or empty directory.", "Deletes the path when possible and returns err.", NULL};
 static const vigil_native_symbol_doc_t vigil_fs_remove_all_doc = {
-    "Remove a path recursively.", "Deletes a file or directory tree recursively.", NULL};
+    "Remove a path recursively.", "Deletes a file or directory tree recursively. Returns err.", NULL};
 static const vigil_native_symbol_doc_t vigil_fs_exists_doc = {"Check whether a path exists.",
                                                               "Returns true when the target path exists.", NULL};
 static const vigil_native_symbol_doc_t vigil_fs_is_dir_doc = {
@@ -1273,10 +1330,10 @@ static const vigil_native_symbol_doc_t vigil_fs_is_file_doc = {
     "Check whether a path is a file.", "Returns true when the target path exists and is a regular file.", NULL};
 static const vigil_native_symbol_doc_t vigil_fs_is_symlink_doc = {
     "Check whether a path is a symbolic link.", "Returns true when the target path is a symbolic link.", NULL};
-static const vigil_native_symbol_doc_t vigil_fs_mkdir_doc = {"Create a directory.", "Creates a single directory.",
+static const vigil_native_symbol_doc_t vigil_fs_mkdir_doc = {"Create a directory.", "Creates a single directory. Returns err.",
                                                              NULL};
 static const vigil_native_symbol_doc_t vigil_fs_mkdir_all_doc = {"Create a directory tree.",
-                                                                 "Creates a directory and any missing parents.", NULL};
+                                                                 "Creates a directory and any missing parents. Returns err.", NULL};
 static const vigil_native_symbol_doc_t vigil_fs_list_doc = {"List directory entries.",
                                                             "Returns the immediate names in a directory.", NULL};
 static const vigil_native_symbol_doc_t vigil_fs_walk_doc = {
@@ -1284,7 +1341,7 @@ static const vigil_native_symbol_doc_t vigil_fs_walk_doc = {
 static const vigil_native_symbol_doc_t vigil_fs_glob_doc = {
     "Glob within a directory.", "Returns paths whose names match the provided glob pattern.", NULL};
 static const vigil_native_symbol_doc_t vigil_fs_symlink_doc = {
-    "Create a symbolic link.", "Creates a symbolic link pointing at the target path.", NULL};
+    "Create a symbolic link.", "Creates a symbolic link pointing at the target path. Returns err.", NULL};
 static const vigil_native_symbol_doc_t vigil_fs_readlink_doc = {
     "Read a symbolic link target.", "Returns the target path referenced by a symbolic link.", NULL};
 static const vigil_native_symbol_doc_t vigil_fs_size_doc = {"Get file size.",
@@ -1309,12 +1366,14 @@ static const vigil_native_symbol_doc_t vigil_fs_app_dir_doc = {
     "Get the directory containing the running executable.",
     "Returns the directory portion of the current executable's path.", NULL};
 static const vigil_native_symbol_doc_t vigil_fs_chdir_doc = {
-    "Change the working directory.", "Changes the process working directory; returns true on success.", NULL};
+    "Change the working directory.", "Changes the process working directory. Returns err.", NULL};
 static const vigil_native_symbol_doc_t vigil_fs_is_valid_name_doc = {
     "Check whether a filename is valid.",
     "Returns true if the name contains no illegal characters or reserved names for the current platform.", NULL};
 
 static const char *const fs_name_param_names[] = {"name"};
+
+static const int fs_str_err_returns[] = {VIGIL_TYPE_STRING, VIGIL_TYPE_ERR};
 
 static const vigil_native_module_function_t vigil_fs_functions[] = {
     /* Path operations */
@@ -1333,19 +1392,19 @@ static const vigil_native_module_function_t vigil_fs_functions[] = {
     {"is_abs", 6U, fs_is_abs, 1U, str_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U, fs_path_param_names, NULL,
      NULL, &vigil_fs_is_abs_doc},
     /* File operations */
-    {"read", 4U, fs_read, 1U, str_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U, fs_path_param_names, NULL,
+    {"read", 4U, fs_read, 1U, str_param, VIGIL_TYPE_STRING, 2U, fs_str_err_returns, 0, NULL, NULL, 0U, fs_path_param_names, NULL,
      NULL, &vigil_fs_read_doc},
-    {"write", 5U, fs_write, 2U, str_str_params, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U, fs_src_dst_param_names,
+    {"write", 5U, fs_write, 2U, str_str_params, VIGIL_TYPE_ERR, 1U, NULL, 0, NULL, NULL, 0U, fs_src_dst_param_names,
      NULL, NULL, &vigil_fs_write_doc},
-    {"append", 6U, fs_append, 2U, str_str_params, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U, fs_src_dst_param_names,
+    {"append", 6U, fs_append, 2U, str_str_params, VIGIL_TYPE_ERR, 1U, NULL, 0, NULL, NULL, 0U, fs_src_dst_param_names,
      NULL, NULL, &vigil_fs_append_doc},
-    {"copy", 4U, fs_copy, 2U, str_str_params, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U, fs_src_dst_param_names,
+    {"copy", 4U, fs_copy, 2U, str_str_params, VIGIL_TYPE_ERR, 1U, NULL, 0, NULL, NULL, 0U, fs_src_dst_param_names,
      NULL, NULL, &vigil_fs_copy_doc},
-    {"move", 4U, fs_move, 2U, str_str_params, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U, fs_src_dst_param_names,
+    {"move", 4U, fs_move, 2U, str_str_params, VIGIL_TYPE_ERR, 1U, NULL, 0, NULL, NULL, 0U, fs_src_dst_param_names,
      NULL, NULL, &vigil_fs_move_doc},
-    {"remove", 6U, fs_remove, 1U, str_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U, fs_path_param_names, NULL,
+    {"remove", 6U, fs_remove, 1U, str_param, VIGIL_TYPE_ERR, 1U, NULL, 0, NULL, NULL, 0U, fs_path_param_names, NULL,
      NULL, &vigil_fs_remove_doc},
-    {"remove_all", 10U, fs_remove_all, 1U, str_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U, fs_path_param_names,
+    {"remove_all", 10U, fs_remove_all, 1U, str_param, VIGIL_TYPE_ERR, 1U, NULL, 0, NULL, NULL, 0U, fs_path_param_names,
      NULL, NULL, &vigil_fs_remove_all_doc},
     {"exists", 6U, fs_exists, 1U, str_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U, fs_path_param_names, NULL,
      NULL, &vigil_fs_exists_doc},
@@ -1356,9 +1415,9 @@ static const vigil_native_module_function_t vigil_fs_functions[] = {
     {"is_symlink", 10U, fs_is_symlink, 1U, str_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U, fs_path_param_names,
      NULL, NULL, &vigil_fs_is_symlink_doc},
     /* Directory operations */
-    {"mkdir", 5U, fs_mkdir, 1U, str_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U, fs_path_param_names, NULL,
+    {"mkdir", 5U, fs_mkdir, 1U, str_param, VIGIL_TYPE_ERR, 1U, NULL, 0, NULL, NULL, 0U, fs_path_param_names, NULL,
      NULL, &vigil_fs_mkdir_doc},
-    {"mkdir_all", 9U, fs_mkdir_all, 1U, str_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U, fs_path_param_names,
+    {"mkdir_all", 9U, fs_mkdir_all, 1U, str_param, VIGIL_TYPE_ERR, 1U, NULL, 0, NULL, NULL, 0U, fs_path_param_names,
      NULL, NULL, &vigil_fs_mkdir_all_doc},
     {"list", 4U, fs_list, 1U, str_param, VIGIL_TYPE_OBJECT, 1U, NULL, VIGIL_TYPE_STRING, NULL, NULL, 0U,
      fs_path_param_names, NULL, NULL, &vigil_fs_list_doc},
@@ -1367,7 +1426,7 @@ static const vigil_native_module_function_t vigil_fs_functions[] = {
     {"glob", 4U, fs_glob, 2U, str_str_params, VIGIL_TYPE_OBJECT, 1U, NULL, VIGIL_TYPE_STRING, NULL, NULL, 0U,
      fs_dir_pattern_param_names, NULL, NULL, &vigil_fs_glob_doc},
     /* Symlink operations */
-    {"symlink", 7U, fs_symlink, 2U, str_str_params, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U,
+    {"symlink", 7U, fs_symlink, 2U, str_str_params, VIGIL_TYPE_ERR, 1U, NULL, 0, NULL, NULL, 0U,
      fs_target_link_param_names, NULL, NULL, &vigil_fs_symlink_doc},
     {"readlink", 8U, fs_readlink, 1U, str_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U, fs_path_param_names,
      NULL, NULL, &vigil_fs_readlink_doc},
@@ -1392,7 +1451,7 @@ static const vigil_native_module_function_t vigil_fs_functions[] = {
     {"cwd", 3U, fs_cwd, 0U, NULL, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, &vigil_fs_cwd_doc},
     {"app_dir", 7U, fs_app_dir, 0U, NULL, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL,
      &vigil_fs_app_dir_doc},
-    {"chdir", 5U, fs_chdir, 1U, str_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U, fs_path_param_names, NULL,
+    {"chdir", 5U, fs_chdir, 1U, str_param, VIGIL_TYPE_ERR, 1U, NULL, 0, NULL, NULL, 0U, fs_path_param_names, NULL,
      NULL, &vigil_fs_chdir_doc},
     {"is_valid_name", 13U, fs_is_valid_name, 1U, str_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U,
      fs_name_param_names, NULL, NULL, &vigil_fs_is_valid_name_doc},
@@ -1410,11 +1469,6 @@ static const vigil_native_module_function_t vigil_fs_functions[] = {
  * instance field.  This avoids exposing raw FILE* into the Vigil value
  * system and makes cleanup straightforward.
  */
-
-/* ── Error-kind constants (from compiler.c vigil_builtin_error_kind_by_name) */
-#define FS_ERR_NOT_FOUND 1
-#define FS_ERR_IO 5
-#define FS_ERR_EOF 4
 
 /* ── Reader ──────────────────────────────────────────────────────── */
 
@@ -1559,29 +1613,6 @@ static int64_t get_handle_field(vigil_object_t *self, size_t field_idx)
     return vigil_nanbox_decode_int(v);
 }
 
-/* Push a Vigil err value with the given kind onto the stack. */
-static vigil_status_t push_err_kind(vigil_vm_t *vm, const char *msg, int64_t kind, vigil_error_t *error)
-{
-    vigil_object_t *obj = NULL;
-    vigil_status_t st = vigil_error_object_new_cstr(vigil_vm_runtime(vm), msg, kind, &obj, error);
-    if (st != VIGIL_STATUS_OK)
-        return st;
-    vigil_value_t v;
-    vigil_value_init_object(&v, &obj);
-    st = vigil_vm_stack_push(vm, &v, error);
-    vigil_value_release(&v);
-    return st;
-}
-
-/* Push an empty string followed by an error kind — for (string, err) fail paths. */
-static vigil_status_t push_empty_str_and_err(vigil_vm_t *vm, const char *msg, int64_t kind, vigil_error_t *error)
-{
-    vigil_status_t st = push_string(vm, "", 0, error);
-    if (st != VIGIL_STATUS_OK)
-        return st;
-    return push_err_kind(vm, msg, kind, error);
-}
-
 /* Push an i32 followed by an error kind — for (i32, err) fail paths. */
 static vigil_status_t push_zero_and_err(vigil_vm_t *vm, const char *msg, int64_t kind, vigil_error_t *error)
 {
@@ -1602,15 +1633,6 @@ static vigil_status_t push_nil_and_err(vigil_vm_t *vm, const char *msg, int64_t 
     return push_err_kind(vm, msg, kind, error);
 }
 
-/* Push a string result followed by ok — success path for (string, err). */
-static vigil_status_t push_str_and_ok(vigil_vm_t *vm, const char *str, size_t len, vigil_error_t *error)
-{
-    vigil_status_t st = push_string(vm, str, len, error);
-    if (st != VIGIL_STATUS_OK)
-        return st;
-    return vigil_runtime_push_ok_error(vigil_vm_runtime(vm), vm, error);
-}
-
 /* Push an i32 result followed by ok — success path for (i32, err). */
 static vigil_status_t push_i32_and_ok(vigil_vm_t *vm, int64_t n, vigil_error_t *error)
 {
@@ -1618,6 +1640,40 @@ static vigil_status_t push_i32_and_ok(vigil_vm_t *vm, int64_t n, vigil_error_t *
     if (st != VIGIL_STATUS_OK)
         return st;
     return vigil_runtime_push_ok_error(vigil_vm_runtime(vm), vm, error);
+}
+
+/* Push an i64 result followed by ok — success path for (i64, err). */
+static vigil_status_t push_i64_and_ok(vigil_vm_t *vm, int64_t n, vigil_error_t *error)
+{
+    vigil_status_t st = push_i64(vm, n, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return vigil_runtime_push_ok_error(vigil_vm_runtime(vm), vm, error);
+}
+
+/* Push an i64(0) followed by an error kind — for (i64, err) fail paths. */
+static vigil_status_t push_i64_zero_and_err(vigil_vm_t *vm, const char *msg, int64_t kind, vigil_error_t *error)
+{
+    vigil_status_t st = push_i64(vm, 0, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return push_err_kind(vm, msg, kind, error);
+}
+
+/* Push an empty array<u8> followed by an error kind — for (array<u8>, err) fail paths. */
+static vigil_status_t push_empty_u8_array_and_err(vigil_vm_t *vm, const char *msg, int64_t kind, vigil_error_t *error)
+{
+    vigil_object_t *arr = NULL;
+    vigil_status_t st = vigil_array_object_new(vigil_vm_runtime(vm), NULL, 0, &arr, error);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    vigil_value_t val;
+    vigil_value_init_object(&val, &arr);
+    st = vigil_vm_stack_push(vm, &val, error);
+    vigil_value_release(&val);
+    if (st != VIGIL_STATUS_OK)
+        return st;
+    return push_err_kind(vm, msg, kind, error);
 }
 
 /* ── Reader implementation ───────────────────────────────────────── */
@@ -1753,39 +1809,64 @@ static vigil_status_t reader_read_bytes(vigil_vm_t *vm, size_t arg_count, vigil_
     int64_t n = vigil_nanbox_decode_int(vigil_vm_stack_get(vm, base + 1));
     int64_t handle;
     fs_reader_t *rd;
-    char *buf = NULL;
+    unsigned char *buf = NULL;
     size_t nread;
     vigil_status_t st;
 
     vigil_vm_stack_pop_n(vm, arg_count);
 
     if (self == NULL || n <= 0)
-        return push_empty_str_and_err(vm, "read_bytes: invalid argument", FS_ERR_IO, error);
+        return push_empty_u8_array_and_err(vm, "read_bytes: invalid argument", FS_ERR_IO, error);
 
     handle = get_handle_field(self, RF_HANDLE);
     rd = (fs_reader_t *)fs_registry_get(&g_readers, handle);
     if (rd == NULL || rd->closed)
-        return push_empty_str_and_err(vm, "read_bytes: reader is closed", FS_ERR_IO, error);
+        return push_empty_u8_array_and_err(vm, "read_bytes: reader is closed", FS_ERR_IO, error);
     if (rd->eof_reached)
-        return push_empty_str_and_err(vm, "", FS_ERR_EOF, error);
+        return push_empty_u8_array_and_err(vm, "", FS_ERR_EOF, error);
 
     {
         vigil_runtime_t *rt = vigil_vm_runtime(vm);
-        st = vigil_runtime_alloc(rt, (size_t)n + 1, (void **)&buf, error);
+        st = vigil_runtime_alloc(rt, (size_t)n, (void **)&buf, error);
         if (st != VIGIL_STATUS_OK)
-            return push_empty_str_and_err(vm, "read_bytes: out of memory", FS_ERR_IO, error);
+            return push_empty_u8_array_and_err(vm, "read_bytes: out of memory", FS_ERR_IO, error);
 
         nread = fread(buf, 1, (size_t)n, rd->fp);
         if (nread == 0)
         {
             vigil_runtime_free(rt, (void **)&buf);
             rd->eof_reached = 1;
-            return push_empty_str_and_err(vm, "", FS_ERR_EOF, error);
+            return push_empty_u8_array_and_err(vm, "", FS_ERR_EOF, error);
         }
-        buf[nread] = '\0';
-        st = push_str_and_ok(vm, buf, nread, error);
+
+        /* Build array<u8> from the raw bytes */
+        vigil_object_t *arr = NULL;
+        st = vigil_array_object_new(rt, NULL, 0, &arr, error);
+        if (st != VIGIL_STATUS_OK)
+        {
+            vigil_runtime_free(rt, (void **)&buf);
+            return push_empty_u8_array_and_err(vm, "read_bytes: out of memory", FS_ERR_IO, error);
+        }
+        for (size_t i = 0; i < nread; i++)
+        {
+            vigil_value_t byte_val;
+            vigil_value_init_int(&byte_val, (int64_t)buf[i]);
+            st = vigil_array_object_append(arr, &byte_val, error);
+            if (st != VIGIL_STATUS_OK)
+            {
+                vigil_runtime_free(rt, (void **)&buf);
+                return push_empty_u8_array_and_err(vm, "read_bytes: out of memory", FS_ERR_IO, error);
+            }
+        }
         vigil_runtime_free(rt, (void **)&buf);
-        return st;
+
+        vigil_value_t arr_val;
+        vigil_value_init_object(&arr_val, &arr);
+        st = vigil_vm_stack_push(vm, &arr_val, error);
+        vigil_value_release(&arr_val);
+        if (st != VIGIL_STATUS_OK)
+            return st;
+        return vigil_runtime_push_ok_error(rt, vm, error);
     }
 }
 
@@ -1874,6 +1955,57 @@ static vigil_status_t reader_close(vigil_vm_t *vm, size_t arg_count, vigil_error
         fs_registry_set(&g_readers, handle, rd);
     }
     return vigil_runtime_push_ok_error(vigil_vm_runtime(vm), vm, error);
+}
+
+static vigil_status_t reader_seek(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    /* Stack: [self, offset_i64] */
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    vigil_object_t *self = get_self_obj(vm, base);
+    int64_t offset = vigil_nanbox_decode_int(vigil_vm_stack_get(vm, base + 1));
+    int64_t handle;
+    fs_reader_t *rd;
+
+    vigil_vm_stack_pop_n(vm, arg_count);
+
+    if (self == NULL)
+        return push_err_kind(vm, "seek: invalid reader", FS_ERR_IO, error);
+
+    handle = get_handle_field(self, RF_HANDLE);
+    rd = (fs_reader_t *)fs_registry_get(&g_readers, handle);
+    if (rd == NULL || rd->closed)
+        return push_err_kind(vm, "seek: reader is closed", FS_ERR_IO, error);
+
+    if (fseek(rd->fp, (long)offset, SEEK_SET) != 0)
+        return push_err_kind(vm, "seek: operation failed", FS_ERR_IO, error);
+
+    rd->eof_reached = 0;
+    return vigil_runtime_push_ok_error(vigil_vm_runtime(vm), vm, error);
+}
+
+static vigil_status_t reader_tell(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    /* Stack: [self] */
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    vigil_object_t *self = get_self_obj(vm, base);
+    int64_t handle;
+    fs_reader_t *rd;
+
+    vigil_vm_stack_pop_n(vm, arg_count);
+
+    if (self == NULL)
+        return push_i64_zero_and_err(vm, "tell: invalid reader", FS_ERR_IO, error);
+
+    handle = get_handle_field(self, RF_HANDLE);
+    rd = (fs_reader_t *)fs_registry_get(&g_readers, handle);
+    if (rd == NULL || rd->closed)
+        return push_i64_zero_and_err(vm, "tell: reader is closed", FS_ERR_IO, error);
+
+    long pos = ftell(rd->fp);
+    if (pos < 0)
+        return push_i64_zero_and_err(vm, "tell: operation failed", FS_ERR_IO, error);
+
+    return push_i64_and_ok(vm, (int64_t)pos, error);
 }
 
 /* ── Writer implementation ───────────────────────────────────────── */
@@ -2060,11 +2192,123 @@ static vigil_status_t writer_close(vigil_vm_t *vm, size_t arg_count, vigil_error
     return vigil_runtime_push_ok_error(vigil_vm_runtime(vm), vm, error);
 }
 
+static vigil_status_t writer_seek(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    /* Stack: [self, offset_i64] */
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    vigil_object_t *self = get_self_obj(vm, base);
+    int64_t offset = vigil_nanbox_decode_int(vigil_vm_stack_get(vm, base + 1));
+    int64_t handle;
+    fs_writer_t *wr;
+
+    vigil_vm_stack_pop_n(vm, arg_count);
+
+    if (self == NULL)
+        return push_err_kind(vm, "seek: invalid writer", FS_ERR_IO, error);
+
+    handle = get_handle_field(self, WF_HANDLE);
+    wr = (fs_writer_t *)fs_registry_get(&g_writers, handle);
+    if (wr == NULL || wr->closed)
+        return push_err_kind(vm, "seek: writer is closed", FS_ERR_IO, error);
+
+    if (fseek(wr->fp, (long)offset, SEEK_SET) != 0)
+        return push_err_kind(vm, "seek: operation failed", FS_ERR_IO, error);
+
+    return vigil_runtime_push_ok_error(vigil_vm_runtime(vm), vm, error);
+}
+
+static vigil_status_t writer_tell(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    /* Stack: [self] */
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    vigil_object_t *self = get_self_obj(vm, base);
+    int64_t handle;
+    fs_writer_t *wr;
+
+    vigil_vm_stack_pop_n(vm, arg_count);
+
+    if (self == NULL)
+        return push_i64_zero_and_err(vm, "tell: invalid writer", FS_ERR_IO, error);
+
+    handle = get_handle_field(self, WF_HANDLE);
+    wr = (fs_writer_t *)fs_registry_get(&g_writers, handle);
+    if (wr == NULL || wr->closed)
+        return push_i64_zero_and_err(vm, "tell: writer is closed", FS_ERR_IO, error);
+
+    long pos = ftell(wr->fp);
+    if (pos < 0)
+        return push_i64_zero_and_err(vm, "tell: operation failed", FS_ERR_IO, error);
+
+    return push_i64_and_ok(vm, (int64_t)pos, error);
+}
+
+static vigil_status_t writer_write_bytes(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    /* Stack: [self, array<u8>] */
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    vigil_object_t *self = get_self_obj(vm, base);
+    vigil_value_t arr_val = vigil_vm_stack_get(vm, base + 1);
+    vigil_object_t *arr;
+    int64_t handle;
+    fs_writer_t *wr;
+
+    if (self == NULL || !vigil_nanbox_is_object(arr_val))
+    {
+        vigil_vm_stack_pop_n(vm, arg_count);
+        return push_zero_and_err(vm, "write_bytes: invalid argument", FS_ERR_IO, error);
+    }
+
+    arr = (vigil_object_t *)vigil_nanbox_decode_ptr(arr_val);
+    if (arr == NULL || vigil_object_type(arr) != VIGIL_OBJECT_ARRAY)
+    {
+        vigil_vm_stack_pop_n(vm, arg_count);
+        return push_zero_and_err(vm, "write_bytes: invalid argument", FS_ERR_IO, error);
+    }
+
+    handle = get_handle_field(self, WF_HANDLE);
+    wr = (fs_writer_t *)fs_registry_get(&g_writers, handle);
+    if (wr == NULL || wr->closed)
+    {
+        vigil_vm_stack_pop_n(vm, arg_count);
+        return push_zero_and_err(vm, "write_bytes: writer is closed", FS_ERR_IO, error);
+    }
+
+    size_t len = vigil_array_object_length(arr);
+    vigil_runtime_t *rt = vigil_vm_runtime(vm);
+    unsigned char *buf = NULL;
+    vigil_status_t st = vigil_runtime_alloc(rt, len > 0 ? len : 1, (void **)&buf, error);
+    if (st != VIGIL_STATUS_OK)
+    {
+        vigil_vm_stack_pop_n(vm, arg_count);
+        return push_zero_and_err(vm, "write_bytes: out of memory", FS_ERR_IO, error);
+    }
+
+    for (size_t i = 0; i < len; i++)
+    {
+        vigil_value_t elem;
+        vigil_array_object_get(arr, i, &elem);
+        buf[i] = (unsigned char)vigil_nanbox_decode_int(elem);
+    }
+
+    size_t written = fwrite(buf, 1, len, wr->fp);
+    vigil_runtime_free(rt, (void **)&buf);
+
+    vigil_vm_stack_pop_n(vm, arg_count);
+
+    if (ferror(wr->fp))
+        return push_zero_and_err(vm, "write_bytes: I/O error", FS_ERR_IO, error);
+
+    return push_i32_and_ok(vm, (int64_t)written, error);
+}
+
 static const int obj_err_returns[] = {VIGIL_TYPE_OBJECT, VIGIL_TYPE_ERR};
 static const int str_err_returns[] = {VIGIL_TYPE_STRING, VIGIL_TYPE_ERR};
 static const int i32_err_returns[] = {VIGIL_TYPE_I32, VIGIL_TYPE_ERR};
+static const int i64_err_returns[] = {VIGIL_TYPE_I64, VIGIL_TYPE_ERR};
 static const int str1_param[] = {VIGIL_TYPE_STRING};
 static const int i32_1_param[] = {VIGIL_TYPE_I32};
+static const int i64_1_param[] = {VIGIL_TYPE_I64};
+static const int obj_1_param[] = {VIGIL_TYPE_OBJECT};
 static const char *const fs_reader_open_param_names[] = {"path"};
 static const char *const fs_reader_read_bytes_param_names[] = {"n"};
 static const char *const fs_writer_open_param_names[] = {"path"};
@@ -2096,7 +2340,7 @@ static const vigil_native_symbol_doc_t vigil_fs_reader_read_line_doc = {
 
 static const vigil_native_symbol_doc_t vigil_fs_reader_read_bytes_doc = {
     "Read up to N bytes.",
-    "Returns up to the requested number of bytes from the stream.",
+    "Returns up to the requested number of bytes from the stream as (array<u8>, err).",
     NULL,
 };
 
@@ -2170,6 +2414,36 @@ static const vigil_native_symbol_doc_t vigil_fs_writer_close_doc = {
     NULL,
 };
 
+static const vigil_native_symbol_doc_t vigil_fs_reader_seek_doc = {
+    "Seek to a byte offset.",
+    "Moves the read position to the given absolute byte offset. Returns err.",
+    NULL,
+};
+
+static const vigil_native_symbol_doc_t vigil_fs_reader_tell_doc = {
+    "Get the current read position.",
+    "Returns the current byte offset as (i64, err).",
+    NULL,
+};
+
+static const vigil_native_symbol_doc_t vigil_fs_writer_seek_doc = {
+    "Seek to a byte offset.",
+    "Moves the write position to the given absolute byte offset. Returns err.",
+    NULL,
+};
+
+static const vigil_native_symbol_doc_t vigil_fs_writer_tell_doc = {
+    "Get the current write position.",
+    "Returns the current byte offset as (i64, err).",
+    NULL,
+};
+
+static const vigil_native_symbol_doc_t vigil_fs_writer_write_bytes_doc = {
+    "Write raw bytes.",
+    "Writes bytes from an array<u8> and returns (i32, err) with the number of bytes written.",
+    NULL,
+};
+
 // clang-format off
 #define FS_STATIC(n, nl, fn, pc, pt, rt, rc, rts) \
     {n, nl, fn, pc, pt, rt, rc, rts, 1, NULL, 0U, 0, NULL, NULL, NULL, NULL}
@@ -2177,15 +2451,23 @@ static const vigil_native_symbol_doc_t vigil_fs_writer_close_doc = {
     {n, nl, fn, pc, pt, rt, rc, rts, 0, NULL, 0U, 0, NULL, NULL, NULL, NULL}
 // clang-format on
 
+static const char *const fs_offset_param_names[] = {"offset"};
+static const char *const fs_bytes_param_names[] = {"bytes"};
+
 static const vigil_native_class_method_t reader_methods[] = {
     {"open", 4U, reader_open, 1U, str1_param, VIGIL_TYPE_OBJECT, 2U, obj_err_returns, 1, "Reader", 6U, 0,
      fs_reader_open_param_names, NULL, "fs.Reader", &vigil_fs_reader_open_doc},
     {"read_line", 9U, reader_read_line, 0U, NULL, VIGIL_TYPE_STRING, 2U, str_err_returns, 0, NULL, 0U, 0, NULL, NULL,
      NULL, &vigil_fs_reader_read_line_doc},
-    {"read_bytes", 10U, reader_read_bytes, 1U, i32_1_param, VIGIL_TYPE_STRING, 2U, str_err_returns, 0, NULL, 0U, 0,
-     fs_reader_read_bytes_param_names, NULL, NULL, &vigil_fs_reader_read_bytes_doc},
+    {"read_bytes", 10U, reader_read_bytes, 1U, i32_1_param, VIGIL_TYPE_OBJECT, 2U, obj_err_returns,
+     0, NULL, 0U, VIGIL_TYPE_U8, fs_reader_read_bytes_param_names, NULL, NULL,
+     &vigil_fs_reader_read_bytes_doc},
     {"read_all", 8U, reader_read_all, 0U, NULL, VIGIL_TYPE_STRING, 2U, str_err_returns, 0, NULL, 0U, 0, NULL, NULL,
      NULL, &vigil_fs_reader_read_all_doc},
+    {"seek", 4U, reader_seek, 1U, i64_1_param, VIGIL_TYPE_ERR, 1U, NULL, 0, NULL, 0U, 0,
+     fs_offset_param_names, NULL, NULL, &vigil_fs_reader_seek_doc},
+    {"tell", 4U, reader_tell, 0U, NULL, VIGIL_TYPE_I64, 2U, i64_err_returns, 0, NULL, 0U, 0, NULL, NULL,
+     NULL, &vigil_fs_reader_tell_doc},
     {"close", 5U, reader_close, 0U, NULL, VIGIL_TYPE_ERR, 1U, NULL, 0, NULL, 0U, 0, NULL, NULL, NULL,
      &vigil_fs_reader_close_doc},
 };
@@ -2199,6 +2481,12 @@ static const vigil_native_class_method_t writer_methods[] = {
      fs_writer_write_param_names, NULL, NULL, &vigil_fs_writer_write_doc},
     {"write_line", 10U, writer_write_line, 1U, str1_param, VIGIL_TYPE_I32, 2U, i32_err_returns, 0, NULL, 0U, 0,
      fs_writer_write_param_names, NULL, NULL, &vigil_fs_writer_write_line_doc},
+    {"write_bytes", 11U, writer_write_bytes, 1U, obj_1_param, VIGIL_TYPE_I32, 2U, i32_err_returns, 0, NULL, 0U, 0,
+     fs_bytes_param_names, NULL, NULL, &vigil_fs_writer_write_bytes_doc},
+    {"seek", 4U, writer_seek, 1U, i64_1_param, VIGIL_TYPE_ERR, 1U, NULL, 0, NULL, 0U, 0,
+     fs_offset_param_names, NULL, NULL, &vigil_fs_writer_seek_doc},
+    {"tell", 4U, writer_tell, 0U, NULL, VIGIL_TYPE_I64, 2U, i64_err_returns, 0, NULL, 0U, 0, NULL, NULL,
+     NULL, &vigil_fs_writer_tell_doc},
     {"flush", 5U, writer_flush, 0U, NULL, VIGIL_TYPE_ERR, 1U, NULL, 0, NULL, 0U, 0, NULL, NULL, NULL,
      &vigil_fs_writer_flush_doc},
     {"close", 5U, writer_close, 0U, NULL, VIGIL_TYPE_ERR, 1U, NULL, 0, NULL, 0U, 0, NULL, NULL, NULL,

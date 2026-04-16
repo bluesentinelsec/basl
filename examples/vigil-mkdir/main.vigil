@@ -21,14 +21,14 @@ fn main() -> i32 {
     bool parents = parser.get_bool("parents")
     for (i32 i = 0; i < positionals.len(); i++) {
         string path = positionals[i]
-        bool ok2 = false
+        err e2 = ok
         if parents {
-            ok2 = fs.mkdir_all(path)
+            e2 = fs.mkdir_all(path)
         } else {
-            ok2 = fs.mkdir(path)
+            e2 = fs.mkdir(path)
         }
 
-        if ! ok2 {
+        if e2 != ok {
             fmt.eprintln(f"vigil-mkdir: cannot create directory '{path}'")
             return 1
         }

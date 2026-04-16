@@ -32,7 +32,12 @@ fn main() -> i32 {
                 return 1
             }
 
-            string content = fs.read(path)
+            string content, err read_err = fs.read(path)
+            if read_err != ok {
+                fmt.eprintln(f"vigil-cat: {path}: read error")
+                return 1
+            }
+
             fmt.print(content)
         }
 
