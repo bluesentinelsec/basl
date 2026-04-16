@@ -58,10 +58,7 @@ static const vigil_allocator_t *args_get_alloc(vigil_vm_t *vm)
 static void args_dealloc(vigil_vm_t *vm, void *ptr)
 {
     const vigil_allocator_t *a = args_get_alloc(vm);
-    if (a)
-        a->deallocate(a->user_data, ptr);
-    else
-        free(ptr);
+    a->deallocate(a->user_data, ptr);
 }
 
 /* ── Parser field indices ────────────────────────────────────────── */
