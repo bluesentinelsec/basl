@@ -48,6 +48,22 @@
 
 #include "internal/vigil_nanbox.h"
 
+/* ── Allocator helpers ───────────────────────────────────────────── */
+
+static const vigil_allocator_t *args_get_alloc(vigil_vm_t *vm)
+{
+    return vigil_runtime_allocator(vigil_vm_runtime(vm));
+}
+
+static void args_dealloc(vigil_vm_t *vm, void *ptr)
+{
+    const vigil_allocator_t *a = args_get_alloc(vm);
+    if (a)
+        a->deallocate(a->user_data, ptr);
+    else
+        free(ptr);
+}
+
 /* ── Parser field indices ────────────────────────────────────────── */
 
 enum
@@ -845,7 +861,9 @@ static vigil_status_t parser_parse(vigil_vm_t *vm, size_t arg_count, vigil_error
     int *cli_set = NULL;
     if (opt_count > 0)
     {
-        cli_set = (int *)calloc(opt_count, sizeof(int));
+        cli_set = (int *)args_get_alloc(vm)->allocate(args_get_alloc(vm)->user_data, opt_count * sizeof(int));
+        if (cli_set)
+            memset(cli_set, 0, opt_count * sizeof(int));
         if (!cli_set)
         {
             snprintf(err_buf, sizeof(err_buf), "out of memory");
@@ -888,7 +906,7 @@ static vigil_status_t parser_parse(vigil_vm_t *vm, size_t arg_count, vigil_error
                 }
                 if (!matched)
                 {
-                    free(cli_set);
+                    args_dealloc(vm, cli_set);
                     snprintf(err_buf, sizeof(err_buf), "unknown subcommand: %s", arg);
                     goto err_out;
                 }
@@ -897,14 +915,14 @@ static vigil_status_t parser_parse(vigil_vm_t *vm, size_t arg_count, vigil_error
                 s = make_string(rt, arg, &sv, error);
                 if (s != VIGIL_STATUS_OK)
                 {
-                    free(cli_set);
+                    args_dealloc(vm, cli_set);
                     goto fail;
                 }
                 s = vigil_instance_object_set_field(self, F_SUB_NAME, &sv, error);
                 vigil_value_release(&sv);
                 if (s != VIGIL_STATUS_OK)
                 {
-                    free(cli_set);
+                    args_dealloc(vm, cli_set);
                     goto fail;
                 }
                 subcmd_found = 1;
@@ -914,7 +932,7 @@ static vigil_status_t parser_parse(vigil_vm_t *vm, size_t arg_count, vigil_error
                     s = array_push_str(pos_arr, rt, argv[ri], error);
                     if (s != VIGIL_STATUS_OK)
                     {
-                        free(cli_set);
+                        args_dealloc(vm, cli_set);
                         goto fail;
                     }
                 }
@@ -925,7 +943,7 @@ static vigil_status_t parser_parse(vigil_vm_t *vm, size_t arg_count, vigil_error
             s = array_push_str(pos_arr, rt, arg, error);
             if (s != VIGIL_STATUS_OK)
             {
-                free(cli_set);
+                args_dealloc(vm, cli_set);
                 goto fail;
             }
             pos++;
@@ -940,7 +958,7 @@ static vigil_status_t parser_parse(vigil_vm_t *vm, size_t arg_count, vigil_error
         int idx = find_opt_idx(names_arr, shorts_arr, key);
         if (idx < 0)
         {
-            free(cli_set);
+            args_dealloc(vm, cli_set);
             snprintf(err_buf, sizeof(err_buf), "unknown option: %s", arg);
             goto err_out;
         }
@@ -954,7 +972,7 @@ static vigil_status_t parser_parse(vigil_vm_t *vm, size_t arg_count, vigil_error
             s = parser_update_vals_entry(vals_arr, rt, name, "true", error);
             if (s != VIGIL_STATUS_OK)
             {
-                free(cli_set);
+                args_dealloc(vm, cli_set);
                 goto fail;
             }
             pos++;
@@ -967,7 +985,7 @@ static vigil_status_t parser_parse(vigil_vm_t *vm, size_t arg_count, vigil_error
                 pos++;
                 if (pos >= argc)
                 {
-                    free(cli_set);
+                    args_dealloc(vm, cli_set);
                     snprintf(err_buf, sizeof(err_buf), "option --%s requires a value", name);
                     goto err_out;
                 }
@@ -981,7 +999,7 @@ static vigil_status_t parser_parse(vigil_vm_t *vm, size_t arg_count, vigil_error
                 (void)strtol(val, &end, 10);
                 if (errno != 0 || end == val || *end != '\0')
                 {
-                    free(cli_set);
+                    args_dealloc(vm, cli_set);
                     snprintf(err_buf, sizeof(err_buf), "option --%s requires an integer, got: %s", name, val);
                     goto err_out;
                 }
@@ -994,7 +1012,7 @@ static vigil_status_t parser_parse(vigil_vm_t *vm, size_t arg_count, vigil_error
                 (void)strtod(val, &end);
                 if (errno != 0 || end == val || *end != '\0')
                 {
-                    free(cli_set);
+                    args_dealloc(vm, cli_set);
                     snprintf(err_buf, sizeof(err_buf), "option --%s requires a number, got: %s", name, val);
                     goto err_out;
                 }
@@ -1005,7 +1023,7 @@ static vigil_status_t parser_parse(vigil_vm_t *vm, size_t arg_count, vigil_error
                 const char *choices = typ + 7;
                 if (!validate_choice(choices, val))
                 {
-                    free(cli_set);
+                    args_dealloc(vm, cli_set);
                     snprintf(err_buf, sizeof(err_buf), "option --%s must be one of: %s, got: %s", name, choices, val);
                     goto err_out;
                 }
@@ -1017,7 +1035,7 @@ static vigil_status_t parser_parse(vigil_vm_t *vm, size_t arg_count, vigil_error
                 s = array_push_str(vals_arr, rt, buf, error);
                 if (s != VIGIL_STATUS_OK)
                 {
-                    free(cli_set);
+                    args_dealloc(vm, cli_set);
                     goto fail;
                 }
             }
@@ -1026,7 +1044,7 @@ static vigil_status_t parser_parse(vigil_vm_t *vm, size_t arg_count, vigil_error
                 s = parser_update_vals_entry(vals_arr, rt, name, val, error);
                 if (s != VIGIL_STATUS_OK)
                 {
-                    free(cli_set);
+                    args_dealloc(vm, cli_set);
                     goto fail;
                 }
             }
@@ -1049,7 +1067,7 @@ static vigil_status_t parser_parse(vigil_vm_t *vm, size_t arg_count, vigil_error
             s = parser_update_vals_entry(vals_arr, rt, name, env_val, error);
             if (s != VIGIL_STATUS_OK)
             {
-                free(cli_set);
+                args_dealloc(vm, cli_set);
                 goto fail;
             }
             cli_set[i] = 1; /* mark as set so config won't override */
@@ -1079,7 +1097,7 @@ static vigil_status_t parser_parse(vigil_vm_t *vm, size_t arg_count, vigil_error
                         s = parser_update_vals_entry(vals_arr, rt, n, cval, error);
                         if (s != VIGIL_STATUS_OK)
                         {
-                            free(cli_set);
+                            args_dealloc(vm, cli_set);
                             goto fail;
                         }
                         cli_set[oi] = 1;
@@ -1090,7 +1108,7 @@ static vigil_status_t parser_parse(vigil_vm_t *vm, size_t arg_count, vigil_error
         }
     }
 
-    free(cli_set);
+    args_dealloc(vm, cli_set);
     cli_set = NULL;
 
     /* Check required options */
@@ -1558,7 +1576,7 @@ static vigil_status_t parser_help(vigil_vm_t *vm, size_t arg_count, vigil_error_
             {
                 snprintf(sname, sizeof(sname), "%s", entry);
             }
-            char padded[64];
+            char padded[128];
             snprintf(padded, sizeof(padded), "  %s", sname);
             size_t pl = strlen(padded);
             while (pl < 30 && pl < sizeof(padded) - 1)
@@ -1581,7 +1599,7 @@ static vigil_status_t parser_help(vigil_vm_t *vm, size_t arg_count, vigil_error_
             const char *d = array_get_str(descs_arr, i);
             const char *req = array_get_str(req_arr, i);
 
-            char flag[64];
+            char flag[128];
             if (sht[0] != '\0')
                 snprintf(flag, sizeof(flag), "  --%s, -%s", name, sht);
             else
@@ -1640,7 +1658,7 @@ static vigil_status_t parser_help(vigil_vm_t *vm, size_t arg_count, vigil_error_
             const char *preq = array_get_str(pr_arr, i);
             const char *pnarg = array_get_str(pnargs_arr, i);
 
-            char padded[64];
+            char padded[128];
             snprintf(padded, sizeof(padded), "  %s", pname);
             size_t pl = strlen(padded);
             while (pl < 30 && pl < sizeof(padded) - 1)
