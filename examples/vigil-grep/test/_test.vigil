@@ -7,7 +7,7 @@ fn test_basic_match(test.T t) -> void {
     // Create test file
     string testFile = path.join(os.temp_dir(), "vigil_grep_test.txt")
     file.write(testFile, "hello world\nfoo bar\nhello again\n")
-    string out, string errOut, i32 exitCode, err e = os.exec("../../../vigil", "../main.vigil", "hello", testFile)
+    string out, string errOut, i32 exitCode, err e = os.exec("../../../vigil", ["../main.vigil", "hello", testFile])
     t.assert(e == ok, "exec should succeed")
     t.assert(exitCode == 0, "should find matches")
     t.assert(out.contains("hello world"), "should match first line")
@@ -20,7 +20,7 @@ fn test_basic_match(test.T t) -> void {
 fn test_case_insensitive(test.T t) -> void {
     string testFile = path.join(os.temp_dir(), "vigil_grep_test.txt")
     file.write(testFile, "HELLO world\nfoo bar\n")
-    string out, string errOut, i32 exitCode, err e = os.exec("../../../vigil", "../main.vigil", "-i", "hello", testFile)
+    string out, string errOut, i32 exitCode, err e = os.exec("../../../vigil", ["../main.vigil", "-i", "hello", testFile])
     t.assert(e == ok, "exec should succeed")
     t.assert(exitCode == 0, "should find matches")
     t.assert(out.contains("HELLO world"), "should match case-insensitively")
@@ -31,7 +31,7 @@ fn test_case_insensitive(test.T t) -> void {
 fn test_line_numbers(test.T t) -> void {
     string testFile = path.join(os.temp_dir(), "vigil_grep_test.txt")
     file.write(testFile, "hello world\nfoo bar\nhello again\n")
-    string out, string errOut, i32 exitCode, err e = os.exec("../../../vigil", "../main.vigil", "-n", "hello", testFile)
+    string out, string errOut, i32 exitCode, err e = os.exec("../../../vigil", ["../main.vigil", "-n", "hello", testFile])
     t.assert(e == ok, "exec should succeed")
     t.assert(exitCode == 0, "should find matches")
     t.assert(out.contains("1:"), "should show line 1")
@@ -43,7 +43,7 @@ fn test_line_numbers(test.T t) -> void {
 fn test_filename_with_spaces(test.T t) -> void {
     string testFile = path.join(os.temp_dir(), "vigil grep test.txt")
     file.write(testFile, "hello world\n")
-    string out, string errOut, i32 exitCode, err e = os.exec("../../../vigil", "../main.vigil", "hello", testFile)
+    string out, string errOut, i32 exitCode, err e = os.exec("../../../vigil", ["../main.vigil", "hello", testFile])
     t.assert(e == ok, "exec should succeed")
     t.assert(exitCode == 0, "should find matches")
     t.assert(out.contains("hello world"), "should match in file with spaces")
@@ -54,7 +54,7 @@ fn test_filename_with_spaces(test.T t) -> void {
 fn test_filename_starting_with_dash(test.T t) -> void {
     string testFile = path.join(os.temp_dir(), "-weird.txt")
     file.write(testFile, "hello world\n")
-    string out, string errOut, i32 exitCode, err e = os.exec("../../../vigil", "../main.vigil", "hello", "--", testFile)
+    string out, string errOut, i32 exitCode, err e = os.exec("../../../vigil", ["../main.vigil", "hello", "--", testFile])
     t.assert(e == ok, "exec should succeed")
     t.assert(exitCode == 0, "should find matches")
     t.assert(out.contains("hello world"), "should match in file starting with dash")
@@ -70,7 +70,7 @@ fn test_recursive_search(test.T t) -> void {
     err e2 = os.mkdir(subDir)
     file.write(path.join(testDir, "file1.txt"), "hello world\n")
     file.write(path.join(subDir, "file2.txt"), "hello again\n")
-    string out, string errOut, i32 exitCode, err e = os.exec("../../../vigil", "../main.vigil", "-r", "hello", testDir)
+    string out, string errOut, i32 exitCode, err e = os.exec("../../../vigil", ["../main.vigil", "-r", "hello", testDir])
     t.assert(e == ok, "exec should succeed")
     t.assert(exitCode == 0, "should find matches")
     t.assert(out.contains("hello world"), "should find in root")
@@ -86,7 +86,7 @@ fn test_recursive_search(test.T t) -> void {
 fn test_no_match(test.T t) -> void {
     string testFile = path.join(os.temp_dir(), "vigil_grep_test.txt")
     file.write(testFile, "foo bar\n")
-    string out, string errOut, i32 exitCode, err e = os.exec("../../../vigil", "../main.vigil", "hello", testFile)
+    string out, string errOut, i32 exitCode, err e = os.exec("../../../vigil", ["../main.vigil", "hello", testFile])
     t.assert(e == ok, "exec should succeed")
     t.assert(exitCode == 1, "should return 1 for no match")
     t.assert(out == "", "should have no output")
@@ -97,7 +97,7 @@ fn test_no_match(test.T t) -> void {
 fn test_count_matches(test.T t) -> void {
     string testFile = path.join(os.temp_dir(), "vigil_grep_test.txt")
     file.write(testFile, "hello world\nfoo bar\nhello again\n")
-    string out, string errOut, i32 exitCode, err e = os.exec("../../../vigil", "../main.vigil", "-c", "hello", testFile)
+    string out, string errOut, i32 exitCode, err e = os.exec("../../../vigil", ["../main.vigil", "-c", "hello", testFile])
     t.assert(e == ok, "exec should succeed")
     t.assert(exitCode == 0, "should find matches")
     t.assert(out.contains("2"), "should count 2 matches")
@@ -111,7 +111,7 @@ fn test_invalid_type_flag(test.T t) -> void {
     file.write(testFile, "hello world\n")
     // grep doesn't have numeric flags, but if it did, this would test validation
     // For now, just test that unknown flags are rejected
-    string out, string errOut, i32 exitCode, err e = os.exec("../../../vigil", "../main.vigil", "--unknown", "hello", testFile)
+    string out, string errOut, i32 exitCode, err e = os.exec("../../../vigil", ["../main.vigil", "--unknown", "hello", testFile])
     t.assert(e == ok, "exec should succeed")
     t.assert(exitCode == 2, "should return 2 for error")
     file.remove(testFile)

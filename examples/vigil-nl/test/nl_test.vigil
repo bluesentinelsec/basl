@@ -5,7 +5,7 @@ import "os"
 import "test"
 
 fn test_nl_basic(test.T t) -> void {
-    string out, string errs, i32 exitCode, err e = os.exec("sh", "-c", "printf 'hello\\nworld\\n' | ./vigil examples/vigil-nl/main.vigil")
+    string out, string errs, i32 exitCode, err e = os.exec("sh", ["-c", "printf 'hello\\nworld\\n' | ./vigil examples/vigil-nl/main.vigil"])
     t.assert(string(e) == "ok", "nl should exit 0")
     t.assert(out == "     1\thello\n     2\tworld\n", "should number lines with formatting")
 }

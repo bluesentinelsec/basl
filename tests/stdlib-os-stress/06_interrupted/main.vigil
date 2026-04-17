@@ -1,0 +1,15 @@
+import "fmt"
+import "os"
+
+fn main() -> i32 {
+    fmt.println("===== TEST 06_INTERRUPTED START =====")
+
+    // Should be false initially (no signal sent)
+    fmt.println(f"interrupted: {os.interrupted()}")
+
+    // Calling multiple times should be consistent
+    fmt.println(f"interrupted again: {os.interrupted()}")
+
+    fmt.println("===== TEST 06_INTERRUPTED END =====")
+    return 0
+}

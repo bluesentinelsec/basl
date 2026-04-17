@@ -7,7 +7,7 @@ import "test"
 
 fn test_sort_basic(test.T t) -> void {
     file.write_all("test_sort_in.txt", "zebra\napple\nbanana\n")
-    string out, string errs, i32 exitCode, err e = os.exec("sh", "-c", "./vigil examples/vigil-sort/main.vigil < test_sort_in.txt")
+    string out, string errs, i32 exitCode, err e = os.exec("sh", ["-c", "./vigil examples/vigil-sort/main.vigil < test_sort_in.txt"])
     t.assert(string(e) == "ok", "sort should exit 0")
     t.assert(out == "apple\nbanana\nzebra\n", "should sort lines alphabetically")
     file.remove("test_sort_in.txt")

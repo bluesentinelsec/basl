@@ -1,0 +1,56 @@
+import "fmt"
+import "os"
+
+fn test_env_batch() -> void {
+    // Set many env vars
+    for (i32 i = 0; i < 10; i++) {
+        os.setenv(f"VIGIL_BATCH_{i}", f"val_{i}")
+    }
+    // Verify all exist
+    i32 found_count = 0
+    for (i32 i = 0; i < 10; i++) {
+        string v, bool f = os.getenv(f"VIGIL_BATCH_{i}")
+        if f { found_count = found_count + 1 }
+    }
+    fmt.println(f"batch found: {found_count}")
+    // Cleanup
+    for (i32 i = 0; i < 10; i++) {
+        os.unsetenv(f"VIGIL_BATCH_{i}")
+    }
+    // Verify all gone
+    i32 remaining = 0
+    for (i32 i = 0; i < 10; i++) {
+        string v, bool f = os.getenv(f"VIGIL_BATCH_{i}")
+        if f { remaining = remaining + 1 }
+    }
+    fmt.println(f"batch remaining: {remaining}")
+}
+
+fn test_exec_patterns() -> void {
+    string out, string errs, i32 code, err e = os.exec("echo", ["hello world"])
+    fmt.println(f"echo: {out.trim()}")
+
+    // True command (exit 0)
+    string o2, string e2s, i32 c2, err e2 = os.exec("true", [])
+    fmt.println(f"true code: {c2}")
+}
+
+fn test_system_info() -> void {
+    string plat = os.platform()
+    fmt.println(f"platform: {plat.any()}")
+    string ar = os.arch()
+    fmt.println(f"arch: {ar.any()}")
+    string host = os.hostname()
+    fmt.println(f"hostname: {host.any()}")
+    fmt.println(f"pid: {os.pid() > 0}")
+    fmt.println(f"interrupted: {!os.interrupted()}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST LARGE_OS_COMPREHENSIVE_2 START =====")
+    test_env_batch()
+    test_exec_patterns()
+    test_system_info()
+    fmt.println("===== TEST LARGE_OS_COMPREHENSIVE_2 END =====")
+    return 0
+}

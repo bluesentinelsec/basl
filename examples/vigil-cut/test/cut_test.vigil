@@ -7,7 +7,7 @@ import "test"
 
 fn test_cut_basic(test.T t) -> void {
     file.write_all("test_cut_in.txt", "a:b:c\nd:e:f\n")
-    string out, string errs, i32 exitCode, err e = os.exec("sh", "-c", "./vigil examples/vigil-cut/main.vigil --f 2 --d : < test_cut_in.txt")
+    string out, string errs, i32 exitCode, err e = os.exec("sh", ["-c", "./vigil examples/vigil-cut/main.vigil --f 2 --d : < test_cut_in.txt"])
     t.assert(string(e) == "ok", "cut should exit 0")
     t.assert(out == "b\ne\n", "should extract field 2 from both lines")
     file.remove("test_cut_in.txt")
@@ -15,7 +15,7 @@ fn test_cut_basic(test.T t) -> void {
 
 
 fn test_cut_invalid_field(test.T t) -> void {
-    string out, string errs, i32 exitCode, err e = os.exec("sh", "-c", "echo '' | ./vigil examples/vigil-cut/main.vigil --f x2 --d : 2>&1")
+    string out, string errs, i32 exitCode, err e = os.exec("sh", ["-c", "echo '' | ./vigil examples/vigil-cut/main.vigil --f x2 --d : 2>&1"])
     t.assert(exitCode != 0, "cut should reject invalid field spec")
 }
 

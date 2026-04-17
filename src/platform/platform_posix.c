@@ -570,6 +570,48 @@ VIGIL_API vigil_status_t vigil_platform_hostname(const vigil_allocator_t *alloca
     return VIGIL_STATUS_OK;
 }
 
+/* ── Process ID and interrupt handling ───────────────────────────── */
+
+VIGIL_API int vigil_platform_getpid(void)
+{
+    return (int)getpid();
+}
+
+#ifdef __EMSCRIPTEN__
+
+/* Emscripten/WASM has no signals. */
+VIGIL_API void vigil_platform_install_interrupt_handler(void) {}
+VIGIL_API int vigil_platform_interrupted(void) { return 0; }
+
+#else
+
+static volatile sig_atomic_t g_interrupted = 0;
+
+static void vigil_sigint_handler(int sig)
+{
+    (void)sig;
+    g_interrupted = 1;
+}
+
+VIGIL_API void vigil_platform_install_interrupt_handler(void)
+{
+    static int installed = 0;
+    if (installed)
+        return;
+    installed = 1;
+    struct sigaction sa;
+    memset(&sa, 0, sizeof(sa));
+    sa.sa_handler = vigil_sigint_handler;
+    sigaction(SIGINT, &sa, NULL);
+}
+
+VIGIL_API int vigil_platform_interrupted(void)
+{
+    return g_interrupted != 0;
+}
+
+#endif
+
 /* ── Environment variables ───────────────────────────────────────── */
 
 VIGIL_API vigil_status_t vigil_platform_unsetenv(const char *key, vigil_error_t *error)

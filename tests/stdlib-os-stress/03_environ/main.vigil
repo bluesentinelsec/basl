@@ -1,0 +1,20 @@
+import "fmt"
+import "os"
+
+fn main() -> i32 {
+    fmt.println("===== TEST 03_ENVIRON START =====")
+
+    os.setenv("VIGIL_ENVIRON_TEST", "hello")
+
+    map<string, string> env = os.environ()
+    fmt.println(f"environ len > 0: {env.len() > 0}")
+    fmt.println(f"has PATH: {env.has("PATH")}")
+
+    // Our test variable should be in environ
+    fmt.println(f"has test var: {env.has("VIGIL_ENVIRON_TEST")}")
+
+    os.unsetenv("VIGIL_ENVIRON_TEST")
+
+    fmt.println("===== TEST 03_ENVIRON END =====")
+    return 0
+}
