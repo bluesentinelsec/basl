@@ -1,0 +1,35 @@
+import "fmt"
+import "os"
+
+fn main() -> i32 {
+    fmt.println("===== TEST LARGE_OS_COMPREHENSIVE_1 START =====")
+
+    fmt.println(f"platform: {os.platform()}")
+    fmt.println(f"arch: {os.arch()}")
+    fmt.println(f"hostname any: {os.hostname().any()}")
+    fmt.println(f"pid > 0: {os.pid() > 0}")
+    fmt.println(f"interrupted: {os.interrupted()}")
+
+    os.setenv("VIGIL_COMP1_A", "alpha")
+    os.setenv("VIGIL_COMP1_B", "beta")
+    string a, bool af = os.getenv("VIGIL_COMP1_A")
+    string b, bool bf = os.getenv("VIGIL_COMP1_B")
+    fmt.println(f"a: {a}, b: {b}")
+
+    map<string, string> env = os.environ()
+    fmt.println(f"environ has A: {env.has("VIGIL_COMP1_A")}")
+
+    os.setenv("VIGIL_COMP1_A", "updated")
+    string a2, bool a2f = os.getenv("VIGIL_COMP1_A")
+    fmt.println(f"overwrite: {a2}")
+
+    os.unsetenv("VIGIL_COMP1_A")
+    os.unsetenv("VIGIL_COMP1_B")
+
+    string out, string errs, i32 code, err e = os.exec("echo", ["test output"])
+    fmt.println(f"exec: {out.trim()}")
+    fmt.println(f"exec code: {code}")
+
+    fmt.println("===== TEST LARGE_OS_COMPREHENSIVE_1 END =====")
+    return 0
+}

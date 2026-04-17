@@ -534,6 +534,39 @@ VIGIL_API vigil_status_t vigil_platform_hostname(const vigil_allocator_t *alloca
     return VIGIL_STATUS_OK;
 }
 
+/* ── Process ID and interrupt handling ───────────────────────────── */
+
+VIGIL_API int vigil_platform_getpid(void)
+{
+    return (int)GetCurrentProcessId();
+}
+
+static volatile LONG g_interrupted_win32 = 0;
+
+static BOOL WINAPI vigil_ctrl_handler(DWORD type)
+{
+    if (type == CTRL_C_EVENT || type == CTRL_BREAK_EVENT)
+    {
+        InterlockedExchange(&g_interrupted_win32, 1);
+        return TRUE;
+    }
+    return FALSE;
+}
+
+VIGIL_API void vigil_platform_install_interrupt_handler(void)
+{
+    static int installed = 0;
+    if (installed)
+        return;
+    installed = 1;
+    SetConsoleCtrlHandler(vigil_ctrl_handler, TRUE);
+}
+
+VIGIL_API int vigil_platform_interrupted(void)
+{
+    return InterlockedCompareExchange(&g_interrupted_win32, 0, 0) != 0;
+}
+
 /* ── Environment variables (new) ──────────────────────────────────── */
 
 VIGIL_API vigil_status_t vigil_platform_unsetenv(const char *key, vigil_error_t *error)

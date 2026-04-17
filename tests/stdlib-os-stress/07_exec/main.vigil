@@ -1,0 +1,27 @@
+import "fmt"
+import "os"
+
+fn main() -> i32 {
+    fmt.println("===== TEST 07_EXEC START =====")
+
+    // Basic exec
+    string out, string errs, i32 code, err e = os.exec("echo", ["hello"])
+    fmt.println(f"exec ok: {e == ok}")
+    fmt.println(f"exec code: {code}")
+    fmt.println(f"exec out: {out.trim()}")
+
+    // Exec with multiple args
+    string out2, string errs2, i32 code2, err e2 = os.exec("echo", ["hello", "world"])
+    fmt.println(f"multi args: {out2.trim()}")
+
+    // Exec with empty args
+    string out3, string errs3, i32 code3, err e3 = os.exec("echo", [])
+    fmt.println(f"empty args ok: {e3 == ok}")
+
+    // Exec nonexistent program
+    string out4, string errs4, i32 code4, err e4 = os.exec("vigil_nonexistent_program_xyz", [])
+    fmt.println(f"bad program: {e4 != ok}")
+
+    fmt.println("===== TEST 07_EXEC END =====")
+    return 0
+}

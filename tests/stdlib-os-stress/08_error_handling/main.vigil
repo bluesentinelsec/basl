@@ -1,0 +1,23 @@
+import "fmt"
+import "os"
+
+fn main() -> i32 {
+    fmt.println("===== TEST 08_ERROR_HANDLING START =====")
+
+    string v, bool f = os.getenv("VIGIL_NONEXISTENT_XYZ")
+    fmt.println(f"missing: [{v}], found={f}")
+
+    os.setenv("VIGIL_ERR_TEST", "x")
+    os.unsetenv("VIGIL_ERR_TEST")
+    string v2, bool f2 = os.getenv("VIGIL_ERR_TEST")
+    fmt.println(f"after unset: found={f2}")
+
+    string out, string errs, i32 code, err e = os.exec("vigil_no_such_program", ["arg"])
+    fmt.println(f"bad exec: {e != ok}")
+
+    map<string, string> env = os.environ()
+    fmt.println(f"environ > 0: {env.len() > 0}")
+
+    fmt.println("===== TEST 08_ERROR_HANDLING END =====")
+    return 0
+}

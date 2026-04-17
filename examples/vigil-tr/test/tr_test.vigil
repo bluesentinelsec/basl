@@ -5,14 +5,14 @@ import "os"
 import "test"
 
 fn test_tr_basic(test.T t) -> void {
-    string out, string errs, i32 exitCode, err e = os.exec("sh", "-c", "printf 'hello world\\n' | ./vigil examples/vigil-tr/main.vigil aeiou 12345")
+    string out, string errs, i32 exitCode, err e = os.exec("sh", ["-c", "printf 'hello world\\n' | ./vigil examples/vigil-tr/main.vigil aeiou 12345"])
     t.assert(string(e) == "ok", "tr should exit 0")
     t.assert(out == "h2ll4 w4rld\n", "should translate all vowels")
 }
 
 
 fn test_tr_length_mismatch(test.T t) -> void {
-    string out, string errs, i32 exitCode, err e = os.exec("sh", "-c", "printf 'test\\n' | ./vigil examples/vigil-tr/main.vigil abc 12 2>&1")
+    string out, string errs, i32 exitCode, err e = os.exec("sh", ["-c", "printf 'test\\n' | ./vigil examples/vigil-tr/main.vigil abc 12 2>&1"])
     t.assert(exitCode != 0, "tr should reject mismatched set lengths")
 }
 

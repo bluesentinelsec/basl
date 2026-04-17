@@ -130,6 +130,15 @@ extern "C"
     VIGIL_API vigil_status_t vigil_platform_hostname(const vigil_allocator_t *allocator, char **out_name,
                                                      vigil_error_t *error);
 
+    /** Get the current process ID. */
+    VIGIL_API int vigil_platform_getpid(void);
+
+    /** Install a SIGINT/Ctrl+C handler that sets an internal flag. Safe to call multiple times. */
+    VIGIL_API void vigil_platform_install_interrupt_handler(void);
+
+    /** Check if an interrupt signal has been received since the handler was installed. */
+    VIGIL_API int vigil_platform_interrupted(void);
+
     /* ── Process execution ───────────────────────────────────────────── */
 
     /**

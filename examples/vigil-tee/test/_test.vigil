@@ -39,7 +39,7 @@ fn test_tee_single_file(test.T t) -> void {
     err e = file.write_all(input_file, test_content)
     t.assert(e == ok, "should write input file")
     string sh_cmd = vigil_bin + " " + main_script + " " + test_file + " < " + input_file
-    string stdout, string stderr, i32 exitCode, err e2 = os.exec("sh", "-c", sh_cmd)
+    string stdout, string stderr, i32 exitCode, err e2 = os.exec("sh", ["-c", sh_cmd])
     t.assert(e2 == ok, "vigil-tee should succeed")
     t.assert(stdout == test_content, "stdout should match input")
     string file_content, err e3 = file.read_all(test_file)
@@ -65,7 +65,7 @@ fn test_tee_multiple_files(test.T t) -> void {
     err e = file.write_all(input_file, test_content)
     t.assert(e == ok, "should write input file")
     string sh_cmd = vigil_bin + " " + main_script + " " + file1 + " " + file2 + " < " + input_file
-    string stdout, string stderr, i32 exitCode, err e2 = os.exec("sh", "-c", sh_cmd)
+    string stdout, string stderr, i32 exitCode, err e2 = os.exec("sh", ["-c", sh_cmd])
     t.assert(e2 == ok, "vigil-tee should succeed")
     t.assert(stdout == test_content, "stdout should match input")
     string content1, err e3 = file.read_all(file1)
@@ -96,7 +96,7 @@ fn test_tee_append_mode(test.T t) -> void {
     err e2 = file.write_all(input_file, "appended\n")
     t.assert(e2 == ok, "should write input file")
     string sh_cmd = vigil_bin + " " + main_script + " -a " + test_file + " < " + input_file
-    string stdout, string stderr, i32 exitCode, err e3 = os.exec("sh", "-c", sh_cmd)
+    string stdout, string stderr, i32 exitCode, err e3 = os.exec("sh", ["-c", sh_cmd])
     t.assert(e3 == ok, "vigil-tee -a should succeed")
     string content, err e4 = file.read_all(test_file)
     t.assert(e4 == ok, "should read output file")
@@ -119,7 +119,7 @@ fn test_tee_empty_input(test.T t) -> void {
     err e = file.write_all(input_file, "")
     t.assert(e == ok, "should write empty input")
     string sh_cmd = vigil_bin + " " + main_script + " " + test_file + " < " + input_file
-    string stdout, string stderr, i32 exitCode, err e2 = os.exec("sh", "-c", sh_cmd)
+    string stdout, string stderr, i32 exitCode, err e2 = os.exec("sh", ["-c", sh_cmd])
     t.assert(e2 == ok, "vigil-tee should succeed on empty input")
     t.assert(stdout == "", "stdout should be empty")
     string content, err e3 = file.read_all(test_file)

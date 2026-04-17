@@ -1,0 +1,20 @@
+import "fmt"
+import "os"
+
+fn main() -> i32 {
+    fmt.println("===== TEST 04_PLATFORM_ARCH START =====")
+
+    string plat = os.platform()
+    fmt.println(f"platform any: {plat.any()}")
+    // Should be one of the known values
+    bool valid_plat = plat == "windows" || plat == "macos" || plat == "linux" || plat == "wasm" || plat == "android" || plat == "ios"
+    fmt.println(f"platform valid: {valid_plat}")
+
+    string ar = os.arch()
+    fmt.println(f"arch any: {ar.any()}")
+    bool valid_arch = ar == "x86_64" || ar == "arm64" || ar == "x86" || ar == "arm" || ar == "wasm32"
+    fmt.println(f"arch valid: {valid_arch}")
+
+    fmt.println("===== TEST 04_PLATFORM_ARCH END =====")
+    return 0
+}

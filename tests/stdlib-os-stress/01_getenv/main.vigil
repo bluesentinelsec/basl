@@ -1,0 +1,35 @@
+import "fmt"
+import "os"
+
+fn main() -> i32 {
+    fmt.println("===== TEST 01_GETENV START =====")
+
+    // PATH should exist on all platforms
+    string path, bool found = os.getenv("PATH")
+    fmt.println(f"PATH found: {found}")
+    fmt.println(f"PATH any: {path.any()}")
+
+    // Missing variable
+    string missing, bool mf = os.getenv("VIGIL_NONEXISTENT_VAR_12345")
+    fmt.println(f"missing found: {mf}")
+    fmt.println(f"missing empty: {missing.none()}")
+
+    // Set then get
+    err se = os.setenv("VIGIL_TEST_GETENV", "test_value")
+    string tv, bool tf = os.getenv("VIGIL_TEST_GETENV")
+    fmt.println(f"set+get found: {tf}")
+    fmt.println(f"set+get val: {tv}")
+
+    // Set to empty string — should be found with empty value
+    err se2 = os.setenv("VIGIL_TEST_EMPTY", "")
+    string ev, bool ef = os.getenv("VIGIL_TEST_EMPTY")
+    fmt.println(f"empty found: {ef}")
+    fmt.println(f"empty val: [{ev}]")
+
+    // Cleanup
+    os.unsetenv("VIGIL_TEST_GETENV")
+    os.unsetenv("VIGIL_TEST_EMPTY")
+
+    fmt.println("===== TEST 01_GETENV END =====")
+    return 0
+}

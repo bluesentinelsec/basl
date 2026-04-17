@@ -1,0 +1,19 @@
+import "fmt"
+import "os"
+
+fn main() -> i32 {
+    fmt.println("===== TEST 05_HOSTNAME_PID START =====")
+
+    string host = os.hostname()
+    fmt.println(f"hostname any: {host.any()}")
+
+    i32 pid = os.pid()
+    fmt.println(f"pid > 0: {pid > 0}")
+
+    // pid should be consistent within the same process
+    i32 pid2 = os.pid()
+    fmt.println(f"pid consistent: {pid == pid2}")
+
+    fmt.println("===== TEST 05_HOSTNAME_PID END =====")
+    return 0
+}

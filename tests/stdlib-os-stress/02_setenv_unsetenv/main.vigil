@@ -1,0 +1,31 @@
+import "fmt"
+import "os"
+
+fn main() -> i32 {
+    fmt.println("===== TEST 02_SETENV_UNSETENV START =====")
+
+    // setenv
+    err e1 = os.setenv("VIGIL_TEST_A", "value_a")
+    fmt.println(f"setenv ok: {e1 == ok}")
+    string va, bool fa = os.getenv("VIGIL_TEST_A")
+    fmt.println(f"get after set: {va}")
+
+    // overwrite
+    err e2 = os.setenv("VIGIL_TEST_A", "new_value")
+    fmt.println(f"overwrite ok: {e2 == ok}")
+    string va2, bool fa2 = os.getenv("VIGIL_TEST_A")
+    fmt.println(f"get after overwrite: {va2}")
+
+    // unsetenv
+    err e3 = os.unsetenv("VIGIL_TEST_A")
+    fmt.println(f"unsetenv ok: {e3 == ok}")
+    string va3, bool fa3 = os.getenv("VIGIL_TEST_A")
+    fmt.println(f"after unset found: {fa3}")
+
+    // unsetenv nonexistent (should succeed)
+    err e4 = os.unsetenv("VIGIL_NONEXISTENT_12345")
+    fmt.println(f"unset missing ok: {e4 == ok}")
+
+    fmt.println("===== TEST 02_SETENV_UNSETENV END =====")
+    return 0
+}

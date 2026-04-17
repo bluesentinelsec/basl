@@ -35,7 +35,7 @@ fn test_cat_single_file(test.T t) -> void {
     string test_content = "test content\n"
     err e = file.write_all(test_file, test_content)
     t.assert(e == ok, "should write test file")
-    string stdout, string stderr, i32 exitCode, err e2 = os.exec(vigil_bin, main_script, test_file)
+    string stdout, string stderr, i32 exitCode, err e2 = os.exec(vigil_bin, [main_script, test_file])
     t.assert(e2 == ok, "vigil-cat should succeed")
     t.assert(stdout == test_content, "output should match file content")
     t.assert(stderr == "", "stderr should be empty on success")
@@ -51,7 +51,7 @@ fn test_cat_multiple_files(test.T t) -> void {
     err e1 = file.write_all(file1, "file1\n")
     err e2 = file.write_all(file2, "file2\n")
     t.assert(e1 == ok && e2 == ok, "should write test files")
-    string stdout, string stderr, i32 exitCode, err e3 = os.exec(vigil_bin, main_script, file1, file2)
+    string stdout, string stderr, i32 exitCode, err e3 = os.exec(vigil_bin, [main_script, file1, file2])
     t.assert(e3 == ok, "vigil-cat should succeed")
     t.assert(stdout == "file1\nfile2\n", "output should concatenate both files")
     t.assert(stderr == "", "stderr should be empty on success")
@@ -64,7 +64,7 @@ fn test_cat_missing_file(test.T t) -> void {
     string vigil_bin, string main_script = find_vigil_and_main()
     t.assert(vigil_bin != "", "should find vigil binary")
     string missing = get_temp_path("nonexistent_vigil_cat_test.txt")
-    string stdout, string stderr, i32 exitCode, err e = os.exec(vigil_bin, main_script, missing)
+    string stdout, string stderr, i32 exitCode, err e = os.exec(vigil_bin, [main_script, missing])
     t.assert(exitCode != 0, "vigil-cat should fail on missing file")
     t.assert(stderr.len() > 0, "stderr should contain error message")
     t.assert(stderr.contains("vigil-cat:"), "error should be from vigil-cat")
@@ -77,7 +77,7 @@ fn test_cat_empty_file(test.T t) -> void {
     string test_file = get_temp_path("vigil_cat_test_empty.txt")
     err e = file.write_all(test_file, "")
     t.assert(e == ok, "should write empty file")
-    string stdout, string stderr, i32 exitCode, err e2 = os.exec(vigil_bin, main_script, test_file)
+    string stdout, string stderr, i32 exitCode, err e2 = os.exec(vigil_bin, [main_script, test_file])
     t.assert(e2 == ok, "vigil-cat should succeed on empty file")
     t.assert(stdout == "", "output should be empty")
     t.assert(stderr == "", "stderr should be empty")
@@ -100,7 +100,7 @@ fn test_cat_stdin_dash(test.T t) -> void {
     t.assert(e == ok, "should write test file")
     // Test "-" reads from stdin by using shell redirection
     string sh_cmd = vigil_bin + " " + main_script + " - < " + test_file
-    string stdout, string stderr, i32 exitCode, err e2 = os.exec("sh", "-c", sh_cmd)
+    string stdout, string stderr, i32 exitCode, err e2 = os.exec("sh", ["-c", sh_cmd])
     t.assert(e2 == ok, "vigil-cat with - should succeed")
     t.assert(stdout == test_content, "output should match stdin")
     file.remove(test_file)
@@ -122,7 +122,7 @@ fn test_cat_no_args_stdin(test.T t) -> void {
     t.assert(e == ok, "should write test file")
     // Test no args reads from stdin
     string sh_cmd = vigil_bin + " " + main_script + " < " + test_file
-    string stdout, string stderr, i32 exitCode, err e2 = os.exec("sh", "-c", sh_cmd)
+    string stdout, string stderr, i32 exitCode, err e2 = os.exec("sh", ["-c", sh_cmd])
     t.assert(e2 == ok, "vigil-cat with no args should succeed")
     t.assert(stdout == test_content, "output should match stdin")
     file.remove(test_file)
