@@ -1,0 +1,39 @@
+import "fmt"
+import "time"
+
+fn main() -> i32 {
+    fmt.println("===== TEST 01_BASIC_TIMESTAMPS START =====")
+
+    // now() returns positive timestamp
+    i64 ts = time.now()
+    fmt.println(f"now > 0: {ts > i64(0)}")
+    fmt.println(f"now reasonable: {ts > i64(1000000000)}")
+
+    // now_ms >= now * 1000
+    i64 ms = time.now_ms()
+    fmt.println(f"now_ms > 0: {ms > i64(0)}")
+
+    // now_ns >= now_ms * 1000000
+    i64 ns = time.now_ns()
+    fmt.println(f"now_ns > 0: {ns > i64(0)}")
+
+    // monotonic_ns
+    i64 m1 = time.monotonic_ns()
+    i64 m2 = time.monotonic_ns()
+    fmt.println(f"monotonic > 0: {m1 > i64(0)}")
+    fmt.println(f"monotonic increasing: {m2 >= m1}")
+
+    // ms helpers
+    fmt.println(f"to_ms 1: {time.to_ms(i64(1))}")
+    fmt.println(f"to_ms 0: {time.to_ms(i64(0))}")
+    fmt.println(f"from_ms 1000: {time.from_ms(i64(1000))}")
+    fmt.println(f"from_ms 1500: {time.from_ms(i64(1500))}")
+    fmt.println(f"from_ms 0: {time.from_ms(i64(0))}")
+
+    // date() creates timestamp
+    i64 d = time.date(2024, 1, 1, 0, 0, 0)
+    fmt.println(f"date > 0: {d > i64(0)}")
+
+    fmt.println("===== TEST 01_BASIC_TIMESTAMPS END =====")
+    return 0
+}

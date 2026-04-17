@@ -1,0 +1,39 @@
+import "fmt"
+import "time"
+
+fn main() -> i32 {
+    fmt.println("===== TEST 04_FORMATTING START =====")
+
+    // Use a known UTC timestamp and format in UTC for determinism
+    i64 ts = i64(1718451045)  // 2024-06-15 12:30:45 UTC
+
+    // format_utc for deterministic output
+    fmt.println(f"format_utc: {time.format_utc(ts, "%Y-%m-%d %H:%M:%S")}")
+    fmt.println(f"format_utc date: {time.format_utc(ts, "%Y-%m-%d")}")
+    fmt.println(f"format_utc time: {time.format_utc(ts, "%H:%M:%S")}")
+
+    // iso8601 (local time, but structure is deterministic)
+    string iso = time.iso8601(ts)
+    fmt.println(f"iso8601 has T: {iso.contains("T")}")
+    fmt.println(f"iso8601 len: {iso.len()}")
+
+    // rfc3339
+    string rfc = time.rfc3339(ts)
+    fmt.println(f"rfc3339 has T: {rfc.contains("T")}")
+    fmt.println(f"rfc3339 has offset: {rfc.contains("+") || rfc.contains("-")}")
+
+    // rfc2822
+    string r28 = time.rfc2822(ts)
+    fmt.println(f"rfc2822 has comma: {r28.contains(",")}")
+    fmt.println(f"rfc2822 len > 20: {r28.len() > 20}")
+
+    // format with empty format string
+    string empty = time.format(ts, "")
+    fmt.println(f"empty format: [{empty}]")
+
+    // format_utc epoch
+    fmt.println(f"epoch utc: {time.format_utc(i64(0), "%Y-%m-%d %H:%M:%S")}")
+
+    fmt.println("===== TEST 04_FORMATTING END =====")
+    return 0
+}

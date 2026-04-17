@@ -1,0 +1,49 @@
+import "fmt"
+import "time"
+
+fn main() -> i32 {
+    fmt.println("===== TEST 06_ARITHMETIC START =====")
+
+    i64 base = time.date(2024, 6, 15, 12, 0, 0)
+
+    // add_days
+    i64 plus7 = time.add_days(base, 7)
+    fmt.println(f"add 7 days: {time.day(plus7)}")
+    i64 minus1 = time.add_days(base, -1)
+    fmt.println(f"sub 1 day: {time.day(minus1)}")
+
+    // add_hours
+    i64 plus3h = time.add_hours(base, 3)
+    fmt.println(f"add 3 hours: {time.hour(plus3h)}")
+
+    // add_minutes
+    i64 plus45m = time.add_minutes(base, 45)
+    fmt.println(f"add 45 min: {time.minute(plus45m)}")
+
+    // add_seconds
+    i64 plus90s = time.add_seconds(base, i64(90))
+    fmt.println(f"add 90 sec min: {time.minute(plus90s)}")
+    fmt.println(f"add 90 sec sec: {time.second(plus90s)}")
+
+    // diff_days
+    i64 a = time.date(2024, 6, 20, 0, 0, 0)
+    i64 b = time.date(2024, 6, 15, 0, 0, 0)
+    fmt.println(f"diff_days: {time.diff_days(a, b)}")
+    fmt.println(f"diff_days neg: {time.diff_days(b, a)}")
+
+    // diff_hours
+    i64 c = time.date(2024, 6, 15, 15, 0, 0)
+    i64 d = time.date(2024, 6, 15, 12, 0, 0)
+    fmt.println(f"diff_hours: {time.diff_hours(c, d)}")
+
+    // diff_minutes
+    i64 e = time.date(2024, 6, 15, 12, 45, 0)
+    fmt.println(f"diff_minutes: {time.diff_minutes(e, d)}")
+
+    // diff_seconds
+    i64 f = time.date(2024, 6, 15, 12, 0, 30)
+    fmt.println(f"diff_seconds: {time.diff_seconds(f, d)}")
+
+    fmt.println("===== TEST 06_ARITHMETIC END =====")
+    return 0
+}
