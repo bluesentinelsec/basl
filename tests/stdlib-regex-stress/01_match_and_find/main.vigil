@@ -1,0 +1,49 @@
+import "fmt"
+import "regex"
+
+fn test_match() -> void {
+    fmt.println(f"match literal: {regex.match("hello", "hello")}")
+    fmt.println(f"match literal fail: {regex.match("hello", "world")}")
+    fmt.println(f"match digits: {regex.match("[0-9]+", "12345")}")
+    fmt.println(f"match digits partial: {regex.match("[0-9]+", "123abc")}")
+    fmt.println(f"match alpha: {regex.match("[a-z]+", "hello")}")
+    fmt.println(f"match empty pat: {regex.match("", "")}")
+    fmt.println(f"match any: {regex.match(".*", "anything")}")
+    fmt.println(f"match dot: {regex.match("h.llo", "hello")}")
+}
+
+fn test_find() -> void {
+    string f1, bool ok1 = regex.find("[0-9]+", "abc123def456")
+    fmt.println(f"find digits: {f1}, {ok1}")
+    string f2, bool ok2 = regex.find("[0-9]+", "no digits")
+    fmt.println(f"find no digits: [{f2}], {ok2}")
+    string f3, bool ok3 = regex.find("[A-Z][a-z]+", "Hello World")
+    fmt.println(f"find word: {f3}, {ok3}")
+    string f4, bool ok4 = regex.find("[0-9]+", "")
+    fmt.println(f"find empty input: [{f4}], {ok4}")
+    string f5, bool ok5 = regex.find(`\d+`, "test42end")
+    fmt.println(f"find mid: {f5}, {ok5}")
+}
+
+fn test_find_all() -> void {
+    array<string> a1 = regex.find_all("[0-9]+", "abc123def456ghi789")
+    fmt.println(f"find_all len: {a1.len()}")
+    fmt.println(f"find_all[0]: {a1[0]}")
+    fmt.println(f"find_all[1]: {a1[1]}")
+    fmt.println(f"find_all[2]: {a1[2]}")
+    array<string> a2 = regex.find_all("[a-z]+", "ABC123")
+    fmt.println(f"find_all none: {a2.len()}")
+    array<string> a3 = regex.find_all("[A-Z]", "Hello World")
+    fmt.println(f"find_all caps: {a3.len()}")
+    array<string> a4 = regex.find_all(".", "abc")
+    fmt.println(f"find_all dot: {a4.len()}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 01_MATCH_AND_FIND START =====")
+    test_match()
+    test_find()
+    test_find_all()
+    fmt.println("===== TEST 01_MATCH_AND_FIND END =====")
+    return 0
+}

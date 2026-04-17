@@ -1,0 +1,57 @@
+import "fmt"
+import "regex"
+
+fn test_alternation() -> void {
+    fmt.println(f"alt cat: {regex.match("cat|dog", "cat")}")
+    fmt.println(f"alt dog: {regex.match("cat|dog", "dog")}")
+    fmt.println(f"alt fail: {regex.match("cat|dog", "bird")}")
+    fmt.println(f"alt multi: {regex.match("red|green|blue", "green")}")
+    string f1, bool ok1 = regex.find("cat|dog", "I have a dog")
+    fmt.println(f"alt find: {f1}, {ok1}")
+}
+
+fn test_nested_groups() -> void {
+    array<string> g1, bool ok1 = regex.captures("(a(b(c)))", "abc")
+    fmt.println(f"deep nest ok: {ok1}")
+    fmt.println(f"deep nest full: {g1[0]}")
+    fmt.println(f"deep nest g1: {g1[1]}")
+    fmt.println(f"deep nest g2: {g1[2]}")
+    fmt.println(f"deep nest g3: {g1[3]}")
+}
+
+fn test_complex_patterns() -> void {
+    string email_pat = "[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]+"
+    fmt.println(f"email match: {regex.match(email_pat, "user@example.com")}")
+    string ip_pat = `[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+`
+    fmt.println(f"ip match: {regex.match(ip_pat, "192.168.1.1")}")
+    fmt.println(f"ip fail: {regex.match(ip_pat, "not.an.ip")}")
+}
+
+fn test_long_input() -> void {
+    string long_str = ""
+    for (i32 i = 0; i < 100; i++) {
+        long_str = long_str + "abcdef"
+    }
+    array<string> matches = regex.find_all("[a-f]+", long_str)
+    fmt.println(f"long input matches: {matches.len()}")
+    string replaced = regex.replace_all("abc", long_str, "XYZ")
+    fmt.println(f"long replace len: {replaced.len()}")
+}
+
+fn test_special_chars() -> void {
+    string escaped = regex.escape("(a+b)*c?")
+    fmt.println(f"escaped special: {escaped}")
+    bool matched = regex.match(escaped, "(a+b)*c?")
+    fmt.println(f"escaped roundtrip: {matched}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 10_EDGE_CASES START =====")
+    test_alternation()
+    test_nested_groups()
+    test_complex_patterns()
+    test_long_input()
+    test_special_chars()
+    fmt.println("===== TEST 10_EDGE_CASES END =====")
+    return 0
+}

@@ -1,0 +1,44 @@
+import "fmt"
+import "regex"
+
+fn test_invalid_patterns() -> void {
+    fmt.println(f"invalid bracket: {regex.match("[abc", "a")}")
+    fmt.println(f"invalid paren: {regex.match("(abc", "abc")}")
+    fmt.println(f"invalid escape: {regex.match(`\`, "a")}")
+    fmt.println(f"is_valid bracket: {regex.is_valid("[abc")}")
+    fmt.println(f"is_valid paren: {regex.is_valid("(abc")}")
+}
+
+fn test_no_match_cases() -> void {
+    string f1, bool ok1 = regex.find("[0-9]+", "no digits here")
+    fmt.println(f"find no match: [{f1}], {ok1}")
+    array<string> a1 = regex.find_all("[0-9]+", "no digits")
+    fmt.println(f"find_all no match: {a1.len()}")
+    array<string> c1, bool cok1 = regex.captures("([0-9]+)", "no digits")
+    fmt.println(f"captures no match: {cok1}, {c1.len()}")
+    string r1 = regex.replace("[0-9]+", "no digits", "X")
+    fmt.println(f"replace no match: {r1}")
+    array<string> s1 = regex.split("[0-9]+", "no digits")
+    fmt.println(f"split no match: {s1.len()}, {s1[0]}")
+}
+
+fn test_empty_inputs() -> void {
+    fmt.println(f"match empty both: {regex.match("", "")}")
+    string f1, bool ok1 = regex.find("[0-9]+", "")
+    fmt.println(f"find empty: [{f1}], {ok1}")
+    array<string> a1 = regex.find_all("[0-9]+", "")
+    fmt.println(f"find_all empty: {a1.len()}")
+    string r1 = regex.replace("[0-9]+", "", "X")
+    fmt.println(f"replace empty: [{r1}]")
+    array<string> s1 = regex.split(",", "")
+    fmt.println(f"split empty: {s1.len()}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 09_ERROR_HANDLING START =====")
+    test_invalid_patterns()
+    test_no_match_cases()
+    test_empty_inputs()
+    fmt.println("===== TEST 09_ERROR_HANDLING END =====")
+    return 0
+}

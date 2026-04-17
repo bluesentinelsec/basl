@@ -1,0 +1,45 @@
+import "fmt"
+import "regex"
+
+fn test_char_classes() -> void {
+    fmt.println(f"class abc: {regex.match("[abc]", "b")}")
+    fmt.println(f"class abc fail: {regex.match("[abc]", "d")}")
+    fmt.println(f"range a-z: {regex.match("[a-z]+", "hello")}")
+    fmt.println(f"range a-z fail: {regex.match("[a-z]+", "HELLO")}")
+    fmt.println(f"negated: {regex.match("[^0-9]+", "hello")}")
+    fmt.println(f"negated fail: {regex.match("[^0-9]+", "123")}")
+}
+
+fn test_shorthand_classes() -> void {
+    fmt.println(f"digit: {regex.match(`\d+`, "123")}")
+    fmt.println(f"digit fail: {regex.match(`\d+`, "abc")}")
+    fmt.println(f"word: {regex.match(`\w+`, "hello_123")}")
+    fmt.println(f"space: {regex.match(`\s+`, "   ")}")
+    fmt.println(f"space fail: {regex.match(`\s+`, "abc")}")
+    fmt.println(f"non-digit: {regex.match(`\D+`, "abc")}")
+    fmt.println(f"non-digit fail: {regex.match(`\D+`, "123")}")
+    fmt.println(f"non-word: {regex.match(`\W+`, "!@#")}")
+    fmt.println(f"non-space: {regex.match(`\S+`, "abc")}")
+}
+
+fn test_dot_and_anchors() -> void {
+    fmt.println(f"dot: {regex.match("h.llo", "hello")}")
+    fmt.println(f"dot fail: {regex.match("h.llo", "hllo")}")
+    string f1, bool ok1 = regex.find("^hello", "hello world")
+    fmt.println(f"anchor start: {f1}, {ok1}")
+    string f2, bool ok2 = regex.find("world$", "hello world")
+    fmt.println(f"anchor end: {f2}, {ok2}")
+    string f3, bool ok3 = regex.find(`\bword\b`, "a word here")
+    fmt.println(f"word boundary: {f3}, {ok3}")
+    string f4, bool ok4 = regex.find(`\bword\b`, "sword")
+    fmt.println(f"word boundary fail: [{f4}], {ok4}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 03_CHARACTER_CLASSES START =====")
+    test_char_classes()
+    test_shorthand_classes()
+    test_dot_and_anchors()
+    fmt.println("===== TEST 03_CHARACTER_CLASSES END =====")
+    return 0
+}

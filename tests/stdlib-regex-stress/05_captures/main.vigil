@@ -1,0 +1,55 @@
+import "fmt"
+import "regex"
+
+fn test_basic_captures() -> void {
+    array<string> g1, bool ok1 = regex.captures("([a-z]+)@([a-z]+)", "user@host")
+    fmt.println(f"captures ok: {ok1}")
+    fmt.println(f"captures full: {g1[0]}")
+    fmt.println(f"captures g1: {g1[1]}")
+    fmt.println(f"captures g2: {g1[2]}")
+    fmt.println(f"captures len: {g1.len()}")
+}
+
+fn test_nested_groups() -> void {
+    array<string> g1, bool ok1 = regex.captures("((a)(b))", "ab")
+    fmt.println(f"nested ok: {ok1}")
+    fmt.println(f"nested full: {g1[0]}")
+    fmt.println(f"nested g1: {g1[1]}")
+    fmt.println(f"nested g2: {g1[2]}")
+    fmt.println(f"nested g3: {g1[3]}")
+}
+
+fn test_non_capturing() -> void {
+    array<string> g1, bool ok1 = regex.captures("(?:a)(b)", "ab")
+    fmt.println(f"non-cap ok: {ok1}")
+    fmt.println(f"non-cap full: {g1[0]}")
+    fmt.println(f"non-cap g1: {g1[1]}")
+    fmt.println(f"non-cap len: {g1.len()}")
+}
+
+fn test_multiple_groups() -> void {
+    string pat = "([0-9]{4})-([0-9]{2})-([0-9]{2})"
+    array<string> g1, bool ok1 = regex.captures(pat, "date 2024-01-15 end")
+    fmt.println(f"multi ok: {ok1}")
+    fmt.println(f"multi full: {g1[0]}")
+    fmt.println(f"multi year: {g1[1]}")
+    fmt.println(f"multi month: {g1[2]}")
+    fmt.println(f"multi day: {g1[3]}")
+}
+
+fn test_no_match() -> void {
+    array<string> g1, bool ok1 = regex.captures("([0-9]+)", "no digits")
+    fmt.println(f"no match: {ok1}")
+    fmt.println(f"no match len: {g1.len()}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 05_CAPTURES START =====")
+    test_basic_captures()
+    test_nested_groups()
+    test_non_capturing()
+    test_multiple_groups()
+    test_no_match()
+    fmt.println("===== TEST 05_CAPTURES END =====")
+    return 0
+}

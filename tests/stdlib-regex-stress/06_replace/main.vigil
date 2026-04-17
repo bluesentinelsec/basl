@@ -1,0 +1,46 @@
+import "fmt"
+import "regex"
+
+fn test_replace_first() -> void {
+    string r1 = regex.replace("[0-9]+", "abc123def456", "NUM")
+    fmt.println(f"replace first: {r1}")
+    string r2 = regex.replace("[0-9]+", "no digits", "NUM")
+    fmt.println(f"replace none: {r2}")
+    string r3 = regex.replace("[a-z]+", "hello world", "X")
+    fmt.println(f"replace word: {r3}")
+}
+
+fn test_replace_all() -> void {
+    string r1 = regex.replace_all("[0-9]+", "abc123def456ghi789", "N")
+    fmt.println(f"replace_all: {r1}")
+    string r2 = regex.replace_all(`\s+`, "hello   world   foo", " ")
+    fmt.println(f"replace_all spaces: {r2}")
+    string r3 = regex.replace_all("[aeiou]", "hello world", "*")
+    fmt.println(f"replace_all vowels: {r3}")
+}
+
+fn test_backreferences() -> void {
+    string r1 = regex.replace("([a-z]+)@([a-z]+)", "user@host end", "$2-$1")
+    fmt.println(f"backref swap: {r1}")
+    string r2 = regex.replace_all("([a-z]+)", "hello world", "[$0]")
+    fmt.println(f"backref zero: {r2}")
+    string r3 = regex.replace("([a-z]+)", "hello", "$$1")
+    fmt.println(f"literal dollar: {r3}")
+}
+
+fn test_replace_empty() -> void {
+    string r1 = regex.replace("[0-9]+", "", "X")
+    fmt.println(f"replace empty input: [{r1}]")
+    string r2 = regex.replace_all("[0-9]+", "abc", "")
+    fmt.println(f"replace_all no match: {r2}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 06_REPLACE START =====")
+    test_replace_first()
+    test_replace_all()
+    test_backreferences()
+    test_replace_empty()
+    fmt.println("===== TEST 06_REPLACE END =====")
+    return 0
+}

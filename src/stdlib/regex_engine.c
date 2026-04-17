@@ -79,6 +79,7 @@ struct vigil_regex
     bool has_first_bytes;                        /* true if first_bytes filter is usable */
     char_class_t class_run[REGEX_CLASS_RUN_MAX]; /* Fast-path class segments */
     size_t class_run_count;                      /* 0 = no fast path */
+    regex_flags_t flags;                         /* Inline flags (?i), (?m), (?s) */
     vigil_allocator_t allocator;
 };
 
@@ -134,12 +135,26 @@ static nfa_state_t *alloc_state(vigil_regex_t *re, nfa_type_t type)
     if (re->state_count >= re->state_capacity)
     {
         size_t new_cap = re->state_capacity == 0 ? 64 : re->state_capacity * 2;
+        nfa_state_t *old_states = re->states;
         nfa_state_t *new_states =
             (nfa_state_t *)re->allocator.reallocate(re->allocator.user_data, re->states, new_cap * sizeof(nfa_state_t));
         if (!new_states)
             return NULL;
         re->states = new_states;
         re->state_capacity = new_cap;
+
+        /* Remap all out1/out2 pointers from old to new array */
+        if (old_states != new_states)
+        {
+            ptrdiff_t delta = (char *)new_states - (char *)old_states;
+            for (size_t i = 0; i < re->state_count; i++)
+            {
+                if (re->states[i].out1)
+                    re->states[i].out1 = (nfa_state_t *)((char *)re->states[i].out1 + delta);
+                if (re->states[i].out2)
+                    re->states[i].out2 = (nfa_state_t *)((char *)re->states[i].out2 + delta);
+            }
+        }
     }
     nfa_state_t *s = &re->states[re->state_count];
     memset(s, 0, sizeof(*s));
@@ -538,6 +553,49 @@ static bool parse_group(parser_t *p, fragment_t *out)
         }
         else
         {
+            /* Check for inline flags (?i), (?m), (?s), (?ims) etc. */
+            bool is_flag_group = false;
+            size_t flag_start = p->pos;
+            while (p->pos < p->length)
+            {
+                char fc = p->pattern[p->pos];
+                if (fc == 'i' || fc == 'm' || fc == 's')
+                {
+                    p->pos++;
+                }
+                else if (fc == ')')
+                {
+                    /* Pure flag group like (?i) — set flags and return empty */
+                    for (size_t fi = flag_start; fi < p->pos; fi++)
+                    {
+                        if (p->pattern[fi] == 'i')
+                            p->re->flags.case_insensitive = true;
+                        else if (p->pattern[fi] == 'm')
+                            p->re->flags.multiline = true;
+                        else if (p->pattern[fi] == 's')
+                            p->re->flags.dotall = true;
+                    }
+                    p->pos++; /* consume ')' */
+                    /* Return empty fragment */
+                    nfa_state_t *jump = alloc_state(p->re, NFA_JUMP);
+                    if (!jump)
+                    {
+                        parser_error(p, "out of memory");
+                        return false;
+                    }
+                    fragment_init(out, &p->re->allocator);
+                    out->start = jump;
+                    fragment_add_patch(out, &jump->out1);
+                    return true;
+                }
+                else
+                {
+                    break;
+                }
+            }
+            /* Not a valid flag group — restore and error */
+            p->pos = flag_start;
+            (void)is_flag_group;
             parser_error(p, "invalid group modifier");
             return false;
         }
@@ -794,11 +852,128 @@ static bool validate_brace_quantifier_spec(parser_t *p, const quantifier_spec_t 
         parser_error(p, "quantifier too large");
         return false;
     }
-    if (spec->has_max && spec->max > 10U)
+    if (spec->has_max && spec->max < spec->min)
     {
-        parser_error(p, "bounded quantifier max > 10 not yet supported");
+        parser_error(p, "quantifier max less than min");
         return false;
     }
+    return true;
+}
+
+/* Deep-copy an NFA fragment by duplicating all reachable states.
+ * The copy's internal transitions are remapped; dangling out-pointers
+ * (those that were in the original patch list) become the new fragment's
+ * patch list. */
+static bool fragment_copy(parser_t *p, const fragment_t *src, fragment_t *dst, size_t src_end_id)
+{
+    vigil_regex_t *re = p->re;
+    /* Map old state id -> new state pointer.  We only need entries for
+     * states that belong to this fragment, but using the full state_count
+     * as the map size is simpler and safe. */
+    size_t map_cap = re->state_count + 1;
+    nfa_state_t **map = (nfa_state_t **)RE_CALLOC(re, map_cap, sizeof(nfa_state_t *));
+    if (!map)
+    {
+        parser_error(p, "out of memory");
+        return false;
+    }
+
+    /* First pass: allocate copies of every state reachable from src->start
+     * via a simple BFS using the state array order.  We identify fragment
+     * states as those whose id is >= the id of src->start (they were
+     * allocated contiguously). */
+    size_t base_id = src->start->id;
+    size_t end_id = src_end_id ? src_end_id : re->state_count;
+    size_t copy_count = end_id - base_id;
+
+    /* Pre-compute patch list info BEFORE any realloc that might
+     * invalidate the pointers in src->patch_list. */
+    struct { size_t state_id; int field; } patch_info[64];
+    size_t patch_info_count = 0;
+    for (size_t i = 0; i < src->patch_count && i < 64; i++)
+    {
+        nfa_state_t **ptr = src->patch_list[i];
+        for (size_t id = base_id; id < end_id; id++)
+        {
+            nfa_state_t *st = &re->states[id];
+            if (ptr == &st->out1) { patch_info[patch_info_count].state_id = id; patch_info[patch_info_count].field = 1; patch_info_count++; break; }
+            if (ptr == &st->out2) { patch_info[patch_info_count].state_id = id; patch_info[patch_info_count].field = 2; patch_info_count++; break; }
+        }
+    }
+
+    /* Now safe to realloc */
+    if (re->state_count + copy_count > re->state_capacity)
+    {
+        size_t new_cap = re->state_capacity == 0 ? 64 : re->state_capacity;
+        while (new_cap < re->state_count + copy_count)
+            new_cap *= 2;
+        nfa_state_t *old_states = re->states;
+        nfa_state_t *new_states = (nfa_state_t *)re->allocator.reallocate(
+            re->allocator.user_data, re->states, new_cap * sizeof(nfa_state_t));
+        if (!new_states)
+        {
+            RE_FREE(re, map);
+            parser_error(p, "out of memory");
+            return false;
+        }
+        re->states = new_states;
+        re->state_capacity = new_cap;
+
+        /* Remap all out1/out2 pointers in existing states from old to new array */
+        if (old_states != new_states)
+        {
+            ptrdiff_t delta = (char *)new_states - (char *)old_states;
+            for (size_t sid = 0; sid < re->state_count; sid++)
+            {
+                if (re->states[sid].out1)
+                    re->states[sid].out1 = (nfa_state_t *)((char *)re->states[sid].out1 + delta);
+                if (re->states[sid].out2)
+                    re->states[sid].out2 = (nfa_state_t *)((char *)re->states[sid].out2 + delta);
+            }
+        }
+    }
+
+    for (size_t id = base_id; id < end_id; id++)
+    {
+        nfa_state_t *orig = &re->states[id];
+        nfa_state_t *copy = alloc_state(re, orig->type);
+        if (!copy)
+        {
+            RE_FREE(re, map);
+            parser_error(p, "out of memory");
+            return false;
+        }
+        copy->data = orig->data;
+        /* out1/out2 remapped below */
+        map[id] = copy;
+    }
+
+    /* Second pass: remap transitions */
+    for (size_t id = base_id; id < end_id; id++)
+    {
+        nfa_state_t *orig = &re->states[id];
+        nfa_state_t *copy = map[id];
+        copy->out1 = (orig->out1 && orig->out1->id >= base_id && orig->out1->id < end_id) ? map[orig->out1->id] : NULL;
+        copy->out2 = (orig->out2 && orig->out2->id >= base_id && orig->out2->id < end_id) ? map[orig->out2->id] : NULL;
+    }
+
+    fragment_init(dst, &re->allocator);
+    dst->start = map[base_id];
+
+    /* Build patch list from pre-computed info */
+    for (size_t i = 0; i < patch_info_count; i++)
+    {
+        nfa_state_t *copy_st = map[patch_info[i].state_id];
+        if (copy_st)
+        {
+            if (patch_info[i].field == 1)
+                fragment_add_patch(dst, &copy_st->out1);
+            else
+                fragment_add_patch(dst, &copy_st->out2);
+        }
+    }
+
+    RE_FREE(re, map);
     return true;
 }
 
@@ -815,8 +990,46 @@ static bool build_exact_brace_quantifier(parser_t *p, fragment_t *atom, fragment
         return true;
     }
 
-    parser_error(p, "exact repetition > 1 not yet supported");
-    return false;
+    /* Concatenate 'count' copies of atom.
+     * fragment_copy handles its own pre-allocation, but we need to
+     * re-resolve atom->start after each call since it may realloc. */
+    size_t atom_id = atom->start->id;
+    size_t atom_end_id = p->re->state_count;
+
+    fragment_t result;
+    if (!fragment_copy(p, atom, &result, atom_end_id))
+        return false;
+    /* Save result start ID */
+    size_t result_start_id = result.start->id;
+
+    for (size_t i = 1; i < count; i++)
+    {
+        /* Re-resolve atom->start after potential realloc */
+        atom->start = &p->re->states[atom_id];
+
+        fragment_t copy;
+        if (!fragment_copy(p, atom, &copy, atom_end_id))
+        {
+            fragment_free(&result);
+            return false;
+        }
+
+        /* Re-resolve result.start after potential realloc */
+        result.start = &p->re->states[result_start_id];
+
+        /* Concatenate: patch result's dangling ends to copy's start */
+        nfa_state_t *saved_start = result.start;
+        fragment_patch(&result, copy.start);
+        result.alloc->deallocate(result.alloc->user_data, result.patch_list);
+        result.start = saved_start;
+        result.patch_list = copy.patch_list;
+        result.patch_count = copy.patch_count;
+        result.patch_capacity = copy.patch_capacity;
+        copy.patch_list = NULL;
+    }
+    fragment_free(atom); /* original atom consumed */
+    *out = result;
+    return true;
 }
 
 static bool build_unbounded_brace_quantifier(parser_t *p, fragment_t *atom, fragment_t *out,
@@ -827,8 +1040,194 @@ static bool build_unbounded_brace_quantifier(parser_t *p, fragment_t *atom, frag
     if (spec->min == 1U)
         return build_loop_quantifier(p, atom, out, spec->greedy, false);
 
-    parser_error(p, "{n,} with n > 1 not yet supported");
-    return false;
+    /* {n,}: n required copies then a loop */
+    fragment_t prefix;
+    if (!build_exact_brace_quantifier(p, atom, &prefix, spec->min))
+        return false;
+
+    fragment_t loop_atom;
+    if (!fragment_copy(p, atom, &loop_atom, 0))
+    {
+        fragment_free(&prefix);
+        return false;
+    }
+    fragment_t loop;
+    if (!build_loop_quantifier(p, &loop_atom, &loop, spec->greedy, true))
+    {
+        fragment_free(&prefix);
+        return false;
+    }
+
+    /* Concatenate prefix + loop */
+    nfa_state_t *saved_start = prefix.start;
+    fragment_patch(&prefix, loop.start);
+    prefix.alloc->deallocate(prefix.alloc->user_data, prefix.patch_list);
+    prefix.start = saved_start;
+    prefix.patch_list = loop.patch_list;
+    prefix.patch_count = loop.patch_count;
+    prefix.patch_capacity = loop.patch_capacity;
+    loop.patch_list = NULL;
+
+    *out = prefix;
+    return true;
+}
+
+static bool build_bounded_brace_quantifier(parser_t *p, fragment_t *atom, fragment_t *out, size_t min, size_t max,
+                                           bool greedy)
+{
+    /* Pre-allocate enough state capacity for ALL copies (exact + optional + saved).
+     * This ensures fragment_copy never triggers a realloc, keeping all
+     * pointers into re->states valid throughout the function. */
+    size_t atom_end_id = p->re->state_count;
+    size_t states_per_atom = p->re->state_count - atom->start->id;
+    /* Pre-allocate for: saved copy + min exact copies + max optional copies + SPLITs.
+     * Each copy needs states_per_atom states. Be very generous to ensure
+     * NO realloc happens during any subsequent operation. */
+    size_t total_states_needed = states_per_atom * (max * 2 + 5) + max * 2 + 100;
+    size_t needed = p->re->state_count + total_states_needed;
+    if (needed > p->re->state_capacity)
+    {
+        size_t new_cap = p->re->state_capacity == 0 ? 64 : p->re->state_capacity;
+        while (new_cap < needed)
+            new_cap *= 2;
+        size_t atom_id = atom->start->id;
+        nfa_state_t *new_states = (nfa_state_t *)p->re->allocator.reallocate(
+            p->re->allocator.user_data, p->re->states, new_cap * sizeof(nfa_state_t));
+        if (!new_states)
+        {
+            parser_error(p, "out of memory");
+            return false;
+        }
+        p->re->states = new_states;
+        p->re->state_capacity = new_cap;
+        atom->start = &p->re->states[atom_id];
+    }
+
+    /* Deep copy the atom for reuse in optional copies */
+    fragment_t atom_saved;
+    memset(&atom_saved, 0, sizeof(atom_saved));
+    if (max > min)
+    {
+        if (!fragment_copy(p, atom, &atom_saved, atom_end_id))
+            return false;
+    }
+
+    /* Build min required copies */
+    fragment_t result;
+    if (min > 0)
+    {
+        if (!build_exact_brace_quantifier(p, atom, &result, min))
+        {
+            if (max > min) fragment_free(&atom_saved);
+            return false;
+        }
+    }
+    else
+    {
+        fragment_free(atom);
+        fragment_init(&result, &p->re->allocator);
+    }
+
+    /* Add (max - min) optional copies, each wrapped in SPLIT.
+     * Structure: result -> SPLIT1 -> copy1 -> SPLIT2 -> copy2 -> ... -> end
+     *                         \-> end            \-> end
+     * Skip patches all go to the end (collected in skip_patches). */
+    size_t skip_count = 0;
+    size_t atom_saved_id = (max > min) ? atom_saved.start->id : 0;
+    size_t result_start_id = (result.start != NULL) ? result.start->id : 0;
+
+    /* Store skip patch info as (state_id, field) pairs instead of raw
+     * pointers, because fragment_copy may realloc re->states. */
+    struct { size_t state_id; int field; /* 1=out1, 2=out2 */ } skip_info[128];
+
+    for (size_t i = min; i < max; i++)
+    {
+        /* Re-resolve atom_saved.start in case fragment_copy reallocated re->states */
+        atom_saved.start = &p->re->states[atom_saved_id];
+
+        fragment_t copy;
+        if (!fragment_copy(p, &atom_saved, &copy, atom_saved_id + states_per_atom))
+        {
+            fragment_free(&atom_saved);
+            fragment_free(&result);
+            return false;
+        }
+
+        nfa_state_t *split = alloc_state(p->re, NFA_SPLIT);
+        if (!split)
+        {
+            fragment_free(&copy);
+            fragment_free(&result);
+            parser_error(p, "out of memory");
+            return false;
+        }
+
+        if (greedy)
+        {
+            split->out1 = copy.start;
+            if (skip_count < 128)
+            {
+                skip_info[skip_count].state_id = split->id;
+                skip_info[skip_count].field = 2; /* out2 */
+                skip_count++;
+            }
+        }
+        else
+        {
+            split->out2 = copy.start;
+            if (skip_count < 128)
+            {
+                skip_info[skip_count].state_id = split->id;
+                skip_info[skip_count].field = 1; /* out1 */
+                skip_count++;
+            }
+        }
+
+        if (result.start == NULL)
+        {
+            fragment_init(&result, &p->re->allocator);
+            result.start = split;
+        }
+        else
+        {
+            /* Re-resolve result.start after potential realloc */
+            result.start = &p->re->states[result_start_id];
+            /* Chain: patch result's dangling ends to this SPLIT */
+            nfa_state_t *saved_start = result.start;
+            fragment_patch(&result, split);
+            result.alloc->deallocate(result.alloc->user_data, result.patch_list);
+            result.start = saved_start;
+            result.patch_list = NULL;
+            result.patch_count = 0;
+            result.patch_capacity = 0;
+        }
+        result_start_id = result.start->id;
+
+        /* Result's new dangling ends are the copy's dangling ends */
+        result.patch_list = copy.patch_list;
+        result.patch_count = copy.patch_count;
+        result.patch_capacity = copy.patch_capacity;
+        copy.patch_list = NULL;
+    }
+
+    /* Add all skip patches to result's patch list (re-resolve from IDs) */
+    if (max > min)
+        fragment_free(&atom_saved);
+    for (size_t i = 0; i < skip_count; i++)
+    {
+        nfa_state_t *st = &p->re->states[skip_info[i].state_id];
+        nfa_state_t **ptr = (skip_info[i].field == 1) ? &st->out1 : &st->out2;
+        fragment_add_patch(&result, ptr);
+    }
+
+    if (result.start == NULL)
+    {
+        fragment_free(atom);
+        return build_empty_quantifier_fragment(p, &result);
+    }
+
+    *out = result;
+    return true;
 }
 
 static bool build_brace_quantifier(parser_t *p, fragment_t *atom, fragment_t *out)
@@ -844,8 +1243,7 @@ static bool build_brace_quantifier(parser_t *p, fragment_t *atom, fragment_t *ou
     if (!spec.has_max)
         return build_unbounded_brace_quantifier(p, atom, out, &spec);
 
-    parser_error(p, "complex bounded quantifiers not yet supported");
-    return false;
+    return build_bounded_brace_quantifier(p, atom, out, spec.min, spec.max, spec.greedy);
 }
 
 static bool parse_quantifier(parser_t *p, fragment_t *atom, fragment_t *out)
@@ -903,6 +1301,11 @@ static bool parse_concatenation(parser_t *p, fragment_t *out)
         {
             if (result.start == NULL)
             {
+                /* If the parser wrote an error, propagate it */
+                if (p->error_buf && p->error_buf[0] != '\0')
+                {
+                    return false;
+                }
                 /* Empty concatenation - create jump state */
                 nfa_state_t *jump = alloc_state(p->re, NFA_JUMP);
                 if (!jump)
@@ -1044,7 +1447,7 @@ static void state_list_clear(state_list_t *l)
 
 /* Add state to list with epsilon closure */
 static void add_state(state_list_t *l, nfa_state_t *s, const size_t *saves, size_t pos, const char *input,
-                      size_t input_len, uint8_t *visited, size_t gen)
+                      size_t input_len, uint8_t *visited, size_t gen, const regex_flags_t *flags)
 {
     if (s == NULL)
         return;
@@ -1056,29 +1459,29 @@ static void add_state(state_list_t *l, nfa_state_t *s, const size_t *saves, size
     switch (s->type)
     {
     case NFA_SPLIT:
-        add_state(l, s->out1, saves, pos, input, input_len, visited, gen);
-        add_state(l, s->out2, saves, pos, input, input_len, visited, gen);
+        add_state(l, s->out1, saves, pos, input, input_len, visited, gen, flags);
+        add_state(l, s->out2, saves, pos, input, input_len, visited, gen, flags);
         return;
     case NFA_JUMP:
-        add_state(l, s->out1, saves, pos, input, input_len, visited, gen);
+        add_state(l, s->out1, saves, pos, input, input_len, visited, gen, flags);
         return;
     case NFA_SAVE: {
         size_t scratch[VIGIL_REGEX_MAX_GROUPS * 2];
         memcpy(scratch, saves, l->save_count * sizeof(size_t));
         scratch[s->data.save_slot] = pos;
-        add_state(l, s->out1, scratch, pos, input, input_len, visited, gen);
+        add_state(l, s->out1, scratch, pos, input, input_len, visited, gen, flags);
         return;
     }
     case NFA_ANCHOR_START:
-        if (pos == 0)
+        if (pos == 0 || (flags->multiline && pos > 0 && input[pos - 1] == '\n'))
         {
-            add_state(l, s->out1, saves, pos, input, input_len, visited, gen);
+            add_state(l, s->out1, saves, pos, input, input_len, visited, gen, flags);
         }
         return;
     case NFA_ANCHOR_END:
-        if (pos == input_len)
+        if (pos == input_len || (flags->multiline && pos < input_len && input[pos] == '\n'))
         {
-            add_state(l, s->out1, saves, pos, input, input_len, visited, gen);
+            add_state(l, s->out1, saves, pos, input, input_len, visited, gen, flags);
         }
         return;
     case NFA_WORD_BOUNDARY: {
@@ -1086,7 +1489,7 @@ static void add_state(state_list_t *l, nfa_state_t *s, const size_t *saves, size
         bool after_word = (pos < input_len) && (isalnum((unsigned char)input[pos]) || input[pos] == '_');
         if (before_word != after_word)
         {
-            add_state(l, s->out1, saves, pos, input, input_len, visited, gen);
+            add_state(l, s->out1, saves, pos, input, input_len, visited, gen, flags);
         }
         return;
     }
@@ -1095,7 +1498,7 @@ static void add_state(state_list_t *l, nfa_state_t *s, const size_t *saves, size
         bool after_word = (pos < input_len) && (isalnum((unsigned char)input[pos]) || input[pos] == '_');
         if (before_word == after_word)
         {
-            add_state(l, s->out1, saves, pos, input, input_len, visited, gen);
+            add_state(l, s->out1, saves, pos, input, input_len, visited, gen, flags);
         }
         return;
     }
@@ -1113,7 +1516,7 @@ static void add_state(state_list_t *l, nfa_state_t *s, const size_t *saves, size
 }
 
 static bool step(state_list_t *curr, state_list_t *next, char ch, size_t pos, const char *input, size_t input_len,
-                 uint8_t *visited, size_t gen)
+                 uint8_t *visited, size_t gen, const regex_flags_t *flags)
 {
     state_list_clear(next);
 
@@ -1126,16 +1529,27 @@ static bool step(state_list_t *curr, state_list_t *next, char ch, size_t pos, co
         switch (s->type)
         {
         case NFA_LITERAL:
-            match = (s->data.literal == (uint8_t)ch);
+            if (flags->case_insensitive)
+                match = (tolower(s->data.literal) == tolower((uint8_t)ch));
+            else
+                match = (s->data.literal == (uint8_t)ch);
             break;
         case NFA_ANY:
-            match = (ch != '\n'); /* . doesn't match newline by default */
+            match = flags->dotall ? true : (ch != '\n');
             break;
         case NFA_CLASS:
-            match = class_test(s->data.cclass, (uint8_t)ch);
+            if (flags->case_insensitive)
+                match = class_test(s->data.cclass, (uint8_t)tolower((uint8_t)ch)) ||
+                        class_test(s->data.cclass, (uint8_t)toupper((uint8_t)ch));
+            else
+                match = class_test(s->data.cclass, (uint8_t)ch);
             break;
         case NFA_CLASS_NEG:
-            match = !class_test(s->data.cclass, (uint8_t)ch);
+            if (flags->case_insensitive)
+                match = !class_test(s->data.cclass, (uint8_t)tolower((uint8_t)ch)) &&
+                        !class_test(s->data.cclass, (uint8_t)toupper((uint8_t)ch));
+            else
+                match = !class_test(s->data.cclass, (uint8_t)ch);
             break;
         default:
             break;
@@ -1143,7 +1557,7 @@ static bool step(state_list_t *curr, state_list_t *next, char ch, size_t pos, co
 
         if (match)
         {
-            add_state(next, s->out1, saves, pos + 1, input, input_len, visited, gen);
+            add_state(next, s->out1, saves, pos + 1, input, input_len, visited, gen, flags);
         }
     }
 
@@ -1298,6 +1712,51 @@ static void regex_detect_class_run(vigil_regex_t *re)
 
 /* ── Public API ─────────────────────────────────────────────── */
 
+/* Parse top-level inline flags like (?i)pattern — consume the flag
+ * prefix and set flags on the regex before normal parsing begins. */
+static void parse_toplevel_flags(parser_t *p)
+{
+    while (p->pos + 2 < p->length && p->pattern[p->pos] == '(' && p->pattern[p->pos + 1] == '?')
+    {
+        size_t saved = p->pos;
+        p->pos += 2; /* skip "(?" */
+        bool found_flags = false;
+        while (p->pos < p->length)
+        {
+            char c = p->pattern[p->pos];
+            if (c == 'i')
+            {
+                p->re->flags.case_insensitive = true;
+                p->pos++;
+                found_flags = true;
+            }
+            else if (c == 'm')
+            {
+                p->re->flags.multiline = true;
+                p->pos++;
+                found_flags = true;
+            }
+            else if (c == 's')
+            {
+                p->re->flags.dotall = true;
+                p->pos++;
+                found_flags = true;
+            }
+            else if (c == ')' && found_flags)
+            {
+                p->pos++; /* consume ')' */
+                break;
+            }
+            else
+            {
+                /* Not a flag prefix — restore position */
+                p->pos = saved;
+                return;
+            }
+        }
+    }
+}
+
 vigil_regex_t *vigil_regex_compile(const vigil_allocator_t *allocator, const char *pattern, size_t pattern_len,
                                    char *error_buf, size_t error_buf_size)
 {
@@ -1310,6 +1769,25 @@ vigil_regex_t *vigil_regex_compile(const vigil_allocator_t *allocator, const cha
         return NULL;
     }
     re->allocator = a;
+    memset(&re->flags, 0, sizeof(re->flags));
+
+    /* Pre-allocate state capacity based on pattern length.
+     * Brace quantifiers like {n,m} can expand a single atom into
+     * many states, so we allocate generously to avoid realloc during
+     * parsing (which would invalidate fragment patch list pointers). */
+    {
+        size_t initial_cap = pattern_len * 200 + 256;
+        if (initial_cap < 256) initial_cap = 256;
+        re->states = (nfa_state_t *)a.allocate(a.user_data, initial_cap * sizeof(nfa_state_t));
+        if (!re->states)
+        {
+            vigil_regex_free(re);
+            if (error_buf)
+                snprintf(error_buf, error_buf_size, "out of memory");
+            return NULL;
+        }
+        re->state_capacity = initial_cap;
+    }
 
     parser_t p = {
         .pattern = pattern,
@@ -1320,6 +1798,9 @@ vigil_regex_t *vigil_regex_compile(const vigil_allocator_t *allocator, const cha
         .re = re,
         .group_count = 1 /* Group 0 is the whole match */
     };
+
+    /* Parse top-level inline flags like (?i) before the main pattern */
+    parse_toplevel_flags(&p);
 
     fragment_t frag;
     if (!parse_alternation(&p, &frag))
@@ -1388,6 +1869,37 @@ vigil_regex_t *vigil_regex_compile(const vigil_allocator_t *allocator, const cha
     return re;
 }
 
+vigil_regex_t *vigil_regex_compile_with_flags(const vigil_allocator_t *allocator, const char *pattern,
+                                               size_t pattern_len, const char *flags, size_t flags_len,
+                                               char *error_buf, size_t error_buf_size)
+{
+    vigil_regex_t *re = vigil_regex_compile(allocator, pattern, pattern_len, error_buf, error_buf_size);
+    if (!re)
+        return NULL;
+
+    for (size_t i = 0; i < flags_len; i++)
+    {
+        switch (flags[i])
+        {
+        case 'i':
+            re->flags.case_insensitive = true;
+            break;
+        case 'm':
+            re->flags.multiline = true;
+            break;
+        case 's':
+            re->flags.dotall = true;
+            break;
+        default:
+            if (error_buf)
+                snprintf(error_buf, error_buf_size, "unknown flag '%c'", flags[i]);
+            vigil_regex_free(re);
+            return NULL;
+        }
+    }
+    return re;
+}
+
 void vigil_regex_free(vigil_regex_t *re)
 {
     if (!re)
@@ -1433,13 +1945,13 @@ bool vigil_regex_match(const vigil_regex_t *re, const char *input, size_t input_
         init_saves[i] = SIZE_MAX;
 
     size_t gen = 1;
-    add_state(&curr, re->start, init_saves, 0, input, input_len, visited, gen);
+    add_state(&curr, re->start, init_saves, 0, input, input_len, visited, gen, &re->flags);
 
     for (size_t i = 0; i < input_len; i++)
     {
         gen++;
         memset(visited, 0, re->state_count + 1);
-        step(&curr, &next, input[i], i, input, input_len, visited, gen);
+        step(&curr, &next, input[i], i, input, input_len, visited, gen, &re->flags);
         state_list_t tmp = curr;
         curr = next;
         next = tmp;
@@ -1565,7 +2077,7 @@ static bool regex_find_reuse(const vigil_regex_t *re, const char *input, size_t 
         memset(sim->visited, 0, state_cap);
 
         size_t gen = 1;
-        add_state(&sim->curr, re->start, sim->init_saves, start, input, input_len, sim->visited, gen);
+        add_state(&sim->curr, re->start, sim->init_saves, start, input, input_len, sim->visited, gen, &re->flags);
 
         vigil_regex_result_t best;
         best.matched = false;
@@ -1579,7 +2091,7 @@ static bool regex_find_reuse(const vigil_regex_t *re, const char *input, size_t 
         {
             gen++;
             memset(sim->visited, 0, state_cap);
-            step(&sim->curr, &sim->next, input[i], i, input, input_len, sim->visited, gen);
+            step(&sim->curr, &sim->next, input[i], i, input, input_len, sim->visited, gen, &re->flags);
             state_list_t tmp = sim->curr;
             sim->curr = sim->next;
             sim->next = tmp;
@@ -1668,6 +2180,83 @@ size_t vigil_regex_find_all(const vigil_regex_t *re, const char *input, size_t i
     return count;
 }
 
+/* Expand $0-$9 and $$ in replacement string using capture groups. */
+static vigil_status_t expand_replacement(const vigil_regex_t *re, const char *input, const char *replacement,
+                                         size_t replacement_len, const vigil_regex_result_t *result, char **output,
+                                         size_t *output_len)
+{
+    /* First pass: compute output length */
+    size_t len = 0;
+    for (size_t i = 0; i < replacement_len; i++)
+    {
+        if (replacement[i] == '$' && i + 1 < replacement_len)
+        {
+            char next = replacement[i + 1];
+            if (next == '$')
+            {
+                len++;
+                i++;
+            }
+            else if (next >= '0' && next <= '9')
+            {
+                size_t g = (size_t)(next - '0');
+                if (g < result->group_count && result->groups[g].start != SIZE_MAX)
+                    len += result->groups[g].end - result->groups[g].start;
+                i++;
+            }
+            else
+            {
+                len++;
+            }
+        }
+        else
+        {
+            len++;
+        }
+    }
+
+    *output = (char *)RE_ALLOC(re, len + 1);
+    if (!*output)
+        return VIGIL_STATUS_OUT_OF_MEMORY;
+
+    /* Second pass: build output */
+    size_t pos = 0;
+    for (size_t i = 0; i < replacement_len; i++)
+    {
+        if (replacement[i] == '$' && i + 1 < replacement_len)
+        {
+            char next = replacement[i + 1];
+            if (next == '$')
+            {
+                (*output)[pos++] = '$';
+                i++;
+            }
+            else if (next >= '0' && next <= '9')
+            {
+                size_t g = (size_t)(next - '0');
+                if (g < result->group_count && result->groups[g].start != SIZE_MAX)
+                {
+                    size_t glen = result->groups[g].end - result->groups[g].start;
+                    memcpy(*output + pos, input + result->groups[g].start, glen);
+                    pos += glen;
+                }
+                i++;
+            }
+            else
+            {
+                (*output)[pos++] = replacement[i];
+            }
+        }
+        else
+        {
+            (*output)[pos++] = replacement[i];
+        }
+    }
+    (*output)[pos] = '\0';
+    *output_len = pos;
+    return VIGIL_STATUS_OK;
+}
+
 vigil_status_t vigil_regex_replace(const vigil_regex_t *re, const char *input, size_t input_len,
                                    const char *replacement, size_t replacement_len, char **output, size_t *output_len)
 {
@@ -1686,18 +2275,29 @@ vigil_status_t vigil_regex_replace(const vigil_regex_t *re, const char *input, s
 
     size_t match_start = r.groups[0].start;
     size_t match_end = r.groups[0].end;
-    size_t new_len = match_start + replacement_len + (input_len - match_end);
 
+    /* Expand replacement with capture group references */
+    char *expanded = NULL;
+    size_t expanded_len = 0;
+    vigil_status_t s = expand_replacement(re, input, replacement, replacement_len, &r, &expanded, &expanded_len);
+    if (s != VIGIL_STATUS_OK)
+        return s;
+
+    size_t new_len = match_start + expanded_len + (input_len - match_end);
     *output = (char *)RE_ALLOC(re, new_len + 1);
     if (!*output)
+    {
+        RE_FREE(re, expanded);
         return VIGIL_STATUS_OUT_OF_MEMORY;
+    }
 
     memcpy(*output, input, match_start);
-    memcpy(*output + match_start, replacement, replacement_len);
-    memcpy(*output + match_start + replacement_len, input + match_end, input_len - match_end);
+    memcpy(*output + match_start, expanded, expanded_len);
+    memcpy(*output + match_start + expanded_len, input + match_end, input_len - match_end);
     (*output)[new_len] = '\0';
     *output_len = new_len;
 
+    RE_FREE(re, expanded);
     return VIGIL_STATUS_OK;
 }
 
@@ -1705,66 +2305,106 @@ vigil_status_t vigil_regex_replace_all(const vigil_regex_t *re, const char *inpu
                                        const char *replacement, size_t replacement_len, char **output,
                                        size_t *output_len)
 {
-    /* Find all matches first */
-    vigil_regex_result_t results[256];
-    size_t match_count = vigil_regex_find_all(re, input, input_len, results, 256);
-
-    if (match_count == 0)
-    {
-        *output = (char *)RE_ALLOC(re, input_len + 1);
-        if (!*output)
-            return VIGIL_STATUS_OUT_OF_MEMORY;
-        memcpy(*output, input, input_len);
-        (*output)[input_len] = '\0';
-        *output_len = input_len;
-        return VIGIL_STATUS_OK;
-    }
-
-    /* Calculate new length */
-    size_t new_len = input_len;
-    for (size_t i = 0; i < match_count; i++)
-    {
-        size_t match_len = results[i].groups[0].end - results[i].groups[0].start;
-        new_len = new_len - match_len + replacement_len;
-    }
-
-    *output = (char *)RE_ALLOC(re, new_len + 1);
-    if (!*output)
+    /* Build output incrementally using find to get capture groups */
+    size_t buf_cap = input_len + 64;
+    char *buf = (char *)RE_ALLOC(re, buf_cap);
+    if (!buf)
         return VIGIL_STATUS_OUT_OF_MEMORY;
 
     size_t out_pos = 0;
     size_t in_pos = 0;
-    for (size_t i = 0; i < match_count; i++)
+
+    regex_sim_t sim;
+    if (!re->start || !regex_sim_init(&sim, re))
     {
-        size_t match_start = results[i].groups[0].start;
-        size_t match_end = results[i].groups[0].end;
-
-        /* Copy text before match */
-        memcpy(*output + out_pos, input + in_pos, match_start - in_pos);
-        out_pos += match_start - in_pos;
-
-        /* Copy replacement */
-        memcpy(*output + out_pos, replacement, replacement_len);
-        out_pos += replacement_len;
-
-        in_pos = match_end;
+        RE_FREE(re, buf);
+        return VIGIL_STATUS_OUT_OF_MEMORY;
     }
 
-    /* Copy remaining text */
-    memcpy(*output + out_pos, input + in_pos, input_len - in_pos);
-    out_pos += input_len - in_pos;
-    (*output)[out_pos] = '\0';
-    *output_len = out_pos;
+    while (in_pos <= input_len)
+    {
+        vigil_regex_result_t r;
+        if (!regex_find_reuse(re, input, input_len, in_pos, &sim, &r))
+            break;
 
+        size_t match_start = r.groups[0].start;
+        size_t match_end = r.groups[0].end;
+
+        /* Expand replacement */
+        char *expanded = NULL;
+        size_t expanded_len = 0;
+        vigil_status_t s = expand_replacement(re, input, replacement, replacement_len, &r, &expanded, &expanded_len);
+        if (s != VIGIL_STATUS_OK)
+        {
+            regex_sim_free(&sim, re);
+            RE_FREE(re, buf);
+            return s;
+        }
+
+        size_t needed = out_pos + (match_start - in_pos) + expanded_len + (input_len - match_end) + 1;
+        if (needed > buf_cap)
+        {
+            buf_cap = needed * 2;
+            char *new_buf = (char *)RE_REALLOC(re, buf, buf_cap);
+            if (!new_buf)
+            {
+                RE_FREE(re, expanded);
+                regex_sim_free(&sim, re);
+                RE_FREE(re, buf);
+                return VIGIL_STATUS_OUT_OF_MEMORY;
+            }
+            buf = new_buf;
+        }
+
+        /* Copy text before match */
+        memcpy(buf + out_pos, input + in_pos, match_start - in_pos);
+        out_pos += match_start - in_pos;
+
+        /* Copy expanded replacement */
+        memcpy(buf + out_pos, expanded, expanded_len);
+        out_pos += expanded_len;
+
+        RE_FREE(re, expanded);
+
+        if (match_end <= in_pos)
+            in_pos = match_end + 1;
+        else
+            in_pos = match_end;
+    }
+
+    regex_sim_free(&sim, re);
+
+    /* Copy remaining text */
+    size_t remaining = input_len - in_pos;
+    if (out_pos + remaining + 1 > buf_cap)
+    {
+        buf_cap = out_pos + remaining + 1;
+        char *new_buf = (char *)RE_REALLOC(re, buf, buf_cap);
+        if (!new_buf)
+        {
+            RE_FREE(re, buf);
+            return VIGIL_STATUS_OUT_OF_MEMORY;
+        }
+        buf = new_buf;
+    }
+    memcpy(buf + out_pos, input + in_pos, remaining);
+    out_pos += remaining;
+    buf[out_pos] = '\0';
+
+    *output = buf;
+    *output_len = out_pos;
     return VIGIL_STATUS_OK;
 }
 
 vigil_status_t vigil_regex_split(const vigil_regex_t *re, const char *input, size_t input_len, char ***parts,
                                  size_t **part_lens, size_t *part_count)
 {
-    /* Find all matches */
-    vigil_regex_result_t results[256];
-    size_t match_count = vigil_regex_find_all(re, input, input_len, results, 256);
+    /* Find all matches using dynamic allocation */
+    size_t results_cap = 256;
+    vigil_regex_result_t *results = (vigil_regex_result_t *)RE_ALLOC(re, results_cap * sizeof(vigil_regex_result_t));
+    if (!results)
+        return VIGIL_STATUS_OUT_OF_MEMORY;
+    size_t match_count = vigil_regex_find_all(re, input, input_len, results, results_cap);
 
     *part_count = match_count + 1;
     *parts = (char **)RE_ALLOC(re, *part_count * sizeof(char *));
@@ -1773,6 +2413,7 @@ vigil_status_t vigil_regex_split(const vigil_regex_t *re, const char *input, siz
     {
         RE_FREE(re, *parts);
         RE_FREE(re, *part_lens);
+        RE_FREE(re, results);
         return VIGIL_STATUS_OUT_OF_MEMORY;
     }
 
@@ -1789,6 +2430,7 @@ vigil_status_t vigil_regex_split(const vigil_regex_t *re, const char *input, siz
                 RE_FREE(re, (*parts)[j]);
             RE_FREE(re, *parts);
             RE_FREE(re, *part_lens);
+            RE_FREE(re, results);
             return VIGIL_STATUS_OUT_OF_MEMORY;
         }
         memcpy((*parts)[i], input + pos, len);
@@ -1807,11 +2449,13 @@ vigil_status_t vigil_regex_split(const vigil_regex_t *re, const char *input, siz
             RE_FREE(re, (*parts)[j]);
         RE_FREE(re, *parts);
         RE_FREE(re, *part_lens);
+        RE_FREE(re, results);
         return VIGIL_STATUS_OUT_OF_MEMORY;
     }
     memcpy((*parts)[match_count], input + pos, len);
     (*parts)[match_count][len] = '\0';
     (*part_lens)[match_count] = len;
 
+    RE_FREE(re, results);
     return VIGIL_STATUS_OK;
 }

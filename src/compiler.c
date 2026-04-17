@@ -6860,8 +6860,22 @@ static vigil_status_t vigil_parser_set_native_fn_return_type(vigil_parser_state_
         }
         else if (fn->return_count == 2U)
         {
-            vigil_expression_result_set_pair(out_result,
-                                             vigil_binding_type_primitive((vigil_type_kind_t)fn->return_types[0]),
+            vigil_parser_type_t first_type;
+            if (fn->return_types[0] == VIGIL_TYPE_OBJECT && fn->return_element_type != 0)
+            {
+                vigil_parser_type_t elem_type =
+                    vigil_binding_type_primitive((vigil_type_kind_t)fn->return_element_type);
+                size_t arr_idx;
+                if (vigil_program_find_array_type(state->program, elem_type, &arr_idx))
+                    first_type = vigil_binding_type_array(arr_idx);
+                else
+                    first_type = vigil_binding_type_primitive(VIGIL_TYPE_OBJECT);
+            }
+            else
+            {
+                first_type = vigil_binding_type_primitive((vigil_type_kind_t)fn->return_types[0]);
+            }
+            vigil_expression_result_set_pair(out_result, first_type,
                                              vigil_binding_type_primitive((vigil_type_kind_t)fn->return_types[1]));
         }
         else
