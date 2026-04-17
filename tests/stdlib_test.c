@@ -2664,7 +2664,7 @@ TEST(VigilStdlibJsonTest, EncodeAndDecodeTypedObject)
     EXPECT_EQ(result, 0);
 }
 
-TEST(VigilStdlibJsonTest, DecodeRejectsExtraFields)
+TEST(VigilStdlibJsonTest, DecodeIgnoresExtraFields)
 {
     int64_t result = RunWithStdlib(vigil_test_failed_,
                                    "import \"json\";\n"
@@ -2674,7 +2674,8 @@ TEST(VigilStdlibJsonTest, DecodeRejectsExtraFields)
                                    "fn main() -> i32 {\n"
                                    "    Person person, err decode_err = "
                                    "json.decode(\"{\\\"name\\\":\\\"vigil\\\",\\\"extra\\\":1}\", Person(\"\"));\n"
-                                   "    if decode_err == ok { return 1; }\n"
+                                   "    if decode_err != ok { return 1; }\n"
+                                   "    if person.name != \"vigil\" { return 2; }\n"
                                    "    return 0;\n"
                                    "}\n");
     EXPECT_EQ(result, 0);
@@ -2687,7 +2688,7 @@ void register_stdlib_json_tests(void)
     REGISTER_TEST(VigilStdlibJsonTest, ParseAndFileRoundTrip);
     REGISTER_TEST(VigilStdlibJsonTest, InvalidJsonReturnsError);
     REGISTER_TEST(VigilStdlibJsonTest, EncodeAndDecodeTypedObject);
-    REGISTER_TEST(VigilStdlibJsonTest, DecodeRejectsExtraFields);
+    REGISTER_TEST(VigilStdlibJsonTest, DecodeIgnoresExtraFields);
 }
 
 /* ── CSV stdlib tests ────────────────────────────────────────────── */

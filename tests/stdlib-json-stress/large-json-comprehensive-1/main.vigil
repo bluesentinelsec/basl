@@ -1,0 +1,76 @@
+import "fmt"
+import "json"
+import "fs"
+
+fn test_config_workflow() -> void {
+    // Build config JSON programmatically
+    json.Value config = json.Value.object()
+    config.set("host", json.Value.from_string("localhost"))
+    config.set("port", json.Value.from_int(8080))
+    config.set("debug", json.Value.from_bool(true))
+
+    json.Value db = json.Value.object()
+    db.set("driver", json.Value.from_string("postgres"))
+    db.set("name", json.Value.from_string("myapp"))
+    config.set("database", db)
+
+    // Write to file
+    string f = fs.join(fs.temp_dir(), "vigil_json_comp1.json")
+    err we = config.write(f)
+    fmt.println(f"write ok: {we == ok}")
+
+    // Read back and verify
+    json.Value loaded, err re = json.Value.read(f)
+    json.Value host, err he = loaded.get("host")
+    string hv, err hve = host.as_string()
+    fmt.println(f"host: {hv}")
+
+    json.Value port, err pe = loaded.get("port")
+    f64 pv, err pve = port.as_number()
+    fmt.println(f"port: {pv}")
+
+    fs.remove(f)
+}
+
+fn test_api_response() -> void {
+    // Simulate parsing an API response
+    string response = "{\"status\":\"ok\",\"data\":{\"users\":[{\"name\":\"Alice\",\"age\":30},{\"name\":\"Bob\",\"age\":25}]},\"count\":2}"
+    json.Value root, err pe = json.Value.parse(response)
+    json.Value status, err se = root.get("status")
+    string sv, err sve = status.as_string()
+    fmt.println(f"status: {sv}")
+
+    json.Value data, err de = root.get("data")
+    json.Value users, err ue = data.get("users")
+    i32 ulen, err ule = users.len()
+    fmt.println(f"users: {ulen}")
+
+    json.Value first, err fe = users.at(0)
+    json.Value fname, err fne = first.get("name")
+    string fnv, err fnve = fname.as_string()
+    fmt.println(f"first user: {fnv}")
+}
+
+fn test_build_and_stringify() -> void {
+    json.Value arr = json.Value.array()
+    for (i32 i = 0; i < 5; i++) {
+        json.Value item = json.Value.object()
+        item.set("id", json.Value.from_int(i))
+        item.set("label", json.Value.from_string(f"item_{i}"))
+        arr.push(item)
+    }
+    i32 len, err le = arr.len()
+    fmt.println(f"built arr len: {len}")
+    string s = arr.stringify()
+    fmt.println(f"has item_0: {s.contains("item_0")}")
+    fmt.println(f"has item_4: {s.contains("item_4")}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST LARGE_JSON_COMPREHENSIVE_1 START =====")
+    test_config_workflow()
+    test_api_response()
+    test_build_and_stringify()
+    fmt.println("===== TEST LARGE_JSON_COMPREHENSIVE_1 END =====")
+    return 0
+}

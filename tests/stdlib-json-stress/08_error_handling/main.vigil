@@ -1,0 +1,51 @@
+import "fmt"
+import "json"
+
+fn test_parse_errors() -> void {
+    json.Value bad, err e1 = json.Value.parse("{")
+    fmt.println(f"bad json: {e1 != ok}")
+    json.Value bad2, err e2 = json.Value.parse("")
+    fmt.println(f"empty: {e2 != ok}")
+    json.Value bad3, err e3 = json.Value.parse("not json")
+    fmt.println(f"not json: {e3 != ok}")
+}
+
+fn test_type_errors() -> void {
+    json.Value num, err pe = json.Value.parse("42")
+    // as_string on number
+    string sv, err se = num.as_string()
+    fmt.println(f"num as_string err: {se != ok}")
+    // as_bool on number
+    bool bv, err be = num.as_bool()
+    fmt.println(f"num as_bool err: {be != ok}")
+    // get on non-object
+    json.Value gv, err ge = num.get("key")
+    fmt.println(f"num get err: {ge != ok}")
+    // at on non-array
+    json.Value av, err ae = num.at(0)
+    fmt.println(f"num at err: {ae != ok}")
+}
+
+fn test_bounds_errors() -> void {
+    json.Value arr, err pe = json.Value.parse("[1,2,3]")
+    json.Value oob, err oe = arr.at(10)
+    fmt.println(f"oob: {oe != ok}")
+    json.Value neg, err ne = arr.at(-1)
+    fmt.println(f"neg: {ne != ok}")
+}
+
+fn test_missing_key() -> void {
+    json.Value obj, err pe = json.Value.parse("{\"a\":1}")
+    json.Value mv, err me = obj.get("z")
+    fmt.println(f"missing key: {me != ok}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 08_ERROR_HANDLING START =====")
+    test_parse_errors()
+    test_type_errors()
+    test_bounds_errors()
+    test_missing_key()
+    fmt.println("===== TEST 08_ERROR_HANDLING END =====")
+    return 0
+}

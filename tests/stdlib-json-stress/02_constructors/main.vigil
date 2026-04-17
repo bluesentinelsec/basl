@@ -1,0 +1,57 @@
+import "fmt"
+import "json"
+
+fn test_object_array() -> void {
+    json.Value obj = json.Value.object()
+    fmt.println(f"obj kind: {obj.kind()}")
+    fmt.println(f"obj is_object: {obj.is_object()}")
+    i32 olen, err ole = obj.len()
+    fmt.println(f"obj len: {olen}")
+
+    json.Value arr = json.Value.array()
+    fmt.println(f"arr kind: {arr.kind()}")
+    fmt.println(f"arr is_array: {arr.is_array()}")
+    i32 alen, err ale = arr.len()
+    fmt.println(f"arr len: {alen}")
+
+    json.Value nv = json.Value.null()
+    fmt.println(f"null kind: {nv.kind()}")
+    fmt.println(f"null is_null: {nv.is_null()}")
+}
+
+fn test_scalars() -> void {
+    json.Value s = json.Value.from_string("hello")
+    fmt.println(f"str kind: {s.kind()}")
+    string sv, err se = s.as_string()
+    fmt.println(f"str val: {sv}")
+
+    json.Value n = json.Value.from_number(3.14)
+    fmt.println(f"num kind: {n.kind()}")
+    f64 nv, err ne = n.as_number()
+    fmt.println(f"num val: {nv}")
+
+    json.Value i = json.Value.from_int(42)
+    fmt.println(f"int kind: {i.kind()}")
+    f64 iv, err ie = i.as_number()
+    fmt.println(f"int val: {iv}")
+}
+
+fn test_bool() -> void {
+    json.Value bt = json.Value.from_bool(true)
+    fmt.println(f"bool kind: {bt.kind()}")
+    bool bv, err be = bt.as_bool()
+    fmt.println(f"bool val: {bv}")
+
+    json.Value bf = json.Value.from_bool(false)
+    bool bfv, err bfe = bf.as_bool()
+    fmt.println(f"bool false: {bfv}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 02_CONSTRUCTORS START =====")
+    test_object_array()
+    test_scalars()
+    test_bool()
+    fmt.println("===== TEST 02_CONSTRUCTORS END =====")
+    return 0
+}

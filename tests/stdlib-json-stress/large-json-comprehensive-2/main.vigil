@@ -1,0 +1,81 @@
+import "fmt"
+import "json"
+
+fn test_stress_build() -> void {
+    // Build large object
+    json.Value obj = json.Value.object()
+    for (i32 i = 0; i < 100; i++) {
+        obj.set(f"k{i}", json.Value.from_int(i))
+    }
+    i32 len, err le = obj.len()
+    fmt.println(f"large obj: {len}")
+    fmt.println(f"has k0: {obj.has("k0")}")
+    fmt.println(f"has k99: {obj.has("k99")}")
+}
+
+fn test_stress_array() -> void {
+    json.Value arr = json.Value.array()
+    for (i32 i = 0; i < 100; i++) {
+        arr.push(json.Value.from_int(i))
+    }
+    i32 len, err le = arr.len()
+    fmt.println(f"large arr: {len}")
+    json.Value first, err fe = arr.at(0)
+    f64 fv, err fve = first.as_number()
+    fmt.println(f"arr[0]: {fv}")
+    json.Value last, err lae = arr.at(99)
+    f64 lv, err lve = last.as_number()
+    fmt.println(f"arr[99]: {lv}")
+}
+
+fn test_deep_nesting() -> void {
+    json.Value inner = json.Value.from_string("deep")
+    for (i32 i = 0; i < 5; i++) {
+        json.Value wrapper = json.Value.object()
+        wrapper.set("child", inner)
+        inner = wrapper
+    }
+    string s = inner.stringify()
+    fmt.println(f"deep has child: {s.contains("child")}")
+    fmt.println(f"deep has deep: {s.contains("deep")}")
+}
+
+fn test_roundtrip() -> void {
+    // Parse -> modify -> stringify -> parse again
+    json.Value orig, err pe = json.Value.parse("{\"a\":1,\"b\":2}")
+    orig.set("c", json.Value.from_int(3))
+    orig.remove("a")
+    string s = orig.stringify()
+    json.Value reparsed, err rpe = json.Value.parse(s)
+    fmt.println(f"roundtrip has b: {reparsed.has("b")}")
+    fmt.println(f"roundtrip has c: {reparsed.has("c")}")
+    fmt.println(f"roundtrip no a: {!reparsed.has("a")}")
+}
+
+fn test_mixed_types() -> void {
+    json.Value obj = json.Value.object()
+    obj.set("str", json.Value.from_string("hello"))
+    obj.set("num", json.Value.from_number(3.14))
+    obj.set("int", json.Value.from_int(42))
+    obj.set("bool", json.Value.from_bool(true))
+    obj.set("null", json.Value.null())
+    obj.set("arr", json.Value.array())
+    obj.set("obj", json.Value.object())
+    i32 len, err le = obj.len()
+    fmt.println(f"mixed len: {len}")
+    string s = obj.stringify()
+    fmt.println(f"mixed has hello: {s.contains("hello")}")
+    fmt.println(f"mixed has 3.14: {s.contains("3.14")}")
+    fmt.println(f"mixed has null: {s.contains("null")}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST LARGE_JSON_COMPREHENSIVE_2 START =====")
+    test_stress_build()
+    test_stress_array()
+    test_deep_nesting()
+    test_roundtrip()
+    test_mixed_types()
+    fmt.println("===== TEST LARGE_JSON_COMPREHENSIVE_2 END =====")
+    return 0
+}

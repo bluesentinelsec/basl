@@ -1,0 +1,48 @@
+import "fmt"
+import "json"
+
+fn test_basic_merge() -> void {
+    json.Value a = json.Value.object()
+    a.set("x", json.Value.from_int(1))
+    a.set("y", json.Value.from_int(2))
+    json.Value b = json.Value.object()
+    b.set("y", json.Value.from_int(99))
+    b.set("z", json.Value.from_int(3))
+    err me = a.merge(b)
+    fmt.println(f"merge ok: {me == ok}")
+    array<string> keys = a.keys()
+    keys.sort()
+    fmt.println(f"keys: {", ".join(keys)}")
+    // y should be overwritten by source
+    json.Value yv, err ye = a.get("y")
+    f64 y, err yne = yv.as_number()
+    fmt.println(f"y after merge: {y}")
+}
+
+fn test_merge_empty() -> void {
+    json.Value a = json.Value.object()
+    a.set("x", json.Value.from_int(1))
+    json.Value empty = json.Value.object()
+    err me = a.merge(empty)
+    fmt.println(f"merge empty ok: {me == ok}")
+    i32 len, err le = a.len()
+    fmt.println(f"len after empty merge: {len}")
+}
+
+fn test_merge_into_empty() -> void {
+    json.Value empty = json.Value.object()
+    json.Value src = json.Value.object()
+    src.set("a", json.Value.from_int(1))
+    err me = empty.merge(src)
+    fmt.println(f"merge into empty ok: {me == ok}")
+    fmt.println(f"has a: {empty.has("a")}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 09_MERGE START =====")
+    test_basic_merge()
+    test_merge_empty()
+    test_merge_into_empty()
+    fmt.println("===== TEST 09_MERGE END =====")
+    return 0
+}
