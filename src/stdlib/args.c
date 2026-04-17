@@ -22,6 +22,7 @@
  *   p.positional_optional(string name, string desc) -> Parser
  *   p.version(string ver) -> Parser
  *   p.subcommand(string name, string desc) -> Parser
+ *   p.add_subcommand(Parser child) -> Parser
  *   p.env(string env_var) -> Parser
  *   p.config(string key) -> Parser
  *   p.parse() -> err
@@ -85,6 +86,7 @@ enum
     F_ENV_VARS,       /* array<string>  "name=ENV_VAR" pairs */
     F_CONFIG_KEYS,    /* array<string>  "name=config_key" pairs */
     F_CONFIG_DATA,    /* array<string>  "key=value" pairs from loaded config file */
+    F_SUB_PARSERS,    /* array<object>  child Parser instances for subcommands */
     FIELD_COUNT
 };
 
@@ -273,6 +275,9 @@ static vigil_status_t parser_new(vigil_vm_t *vm, size_t arg_count, vigil_error_t
     if (s != VIGIL_STATUS_OK)
         goto cleanup;
     s = make_empty_array(rt, &fields[F_CONFIG_DATA], error);
+    if (s != VIGIL_STATUS_OK)
+        goto cleanup;
+    s = make_empty_array(rt, &fields[F_SUB_PARSERS], error);
     if (s != VIGIL_STATUS_OK)
         goto cleanup;
 
@@ -538,6 +543,45 @@ static vigil_status_t parser_subcommand(vigil_vm_t *vm, size_t arg_count, vigil_
     vigil_status_t s = array_push_str(get_field_obj(self, F_SUBCOMMANDS), vigil_vm_runtime(vm), buf, error);
     if (s != VIGIL_STATUS_OK)
         return s;
+    /* Push a NULL placeholder into sub_parsers to keep indices aligned */
+    {
+        vigil_value_t null_val;
+        vigil_value_init_nil(&null_val);
+        s = vigil_array_object_append(get_field_obj(self, F_SUB_PARSERS), &null_val, error);
+        vigil_value_release(&null_val);
+        if (s != VIGIL_STATUS_OK)
+            return s;
+    }
+    return return_self(vm, self, arg_count, error);
+}
+
+static vigil_status_t parser_add_subcommand(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    /* stack: [self, child_parser] */
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    vigil_object_t *self = get_self(vm, base);
+    vigil_object_t *child = get_self(vm, base + 1);
+    vigil_runtime_t *rt = vigil_vm_runtime(vm);
+    vigil_status_t s;
+
+    /* Read prog and desc from child parser */
+    const char *child_prog = get_field_str(child, F_PROG);
+    const char *child_desc = get_field_str(child, F_DESC);
+    char buf[512];
+    snprintf(buf, sizeof(buf), "%s:%s", child_prog, child_desc);
+    s = array_push_str(get_field_obj(self, F_SUBCOMMANDS), rt, buf, error);
+    if (s != VIGIL_STATUS_OK)
+        return s;
+
+    /* Store child parser instance in sub_parsers array */
+    {
+        vigil_object_retain(child);
+        vigil_value_t cv = vigil_nanbox_encode_object(child);
+        s = vigil_array_object_append(get_field_obj(self, F_SUB_PARSERS), &cv, error);
+        vigil_object_release(&child);
+        if (s != VIGIL_STATUS_OK)
+            return s;
+    }
     return return_self(vm, self, arg_count, error);
 }
 
@@ -725,17 +769,39 @@ static const char *lookup_env_var(vigil_object_t *env_arr, const char *name)
     return NULL;
 }
 
-static vigil_status_t parser_parse(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+/*
+ * parse_core: internal parse engine that works on arbitrary argv.
+ * Returns 0 = ok, 1 = parse error (msg in err_buf), 2 = help requested,
+ * 3 = version requested.  On success stores results in self's fields.
+ * Does NOT touch the VM stack.
+ */
+#define PARSE_OK      0
+#define PARSE_ERR     1
+#define PARSE_HELP    2
+#define PARSE_VERSION 3
+
+static int parse_core(vigil_object_t *self, vigil_vm_t *vm, const char *const *argv, size_t argc,
+                      char *err_buf, size_t err_size, vigil_error_t *error);
+
+/* Find short flag index by single character. Returns -1 if not found. */
+static int find_short_flag_idx(vigil_object_t *shorts_arr, char ch)
 {
-    /* stack: [self] — no argc parameter, always parse all args from index 0 */
-    size_t base = vigil_vm_stack_depth(vm) - arg_count;
-    vigil_object_t *self = get_self(vm, base);
+    char needle[2] = {ch, '\0'};
+    size_t len = vigil_array_object_length(shorts_arr);
+    for (size_t i = 0; i < len; i++)
+    {
+        const char *s = array_get_str(shorts_arr, i);
+        if (s[0] != '\0' && strcmp(s, needle) == 0)
+            return (int)i;
+    }
+    return -1;
+}
+
+static int parse_core(vigil_object_t *self, vigil_vm_t *vm, const char *const *argv, size_t argc,
+                      char *err_buf, size_t err_size, vigil_error_t *error)
+{
     vigil_runtime_t *rt = vigil_vm_runtime(vm);
     vigil_status_t s;
-
-    const char *const *argv = NULL;
-    size_t argc = 0;
-    vigil_vm_get_args(vm, &argv, &argc);
 
     vigil_object_t *names_arr = get_field_obj(self, F_NAMES);
     vigil_object_t *shorts_arr = get_field_obj(self, F_SHORTS);
@@ -743,66 +809,31 @@ static vigil_status_t parser_parse(vigil_vm_t *vm, size_t arg_count, vigil_error
     vigil_object_t *defaults_arr = get_field_obj(self, F_DEFAULTS);
     vigil_object_t *req_arr = get_field_obj(self, F_REQUIRED);
     vigil_object_t *subcmds_arr = get_field_obj(self, F_SUBCOMMANDS);
+    vigil_object_t *sub_parsers_arr = get_field_obj(self, F_SUB_PARSERS);
     vigil_object_t *env_arr = get_field_obj(self, F_ENV_VARS);
     size_t opt_count = vigil_array_object_length(names_arr);
     size_t subcmd_count = vigil_array_object_length(subcmds_arr);
 
-    /* Clear and rebuild values + positionals arrays */
     vigil_object_t *vals_arr = NULL;
     vigil_object_t *pos_arr = NULL;
     s = vigil_array_object_new(rt, NULL, 0, &vals_arr, error);
     if (s != VIGIL_STATUS_OK)
-        return s;
+        return PARSE_ERR;
     s = vigil_array_object_new(rt, NULL, 0, &pos_arr, error);
     if (s != VIGIL_STATUS_OK)
     {
         vigil_object_release(&vals_arr);
-        return s;
+        return PARSE_ERR;
     }
-
-    char err_buf[256];
 
     /* Built-in --help/-h check */
     for (size_t hi = 0; hi < argc; hi++)
     {
         if (strcmp(argv[hi], "--help") == 0 || strcmp(argv[hi], "-h") == 0)
         {
-            /* Print help to stdout using the help generation logic */
             vigil_object_release(&vals_arr);
             vigil_object_release(&pos_arr);
-
-            /* Call parser_help to get the text, then print it */
-            /* We do it inline to avoid stack manipulation issues */
-            vigil_vm_stack_pop_n(vm, arg_count);
-            {
-                /* Push self for help call */
-                vigil_object_retain(self);
-                vigil_value_t sv = vigil_nanbox_encode_object(self);
-                s = vigil_vm_stack_push(vm, &sv, error);
-                vigil_object_release(&self);
-                if (s != VIGIL_STATUS_OK)
-                    return s;
-                s = parser_help(vm, 1, error);
-                if (s != VIGIL_STATUS_OK)
-                    return s;
-                /* Pop the help string, print it */
-                vigil_value_t hv = vigil_vm_stack_get(vm, vigil_vm_stack_depth(vm) - 1);
-                vigil_object_t *hobj = (vigil_object_t *)vigil_nanbox_decode_ptr(hv);
-                if (hobj)
-                    printf("%s\n", vigil_string_object_c_str(hobj));
-                vigil_vm_stack_pop_n(vm, 1);
-            }
-            {
-                vigil_object_t *err_obj = NULL;
-                s = vigil_error_object_new_cstr(rt, "help requested", 1, &err_obj, error);
-                if (s != VIGIL_STATUS_OK)
-                    return s;
-                vigil_value_t ev;
-                vigil_value_init_object(&ev, &err_obj);
-                s = vigil_vm_stack_push(vm, &ev, error);
-                vigil_value_release(&ev);
-            }
-            return s;
+            return PARSE_HELP;
         }
     }
 
@@ -817,19 +848,7 @@ static vigil_status_t parser_parse(vigil_vm_t *vm, size_t arg_count, vigil_error
                 {
                     vigil_object_release(&vals_arr);
                     vigil_object_release(&pos_arr);
-                    printf("%s\n", ver);
-                    vigil_vm_stack_pop_n(vm, arg_count);
-                    {
-                        vigil_object_t *err_obj = NULL;
-                        s = vigil_error_object_new_cstr(rt, "version requested", 1, &err_obj, error);
-                        if (s != VIGIL_STATUS_OK)
-                            return s;
-                        vigil_value_t ev;
-                        vigil_value_init_object(&ev, &err_obj);
-                        s = vigil_vm_stack_push(vm, &ev, error);
-                        vigil_value_release(&ev);
-                    }
-                    return s;
+                    return PARSE_VERSION;
                 }
             }
         }
@@ -863,7 +882,7 @@ static vigil_status_t parser_parse(vigil_vm_t *vm, size_t arg_count, vigil_error
             memset(cli_set, 0, opt_count * sizeof(int));
         if (!cli_set)
         {
-            snprintf(err_buf, sizeof(err_buf), "out of memory");
+            snprintf(err_buf, err_size, "out of memory");
             goto err_out;
         }
     }
@@ -889,7 +908,7 @@ static vigil_status_t parser_parse(vigil_vm_t *vm, size_t arg_count, vigil_error
             /* Check for subcommand: first non-flag arg when subcommands are declared */
             if (!subcmd_found && subcmd_count > 0)
             {
-                int matched = 0;
+                int matched = -1;
                 for (size_t si = 0; si < subcmd_count; si++)
                 {
                     const char *entry = array_get_str(subcmds_arr, si);
@@ -897,14 +916,14 @@ static vigil_status_t parser_parse(vigil_vm_t *vm, size_t arg_count, vigil_error
                     size_t nlen = colon ? (size_t)(colon - entry) : strlen(entry);
                     if (strlen(arg) == nlen && strncmp(arg, entry, nlen) == 0)
                     {
-                        matched = 1;
+                        matched = (int)si;
                         break;
                     }
                 }
-                if (!matched)
+                if (matched < 0)
                 {
                     args_dealloc(vm, cli_set);
-                    snprintf(err_buf, sizeof(err_buf), "unknown subcommand: %s", arg);
+                    snprintf(err_buf, err_size, "unknown subcommand: %s", arg);
                     goto err_out;
                 }
                 /* Store subcommand name */
@@ -923,14 +942,50 @@ static vigil_status_t parser_parse(vigil_vm_t *vm, size_t arg_count, vigil_error
                     goto fail;
                 }
                 subcmd_found = 1;
-                /* Store subcommand and all remaining args as positionals */
-                for (size_t ri = pos; ri < argc; ri++)
+
+                /* Check for child parser at this index */
+                vigil_value_t cp_val;
+                vigil_object_t *child = NULL;
+                if (vigil_array_object_get(sub_parsers_arr, (size_t)matched, &cp_val))
                 {
-                    s = array_push_str(pos_arr, rt, argv[ri], error);
-                    if (s != VIGIL_STATUS_OK)
+                    if (!vigil_nanbox_is_nil(cp_val))
+                        child = (vigil_object_t *)vigil_nanbox_decode_ptr(cp_val);
+                    vigil_value_release(&cp_val);
+                }
+
+                if (child != NULL)
+                {
+                    /* Delegate remaining args to child parser */
+                    const char *const *child_argv = argv + pos + 1;
+                    size_t child_argc = argc - pos - 1;
+                    char child_err[256];
+                    int cr = parse_core(child, vm, child_argv, child_argc,
+                                        child_err, sizeof(child_err), error);
+                    if (cr == PARSE_ERR)
                     {
                         args_dealloc(vm, cli_set);
-                        goto fail;
+                        snprintf(err_buf, err_size, "%s", child_err);
+                        goto err_out;
+                    }
+                    if (cr == PARSE_HELP || cr == PARSE_VERSION)
+                    {
+                        args_dealloc(vm, cli_set);
+                        vigil_object_release(&vals_arr);
+                        vigil_object_release(&pos_arr);
+                        return cr;
+                    }
+                }
+                else
+                {
+                    /* No child parser — store remaining args as positionals */
+                    for (size_t ri = pos; ri < argc; ri++)
+                    {
+                        s = array_push_str(pos_arr, rt, argv[ri], error);
+                        if (s != VIGIL_STATUS_OK)
+                        {
+                            args_dealloc(vm, cli_set);
+                            goto fail;
+                        }
                     }
                 }
                 pos = argc; /* done */
@@ -953,10 +1008,70 @@ static vigil_status_t parser_parse(vigil_vm_t *vm, size_t arg_count, vigil_error
         const char *key = parser_extract_key(arg, key_buf, sizeof(key_buf), &inline_val);
 
         int idx = find_opt_idx(names_arr, shorts_arr, key);
+        if (idx < 0 && arg[0] == '-' && arg[1] != '-' && strlen(key) > 1)
+        {
+            /* Try short flag grouping: -abc -> -a -b -c */
+            size_t klen = strlen(key);
+            int group_ok = 1;
+            for (size_t gi = 0; gi < klen; gi++)
+            {
+                int fi = find_short_flag_idx(shorts_arr, key[gi]);
+                if (fi < 0)
+                {
+                    group_ok = 0;
+                    break;
+                }
+                const char *ftyp = array_get_str(types_arr, (size_t)fi);
+                /* Non-bool only allowed as last char in group */
+                if (strcmp(ftyp, "bool") != 0 && gi < klen - 1)
+                {
+                    group_ok = 0;
+                    break;
+                }
+            }
+            if (group_ok)
+            {
+                for (size_t gi = 0; gi < klen; gi++)
+                {
+                    int fi = find_short_flag_idx(shorts_arr, key[gi]);
+                    const char *fname = array_get_str(names_arr, (size_t)fi);
+                    const char *ftyp = array_get_str(types_arr, (size_t)fi);
+                    cli_set[fi] = 1;
+                    if (strcmp(ftyp, "bool") == 0)
+                    {
+                        s = parser_update_vals_entry(vals_arr, rt, fname, "true", error);
+                        if (s != VIGIL_STATUS_OK)
+                        {
+                            args_dealloc(vm, cli_set);
+                            goto fail;
+                        }
+                    }
+                    else
+                    {
+                        /* Last char is a value-taking option */
+                        pos++;
+                        if (pos >= argc)
+                        {
+                            args_dealloc(vm, cli_set);
+                            snprintf(err_buf, err_size, "option --%s requires a value", fname);
+                            goto err_out;
+                        }
+                        s = parser_update_vals_entry(vals_arr, rt, fname, argv[pos], error);
+                        if (s != VIGIL_STATUS_OK)
+                        {
+                            args_dealloc(vm, cli_set);
+                            goto fail;
+                        }
+                    }
+                }
+                pos++;
+                continue;
+            }
+        }
         if (idx < 0)
         {
             args_dealloc(vm, cli_set);
-            snprintf(err_buf, sizeof(err_buf), "unknown option: %s", arg);
+            snprintf(err_buf, err_size, "unknown option: %s", arg);
             goto err_out;
         }
 
@@ -983,7 +1098,7 @@ static vigil_status_t parser_parse(vigil_vm_t *vm, size_t arg_count, vigil_error
                 if (pos >= argc)
                 {
                     args_dealloc(vm, cli_set);
-                    snprintf(err_buf, sizeof(err_buf), "option --%s requires a value", name);
+                    snprintf(err_buf, err_size, "option --%s requires a value", name);
                     goto err_out;
                 }
                 val = argv[pos];
@@ -997,7 +1112,7 @@ static vigil_status_t parser_parse(vigil_vm_t *vm, size_t arg_count, vigil_error
                 if (errno != 0 || end == val || *end != '\0')
                 {
                     args_dealloc(vm, cli_set);
-                    snprintf(err_buf, sizeof(err_buf), "option --%s requires an integer, got: %s", name, val);
+                    snprintf(err_buf, err_size, "option --%s requires an integer, got: %s", name, val);
                     goto err_out;
                 }
             }
@@ -1010,7 +1125,7 @@ static vigil_status_t parser_parse(vigil_vm_t *vm, size_t arg_count, vigil_error
                 if (errno != 0 || end == val || *end != '\0')
                 {
                     args_dealloc(vm, cli_set);
-                    snprintf(err_buf, sizeof(err_buf), "option --%s requires a number, got: %s", name, val);
+                    snprintf(err_buf, err_size, "option --%s requires a number, got: %s", name, val);
                     goto err_out;
                 }
             }
@@ -1021,7 +1136,7 @@ static vigil_status_t parser_parse(vigil_vm_t *vm, size_t arg_count, vigil_error
                 if (!validate_choice(choices, val))
                 {
                     args_dealloc(vm, cli_set);
-                    snprintf(err_buf, sizeof(err_buf), "option --%s must be one of: %s, got: %s", name, choices, val);
+                    snprintf(err_buf, err_size, "option --%s must be one of: %s, got: %s", name, choices, val);
                     goto err_out;
                 }
             }
@@ -1109,7 +1224,7 @@ static vigil_status_t parser_parse(vigil_vm_t *vm, size_t arg_count, vigil_error
     cli_set = NULL;
 
     /* Check required options */
-    if (!parser_check_required(vals_arr, names_arr, types_arr, req_arr, opt_count, err_buf, sizeof(err_buf)))
+    if (!parser_check_required(vals_arr, names_arr, types_arr, req_arr, opt_count, err_buf, err_size))
         goto err_out;
 
     /* Check required positionals and nargs */
@@ -1131,7 +1246,7 @@ static vigil_status_t parser_parse(vigil_vm_t *vm, size_t arg_count, vigil_error
             {
                 if (strcmp(preq, "true") == 0 && pos_consumed >= pos_actual_count)
                 {
-                    snprintf(err_buf, sizeof(err_buf), "required positional argument <%s> not provided", pname);
+                    snprintf(err_buf, err_size, "required positional argument <%s> not provided", pname);
                     goto err_out;
                 }
                 if (pos_consumed < pos_actual_count)
@@ -1143,7 +1258,7 @@ static vigil_status_t parser_parse(vigil_vm_t *vm, size_t arg_count, vigil_error
                 size_t remaining = (pos_consumed < pos_actual_count) ? pos_actual_count - pos_consumed : 0;
                 if (remaining < 1)
                 {
-                    snprintf(err_buf, sizeof(err_buf), "positional argument <%s> requires one or more values", pname);
+                    snprintf(err_buf, err_size, "positional argument <%s> requires one or more values", pname);
                     goto err_out;
                 }
                 pos_consumed = pos_actual_count; /* consumes all remaining */
@@ -1175,24 +1290,83 @@ static vigil_status_t parser_parse(vigil_vm_t *vm, size_t arg_count, vigil_error
             goto fail;
     }
 
-    /* Return ok */
-    vigil_vm_stack_pop_n(vm, arg_count);
-    {
-        vigil_object_t *ok_obj = NULL;
-        s = vigil_error_object_new_cstr(rt, "", 0, &ok_obj, error);
-        if (s != VIGIL_STATUS_OK)
-            return s;
-        vigil_value_t ev;
-        vigil_value_init_object(&ev, &ok_obj);
-        s = vigil_vm_stack_push(vm, &ev, error);
-        vigil_value_release(&ev);
-    }
-    return s;
+    return PARSE_OK;
 
 err_out:
     vigil_object_release(&vals_arr);
     vigil_object_release(&pos_arr);
+    return PARSE_ERR;
+
+fail:
+    vigil_object_release(&vals_arr);
+    vigil_object_release(&pos_arr);
+    return PARSE_ERR;
+}
+
+/* ── parser_parse: VM-facing wrapper around parse_core ───────────── */
+
+static vigil_status_t parser_parse(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    vigil_object_t *self = get_self(vm, base);
+    vigil_runtime_t *rt = vigil_vm_runtime(vm);
+    vigil_status_t s;
+
+    const char *const *argv = NULL;
+    size_t argc = 0;
+    vigil_vm_get_args(vm, &argv, &argc);
+
+    char err_buf[256];
+    err_buf[0] = '\0';
+    int rc = parse_core(self, vm, argv, argc, err_buf, sizeof(err_buf), error);
+
+    if (rc == PARSE_HELP)
+    {
+        /* Generate and print help text */
+        vigil_vm_stack_pop_n(vm, arg_count);
+        vigil_object_retain(self);
+        vigil_value_t sv = vigil_nanbox_encode_object(self);
+        s = vigil_vm_stack_push(vm, &sv, error);
+        vigil_object_release(&self);
+        if (s != VIGIL_STATUS_OK)
+            return s;
+        s = parser_help(vm, 1, error);
+        if (s != VIGIL_STATUS_OK)
+            return s;
+        vigil_value_t hv = vigil_vm_stack_get(vm, vigil_vm_stack_depth(vm) - 1);
+        vigil_object_t *hobj = (vigil_object_t *)vigil_nanbox_decode_ptr(hv);
+        if (hobj)
+            printf("%s\n", vigil_string_object_c_str(hobj));
+        vigil_vm_stack_pop_n(vm, 1);
+        vigil_object_t *err_obj = NULL;
+        s = vigil_error_object_new_cstr(rt, "help requested", 1, &err_obj, error);
+        if (s != VIGIL_STATUS_OK)
+            return s;
+        vigil_value_t ev;
+        vigil_value_init_object(&ev, &err_obj);
+        s = vigil_vm_stack_push(vm, &ev, error);
+        vigil_value_release(&ev);
+        return s;
+    }
+
+    if (rc == PARSE_VERSION)
+    {
+        const char *ver = get_field_str(self, F_VERSION_STR);
+        printf("%s\n", ver);
+        vigil_vm_stack_pop_n(vm, arg_count);
+        vigil_object_t *err_obj = NULL;
+        s = vigil_error_object_new_cstr(rt, "version requested", 1, &err_obj, error);
+        if (s != VIGIL_STATUS_OK)
+            return s;
+        vigil_value_t ev;
+        vigil_value_init_object(&ev, &err_obj);
+        s = vigil_vm_stack_push(vm, &ev, error);
+        vigil_value_release(&ev);
+        return s;
+    }
+
     vigil_vm_stack_pop_n(vm, arg_count);
+    if (rc == PARSE_ERR)
     {
         vigil_object_t *err_obj = NULL;
         s = vigil_error_object_new_cstr(rt, err_buf, 1, &err_obj, error);
@@ -1202,12 +1376,18 @@ err_out:
         vigil_value_init_object(&ev, &err_obj);
         s = vigil_vm_stack_push(vm, &ev, error);
         vigil_value_release(&ev);
+        return s;
     }
-    return s;
 
-fail:
-    vigil_object_release(&vals_arr);
-    vigil_object_release(&pos_arr);
+    /* PARSE_OK */
+    vigil_object_t *ok_obj = NULL;
+    s = vigil_error_object_new_cstr(rt, "", 0, &ok_obj, error);
+    if (s != VIGIL_STATUS_OK)
+        return s;
+    vigil_value_t ev;
+    vigil_value_init_object(&ev, &ok_obj);
+    s = vigil_vm_stack_push(vm, &ev, error);
+    vigil_value_release(&ev);
     return s;
 }
 
@@ -1781,6 +1961,12 @@ static const vigil_native_symbol_doc_t parser_env_vars_doc = {
 static const vigil_native_symbol_doc_t parser_config_keys_doc = {
     "Config file key mappings.", "Stores name=config_key pairs for config file integration.",
     "array<string> keys = parser.config_keys"};
+static const vigil_native_symbol_doc_t parser_config_data_doc = {
+    "Loaded config data.", "Stores key=value pairs loaded from config file.",
+    "array<string> data = parser.config_data"};
+static const vigil_native_symbol_doc_t parser_sub_parsers_doc = {
+    "Child subcommand parsers.", "Stores Parser instances registered via add_subcommand.",
+    "array<object> parsers = parser.sub_parsers"};
 
 static const vigil_native_class_field_t parser_fields[] = {
     {"prog", 4U, VIGIL_TYPE_STRING, VIGIL_NATIVE_FIELD_PRIMITIVE, NULL, 0U, 0, NULL, &parser_prog_doc},
@@ -1813,7 +1999,9 @@ static const vigil_native_class_field_t parser_fields[] = {
     {"config_keys", 11U, VIGIL_TYPE_OBJECT, VIGIL_NATIVE_FIELD_ARRAY, NULL, 0U, VIGIL_TYPE_STRING, NULL,
      &parser_config_keys_doc},
     {"config_data", 11U, VIGIL_TYPE_OBJECT, VIGIL_NATIVE_FIELD_ARRAY, NULL, 0U, VIGIL_TYPE_STRING, NULL,
-     &parser_config_keys_doc},
+     &parser_config_data_doc},
+    {"sub_parsers", 11U, VIGIL_TYPE_OBJECT, VIGIL_NATIVE_FIELD_ARRAY, NULL, 0U, VIGIL_TYPE_OBJECT, NULL,
+     &parser_sub_parsers_doc},
 };
 
 /* ── Parameter type arrays ───────────────────────────────────────── */
@@ -1826,6 +2014,7 @@ static const int str2_params[] = {VIGIL_TYPE_STRING, VIGIL_TYPE_STRING};
 static const int str1_params[] = {VIGIL_TYPE_STRING};
 static const int str3_i32_params[] = {VIGIL_TYPE_STRING, VIGIL_TYPE_STRING, VIGIL_TYPE_STRING, VIGIL_TYPE_I32};
 static const int str3_f64_params[] = {VIGIL_TYPE_STRING, VIGIL_TYPE_STRING, VIGIL_TYPE_STRING, VIGIL_TYPE_F64};
+static const int obj1_params[] = {VIGIL_TYPE_OBJECT};
 
 /* ── Parameter name arrays ───────────────────────────────────────── */
 
@@ -1839,6 +2028,7 @@ static const char *const parser_positional_param_names[] = {"name", "desc"};
 static const char *const parser_name_param_names[] = {"name"};
 static const char *const parser_version_param_names[] = {"ver"};
 static const char *const parser_subcommand_param_names[] = {"name", "desc"};
+static const char *const parser_add_subcommand_param_names[] = {"parser"};
 static const char *const parser_env_param_names[] = {"env_var"};
 static const char *const parser_config_param_names[] = {"key"};
 static const char *const parser_load_config_param_names[] = {"path"};
@@ -1919,6 +2109,12 @@ static const vigil_native_symbol_doc_t parser_subcommand_doc = {
     "Declare a subcommand.",
     "Adds a named subcommand with a description.",
     "parser.subcommand(\"build\", \"Build the project\")",
+};
+static const vigil_native_symbol_doc_t parser_add_subcommand_doc = {
+    "Register a child parser as a subcommand.",
+    "Adds a child Parser whose prog field names the subcommand. When matched during parse, remaining args are "
+    "delegated to the child parser.",
+    "parser.add_subcommand(build_parser)",
 };
 static const vigil_native_symbol_doc_t parser_env_doc = {
     "Set env var fallback for the last option.",
@@ -2029,6 +2225,9 @@ static const vigil_native_class_method_t parser_methods[] = {
     /* subcommand(name, desc) -> Parser */
     {"subcommand", 10U, parser_subcommand, 2U, str2_params, VIGIL_TYPE_OBJECT, 1U, NULL, 0, "Parser", 6U, 0,
      parser_subcommand_param_names, NULL, NULL, &parser_subcommand_doc},
+    /* add_subcommand(parser) -> Parser */
+    {"add_subcommand", 14U, parser_add_subcommand, 1U, obj1_params, VIGIL_TYPE_OBJECT, 1U, NULL, 0, "Parser", 6U, 0,
+     parser_add_subcommand_param_names, NULL, NULL, &parser_add_subcommand_doc},
     /* env(env_var) -> Parser */
     {"env", 3U, parser_env, 1U, str1_params, VIGIL_TYPE_OBJECT, 1U, NULL, 0, "Parser", 6U, 0, parser_env_param_names,
      NULL, NULL, &parser_env_doc},
