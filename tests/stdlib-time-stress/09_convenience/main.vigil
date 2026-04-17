@@ -1,0 +1,36 @@
+import "fmt"
+import "time"
+
+fn main() -> i32 {
+    fmt.println("===== TEST 09_CONVENIENCE START =====")
+
+    i64 ts = i64(1718451045)  // 2024-06-15 12:30:45 UTC
+
+    // iso8601
+    string iso = time.iso8601(ts)
+    fmt.println(f"iso8601 len: {iso.len()}")
+    fmt.println(f"iso8601 has T: {iso.contains("T")}")
+    fmt.println(f"iso8601 has colon: {iso.contains(":")}")
+
+    // rfc3339
+    string rfc = time.rfc3339(ts)
+    fmt.println(f"rfc3339 len > 19: {rfc.len() > 19}")
+    fmt.println(f"rfc3339 has T: {rfc.contains("T")}")
+
+    // rfc2822
+    string r28 = time.rfc2822(ts)
+    fmt.println(f"rfc2822 has comma: {r28.contains(",")}")
+    fmt.println(f"rfc2822 has space: {r28.contains(" ")}")
+    fmt.println(f"rfc2822 len > 25: {r28.len() > 25}")
+
+    // format_utc deterministic
+    fmt.println(f"utc format: {time.format_utc(ts, "%Y-%m-%d %H:%M:%S")}")
+
+    // ms helpers
+    fmt.println(f"to_ms 10: {time.to_ms(i64(10))}")
+    fmt.println(f"from_ms 10000: {time.from_ms(i64(10000))}")
+    fmt.println(f"roundtrip: {time.from_ms(time.to_ms(i64(42)))}")
+
+    fmt.println("===== TEST 09_CONVENIENCE END =====")
+    return 0
+}

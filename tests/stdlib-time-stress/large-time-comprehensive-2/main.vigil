@@ -1,0 +1,55 @@
+import "fmt"
+import "time"
+
+fn main() -> i32 {
+    fmt.println("===== TEST LARGE_TIME_COMPREHENSIVE_2 START =====")
+
+    // Stress: many add_months
+    i64 base = time.date(2024, 1, 15, 0, 0, 0)
+    for (i32 i = 0; i < 24; i++) {
+        i64 t = time.add_months(base, i)
+        if i == 0 { fmt.println(f"month 0: {time.year(t)}/{time.month(t)}") }
+        if i == 11 { fmt.println(f"month 11: {time.year(t)}/{time.month(t)}") }
+        if i == 23 { fmt.println(f"month 23: {time.year(t)}/{time.month(t)}") }
+    }
+
+    // Stress: parse multiple dates
+    array<string> dates = ["2024-01-01", "2024-06-15", "2024-12-31", "2000-01-01", "1999-12-31"]
+    for d in dates {
+        i64 ts, err e = time.parse(d, "%Y-%m-%d")
+        if e == ok {
+            fmt.println(f"parsed {d}: year={time.year(ts)}")
+        }
+    }
+
+    // Stress: UTC component extraction
+    i64 known = i64(1718451045)
+    fmt.println(f"utc: {time.utc_year(known)}-{time.utc_month(known)}-{time.utc_day(known)} {time.utc_hour(known)}:{time.utc_minute(known)}:{time.utc_second(known)}")
+
+    // Stress: diff chain
+    i64 a = time.date(2024, 1, 1, 0, 0, 0)
+    i64 b = time.date(2025, 1, 1, 0, 0, 0)
+    fmt.println(f"year diff days: {time.diff_days(b, a)}")
+    fmt.println(f"year diff hours: {time.diff_hours(b, a)}")
+
+    // Stress: timezone roundtrip
+    i64 local = time.date(2024, 6, 15, 12, 0, 0)
+    i64 utc = time.to_utc(local)
+    i64 back = time.from_utc(utc)
+    fmt.println(f"tz roundtrip: {back == local}")
+
+    // Stress: monotonic timing
+    i64 m1 = time.monotonic_ns()
+    i32 sum = 0
+    for (i32 i = 0; i < 1000; i++) { sum = sum + i }
+    i64 m2 = time.monotonic_ns()
+    fmt.println(f"monotonic elapsed >= 0: {m2 >= m1}")
+    fmt.println(f"sum: {sum}")
+
+    // Stress: format_utc consistency
+    i64 epoch = i64(0)
+    fmt.println(f"epoch: {time.format_utc(epoch, "%Y-%m-%dT%H:%M:%SZ")}")
+
+    fmt.println("===== TEST LARGE_TIME_COMPREHENSIVE_2 END =====")
+    return 0
+}

@@ -1,0 +1,40 @@
+import "fmt"
+import "time"
+
+fn main() -> i32 {
+    fmt.println("===== TEST 05_PARSING START =====")
+
+    // Successful parse
+    i64 ts1, err e1 = time.parse("2024-12-25", "%Y-%m-%d")
+    fmt.println(f"parse date ok: {e1 == ok}")
+    fmt.println(f"parse year: {time.year(ts1)}")
+    fmt.println(f"parse month: {time.month(ts1)}")
+    fmt.println(f"parse day: {time.day(ts1)}")
+
+    // Parse with time
+    i64 ts2, err e2 = time.parse("2024-06-15 14:30:00", "%Y-%m-%d %H:%M:%S")
+    fmt.println(f"parse datetime ok: {e2 == ok}")
+    fmt.println(f"parse hour: {time.hour(ts2)}")
+    fmt.println(f"parse minute: {time.minute(ts2)}")
+
+    // Parse ISO 8601
+    i64 ts3, err e3 = time.parse("2024-01-01T00:00:00", "%Y-%m-%dT%H:%M:%S")
+    fmt.println(f"parse iso ok: {e3 == ok}")
+    fmt.println(f"parse iso year: {time.year(ts3)}")
+
+    // Parse failure — bad format
+    i64 ts4, err e4 = time.parse("not-a-date", "%Y-%m-%d")
+    fmt.println(f"parse fail: {e4 != ok}")
+    fmt.println(f"parse fail msg: {e4.message().any()}")
+
+    // Parse failure — empty string
+    i64 ts5, err e5 = time.parse("", "%Y-%m-%d")
+    fmt.println(f"parse empty: {e5 != ok}")
+
+    // Parse failure — empty format
+    i64 ts6, err e6 = time.parse("2024-01-01", "")
+    fmt.println(f"parse empty fmt: {e6 != ok}")
+
+    fmt.println("===== TEST 05_PARSING END =====")
+    return 0
+}

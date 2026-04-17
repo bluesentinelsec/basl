@@ -1,0 +1,36 @@
+import "fmt"
+import "time"
+
+fn main() -> i32 {
+    fmt.println("===== TEST 02_LOCAL_COMPONENTS START =====")
+
+    // Use date() to create known timestamp, extract components
+    i64 ts = time.date(2024, 6, 15, 14, 30, 45)
+    fmt.println(f"year: {time.year(ts)}")
+    fmt.println(f"month: {time.month(ts)}")
+    fmt.println(f"day: {time.day(ts)}")
+    fmt.println(f"hour: {time.hour(ts)}")
+    fmt.println(f"minute: {time.minute(ts)}")
+    fmt.println(f"second: {time.second(ts)}")
+
+    // weekday (0=Sun..6=Sat) — June 15, 2024 is Saturday
+    i32 wd = time.weekday(ts)
+    fmt.println(f"weekday valid: {wd >= 0}")
+    fmt.println(f"weekday valid: {wd <= 6}")
+
+    // yearday (1..366)
+    i32 yd = time.yearday(ts)
+    fmt.println(f"yearday > 0: {yd > 0}")
+    fmt.println(f"yearday <= 366: {yd <= 366}")
+
+    // is_dst returns bool
+    bool dst = time.is_dst(ts)
+    fmt.println(f"is_dst type: bool")
+
+    // Round-trip: date -> components -> date
+    i64 rt = time.date(time.year(ts), time.month(ts), time.day(ts), time.hour(ts), time.minute(ts), time.second(ts))
+    fmt.println(f"roundtrip: {rt == ts}")
+
+    fmt.println("===== TEST 02_LOCAL_COMPONENTS END =====")
+    return 0
+}

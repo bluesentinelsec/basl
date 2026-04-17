@@ -1,0 +1,40 @@
+import "fmt"
+import "time"
+
+fn main() -> i32 {
+    fmt.println("===== TEST 03_UTC_COMPONENTS START =====")
+
+    // Unix epoch in UTC is 1970-01-01 00:00:00
+    i64 epoch = i64(0)
+    fmt.println(f"epoch utc_year: {time.utc_year(epoch)}")
+    fmt.println(f"epoch utc_month: {time.utc_month(epoch)}")
+    fmt.println(f"epoch utc_day: {time.utc_day(epoch)}")
+    fmt.println(f"epoch utc_hour: {time.utc_hour(epoch)}")
+    fmt.println(f"epoch utc_minute: {time.utc_minute(epoch)}")
+    fmt.println(f"epoch utc_second: {time.utc_second(epoch)}")
+
+    // Known timestamp: 2024-06-15 12:30:45 UTC = 1718451045
+    i64 known = i64(1718451045)
+    fmt.println(f"known utc_year: {time.utc_year(known)}")
+    fmt.println(f"known utc_month: {time.utc_month(known)}")
+    fmt.println(f"known utc_day: {time.utc_day(known)}")
+    fmt.println(f"known utc_hour: {time.utc_hour(known)}")
+    fmt.println(f"known utc_minute: {time.utc_minute(known)}")
+    fmt.println(f"known utc_second: {time.utc_second(known)}")
+
+    // UTC weekday for epoch (Thursday = 4)
+    fmt.println(f"epoch utc_weekday: {time.utc_weekday(epoch)}")
+
+    // UTC yearday for epoch (day 1)
+    fmt.println(f"epoch utc_yearday: {time.utc_yearday(epoch)}")
+
+    // utc_offset takes timestamp
+    i32 off = time.utc_offset(known)
+    fmt.println(f"offset is int: true")
+    // Offset should be in reasonable range (-12h to +14h)
+    fmt.println(f"offset reasonable: {off >= -43200}")
+    fmt.println(f"offset reasonable: {off <= 50400}")
+
+    fmt.println("===== TEST 03_UTC_COMPONENTS END =====")
+    return 0
+}

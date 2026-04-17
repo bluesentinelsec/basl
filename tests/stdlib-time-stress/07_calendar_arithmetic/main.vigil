@@ -1,0 +1,54 @@
+import "fmt"
+import "time"
+
+fn main() -> i32 {
+    fmt.println("===== TEST 07_CALENDAR_ARITHMETIC START =====")
+
+    // add_months basic
+    i64 jan = time.date(2024, 1, 15, 0, 0, 0)
+    i64 feb = time.add_months(jan, 1)
+    fmt.println(f"jan+1mo: {time.month(feb)}")
+    fmt.println(f"jan+1mo day: {time.day(feb)}")
+
+    // add_months end-of-month clamping
+    i64 jan31 = time.date(2024, 1, 31, 0, 0, 0)
+    i64 feb_clamped = time.add_months(jan31, 1)
+    fmt.println(f"jan31+1mo month: {time.month(feb_clamped)}")
+    fmt.println(f"jan31+1mo day: {time.day(feb_clamped)}")  // Feb 29 (2024 is leap)
+
+    // add_months across year boundary
+    i64 nov = time.date(2024, 11, 15, 0, 0, 0)
+    i64 jan_next = time.add_months(nov, 2)
+    fmt.println(f"nov+2mo year: {time.year(jan_next)}")
+    fmt.println(f"nov+2mo month: {time.month(jan_next)}")
+
+    // add_months negative
+    i64 mar = time.date(2024, 3, 15, 0, 0, 0)
+    i64 jan_prev = time.add_months(mar, -2)
+    fmt.println(f"mar-2mo month: {time.month(jan_prev)}")
+
+    // add_months many
+    i64 start = time.date(2024, 1, 1, 0, 0, 0)
+    i64 plus12 = time.add_months(start, 12)
+    fmt.println(f"+12mo year: {time.year(plus12)}")
+    fmt.println(f"+12mo month: {time.month(plus12)}")
+
+    // add_years basic
+    i64 y2024 = time.date(2024, 6, 15, 0, 0, 0)
+    i64 y2025 = time.add_years(y2024, 1)
+    fmt.println(f"+1yr year: {time.year(y2025)}")
+    fmt.println(f"+1yr month: {time.month(y2025)}")
+
+    // add_years leap day clamping
+    i64 leap = time.date(2024, 2, 29, 0, 0, 0)
+    i64 non_leap = time.add_years(leap, 1)
+    fmt.println(f"leap+1yr month: {time.month(non_leap)}")
+    fmt.println(f"leap+1yr day: {time.day(non_leap)}")  // Feb 28
+
+    // add_years negative
+    i64 y2020 = time.add_years(y2024, -4)
+    fmt.println(f"-4yr year: {time.year(y2020)}")
+
+    fmt.println("===== TEST 07_CALENDAR_ARITHMETIC END =====")
+    return 0
+}

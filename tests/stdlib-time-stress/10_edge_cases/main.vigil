@@ -1,0 +1,50 @@
+import "fmt"
+import "time"
+
+fn main() -> i32 {
+    fmt.println("===== TEST 10_EDGE_CASES START =====")
+
+    // Epoch
+    i64 epoch = i64(0)
+    fmt.println(f"epoch utc_year: {time.utc_year(epoch)}")
+    fmt.println(f"epoch utc_month: {time.utc_month(epoch)}")
+    fmt.println(f"epoch utc_day: {time.utc_day(epoch)}")
+
+    // Large timestamp (year 2100)
+    i64 y2100 = i64(4102444800)
+    fmt.println(f"2100 utc_year: {time.utc_year(y2100)}")
+
+    // Negative diff
+    i64 a = time.date(2024, 1, 1, 0, 0, 0)
+    i64 b = time.date(2024, 1, 2, 0, 0, 0)
+    fmt.println(f"neg diff_days: {time.diff_days(a, b)}")
+    fmt.println(f"neg diff_hours: {time.diff_hours(a, b)}")
+
+    // add_days 0
+    i64 same = time.add_days(a, 0)
+    fmt.println(f"add 0 days: {same == a}")
+
+    // add_months 0
+    i64 same2 = time.add_months(a, 0)
+    fmt.println(f"add 0 months: {time.month(same2)}")
+
+    // add_years 0
+    i64 same3 = time.add_years(a, 0)
+    fmt.println(f"add 0 years: {time.year(same3)}")
+
+    // Parse error returns proper err
+    i64 bad, err be = time.parse("xyz", "%Y")
+    fmt.println(f"parse error: {be != ok}")
+    fmt.println(f"parse error msg: {be.message().any()}")
+
+    // diff_seconds large
+    i64 far = time.add_days(a, 365)
+    i64 ds = time.diff_seconds(far, a)
+    fmt.println(f"year diff_seconds: {ds}")
+
+    // monotonic is non-negative
+    fmt.println(f"monotonic > 0: {time.monotonic_ns() > i64(0)}")
+
+    fmt.println("===== TEST 10_EDGE_CASES END =====")
+    return 0
+}
