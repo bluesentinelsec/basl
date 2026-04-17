@@ -64,6 +64,52 @@ fn test_help_length() -> void {
     fmt.println(f"min help: {p.help().len() > 0}")
 }
 
+fn test_nested_subcommands() -> void {
+    // add_subcommand with child parsers
+    args.Parser child = args.Parser.new("deploy", "Deploy app")
+        .option("region", "r", "Region", "us-east-1")
+        .flag("force", "f", "Force")
+    args.Parser parent = args.Parser.new("app", "Manager")
+        .flag("verbose", "v", "Verbose")
+        .add_subcommand(child)
+
+    string ph = parent.help()
+    fmt.println(f"nested has deploy: {ph.contains("deploy")}")
+    fmt.println(f"nested has commands: {ph.contains("Commands:")}")
+
+    // Child help is independent
+    string ch = child.help()
+    fmt.println(f"child has region: {ch.contains("--region")}")
+    fmt.println(f"child has force: {ch.contains("--force")}")
+
+    // Parse with no args
+    err e = parent.parse()
+    fmt.println(f"nested parse ok: {e == ok}")
+    fmt.println(f"nested subcmd: [{parent.get_subcommand()}]")
+}
+
+fn test_flag_grouping_builder() -> void {
+    // Flag grouping requires multiple short flags
+    args.Parser p = args.Parser.new("app", "desc")
+        .flag("verbose", "v", "Verbose")
+        .flag("debug", "d", "Debug")
+        .flag("force", "f", "Force")
+        .option("output", "o", "Output", "out.txt")
+
+    // Verify all flags exist in help
+    string h = p.help()
+    fmt.println(f"fg has -v: {h.contains("-v")}")
+    fmt.println(f"fg has -d: {h.contains("-d")}")
+    fmt.println(f"fg has -f: {h.contains("-f")}")
+    fmt.println(f"fg has -o: {h.contains("-o")}")
+
+    // Parse with no args — all defaults
+    err e = p.parse()
+    fmt.println(f"fg parse ok: {e == ok}")
+    fmt.println(f"fg verbose: {p.get_bool("verbose")}")
+    fmt.println(f"fg output: {p.get("output")}")
+}
+
 fn main() -> i32 {
     fmt.println("===== TEST 12_EDGE_CASES START =====")
     test_many_options()
@@ -71,6 +117,8 @@ fn main() -> i32 {
     test_all_types_together()
     test_empty_defaults()
     test_help_length()
+    test_nested_subcommands()
+    test_flag_grouping_builder()
     fmt.println("===== TEST 12_EDGE_CASES END =====")
     return 0
 }
