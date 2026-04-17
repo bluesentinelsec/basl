@@ -1,0 +1,70 @@
+import "fmt"
+import "json"
+
+fn test_nested_objects() -> void {
+    json.Value inner = json.Value.object()
+    inner.set("x", json.Value.from_int(1))
+    json.Value outer = json.Value.object()
+    outer.set("inner", inner)
+    json.Value got, err ge = outer.get("inner")
+    fmt.println(f"nested kind: {got.kind()}")
+    json.Value x, err xe = got.get("x")
+    f64 xv, err xve = x.as_number()
+    fmt.println(f"nested x: {xv}")
+}
+
+fn test_nested_arrays() -> void {
+    json.Value inner = json.Value.array()
+    inner.push(json.Value.from_int(1))
+    inner.push(json.Value.from_int(2))
+    json.Value outer = json.Value.array()
+    outer.push(inner)
+    json.Value got, err ge = outer.at(0)
+    fmt.println(f"nested arr kind: {got.kind()}")
+    i32 len, err le = got.len()
+    fmt.println(f"nested arr len: {len}")
+}
+
+fn test_empty_containers() -> void {
+    json.Value obj = json.Value.object()
+    i32 olen, err ole = obj.len()
+    fmt.println(f"empty obj len: {olen}")
+    array<string> keys = obj.keys()
+    fmt.println(f"empty obj keys: {keys.len()}")
+
+    json.Value arr = json.Value.array()
+    i32 alen, err ale = arr.len()
+    fmt.println(f"empty arr len: {alen}")
+}
+
+fn test_special_strings() -> void {
+    json.Value s1 = json.Value.from_string("")
+    string v1, err e1 = s1.as_string()
+    fmt.println(f"empty str: [{v1}]")
+
+    json.Value s2 = json.Value.from_string("hello \"world\"")
+    string v2, err e2 = s2.as_string()
+    fmt.println(f"quoted str: {v2}")
+}
+
+fn test_large_object() -> void {
+    json.Value obj = json.Value.object()
+    for (i32 i = 0; i < 50; i++) {
+        obj.set(f"key_{i}", json.Value.from_int(i))
+    }
+    i32 len, err le = obj.len()
+    fmt.println(f"large obj len: {len}")
+    fmt.println(f"has key_0: {obj.has("key_0")}")
+    fmt.println(f"has key_49: {obj.has("key_49")}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 10_EDGE_CASES START =====")
+    test_nested_objects()
+    test_nested_arrays()
+    test_empty_containers()
+    test_special_strings()
+    test_large_object()
+    fmt.println("===== TEST 10_EDGE_CASES END =====")
+    return 0
+}

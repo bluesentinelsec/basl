@@ -1,0 +1,43 @@
+import "fmt"
+import "json"
+
+fn test_type_checks() -> void {
+    json.Value obj, err e1 = json.Value.parse("{}")
+    fmt.println(f"obj is_object: {obj.is_object()}")
+    fmt.println(f"obj is_array: {obj.is_array()}")
+    fmt.println(f"obj is_string: {obj.is_string()}")
+    fmt.println(f"obj kind: {obj.kind()}")
+}
+
+fn test_array_type() -> void {
+    json.Value arr, err e = json.Value.parse("[]")
+    fmt.println(f"arr is_array: {arr.is_array()}")
+    fmt.println(f"arr is_object: {arr.is_object()}")
+    fmt.println(f"arr kind: {arr.kind()}")
+}
+
+fn test_string_number() -> void {
+    json.Value s, err e1 = json.Value.parse("\"hello\"")
+    fmt.println(f"str is_string: {s.is_string()}")
+    fmt.println(f"str kind: {s.kind()}")
+
+    json.Value n, err e2 = json.Value.parse("42")
+    fmt.println(f"num is_number: {n.is_number()}")
+    fmt.println(f"num kind: {n.kind()}")
+}
+
+fn test_bool_null_types() -> void {
+    json.Value b, err e3 = json.Value.parse("true")
+    fmt.println(f"bool is_bool: {b.is_bool()}")
+    fmt.println(f"bool kind: {b.kind()}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 05_TYPE_CHECKS START =====")
+    test_type_checks()
+    test_array_type()
+    test_string_number()
+    test_bool_null_types()
+    fmt.println("===== TEST 05_TYPE_CHECKS END =====")
+    return 0
+}

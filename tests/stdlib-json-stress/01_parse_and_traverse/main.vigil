@@ -1,0 +1,61 @@
+import "fmt"
+import "json"
+
+fn test_parse_object() -> void {
+    json.Value root, err pe = json.Value.parse("{\"name\":\"Alice\",\"age\":30,\"active\":true}")
+    fmt.println(f"parse ok: {pe == ok}")
+    fmt.println(f"kind: {root.kind()}")
+    fmt.println(f"is_object: {root.is_object()}")
+    i32 len, err le = root.len()
+    fmt.println(f"len: {len}")
+}
+
+fn test_get_values() -> void {
+    json.Value root, err pe = json.Value.parse("{\"name\":\"Alice\",\"age\":30,\"active\":true}")
+    json.Value name, err ne = root.get("name")
+    string n, err nse = name.as_string()
+    fmt.println(f"name: {n}")
+    json.Value age, err ae = root.get("age")
+    f64 a, err ane = age.as_number()
+    fmt.println(f"age: {a}")
+    json.Value active, err ace = root.get("active")
+    bool av, err ave = active.as_bool()
+    fmt.println(f"active: {av}")
+}
+
+fn test_parse_array() -> void {
+    json.Value arr, err pe = json.Value.parse("[1,2,3,\"four\",true]")
+    fmt.println(f"arr kind: {arr.kind()}")
+    fmt.println(f"is_array: {arr.is_array()}")
+    i32 len, err le = arr.len()
+    fmt.println(f"arr len: {len}")
+    json.Value first, err fe = arr.at(0)
+    f64 fv, err fve = first.as_number()
+    fmt.println(f"arr[0]: {fv}")
+}
+
+fn test_has_and_keys() -> void {
+    json.Value obj, err pe = json.Value.parse("{\"a\":1,\"b\":2,\"c\":3}")
+    fmt.println(f"has a: {obj.has("a")}")
+    fmt.println(f"has z: {obj.has("z")}")
+    array<string> keys = obj.keys()
+    keys.sort()
+    fmt.println(f"keys: {", ".join(keys)}")
+}
+
+fn test_stringify() -> void {
+    json.Value obj, err pe = json.Value.parse("{\"x\":1}")
+    string s = obj.stringify()
+    fmt.println(f"stringify: {s}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 01_PARSE_AND_TRAVERSE START =====")
+    test_parse_object()
+    test_get_values()
+    test_parse_array()
+    test_has_and_keys()
+    test_stringify()
+    fmt.println("===== TEST 01_PARSE_AND_TRAVERSE END =====")
+    return 0
+}

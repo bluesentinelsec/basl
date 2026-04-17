@@ -1,0 +1,67 @@
+import "fmt"
+import "json"
+
+fn test_object_set() -> void {
+    json.Value obj = json.Value.object()
+    err e1 = obj.set("name", json.Value.from_string("Alice"))
+    err e2 = obj.set("age", json.Value.from_int(30))
+    fmt.println(f"set ok: {e1 == ok}")
+    i32 len, err le = obj.len()
+    fmt.println(f"len: {len}")
+    json.Value name, err ne = obj.get("name")
+    string nv, err nve = name.as_string()
+    fmt.println(f"name: {nv}")
+}
+
+fn test_object_overwrite() -> void {
+    json.Value obj = json.Value.object()
+    obj.set("x", json.Value.from_int(1))
+    obj.set("x", json.Value.from_int(99))
+    json.Value x, err xe = obj.get("x")
+    f64 xv, err xve = x.as_number()
+    fmt.println(f"overwrite: {xv}")
+}
+
+fn test_object_remove() -> void {
+    json.Value obj = json.Value.object()
+    obj.set("a", json.Value.from_int(1))
+    obj.set("b", json.Value.from_int(2))
+    err re = obj.remove("a")
+    fmt.println(f"remove ok: {re == ok}")
+    fmt.println(f"has a: {obj.has("a")}")
+    fmt.println(f"has b: {obj.has("b")}")
+}
+
+fn test_array_push() -> void {
+    json.Value arr = json.Value.array()
+    err e1 = arr.push(json.Value.from_int(1))
+    err e2 = arr.push(json.Value.from_int(2))
+    err e3 = arr.push(json.Value.from_string("three"))
+    fmt.println(f"push ok: {e1 == ok}")
+    i32 len, err le = arr.len()
+    fmt.println(f"arr len: {len}")
+    json.Value first, err fe = arr.at(0)
+    f64 fv, err fve = first.as_number()
+    fmt.println(f"arr[0]: {fv}")
+    json.Value last, err lae = arr.at(2)
+    string lv, err lve = last.as_string()
+    fmt.println(f"arr[2]: {lv}")
+}
+
+fn test_stringify_after_mutation() -> void {
+    json.Value obj = json.Value.object()
+    obj.set("key", json.Value.from_string("value"))
+    string s = obj.stringify()
+    fmt.println(f"stringify: {s}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 03_MUTATION START =====")
+    test_object_set()
+    test_object_overwrite()
+    test_object_remove()
+    test_array_push()
+    test_stringify_after_mutation()
+    fmt.println("===== TEST 03_MUTATION END =====")
+    return 0
+}

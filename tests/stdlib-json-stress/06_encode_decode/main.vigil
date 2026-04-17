@@ -1,0 +1,30 @@
+import "fmt"
+import "json"
+
+fn test_encode_array() -> void {
+    array<i32> nums = [1, 2, 3]
+    string encoded, err ee = json.encode(nums)
+    fmt.println(f"encode arr: {encoded}")
+}
+
+fn test_encode_map() -> void {
+    map<string, i32> m = {"a": 1, "b": 2}
+    string encoded, err ee = json.encode(m)
+    fmt.println(f"encode map has a: {encoded.contains("a")}")
+    fmt.println(f"encode map has 1: {encoded.contains("1")}")
+}
+
+fn test_encode_string_array() -> void {
+    array<string> strs = ["hello", "world"]
+    string encoded, err ee = json.encode(strs)
+    fmt.println(f"encode str arr: {encoded}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 06_ENCODE_DECODE START =====")
+    test_encode_array()
+    test_encode_map()
+    test_encode_string_array()
+    fmt.println("===== TEST 06_ENCODE_DECODE END =====")
+    return 0
+}

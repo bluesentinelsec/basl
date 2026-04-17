@@ -1,0 +1,37 @@
+import "fmt"
+import "json"
+import "fs"
+
+fn main() -> i32 {
+    fmt.println("===== TEST 07_FILE_IO START =====")
+
+    string base = fs.join(fs.temp_dir(), "vigil_json_07")
+    err me = fs.mkdir_all(base)
+
+    // Write JSON to file
+    json.Value obj = json.Value.object()
+    obj.set("name", json.Value.from_string("test"))
+    obj.set("value", json.Value.from_int(42))
+    string f = fs.join(base, "test.json")
+    err we = obj.write(f)
+    fmt.println(f"write ok: {we == ok}")
+    fmt.println(f"file exists: {fs.exists(f)}")
+
+    // Read JSON from file
+    json.Value loaded, err re = json.Value.read(f)
+    fmt.println(f"read ok: {re == ok}")
+    fmt.println(f"read kind: {loaded.kind()}")
+    json.Value name, err ne = loaded.get("name")
+    string nv, err nve = name.as_string()
+    fmt.println(f"read name: {nv}")
+
+    // Read missing file
+    json.Value missing, err mre = json.Value.read(fs.join(base, "nope.json"))
+    fmt.println(f"read missing: {mre != ok}")
+
+    // Cleanup
+    fs.remove_all(base)
+
+    fmt.println("===== TEST 07_FILE_IO END =====")
+    return 0
+}

@@ -1,0 +1,46 @@
+import "fmt"
+import "json"
+
+fn test_pretty_object() -> void {
+    json.Value obj = json.Value.object()
+    obj.set("name", json.Value.from_string("Alice"))
+    obj.set("age", json.Value.from_int(30))
+    string pretty = obj.stringify_pretty(2)
+    fmt.println(f"has newline: {pretty.contains("\n")}")
+    fmt.println(f"has indent: {pretty.contains("  ")}")
+    fmt.println(f"has name: {pretty.contains("name")}")
+}
+
+fn test_pretty_array() -> void {
+    json.Value arr = json.Value.array()
+    arr.push(json.Value.from_int(1))
+    arr.push(json.Value.from_int(2))
+    string pretty = arr.stringify_pretty(2)
+    fmt.println(f"arr pretty has newline: {pretty.contains("\n")}")
+}
+
+fn test_pretty_nested() -> void {
+    json.Value inner = json.Value.object()
+    inner.set("x", json.Value.from_int(1))
+    json.Value outer = json.Value.object()
+    outer.set("inner", inner)
+    string pretty = outer.stringify_pretty(4)
+    fmt.println(f"nested pretty: {pretty.contains("    ")}")
+}
+
+fn test_compact() -> void {
+    json.Value obj = json.Value.object()
+    obj.set("a", json.Value.from_int(1))
+    string compact = obj.stringify()
+    fmt.println(f"compact no newline: {!compact.contains("\n")}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 04_PRETTY_PRINT START =====")
+    test_pretty_object()
+    test_pretty_array()
+    test_pretty_nested()
+    test_compact()
+    fmt.println("===== TEST 04_PRETTY_PRINT END =====")
+    return 0
+}
