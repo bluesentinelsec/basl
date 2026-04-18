@@ -10,7 +10,7 @@ concurrency:
 
 jobs:
   syntax-stress:
-    timeout-minutes: 60
+    timeout-minutes: 360
     strategy:
       fail-fast: false
       matrix:
@@ -63,6 +63,7 @@ jobs:
             --suite-dir tests/stdlib-json-stress \
             --suite-dir tests/stdlib-os-stress \
             --suite-dir tests/stdlib-regex-stress \
+            --suite-dir tests/stdlib-csv-stress \
             --work-dir ${{ runner.temp }}/syntax_stress \
             -j 4
 
@@ -84,5 +85,6 @@ jobs:
             --suite-dir tests/stdlib-json-stress `
             --suite-dir tests/stdlib-os-stress `
             --suite-dir tests/stdlib-regex-stress `
+            --suite-dir tests/stdlib-csv-stress `
             --work-dir "${{ runner.temp }}/syntax_stress" `
             -j 4

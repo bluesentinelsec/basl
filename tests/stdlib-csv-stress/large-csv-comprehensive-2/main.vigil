@@ -1,0 +1,113 @@
+import "fmt"
+import "csv"
+
+fn test_50_columns() -> void {
+    string hdr = ""
+    string row = ""
+    for (i32 i = 0; i < 50; i++) {
+        if i > 0 {
+            hdr = hdr + ","
+            row = row + ","
+        }
+        hdr = hdr + f"col{i}"
+        row = row + f"val{i}"
+    }
+    string data = hdr + "\n" + row + "\n"
+
+    array<array<string>> parsed, err e1 = csv.parse(data, ",")
+    bool ok1 = e1 == ok
+    fmt.println(f"50col parse ok: {ok1}")
+    fmt.println(f"50col rows: {parsed.len()}")
+    fmt.println(f"50col first: {parsed[0][0]}")
+    fmt.println(f"50col last: {parsed[0][49]}")
+
+    array<map<string, string>> records, err e2 = csv.parse_with_header(data, ",")
+    bool ok2 = e2 == ok
+    fmt.println(f"50col hdr ok: {ok2}")
+    fmt.println(f"50col hdr len: {records.len()}")
+    string v0, bool f0 = records[0].get("col0")
+    string v49, bool f49 = records[0].get("col49")
+    fmt.println(f"50col hdr col0: {v0}")
+    fmt.println(f"50col hdr col49: {v49}")
+
+    i32 fc, err _ = csv.field_count(data, ",")
+    fmt.println(f"50col fc: {fc}")
+}
+
+fn test_100_rows_with_header() -> void {
+    string data = "id,name,value\n"
+    for (i32 i = 0; i < 100; i++) {
+        data = data + f"{i},item{i},{i * 10}\n"
+    }
+
+    array<map<string, string>> records, err e = csv.parse_with_header(data, ",")
+    bool ok1 = e == ok
+    fmt.println(f"100row hdr ok: {ok1}")
+    fmt.println(f"100row hdr len: {records.len()}")
+
+    string v0, bool f0 = records[0].get("id")
+    string v0n, bool f0n = records[0].get("name")
+    fmt.println(f"100row r0 id: {v0}")
+    fmt.println(f"100row r0 name: {v0n}")
+
+    string v99, bool f99 = records[99].get("value")
+    fmt.println(f"100row r99 value: {v99}")
+
+    i32 rc = csv.row_count(data)
+    fmt.println(f"100row rc: {rc}")
+    i32 fc, err _ = csv.field_count(data, ",")
+    fmt.println(f"100row fc: {fc}")
+    bool hh = csv.has_header(data, ",")
+    fmt.println(f"100row hh: {hh}")
+}
+
+fn test_complex_quoting_roundtrip() -> void {
+    array<string> r1 = ["simple", "has,comma", "has\"quote", "has\nnewline"]
+    array<string> r2 = ["", "  spaces  ", "\"all\"special\",\"", "normal"]
+    array<array<string>> rows = [r1, r2]
+    string out, err e1 = csv.stringify(rows, ",")
+    bool ok1 = e1 == ok
+    array<array<string>> parsed, err e2 = csv.parse(out, ",")
+    bool ok2 = e2 == ok
+    fmt.println(f"cq stringify ok: {ok1}")
+    fmt.println(f"cq parse ok: {ok2}")
+
+    bool m1 = true
+    for (i32 i = 0; i < r1.len(); i++) {
+        if r1[i] != parsed[0][i] { m1 = false }
+    }
+    fmt.println(f"cq row1 match: {m1}")
+
+    bool m2 = true
+    for (i32 i = 0; i < r2.len(); i++) {
+        if r2[i] != parsed[1][i] { m2 = false }
+    }
+    fmt.println(f"cq row2 match: {m2}")
+}
+
+fn test_delimiter_variety() -> void {
+    array<string> r1 = ["a", "b", "c"]
+    array<string> r2 = ["d", "e", "f"]
+    array<array<string>> rows = [r1, r2]
+    string delimiters = ",\t|;:# "
+    bool all_ok = true
+    for (i32 i = 0; i < delimiters.len(); i++) {
+        string d, err _ = delimiters.substr(i, 1)
+        string out, err e1 = csv.stringify(rows, d)
+        array<array<string>> parsed, err e2 = csv.parse(out, d)
+        if e1 != ok || e2 != ok { all_ok = false }
+        if parsed[0][0] != "a" || parsed[0][2] != "c" { all_ok = false }
+        if parsed[1][0] != "d" || parsed[1][2] != "f" { all_ok = false }
+    }
+    fmt.println(f"delim_variety: {all_ok}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST LARGE_CSV_COMPREHENSIVE_2 START =====")
+    test_50_columns()
+    test_100_rows_with_header()
+    test_complex_quoting_roundtrip()
+    test_delimiter_variety()
+    fmt.println("===== TEST LARGE_CSV_COMPREHENSIVE_2 END =====")
+    return 0
+}

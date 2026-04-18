@@ -1,0 +1,135 @@
+import "fmt"
+import "csv"
+import "fs"
+
+fn test_multi_delimiter_parse() -> void {
+    string csv_data = "a,b,c\n1,2,3\n4,5,6\n"
+    array<array<string>> rows, err e1 = csv.parse(csv_data, ",")
+    bool ok1 = e1 == ok
+    fmt.println(f"csv parse ok: {ok1}")
+    fmt.println(f"csv rows: {rows.len()}")
+    fmt.println(f"csv r0c0: {rows[0][0]}")
+
+    string tsv_data = "x\ty\tz\n10\t20\t30\n"
+    array<array<string>> trows, err e2 = csv.parse(tsv_data, "\t")
+    bool ok2 = e2 == ok
+    fmt.println(f"tsv parse ok: {ok2}")
+    fmt.println(f"tsv r1c2: {trows[1][2]}")
+
+    string pipe_data = "p|q|r\nfoo|bar|baz\n"
+    array<array<string>> prows, err e3 = csv.parse(pipe_data, "|")
+    bool ok3 = e3 == ok
+    fmt.println(f"pipe parse ok: {ok3}")
+    fmt.println(f"pipe r1c1: {prows[1][1]}")
+}
+
+fn test_stringify_roundtrip() -> void {
+    array<string> h = ["name", "age", "city"]
+    array<string> r1 = ["Alice", "30", "NYC"]
+    array<string> r2 = ["Bob", "25", "LA"]
+    array<array<string>> rows = [h, r1, r2]
+    string out, err e1 = csv.stringify(rows, ",")
+    bool ok1 = e1 == ok
+    fmt.println(f"stringify ok: {ok1}")
+
+    array<array<string>> parsed, err e2 = csv.parse(out, ",")
+    bool ok2 = e2 == ok
+    bool match = parsed[0][0] == "name" && parsed[1][0] == "Alice" && parsed[2][2] == "LA"
+    fmt.println(f"roundtrip ok: {ok2}")
+    fmt.println(f"roundtrip match: {match}")
+}
+
+fn test_parse_with_header() -> void {
+    string data = "id,name,score\n1,Alice,95\n2,Bob,87\n3,Carol,92\n"
+    array<map<string, string>> records, err e = csv.parse_with_header(data, ",")
+    bool ok1 = e == ok
+    fmt.println(f"pwh ok: {ok1}")
+    fmt.println(f"pwh len: {records.len()}")
+
+    string v0, bool f0 = records[0].get("name")
+    string v1, bool f1 = records[1].get("score")
+    string v2, bool f2 = records[2].get("id")
+    fmt.println(f"pwh alice: {v0}")
+    fmt.println(f"pwh bob_score: {v1}")
+    fmt.println(f"pwh carol_id: {v2}")
+}
+
+fn test_file_io_chain() -> void {
+    string base = fs.join(fs.temp_dir(), "vigil_csv_lc1")
+    err _ = fs.remove_all(base)
+    err _ = fs.mkdir_all(base)
+
+    string path = fs.join(base, "chain.csv")
+    array<string> h = ["key", "value", "tag"]
+    array<string> r1 = ["a", "1", "x"]
+    array<string> r2 = ["b", "2", "y"]
+    array<string> r3 = ["c", "3", "z"]
+    array<array<string>> rows = [h, r1, r2, r3]
+    err we = csv.write_file(path, rows, ",")
+    bool wok = we == ok
+    fmt.println(f"chain write: {wok}")
+
+    array<array<string>> raw, err re = csv.read_file(path, ",")
+    bool rok = re == ok
+    fmt.println(f"chain read ok: {rok}")
+    fmt.println(f"chain read rows: {raw.len()}")
+    fmt.println(f"chain read r0c0: {raw[0][0]}")
+
+    array<map<string, string>> hdr, err he = csv.read_file_with_header(path, ",")
+    bool hok = he == ok
+    fmt.println(f"chain hdr ok: {hok}")
+    fmt.println(f"chain hdr len: {hdr.len()}")
+    string hv, bool hf = hdr[0].get("key")
+    fmt.println(f"chain hdr r0 key: {hv}")
+    string hv2, bool hf2 = hdr[2].get("tag")
+    fmt.println(f"chain hdr r2 tag: {hv2}")
+
+    string content, err _ = fs.read(path)
+    i32 fc, err _ = csv.field_count(content, ",")
+    i32 rc = csv.row_count(content)
+    bool hh = csv.has_header(content, ",")
+    fmt.println(f"chain fc: {fc}")
+    fmt.println(f"chain rc: {rc}")
+    fmt.println(f"chain hh: {hh}")
+
+    err _ = fs.remove_all(base)
+}
+
+fn test_quoted_roundtrip() -> void {
+    array<string> r1 = ["Widget", "A \"fancy\" widget", "Has, commas"]
+    array<string> r2 = ["Gadget", "Line\nbreak", "normal"]
+    array<array<string>> rows = [r1, r2]
+    string out, err e1 = csv.stringify(rows, ",")
+    bool ok1 = e1 == ok
+    array<array<string>> parsed, err e2 = csv.parse(out, ",")
+    bool ok2 = e2 == ok
+    bool m1 = parsed[0][1] == "A \"fancy\" widget" && parsed[0][2] == "Has, commas"
+    bool m2 = parsed[1][1] == "Line\nbreak" && parsed[1][2] == "normal"
+    fmt.println(f"qrt ok: {ok1}")
+    fmt.println(f"qrt parse ok: {ok2}")
+    fmt.println(f"qrt match1: {m1}")
+    fmt.println(f"qrt match2: {m2}")
+}
+
+fn test_tsv_header_chain() -> void {
+    string tsv = "fruit\tcount\napple\t5\nbanana\t12\n"
+    array<map<string, string>> records, err e = csv.parse_with_header(tsv, "\t")
+    bool ok1 = e == ok
+    fmt.println(f"tsv hdr ok: {ok1}")
+    string v0, bool f0 = records[0].get("fruit")
+    string v1, bool f1 = records[1].get("count")
+    fmt.println(f"tsv hdr fruit: {v0}")
+    fmt.println(f"tsv hdr count: {v1}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST LARGE_CSV_COMPREHENSIVE_1 START =====")
+    test_multi_delimiter_parse()
+    test_stringify_roundtrip()
+    test_parse_with_header()
+    test_file_io_chain()
+    test_quoted_roundtrip()
+    test_tsv_header_chain()
+    fmt.println("===== TEST LARGE_CSV_COMPREHENSIVE_1 END =====")
+    return 0
+}

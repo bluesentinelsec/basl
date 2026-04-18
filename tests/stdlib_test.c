@@ -2696,18 +2696,18 @@ void register_stdlib_json_tests(void)
 TEST(VigilStdlibCsvTest, ParseRowAndStringifyRow)
 {
     /* Covers csv_parse_field_buf (unquoted + quoted fields),
-       csv_is_field_end, csv_parse_row, csv_stringify_row,
-       csv_write_field, csv_needs_quote. */
+       csv_parse_row, csv_stringify_row, csv_write_field, csv_needs_quote. */
     int64_t result = RunWithStdlib(vigil_test_failed_, "import \"csv\";\n"
                                                        "fn main() -> i32 {\n"
-                                                       "    array<string> row = csv.parse_row(\"a,b,c\");\n"
-                                                       "    if row.len() != 3 { return 1; }\n"
-                                                       "    if row[0] != \"a\" { return 2; }\n"
-                                                       "    string out = csv.stringify_row(row);\n"
-                                                       "    if out != \"a,b,c\" { return 3; }\n"
-                                                       "    array<string> q = csv.parse_row(\"\\\"x,y\\\",z\");\n"
-                                                       "    if q.len() != 2 { return 4; }\n"
-                                                       "    if q[0] != \"x,y\" { return 5; }\n"
+                                                       "    array<string> row, err e1 = csv.parse_row(\"a,b,c\", \",\");\n"
+                                                       "    if e1 != ok { return 1; }\n"
+                                                       "    if row.len() != 3 { return 2; }\n"
+                                                       "    if row[0] != \"a\" { return 3; }\n"
+                                                       "    string out, err e2 = csv.stringify_row(row, \",\");\n"
+                                                       "    if out != \"a,b,c\" { return 4; }\n"
+                                                       "    array<string> q, err e3 = csv.parse_row(\"\\\"x,y\\\",z\", \",\");\n"
+                                                       "    if q.len() != 2 { return 5; }\n"
+                                                       "    if q[0] != \"x,y\" { return 6; }\n"
                                                        "    return 0;\n"
                                                        "}\n");
     EXPECT_EQ(result, 0);
@@ -2724,7 +2724,7 @@ TEST(VigilStdlibCsvTest, LongFieldSpillsToHeap)
                                           "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
                                           "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
                                           "aaaaaaaaaaaa\";\n"
-                                          "    array<string> row = csv.parse_row(big);\n"
+                                          "    array<string> row, err e = csv.parse_row(big, \",\");\n"
                                           "    if row.len() != 1 { return 1; }\n"
                                           "    if row[0].len() != big.len() { return 2; }\n"
                                           "    return 0;\n"

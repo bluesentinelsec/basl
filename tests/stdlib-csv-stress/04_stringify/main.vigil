@@ -1,0 +1,107 @@
+import "fmt"
+import "csv"
+
+fn test_stringify_row_simple() -> void {
+    array<string> row = ["x", "y", "z"]
+    string out, err e = csv.stringify_row(row, ",")
+    bool ok = e == ok
+    fmt.println(f"row ok: {ok}")
+    fmt.println(f"row: {out}")
+}
+
+fn test_stringify_quotes_comma() -> void {
+    array<string> row = ["hello, world", "b"]
+    string out, err e = csv.stringify_row(row, ",")
+    fmt.println(f"qc: {out}")
+}
+
+fn test_stringify_quotes_quote() -> void {
+    array<string> row = ["say \"hi\"", "b"]
+    string out, err e = csv.stringify_row(row, ",")
+    fmt.println(f"qq: {out}")
+}
+
+fn test_stringify_quotes_newline() -> void {
+    array<string> row = ["line1\nline2", "b"]
+    string out, err e = csv.stringify_row(row, ",")
+    fmt.println(f"qn len: {out.len()}")
+}
+
+fn test_stringify_empty_fields() -> void {
+    array<string> row = ["", "", ""]
+    string out, err e = csv.stringify_row(row, ",")
+    fmt.println(f"ef: [{out}]")
+}
+
+fn test_stringify_single_field() -> void {
+    array<string> row = ["only"]
+    string out, err e = csv.stringify_row(row, ",")
+    fmt.println(f"sf: {out}")
+}
+
+fn test_stringify_multi_row() -> void {
+    array<string> r1 = ["name", "age"]
+    array<string> r2 = ["Alice", "30"]
+    array<string> r3 = ["Bob", "25"]
+    array<array<string>> rows = [r1, r2, r3]
+    string out, err e = csv.stringify(rows, ",")
+    bool ok = e == ok
+    fmt.println(f"multi ok: {ok}")
+    i32 rc = csv.row_count(out)
+    fmt.println(f"multi rc: {rc}")
+}
+
+fn test_stringify_multi_row_tab() -> void {
+    array<string> r1 = ["a", "b"]
+    array<string> r2 = ["c", "d"]
+    array<array<string>> rows = [r1, r2]
+    string out, err e = csv.stringify(rows, "\t")
+    bool ok = e == ok
+    fmt.println(f"tab ok: {ok}")
+    i32 fc, err _ = csv.field_count(out, "\t")
+    fmt.println(f"tab fc: {fc}")
+}
+
+fn test_stringify_roundtrip() -> void {
+    array<string> r1 = ["a", "b", "c"]
+    array<string> r2 = ["d", "e", "f"]
+    array<array<string>> rows = [r1, r2]
+    string text, err e1 = csv.stringify(rows, ",")
+    array<array<string>> parsed, err e2 = csv.parse(text, ",")
+    bool ok1 = e1 == ok
+    bool ok2 = e2 == ok
+    bool match = parsed[0][0] == "a" && parsed[0][2] == "c" && parsed[1][1] == "e"
+    fmt.println(f"rt ok1: {ok1}")
+    fmt.println(f"rt ok2: {ok2}")
+    fmt.println(f"rt match: {match}")
+}
+
+fn test_stringify_quoted_fields() -> void {
+    array<string> r1 = ["has, comma", "normal"]
+    array<string> r2 = ["has \"quote\"", "ok"]
+    array<array<string>> rows = [r1, r2]
+    string out, err e = csv.stringify(rows, ",")
+    bool ok = e == ok
+    fmt.println(f"quoted ok: {ok}")
+    array<array<string>> back, err e2 = csv.parse(out, ",")
+    bool m1 = back[0][0] == "has, comma"
+    bool m2 = back[1][0] == "has \"quote\""
+    fmt.println(f"quoted m1: {m1}")
+    fmt.println(f"quoted m2: {m2}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 04_STRINGIFY START =====")
+    test_stringify_row_simple()
+    test_stringify_quotes_comma()
+    test_stringify_quotes_quote()
+    test_stringify_quotes_newline()
+    test_stringify_empty_fields()
+    test_stringify_single_field()
+    test_stringify_multi_row()
+    test_stringify_multi_row_tab()
+    test_stringify_roundtrip()
+    test_stringify_quoted_fields()
+    fmt.println("===== TEST 04_STRINGIFY END =====")
+    return 0
+}

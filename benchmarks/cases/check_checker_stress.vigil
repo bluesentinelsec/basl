@@ -52,7 +52,7 @@ fn fold_values(array<i32> values) -> i32 {
 
 
 fn score_line(string line) -> i32 {
-    array<string> row = csv.parse_row(line)
+    array<string> row, err _ = csv.parse_row(line, ",")
     array<i32> nums = parse_numbers(row)
     i32 total = fold_values(nums)
     if regex.match(".*critical.*", line) {

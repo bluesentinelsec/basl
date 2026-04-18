@@ -1,0 +1,67 @@
+import "fmt"
+import "csv"
+
+fn test_basic_header() -> void {
+    string data = "name,age,city\r\nAlice,30,NYC\r\nBob,25,LA\r\n"
+    array<map<string, string>> records, err e = csv.parse_with_header(data, ",")
+    bool ok = e == ok
+    fmt.println(f"basic ok: {ok}")
+    fmt.println(f"basic len: {records.len()}")
+    fmt.println(f"r0 name: {records[0]["name"]}")
+    fmt.println(f"r0 age: {records[0]["age"]}")
+    fmt.println(f"r0 city: {records[0]["city"]}")
+    fmt.println(f"r1 name: {records[1]["name"]}")
+    fmt.println(f"r1 age: {records[1]["age"]}")
+}
+
+fn test_header_only() -> void {
+    string data = "a,b,c\r\n"
+    array<map<string, string>> records, err e = csv.parse_with_header(data, ",")
+    bool ok = e == ok
+    fmt.println(f"honly ok: {ok}")
+    fmt.println(f"honly len: {records.len()}")
+}
+
+fn test_empty_data() -> void {
+    string data = ""
+    array<map<string, string>> records, err e = csv.parse_with_header(data, ",")
+    fmt.println(f"empty len: {records.len()}")
+}
+
+fn test_tab_header() -> void {
+    string data = "key\tvalue\r\nfoo\tbar\r\nbaz\tqux\r\n"
+    array<map<string, string>> records, err e = csv.parse_with_header(data, "\t")
+    bool ok = e == ok
+    fmt.println(f"tab ok: {ok}")
+    fmt.println(f"tab len: {records.len()}")
+    fmt.println(f"tab r0 key: {records[0]["key"]}")
+    fmt.println(f"tab r0 val: {records[0]["value"]}")
+    fmt.println(f"tab r1 key: {records[1]["key"]}")
+}
+
+fn test_ragged_rows() -> void {
+    string data = "a,b,c\r\n1\r\n4,5,6\r\n"
+    array<map<string, string>> records, err e = csv.parse_with_header(data, ",")
+    fmt.println(f"ragged len: {records.len()}")
+    fmt.println(f"ragged r1 a: {records[1]["a"]}")
+    fmt.println(f"ragged r1 c: {records[1]["c"]}")
+}
+
+fn test_has_header() -> void {
+    bool hh1 = csv.has_header("name,age,city\r\nAlice,30,NYC\r\n", ",")
+    fmt.println(f"hh_true: {hh1}")
+    bool hh2 = csv.has_header("1,2,3\r\n4,5,6\r\n", ",")
+    fmt.println(f"hh_num: {hh2}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 05_HEADER_PARSING START =====")
+    test_basic_header()
+    test_header_only()
+    test_empty_data()
+    test_tab_header()
+    test_ragged_rows()
+    test_has_header()
+    fmt.println("===== TEST 05_HEADER_PARSING END =====")
+    return 0
+}

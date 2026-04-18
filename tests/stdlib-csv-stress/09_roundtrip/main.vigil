@@ -1,0 +1,74 @@
+import "fmt"
+import "csv"
+
+fn test_simple_roundtrip() -> void {
+    array<string> original = ["hello", "world", "test"]
+    string line, err e1 = csv.stringify_row(original, ",")
+    array<string> parsed, err e2 = csv.parse_row(line, ",")
+    bool ok = parsed[0] == "hello" && parsed[1] == "world" && parsed[2] == "test"
+    fmt.println(f"simple rt: {ok}")
+}
+
+fn test_quoted_roundtrip() -> void {
+    array<string> original = ["has, comma", "has \"quote\"", "normal"]
+    string line, err e1 = csv.stringify_row(original, ",")
+    array<string> parsed, err e2 = csv.parse_row(line, ",")
+    bool ok = parsed[0] == "has, comma" && parsed[1] == "has \"quote\"" && parsed[2] == "normal"
+    fmt.println(f"quoted rt: {ok}")
+}
+
+fn test_tab_roundtrip() -> void {
+    array<string> original = ["col1", "col2", "col3"]
+    string line, err e1 = csv.stringify_row(original, "\t")
+    array<string> parsed, err e2 = csv.parse_row(line, "\t")
+    bool ok = parsed[0] == "col1" && parsed[1] == "col2" && parsed[2] == "col3"
+    fmt.println(f"tab rt: {ok}")
+}
+
+fn test_parse_stringify_roundtrip() -> void {
+    string data = "a,b,c\n1,2,3\n4,5,6\n"
+    array<array<string>> rows, err e1 = csv.parse(data, ",")
+    string out, err e2 = csv.stringify(rows, ",")
+    array<array<string>> rows2, err e3 = csv.parse(out, ",")
+    bool ok = rows2[0][0] == "a" && rows2[1][1] == "2" && rows2[2][2] == "6"
+    fmt.println(f"parse_str rt: {ok}")
+}
+
+fn test_empty_fields_roundtrip() -> void {
+    array<string> original = ["", "middle", ""]
+    string line, err e1 = csv.stringify_row(original, ",")
+    array<string> parsed, err e2 = csv.parse_row(line, ",")
+    bool ok = parsed[0] == "" && parsed[1] == "middle" && parsed[2] == ""
+    fmt.println(f"empty rt: {ok}")
+}
+
+fn test_multi_row_roundtrip() -> void {
+    array<string> r1 = ["x", "y"]
+    array<string> r2 = ["1", "2"]
+    array<array<string>> rows = [r1, r2]
+    string out, err e1 = csv.stringify(rows, ",")
+    array<array<string>> parsed, err e2 = csv.parse(out, ",")
+    bool ok = parsed[0][0] == "x" && parsed[0][1] == "y" && parsed[1][0] == "1" && parsed[1][1] == "2"
+    fmt.println(f"multi_row rt: {ok}")
+}
+
+fn test_newline_roundtrip() -> void {
+    array<string> original = ["has\nnewline", "normal"]
+    string line, err e1 = csv.stringify_row(original, ",")
+    array<string> parsed, err e2 = csv.parse_row(line, ",")
+    bool ok = parsed[0] == "has\nnewline" && parsed[1] == "normal"
+    fmt.println(f"nl rt: {ok}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 09_ROUNDTRIP START =====")
+    test_simple_roundtrip()
+    test_quoted_roundtrip()
+    test_tab_roundtrip()
+    test_parse_stringify_roundtrip()
+    test_empty_fields_roundtrip()
+    test_multi_row_roundtrip()
+    test_newline_roundtrip()
+    fmt.println("===== TEST 09_ROUNDTRIP END =====")
+    return 0
+}

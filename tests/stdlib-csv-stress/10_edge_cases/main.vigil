@@ -1,0 +1,71 @@
+import "fmt"
+import "csv"
+
+fn test_single_column() -> void {
+    array<string> row, err e = csv.parse_row("hello", ",")
+    fmt.println(f"single_col len: {row.len()}")
+    fmt.println(f"single_col val: {row[0]}")
+}
+
+fn test_large_field() -> void {
+    string big = ""
+    for (i32 i = 0; i < 50; i++) {
+        big = big + "0123456789"
+    }
+    array<string> r1 = [big, "b"]
+    array<array<string>> rows = [r1]
+    string out, err e1 = csv.stringify(rows, ",")
+    array<array<string>> parsed, err e2 = csv.parse(out, ",")
+    bool ok = parsed[0][0] == big
+    fmt.println(f"large match: {ok}")
+    fmt.println(f"large len: {parsed[0][0].len()}")
+}
+
+fn test_trailing_comma() -> void {
+    array<string> row, err e = csv.parse_row("a,b,", ",")
+    fmt.println(f"trail len: {row.len()}")
+    fmt.println(f"trail last: [{row[2]}]")
+}
+
+fn test_only_commas() -> void {
+    array<string> row, err e = csv.parse_row(",,", ",")
+    fmt.println(f"commas len: {row.len()}")
+}
+
+fn test_row_count_various() -> void {
+    i32 rc1 = csv.row_count("a,b\r\nc,d\r\ne,f\r\n")
+    fmt.println(f"rc_crlf: {rc1}")
+    i32 rc2 = csv.row_count("a\nb\nc\n")
+    fmt.println(f"rc_lf: {rc2}")
+    i32 rc3 = csv.row_count("")
+    fmt.println(f"rc_empty: {rc3}")
+    i32 rc4 = csv.row_count("a,b\nc,d")
+    fmt.println(f"rc_no_nl: {rc4}")
+}
+
+fn test_field_count_edge() -> void {
+    i32 fc, err e = csv.field_count("", ",")
+    bool ok = e == ok
+    fmt.println(f"fc_empty ok: {ok}")
+    fmt.println(f"fc_empty: {fc}")
+}
+
+fn test_field_count_trailing() -> void {
+    i32 fc, err e = csv.field_count("a,b,\n", ",")
+    bool ok = e == ok
+    fmt.println(f"fc_trail ok: {ok}")
+    fmt.println(f"fc_trail: {fc}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 10_EDGE_CASES START =====")
+    test_single_column()
+    test_large_field()
+    test_trailing_comma()
+    test_only_commas()
+    test_row_count_various()
+    test_field_count_edge()
+    test_field_count_trailing()
+    fmt.println("===== TEST 10_EDGE_CASES END =====")
+    return 0
+}
