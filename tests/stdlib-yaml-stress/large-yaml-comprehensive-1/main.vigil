@@ -1,0 +1,124 @@
+import "fmt"
+import "yaml"
+import "fs"
+
+fn test_config_parse_and_query() -> void {
+    string config = "server:\n  host: localhost\n  port: 8080\n  workers: 4\ndatabase:\n  driver: postgres\n  host: db.example.com\n  port: 5432\n  name: myapp\n  pool_size: 10\nlogging:\n  level: info\n  file: /var/log/app.log\n  rotate: true\n"
+
+    // Query server section
+    string host, err e1 = yaml.get(config, "server.host")
+    fmt.println(f"server host: {host}")
+    string port, err e2 = yaml.get(config, "server.port")
+    fmt.println(f"server port: {port}")
+    string workers, err e3 = yaml.get(config, "server.workers")
+    fmt.println(f"server workers: {workers}")
+
+    // Query database section
+    string db_driver, err e4 = yaml.get(config, "database.driver")
+    fmt.println(f"db driver: {db_driver}")
+    string db_name, err e5 = yaml.get(config, "database.name")
+    fmt.println(f"db name: {db_name}")
+    string pool, err e6 = yaml.get(config, "database.pool_size")
+    fmt.println(f"db pool: {pool}")
+
+    // Query logging section
+    string log_level, err e7 = yaml.get(config, "logging.level")
+    fmt.println(f"log level: {log_level}")
+    string log_file, err e8 = yaml.get(config, "logging.file")
+    fmt.println(f"log file: {log_file}")
+
+    // Check types and structure
+    string server_type = yaml.type(config, "server")
+    fmt.println(f"server type: {server_type}")
+    bool has_logging = yaml.has(config, "logging")
+    fmt.println(f"has logging: {has_logging}")
+    bool has_missing = yaml.has(config, "cache")
+    fmt.println(f"has cache: {has_missing}")
+
+    // Keys at root
+    array<string> root_keys, err ke = yaml.keys(config, "")
+    bool kok = ke == ok
+    fmt.println(f"root keys ok: {kok}")
+    fmt.println(f"root keys count: {root_keys.len()}")
+
+    // Keys in database section
+    array<string> db_keys, err dke = yaml.keys(config, "database")
+    bool dkok = dke == ok
+    fmt.println(f"db keys ok: {dkok}")
+    fmt.println(f"db keys count: {db_keys.len()}")
+}
+
+fn test_modify_with_set() -> void {
+    string config = "server:\n  host: localhost\n  port: 8080\nlogging:\n  level: info\n"
+
+    // Modify values
+    string updated, err e1 = yaml.set(config, "server.port", "9090")
+    bool ok1 = e1 == ok
+    fmt.println(f"set port ok: {ok1}")
+
+    string new_port, err e2 = yaml.get(updated, "server.port")
+    fmt.println(f"updated port: {new_port}")
+
+    // Verify other values unchanged
+    string host, err e3 = yaml.get(updated, "server.host")
+    fmt.println(f"host unchanged: {host}")
+
+    string level, err e4 = yaml.get(updated, "logging.level")
+    fmt.println(f"level unchanged: {level}")
+}
+
+fn test_stringify_roundtrip() -> void {
+    string config = "app: myservice\nversion: 2\n"
+    string json_str, err e1 = yaml.parse(config)
+    bool parse_ok = e1 == ok
+    fmt.println(f"parse to json ok: {parse_ok}")
+
+    string back, err e2 = yaml.stringify(json_str)
+    bool str_ok = e2 == ok
+    fmt.println(f"stringify ok: {str_ok}")
+
+    string app, err e3 = yaml.get(back, "app")
+    fmt.println(f"roundtrip app: {app}")
+    string ver, err e4 = yaml.get(back, "version")
+    fmt.println(f"roundtrip version: {ver}")
+}
+
+fn test_file_io_chain() -> void {
+    string base = fs.join(fs.temp_dir(), "vigil_yaml_comp1")
+    err _ = fs.remove_all(base)
+    err _ = fs.mkdir_all(base)
+
+    string config = "server:\n  host: localhost\n  port: 8080\ndatabase:\n  driver: sqlite\n"
+    string path = fs.join(base, "config.yaml")
+
+    // Convert to JSON for write_file
+    string json_str, err pe = yaml.parse(config)
+    bool parse_ok = pe == ok
+    fmt.println(f"file io parse ok: {parse_ok}")
+
+    err we = yaml.write_file(path, json_str)
+    bool write_ok = we == ok
+    fmt.println(f"file io write ok: {write_ok}")
+
+    // Read back
+    string read_back, err re = yaml.read_file(path)
+    bool read_ok = re == ok
+    fmt.println(f"file io read ok: {read_ok}")
+
+    string host, err he = yaml.get(read_back, "server.host")
+    fmt.println(f"file io host: {host}")
+    string driver, err de = yaml.get(read_back, "database.driver")
+    fmt.println(f"file io driver: {driver}")
+
+    err _ = fs.remove_all(base)
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST LARGE_YAML_COMPREHENSIVE_1 START =====")
+    test_config_parse_and_query()
+    test_modify_with_set()
+    test_stringify_roundtrip()
+    test_file_io_chain()
+    fmt.println("===== TEST LARGE_YAML_COMPREHENSIVE_1 END =====")
+    return 0
+}

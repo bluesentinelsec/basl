@@ -1,0 +1,99 @@
+import "fmt"
+import "yaml"
+
+fn test_empty_string_parse() -> void {
+    string v1, err e1 = yaml.parse("")
+    bool is_ok = e1 == ok
+    fmt.println(f"empty parse ok: {is_ok}")
+}
+
+fn test_document_separator() -> void {
+    string doc = "---\nname: Alice\nage: 30\n"
+    string name, err e1 = yaml.get(doc, "name")
+    bool is_ok = e1 == ok
+    fmt.println(f"doc separator get ok: {is_ok}")
+    fmt.println(f"doc separator name: {name}")
+}
+
+fn test_large_mapping() -> void {
+    string doc = ""
+    for (i32 i = 0; i < 25; i++) {
+        doc = doc + f"key_{i}: value_{i}\n"
+    }
+    string v0, err e0 = yaml.get(doc, "key_0")
+    bool ok0 = e0 == ok
+    fmt.println(f"large map key_0 ok: {ok0}")
+    fmt.println(f"large map key_0: {v0}")
+
+    string v24, err e24 = yaml.get(doc, "key_24")
+    bool ok24 = e24 == ok
+    fmt.println(f"large map key_24 ok: {ok24}")
+    fmt.println(f"large map key_24: {v24}")
+
+    array<string> keys, err ke = yaml.keys(doc, "")
+    bool kok = ke == ok
+    fmt.println(f"large map keys ok: {kok}")
+    i32 klen = keys.len()
+    bool has25 = klen >= 25
+    fmt.println(f"large map keys >= 25: {has25}")
+}
+
+fn test_unicode_content() -> void {
+    string doc = "greeting: こんにちは\nemoji: 🚀\naccent: café\n"
+    string g, err e1 = yaml.get(doc, "greeting")
+    fmt.println(f"unicode greeting: {g}")
+    string em, err e2 = yaml.get(doc, "emoji")
+    fmt.println(f"unicode emoji: {em}")
+    string ac, err e3 = yaml.get(doc, "accent")
+    fmt.println(f"unicode accent: {ac}")
+}
+
+fn test_special_characters() -> void {
+    string doc = "quoted: \"hello: world\"\ncolon: 'key: value'\nhash: 'has # inside'\n"
+    string q, err e1 = yaml.get(doc, "quoted")
+    fmt.println(f"special quoted: {q}")
+    string c, err e2 = yaml.get(doc, "colon")
+    fmt.println(f"special colon: {c}")
+    string h, err e3 = yaml.get(doc, "hash")
+    fmt.println(f"special hash: {h}")
+}
+
+fn test_null_and_tilde() -> void {
+    string doc = "a: null\nb: ~\nc: Null\n"
+    string ta = yaml.type(doc, "a")
+    fmt.println(f"null type: {ta}")
+    string tb = yaml.type(doc, "b")
+    fmt.println(f"tilde type: {tb}")
+    string tc = yaml.type(doc, "c")
+    fmt.println(f"Null type: {tc}")
+}
+
+fn test_deeply_nested() -> void {
+    string doc = "l1:\n  l2:\n    l3:\n      l4:\n        l5: deep_value\n"
+    string v, err e = yaml.get(doc, "l1.l2.l3.l4.l5")
+    bool is_ok = e == ok
+    fmt.println(f"deep get ok: {is_ok}")
+    fmt.println(f"deep value: {v}")
+
+    string t = yaml.type(doc, "l1.l2.l3.l4")
+    fmt.println(f"deep l4 type: {t}")
+
+    bool has_deep = yaml.has(doc, "l1.l2.l3.l4.l5")
+    fmt.println(f"has deep path: {has_deep}")
+
+    bool no_deep = yaml.has(doc, "l1.l2.l3.l4.l5.l6")
+    fmt.println(f"has missing deeper: {no_deep}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 10_EDGE_CASES START =====")
+    test_empty_string_parse()
+    test_document_separator()
+    test_large_mapping()
+    test_unicode_content()
+    test_special_characters()
+    test_null_and_tilde()
+    test_deeply_nested()
+    fmt.println("===== TEST 10_EDGE_CASES END =====")
+    return 0
+}

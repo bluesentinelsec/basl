@@ -1,0 +1,81 @@
+import "fmt"
+import "yaml"
+
+fn test_simple_object() -> void {
+    string y, err e = yaml.stringify("{\"name\":\"Alice\",\"age\":30}")
+    bool ok1 = e == ok
+    fmt.println(f"simple obj ok: {ok1}")
+    bool has_name = yaml.has(y, "name")
+    fmt.println(f"simple has name: {has_name}")
+    string n, err _ = yaml.get(y, "name")
+    fmt.println(f"simple name: {n}")
+}
+
+fn test_nested_object() -> void {
+    string j, err _ = yaml.parse("a:\n  b:\n    c: 1")
+    string y, err e = yaml.stringify(j)
+    bool ok1 = e == ok
+    fmt.println(f"nested obj ok: {ok1}")
+    string v, err _ = yaml.get(y, "a.b.c")
+    fmt.println(f"nested a.b.c: {v}")
+}
+
+fn test_arrays() -> void {
+    string y, err e = yaml.stringify("[1,2,3]")
+    bool ok1 = e == ok
+    fmt.println(f"array ok: {ok1}")
+    i32 l, err _ = yaml.len(y, "")
+    fmt.println(f"array len: {l}")
+}
+
+fn test_mixed_types() -> void {
+    string y, err e = yaml.stringify("{\"s\":\"hello\",\"n\":42,\"b\":true,\"nul\":null}")
+    bool ok1 = e == ok
+    fmt.println(f"mixed ok: {ok1}")
+    string ts = yaml.type(y, "s")
+    fmt.println(f"mixed type s: {ts}")
+    string tn = yaml.type(y, "n")
+    fmt.println(f"mixed type n: {tn}")
+    string tb = yaml.type(y, "b")
+    fmt.println(f"mixed type b: {tb}")
+    string tnu = yaml.type(y, "nul")
+    fmt.println(f"mixed type nul: {tnu}")
+}
+
+fn test_empty() -> void {
+    string y1, err e1 = yaml.stringify("{}")
+    bool ok1 = e1 == ok
+    fmt.println(f"empty obj ok: {ok1}")
+    string y2, err e2 = yaml.stringify("[]")
+    bool ok2 = e2 == ok
+    fmt.println(f"empty arr ok: {ok2}")
+}
+
+fn test_roundtrip() -> void {
+    string original = "name: roundtrip\ncount: 99"
+    string j1, err e1 = yaml.parse(original)
+    bool ok1 = e1 == ok
+    fmt.println(f"roundtrip parse ok: {ok1}")
+    string y, err e2 = yaml.stringify(j1)
+    bool ok2 = e2 == ok
+    fmt.println(f"roundtrip stringify ok: {ok2}")
+    string j2, err e3 = yaml.parse(y)
+    bool ok3 = e3 == ok
+    fmt.println(f"roundtrip reparse ok: {ok3}")
+    string n, err _ = yaml.get(j2, "name")
+    fmt.println(f"roundtrip name: {n}")
+    string c, err _ = yaml.get(j2, "count")
+    fmt.println(f"roundtrip count: {c}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 07_stringify START =====")
+    test_simple_object()
+    test_nested_object()
+    test_arrays()
+    test_mixed_types()
+    test_empty()
+    test_roundtrip()
+    fmt.println("===== TEST 07_stringify END =====")
+    return 0
+}

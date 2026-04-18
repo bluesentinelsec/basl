@@ -1,0 +1,144 @@
+import "fmt"
+import "yaml"
+
+fn test_mixed_flow_and_block() -> void {
+    string doc = "block_map:\n  a: 1\n  b: 2\nflow_map: {x: 10, y: 20}\nblock_seq:\n  - one\n  - two\nflow_seq: [alpha, beta, gamma]\n"
+
+    string a, err e1 = yaml.get(doc, "block_map.a")
+    fmt.println(f"block map a: {a}")
+    string x, err e2 = yaml.get(doc, "flow_map.x")
+    fmt.println(f"flow map x: {x}")
+    string s0, err e3 = yaml.get(doc, "block_seq[0]")
+    fmt.println(f"block seq 0: {s0}")
+    string f1, err e4 = yaml.get(doc, "flow_seq[1]")
+    fmt.println(f"flow seq 1: {f1}")
+}
+
+fn test_sequences_of_mappings() -> void {
+    string doc = "users:\n  - name: Alice\n    role: admin\n  - name: Bob\n    role: user\n  - name: Carol\n    role: editor\n"
+
+    string u0_name, err e1 = yaml.get(doc, "users[0].name")
+    fmt.println(f"user 0 name: {u0_name}")
+    string u1_role, err e2 = yaml.get(doc, "users[1].role")
+    fmt.println(f"user 1 role: {u1_role}")
+    string u2_name, err e3 = yaml.get(doc, "users[2].name")
+    fmt.println(f"user 2 name: {u2_name}")
+
+    i32 ulen, err le = yaml.len(doc, "users")
+    fmt.println(f"users len: {ulen}")
+}
+
+fn test_all_query_functions() -> void {
+    string doc = "name: test\ncount: 42\nactive: true\ntags:\n  - a\n  - b\nconfig:\n  debug: false\n  level: 3\n"
+
+    // get
+    string name, err e1 = yaml.get(doc, "name")
+    fmt.println(f"get name: {name}")
+
+    // has
+    bool has_name = yaml.has(doc, "name")
+    fmt.println(f"has name: {has_name}")
+    bool has_missing = yaml.has(doc, "nonexistent")
+    fmt.println(f"has nonexistent: {has_missing}")
+
+    // type
+    string name_type = yaml.type(doc, "name")
+    fmt.println(f"type name: {name_type}")
+    string count_type = yaml.type(doc, "count")
+    fmt.println(f"type count: {count_type}")
+    string active_type = yaml.type(doc, "active")
+    fmt.println(f"type active: {active_type}")
+    string tags_type = yaml.type(doc, "tags")
+    fmt.println(f"type tags: {tags_type}")
+    string config_type = yaml.type(doc, "config")
+    fmt.println(f"type config: {config_type}")
+
+    // keys
+    array<string> root_keys, err ke = yaml.keys(doc, "")
+    bool kok = ke == ok
+    fmt.println(f"root keys ok: {kok}")
+    fmt.println(f"root keys count: {root_keys.len()}")
+
+    array<string> cfg_keys, err cke = yaml.keys(doc, "config")
+    bool ckok = cke == ok
+    fmt.println(f"config keys ok: {ckok}")
+    fmt.println(f"config keys count: {cfg_keys.len()}")
+
+    // len
+    i32 tags_len, err tle = yaml.len(doc, "tags")
+    fmt.println(f"tags len: {tags_len}")
+}
+
+fn test_stringify_roundtrip() -> void {
+    string doc = "app: myapp\nport: 3000\nfeatures:\n  - auth\n  - logging\n"
+
+    string json_str, err e1 = yaml.parse(doc)
+    bool parse_ok = e1 == ok
+    fmt.println(f"parse ok: {parse_ok}")
+
+    string yaml_back, err e2 = yaml.stringify(json_str)
+    bool str_ok = e2 == ok
+    fmt.println(f"stringify ok: {str_ok}")
+
+    string app, err e3 = yaml.get(yaml_back, "app")
+    fmt.println(f"roundtrip app: {app}")
+    string port, err e4 = yaml.get(yaml_back, "port")
+    fmt.println(f"roundtrip port: {port}")
+    string f0, err e5 = yaml.get(yaml_back, "features[0]")
+    fmt.println(f"roundtrip feature 0: {f0}")
+}
+
+fn test_multiple_set_operations() -> void {
+    string doc = "server:\n  host: localhost\n  port: 8080\n  debug: false\n"
+
+    string s1, err e1 = yaml.set(doc, "server.host", "0.0.0.0")
+    bool ok1 = e1 == ok
+    fmt.println(f"set host ok: {ok1}")
+
+    string s2, err e2 = yaml.set(s1, "server.port", "9090")
+    bool ok2 = e2 == ok
+    fmt.println(f"set port ok: {ok2}")
+
+    string s3, err e3 = yaml.set(s2, "server.debug", "true")
+    bool ok3 = e3 == ok
+    fmt.println(f"set debug ok: {ok3}")
+
+    // Verify all changes
+    string host, err he = yaml.get(s3, "server.host")
+    fmt.println(f"final host: {host}")
+    string port, err pe = yaml.get(s3, "server.port")
+    fmt.println(f"final port: {port}")
+    string debug_val, err de = yaml.get(s3, "server.debug")
+    fmt.println(f"final debug: {debug_val}")
+}
+
+fn test_verify_all_types() -> void {
+    string doc = "str_val: hello\nint_val: 42\nfloat_val: 3.14\nbool_val: true\nnull_val: null\nlist_val:\n  - 1\nmap_val:\n  key: val\n"
+
+    string t1 = yaml.type(doc, "str_val")
+    fmt.println(f"str type: {t1}")
+    string t2 = yaml.type(doc, "int_val")
+    fmt.println(f"int type: {t2}")
+    string t3 = yaml.type(doc, "float_val")
+    fmt.println(f"float type: {t3}")
+    string t4 = yaml.type(doc, "bool_val")
+    fmt.println(f"bool type: {t4}")
+    string t5 = yaml.type(doc, "null_val")
+    fmt.println(f"null type: {t5}")
+    string t6 = yaml.type(doc, "list_val")
+    fmt.println(f"list type: {t6}")
+    string t7 = yaml.type(doc, "map_val")
+    fmt.println(f"map type: {t7}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST LARGE_YAML_COMPREHENSIVE_2 START =====")
+    test_mixed_flow_and_block()
+    test_sequences_of_mappings()
+    test_all_query_functions()
+    test_stringify_roundtrip()
+    test_multiple_set_operations()
+    test_verify_all_types()
+    fmt.println("===== TEST LARGE_YAML_COMPREHENSIVE_2 END =====")
+    return 0
+}

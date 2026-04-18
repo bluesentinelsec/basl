@@ -1,0 +1,91 @@
+import "fmt"
+import "yaml"
+
+fn test_nested_mapping_2_levels() -> void {
+    string input = "person:\n  name: Alice\n  age: 30"
+    string n, err e1 = yaml.get(input, "person.name")
+    string a, err e2 = yaml.get(input, "person.age")
+    fmt.println(f"nest2 name: {n}")
+    fmt.println(f"nest2 age: {a}")
+}
+
+fn test_nested_mapping_3_levels() -> void {
+    string input = "org:\n  team:\n    lead: Bob\n    size: 5"
+    string lead, err e1 = yaml.get(input, "org.team.lead")
+    string size, err e2 = yaml.get(input, "org.team.size")
+    fmt.println(f"nest3 lead: {lead}")
+    fmt.println(f"nest3 size: {size}")
+}
+
+fn test_sequence_of_mappings() -> void {
+    string input = "users:\n  - name: Alice\n    role: admin\n  - name: Bob\n    role: user"
+    string n0, err e1 = yaml.get(input, "users[0].name")
+    string r0, err e2 = yaml.get(input, "users[0].role")
+    string n1, err e3 = yaml.get(input, "users[1].name")
+    string r1, err e4 = yaml.get(input, "users[1].role")
+    i32 length, err e5 = yaml.len(input, "users")
+    fmt.println(f"seqmap n0: {n0}")
+    fmt.println(f"seqmap r0: {r0}")
+    fmt.println(f"seqmap n1: {n1}")
+    fmt.println(f"seqmap r1: {r1}")
+    fmt.println(f"seqmap len: {length}")
+}
+
+fn test_mapping_with_sequence_values() -> void {
+    string input = "colors:\n  - red\n  - green\n  - blue\nsizes:\n  - small\n  - large"
+    string c0, err e1 = yaml.get(input, "colors[0]")
+    string c2, err e2 = yaml.get(input, "colors[2]")
+    string s1, err e3 = yaml.get(input, "sizes[1]")
+    i32 clen, err e4 = yaml.len(input, "colors")
+    i32 slen, err e5 = yaml.len(input, "sizes")
+    fmt.println(f"mapseq c0: {c0}")
+    fmt.println(f"mapseq c2: {c2}")
+    fmt.println(f"mapseq s1: {s1}")
+    fmt.println(f"mapseq clen: {clen}")
+    fmt.println(f"mapseq slen: {slen}")
+}
+
+fn test_mixed_nesting() -> void {
+    string input = "config:\n  db:\n    host: localhost\n    ports:\n      - 5432\n      - 5433\n  cache:\n    enabled: true"
+    string host, err e1 = yaml.get(input, "config.db.host")
+    string p0, err e2 = yaml.get(input, "config.db.ports[0]")
+    string p1, err e3 = yaml.get(input, "config.db.ports[1]")
+    string enabled, err e4 = yaml.get(input, "config.cache.enabled")
+    string t = yaml.type(input, "config.db.ports")
+    fmt.println(f"mixed host: {host}")
+    fmt.println(f"mixed p0: {p0}")
+    fmt.println(f"mixed p1: {p1}")
+    fmt.println(f"mixed enabled: {enabled}")
+    fmt.println(f"mixed ports_type: {t}")
+}
+
+fn test_has_nested() -> void {
+    string input = "a:\n  b:\n    c: 1"
+    bool h1 = yaml.has(input, "a.b.c")
+    bool h2 = yaml.has(input, "a.b.d")
+    bool h3 = yaml.has(input, "a.b")
+    fmt.println(f"has a.b.c: {h1}")
+    fmt.println(f"has a.b.d: {h2}")
+    fmt.println(f"has a.b: {h3}")
+}
+
+fn test_keys_nested() -> void {
+    string input = "server:\n  host: localhost\n  port: 8080\n  debug: true"
+    array<string> k, err e = yaml.keys(input, "server")
+    bool ok = e == ok
+    fmt.println(f"keys ok: {ok}")
+    fmt.println(f"keys len: {k.len()}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 02_NESTED_STRUCTURES START =====")
+    test_nested_mapping_2_levels()
+    test_nested_mapping_3_levels()
+    test_sequence_of_mappings()
+    test_mapping_with_sequence_values()
+    test_mixed_nesting()
+    test_has_nested()
+    test_keys_nested()
+    fmt.println("===== TEST 02_NESTED_STRUCTURES END =====")
+    return 0
+}

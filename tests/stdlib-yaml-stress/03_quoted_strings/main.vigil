@@ -1,0 +1,107 @@
+import "fmt"
+import "yaml"
+
+fn test_double_quoted() -> void {
+    string input = "msg: \"hello world\""
+    string val, err e = yaml.get(input, "msg")
+    bool ok = e == ok
+    fmt.println(f"dq ok: {ok}")
+    fmt.println(f"dq val: {val}")
+}
+
+fn test_single_quoted() -> void {
+    string input = "msg: 'hello world'"
+    string val, err e = yaml.get(input, "msg")
+    bool ok = e == ok
+    fmt.println(f"sq ok: {ok}")
+    fmt.println(f"sq val: {val}")
+}
+
+fn test_double_quoted_with_special_chars() -> void {
+    string input = "msg: \"has: colon and # hash\""
+    string val, err e = yaml.get(input, "msg")
+    fmt.println(f"dq_special val: {val}")
+}
+
+fn test_single_quoted_with_special_chars() -> void {
+    string input = "msg: 'has: colon and # hash'"
+    string val, err e = yaml.get(input, "msg")
+    fmt.println(f"sq_special val: {val}")
+}
+
+fn test_escape_newline() -> void {
+    string input = "msg: \"line1\\nline2\""
+    string val, err e = yaml.get(input, "msg")
+    bool ok = e == ok
+    fmt.println(f"esc_n ok: {ok}")
+    fmt.println(f"esc_n val: {val}")
+}
+
+fn test_escape_tab() -> void {
+    string input = "msg: \"col1\\tcol2\""
+    string val, err e = yaml.get(input, "msg")
+    bool ok = e == ok
+    fmt.println(f"esc_t ok: {ok}")
+    fmt.println(f"esc_t val: {val}")
+}
+
+fn test_escape_backslash() -> void {
+    string input = "path: \"C:\\\\Users\\\\test\""
+    string val, err e = yaml.get(input, "path")
+    bool ok = e == ok
+    fmt.println(f"esc_bs ok: {ok}")
+    fmt.println(f"esc_bs val: {val}")
+}
+
+fn test_escape_double_quote() -> void {
+    string input = "msg: \"say \\\"hi\\\"\""
+    string val, err e = yaml.get(input, "msg")
+    bool ok = e == ok
+    fmt.println(f"esc_dq ok: {ok}")
+    fmt.println(f"esc_dq val: {val}")
+}
+
+fn test_empty_double_quoted() -> void {
+    string input = "msg: \"\""
+    string val, err e = yaml.get(input, "msg")
+    bool ok = e == ok
+    string t = yaml.type(input, "msg")
+    fmt.println(f"empty_dq ok: {ok}")
+    fmt.println(f"empty_dq val: [{val}]")
+    fmt.println(f"empty_dq type: {t}")
+}
+
+fn test_empty_single_quoted() -> void {
+    string input = "msg: ''"
+    string val, err e = yaml.get(input, "msg")
+    bool ok = e == ok
+    string t = yaml.type(input, "msg")
+    fmt.println(f"empty_sq ok: {ok}")
+    fmt.println(f"empty_sq val: [{val}]")
+    fmt.println(f"empty_sq type: {t}")
+}
+
+fn test_quoted_number_as_string() -> void {
+    string input = "val: \"42\""
+    string t = yaml.type(input, "val")
+    string val, err e = yaml.get(input, "val")
+    fmt.println(f"quoted_num type: {t}")
+    fmt.println(f"quoted_num val: {val}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 03_QUOTED_STRINGS START =====")
+    test_double_quoted()
+    test_single_quoted()
+    test_double_quoted_with_special_chars()
+    test_single_quoted_with_special_chars()
+    test_escape_newline()
+    test_escape_tab()
+    test_escape_backslash()
+    test_escape_double_quote()
+    test_empty_double_quoted()
+    test_empty_single_quoted()
+    test_quoted_number_as_string()
+    fmt.println("===== TEST 03_QUOTED_STRINGS END =====")
+    return 0
+}

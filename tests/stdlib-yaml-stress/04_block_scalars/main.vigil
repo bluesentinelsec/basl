@@ -1,0 +1,86 @@
+import "fmt"
+import "yaml"
+
+fn test_literal_block() -> void {
+    string input = "msg: |\n  line one\n  line two\n  line three"
+    string val, err e = yaml.get(input, "msg")
+    bool ok = e == ok
+    fmt.println(f"literal ok: {ok}")
+    fmt.println(f"literal val: {val}")
+}
+
+fn test_folded_block() -> void {
+    string input = "msg: >\n  this is\n  a folded\n  block"
+    string val, err e = yaml.get(input, "msg")
+    bool ok = e == ok
+    fmt.println(f"folded ok: {ok}")
+    fmt.println(f"folded val: {val}")
+}
+
+fn test_literal_preserves_newlines() -> void {
+    string input = "text: |\n  first\n  second"
+    string val, err e = yaml.get(input, "text")
+    string t = yaml.type(input, "text")
+    fmt.println(f"lit_nl type: {t}")
+    bool has = yaml.has(input, "text")
+    fmt.println(f"lit_nl has: {has}")
+}
+
+fn test_folded_joins_lines() -> void {
+    string input = "text: >\n  hello\n  world"
+    string val, err e = yaml.get(input, "text")
+    string t = yaml.type(input, "text")
+    fmt.println(f"fold_join type: {t}")
+    fmt.println(f"fold_join val: {val}")
+}
+
+fn test_literal_with_other_keys() -> void {
+    string input = "title: Test\nbody: |\n  paragraph one\n  paragraph two\nfooter: end"
+    string title, err e1 = yaml.get(input, "title")
+    string body, err e2 = yaml.get(input, "body")
+    string footer, err e3 = yaml.get(input, "footer")
+    fmt.println(f"multi title: {title}")
+    fmt.println(f"multi body: {body}")
+    fmt.println(f"multi footer: {footer}")
+}
+
+fn test_folded_with_other_keys() -> void {
+    string input = "header: top\ncontent: >\n  some folded\n  text here\nstatus: ok"
+    string header, err e1 = yaml.get(input, "header")
+    string content, err e2 = yaml.get(input, "content")
+    string status, err e3 = yaml.get(input, "status")
+    fmt.println(f"fmulti header: {header}")
+    fmt.println(f"fmulti content: {content}")
+    fmt.println(f"fmulti status: {status}")
+}
+
+fn test_literal_in_nested() -> void {
+    string input = "config:\n  script: |\n    echo hello\n    echo world"
+    string val, err e = yaml.get(input, "config.script")
+    bool ok = e == ok
+    fmt.println(f"nested_lit ok: {ok}")
+    fmt.println(f"nested_lit val: {val}")
+}
+
+fn test_block_parse_roundtrip() -> void {
+    string input = "msg: |\n  hello\n  world"
+    string json, err e1 = yaml.parse(input)
+    bool parse_ok = e1 == ok
+    fmt.println(f"roundtrip parse_ok: {parse_ok}")
+    bool has = yaml.has(input, "msg")
+    fmt.println(f"roundtrip has: {has}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 04_BLOCK_SCALARS START =====")
+    test_literal_block()
+    test_folded_block()
+    test_literal_preserves_newlines()
+    test_folded_joins_lines()
+    test_literal_with_other_keys()
+    test_folded_with_other_keys()
+    test_literal_in_nested()
+    test_block_parse_roundtrip()
+    fmt.println("===== TEST 04_BLOCK_SCALARS END =====")
+    return 0
+}
