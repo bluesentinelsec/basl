@@ -1,0 +1,34 @@
+name = "02_quoting_and_escaping"
+description = "CSV stress test"
+version = "1.0.0"
+type = "cli"
+org = "com.example"
+author = ""
+license = ""
+homepage = ""
+repository = ""
+readme = "README.md"
+keywords = []
+platforms = ["windows", "linux", "macos"]
+[icon]
+windows = ""
+macos = ""
+linux = ""
+ios = ""
+android = ""
+[platform.macos]
+min-os-version = ""
+category = ""
+entitlements = []
+[platform.ios]
+min-os-version = ""
+orientation = "both"
+permissions = []
+[platform.android]
+min-sdk-version = 26
+permissions = []
+[platform.windows]
+manifest = true
+[platform.linux]
+category = ""
+[dependencies]

@@ -1,0 +1,58 @@
+import "fmt"
+import "csv"
+
+fn test_tab_delimiter() -> void {
+    array<string> row, err e = csv.parse_row("a\tb\tc", "\t")
+    fmt.println(f"tab len: {row.len()}")
+    fmt.println(f"tab: {row[0]},{row[1]},{row[2]}")
+}
+
+fn test_pipe_delimiter() -> void {
+    array<string> row, err e = csv.parse_row("x|y|z", "|")
+    fmt.println(f"pipe: {row[0]},{row[1]},{row[2]}")
+}
+
+fn test_semicolon_delimiter() -> void {
+    array<string> row, err e = csv.parse_row("a;b;c", ";")
+    fmt.println(f"semi: {row[0]};{row[1]};{row[2]}")
+}
+
+fn test_tab_stringify() -> void {
+    array<string> row = ["hello", "world"]
+    string out, err e = csv.stringify_row(row, "\t")
+    fmt.println(f"tab str: [{out}]")
+}
+
+fn test_pipe_stringify() -> void {
+    array<string> row = ["a", "b|c", "d"]
+    string out, err e = csv.stringify_row(row, "|")
+    fmt.println(f"pipe str: [{out}]")
+}
+
+fn test_semicolon_roundtrip() -> void {
+    array<string> row = ["x", "y", "z"]
+    string line, err e1 = csv.stringify_row(row, ";")
+    array<string> parsed, err e2 = csv.parse_row(line, ";")
+    bool ok = parsed[0] == "x" && parsed[1] == "y" && parsed[2] == "z"
+    fmt.println(f"semi rt: {ok}")
+}
+
+fn test_comma_in_tab_delimited() -> void {
+    array<string> row, err e = csv.parse_row("a,b\tc,d", "\t")
+    fmt.println(f"comma_tab len: {row.len()}")
+    fmt.println(f"comma_tab f0: {row[0]}")
+    fmt.println(f"comma_tab f1: {row[1]}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 03_CUSTOM_DELIMITERS START =====")
+    test_tab_delimiter()
+    test_pipe_delimiter()
+    test_semicolon_delimiter()
+    test_tab_stringify()
+    test_pipe_stringify()
+    test_semicolon_roundtrip()
+    test_comma_in_tab_delimited()
+    fmt.println("===== TEST 03_CUSTOM_DELIMITERS END =====")
+    return 0
+}

@@ -6565,7 +6565,16 @@ static vigil_status_t vigil_native_type_to_binding_type(vigil_parser_state_t *st
     if (native_type->object_kind == 4)
     {
         /* Array type */
-        elem_type = vigil_binding_type_primitive((vigil_type_kind_t)native_type->element_type);
+        if (native_type->element_type_ext != NULL)
+        {
+            status = vigil_native_type_to_binding_type(state, native_type->element_type_ext, &elem_type);
+            if (status != VIGIL_STATUS_OK)
+                return status;
+        }
+        else
+        {
+            elem_type = vigil_binding_type_primitive((vigil_type_kind_t)native_type->element_type);
+        }
         status = vigil_program_intern_array_type((vigil_program_state_t *)state->program, elem_type, out_type);
         return status;
     }
@@ -6573,7 +6582,16 @@ static vigil_status_t vigil_native_type_to_binding_type(vigil_parser_state_t *st
     {
         /* Map type */
         key_type = vigil_binding_type_primitive((vigil_type_kind_t)native_type->key_type);
-        value_type = vigil_binding_type_primitive((vigil_type_kind_t)native_type->value_type);
+        if (native_type->element_type_ext != NULL)
+        {
+            status = vigil_native_type_to_binding_type(state, native_type->element_type_ext, &value_type);
+            if (status != VIGIL_STATUS_OK)
+                return status;
+        }
+        else
+        {
+            value_type = vigil_binding_type_primitive((vigil_type_kind_t)native_type->value_type);
+        }
         status = vigil_program_intern_map_type((vigil_program_state_t *)state->program, key_type, value_type, out_type);
         return status;
     }
@@ -6861,7 +6879,15 @@ static vigil_status_t vigil_parser_set_native_fn_return_type(vigil_parser_state_
         else if (fn->return_count == 2U)
         {
             vigil_parser_type_t first_type;
-            if (fn->return_types[0] == VIGIL_TYPE_OBJECT && fn->return_element_type != 0)
+            if (fn->return_types[0] == VIGIL_TYPE_OBJECT && fn->return_type_ext != NULL)
+            {
+                vigil_binding_type_t resolved;
+                status = vigil_native_type_to_binding_type(state, fn->return_type_ext, &resolved);
+                if (status != VIGIL_STATUS_OK)
+                    return status;
+                first_type = resolved;
+            }
+            else if (fn->return_types[0] == VIGIL_TYPE_OBJECT && fn->return_element_type != 0)
             {
                 vigil_parser_type_t elem_type =
                     vigil_binding_type_primitive((vigil_type_kind_t)fn->return_element_type);

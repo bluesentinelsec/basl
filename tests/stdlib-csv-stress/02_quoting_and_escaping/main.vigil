@@ -1,0 +1,61 @@
+import "fmt"
+import "csv"
+
+fn test_quoted_field() -> void {
+    array<string> row, err e = csv.parse_row("\"hello, world\",b", ",")
+    fmt.println(f"quoted f0: {row[0]}")
+    fmt.println(f"quoted f1: {row[1]}")
+}
+
+fn test_escaped_quote() -> void {
+    array<string> row, err e = csv.parse_row("\"say \"\"hi\"\"\",b", ",")
+    fmt.println(f"escaped f0: {row[0]}")
+}
+
+fn test_double_quote_only() -> void {
+    array<string> row, err e = csv.parse_row("\"\"\"\"\"\"\",b", ",")
+    fmt.println(f"dq f0: {row[0]}")
+}
+
+fn test_empty_quoted() -> void {
+    array<string> row, err e = csv.parse_row("\"\",b,\"\"", ",")
+    fmt.println(f"eq f0: [{row[0]}]")
+    fmt.println(f"eq f1: {row[1]}")
+    fmt.println(f"eq f2: [{row[2]}]")
+}
+
+fn test_unquoted() -> void {
+    array<string> row, err e = csv.parse_row("abc,def", ",")
+    fmt.println(f"uq f0: {row[0]}")
+    fmt.println(f"uq f1: {row[1]}")
+}
+
+fn test_embedded_newline_parse_row() -> void {
+    array<string> row, err e = csv.parse_row("\"line1\nline2\",b", ",")
+    fmt.println(f"nl f0: {row[0]}")
+    fmt.println(f"nl f1: {row[1]}")
+}
+
+fn test_embedded_newline_parse() -> void {
+    string data = "\"line1\nline2\",b\nc,d\n"
+    array<array<string>> rows, err e = csv.parse(data, ",")
+    bool ok = e == ok
+    fmt.println(f"nl parse ok: {ok}")
+    fmt.println(f"nl parse rows: {rows.len()}")
+    fmt.println(f"nl parse r0f0: {rows[0][0]}")
+    fmt.println(f"nl parse r0f1: {rows[0][1]}")
+    fmt.println(f"nl parse r1f0: {rows[1][0]}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 02_QUOTING_AND_ESCAPING START =====")
+    test_quoted_field()
+    test_escaped_quote()
+    test_double_quote_only()
+    test_empty_quoted()
+    test_unquoted()
+    test_embedded_newline_parse_row()
+    test_embedded_newline_parse()
+    fmt.println("===== TEST 02_QUOTING_AND_ESCAPING END =====")
+    return 0
+}

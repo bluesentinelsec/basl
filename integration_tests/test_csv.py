@@ -25,7 +25,8 @@ class CsvParseRowTest(unittest.TestCase):
     def test_parse_row_simple(self):
         code = r'''import "csv"
 fn main() -> i32 {
-    array<string> row = csv.parse_row("a,b,c")
+    array<string> row, err e = csv.parse_row("a,b,c", ",")
+    if e != ok { return 1 }
     if row[0] == "a" && row[1] == "b" && row[2] == "c" { return 0 }
     return 1
 }'''
@@ -35,7 +36,7 @@ fn main() -> i32 {
     def test_parse_row_quoted(self):
         code = r'''import "csv"
 fn main() -> i32 {
-    array<string> row = csv.parse_row("\"hello, world\",b")
+    array<string> row, err e = csv.parse_row("\"hello, world\",b", ",")
     if row[0] == "hello, world" { return 0 }
     return 1
 }'''
@@ -45,7 +46,7 @@ fn main() -> i32 {
     def test_parse_row_escaped_quote(self):
         code = r'''import "csv"
 fn main() -> i32 {
-    array<string> row = csv.parse_row("\"say \"\"hi\"\"\",b")
+    array<string> row, err e = csv.parse_row("\"say \"\"hi\"\"\",b", ",")
     if row[0] == "say \"hi\"" { return 0 }
     return 1
 }'''
@@ -58,7 +59,7 @@ class CsvStringifyRowTest(unittest.TestCase):
         code = r'''import "csv"
 fn main() -> i32 {
     array<string> row = ["x", "y", "z"]
-    string out = csv.stringify_row(row)
+    string out, err e = csv.stringify_row(row, ",")
     if out == "x,y,z" { return 0 }
     return 1
 }'''
@@ -69,7 +70,7 @@ fn main() -> i32 {
         code = r'''import "csv"
 fn main() -> i32 {
     array<string> row = ["hello, world", "b"]
-    string out = csv.stringify_row(row)
+    string out, err e = csv.stringify_row(row, ",")
     if out == "\"hello, world\",b" { return 0 }
     return 1
 }'''
@@ -80,7 +81,7 @@ fn main() -> i32 {
         code = r'''import "csv"
 fn main() -> i32 {
     array<string> row = ["say \"hi\"", "b"]
-    string out = csv.stringify_row(row)
+    string out, err e = csv.stringify_row(row, ",")
     if out == "\"say \"\"hi\"\"\",b" { return 0 }
     return 1
 }'''
@@ -93,8 +94,8 @@ class CsvRoundtripTest(unittest.TestCase):
         code = r'''import "csv"
 fn main() -> i32 {
     array<string> row = ["a", "b", "c"]
-    string line = csv.stringify_row(row)
-    array<string> parsed = csv.parse_row(line)
+    string line, err e1 = csv.stringify_row(row, ",")
+    array<string> parsed, err e2 = csv.parse_row(line, ",")
     if parsed[0] == "a" && parsed[1] == "b" && parsed[2] == "c" { return 0 }
     return 1
 }'''

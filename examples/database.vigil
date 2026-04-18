@@ -19,7 +19,7 @@ fn db_init() -> void {
 
 fn db_insert(string id, string name, string age) -> void {
     array<string> row = [id, name, age]
-    string line = csv.stringify_row(row)
+    string line, err _ = csv.stringify_row(row, ",")
     err _ = fs.append(DB_FILE, line + "\n")
 }
 
@@ -47,7 +47,7 @@ fn main() -> i32 {
             continue
         }
 
-        array<string> row = csv.parse_row(line)
+        array<string> row, err _ = csv.parse_row(line, ",")
         if row.len() >= 3 {
             string id = row[0]
             string name = row[1]
@@ -65,7 +65,7 @@ fn main() -> i32 {
             continue
         }
 
-        array<string> row = csv.parse_row(line)
+        array<string> row, err _ = csv.parse_row(line, ",")
         if row.len() >= 3 {
             string name = row[1]
             string age_str = row[2]

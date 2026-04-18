@@ -28,21 +28,22 @@ extern "C"
         int element_type; /* For arrays: element vigil_type_kind_t */
         int key_type;     /* For maps: key vigil_type_kind_t */
         int value_type;   /* For maps: value vigil_type_kind_t */
+        const struct vigil_native_type *element_type_ext; /* For nested types: overrides element_type/value_type */
     } vigil_native_type_t;
 
     /* Helper macros for defining native types */
     /* clang-format off */
 #define VIGIL_NATIVE_TYPE_PRIMITIVE(k)                                                                                 \
     {                                                                                                                  \
-        (k), 0, 0, 0, 0                                                                                               \
+        (k), 0, 0, 0, 0, NULL                                                                                         \
     }
 #define VIGIL_NATIVE_TYPE_ARRAY(elem)                                                                                  \
     {                                                                                                                  \
-        VIGIL_TYPE_OBJECT, 4, (elem), 0, 0                                                                             \
+        VIGIL_TYPE_OBJECT, 4, (elem), 0, 0, NULL                                                                       \
     }
 #define VIGIL_NATIVE_TYPE_MAP(k, v)                                                                                    \
     {                                                                                                                  \
-        VIGIL_TYPE_OBJECT, 5, 0, (k), (v)                                                                              \
+        VIGIL_TYPE_OBJECT, 5, 0, (k), (v), NULL                                                                        \
     }
     /* clang-format on */
 
