@@ -1,0 +1,47 @@
+import "fmt"
+import "regex"
+
+fn test_basic_split() -> void {
+    array<string> p1 = regex.split(",", "a,b,c")
+    fmt.println(f"split comma len: {p1.len()}")
+    fmt.println(f"split[0]: {p1[0]}")
+    fmt.println(f"split[1]: {p1[1]}")
+    fmt.println(f"split[2]: {p1[2]}")
+}
+
+fn test_regex_split() -> void {
+    array<string> p1 = regex.split(`\s+`, "hello   world   foo")
+    fmt.println(f"split ws len: {p1.len()}")
+    fmt.println(f"split ws[0]: {p1[0]}")
+    fmt.println(f"split ws[1]: {p1[1]}")
+    fmt.println(f"split ws[2]: {p1[2]}")
+    array<string> p2 = regex.split("[,;]+", "a,b;;c,d")
+    fmt.println(f"split multi-sep len: {p2.len()}")
+    fmt.println(f"split multi[0]: {p2[0]}")
+    fmt.println(f"split multi[3]: {p2[3]}")
+}
+
+fn test_no_match_split() -> void {
+    array<string> p1 = regex.split("[0-9]+", "abc")
+    fmt.println(f"split no match len: {p1.len()}")
+    fmt.println(f"split no match[0]: {p1[0]}")
+}
+
+fn test_split_edges() -> void {
+    array<string> p1 = regex.split(",", "a,,b")
+    fmt.println(f"split empty parts len: {p1.len()}")
+    array<string> p2 = regex.split(`\|`, "one|two|three")
+    fmt.println(f"split pipe len: {p2.len()}")
+    fmt.println(f"split pipe[0]: {p2[0]}")
+    fmt.println(f"split pipe[2]: {p2[2]}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 07_SPLIT START =====")
+    test_basic_split()
+    test_regex_split()
+    test_no_match_split()
+    test_split_edges()
+    fmt.println("===== TEST 07_SPLIT END =====")
+    return 0
+}

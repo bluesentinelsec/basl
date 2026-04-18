@@ -125,14 +125,27 @@ fn main() -> i32 {
         self.assertEqual(rc, 0, f"stderr: {err}")
 
     def test_match_unsupported_brace_quantifiers_return_false(self):
+        """Brace quantifiers that remain unsupported (bad syntax, too large)."""
         code = '''import "regex"
 fn main() -> i32 {
-    if !regex.match("a{2}", "aa")
-        && !regex.match("a{1", "a")
-        && !regex.match("a{101}", "a")
-        && !regex.match("a{0,11}", "")
-        && !regex.match("a{2,}", "aa")
-        && !regex.match("a{1,2}", "a") { return 0 }
+    if !regex.match("a{1", "a")
+        && !regex.match("a{101}", "a") { return 0 }
+    return 1
+}'''
+        rc, out, err = run_vigil(code)
+        self.assertEqual(rc, 0, f"stderr: {err}")
+
+    def test_match_brace_quantifiers(self):
+        """Brace quantifiers that are now supported."""
+        code = '''import "regex"
+fn main() -> i32 {
+    if regex.match("a{2}", "aa")
+        && regex.match("a{0,11}", "")
+        && regex.match("a{2,}", "aa")
+        && regex.match("a{1,2}", "a")
+        && regex.match("a{1,2}", "aa")
+        && !regex.match("a{2}", "a")
+        && !regex.match("a{2,3}", "a") { return 0 }
     return 1
 }'''
         rc, out, err = run_vigil(code)

@@ -1,0 +1,91 @@
+import "fmt"
+import "regex"
+
+fn test_many_find_all() -> void {
+    string input = ""
+    for (i32 i = 0; i < 50; i++) {
+        input = input + f"item{i} "
+    }
+    array<string> matches = regex.find_all("[a-z]+[0-9]+", input)
+    fmt.println(f"many matches: {matches.len()}")
+    fmt.println(f"first: {matches[0]}")
+    fmt.println(f"last: {matches[49]}")
+}
+
+fn test_large_input() -> void {
+    string big = ""
+    for (i32 i = 0; i < 200; i++) {
+        big = big + "abc123 "
+    }
+    array<string> nums = regex.find_all("[0-9]+", big)
+    fmt.println(f"large nums: {nums.len()}")
+    string replaced = regex.replace_all("[0-9]+", big, "X")
+    string f1, bool ok1 = regex.find("[0-9]+", replaced)
+    fmt.println(f"all replaced: {!ok1}")
+}
+
+fn test_complex_patterns() -> void {
+    string csv = "Alice,30,NYC;Bob,25,LA;Carol,35,SF"
+    array<string> records = regex.split(";", csv)
+    fmt.println(f"records: {records.len()}")
+    for rec in records {
+        array<string> fields = regex.split(",", rec)
+        fmt.println(f"  name={fields[0]} age={fields[1]} city={fields[2]}")
+    }
+}
+
+fn test_captures_chain() -> void {
+    string input = "John:42 Jane:38 Jim:25"
+    array<string> pairs = regex.find_all("[A-Za-z]+:[0-9]+", input)
+    fmt.println(f"pairs: {pairs.len()}")
+    for pair in pairs {
+        array<string> g1, bool ok1 = regex.captures("([A-Za-z]+):([0-9]+)", pair)
+        if ok1 {
+            fmt.println(f"  {g1[1]} is {g1[2]}")
+        }
+    }
+}
+
+fn test_replace_chain() -> void {
+    string input = "  Hello,   World!  How   are  you?  "
+    string step1 = regex.replace_all(`\s+`, input, " ")
+    string step2 = regex.replace_all("^ | $", step1, "")
+    string step3 = regex.replace_all("[^a-zA-Z ]", step2, "")
+    fmt.println(f"cleaned: [{step3}]")
+}
+
+fn test_stress_is_valid() -> void {
+    i32 valid_count = 0
+    array<string> patterns = ["[a-z]+", `\d+`, ".*", "a|b", "(a)(b)", "[^x]", "a+?"]
+    for pat in patterns {
+        if regex.is_valid(pat) {
+            valid_count = valid_count + 1
+        }
+    }
+    fmt.println(f"valid patterns: {valid_count}")
+    fmt.println(f"invalid unclosed: {regex.is_valid("[abc")}")
+    fmt.println(f"invalid paren: {regex.is_valid("(abc")}")
+}
+
+fn test_mixed_operations() -> void {
+    string text = "Error: code=404, msg=Not Found; Error: code=500, msg=Server Error"
+    array<string> errors = regex.find_all("code=[0-9]+", text)
+    fmt.println(f"error codes: {errors.len()}")
+    string redacted = regex.replace_all("code=[0-9]+", text, "code=XXX")
+    fmt.println(f"redacted: {redacted}")
+    array<string> parts = regex.split("; ", text)
+    fmt.println(f"error entries: {parts.len()}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST LARGE_REGEX_COMPREHENSIVE_2 START =====")
+    test_many_find_all()
+    test_large_input()
+    test_complex_patterns()
+    test_captures_chain()
+    test_replace_chain()
+    test_stress_is_valid()
+    test_mixed_operations()
+    fmt.println("===== TEST LARGE_REGEX_COMPREHENSIVE_2 END =====")
+    return 0
+}

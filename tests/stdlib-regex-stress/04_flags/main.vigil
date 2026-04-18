@@ -1,0 +1,39 @@
+import "fmt"
+import "regex"
+
+fn test_case_insensitive() -> void {
+    fmt.println(f"case-i match: {regex.match("(?i)hello", "HELLO")}")
+    fmt.println(f"case-i mixed: {regex.match("(?i)hello", "HeLLo")}")
+    fmt.println(f"case-i find: {regex.match("(?i)[a-z]+", "ABC")}")
+    string f1, bool ok1 = regex.find("(?i)world", "Hello WORLD")
+    fmt.println(f"case-i find: {f1}, {ok1}")
+}
+
+fn test_dotall() -> void {
+    fmt.println(f"dotall: {regex.match("(?s)a.b", "a\nb")}")
+    fmt.println(f"no dotall: {regex.match("a.b", "a\nb")}")
+    string f1, bool ok1 = regex.find("(?s).+", "line1\nline2")
+    fmt.println(f"dotall find len: {f1.len()}, {ok1}")
+}
+
+fn test_multiline() -> void {
+    string input = "line1\nline2\nline3"
+    array<string> lines = regex.find_all("(?m)^line[0-9]", input)
+    fmt.println(f"multiline count: {lines.len()}")
+    string f1, bool ok1 = regex.find("(?m)^line2", input)
+    fmt.println(f"multiline find: {f1}, {ok1}")
+}
+
+fn test_combined_flags() -> void {
+    fmt.println(f"combined i+s: {regex.match("(?is)hello.world", "HELLO\nWORLD")}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 04_FLAGS START =====")
+    test_case_insensitive()
+    test_dotall()
+    test_multiline()
+    test_combined_flags()
+    fmt.println("===== TEST 04_FLAGS END =====")
+    return 0
+}

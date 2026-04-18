@@ -258,8 +258,18 @@ static vigil_status_t vigil_regex_find_all_fn(vigil_vm_t *vm, size_t arg_count, 
         return s;
     }
 
-    vigil_regex_result_t results[256];
-    size_t count = vigil_regex_find_all(re, input, input_len, results, 256);
+    vigil_regex_result_t *results = NULL;
+    size_t results_cap = 256;
+    {
+        const vigil_allocator_t *a = re_get_alloc(vm);
+        results = (vigil_regex_result_t *)a->allocate(a->user_data, results_cap * sizeof(vigil_regex_result_t));
+    }
+    if (!results)
+    {
+        vigil_vm_stack_pop_n(vm, arg_count);
+        return VIGIL_STATUS_OUT_OF_MEMORY;
+    }
+    size_t count = vigil_regex_find_all(re, input, input_len, results, results_cap);
 
     /* Build array of match strings */
     vigil_value_t *items = NULL;
@@ -271,6 +281,10 @@ static vigil_status_t vigil_regex_find_all_fn(vigil_vm_t *vm, size_t arg_count, 
         }
         if (!items)
         {
+            {
+                const vigil_allocator_t *a = re_get_alloc(vm);
+                a->deallocate(a->user_data, results);
+            }
             vigil_vm_stack_pop_n(vm, arg_count);
             return VIGIL_STATUS_OUT_OF_MEMORY;
         }
@@ -287,6 +301,7 @@ static vigil_status_t vigil_regex_find_all_fn(vigil_vm_t *vm, size_t arg_count, 
                 {
                     const vigil_allocator_t *a = re_get_alloc(vm);
                     a->deallocate(a->user_data, items);
+                    a->deallocate(a->user_data, results);
                 }
                 vigil_vm_stack_pop_n(vm, arg_count);
                 return s;
@@ -296,6 +311,11 @@ static vigil_status_t vigil_regex_find_all_fn(vigil_vm_t *vm, size_t arg_count, 
     }
 
     vigil_vm_stack_pop_n(vm, arg_count);
+
+    {
+        const vigil_allocator_t *a = re_get_alloc(vm);
+        a->deallocate(a->user_data, results);
+    }
 
     vigil_object_t *arr = NULL;
     s = vigil_array_object_new(vigil_vm_runtime(vm), items, count, &arr, error);
@@ -514,6 +534,165 @@ static vigil_status_t vigil_regex_split_fn(vigil_vm_t *vm, size_t arg_count, vig
     return s;
 }
 
+/* ── regex.captures(pattern, input) -> (array<string>, bool) ── */
+
+static vigil_status_t regex_captures(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    const char *pattern, *input;
+    size_t pattern_len, input_len;
+    vigil_status_t s;
+
+    if (!get_string_arg(vm, base, 0, &pattern, &pattern_len) || !get_string_arg(vm, base, 1, &input, &input_len))
+        goto no_match;
+
+    {
+        char err_buf[128];
+        vigil_regex_t *re = regex_cache_get(vigil_vm_runtime(vm), pattern, pattern_len, err_buf, sizeof(err_buf));
+        if (!re)
+            goto no_match;
+
+        vigil_regex_result_t result;
+        bool found = vigil_regex_find(re, input, input_len, &result);
+        if (!found)
+            goto no_match;
+
+        /* Build array of capture group strings */
+        const vigil_allocator_t *alloc = re_get_alloc(vm);
+        vigil_value_t *items =
+            (vigil_value_t *)alloc->allocate(alloc->user_data, result.group_count * sizeof(vigil_value_t));
+        if (!items)
+        {
+            vigil_vm_stack_pop_n(vm, arg_count);
+            return VIGIL_STATUS_OUT_OF_MEMORY;
+        }
+
+        for (size_t i = 0; i < result.group_count; i++)
+        {
+            vigil_object_t *str_obj = NULL;
+            if (result.groups[i].start != SIZE_MAX)
+            {
+                size_t gs = result.groups[i].start;
+                size_t ge = result.groups[i].end;
+                s = vigil_string_object_new(vigil_vm_runtime(vm), input + gs, ge - gs, &str_obj, error);
+            }
+            else
+            {
+                s = vigil_string_object_new(vigil_vm_runtime(vm), "", 0, &str_obj, error);
+            }
+            if (s != VIGIL_STATUS_OK)
+            {
+                for (size_t j = 0; j < i; j++)
+                    vigil_value_release(&items[j]);
+                alloc->deallocate(alloc->user_data, items);
+                vigil_vm_stack_pop_n(vm, arg_count);
+                return s;
+            }
+            vigil_value_init_object(&items[i], &str_obj);
+        }
+
+        vigil_vm_stack_pop_n(vm, arg_count);
+
+        vigil_object_t *arr = NULL;
+        s = vigil_array_object_new(vigil_vm_runtime(vm), items, result.group_count, &arr, error);
+        for (size_t i = 0; i < result.group_count; i++)
+            vigil_value_release(&items[i]);
+        alloc->deallocate(alloc->user_data, items);
+        if (s != VIGIL_STATUS_OK)
+            return s;
+
+        vigil_value_t val;
+        vigil_value_init_object(&val, &arr);
+        s = vigil_vm_stack_push(vm, &val, error);
+        vigil_value_release(&val);
+        if (s == VIGIL_STATUS_OK)
+            s = push_bool(vm, true, error);
+        return s;
+    }
+
+no_match:
+    vigil_vm_stack_pop_n(vm, arg_count);
+    {
+        vigil_object_t *arr = NULL;
+        s = vigil_array_object_new(vigil_vm_runtime(vm), NULL, 0, &arr, error);
+        if (s != VIGIL_STATUS_OK)
+            return s;
+        vigil_value_t val;
+        vigil_value_init_object(&val, &arr);
+        s = vigil_vm_stack_push(vm, &val, error);
+        vigil_value_release(&val);
+        if (s == VIGIL_STATUS_OK)
+            s = push_bool(vm, false, error);
+        return s;
+    }
+}
+
+/* ── regex.escape(input) -> string ──────────────────────────── */
+
+static vigil_status_t regex_escape(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    const char *input;
+    size_t input_len;
+
+    if (!get_string_arg(vm, base, 0, &input, &input_len))
+    {
+        vigil_vm_stack_pop_n(vm, arg_count);
+        return push_string(vm, "", 0, error);
+    }
+
+    /* Worst case: every char is escaped -> 2x length */
+    const vigil_allocator_t *alloc = re_get_alloc(vm);
+    char *buf = (char *)alloc->allocate(alloc->user_data, input_len * 2 + 1);
+    if (!buf)
+    {
+        vigil_vm_stack_pop_n(vm, arg_count);
+        return VIGIL_STATUS_OUT_OF_MEMORY;
+    }
+
+    size_t out = 0;
+    for (size_t i = 0; i < input_len; i++)
+    {
+        char c = input[i];
+        if (c == '.' || c == '*' || c == '+' || c == '?' || c == '(' || c == ')' || c == '[' || c == ']' ||
+            c == '{' || c == '}' || c == '\\' || c == '^' || c == '$' || c == '|')
+        {
+            buf[out++] = '\\';
+        }
+        buf[out++] = c;
+    }
+    buf[out] = '\0';
+
+    vigil_vm_stack_pop_n(vm, arg_count);
+    vigil_status_t s = push_string(vm, buf, out, error);
+    alloc->deallocate(alloc->user_data, buf);
+    return s;
+}
+
+/* ── regex.is_valid(pattern) -> bool ────────────────────────── */
+
+static vigil_status_t regex_is_valid(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    const char *pattern;
+    size_t pattern_len;
+
+    if (!get_string_arg(vm, base, 0, &pattern, &pattern_len))
+    {
+        vigil_vm_stack_pop_n(vm, arg_count);
+        return push_bool(vm, false, error);
+    }
+
+    char err_buf[128];
+    vigil_regex_t *re = vigil_regex_compile(re_get_alloc(vm), pattern, pattern_len, err_buf, sizeof(err_buf));
+    bool valid = (re != NULL);
+    if (re)
+        vigil_regex_free(re);
+
+    vigil_vm_stack_pop_n(vm, arg_count);
+    return push_bool(vm, valid, error);
+}
+
 /* ── Module Descriptor ──────────────────────────────────────── */
 
 static const int match_params[] = {VIGIL_TYPE_STRING, VIGIL_TYPE_STRING};
@@ -522,13 +701,19 @@ static const int find_ret[] = {VIGIL_TYPE_STRING, VIGIL_TYPE_BOOL};
 static const int find_all_params[] = {VIGIL_TYPE_STRING, VIGIL_TYPE_STRING};
 static const int replace_params[] = {VIGIL_TYPE_STRING, VIGIL_TYPE_STRING, VIGIL_TYPE_STRING};
 static const int split_params[] = {VIGIL_TYPE_STRING, VIGIL_TYPE_STRING};
+static const int captures_ret[] = {VIGIL_TYPE_OBJECT, VIGIL_TYPE_BOOL};
+static const int escape_params[] = {VIGIL_TYPE_STRING};
+static const int is_valid_params[] = {VIGIL_TYPE_STRING};
 static const char *const regex_pattern_input_param_names[] = {"pattern", "input"};
 static const char *const regex_pattern_input_replacement_param_names[] = {"pattern", "input", "replacement"};
+static const char *const regex_input_param_names[] = {"input"};
+static const char *const regex_pattern_param_names[] = {"pattern"};
 
 static const vigil_native_symbol_doc_t vigil_regex_module_doc = {
     "Regular expression matching (RE2-style).",
     "The regex module provides pattern matching with linear time guarantees using a Thompson NFA implementation "
-    "without catastrophic backtracking.",
+    "without catastrophic backtracking. Supports inline flags (?i), (?m), (?s) and capture group references $0-$9 in "
+    "replacements.",
     NULL,
 };
 
@@ -552,13 +737,13 @@ static const vigil_native_symbol_doc_t vigil_regex_find_all_doc = {
 
 static const vigil_native_symbol_doc_t vigil_regex_replace_doc = {
     "Replace first match with replacement.",
-    "Returns the input with the first match replaced.",
-    "regex.replace(\"[0-9]+\", \"a1b2\", \"X\")",
+    "Supports $0-$9 capture group references and $$ for literal $.",
+    "regex.replace(\"(\\\\w+)@(\\\\w+)\", \"user@host\", \"$1 at $2\")",
 };
 
 static const vigil_native_symbol_doc_t vigil_regex_replace_all_doc = {
     "Replace all matches with replacement.",
-    "Returns the input with all matches replaced.",
+    "Supports $0-$9 capture group references and $$ for literal $.",
     "regex.replace_all(\"[0-9]+\", \"a1b2\", \"X\")",
 };
 
@@ -566,6 +751,24 @@ static const vigil_native_symbol_doc_t vigil_regex_split_doc = {
     "Split input by pattern.",
     "Returns an array of substrings split by the pattern.",
     "regex.split(\",\", \"a,b,c\")",
+};
+
+static const vigil_native_symbol_doc_t vigil_regex_captures_doc = {
+    "Find first match and return all capture groups.",
+    "Returns (array<string>, bool) where index 0 is the full match.",
+    "array<string> groups, bool ok = regex.captures(\"(\\\\w+)@(\\\\w+)\", \"user@host\")",
+};
+
+static const vigil_native_symbol_doc_t vigil_regex_escape_doc = {
+    "Escape regex metacharacters in a string.",
+    "Returns the input with all regex special characters backslash-escaped.",
+    "regex.escape(\"hello.world\") // \"hello\\\\.world\"",
+};
+
+static const vigil_native_symbol_doc_t vigil_regex_is_valid_doc = {
+    "Check if a pattern is a valid regex.",
+    "Returns true if the pattern compiles without error.",
+    "regex.is_valid(\"[a-z]+\")",
 };
 
 static const vigil_native_module_function_t vigil_regex_functions[] = {
@@ -581,6 +784,12 @@ static const vigil_native_module_function_t vigil_regex_functions[] = {
      regex_pattern_input_replacement_param_names, NULL, NULL, &vigil_regex_replace_all_doc},
     {"split", 5U, vigil_regex_split_fn, 2U, split_params, VIGIL_TYPE_OBJECT, 1U, NULL, VIGIL_TYPE_STRING, NULL, NULL,
      0U, regex_pattern_input_param_names, NULL, "array<string>", &vigil_regex_split_doc},
+    {"captures", 8U, regex_captures, 2U, find_params, VIGIL_TYPE_OBJECT, 2U, captures_ret, VIGIL_TYPE_STRING, NULL,
+     NULL, 0U, regex_pattern_input_param_names, NULL, "array<string>", &vigil_regex_captures_doc},
+    {"escape", 6U, regex_escape, 1U, escape_params, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U,
+     regex_input_param_names, NULL, NULL, &vigil_regex_escape_doc},
+    {"is_valid", 8U, regex_is_valid, 1U, is_valid_params, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U,
+     regex_pattern_param_names, NULL, NULL, &vigil_regex_is_valid_doc},
 };
 
 #define VIGIL_REGEX_FUNCTION_COUNT (sizeof(vigil_regex_functions) / sizeof(vigil_regex_functions[0]))

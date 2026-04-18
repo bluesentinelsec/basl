@@ -1,0 +1,45 @@
+import "fmt"
+import "regex"
+
+fn test_basic_quantifiers() -> void {
+    fmt.println(f"star zero: {regex.match("ab*c", "ac")}")
+    fmt.println(f"star many: {regex.match("ab*c", "abbbc")}")
+    fmt.println(f"plus one: {regex.match("ab+c", "abc")}")
+    fmt.println(f"plus zero: {regex.match("ab+c", "ac")}")
+    fmt.println(f"question present: {regex.match("ab?c", "abc")}")
+    fmt.println(f"question absent: {regex.match("ab?c", "ac")}")
+}
+
+fn test_brace_quantifiers() -> void {
+    string p_exact = "a{3}"
+    fmt.println(f"exact 3 match: {regex.match(p_exact, "aaa")}")
+    fmt.println(f"exact 3 fail: {regex.match(p_exact, "aa")}")
+    string p_range = "a{2,4}"
+    fmt.println(f"range 2-4 min: {regex.match(p_range, "aa")}")
+    fmt.println(f"range 2-4 max: {regex.match(p_range, "aaaa")}")
+    fmt.println(f"range 2-4 fail: {regex.match(p_range, "a")}")
+    string p_open = "a{2,}"
+    fmt.println(f"open 2+: {regex.match(p_open, "aaa")}")
+    fmt.println(f"open 2+ fail: {regex.match(p_open, "a")}")
+}
+
+fn test_lazy_quantifiers() -> void {
+    string f1, bool ok1 = regex.find("a+?", "aaaa")
+    fmt.println(f"lazy plus: {f1}, {ok1}")
+    string f2, bool ok2 = regex.find("a*?b", "aaab")
+    fmt.println(f"lazy star: {f2}, {ok2}")
+    string f3, bool ok3 = regex.find("a??b", "ab")
+    fmt.println(f"lazy question: {f3}, {ok3}")
+    string p_lazy_brace = "a{2,4}?"
+    string f4, bool ok4 = regex.find(p_lazy_brace, "aaaa")
+    fmt.println(f"lazy brace: {f4}, {ok4}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 02_QUANTIFIERS START =====")
+    test_basic_quantifiers()
+    test_brace_quantifiers()
+    test_lazy_quantifiers()
+    fmt.println("===== TEST 02_QUANTIFIERS END =====")
+    return 0
+}

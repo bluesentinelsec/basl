@@ -39,9 +39,22 @@ extern "C"
         vigil_regex_match_t groups[VIGIL_REGEX_MAX_GROUPS];
     } vigil_regex_result_t;
 
+    /* Inline flags parsed from (?i), (?m), (?s) or the flags string API. */
+    typedef struct
+    {
+        bool case_insensitive; /* (?i) */
+        bool multiline;        /* (?m) */
+        bool dotall;           /* (?s) */
+    } regex_flags_t;
+
     /* Compile a regex pattern. Returns NULL on error, sets error message. */
     vigil_regex_t *vigil_regex_compile(const vigil_allocator_t *allocator, const char *pattern, size_t pattern_len,
                                        char *error_buf, size_t error_buf_size);
+
+    /* Compile with explicit flags string (e.g. "ims"). */
+    vigil_regex_t *vigil_regex_compile_with_flags(const vigil_allocator_t *allocator, const char *pattern,
+                                                   size_t pattern_len, const char *flags, size_t flags_len,
+                                                   char *error_buf, size_t error_buf_size);
 
     /* Free a compiled regex */
     void vigil_regex_free(vigil_regex_t *re);

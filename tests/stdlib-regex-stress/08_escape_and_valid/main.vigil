@@ -1,0 +1,44 @@
+import "fmt"
+import "regex"
+
+fn test_escape() -> void {
+    string e1 = regex.escape("hello.world")
+    fmt.println(f"escape dot: {e1}")
+    string e2 = regex.escape("a+b*c?")
+    fmt.println(f"escape quant: {e2}")
+    string e3 = regex.escape("[abc]")
+    fmt.println(f"escape brackets: {e3}")
+    string e4 = regex.escape("(a|b)")
+    fmt.println(f"escape parens: {e4}")
+    string e5 = regex.escape("price: $10")
+    fmt.println(f"escape dollar: {e5}")
+    string e6 = regex.escape("a^b")
+    fmt.println(f"escape caret: {e6}")
+    string e7 = regex.escape("plain")
+    fmt.println(f"escape plain: {e7}")
+}
+
+fn test_escape_roundtrip() -> void {
+    string special = "test.file(1)[2]"
+    string escaped = regex.escape(special)
+    bool matched = regex.match(escaped, special)
+    fmt.println(f"roundtrip: {matched}")
+}
+
+fn test_is_valid() -> void {
+    fmt.println(f"valid simple: {regex.is_valid("[a-z]+")}")
+    fmt.println(f"valid complex: {regex.is_valid(`\d{3}-\d{4}`)}")
+    fmt.println(f"valid empty: {regex.is_valid("")}")
+    fmt.println(f"invalid bracket: {regex.is_valid("[abc")}")
+    fmt.println(f"invalid paren: {regex.is_valid("(abc")}")
+    fmt.println(f"valid dot star: {regex.is_valid(".*")}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 08_ESCAPE_AND_VALID START =====")
+    test_escape()
+    test_escape_roundtrip()
+    test_is_valid()
+    fmt.println("===== TEST 08_ESCAPE_AND_VALID END =====")
+    return 0
+}

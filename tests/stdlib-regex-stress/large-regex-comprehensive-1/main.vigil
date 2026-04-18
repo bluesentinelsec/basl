@@ -1,0 +1,76 @@
+import "fmt"
+import "regex"
+
+fn test_email_patterns() -> void {
+    string pat = "[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]+"
+    fmt.println(f"email valid: {regex.match(pat, "user@example.com")}")
+    fmt.println(f"email dots: {regex.match(pat, "first.last@sub.domain.com")}")
+    fmt.println(f"email plus: {regex.match(pat, "user+tag@example.com")}")
+    string text = "Contact alice@example.com and bob@test.org for info"
+    array<string> emails = regex.find_all("[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]+", text)
+    fmt.println(f"emails found: {emails.len()}")
+    fmt.println(f"email[0]: {emails[0]}")
+    fmt.println(f"email[1]: {emails[1]}")
+}
+
+fn test_ip_patterns() -> void {
+    string pat = `[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+`
+    fmt.println(f"ip valid: {regex.match(pat, "192.168.1.1")}")
+    fmt.println(f"ip loopback: {regex.match(pat, "127.0.0.1")}")
+    string log = "Server 10.0.0.1 connected to 10.0.0.2 via 10.0.0.3"
+    array<string> ips = regex.find_all(`[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+`, log)
+    fmt.println(f"ips found: {ips.len()}")
+}
+
+fn test_date_patterns() -> void {
+    string pat = `[0-9]{4}-[0-9]{2}-[0-9]{2}`
+    fmt.println(f"date valid: {regex.match(pat, "2024-01-15")}")
+    fmt.println(f"date fail: {regex.match(pat, "24-1-5")}")
+    array<string> g1, bool ok1 = regex.captures("([0-9]{4})-([0-9]{2})-([0-9]{2})", "2024-03-25")
+    fmt.println(f"date captures: {ok1}")
+    fmt.println(f"date year: {g1[1]}")
+    fmt.println(f"date month: {g1[2]}")
+    fmt.println(f"date day: {g1[3]}")
+}
+
+fn test_phone_patterns() -> void {
+    string pat = `\d{3}-\d{3}-\d{4}`
+    fmt.println(f"phone valid: {regex.match(pat, "555-123-4567")}")
+    fmt.println(f"phone fail: {regex.match(pat, "5551234567")}")
+    string text = "Call 555-111-2222 or 555-333-4444"
+    array<string> phones = regex.find_all(`\d{3}-\d{3}-\d{4}`, text)
+    fmt.println(f"phones found: {phones.len()}")
+}
+
+fn test_url_patterns() -> void {
+    string pat = "https?://[a-zA-Z0-9.-]+/[a-zA-Z0-9./_-]*"
+    string f1, bool ok1 = regex.find(pat, "Visit https://example.com/path/page today")
+    fmt.println(f"url found: {ok1}")
+    fmt.println(f"url: {f1}")
+}
+
+fn test_log_parsing() -> void {
+    string log = "2024-01-15 10:30:45 ERROR Failed to connect"
+    string date_pat = `[0-9]{4}-[0-9]{2}-[0-9]{2}`
+    string time_pat = `[0-9]{2}:[0-9]{2}:[0-9]{2}`
+    string d1, bool dok = regex.find(date_pat, log)
+    fmt.println(f"log date: {d1}, {dok}")
+    string t1, bool tok = regex.find(time_pat, log)
+    fmt.println(f"log time: {t1}, {tok}")
+    string level, bool lok = regex.find("ERROR|WARN|INFO|DEBUG", log)
+    fmt.println(f"log level: {level}, {lok}")
+    string cleaned = regex.replace(`[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2} `, log, "")
+    fmt.println(f"log msg: {cleaned}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST LARGE_REGEX_COMPREHENSIVE_1 START =====")
+    test_email_patterns()
+    test_ip_patterns()
+    test_date_patterns()
+    test_phone_patterns()
+    test_url_patterns()
+    test_log_parsing()
+    fmt.println("===== TEST LARGE_REGEX_COMPREHENSIVE_1 END =====")
+    return 0
+}
