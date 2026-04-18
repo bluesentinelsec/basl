@@ -18,6 +18,8 @@
 #include "lz4.h"
 #include "miniz.h"
 
+#define COMPRESS_MAX_DECOMPRESS (256UL * 1024UL * 1024UL)
+
 /* ── Allocator helpers ───────────────────────────────────────────── */
 
 static vigil_allocator_t get_alloc(vigil_vm_t *vm)
@@ -61,6 +63,61 @@ static vigil_status_t push_bytes(vigil_vm_t *vm, const void *data, size_t len, v
 static vigil_status_t push_empty_bytes(vigil_vm_t *vm, vigil_error_t *error)
 {
     return push_bytes(vm, "", 0, error);
+}
+
+/* ── Multi-return helpers ────────────────────────────────────────── */
+
+static vigil_status_t push_bytes_and_ok(vigil_vm_t *vm, const void *data, size_t len, vigil_error_t *error)
+{
+    vigil_status_t s = push_bytes(vm, data, len, error);
+    if (s != VIGIL_STATUS_OK)
+        return s;
+    return vigil_runtime_push_ok_error(vigil_vm_runtime(vm), vm, error);
+}
+
+static vigil_status_t push_bytes_and_err(vigil_vm_t *vm, const char *msg, vigil_error_t *error)
+{
+    vigil_status_t s = push_empty_bytes(vm, error);
+    if (s != VIGIL_STATUS_OK)
+        return s;
+    vigil_object_t *err_obj = NULL;
+    s = vigil_error_object_new_cstr(vigil_vm_runtime(vm), msg, 1, &err_obj, error);
+    if (s != VIGIL_STATUS_OK)
+        return s;
+    vigil_value_t v;
+    vigil_value_init_object(&v, &err_obj);
+    s = vigil_vm_stack_push(vm, &v, error);
+    vigil_value_release(&v);
+    return s;
+}
+
+static vigil_status_t push_obj_and_ok(vigil_vm_t *vm, vigil_object_t **obj, vigil_error_t *error)
+{
+    vigil_value_t v;
+    vigil_value_init_object(&v, obj);
+    vigil_status_t s = vigil_vm_stack_push(vm, &v, error);
+    vigil_value_release(&v);
+    if (s != VIGIL_STATUS_OK)
+        return s;
+    return vigil_runtime_push_ok_error(vigil_vm_runtime(vm), vm, error);
+}
+
+static vigil_status_t push_obj_and_err(vigil_vm_t *vm, vigil_object_t **empty, const char *msg, vigil_error_t *error)
+{
+    vigil_value_t v;
+    vigil_value_init_object(&v, empty);
+    vigil_status_t s = vigil_vm_stack_push(vm, &v, error);
+    vigil_value_release(&v);
+    if (s != VIGIL_STATUS_OK)
+        return s;
+    vigil_object_t *err_obj = NULL;
+    s = vigil_error_object_new_cstr(vigil_vm_runtime(vm), msg, 1, &err_obj, error);
+    if (s != VIGIL_STATUS_OK)
+        return s;
+    vigil_value_init_object(&v, &err_obj);
+    s = vigil_vm_stack_push(vm, &v, error);
+    vigil_value_release(&v);
+    return s;
 }
 
 static int clamp_level(int level)
@@ -117,24 +174,24 @@ static vigil_status_t zlib_compress_fn(vigil_vm_t *vm, size_t arg_count, vigil_e
 
     if (!src || src_len == 0)
     {
-        return push_empty_bytes(vm, error);
+        return push_bytes_and_err(vm, "empty input", error);
     }
 
     dst_len = mz_compressBound((mz_ulong)src_len);
     dst = (unsigned char *)alloc.allocate(alloc.user_data, dst_len);
     if (!dst)
     {
-        return push_empty_bytes(vm, error);
+        return push_bytes_and_err(vm, "allocation failed", error);
     }
 
     status = mz_compress(dst, &dst_len, (const unsigned char *)src, (mz_ulong)src_len);
     if (status != MZ_OK)
     {
         alloc.deallocate(alloc.user_data, dst);
-        return push_empty_bytes(vm, error);
+        return push_bytes_and_err(vm, "zlib compression failed", error);
     }
 
-    ret = push_bytes(vm, dst, dst_len, error);
+    ret = push_bytes_and_ok(vm, dst, dst_len, error);
     alloc.deallocate(alloc.user_data, dst);
     return ret;
 }
@@ -153,21 +210,21 @@ static vigil_status_t zlib_compress_level_fn(vigil_vm_t *vm, size_t arg_count, v
     vigil_vm_stack_pop_n(vm, arg_count);
 
     if (!src || src_len == 0)
-        return push_empty_bytes(vm, error);
+        return push_bytes_and_err(vm, "empty input", error);
 
     mz_ulong dst_len = mz_compressBound((mz_ulong)src_len);
     unsigned char *dst = (unsigned char *)alloc.allocate(alloc.user_data, dst_len);
     if (!dst)
-        return push_empty_bytes(vm, error);
+        return push_bytes_and_err(vm, "allocation failed", error);
 
     int status = mz_compress2(dst, &dst_len, (const unsigned char *)src, (mz_ulong)src_len, level);
     if (status != MZ_OK)
     {
         alloc.deallocate(alloc.user_data, dst);
-        return push_empty_bytes(vm, error);
+        return push_bytes_and_err(vm, "zlib compression failed", error);
     }
 
-    vigil_status_t ret = push_bytes(vm, dst, dst_len, error);
+    vigil_status_t ret = push_bytes_and_ok(vm, dst, dst_len, error);
     alloc.deallocate(alloc.user_data, dst);
     return ret;
 }
@@ -188,7 +245,7 @@ static vigil_status_t zlib_decompress_fn(vigil_vm_t *vm, size_t arg_count, vigil
 
     if (!src || src_len == 0)
     {
-        return push_empty_bytes(vm, error);
+        return push_bytes_and_err(vm, "empty input", error);
     }
 
     /* Start with 4x source size, grow if needed */
@@ -199,7 +256,7 @@ static vigil_status_t zlib_decompress_fn(vigil_vm_t *vm, size_t arg_count, vigil
     dst = (unsigned char *)alloc.allocate(alloc.user_data, dst_len);
     if (!dst)
     {
-        return push_empty_bytes(vm, error);
+        return push_bytes_and_err(vm, "allocation failed", error);
     }
 
     while (1)
@@ -208,7 +265,7 @@ static vigil_status_t zlib_decompress_fn(vigil_vm_t *vm, size_t arg_count, vigil
         status = mz_uncompress(dst, &try_len, (const unsigned char *)src, (mz_ulong)src_len);
         if (status == MZ_OK)
         {
-            vigil_status_t ret = push_bytes(vm, dst, try_len, error);
+            vigil_status_t ret = push_bytes_and_ok(vm, dst, try_len, error);
             alloc.deallocate(alloc.user_data, dst);
             return ret;
         }
@@ -216,11 +273,16 @@ static vigil_status_t zlib_decompress_fn(vigil_vm_t *vm, size_t arg_count, vigil
         {
             /* Need more space */
             mz_ulong new_len = dst_len * 2;
+            if (new_len > COMPRESS_MAX_DECOMPRESS)
+            {
+                alloc.deallocate(alloc.user_data, dst);
+                return push_bytes_and_err(vm, "decompressed size exceeds 256MB limit", error);
+            }
             unsigned char *new_dst = (unsigned char *)alloc.reallocate(alloc.user_data, dst, new_len);
             if (!new_dst)
             {
                 alloc.deallocate(alloc.user_data, dst);
-                return push_empty_bytes(vm, error);
+                return push_bytes_and_err(vm, "allocation failed during decompression", error);
             }
             dst = new_dst;
             dst_len = new_len;
@@ -228,7 +290,7 @@ static vigil_status_t zlib_decompress_fn(vigil_vm_t *vm, size_t arg_count, vigil
         }
         /* Other error */
         alloc.deallocate(alloc.user_data, dst);
-        return push_empty_bytes(vm, error);
+        return push_bytes_and_err(vm, "zlib decompression failed", error);
     }
 }
 
@@ -240,12 +302,12 @@ static vigil_status_t deflate_compress_impl(vigil_vm_t *vm, const char *src, siz
     vigil_allocator_t alloc = get_alloc(vm);
 
     if (!src || src_len == 0)
-        return push_empty_bytes(vm, error);
+        return push_bytes_and_err(vm, "empty input", error);
 
     mz_ulong bound = mz_deflateBound(NULL, (mz_ulong)src_len);
     unsigned char *dst = (unsigned char *)alloc.allocate(alloc.user_data, bound);
     if (!dst)
-        return push_empty_bytes(vm, error);
+        return push_bytes_and_err(vm, "allocation failed", error);
 
     mz_stream stream;
     memset(&stream, 0, sizeof(stream));
@@ -258,18 +320,18 @@ static vigil_status_t deflate_compress_impl(vigil_vm_t *vm, const char *src, siz
     if (mz_deflateInit2(&stream, level, MZ_DEFLATED, -MZ_DEFAULT_WINDOW_BITS, 9, MZ_DEFAULT_STRATEGY) != MZ_OK)
     {
         alloc.deallocate(alloc.user_data, dst);
-        return push_empty_bytes(vm, error);
+        return push_bytes_and_err(vm, "deflate init failed", error);
     }
     if (mz_deflate(&stream, MZ_FINISH) != MZ_STREAM_END)
     {
         mz_deflateEnd(&stream);
         alloc.deallocate(alloc.user_data, dst);
-        return push_empty_bytes(vm, error);
+        return push_bytes_and_err(vm, "deflate compression failed", error);
     }
     size_t out_len = stream.total_out;
     mz_deflateEnd(&stream);
 
-    vigil_status_t ret = push_bytes(vm, dst, out_len, error);
+    vigil_status_t ret = push_bytes_and_ok(vm, dst, out_len, error);
     alloc.deallocate(alloc.user_data, dst);
     return ret;
 }
@@ -312,13 +374,13 @@ static vigil_status_t deflate_decompress_fn(vigil_vm_t *vm, size_t arg_count, vi
 
     if (!src || src_len == 0)
     {
-        return push_empty_bytes(vm, error);
+        return push_bytes_and_err(vm, "empty input", error);
     }
 
     dst = (unsigned char *)alloc.allocate(alloc.user_data, dst_cap);
     if (!dst)
     {
-        return push_empty_bytes(vm, error);
+        return push_bytes_and_err(vm, "allocation failed", error);
     }
 
     tinfl_init(&decomp);
@@ -342,16 +404,21 @@ static vigil_status_t deflate_decompress_fn(vigil_vm_t *vm, size_t arg_count, vi
         if (status < 0)
         {
             alloc.deallocate(alloc.user_data, dst);
-            return push_empty_bytes(vm, error);
+            return push_bytes_and_err(vm, "deflate decompression failed", error);
         }
         if (status == TINFL_STATUS_HAS_MORE_OUTPUT || dst_len >= dst_cap)
         {
             size_t new_cap = dst_cap * 2;
+            if (new_cap > COMPRESS_MAX_DECOMPRESS)
+            {
+                alloc.deallocate(alloc.user_data, dst);
+                return push_bytes_and_err(vm, "decompressed size exceeds 256MB limit", error);
+            }
             unsigned char *new_dst = (unsigned char *)alloc.reallocate(alloc.user_data, dst, new_cap);
             if (!new_dst)
             {
                 alloc.deallocate(alloc.user_data, dst);
-                return push_empty_bytes(vm, error);
+                return push_bytes_and_err(vm, "allocation failed during decompression", error);
             }
             dst = new_dst;
             dst_cap = new_cap;
@@ -359,7 +426,7 @@ static vigil_status_t deflate_decompress_fn(vigil_vm_t *vm, size_t arg_count, vi
     }
 
     {
-        vigil_status_t ret = push_bytes(vm, dst, dst_len, error);
+        vigil_status_t ret = push_bytes_and_ok(vm, dst, dst_len, error);
         alloc.deallocate(alloc.user_data, dst);
         return ret;
     }
@@ -383,13 +450,13 @@ static vigil_status_t gzip_compress_impl(vigil_vm_t *vm, const char *src, size_t
     {
         static const unsigned char empty_gz[] = {0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03,
                                                  0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-        return push_bytes(vm, empty_gz, sizeof(empty_gz), error);
+        return push_bytes_and_ok(vm, empty_gz, sizeof(empty_gz), error);
     }
 
     bound = mz_deflateBound(NULL, (mz_ulong)src_len);
     out = (unsigned char *)alloc.allocate(alloc.user_data, 10 + bound + 8);
     if (!out)
-        return push_empty_bytes(vm, error);
+        return push_bytes_and_err(vm, "allocation failed", error);
 
     /* Gzip header with proper XFL byte */
     out[0] = 0x1f;
@@ -412,13 +479,13 @@ static vigil_status_t gzip_compress_impl(vigil_vm_t *vm, const char *src, size_t
     if (mz_deflateInit2(&stream, level, MZ_DEFLATED, -MZ_DEFAULT_WINDOW_BITS, 9, MZ_DEFAULT_STRATEGY) != MZ_OK)
     {
         alloc.deallocate(alloc.user_data, out);
-        return push_empty_bytes(vm, error);
+        return push_bytes_and_err(vm, "gzip deflate init failed", error);
     }
     if (mz_deflate(&stream, MZ_FINISH) != MZ_STREAM_END)
     {
         mz_deflateEnd(&stream);
         alloc.deallocate(alloc.user_data, out);
-        return push_empty_bytes(vm, error);
+        return push_bytes_and_err(vm, "gzip compression failed", error);
     }
 
     out_len = 10 + stream.total_out;
@@ -434,7 +501,7 @@ static vigil_status_t gzip_compress_impl(vigil_vm_t *vm, const char *src, size_t
     out[out_len++] = (unsigned char)((src_len >> 16) & 0xff);
     out[out_len++] = (unsigned char)((src_len >> 24) & 0xff);
 
-    ret = push_bytes(vm, out, out_len, error);
+    ret = push_bytes_and_ok(vm, out, out_len, error);
     alloc.deallocate(alloc.user_data, out);
     return ret;
 }
@@ -499,22 +566,22 @@ static vigil_status_t gzip_decompress_fn(vigil_vm_t *vm, size_t arg_count, vigil
     vigil_vm_stack_pop_n(vm, arg_count);
 
     if (!src || src_len < 18)
-        return push_empty_bytes(vm, error);
+        return push_bytes_and_err(vm, "invalid gzip data", error);
 
     const unsigned char *usrc = (const unsigned char *)src;
     if (usrc[0] != 0x1f || usrc[1] != 0x8b)
-        return push_empty_bytes(vm, error);
+        return push_bytes_and_err(vm, "not gzip format", error);
 
     size_t hdr_len = gzip_skip_header(usrc, src_len);
     if (hdr_len == 0)
-        return push_empty_bytes(vm, error);
+        return push_bytes_and_err(vm, "invalid gzip header", error);
 
     size_t deflate_len = src_len - hdr_len - 8;
     size_t dst_cap = 1024 * 64;
     size_t dst_len = 0;
     unsigned char *dst = (unsigned char *)alloc.allocate(alloc.user_data, dst_cap);
     if (!dst)
-        return push_empty_bytes(vm, error);
+        return push_bytes_and_err(vm, "allocation failed", error);
 
     tinfl_decompressor decomp;
     tinfl_init(&decomp);
@@ -534,7 +601,7 @@ static vigil_status_t gzip_decompress_fn(vigil_vm_t *vm, size_t arg_count, vigil
         if (status < 0)
         {
             alloc.deallocate(alloc.user_data, dst);
-            return push_empty_bytes(vm, error);
+            return push_bytes_and_err(vm, "gzip decompression failed", error);
         }
         if (status == TINFL_STATUS_HAS_MORE_OUTPUT || dst_len >= dst_cap)
         {
@@ -543,14 +610,14 @@ static vigil_status_t gzip_decompress_fn(vigil_vm_t *vm, size_t arg_count, vigil
             if (!new_dst)
             {
                 alloc.deallocate(alloc.user_data, dst);
-                return push_empty_bytes(vm, error);
+                return push_bytes_and_err(vm, "allocation failed during decompression", error);
             }
             dst = new_dst;
             dst_cap = new_cap;
         }
     }
 
-    vigil_status_t ret = push_bytes(vm, dst, dst_len, error);
+    vigil_status_t ret = push_bytes_and_ok(vm, dst, dst_len, error);
     alloc.deallocate(alloc.user_data, dst);
     return ret;
 }
@@ -573,24 +640,24 @@ static vigil_status_t lz4_compress_fn(vigil_vm_t *vm, size_t arg_count, vigil_er
 
     if (!src || src_len == 0)
     {
-        return push_empty_bytes(vm, error);
+        return push_bytes_and_err(vm, "empty input", error);
     }
 
     dst_cap = LZ4_compressBound((int)src_len);
     dst = (char *)alloc.allocate(alloc.user_data, (size_t)dst_cap);
     if (!dst)
     {
-        return push_empty_bytes(vm, error);
+        return push_bytes_and_err(vm, "allocation failed", error);
     }
 
     compressed_size = LZ4_compress_default(src, dst, (int)src_len, dst_cap);
     if (compressed_size <= 0)
     {
         alloc.deallocate(alloc.user_data, dst);
-        return push_empty_bytes(vm, error);
+        return push_bytes_and_err(vm, "lz4 compression failed", error);
     }
 
-    ret = push_bytes(vm, dst, (size_t)compressed_size, error);
+    ret = push_bytes_and_ok(vm, dst, (size_t)compressed_size, error);
     alloc.deallocate(alloc.user_data, dst);
     return ret;
 }
@@ -610,7 +677,7 @@ static vigil_status_t lz4_decompress_fn(vigil_vm_t *vm, size_t arg_count, vigil_
 
     if (!src || src_len == 0)
     {
-        return push_empty_bytes(vm, error);
+        return push_bytes_and_err(vm, "empty input", error);
     }
 
     /* Start with 4x source size, grow if needed */
@@ -621,7 +688,7 @@ static vigil_status_t lz4_decompress_fn(vigil_vm_t *vm, size_t arg_count, vigil_
     dst = (char *)alloc.allocate(alloc.user_data, (size_t)dst_cap);
     if (!dst)
     {
-        return push_empty_bytes(vm, error);
+        return push_bytes_and_err(vm, "allocation failed", error);
     }
 
     while (1)
@@ -629,7 +696,7 @@ static vigil_status_t lz4_decompress_fn(vigil_vm_t *vm, size_t arg_count, vigil_
         decompressed_size = LZ4_decompress_safe(src, dst, (int)src_len, dst_cap);
         if (decompressed_size > 0)
         {
-            vigil_status_t ret = push_bytes(vm, dst, (size_t)decompressed_size, error);
+            vigil_status_t ret = push_bytes_and_ok(vm, dst, (size_t)decompressed_size, error);
             alloc.deallocate(alloc.user_data, dst);
             return ret;
         }
@@ -637,14 +704,14 @@ static vigil_status_t lz4_decompress_fn(vigil_vm_t *vm, size_t arg_count, vigil_
         {
             /* Empty result */
             alloc.deallocate(alloc.user_data, dst);
-            return push_empty_bytes(vm, error);
+            return push_bytes_and_err(vm, "lz4 decompression produced empty output", error);
         }
         /* Negative = error, try larger buffer */
         if (dst_cap > 256 * 1024 * 1024)
         {
             /* Give up after 256MB */
             alloc.deallocate(alloc.user_data, dst);
-            return push_empty_bytes(vm, error);
+            return push_bytes_and_err(vm, "decompressed size exceeds 256MB limit", error);
         }
         {
             int new_cap = dst_cap * 2;
@@ -652,7 +719,7 @@ static vigil_status_t lz4_decompress_fn(vigil_vm_t *vm, size_t arg_count, vigil_
             if (!new_dst)
             {
                 alloc.deallocate(alloc.user_data, dst);
-                return push_empty_bytes(vm, error);
+                return push_bytes_and_err(vm, "allocation failed during decompression", error);
             }
             dst = new_dst;
             dst_cap = new_cap;
@@ -681,13 +748,13 @@ static vigil_status_t zip_list_fn(vigil_vm_t *vm, size_t arg_count, vigil_error_
 
     if (!src || src_len == 0)
     {
-        goto done;
+        return push_obj_and_err(vm, &arr, "empty input", error);
     }
 
     mz_zip_zero_struct(&zip);
     if (!mz_zip_reader_init_mem(&zip, src, src_len, 0))
     {
-        goto done;
+        return push_obj_and_err(vm, &arr, "invalid zip archive", error);
     }
 
     num_files = mz_zip_reader_get_num_files(&zip);
@@ -708,13 +775,7 @@ static vigil_status_t zip_list_fn(vigil_vm_t *vm, size_t arg_count, vigil_error_
     }
     mz_zip_reader_end(&zip);
 
-done: {
-    vigil_value_t val;
-    vigil_value_init_object(&val, &arr);
-    s = vigil_vm_stack_push(vm, &val, error);
-    vigil_value_release(&val);
-    return s;
-}
+    return push_obj_and_ok(vm, &arr, error);
 }
 
 static vigil_status_t zip_read_fn(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
@@ -734,20 +795,20 @@ static vigil_status_t zip_read_fn(vigil_vm_t *vm, size_t arg_count, vigil_error_
 
     if (!zip_data || zip_len == 0 || !name || name_len == 0)
     {
-        return push_empty_bytes(vm, error);
+        return push_bytes_and_err(vm, "invalid zip data or filename", error);
     }
 
     mz_zip_zero_struct(&zip);
     if (!mz_zip_reader_init_mem(&zip, zip_data, zip_len, 0))
     {
-        return push_empty_bytes(vm, error);
+        return push_bytes_and_err(vm, "invalid zip archive", error);
     }
 
     file_index = mz_zip_reader_locate_file(&zip, name, NULL, 0);
     if (file_index < 0)
     {
         mz_zip_reader_end(&zip);
-        return push_empty_bytes(vm, error);
+        return push_bytes_and_err(vm, "file not found in zip archive", error);
     }
 
     data = mz_zip_reader_extract_to_heap(&zip, (mz_uint)file_index, &data_size, 0);
@@ -755,10 +816,10 @@ static vigil_status_t zip_read_fn(vigil_vm_t *vm, size_t arg_count, vigil_error_
 
     if (!data)
     {
-        return push_empty_bytes(vm, error);
+        return push_bytes_and_err(vm, "zip extraction failed", error);
     }
 
-    ret = push_bytes(vm, data, data_size, error);
+    ret = push_bytes_and_ok(vm, data, data_size, error);
     mz_free(data);
     return ret;
 }
@@ -780,14 +841,14 @@ static vigil_status_t zip_create_fn(vigil_vm_t *vm, size_t arg_count, vigil_erro
 
     if (!vigil_nanbox_is_object(names_val) || !vigil_nanbox_is_object(contents_val))
     {
-        return push_empty_bytes(vm, error);
+        return push_bytes_and_err(vm, "names and contents must be arrays", error);
     }
     names_obj = (const vigil_object_t *)vigil_nanbox_decode_ptr(names_val);
     contents_obj = (const vigil_object_t *)vigil_nanbox_decode_ptr(contents_val);
     if (!names_obj || vigil_object_type(names_obj) != VIGIL_OBJECT_ARRAY || !contents_obj ||
         vigil_object_type(contents_obj) != VIGIL_OBJECT_ARRAY)
     {
-        return push_empty_bytes(vm, error);
+        return push_bytes_and_err(vm, "names and contents must be arrays", error);
     }
 
     count = vigil_array_object_length(names_obj);
@@ -799,7 +860,7 @@ static vigil_status_t zip_create_fn(vigil_vm_t *vm, size_t arg_count, vigil_erro
     mz_zip_zero_struct(&zip);
     if (!mz_zip_writer_init_heap(&zip, 0, 0))
     {
-        return push_empty_bytes(vm, error);
+        return push_bytes_and_err(vm, "zip writer init failed", error);
     }
 
     for (i = 0; i < count; i++)
@@ -833,11 +894,11 @@ static vigil_status_t zip_create_fn(vigil_vm_t *vm, size_t arg_count, vigil_erro
     if (!mz_zip_writer_finalize_heap_archive(&zip, &zip_data, &zip_size))
     {
         mz_zip_writer_end(&zip);
-        return push_empty_bytes(vm, error);
+        return push_bytes_and_err(vm, "zip finalization failed", error);
     }
     mz_zip_writer_end(&zip);
 
-    ret = push_bytes(vm, zip_data, zip_size, error);
+    ret = push_bytes_and_ok(vm, zip_data, zip_size, error);
     mz_free(zip_data);
     return ret;
 }
@@ -860,14 +921,14 @@ static vigil_status_t zip_create_level_fn(vigil_vm_t *vm, size_t arg_count, vigi
 
     if (!vigil_nanbox_is_object(names_val) || !vigil_nanbox_is_object(contents_val))
     {
-        return push_empty_bytes(vm, error);
+        return push_bytes_and_err(vm, "names and contents must be arrays", error);
     }
     names_obj = (const vigil_object_t *)vigil_nanbox_decode_ptr(names_val);
     contents_obj = (const vigil_object_t *)vigil_nanbox_decode_ptr(contents_val);
     if (!names_obj || vigil_object_type(names_obj) != VIGIL_OBJECT_ARRAY || !contents_obj ||
         vigil_object_type(contents_obj) != VIGIL_OBJECT_ARRAY)
     {
-        return push_empty_bytes(vm, error);
+        return push_bytes_and_err(vm, "names and contents must be arrays", error);
     }
 
     count = vigil_array_object_length(names_obj);
@@ -879,7 +940,7 @@ static vigil_status_t zip_create_level_fn(vigil_vm_t *vm, size_t arg_count, vigi
     mz_zip_zero_struct(&zip);
     if (!mz_zip_writer_init_heap(&zip, 0, 0))
     {
-        return push_empty_bytes(vm, error);
+        return push_bytes_and_err(vm, "zip writer init failed", error);
     }
 
     for (i = 0; i < count; i++)
@@ -913,11 +974,11 @@ static vigil_status_t zip_create_level_fn(vigil_vm_t *vm, size_t arg_count, vigi
     if (!mz_zip_writer_finalize_heap_archive(&zip, &zip_data, &zip_size))
     {
         mz_zip_writer_end(&zip);
-        return push_empty_bytes(vm, error);
+        return push_bytes_and_err(vm, "zip finalization failed", error);
     }
     mz_zip_writer_end(&zip);
 
-    ret = push_bytes(vm, zip_data, zip_size, error);
+    ret = push_bytes_and_ok(vm, zip_data, zip_size, error);
     mz_free(zip_data);
     return ret;
 }
@@ -1045,13 +1106,7 @@ static vigil_status_t tar_list_fn(vigil_vm_t *vm, size_t arg_count, vigil_error_
         pos += 512 + ((file_size + 511) & ~511);
     }
 
-    {
-        vigil_value_t val;
-        vigil_value_init_object(&val, &arr);
-        s = vigil_vm_stack_push(vm, &val, error);
-        vigil_value_release(&val);
-        return s;
-    }
+    return push_obj_and_ok(vm, &arr, error);
 }
 
 static vigil_status_t tar_read_fn(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
@@ -1067,7 +1122,7 @@ static vigil_status_t tar_read_fn(vigil_vm_t *vm, size_t arg_count, vigil_error_
 
     if (!tar_data || tar_len == 0 || !name || name_len == 0)
     {
-        return push_empty_bytes(vm, error);
+        return push_bytes_and_err(vm, "invalid tar data or filename", error);
     }
 
     while (pos + 512 <= tar_len)
@@ -1102,7 +1157,7 @@ static vigil_status_t tar_read_fn(vigil_vm_t *vm, size_t arg_count, vigil_error_
         {
             if (pos + 512 + file_size <= tar_len)
             {
-                return push_bytes(vm, tar_data + pos + 512, file_size, error);
+                return push_bytes_and_ok(vm, tar_data + pos + 512, file_size, error);
             }
             break;
         }
@@ -1110,7 +1165,7 @@ static vigil_status_t tar_read_fn(vigil_vm_t *vm, size_t arg_count, vigil_error_
         pos += 512 + ((file_size + 511) & ~511);
     }
 
-    return push_empty_bytes(vm, error);
+    return push_bytes_and_err(vm, "file not found in tar archive", error);
 }
 
 typedef struct
@@ -1182,14 +1237,14 @@ static vigil_status_t tar_create_fn(vigil_vm_t *vm, size_t arg_count, vigil_erro
 
     if (!vigil_nanbox_is_object(names_val) || !vigil_nanbox_is_object(contents_val))
     {
-        return push_empty_bytes(vm, error);
+        return push_bytes_and_err(vm, "names and contents must be arrays", error);
     }
     names_obj = (const vigil_object_t *)vigil_nanbox_decode_ptr(names_val);
     contents_obj = (const vigil_object_t *)vigil_nanbox_decode_ptr(contents_val);
     if (!names_obj || vigil_object_type(names_obj) != VIGIL_OBJECT_ARRAY || !contents_obj ||
         vigil_object_type(contents_obj) != VIGIL_OBJECT_ARRAY)
     {
-        return push_empty_bytes(vm, error);
+        return push_bytes_and_err(vm, "names and contents must be arrays", error);
     }
 
     count = vigil_array_object_length(names_obj);
@@ -1226,7 +1281,7 @@ static vigil_status_t tar_create_fn(vigil_vm_t *vm, size_t arg_count, vigil_erro
             alloc.deallocate(alloc.user_data, tb.data);
             vigil_value_release(&name_val);
             vigil_value_release(&content_val);
-            return push_empty_bytes(vm, error);
+            return push_bytes_and_err(vm, "tar entry append failed", error);
         }
         vigil_value_release(&name_val);
         vigil_value_release(&content_val);
@@ -1241,7 +1296,7 @@ static vigil_status_t tar_create_fn(vigil_vm_t *vm, size_t arg_count, vigil_erro
             if (!new_data)
             {
                 alloc.deallocate(alloc.user_data, tb.data);
-                return push_empty_bytes(vm, error);
+                return push_bytes_and_err(vm, "allocation failed", error);
             }
             tb.data = new_data;
         }
@@ -1249,7 +1304,7 @@ static vigil_status_t tar_create_fn(vigil_vm_t *vm, size_t arg_count, vigil_erro
         tb.size += 1024;
     }
 
-    ret = push_bytes(vm, tb.data, tb.size, error);
+    ret = push_bytes_and_ok(vm, tb.data, tb.size, error);
     alloc.deallocate(alloc.user_data, tb.data);
     return ret;
 }
@@ -1261,13 +1316,14 @@ static vigil_status_t tar_gz_create_fn(vigil_vm_t *vm, size_t arg_count, vigil_e
     vigil_allocator_t alloc = get_alloc(vm);
 
     /* Build tar in memory, then gzip it.
-     * We call tar_create_fn which pops our args and pushes the tar bytes. */
+     * We call tar_create_fn which pops our args and pushes (tar_bytes, err). */
     vigil_status_t s = tar_create_fn(vm, arg_count, error);
     if (s != VIGIL_STATUS_OK)
         return s;
 
-    /* tar_create pushed the tar bytes; pop and gzip them */
-    vigil_value_t tar_val = vigil_vm_stack_get(vm, vigil_vm_stack_depth(vm) - 1);
+    /* tar_create pushed (tar_bytes, err_sentinel); pop both and check */
+    size_t depth = vigil_vm_stack_depth(vm);
+    vigil_value_t tar_val = vigil_vm_stack_get(vm, depth - 2);
     size_t tar_len;
     const char *tar_data = get_bytes_data(tar_val, &tar_len);
 
@@ -1279,9 +1335,15 @@ static vigil_status_t tar_gz_create_fn(vigil_vm_t *vm, size_t arg_count, vigil_e
         if (tar_copy)
             memcpy(tar_copy, tar_data, tar_len);
     }
-    vigil_vm_stack_pop_n(vm, 1);
+    vigil_vm_stack_pop_n(vm, 2);
 
-    s = gzip_compress_impl(vm, tar_copy, tar_copy ? tar_len : 0, MZ_DEFAULT_COMPRESSION, error);
+    if (!tar_copy || tar_len == 0)
+    {
+        alloc.deallocate(alloc.user_data, tar_copy);
+        return push_bytes_and_err(vm, "tar creation failed", error);
+    }
+
+    s = gzip_compress_impl(vm, tar_copy, tar_len, MZ_DEFAULT_COMPRESSION, error);
     alloc.deallocate(alloc.user_data, tar_copy);
     return s;
 }
@@ -1299,11 +1361,11 @@ static vigil_status_t gzip_decompress_max_fn(vigil_vm_t *vm, size_t arg_count, v
     vigil_allocator_t alloc = get_alloc(vm);
 
     if (max_bytes <= 0 || !src || src_len < 18)
-        return push_empty_bytes(vm, error);
+        return push_bytes_and_err(vm, "invalid gzip data or max_bytes", error);
 
     const unsigned char *usrc = (const unsigned char *)src;
     if (usrc[0] != 0x1f || usrc[1] != 0x8b)
-        return push_empty_bytes(vm, error);
+        return push_bytes_and_err(vm, "not gzip format", error);
 
     /* Skip gzip header */
     size_t hdr_len = 10;
@@ -1312,7 +1374,7 @@ static vigil_status_t gzip_decompress_max_fn(vigil_vm_t *vm, size_t arg_count, v
         if (flags & 0x04)
         {
             if (hdr_len + 2 > src_len)
-                return push_empty_bytes(vm, error);
+                return push_bytes_and_err(vm, "invalid gzip header", error);
             hdr_len += 2 + (usrc[hdr_len] | (usrc[hdr_len + 1] << 8));
         }
         if (flags & 0x08)
@@ -1331,13 +1393,13 @@ static vigil_status_t gzip_decompress_max_fn(vigil_vm_t *vm, size_t arg_count, v
             hdr_len += 2;
     }
     if (hdr_len + 8 > src_len)
-        return push_empty_bytes(vm, error);
+        return push_bytes_and_err(vm, "invalid gzip header", error);
 
     size_t deflate_len = src_len - hdr_len - 8;
     size_t cap = (size_t)max_bytes;
     unsigned char *dst = (unsigned char *)alloc.allocate(alloc.user_data, cap);
     if (!dst)
-        return push_empty_bytes(vm, error);
+        return push_bytes_and_err(vm, "allocation failed", error);
 
     /* Use mz_stream for bounded inflate — simpler than tinfl for partial output */
     mz_stream stream;
@@ -1350,14 +1412,14 @@ static vigil_status_t gzip_decompress_max_fn(vigil_vm_t *vm, size_t arg_count, v
     if (mz_inflateInit2(&stream, -MZ_DEFAULT_WINDOW_BITS) != MZ_OK)
     {
         alloc.deallocate(alloc.user_data, dst);
-        return push_empty_bytes(vm, error);
+        return push_bytes_and_err(vm, "gzip inflate init failed", error);
     }
 
     mz_inflate(&stream, MZ_FINISH);
     size_t out_len = stream.total_out;
     mz_inflateEnd(&stream);
 
-    vigil_status_t ret = push_bytes(vm, dst, out_len, error);
+    vigil_status_t ret = push_bytes_and_ok(vm, dst, out_len, error);
     alloc.deallocate(alloc.user_data, dst);
     return ret;
 }
@@ -1400,10 +1462,14 @@ static vigil_status_t gzip_info_fn(vigil_vm_t *vm, size_t arg_count, vigil_error
         return s;
 
     if (!src || src_len < 18)
-        goto done;
+    {
+        return push_obj_and_err(vm, &map, "invalid gzip data", error);
+    }
     const unsigned char *u = (const unsigned char *)src;
     if (u[0] != 0x1f || u[1] != 0x8b)
-        goto done;
+    {
+        return push_obj_and_err(vm, &map, "not gzip format", error);
+    }
 
     /* Method */
     {
@@ -1469,12 +1535,285 @@ static vigil_status_t gzip_info_fn(vigil_vm_t *vm, size_t arg_count, vigil_error
         push_map_str(vm, map, "size", buf, strlen(buf), error);
     }
 
-done:;
-    vigil_value_t val;
-    vigil_value_init_object(&val, &map);
-    s = vigil_vm_stack_push(vm, &val, error);
-    vigil_value_release(&val);
-    return s;
+    return push_obj_and_ok(vm, &map, error);
+}
+
+/* ── Bounded decompression variants ──────────────────────────────── */
+
+static vigil_status_t deflate_decompress_max_fn(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    size_t src_len;
+    const char *src = get_bytes_data(vigil_vm_stack_get(vm, base), &src_len);
+    int64_t max_bytes = vigil_nanbox_decode_int(vigil_vm_stack_get(vm, base + 1));
+    vigil_vm_stack_pop_n(vm, arg_count);
+
+    vigil_allocator_t alloc = get_alloc(vm);
+
+    if (max_bytes <= 0 || !src || src_len == 0)
+        return push_bytes_and_err(vm, "invalid input or max_bytes", error);
+
+    size_t cap = (size_t)max_bytes;
+    unsigned char *dst = (unsigned char *)alloc.allocate(alloc.user_data, cap);
+    if (!dst)
+        return push_bytes_and_err(vm, "allocation failed", error);
+
+    mz_stream stream;
+    memset(&stream, 0, sizeof(stream));
+    stream.next_in = (const unsigned char *)src;
+    stream.avail_in = (mz_uint32)src_len;
+    stream.next_out = dst;
+    stream.avail_out = (mz_uint32)cap;
+
+    if (mz_inflateInit2(&stream, -MZ_DEFAULT_WINDOW_BITS) != MZ_OK)
+    {
+        alloc.deallocate(alloc.user_data, dst);
+        return push_bytes_and_err(vm, "deflate inflate init failed", error);
+    }
+
+    mz_inflate(&stream, MZ_FINISH);
+    size_t out_len = stream.total_out;
+    mz_inflateEnd(&stream);
+
+    vigil_status_t ret = push_bytes_and_ok(vm, dst, out_len, error);
+    alloc.deallocate(alloc.user_data, dst);
+    return ret;
+}
+
+static vigil_status_t zlib_decompress_max_fn(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    size_t src_len;
+    const char *src = get_bytes_data(vigil_vm_stack_get(vm, base), &src_len);
+    int64_t max_bytes = vigil_nanbox_decode_int(vigil_vm_stack_get(vm, base + 1));
+    vigil_vm_stack_pop_n(vm, arg_count);
+
+    vigil_allocator_t alloc = get_alloc(vm);
+
+    if (max_bytes <= 0 || !src || src_len == 0)
+        return push_bytes_and_err(vm, "invalid input or max_bytes", error);
+
+    size_t cap = (size_t)max_bytes;
+    unsigned char *dst = (unsigned char *)alloc.allocate(alloc.user_data, cap);
+    if (!dst)
+        return push_bytes_and_err(vm, "allocation failed", error);
+
+    mz_ulong dst_len = (mz_ulong)cap;
+    int status = mz_uncompress(dst, &dst_len, (const unsigned char *)src, (mz_ulong)src_len);
+    if (status != MZ_OK)
+    {
+        alloc.deallocate(alloc.user_data, dst);
+        return push_bytes_and_err(vm, "zlib decompression failed", error);
+    }
+
+    vigil_status_t ret = push_bytes_and_ok(vm, dst, dst_len, error);
+    alloc.deallocate(alloc.user_data, dst);
+    return ret;
+}
+
+static vigil_status_t lz4_decompress_max_fn(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    size_t src_len;
+    const char *src = get_bytes_data(vigil_vm_stack_get(vm, base), &src_len);
+    int64_t max_bytes = vigil_nanbox_decode_int(vigil_vm_stack_get(vm, base + 1));
+    vigil_vm_stack_pop_n(vm, arg_count);
+
+    vigil_allocator_t alloc = get_alloc(vm);
+
+    if (max_bytes <= 0 || !src || src_len == 0)
+        return push_bytes_and_err(vm, "invalid input or max_bytes", error);
+
+    int cap = (int)max_bytes;
+    char *dst = (char *)alloc.allocate(alloc.user_data, (size_t)cap);
+    if (!dst)
+        return push_bytes_and_err(vm, "allocation failed", error);
+
+    int decompressed_size = LZ4_decompress_safe(src, dst, (int)src_len, cap);
+    if (decompressed_size <= 0)
+    {
+        alloc.deallocate(alloc.user_data, dst);
+        return push_bytes_and_err(vm, "lz4 decompression failed", error);
+    }
+
+    vigil_status_t ret = push_bytes_and_ok(vm, dst, (size_t)decompressed_size, error);
+    alloc.deallocate(alloc.user_data, dst);
+    return ret;
+}
+
+/* LZ4 compression with level (falls back to LZ4_compress_default since HC is not available) */
+static vigil_status_t lz4_compress_level_fn(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    size_t src_len;
+    const char *src = get_bytes_data(vigil_vm_stack_get(vm, base), &src_len);
+    (void)vigil_nanbox_decode_int(vigil_vm_stack_get(vm, base + 1)); /* level ignored without HC */
+    vigil_vm_stack_pop_n(vm, arg_count);
+
+    vigil_allocator_t alloc = get_alloc(vm);
+
+    if (!src || src_len == 0)
+        return push_bytes_and_err(vm, "empty input", error);
+
+    int dst_cap = LZ4_compressBound((int)src_len);
+    char *dst = (char *)alloc.allocate(alloc.user_data, (size_t)dst_cap);
+    if (!dst)
+        return push_bytes_and_err(vm, "allocation failed", error);
+
+    int compressed_size = LZ4_compress_default(src, dst, (int)src_len, dst_cap);
+    if (compressed_size <= 0)
+    {
+        alloc.deallocate(alloc.user_data, dst);
+        return push_bytes_and_err(vm, "lz4 compression failed", error);
+    }
+
+    vigil_status_t ret = push_bytes_and_ok(vm, dst, (size_t)compressed_size, error);
+    alloc.deallocate(alloc.user_data, dst);
+    return ret;
+}
+
+/* ── TAR.GZ convenience: list and read ───────────────────────────── */
+
+static vigil_status_t tar_gz_list_fn(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    vigil_allocator_t alloc = get_alloc(vm);
+
+    /* Decompress gzip first, then list tar entries */
+    vigil_status_t s = gzip_decompress_fn(vm, arg_count, error);
+    if (s != VIGIL_STATUS_OK)
+        return s;
+
+    /* gzip_decompress pushed (bytes, err_sentinel); grab the bytes */
+    size_t depth = vigil_vm_stack_depth(vm);
+    vigil_value_t tar_val = vigil_vm_stack_get(vm, depth - 2);
+    size_t tar_len;
+    const char *tar_data = get_bytes_data(tar_val, &tar_len);
+
+    if (!tar_data || tar_len == 0)
+    {
+        /* Decompression produced empty/error — propagate as obj error */
+        vigil_vm_stack_pop_n(vm, 2);
+        vigil_object_t *arr = NULL;
+        s = vigil_array_object_new(vigil_vm_runtime(vm), NULL, 0, &arr, error);
+        if (s != VIGIL_STATUS_OK)
+            return s;
+        return push_obj_and_err(vm, &arr, "gzip decompression failed", error);
+    }
+
+    /* Copy tar data, pop gzip results, then push as single arg and call tar_list */
+    char *tar_copy = (char *)alloc.allocate(alloc.user_data, tar_len);
+    if (!tar_copy)
+    {
+        vigil_vm_stack_pop_n(vm, 2);
+        vigil_object_t *arr = NULL;
+        s = vigil_array_object_new(vigil_vm_runtime(vm), NULL, 0, &arr, error);
+        if (s != VIGIL_STATUS_OK)
+            return s;
+        return push_obj_and_err(vm, &arr, "allocation failed", error);
+    }
+    memcpy(tar_copy, tar_data, tar_len);
+    vigil_vm_stack_pop_n(vm, 2);
+
+    /* Push tar data as argument */
+    s = push_bytes(vm, tar_copy, tar_len, error);
+    alloc.deallocate(alloc.user_data, tar_copy);
+    if (s != VIGIL_STATUS_OK)
+        return s;
+
+    return tar_list_fn(vm, 1, error);
+}
+
+static vigil_status_t tar_gz_read_fn(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    vigil_allocator_t alloc = get_alloc(vm);
+
+    /* Save the filename argument before gzip_decompress pops everything */
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    size_t name_len;
+    const char *name_src = get_bytes_data(vigil_vm_stack_get(vm, base + 1), &name_len);
+    char *name_copy = NULL;
+    if (name_src && name_len > 0)
+    {
+        name_copy = (char *)alloc.allocate(alloc.user_data, name_len);
+        if (name_copy)
+            memcpy(name_copy, name_src, name_len);
+    }
+
+    /* Pop only the first arg (data) for gzip decompress — we need to handle args manually */
+    vigil_value_t data_val = vigil_vm_stack_get(vm, base);
+    size_t data_len;
+    const char *data_src = get_bytes_data(data_val, &data_len);
+    char *data_copy = NULL;
+    if (data_src && data_len > 0)
+    {
+        data_copy = (char *)alloc.allocate(alloc.user_data, data_len);
+        if (data_copy)
+            memcpy(data_copy, data_src, data_len);
+    }
+    vigil_vm_stack_pop_n(vm, arg_count);
+
+    if (!data_copy || data_len == 0 || !name_copy || name_len == 0)
+    {
+        alloc.deallocate(alloc.user_data, data_copy);
+        alloc.deallocate(alloc.user_data, name_copy);
+        return push_bytes_and_err(vm, "invalid tar.gz data or filename", error);
+    }
+
+    /* Push data and call gzip_decompress */
+    vigil_status_t s = push_bytes(vm, data_copy, data_len, error);
+    alloc.deallocate(alloc.user_data, data_copy);
+    if (s != VIGIL_STATUS_OK)
+    {
+        alloc.deallocate(alloc.user_data, name_copy);
+        return s;
+    }
+
+    s = gzip_decompress_fn(vm, 1, error);
+    if (s != VIGIL_STATUS_OK)
+    {
+        alloc.deallocate(alloc.user_data, name_copy);
+        return s;
+    }
+
+    /* gzip_decompress pushed (bytes, err_sentinel); grab the bytes */
+    size_t depth = vigil_vm_stack_depth(vm);
+    vigil_value_t tar_val = vigil_vm_stack_get(vm, depth - 2);
+    size_t tar_len;
+    const char *tar_data = get_bytes_data(tar_val, &tar_len);
+
+    if (!tar_data || tar_len == 0)
+    {
+        vigil_vm_stack_pop_n(vm, 2);
+        alloc.deallocate(alloc.user_data, name_copy);
+        return push_bytes_and_err(vm, "gzip decompression failed", error);
+    }
+
+    /* Copy tar data before popping */
+    char *tar_copy = (char *)alloc.allocate(alloc.user_data, tar_len);
+    if (!tar_copy)
+    {
+        vigil_vm_stack_pop_n(vm, 2);
+        alloc.deallocate(alloc.user_data, name_copy);
+        return push_bytes_and_err(vm, "allocation failed", error);
+    }
+    memcpy(tar_copy, tar_data, tar_len);
+    vigil_vm_stack_pop_n(vm, 2);
+
+    /* Push tar data and filename as arguments, then call tar_read */
+    s = push_bytes(vm, tar_copy, tar_len, error);
+    alloc.deallocate(alloc.user_data, tar_copy);
+    if (s != VIGIL_STATUS_OK)
+    {
+        alloc.deallocate(alloc.user_data, name_copy);
+        return s;
+    }
+
+    s = push_bytes(vm, name_copy, name_len, error);
+    alloc.deallocate(alloc.user_data, name_copy);
+    if (s != VIGIL_STATUS_OK)
+        return s;
+
+    return tar_read_fn(vm, 2, error);
 }
 
 /* ── Module descriptor ───────────────────────────────────────────── */
@@ -1510,6 +1849,10 @@ static const vigil_native_type_t array_string_return = VIGIL_NATIVE_TYPE_ARRAY(V
  * issue with map type interning, not a compress module bug. */
 static const vigil_native_type_t map_ss_return = VIGIL_NATIVE_TYPE_MAP(VIGIL_TYPE_STRING, VIGIL_TYPE_STRING);
 
+/* Multi-return type arrays */
+static const int str_err_returns[] = {VIGIL_TYPE_STRING, VIGIL_TYPE_ERR};
+static const int obj_err_returns[] = {VIGIL_TYPE_OBJECT, VIGIL_TYPE_ERR};
+
 static const vigil_native_symbol_doc_t vigil_compress_module_doc = {
     "Data compression and decompression.",
     "The compress module provides deflate, zlib, gzip, lz4, zip, and tar support.\n"
@@ -1519,68 +1862,68 @@ static const vigil_native_symbol_doc_t vigil_compress_module_doc = {
 
 static const vigil_native_symbol_doc_t vigil_compress_deflate_compress_doc = {
     "Compress with raw deflate.",
-    "Returns deflate-compressed data.",
-    "compress.deflate_compress(data)",
+    "Returns (compressed_data, err). err is nil on success.",
+    "result, err := compress.deflate_compress(data)",
 };
 
 static const vigil_native_symbol_doc_t vigil_compress_deflate_compress_level_doc = {
     "Compress with raw deflate at level.",
-    "Level 0=store, 1=fast, 9=best, 10=uber.",
-    "compress.deflate_compress_level(data, 9)",
+    "Level 0=store, 1=fast, 9=best, 10=uber. Returns (compressed_data, err).",
+    "result, err := compress.deflate_compress_level(data, 9)",
 };
 
 static const vigil_native_symbol_doc_t vigil_compress_deflate_decompress_doc = {
     "Decompress raw deflate.",
-    "Returns decompressed data.",
-    "compress.deflate_decompress(compressed)",
+    "Returns (decompressed_data, err). err is nil on success.",
+    "result, err := compress.deflate_decompress(compressed)",
 };
 
 static const vigil_native_symbol_doc_t vigil_compress_zlib_compress_doc = {
     "Compress with zlib format.",
-    "Returns zlib-compressed data (deflate + header/checksum).",
-    "compress.zlib_compress(data)",
+    "Returns (compressed_data, err). err is nil on success.",
+    "result, err := compress.zlib_compress(data)",
 };
 
 static const vigil_native_symbol_doc_t vigil_compress_zlib_compress_level_doc = {
     "Compress with zlib at level.",
-    "Level 0=store, 1=fast, 9=best, 10=uber.",
-    "compress.zlib_compress_level(data, 9)",
+    "Level 0=store, 1=fast, 9=best, 10=uber. Returns (compressed_data, err).",
+    "result, err := compress.zlib_compress_level(data, 9)",
 };
 
 static const vigil_native_symbol_doc_t vigil_compress_zlib_decompress_doc = {
     "Decompress zlib format.",
-    "Returns decompressed data.",
-    "compress.zlib_decompress(compressed)",
+    "Returns (decompressed_data, err). err is nil on success.",
+    "result, err := compress.zlib_decompress(compressed)",
 };
 
 static const vigil_native_symbol_doc_t vigil_compress_gzip_compress_doc = {
     "Compress with gzip format.",
-    "Returns gzip-compressed data.",
-    "compress.gzip_compress(data)",
+    "Returns (compressed_data, err). err is nil on success.",
+    "result, err := compress.gzip_compress(data)",
 };
 
 static const vigil_native_symbol_doc_t vigil_compress_gzip_compress_level_doc = {
     "Compress with gzip at level.",
-    "Level 0=store, 1=fast, 9=best. Sets XFL header byte.",
-    "compress.gzip_compress_level(data, 9)",
+    "Level 0=store, 1=fast, 9=best. Sets XFL header byte. Returns (compressed_data, err).",
+    "result, err := compress.gzip_compress_level(data, 9)",
 };
 
 static const vigil_native_symbol_doc_t vigil_compress_gzip_decompress_doc = {
     "Decompress gzip format.",
-    "Returns decompressed data.",
-    "compress.gzip_decompress(compressed)",
+    "Returns (decompressed_data, err). err is nil on success.",
+    "result, err := compress.gzip_decompress(compressed)",
 };
 
 static const vigil_native_symbol_doc_t vigil_compress_lz4_compress_doc = {
     "Compress with LZ4.",
-    "Returns LZ4-compressed data. Very fast.",
-    "compress.lz4_compress(data)",
+    "Returns (compressed_data, err). Very fast. err is nil on success.",
+    "result, err := compress.lz4_compress(data)",
 };
 
 static const vigil_native_symbol_doc_t vigil_compress_lz4_decompress_doc = {
     "Decompress LZ4.",
-    "Returns decompressed data.",
-    "compress.lz4_decompress(compressed)",
+    "Returns (decompressed_data, err). err is nil on success.",
+    "result, err := compress.lz4_decompress(compressed)",
 };
 
 static const vigil_native_symbol_doc_t vigil_compress_crc32_doc = {
@@ -1597,112 +1940,162 @@ static const vigil_native_symbol_doc_t vigil_compress_adler32_doc = {
 
 static const vigil_native_symbol_doc_t vigil_compress_zip_list_doc = {
     "List files in ZIP archive.",
-    "Returns array of filenames in the archive.",
-    "compress.zip_list(zip_data)",
+    "Returns (array_of_filenames, err). err is nil on success.",
+    "files, err := compress.zip_list(zip_data)",
 };
 
 static const vigil_native_symbol_doc_t vigil_compress_zip_read_doc = {
     "Read file from ZIP archive.",
-    "Extracts and returns contents of named file.",
-    "compress.zip_read(zip_data, \"file.txt\")",
+    "Returns (file_contents, err). err is nil on success.",
+    "data, err := compress.zip_read(zip_data, \"file.txt\")",
 };
 
 static const vigil_native_symbol_doc_t vigil_compress_zip_create_doc = {
     "Create ZIP archive.",
-    "Creates archive from parallel arrays of names and contents.",
-    "compress.zip_create([\"a.txt\"], [\"data\"])",
+    "Creates archive from parallel arrays. Returns (zip_data, err).",
+    "data, err := compress.zip_create([\"a.txt\"], [\"data\"])",
 };
 
 static const vigil_native_symbol_doc_t vigil_compress_zip_create_level_doc = {
     "Create ZIP archive at level.",
-    "Level 0=store, 1=fast, 9=best, 10=uber.",
-    "compress.zip_create_level([\"a.txt\"], [\"data\"], 9)",
+    "Level 0=store, 1=fast, 9=best, 10=uber. Returns (zip_data, err).",
+    "data, err := compress.zip_create_level([\"a.txt\"], [\"data\"], 9)",
 };
 
 static const vigil_native_symbol_doc_t vigil_compress_tar_list_doc = {
     "List files in TAR archive.",
-    "Returns array of filenames in the archive.",
-    "compress.tar_list(tar_data)",
+    "Returns (array_of_filenames, err). err is nil on success.",
+    "files, err := compress.tar_list(tar_data)",
 };
 
 static const vigil_native_symbol_doc_t vigil_compress_tar_read_doc = {
     "Read file from TAR archive.",
-    "Extracts and returns contents of named file.",
-    "compress.tar_read(tar_data, \"file.txt\")",
+    "Returns (file_contents, err). err is nil on success.",
+    "data, err := compress.tar_read(tar_data, \"file.txt\")",
 };
 
 static const vigil_native_symbol_doc_t vigil_compress_tar_create_doc = {
     "Create TAR archive.",
-    "Creates archive from parallel arrays of names and contents.",
-    "compress.tar_create([\"a.txt\"], [\"data\"])",
+    "Creates archive from parallel arrays. Returns (tar_data, err).",
+    "data, err := compress.tar_create([\"a.txt\"], [\"data\"])",
 };
 
 static const vigil_native_symbol_doc_t vigil_compress_tar_gz_create_doc = {
     "Create TAR.GZ archive.",
-    "Creates tar archive and gzip-compresses it.",
-    "compress.tar_gz_create([\"a.txt\"], [\"data\"])",
+    "Creates tar archive and gzip-compresses it. Returns (tar_gz_data, err).",
+    "data, err := compress.tar_gz_create([\"a.txt\"], [\"data\"])",
 };
 
 static const vigil_native_symbol_doc_t vigil_compress_gzip_decompress_max_doc = {
     "Decompress gzip with size limit.",
-    "Stops decompression at max_bytes. Protects against zip bombs.",
-    "compress.gzip_decompress_max(data, 1048576)",
+    "Stops decompression at max_bytes. Returns (data, err). Protects against zip bombs.",
+    "data, err := compress.gzip_decompress_max(data, 1048576)",
 };
 
 static const vigil_native_symbol_doc_t vigil_compress_gzip_info_doc = {
     "Read gzip header metadata.",
-    "Returns map with method, xfl, os, flags, size, and optional filename/comment.",
-    "compress.gzip_info(gz_data)",
+    "Returns (map, err) with method, xfl, os, flags, size, and optional filename/comment.",
+    "info, err := compress.gzip_info(gz_data)",
+};
+
+static const vigil_native_symbol_doc_t vigil_compress_deflate_decompress_max_doc = {
+    "Decompress raw deflate with size limit.",
+    "Stops decompression at max_bytes. Returns (data, err). Protects against zip bombs.",
+    "data, err := compress.deflate_decompress_max(data, 1048576)",
+};
+
+static const vigil_native_symbol_doc_t vigil_compress_zlib_decompress_max_doc = {
+    "Decompress zlib with size limit.",
+    "Stops decompression at max_bytes. Returns (data, err). Protects against zip bombs.",
+    "data, err := compress.zlib_decompress_max(data, 1048576)",
+};
+
+static const vigil_native_symbol_doc_t vigil_compress_lz4_decompress_max_doc = {
+    "Decompress LZ4 with size limit.",
+    "Stops decompression at max_bytes. Returns (data, err). Protects against zip bombs.",
+    "data, err := compress.lz4_decompress_max(data, 1048576)",
+};
+
+static const vigil_native_symbol_doc_t vigil_compress_lz4_compress_level_doc = {
+    "Compress with LZ4 at level.",
+    "Uses LZ4 HC if available, otherwise falls back to default. Returns (compressed_data, err).",
+    "result, err := compress.lz4_compress_level(data, 9)",
+};
+
+static const vigil_native_symbol_doc_t vigil_compress_tar_gz_list_doc = {
+    "List files in TAR.GZ archive.",
+    "Decompresses gzip then lists tar entries. Returns (array_of_filenames, err).",
+    "files, err := compress.tar_gz_list(tar_gz_data)",
+};
+
+static const vigil_native_symbol_doc_t vigil_compress_tar_gz_read_doc = {
+    "Read file from TAR.GZ archive.",
+    "Decompresses gzip then extracts named file. Returns (file_contents, err).",
+    "data, err := compress.tar_gz_read(tar_gz_data, \"file.txt\")",
 };
 
 static const vigil_native_module_function_t compress_functions[] = {
-    {"deflate_compress", 16U, deflate_compress_fn, 1U, bytes_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U,
-     compress_data_param_names, NULL, NULL, &vigil_compress_deflate_compress_doc},
-    {"deflate_compress_level", 22U, deflate_compress_level_fn, 2U, bytes_int_param, VIGIL_TYPE_STRING, 1U, NULL, 0,
-     NULL, NULL, 0U, compress_data_level_param_names, NULL, NULL, &vigil_compress_deflate_compress_level_doc},
-    {"deflate_decompress", 18U, deflate_decompress_fn, 1U, bytes_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U,
-     compress_data_param_names, NULL, NULL, &vigil_compress_deflate_decompress_doc},
-    {"zlib_compress", 13U, zlib_compress_fn, 1U, bytes_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U,
-     compress_data_param_names, NULL, NULL, &vigil_compress_zlib_compress_doc},
-    {"zlib_compress_level", 19U, zlib_compress_level_fn, 2U, bytes_int_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL,
-     NULL, 0U, compress_data_level_param_names, NULL, NULL, &vigil_compress_zlib_compress_level_doc},
-    {"zlib_decompress", 15U, zlib_decompress_fn, 1U, bytes_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U,
-     compress_data_param_names, NULL, NULL, &vigil_compress_zlib_decompress_doc},
-    {"gzip_compress", 13U, gzip_compress_fn, 1U, bytes_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U,
-     compress_data_param_names, NULL, NULL, &vigil_compress_gzip_compress_doc},
-    {"gzip_compress_level", 19U, gzip_compress_level_fn, 2U, bytes_int_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL,
-     NULL, 0U, compress_data_level_param_names, NULL, NULL, &vigil_compress_gzip_compress_level_doc},
-    {"gzip_decompress", 15U, gzip_decompress_fn, 1U, bytes_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U,
-     compress_data_param_names, NULL, NULL, &vigil_compress_gzip_decompress_doc},
-    {"lz4_compress", 12U, lz4_compress_fn, 1U, bytes_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U,
+    {"deflate_compress", 16U, deflate_compress_fn, 1U, bytes_param, VIGIL_TYPE_STRING, 2U, str_err_returns, 0, NULL,
+     NULL, 0U, compress_data_param_names, NULL, NULL, &vigil_compress_deflate_compress_doc},
+    {"deflate_compress_level", 22U, deflate_compress_level_fn, 2U, bytes_int_param, VIGIL_TYPE_STRING, 2U,
+     str_err_returns, 0, NULL, NULL, 0U, compress_data_level_param_names, NULL, NULL,
+     &vigil_compress_deflate_compress_level_doc},
+    {"deflate_decompress", 18U, deflate_decompress_fn, 1U, bytes_param, VIGIL_TYPE_STRING, 2U, str_err_returns, 0,
+     NULL, NULL, 0U, compress_data_param_names, NULL, NULL, &vigil_compress_deflate_decompress_doc},
+    {"deflate_decompress_max", 22U, deflate_decompress_max_fn, 2U, bytes_int_param, VIGIL_TYPE_STRING, 2U,
+     str_err_returns, 0, NULL, NULL, 0U, compress_data_max_bytes_param_names, NULL, NULL,
+     &vigil_compress_deflate_decompress_max_doc},
+    {"zlib_compress", 13U, zlib_compress_fn, 1U, bytes_param, VIGIL_TYPE_STRING, 2U, str_err_returns, 0, NULL, NULL,
+     0U, compress_data_param_names, NULL, NULL, &vigil_compress_zlib_compress_doc},
+    {"zlib_compress_level", 19U, zlib_compress_level_fn, 2U, bytes_int_param, VIGIL_TYPE_STRING, 2U, str_err_returns, 0,
+     NULL, NULL, 0U, compress_data_level_param_names, NULL, NULL, &vigil_compress_zlib_compress_level_doc},
+    {"zlib_decompress", 15U, zlib_decompress_fn, 1U, bytes_param, VIGIL_TYPE_STRING, 2U, str_err_returns, 0, NULL,
+     NULL, 0U, compress_data_param_names, NULL, NULL, &vigil_compress_zlib_decompress_doc},
+    {"zlib_decompress_max", 19U, zlib_decompress_max_fn, 2U, bytes_int_param, VIGIL_TYPE_STRING, 2U, str_err_returns,
+     0, NULL, NULL, 0U, compress_data_max_bytes_param_names, NULL, NULL, &vigil_compress_zlib_decompress_max_doc},
+    {"gzip_compress", 13U, gzip_compress_fn, 1U, bytes_param, VIGIL_TYPE_STRING, 2U, str_err_returns, 0, NULL, NULL,
+     0U, compress_data_param_names, NULL, NULL, &vigil_compress_gzip_compress_doc},
+    {"gzip_compress_level", 19U, gzip_compress_level_fn, 2U, bytes_int_param, VIGIL_TYPE_STRING, 2U, str_err_returns,
+     0, NULL, NULL, 0U, compress_data_level_param_names, NULL, NULL, &vigil_compress_gzip_compress_level_doc},
+    {"gzip_decompress", 15U, gzip_decompress_fn, 1U, bytes_param, VIGIL_TYPE_STRING, 2U, str_err_returns, 0, NULL,
+     NULL, 0U, compress_data_param_names, NULL, NULL, &vigil_compress_gzip_decompress_doc},
+    {"lz4_compress", 12U, lz4_compress_fn, 1U, bytes_param, VIGIL_TYPE_STRING, 2U, str_err_returns, 0, NULL, NULL, 0U,
      compress_data_param_names, NULL, NULL, &vigil_compress_lz4_compress_doc},
-    {"lz4_decompress", 14U, lz4_decompress_fn, 1U, bytes_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U,
-     compress_data_param_names, NULL, NULL, &vigil_compress_lz4_decompress_doc},
+    {"lz4_compress_level", 18U, lz4_compress_level_fn, 2U, bytes_int_param, VIGIL_TYPE_STRING, 2U, str_err_returns, 0,
+     NULL, NULL, 0U, compress_data_level_param_names, NULL, NULL, &vigil_compress_lz4_compress_level_doc},
+    {"lz4_decompress", 14U, lz4_decompress_fn, 1U, bytes_param, VIGIL_TYPE_STRING, 2U, str_err_returns, 0, NULL, NULL,
+     0U, compress_data_param_names, NULL, NULL, &vigil_compress_lz4_decompress_doc},
+    {"lz4_decompress_max", 18U, lz4_decompress_max_fn, 2U, bytes_int_param, VIGIL_TYPE_STRING, 2U, str_err_returns, 0,
+     NULL, NULL, 0U, compress_data_max_bytes_param_names, NULL, NULL, &vigil_compress_lz4_decompress_max_doc},
     {"crc32", 5U, crc32_fn, 1U, bytes_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U, compress_data_param_names,
      NULL, NULL, &vigil_compress_crc32_doc},
-    {"adler32", 7U, adler32_fn, 1U, bytes_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U, compress_data_param_names,
-     NULL, NULL, &vigil_compress_adler32_doc},
-    {"zip_list", 8U, zip_list_fn, 1U, bytes_param, VIGIL_TYPE_OBJECT, 1U, NULL, VIGIL_TYPE_STRING, NULL,
+    {"adler32", 7U, adler32_fn, 1U, bytes_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U,
+     compress_data_param_names, NULL, NULL, &vigil_compress_adler32_doc},
+    {"zip_list", 8U, zip_list_fn, 1U, bytes_param, VIGIL_TYPE_OBJECT, 2U, obj_err_returns, VIGIL_TYPE_STRING, NULL,
      &array_string_return, 0U, compress_data_param_names, NULL, NULL, &vigil_compress_zip_list_doc},
-    {"zip_read", 8U, zip_read_fn, 2U, two_bytes_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U,
+    {"zip_read", 8U, zip_read_fn, 2U, two_bytes_param, VIGIL_TYPE_STRING, 2U, str_err_returns, 0, NULL, NULL, 0U,
      compress_data_filename_param_names, NULL, NULL, &vigil_compress_zip_read_doc},
-    {"zip_create", 10U, zip_create_fn, 2U, two_arrays_param, VIGIL_TYPE_STRING, 1U, NULL, 0, create_params_ext, NULL,
-     0U, compress_names_contents_param_names, NULL, NULL, &vigil_compress_zip_create_doc},
-    {"zip_create_level", 16U, zip_create_level_fn, 3U, two_arrays_int_param, VIGIL_TYPE_STRING, 1U, NULL, 0,
+    {"zip_create", 10U, zip_create_fn, 2U, two_arrays_param, VIGIL_TYPE_STRING, 2U, str_err_returns, 0,
+     create_params_ext, NULL, 0U, compress_names_contents_param_names, NULL, NULL, &vigil_compress_zip_create_doc},
+    {"zip_create_level", 16U, zip_create_level_fn, 3U, two_arrays_int_param, VIGIL_TYPE_STRING, 2U, str_err_returns, 0,
      create_level_params_ext, NULL, 0U, compress_names_contents_level_param_names, NULL, NULL,
      &vigil_compress_zip_create_level_doc},
-    {"tar_list", 8U, tar_list_fn, 1U, bytes_param, VIGIL_TYPE_OBJECT, 1U, NULL, VIGIL_TYPE_STRING, NULL,
+    {"tar_list", 8U, tar_list_fn, 1U, bytes_param, VIGIL_TYPE_OBJECT, 2U, obj_err_returns, VIGIL_TYPE_STRING, NULL,
      &array_string_return, 0U, compress_data_param_names, NULL, NULL, &vigil_compress_tar_list_doc},
-    {"tar_read", 8U, tar_read_fn, 2U, two_bytes_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U,
+    {"tar_read", 8U, tar_read_fn, 2U, two_bytes_param, VIGIL_TYPE_STRING, 2U, str_err_returns, 0, NULL, NULL, 0U,
      compress_data_filename_param_names, NULL, NULL, &vigil_compress_tar_read_doc},
-    {"tar_create", 10U, tar_create_fn, 2U, two_arrays_param, VIGIL_TYPE_STRING, 1U, NULL, 0, create_params_ext, NULL,
-     0U, compress_names_contents_param_names, NULL, NULL, &vigil_compress_tar_create_doc},
-    {"tar_gz_create", 13U, tar_gz_create_fn, 2U, two_arrays_param, VIGIL_TYPE_STRING, 1U, NULL, 0, create_params_ext,
-     NULL, 0U, compress_names_contents_param_names, NULL, NULL, &vigil_compress_tar_gz_create_doc},
-    {"gzip_decompress_max", 19U, gzip_decompress_max_fn, 2U, bytes_int_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL,
-     NULL, 0U, compress_data_max_bytes_param_names, NULL, NULL, &vigil_compress_gzip_decompress_max_doc},
-    {"gzip_info", 9U, gzip_info_fn, 1U, bytes_param, VIGIL_TYPE_OBJECT, 1U, NULL, 0, NULL, &map_ss_return, 0U,
-     compress_data_param_names, NULL, NULL, &vigil_compress_gzip_info_doc},
+    {"tar_create", 10U, tar_create_fn, 2U, two_arrays_param, VIGIL_TYPE_STRING, 2U, str_err_returns, 0,
+     create_params_ext, NULL, 0U, compress_names_contents_param_names, NULL, NULL, &vigil_compress_tar_create_doc},
+    {"tar_gz_create", 13U, tar_gz_create_fn, 2U, two_arrays_param, VIGIL_TYPE_STRING, 2U, str_err_returns, 0,
+     create_params_ext, NULL, 0U, compress_names_contents_param_names, NULL, NULL, &vigil_compress_tar_gz_create_doc},
+    {"tar_gz_list", 11U, tar_gz_list_fn, 1U, bytes_param, VIGIL_TYPE_OBJECT, 2U, obj_err_returns, VIGIL_TYPE_STRING,
+     NULL, &array_string_return, 0U, compress_data_param_names, NULL, NULL, &vigil_compress_tar_gz_list_doc},
+    {"tar_gz_read", 11U, tar_gz_read_fn, 2U, two_bytes_param, VIGIL_TYPE_STRING, 2U, str_err_returns, 0, NULL, NULL,
+     0U, compress_data_filename_param_names, NULL, NULL, &vigil_compress_tar_gz_read_doc},
+    {"gzip_decompress_max", 19U, gzip_decompress_max_fn, 2U, bytes_int_param, VIGIL_TYPE_STRING, 2U, str_err_returns,
+     0, NULL, NULL, 0U, compress_data_max_bytes_param_names, NULL, NULL, &vigil_compress_gzip_decompress_max_doc},
+    {"gzip_info", 9U, gzip_info_fn, 1U, bytes_param, VIGIL_TYPE_OBJECT, 2U, obj_err_returns, 0, NULL, &map_ss_return,
+     0U, compress_data_param_names, NULL, NULL, &vigil_compress_gzip_info_doc},
 };
 
 #define COMPRESS_FUNCTION_COUNT (sizeof(compress_functions) / sizeof(compress_functions[0]))

@@ -1,0 +1,64 @@
+import "fmt"
+import "compress"
+
+fn test_create_and_list() -> void {
+    array<string> names = ["hello.txt"]
+    array<string> contents = ["hello world"]
+    string archive, err e1 = compress.zip_create(names, contents)
+    bool ok1 = e1 == ok
+    fmt.println(f"zip create ok: {ok1}")
+
+    array<string> listing, err e2 = compress.zip_list(archive)
+    bool ok2 = e2 == ok
+    fmt.println(f"zip list ok: {ok2}")
+    fmt.println(f"zip list len: {listing.len()}")
+    bool name_match = listing[0] == "hello.txt"
+    fmt.println(f"zip list name: {name_match}")
+}
+
+fn test_create_and_read() -> void {
+    array<string> names = ["test.txt"]
+    array<string> contents = ["test content here"]
+    string archive, err e1 = compress.zip_create(names, contents)
+
+    string data, err e2 = compress.zip_read(archive, "test.txt")
+    bool ok2 = e2 == ok
+    fmt.println(f"zip read ok: {ok2}")
+    bool match = data == "test content here"
+    fmt.println(f"zip read match: {match}")
+}
+
+fn test_create_level() -> void {
+    array<string> names = ["level.txt"]
+    array<string> contents = ["level test content with repeated data repeated data repeated data"]
+    string archive, err e1 = compress.zip_create_level(names, contents, 9)
+    bool ok1 = e1 == ok
+    fmt.println(f"zip create_level ok: {ok1}")
+
+    string data, err e2 = compress.zip_read(archive, "level.txt")
+    bool match = data == "level test content with repeated data repeated data repeated data"
+    fmt.println(f"zip create_level roundtrip: {match}")
+}
+
+fn test_roundtrip() -> void {
+    array<string> names = ["a.txt"]
+    array<string> contents = ["file a content"]
+    string archive, err e1 = compress.zip_create(names, contents)
+
+    array<string> listing, err e2 = compress.zip_list(archive)
+    fmt.println(f"zip roundtrip list len: {listing.len()}")
+
+    string data, err e3 = compress.zip_read(archive, "a.txt")
+    bool match = data == "file a content"
+    fmt.println(f"zip roundtrip read match: {match}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 06_ZIP_BASIC START =====")
+    test_create_and_list()
+    test_create_and_read()
+    test_create_level()
+    test_roundtrip()
+    fmt.println("===== TEST 06_ZIP_BASIC END =====")
+    return 0
+}

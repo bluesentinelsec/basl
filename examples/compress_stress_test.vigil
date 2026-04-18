@@ -174,20 +174,20 @@ fn gen_source_code() -> string {
 // ─── Mode 1: Round-Trip Integrity ──────────────────────────────
 fn test_roundtrip(string data, string label) -> void {
     // Deflate round-trip
-    string deflated = compress.deflate_compress(data)
-    string inflated = compress.deflate_decompress(deflated)
+    string deflated, err _ = compress.deflate_compress(data)
+    string inflated, err _ = compress.deflate_decompress(deflated)
     check(inflated == data, label + " deflate round-trip")
     // Zlib round-trip
-    string zlib_c = compress.zlib_compress(data)
-    string zlib_d = compress.zlib_decompress(zlib_c)
+    string zlib_c, err _ = compress.zlib_compress(data)
+    string zlib_d, err _ = compress.zlib_decompress(zlib_c)
     check(zlib_d == data, label + " zlib round-trip")
     // Gzip round-trip
-    string gz_c = compress.gzip_compress(data)
-    string gz_d = compress.gzip_decompress(gz_c)
+    string gz_c, err _ = compress.gzip_compress(data)
+    string gz_d, err _ = compress.gzip_decompress(gz_c)
     check(gz_d == data, label + " gzip round-trip")
     // LZ4 round-trip
-    string lz4_c = compress.lz4_compress(data)
-    string lz4_d = compress.lz4_decompress(lz4_c)
+    string lz4_c, err _ = compress.lz4_compress(data)
+    string lz4_d, err _ = compress.lz4_decompress(lz4_c)
     check(lz4_d == data, label + " lz4 round-trip")
 }
 
@@ -222,10 +222,10 @@ fn test_format_comparison() -> void {
     string data = gen_log_data(100)
     i32 orig_len = data.len()
     fmt.println("  Original size: " + string(orig_len) + " bytes")
-    string deflated = compress.deflate_compress(data)
-    string zlib_c = compress.zlib_compress(data)
-    string gz_c = compress.gzip_compress(data)
-    string lz4_c = compress.lz4_compress(data)
+    string deflated, err _ = compress.deflate_compress(data)
+    string zlib_c, err _ = compress.zlib_compress(data)
+    string gz_c, err _ = compress.gzip_compress(data)
+    string lz4_c, err _ = compress.lz4_compress(data)
     fmt.println("  Deflate:  " + string(deflated.len()) + " bytes (" + string(i64(deflated.len()) * i64(100) / i64(orig_len)) + "%)")
     fmt.println("  Zlib:     " + string(zlib_c.len()) + " bytes (" + string(i64(zlib_c.len()) * i64(100) / i64(orig_len)) + "%)")
     fmt.println("  Gzip:     " + string(gz_c.len()) + " bytes (" + string(i64(gz_c.len()) * i64(100) / i64(orig_len)) + "%)")
@@ -238,10 +238,14 @@ fn test_format_comparison() -> void {
     check(deflated.len() < orig_len / 2, "deflate compresses text < 50%")
     check(lz4_c.len() < orig_len, "lz4 compresses text < 100%")
     // Verify all decompress to same result
-    check(compress.deflate_decompress(deflated) == data, "deflate decompresses correctly")
-    check(compress.zlib_decompress(zlib_c) == data, "zlib decompresses correctly")
-    check(compress.gzip_decompress(gz_c) == data, "gzip decompresses correctly")
-    check(compress.lz4_decompress(lz4_c) == data, "lz4 decompresses correctly")
+    string dd_v, err _ = compress.deflate_decompress(deflated)
+    check(dd_v == data, "deflate decompresses correctly")
+    string zd_v, err _ = compress.zlib_decompress(zlib_c)
+    check(zd_v == data, "zlib decompresses correctly")
+    string gd_v, err _ = compress.gzip_decompress(gz_c)
+    check(gd_v == data, "gzip decompresses correctly")
+    string ld_v, err _ = compress.lz4_decompress(lz4_c)
+    check(ld_v == data, "lz4 decompresses correctly")
 }
 
 // ─── Mode 3: Compression Benchmarks ────────────────────────────
@@ -250,36 +254,36 @@ fn bench_compress(string data, string label) -> void {
     fmt.println("  " + label + " (" + string(orig) + " bytes):")
     // Deflate
     i64 t0 = time.now_ns()
-    string dc = compress.deflate_compress(data)
+    string dc, err _ = compress.deflate_compress(data)
     i64 t1 = time.now_ns()
-    string dd = compress.deflate_decompress(dc)
+    string dd, err _ = compress.deflate_decompress(dc)
     i64 t2 = time.now_ns()
     i64 dc_pct = i64(dc.len()) * i64(100) / i64(orig)
     fmt.println("    deflate: " + string(dc.len()) + "b (" + string(dc_pct) + "%) " + "compress=" + string((t1 - t0) / i64(1000)) + "us decompress=" + string((t2 - t1) / i64(1000)) + "us")
     check(dd == data, label + " deflate bench verify")
     // Zlib
     t0 = time.now_ns()
-    string zc = compress.zlib_compress(data)
+    string zc, err _ = compress.zlib_compress(data)
     t1 = time.now_ns()
-    string zd = compress.zlib_decompress(zc)
+    string zd, err _ = compress.zlib_decompress(zc)
     t2 = time.now_ns()
     i64 zc_pct = i64(zc.len()) * i64(100) / i64(orig)
     fmt.println("    zlib:    " + string(zc.len()) + "b (" + string(zc_pct) + "%) " + "compress=" + string((t1 - t0) / i64(1000)) + "us decompress=" + string((t2 - t1) / i64(1000)) + "us")
     check(zd == data, label + " zlib bench verify")
     // Gzip
     t0 = time.now_ns()
-    string gc = compress.gzip_compress(data)
+    string gc, err _ = compress.gzip_compress(data)
     t1 = time.now_ns()
-    string gd = compress.gzip_decompress(gc)
+    string gd, err _ = compress.gzip_decompress(gc)
     t2 = time.now_ns()
     i64 gc_pct = i64(gc.len()) * i64(100) / i64(orig)
     fmt.println("    gzip:    " + string(gc.len()) + "b (" + string(gc_pct) + "%) " + "compress=" + string((t1 - t0) / i64(1000)) + "us decompress=" + string((t2 - t1) / i64(1000)) + "us")
     check(gd == data, label + " gzip bench verify")
     // LZ4
     t0 = time.now_ns()
-    string lc = compress.lz4_compress(data)
+    string lc, err _ = compress.lz4_compress(data)
     t1 = time.now_ns()
-    string ld = compress.lz4_decompress(lc)
+    string ld, err _ = compress.lz4_decompress(lc)
     t2 = time.now_ns()
     i64 lc_pct = i64(lc.len()) * i64(100) / i64(orig)
     fmt.println("    lz4:     " + string(lc.len()) + "b (" + string(lc_pct) + "%) " + "compress=" + string((t1 - t0) / i64(1000)) + "us decompress=" + string((t2 - t1) / i64(1000)) + "us")
@@ -308,11 +312,11 @@ fn test_zip_archive() -> void {
     array<string> names = ["readme.txt", "data/config.json", "data/log.txt", "src/main.vigil", "empty.txt"]
     array<string> contents = ["This is a README file for the test archive.\nIt has multiple lines.\n", gen_json_data(10), gen_log_data(20), gen_source_code(), ""]
     // Create ZIP
-    string zip_data = compress.zip_create(names, contents)
+    string zip_data, err _ = compress.zip_create(names, contents)
     check(zip_data.len() > 0, "zip_create produces non-empty output")
     fmt.println("  ZIP archive size: " + string(zip_data.len()) + " bytes")
     // List files
-    array<string> listed = compress.zip_list(zip_data)
+    array<string> listed, err _ = compress.zip_list(zip_data)
     check(listed.len() == 5, "zip_list returns 5 entries (got " + string(listed.len()) + ")")
     fmt.println("  ZIP entries: " + string(listed.len()))
     // Verify each file name is present
@@ -330,16 +334,16 @@ fn test_zip_archive() -> void {
     // Read back each file and verify content
     i32 idx = 0
     while idx < 5 {
-        string read_back = compress.zip_read(zip_data, names[idx])
+        string read_back, err _ = compress.zip_read(zip_data, names[idx])
         check(read_back == contents[idx], "zip_read '" + names[idx] + "' matches original")
         idx++
     }
 
     // Read non-existent file
-    string missing = compress.zip_read(zip_data, "nonexistent.txt")
+    string missing, err _ = compress.zip_read(zip_data, "nonexistent.txt")
     check(missing.len() == 0, "zip_read missing file returns empty")
     // List empty/invalid ZIP
-    array<string> empty_list = compress.zip_list("")
+    array<string> empty_list, err _ = compress.zip_list("")
     check(empty_list.len() == 0, "zip_list empty input returns empty array")
     fmt.println("  ZIP archive tests complete.")
 }
@@ -350,27 +354,27 @@ fn test_tar_archive() -> void {
     array<string> names = ["project/README.md", "project/src/main.vigil", "project/data/sample.json", "project/empty.txt"]
     array<string> contents = ["# My Project\n\nA sample project for testing.\n", gen_source_code(), gen_json_data(5), ""]
     // Create TAR
-    string tar_data = compress.tar_create(names, contents)
+    string tar_data, err _ = compress.tar_create(names, contents)
     check(tar_data.len() > 0, "tar_create produces non-empty output")
     fmt.println("  TAR archive size: " + string(tar_data.len()) + " bytes")
     // TAR should be larger than ZIP (no compression, 512-byte headers)
     check(tar_data.len() >= 512 * 4, "tar has at least 4 header blocks")
     // List files
-    array<string> listed = compress.tar_list(tar_data)
+    array<string> listed, err _ = compress.tar_list(tar_data)
     check(listed.len() == 4, "tar_list returns 4 entries (got " + string(listed.len()) + ")")
     // Read back each file
     i32 idx = 0
     while idx < 4 {
-        string read_back = compress.tar_read(tar_data, names[idx])
+        string read_back, err _ = compress.tar_read(tar_data, names[idx])
         check(read_back == contents[idx], "tar_read '" + names[idx] + "' matches original")
         idx++
     }
 
     // Read non-existent
-    string missing = compress.tar_read(tar_data, "nonexistent.txt")
+    string missing, err _ = compress.tar_read(tar_data, "nonexistent.txt")
     check(missing.len() == 0, "tar_read missing file returns empty")
     // Empty tar
-    array<string> empty_list = compress.tar_list("")
+    array<string> empty_list, err _ = compress.tar_list("")
     check(empty_list.len() == 0, "tar_list empty input returns empty array")
     fmt.println("  TAR archive tests complete.")
 }
@@ -383,35 +387,35 @@ fn test_tar_gz_pipeline() -> void {
     array<string> contents = [gen_log_data(100), gen_log_data(30), gen_json_data(20), gen_json_data(50), "# Backup Archive\n\nCreated by compress_stress_test.vigil\n"]
     // Step 1: Create TAR
     i64 t0 = time.now_ns()
-    string tar_data = compress.tar_create(names, contents)
+    string tar_data, err _ = compress.tar_create(names, contents)
     i64 t1 = time.now_ns()
     fmt.println("  TAR create: " + string(tar_data.len()) + " bytes in " + string((t1 - t0) / i64(1000)) + "us")
     // Step 2: Gzip compress the TAR
     t0 = time.now_ns()
-    string tar_gz = compress.gzip_compress(tar_data)
+    string tar_gz, err _ = compress.gzip_compress(tar_data)
     t1 = time.now_ns()
     fmt.println("  GZIP compress: " + string(tar_gz.len()) + " bytes (" + string(i64(tar_gz.len()) * i64(100) / i64(tar_data.len())) + "%) in " + string((t1 - t0) / i64(1000)) + "us")
     check(tar_gz.len() < tar_data.len(), "tar.gz is smaller than tar")
     // Step 3: Gzip decompress
     t0 = time.now_ns()
-    string tar_restored = compress.gzip_decompress(tar_gz)
+    string tar_restored, err _ = compress.gzip_decompress(tar_gz)
     t1 = time.now_ns()
     fmt.println("  GZIP decompress: " + string(tar_restored.len()) + " bytes in " + string((t1 - t0) / i64(1000)) + "us")
     check(tar_restored == tar_data, "gzip round-trip preserves tar data exactly")
     // Step 4: Extract files from restored TAR
-    array<string> restored_list = compress.tar_list(tar_restored)
+    array<string> restored_list, err _ = compress.tar_list(tar_restored)
     check(restored_list.len() == 5, "restored tar has 5 entries")
     i32 idx = 0
     while idx < 5 {
-        string extracted = compress.tar_read(tar_restored, names[idx])
+        string extracted, err _ = compress.tar_read(tar_restored, names[idx])
         check(extracted == contents[idx], "tar.gz pipeline: '" + names[idx] + "' intact")
         idx++
     }
 
     // Also try LZ4 compression of the TAR (tar.lz4)
-    string tar_lz4 = compress.lz4_compress(tar_data)
+    string tar_lz4, err _ = compress.lz4_compress(tar_data)
     fmt.println("  LZ4 compress: " + string(tar_lz4.len()) + " bytes (" + string(i64(tar_lz4.len()) * i64(100) / i64(tar_data.len())) + "%)")
-    string tar_from_lz4 = compress.lz4_decompress(tar_lz4)
+    string tar_from_lz4, err _ = compress.lz4_decompress(tar_lz4)
     check(tar_from_lz4 == tar_data, "tar.lz4 round-trip preserves tar data")
     fmt.println("  TAR.GZ pipeline tests complete.")
 }
@@ -421,18 +425,18 @@ fn test_edge_cases() -> void {
     section("Mode 7: Edge Cases")
     // Empty string
     string empty = ""
-    string dc = compress.deflate_compress(empty)
-    string dd = compress.deflate_decompress(dc)
+    string dc, err _ = compress.deflate_compress(empty)
+    string dd, err _ = compress.deflate_decompress(dc)
     check(dd == empty, "deflate empty round-trip")
-    string zc = compress.zlib_compress(empty)
-    string zd = compress.zlib_decompress(zc)
+    string zc, err _ = compress.zlib_compress(empty)
+    string zd, err _ = compress.zlib_decompress(zc)
     check(zd == empty, "zlib empty round-trip")
-    string gc = compress.gzip_compress(empty)
+    string gc, err _ = compress.gzip_compress(empty)
     check(gc.len() > 0, "gzip of empty produces valid gzip")
-    string gd = compress.gzip_decompress(gc)
+    string gd, err _ = compress.gzip_decompress(gc)
     check(gd == empty, "gzip empty round-trip")
-    string lc = compress.lz4_compress(empty)
-    string ld = compress.lz4_decompress(lc)
+    string lc, err _ = compress.lz4_compress(empty)
+    string ld, err _ = compress.lz4_decompress(lc)
     check(ld == empty, "lz4 empty round-trip")
     // Single byte
     string one = "X"
@@ -441,46 +445,46 @@ fn test_edge_cases() -> void {
     test_roundtrip("AB", "two_bytes")
     // Large repeated data (high compression ratio)
     string big_repeat = "Z".repeat(50000)
-    string big_dc = compress.deflate_compress(big_repeat)
-    string big_dd = compress.deflate_decompress(big_dc)
+    string big_dc, err _ = compress.deflate_compress(big_repeat)
+    string big_dd, err _ = compress.deflate_decompress(big_dc)
     check(big_dd == big_repeat, "50k repeated deflate round-trip")
     check(big_dc.len() < 500, "50k repeated compresses to < 500 bytes")
     fmt.println("  50k repeated: " + string(big_repeat.len()) + " -> " + string(big_dc.len()) + " bytes")
     // Large repeated via gzip
-    string big_gc = compress.gzip_compress(big_repeat)
-    string big_gd = compress.gzip_decompress(big_gc)
+    string big_gc, err _ = compress.gzip_compress(big_repeat)
+    string big_gd, err _ = compress.gzip_decompress(big_gc)
     check(big_gd == big_repeat, "50k repeated gzip round-trip")
     // Large repeated via lz4
-    string big_lc = compress.lz4_compress(big_repeat)
-    string big_ld = compress.lz4_decompress(big_lc)
+    string big_lc, err _ = compress.lz4_compress(big_repeat)
+    string big_ld, err _ = compress.lz4_decompress(big_lc)
     check(big_ld == big_repeat, "50k repeated lz4 round-trip")
     // Incompressible data — compressed output may be larger
     string incomp = gen_pseudo_random(2000)
-    string incomp_dc = compress.deflate_compress(incomp)
-    string incomp_dd = compress.deflate_decompress(incomp_dc)
+    string incomp_dc, err _ = compress.deflate_compress(incomp)
+    string incomp_dd, err _ = compress.deflate_decompress(incomp_dc)
     check(incomp_dd == incomp, "incompressible deflate round-trip")
     fmt.println("  Incompressible 2k: " + string(incomp.len()) + " -> " + string(incomp_dc.len()) + " bytes")
     // Already-compressed data (compress compressed data)
     // Vigil strings are binary-safe (length-tracked, not null-terminated),
     // so double-compression round-trips correctly even with embedded nulls.
-    string inner_gz = compress.gzip_compress("test data here")
-    string double_c = compress.gzip_compress(inner_gz)
-    string double_d = compress.gzip_decompress(double_c)
-    string final_d = compress.gzip_decompress(double_d)
+    string inner_gz, err _ = compress.gzip_compress("test data here")
+    string double_c, err _ = compress.gzip_compress(inner_gz)
+    string double_d, err _ = compress.gzip_decompress(double_c)
+    string final_d, err _ = compress.gzip_decompress(double_d)
     check(final_d == "test data here", "double gzip compress/decompress")
     // ZIP with single empty file
     array<string> zip_names = ["empty.txt"]
     array<string> zip_contents = [""]
-    string zip_empty = compress.zip_create(zip_names, zip_contents)
-    array<string> zip_list = compress.zip_list(zip_empty)
+    string zip_empty, err _ = compress.zip_create(zip_names, zip_contents)
+    array<string> zip_list, err _ = compress.zip_list(zip_empty)
     check(zip_list.len() == 1, "zip with empty file lists 1 entry")
-    string zip_read = compress.zip_read(zip_empty, "empty.txt")
+    string zip_read, err _ = compress.zip_read(zip_empty, "empty.txt")
     check(zip_read == "", "zip read empty file returns empty string")
     // TAR with single empty file
-    string tar_empty = compress.tar_create(zip_names, zip_contents)
-    array<string> tar_list = compress.tar_list(tar_empty)
+    string tar_empty, err _ = compress.tar_create(zip_names, zip_contents)
+    array<string> tar_list, err _ = compress.tar_list(tar_empty)
     check(tar_list.len() == 1, "tar with empty file lists 1 entry")
-    string tar_read = compress.tar_read(tar_empty, "empty.txt")
+    string tar_read, err _ = compress.tar_read(tar_empty, "empty.txt")
     check(tar_read == "", "tar read empty file returns empty string")
     // ZIP with many files
     array<string> many_names = []
@@ -492,13 +496,16 @@ fn test_edge_cases() -> void {
         i++
     }
 
-    string big_zip = compress.zip_create(many_names, many_contents)
-    array<string> big_zip_list = compress.zip_list(big_zip)
+    string big_zip, err _ = compress.zip_create(many_names, many_contents)
+    array<string> big_zip_list, err _ = compress.zip_list(big_zip)
     check(big_zip_list.len() == 50, "zip with 50 files lists all 50")
     // Spot-check a few
-    check(compress.zip_read(big_zip, "file_0.txt") == "Content of file 0\n", "zip read file_0")
-    check(compress.zip_read(big_zip, "file_49.txt") == "Content of file 49\n", "zip read file_49")
-    check(compress.zip_read(big_zip, "file_25.txt") == "Content of file 25\n", "zip read file_25")
+    string zr0, err _ = compress.zip_read(big_zip, "file_0.txt")
+    check(zr0 == "Content of file 0\n", "zip read file_0")
+    string zr49, err _ = compress.zip_read(big_zip, "file_49.txt")
+    check(zr49 == "Content of file 49\n", "zip read file_49")
+    string zr25, err _ = compress.zip_read(big_zip, "file_25.txt")
+    check(zr25 == "Content of file 25\n", "zip read file_25")
     fmt.println("  Edge case tests complete.")
 }
 
@@ -507,35 +514,44 @@ fn test_levels_and_checksums() -> void {
     section("Mode 8: Compression Levels & Checksums (NEW APIs)")
     string data = gen_log_data(100)
     // Test compression levels 0 (store) through 9 (best)
-    string level0 = compress.gzip_compress_level(data, 0)
-    string level1 = compress.gzip_compress_level(data, 1)
-    string level6 = compress.gzip_compress_level(data, 6)
-    string level9 = compress.gzip_compress_level(data, 9)
+    string level0, err _ = compress.gzip_compress_level(data, 0)
+    string level1, err _ = compress.gzip_compress_level(data, 1)
+    string level6, err _ = compress.gzip_compress_level(data, 6)
+    string level9, err _ = compress.gzip_compress_level(data, 9)
     // All must round-trip correctly
-    check(compress.gzip_decompress(level0) == data, "gzip level 0 round-trip")
-    check(compress.gzip_decompress(level1) == data, "gzip level 1 round-trip")
-    check(compress.gzip_decompress(level6) == data, "gzip level 6 round-trip")
-    check(compress.gzip_decompress(level9) == data, "gzip level 9 round-trip")
+    string dl0, err _ = compress.gzip_decompress(level0)
+    check(dl0 == data, "gzip level 0 round-trip")
+    string dl1, err _ = compress.gzip_decompress(level1)
+    check(dl1 == data, "gzip level 1 round-trip")
+    string dl6, err _ = compress.gzip_decompress(level6)
+    check(dl6 == data, "gzip level 6 round-trip")
+    string dl9, err _ = compress.gzip_decompress(level9)
+    check(dl9 == data, "gzip level 9 round-trip")
     // Level 0 (store) should be largest, level 9 should be smallest
     check(level0.len() > level9.len(), "gzip level 0 > level 9 size")
     check(level1.len() >= level9.len(), "gzip level 1 >= level 9 size")
     fmt.println("  gzip levels: 0=" + string(level0.len()) + " 1=" + string(level1.len()) + " 6=" + string(level6.len()) + " 9=" + string(level9.len()))
     // Default should produce reasonable output (between level 1 and level 9)
-    string default_gz = compress.gzip_compress(data)
+    string default_gz, err _ = compress.gzip_compress(data)
     check(default_gz.len() <= level1.len(), "gzip default <= level 1 size")
-    check(compress.gzip_decompress(default_gz) == data, "gzip default round-trip")
+    string ddef, err _ = compress.gzip_decompress(default_gz)
+    check(ddef == data, "gzip default round-trip")
     // Zlib compress level
-    string zlib0 = compress.zlib_compress_level(data, 0)
-    string zlib9 = compress.zlib_compress_level(data, 9)
-    check(compress.zlib_decompress(zlib0) == data, "zlib level 0 round-trip")
-    check(compress.zlib_decompress(zlib9) == data, "zlib level 9 round-trip")
+    string zlib0, err _ = compress.zlib_compress_level(data, 0)
+    string zlib9, err _ = compress.zlib_compress_level(data, 9)
+    string dzl0, err _ = compress.zlib_decompress(zlib0)
+    check(dzl0 == data, "zlib level 0 round-trip")
+    string dzl9, err _ = compress.zlib_decompress(zlib9)
+    check(dzl9 == data, "zlib level 9 round-trip")
     check(zlib0.len() > zlib9.len(), "zlib level 0 > level 9 size")
     fmt.println("  zlib levels: 0=" + string(zlib0.len()) + " 9=" + string(zlib9.len()))
     // Deflate compress level
-    string def1 = compress.deflate_compress_level(data, 1)
-    string def9 = compress.deflate_compress_level(data, 9)
-    check(compress.deflate_decompress(def1) == data, "deflate level 1 round-trip")
-    check(compress.deflate_decompress(def9) == data, "deflate level 9 round-trip")
+    string def1, err _ = compress.deflate_compress_level(data, 1)
+    string def9, err _ = compress.deflate_compress_level(data, 9)
+    string dfl1, err _ = compress.deflate_decompress(def1)
+    check(dfl1 == data, "deflate level 1 round-trip")
+    string dfl9, err _ = compress.deflate_decompress(def9)
+    check(dfl9 == data, "deflate level 9 round-trip")
     check(def1.len() >= def9.len(), "deflate level 1 >= level 9 size")
     fmt.println("  deflate levels: 1=" + string(def1.len()) + " 9=" + string(def9.len()))
     // CRC32
@@ -557,10 +573,12 @@ fn test_levels_and_checksums() -> void {
     check(a1 != i64(0), "adler32 non-zero for non-empty")
     fmt.println("  adler32(\"Hello, World!\") = " + string(a1))
     // Edge: level out of range should clamp
-    string clamped_low = compress.gzip_compress_level(data, - 5)
-    check(compress.gzip_decompress(clamped_low) == data, "gzip negative level round-trip")
-    string clamped_high = compress.gzip_compress_level(data, 99)
-    check(compress.gzip_decompress(clamped_high) == data, "gzip level 99 round-trip")
+    string clamped_low, err _ = compress.gzip_compress_level(data, - 5)
+    string dcl, err _ = compress.gzip_decompress(clamped_low)
+    check(dcl == data, "gzip negative level round-trip")
+    string clamped_high, err _ = compress.gzip_compress_level(data, 99)
+    string dch, err _ = compress.gzip_decompress(clamped_high)
+    check(dch == data, "gzip level 99 round-trip")
     fmt.println("  Compression levels & checksums tests complete.")
 }
 
@@ -569,19 +587,19 @@ fn test_error_handling() -> void {
     section("Mode 9: Error Handling & Corrupt Data")
     // Decompress garbage data — should return empty, not crash
     string garbage = "This is not compressed data at all!"
-    string d1 = compress.deflate_decompress(garbage)
+    string d1, err _ = compress.deflate_decompress(garbage)
     check(d1.len() == 0, "deflate_decompress garbage returns empty")
-    string d2 = compress.zlib_decompress(garbage)
+    string d2, err _ = compress.zlib_decompress(garbage)
     check(d2.len() == 0, "zlib_decompress garbage returns empty")
-    string d3 = compress.gzip_decompress(garbage)
+    string d3, err _ = compress.gzip_decompress(garbage)
     check(d3.len() == 0, "gzip_decompress garbage returns empty")
-    string d4 = compress.lz4_decompress(garbage)
+    string d4, err _ = compress.lz4_decompress(garbage)
     check(d4.len() == 0, "lz4_decompress garbage returns empty")
     // Truncated gzip — valid header but truncated body
-    string valid_gz = compress.gzip_compress("Hello, World! This is a test string.")
+    string valid_gz, err _ = compress.gzip_compress("Hello, World! This is a test string.")
     // Take only first 15 bytes (header + partial body)
     string truncated_gz, err e1 = valid_gz.substr(0, 15)
-    string d5 = compress.gzip_decompress(truncated_gz)
+    string d5, err _ = compress.gzip_decompress(truncated_gz)
     check(d5.len() == 0, "gzip_decompress truncated returns empty")
     // Corrupt gzip — flip a byte in the compressed body
     string corrupt_gz = valid_gz
@@ -589,48 +607,52 @@ fn test_error_handling() -> void {
     // with wrong magic bytes
     string gz_tail, err e2 = valid_gz.substr(2, valid_gz.len() - 2)
     string wrong_magic = "XX" + gz_tail
-    string d6 = compress.gzip_decompress(wrong_magic)
+    string d6, err _ = compress.gzip_decompress(wrong_magic)
     check(d6.len() == 0, "gzip_decompress wrong magic returns empty")
     // Truncated zlib
-    string valid_zlib = compress.zlib_compress("Test data for truncation")
+    string valid_zlib, err _ = compress.zlib_compress("Test data for truncation")
     string truncated_zlib, err e3 = valid_zlib.substr(0, 5)
-    string d7 = compress.zlib_decompress(truncated_zlib)
+    string d7, err _ = compress.zlib_decompress(truncated_zlib)
     // May partially decompress or return empty — either is acceptable
     // The key is it doesn't crash
     check(true, "zlib_decompress truncated doesn't crash")
     // Truncated LZ4
-    string valid_lz4 = compress.lz4_compress("Test data for LZ4 truncation test")
+    string valid_lz4, err _ = compress.lz4_compress("Test data for LZ4 truncation test")
     string truncated_lz4, err e4 = valid_lz4.substr(0, 3)
-    string d8 = compress.lz4_decompress(truncated_lz4)
+    string d8, err _ = compress.lz4_decompress(truncated_lz4)
     check(d8.len() == 0, "lz4_decompress truncated returns empty")
     // Cross-format: try to decompress zlib data as gzip
-    string zlib_data = compress.zlib_compress("cross format test")
-    string d9 = compress.gzip_decompress(zlib_data)
+    string zlib_data, err _ = compress.zlib_compress("cross format test")
+    string d9, err _ = compress.gzip_decompress(zlib_data)
     check(d9.len() == 0, "gzip_decompress of zlib data returns empty")
     // Cross-format: try to decompress gzip data as zlib
-    string gzip_data = compress.gzip_compress("cross format test")
-    string d10 = compress.zlib_decompress(gzip_data)
+    string gzip_data, err _ = compress.gzip_compress("cross format test")
+    string d10, err _ = compress.zlib_decompress(gzip_data)
     check(d10.len() == 0, "zlib_decompress of gzip data returns empty")
     // Cross-format: try to decompress lz4 as deflate
-    string lz4_data = compress.lz4_compress("cross format test")
-    string d11 = compress.deflate_decompress(lz4_data)
+    string lz4_data, err _ = compress.lz4_compress("cross format test")
+    string d11, err _ = compress.deflate_decompress(lz4_data)
     // May produce garbage or empty — key is no crash
     check(true, "deflate_decompress of lz4 data doesn't crash")
     // Invalid ZIP data
-    array<string> bad_zip_list = compress.zip_list("not a zip file")
+    array<string> bad_zip_list, err _ = compress.zip_list("not a zip file")
     check(bad_zip_list.len() == 0, "zip_list invalid data returns empty")
-    string bad_zip_read = compress.zip_read("not a zip file", "test.txt")
+    string bad_zip_read, err _ = compress.zip_read("not a zip file", "test.txt")
     check(bad_zip_read.len() == 0, "zip_read invalid data returns empty")
     // Invalid TAR data
-    array<string> bad_tar_list = compress.tar_list("not a tar file")
+    array<string> bad_tar_list, err _ = compress.tar_list("not a tar file")
     check(bad_tar_list.len() == 0, "tar_list invalid data returns empty")
-    string bad_tar_read = compress.tar_read("not a tar file", "test.txt")
+    string bad_tar_read, err _ = compress.tar_read("not a tar file", "test.txt")
     check(bad_tar_read.len() == 0, "tar_read invalid data returns empty")
     // Very short inputs (1-2 bytes)
-    check(compress.gzip_decompress("X").len() == 0, "gzip_decompress 1 byte returns empty")
-    check(compress.zlib_decompress("X").len() == 0, "zlib_decompress 1 byte returns empty")
-    check(compress.deflate_decompress("X").len() == 0, "deflate_decompress 1 byte doesn't crash")
-    check(compress.lz4_decompress("X").len() == 0, "lz4_decompress 1 byte returns empty")
+    string gx, err _ = compress.gzip_decompress("X")
+    check(gx.len() == 0, "gzip_decompress 1 byte returns empty")
+    string zx, err _ = compress.zlib_decompress("X")
+    check(zx.len() == 0, "zlib_decompress 1 byte returns empty")
+    string dx, err _ = compress.deflate_decompress("X")
+    check(dx.len() == 0, "deflate_decompress 1 byte doesn't crash")
+    string lx, err _ = compress.lz4_decompress("X")
+    check(lx.len() == 0, "lz4_decompress 1 byte returns empty")
     fmt.println("  Error handling tests complete.")
 }
 
@@ -645,7 +667,7 @@ fn test_file_io(string workspace) -> void {
     err _ = fs.write(orig_path, original)
     check(fs.exists(orig_path), "wrote original file")
     // Compress and write
-    string compressed = compress.gzip_compress(original)
+    string compressed, err _ = compress.gzip_compress(original)
     err _ = fs.write(gz_path, compressed)
     check(fs.exists(gz_path), "wrote compressed file")
     fmt.println("  Original: " + string(fs.size(orig_path)) + " bytes")
@@ -653,7 +675,7 @@ fn test_file_io(string workspace) -> void {
     check(fs.size(gz_path) < fs.size(orig_path), "compressed file is smaller")
     // Read compressed, decompress, write restored
     string read_compressed, err _ = fs.read(gz_path)
-    string decompressed = compress.gzip_decompress(read_compressed)
+    string decompressed, err _ = compress.gzip_decompress(read_compressed)
     err _ = fs.write(restored_path, decompressed)
     // Verify
     string read_restored, err _ = fs.read(restored_path)
@@ -661,17 +683,18 @@ fn test_file_io(string workspace) -> void {
     // Create a project archive via tar.gz and write to disk
     array<string> proj_names = ["src/main.vigil", "README.md", "config.json"]
     array<string> proj_contents = [gen_source_code(), "# Project\n", gen_json_data(5)]
-    string tar = compress.tar_create(proj_names, proj_contents)
-    string tar_gz = compress.gzip_compress(tar)
+    string tar, err _ = compress.tar_create(proj_names, proj_contents)
+    string tar_gz, err _ = compress.gzip_compress(tar)
     string archive_path = fs.join(workspace, "project.tar.gz")
     err _ = fs.write(archive_path, tar_gz)
     fmt.println("  Archive: " + string(fs.size(archive_path)) + " bytes")
     // Read back and extract
     string read_archive, err _ = fs.read(archive_path)
-    string unzipped = compress.gzip_decompress(read_archive)
-    array<string> entries = compress.tar_list(unzipped)
+    string unzipped, err _ = compress.gzip_decompress(read_archive)
+    array<string> entries, err _ = compress.tar_list(unzipped)
     check(entries.len() == 3, "tar.gz archive has 3 entries")
-    check(compress.tar_read(unzipped, "src/main.vigil") == gen_source_code(), "extracted source matches")
+    string extracted_src, err _ = compress.tar_read(unzipped, "src/main.vigil")
+    check(extracted_src == gen_source_code(), "extracted source matches")
     fmt.println("  File I/O integration tests complete.")
 }
 
@@ -683,47 +706,53 @@ fn test_new_apis() -> void {
     array<string> names = ["a.txt", "b.txt"]
     array<string> contents = [data, data]
     // zip_create_level
-    string zip0 = compress.zip_create_level(names, contents, 0)
-    string zip9 = compress.zip_create_level(names, contents, 9)
+    string zip0, err _ = compress.zip_create_level(names, contents, 0)
+    string zip9, err _ = compress.zip_create_level(names, contents, 9)
     check(zip0.len() > zip9.len(), "zip level 0 > level 9")
-    check(compress.zip_read(zip0, "a.txt") == data, "zip_create_level 0 read")
-    check(compress.zip_read(zip9, "b.txt") == data, "zip_create_level 9 read")
-    check(compress.zip_list(zip9).len() == 2, "zip_create_level list")
+    string zr0_v, err _ = compress.zip_read(zip0, "a.txt")
+    check(zr0_v == data, "zip_create_level 0 read")
+    string zr9_v, err _ = compress.zip_read(zip9, "b.txt")
+    check(zr9_v == data, "zip_create_level 9 read")
+    array<string> zl9, err _ = compress.zip_list(zip9)
+    check(zl9.len() == 2, "zip_create_level list")
     // tar_gz_create
-    string tgz = compress.tar_gz_create(names, contents)
-    string tar = compress.gzip_decompress(tgz)
+    string tgz, err _ = compress.tar_gz_create(names, contents)
+    string tar, err _ = compress.gzip_decompress(tgz)
     check(tar.len() > 0, "tar_gz_create non-empty")
-    check(compress.tar_list(tar).len() == 2, "tar_gz_create list")
-    check(compress.tar_read(tar, "a.txt") == data, "tar_gz_create read a")
-    check(compress.tar_read(tar, "b.txt") == data, "tar_gz_create read b")
+    array<string> tl, err _ = compress.tar_list(tar)
+    check(tl.len() == 2, "tar_gz_create list")
+    string tra, err _ = compress.tar_read(tar, "a.txt")
+    check(tra == data, "tar_gz_create read a")
+    string trb, err _ = compress.tar_read(tar, "b.txt")
+    check(trb == data, "tar_gz_create read b")
     check(tgz.len() < tar.len(), "tar_gz smaller than tar")
     // gzip_decompress_max
     string big = "x".repeat(i32(10000))
-    string gz = compress.gzip_compress(big)
-    string limited = compress.gzip_decompress_max(gz, 100)
+    string gz, err _ = compress.gzip_compress(big)
+    string limited, err _ = compress.gzip_decompress_max(gz, 100)
     check(limited.len() <= 100, "decompress_max respects limit")
     check(limited.len() > 0, "decompress_max non-empty")
-    string full = compress.gzip_decompress_max(gz, 20000)
+    string full, err _ = compress.gzip_decompress_max(gz, 20000)
     check(full.len() == 10000, "decompress_max full recovery")
     check(full == big, "decompress_max data integrity")
     // Edge: limit of 0
-    string zero = compress.gzip_decompress_max(gz, 0)
+    string zero, err _ = compress.gzip_decompress_max(gz, 0)
     check(zero.len() == 0, "decompress_max limit=0 empty")
     // gzip_info
-    map<string, string> info = compress.gzip_info(gz)
+    map<string, string> info, err _ = compress.gzip_info(gz)
     check(info["method"] == "8", "gzip_info method=deflate")
     check(info["os"] == "3", "gzip_info os=unix")
     check(info["size"] == "10000", "gzip_info original size")
     // Info on level 9 compressed data
-    string gz9 = compress.gzip_compress_level(big, 9)
-    map<string, string> info9 = compress.gzip_info(gz9)
+    string gz9, err _ = compress.gzip_compress_level(big, 9)
+    map<string, string> info9, err _ = compress.gzip_info(gz9)
     check(info9["xfl"] == "2", "gzip_info xfl=2 for level 9")
     // Info on level 1 compressed data
-    string gz1 = compress.gzip_compress_level(big, 1)
-    map<string, string> info1 = compress.gzip_info(gz1)
+    string gz1, err _ = compress.gzip_compress_level(big, 1)
+    map<string, string> info1, err _ = compress.gzip_info(gz1)
     check(info1["xfl"] == "4", "gzip_info xfl=4 for level 1")
     // Info on empty/invalid data
-    map<string, string> empty_info = compress.gzip_info("")
+    map<string, string> empty_info, err _ = compress.gzip_info("")
     check(empty_info.len() == 0, "gzip_info empty input")
     fmt.println("  New APIs tests complete.")
 }

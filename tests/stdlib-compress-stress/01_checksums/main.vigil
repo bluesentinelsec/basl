@@ -1,0 +1,76 @@
+import "fmt"
+import "compress"
+
+fn test_crc32_empty() -> void {
+    i64 c = compress.crc32("")
+    fmt.println(f"crc32 empty: {c}")
+}
+
+fn test_crc32_hello() -> void {
+    i64 c = compress.crc32("hello")
+    fmt.println(f"crc32 hello: {c}")
+}
+
+fn test_crc32_consistency() -> void {
+    i64 a = compress.crc32("hello")
+    i64 b = compress.crc32("hello")
+    bool same = a == b
+    fmt.println(f"crc32 consistent: {same}")
+}
+
+fn test_crc32_different_inputs() -> void {
+    i64 a = compress.crc32("hello")
+    i64 b = compress.crc32("world")
+    bool diff = a != b
+    fmt.println(f"crc32 diff inputs: {diff}")
+}
+
+fn test_crc32_medium() -> void {
+    i64 c = compress.crc32("the quick brown fox jumps over the lazy dog")
+    fmt.println(f"crc32 medium: {c}")
+}
+
+fn test_adler32_empty() -> void {
+    i64 a = compress.adler32("")
+    fmt.println(f"adler32 empty: {a}")
+}
+
+fn test_adler32_hello() -> void {
+    i64 a = compress.adler32("hello")
+    fmt.println(f"adler32 hello: {a}")
+}
+
+fn test_adler32_consistency() -> void {
+    i64 a = compress.adler32("hello")
+    i64 b = compress.adler32("hello")
+    bool same = a == b
+    fmt.println(f"adler32 consistent: {same}")
+}
+
+fn test_adler32_different_inputs() -> void {
+    i64 a = compress.adler32("hello")
+    i64 b = compress.adler32("world")
+    bool diff = a != b
+    fmt.println(f"adler32 diff inputs: {diff}")
+}
+
+fn test_adler32_medium() -> void {
+    i64 a = compress.adler32("the quick brown fox jumps over the lazy dog")
+    fmt.println(f"adler32 medium: {a}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 01_CHECKSUMS START =====")
+    test_crc32_empty()
+    test_crc32_hello()
+    test_crc32_consistency()
+    test_crc32_different_inputs()
+    test_crc32_medium()
+    test_adler32_empty()
+    test_adler32_hello()
+    test_adler32_consistency()
+    test_adler32_different_inputs()
+    test_adler32_medium()
+    fmt.println("===== TEST 01_CHECKSUMS END =====")
+    return 0
+}

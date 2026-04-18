@@ -468,7 +468,7 @@ TEST(DocRegistryTest, DescriptorBackedDocsRenderDerivedSignaturesForThreadAndCom
 
     ASSERT_NE(compress_zip, NULL);
     EXPECT_STREQ(compress_zip->signature,
-                 "compress.zip_create_level(names: array<string>, contents: array<string>, level: i32) -> string");
+                 "compress.zip_create_level(names: array<string>, contents: array<string>, level: i32) -> (string, err)");
     EXPECT_STREQ(compress_zip->summary, "Create ZIP archive at level.");
 
 #ifdef VIGIL_HAS_STDLIB_THREAD

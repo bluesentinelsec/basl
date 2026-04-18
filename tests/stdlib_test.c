@@ -2189,8 +2189,9 @@ TEST(VigilStdlibCompressTest, RoundTrip)
     EXPECT_EQ(RunWithStdlib(vigil_test_failed_, "\n"
                                                 "import \"compress\";\n"
                                                 "fn main() -> i32 {\n"
-                                                "    string gz = compress.gzip_compress(\"hello\");\n"
-                                                "    if compress.gzip_decompress(gz) != \"hello\" { return 1; }\n"
+                                                "    string gz, err e1 = compress.gzip_compress(\"hello\");\n"
+                                                "    string out, err e2 = compress.gzip_decompress(gz);\n"
+                                                "    if out != \"hello\" { return 1; }\n"
                                                 "    return 0;\n"
                                                 "}\n"),
               0);
@@ -2201,8 +2202,9 @@ TEST(VigilStdlibCompressTest, CompressLevels)
     EXPECT_EQ(RunWithStdlib(vigil_test_failed_, "\n"
                                                 "import \"compress\";\n"
                                                 "fn main() -> i32 {\n"
-                                                "    string g9 = compress.gzip_compress_level(\"hello\", 9);\n"
-                                                "    if compress.gzip_decompress(g9) != \"hello\" { return 1; }\n"
+                                                "    string g9, err e1 = compress.gzip_compress_level(\"hello\", 9);\n"
+                                                "    string out, err e2 = compress.gzip_decompress(g9);\n"
+                                                "    if out != \"hello\" { return 1; }\n"
                                                 "    return 0;\n"
                                                 "}\n"),
               0);
@@ -2228,8 +2230,9 @@ TEST(VigilStdlibCompressTest, ZipCreateLevel)
                                                 "fn main() -> i32 {\n"
                                                 "    array<string> n = [\"a.txt\"];\n"
                                                 "    array<string> c = [\"hello\"];\n"
-                                                "    string z = compress.zip_create_level(n, c, 9);\n"
-                                                "    if compress.zip_read(z, \"a.txt\") != \"hello\" { return 1; }\n"
+                                                "    string z, err e1 = compress.zip_create_level(n, c, 9);\n"
+                                                "    string out, err e2 = compress.zip_read(z, \"a.txt\");\n"
+                                                "    if out != \"hello\" { return 1; }\n"
                                                 "    return 0;\n"
                                                 "}\n"),
               0);
@@ -2242,9 +2245,10 @@ TEST(VigilStdlibCompressTest, TarGzCreate)
                                                 "fn main() -> i32 {\n"
                                                 "    array<string> n = [\"a.txt\"];\n"
                                                 "    array<string> c = [\"hello\"];\n"
-                                                "    string tgz = compress.tar_gz_create(n, c);\n"
-                                                "    string tar = compress.gzip_decompress(tgz);\n"
-                                                "    if compress.tar_read(tar, \"a.txt\") != \"hello\" { return 1; }\n"
+                                                "    string tgz, err e1 = compress.tar_gz_create(n, c);\n"
+                                                "    string tar, err e2 = compress.gzip_decompress(tgz);\n"
+                                                "    string out, err e3 = compress.tar_read(tar, \"a.txt\");\n"
+                                                "    if out != \"hello\" { return 1; }\n"
                                                 "    return 0;\n"
                                                 "}\n"),
               0);
@@ -2255,10 +2259,10 @@ TEST(VigilStdlibCompressTest, GzipDecompressMax)
     EXPECT_EQ(RunWithStdlib(vigil_test_failed_, "\n"
                                                 "import \"compress\";\n"
                                                 "fn main() -> i32 {\n"
-                                                "    string gz = compress.gzip_compress(\"abcdefghij\");\n"
-                                                "    string limited = compress.gzip_decompress_max(gz, 5);\n"
+                                                "    string gz, err e0 = compress.gzip_compress(\"abcdefghij\");\n"
+                                                "    string limited, err e1 = compress.gzip_decompress_max(gz, 5);\n"
                                                 "    if limited.len() > 5 { return 1; }\n"
-                                                "    string full = compress.gzip_decompress_max(gz, 100);\n"
+                                                "    string full, err e2 = compress.gzip_decompress_max(gz, 100);\n"
                                                 "    if full != \"abcdefghij\" { return 2; }\n"
                                                 "    return 0;\n"
                                                 "}\n"),
@@ -2270,8 +2274,8 @@ TEST(VigilStdlibCompressTest, GzipInfo)
     EXPECT_EQ(RunWithStdlib(vigil_test_failed_, "\n"
                                                 "import \"compress\";\n"
                                                 "fn main() -> i32 {\n"
-                                                "    string gz = compress.gzip_compress(\"hello\");\n"
-                                                "    map<string, string> m = compress.gzip_info(gz);\n"
+                                                "    string gz, err e0 = compress.gzip_compress(\"hello\");\n"
+                                                "    map<string, string> m, err e1 = compress.gzip_info(gz);\n"
                                                 "    if m[\"size\"] != \"5\" { return 1; }\n"
                                                 "    if m[\"method\"] != \"8\" { return 2; }\n"
                                                 "    return 0;\n"

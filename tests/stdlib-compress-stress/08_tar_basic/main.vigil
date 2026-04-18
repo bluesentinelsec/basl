@@ -1,0 +1,85 @@
+import "fmt"
+import "compress"
+
+fn test_tar_create_single() -> void {
+    array<string> names = ["hello.txt"]
+    array<string> contents = ["Hello from tar"]
+    string tar, err e = compress.tar_create(names, contents)
+    bool ok1 = e == ok
+    fmt.println(f"tar create single ok: {ok1}")
+    bool nonempty = tar.len() > 0
+    fmt.println(f"tar create single nonempty: {nonempty}")
+}
+
+fn test_tar_create_multi() -> void {
+    array<string> names = ["a.txt", "b.txt", "c.txt"]
+    array<string> contents = ["aaa", "bbb", "ccc"]
+    string tar, err e = compress.tar_create(names, contents)
+    bool ok1 = e == ok
+    fmt.println(f"tar create multi ok: {ok1}")
+    bool nonempty = tar.len() > 0
+    fmt.println(f"tar create multi nonempty: {nonempty}")
+}
+
+fn test_tar_list() -> void {
+    array<string> names = ["file1.txt", "file2.txt", "file3.txt"]
+    array<string> contents = ["one", "two", "three"]
+    string tar, err _ = compress.tar_create(names, contents)
+    array<string> listed, err e = compress.tar_list(tar)
+    bool ok1 = e == ok
+    fmt.println(f"tar list ok: {ok1}")
+    bool count3 = listed.len() == 3
+    fmt.println(f"tar list count 3: {count3}")
+    bool has1 = listed[0] == "file1.txt"
+    fmt.println(f"tar list has file1: {has1}")
+    bool has2 = listed[1] == "file2.txt"
+    fmt.println(f"tar list has file2: {has2}")
+    bool has3 = listed[2] == "file3.txt"
+    fmt.println(f"tar list has file3: {has3}")
+}
+
+fn test_tar_read() -> void {
+    array<string> names = ["doc.txt", "code.vigil"]
+    array<string> contents = ["documentation here", "fn main() -> i32 { return 0 }"]
+    string tar, err _ = compress.tar_create(names, contents)
+    string r1, err e1 = compress.tar_read(tar, "doc.txt")
+    bool ok1 = e1 == ok
+    fmt.println(f"tar read doc ok: {ok1}")
+    bool match1 = r1 == "documentation here"
+    fmt.println(f"tar read doc match: {match1}")
+    string r2, err e2 = compress.tar_read(tar, "code.vigil")
+    bool ok2 = e2 == ok
+    fmt.println(f"tar read code ok: {ok2}")
+    bool match2 = r2 == "fn main() -> i32 { return 0 }"
+    fmt.println(f"tar read code match: {match2}")
+}
+
+fn test_tar_roundtrip() -> void {
+    array<string> names = ["alpha.txt", "beta.txt", "gamma.txt", "delta.txt"]
+    array<string> contents = ["alpha content", "beta content", "gamma content", "delta content"]
+    string tar, err _ = compress.tar_create(names, contents)
+    array<string> listed, err _ = compress.tar_list(tar)
+    bool count4 = listed.len() == 4
+    fmt.println(f"tar roundtrip count 4: {count4}")
+    i32 i = 0
+    bool all_match = true
+    while i < 4 {
+        string r, err _ = compress.tar_read(tar, names[i])
+        if r != contents[i] {
+            all_match = false
+        }
+        i = i + 1
+    }
+    fmt.println(f"tar roundtrip all match: {all_match}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 08_tar_basic START =====")
+    test_tar_create_single()
+    test_tar_create_multi()
+    test_tar_list()
+    test_tar_read()
+    test_tar_roundtrip()
+    fmt.println("===== TEST 08_tar_basic END =====")
+    return 0
+}

@@ -1,0 +1,107 @@
+import "fmt"
+import "compress"
+
+fn make_names() -> array<string> {
+    array<string> names = ["src/main.vigil", "src/util.vigil", "README.md", "config.json", "data/log.txt"]
+    return names
+}
+
+fn make_contents() -> array<string> {
+    array<string> contents = [
+        "fn main() -> i32 { return 0 }",
+        "fn helper() -> string { return \"ok\" }",
+        "# My Project\nThis is a readme.",
+        "{\"version\": 1, \"name\": \"test\"}",
+        "2026-01-01 INFO startup complete\n2026-01-01 INFO ready\n"
+    ]
+    return contents
+}
+
+fn test_zip_workflow() -> void {
+    array<string> names = make_names()
+    array<string> contents = make_contents()
+    string zip, err e = compress.zip_create(names, contents)
+    bool ok1 = e == ok
+    fmt.println(f"zip create 5 files ok: {ok1}")
+    array<string> listed, err e2 = compress.zip_list(zip)
+    bool count5 = listed.len() == 5
+    fmt.println(f"zip list count 5: {count5}")
+    i32 i = 0
+    bool all_match = true
+    while i < 5 {
+        string r, err _ = compress.zip_read(zip, names[i])
+        if r != contents[i] {
+            all_match = false
+        }
+        i = i + 1
+    }
+    fmt.println(f"zip read all match: {all_match}")
+}
+
+fn test_tar_gz_workflow() -> void {
+    array<string> names = make_names()
+    array<string> contents = make_contents()
+    string tgz, err e = compress.tar_gz_create(names, contents)
+    bool ok1 = e == ok
+    fmt.println(f"tar gz create 5 files ok: {ok1}")
+    array<string> listed, err e2 = compress.tar_gz_list(tgz)
+    bool count5 = listed.len() == 5
+    fmt.println(f"tar gz list count 5: {count5}")
+    i32 i = 0
+    bool all_match = true
+    while i < 5 {
+        string r, err _ = compress.tar_gz_read(tgz, names[i])
+        if r != contents[i] {
+            all_match = false
+        }
+        i = i + 1
+    }
+    fmt.println(f"tar gz read all match: {all_match}")
+}
+
+fn test_cross_format_verify() -> void {
+    array<string> names = make_names()
+    array<string> contents = make_contents()
+    string zip, err _ = compress.zip_create(names, contents)
+    string tgz, err _ = compress.tar_gz_create(names, contents)
+    // Both formats should list the same files
+    array<string> zip_list, err _ = compress.zip_list(zip)
+    array<string> tgz_list, err _ = compress.tar_gz_list(tgz)
+    bool same_count = zip_list.len() == tgz_list.len()
+    fmt.println(f"cross format same count: {same_count}")
+    // Read each file from both and compare
+    i32 i = 0
+    bool all_match = true
+    while i < 5 {
+        string from_zip, err _ = compress.zip_read(zip, names[i])
+        string from_tgz, err _ = compress.tar_gz_read(tgz, names[i])
+        if from_zip != from_tgz {
+            all_match = false
+        }
+        i = i + 1
+    }
+    fmt.println(f"cross format content match: {all_match}")
+    // Verify checksums match across formats
+    i32 j = 0
+    bool checksums_match = true
+    while j < 5 {
+        string zr, err _ = compress.zip_read(zip, names[j])
+        string tr, err _ = compress.tar_gz_read(tgz, names[j])
+        i64 zcrc = compress.crc32(zr)
+        i64 tcrc = compress.crc32(tr)
+        if zcrc != tcrc {
+            checksums_match = false
+        }
+        j = j + 1
+    }
+    fmt.println(f"cross format checksums match: {checksums_match}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST large-compress-comprehensive-2 START =====")
+    test_zip_workflow()
+    test_tar_gz_workflow()
+    test_cross_format_verify()
+    fmt.println("===== TEST large-compress-comprehensive-2 END =====")
+    return 0
+}

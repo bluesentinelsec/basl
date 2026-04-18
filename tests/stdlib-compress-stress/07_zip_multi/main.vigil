@@ -1,0 +1,84 @@
+import "fmt"
+import "compress"
+
+fn test_zip_create_multi() -> void {
+    array<string> names = ["readme.txt", "src/main.vigil", "data/config.json"]
+    array<string> contents = ["Hello README", "fn main() -> i32 { return 0 }", "{\"key\": \"value\"}"]
+    string zip, err e = compress.zip_create(names, contents)
+    bool ok1 = e == ok
+    fmt.println(f"zip create multi ok: {ok1}")
+    bool nonempty = zip.len() > 0
+    fmt.println(f"zip create multi nonempty: {nonempty}")
+}
+
+fn test_zip_list_multi() -> void {
+    array<string> names = ["a.txt", "b.txt", "c.txt", "d.txt"]
+    array<string> contents = ["aaa", "bbb", "ccc", "ddd"]
+    string zip, err _ = compress.zip_create(names, contents)
+    array<string> listed, err e = compress.zip_list(zip)
+    bool ok1 = e == ok
+    fmt.println(f"zip list multi ok: {ok1}")
+    bool count4 = listed.len() == 4
+    fmt.println(f"zip list count 4: {count4}")
+    bool has_a = listed[0] == "a.txt"
+    fmt.println(f"zip list has a: {has_a}")
+    bool has_b = listed[1] == "b.txt"
+    fmt.println(f"zip list has b: {has_b}")
+    bool has_c = listed[2] == "c.txt"
+    fmt.println(f"zip list has c: {has_c}")
+    bool has_d = listed[3] == "d.txt"
+    fmt.println(f"zip list has d: {has_d}")
+}
+
+fn test_zip_read_each() -> void {
+    array<string> names = ["one.txt", "two.txt", "three.txt"]
+    array<string> contents = ["content one", "content two", "content three"]
+    string zip, err _ = compress.zip_create(names, contents)
+    string r1, err e1 = compress.zip_read(zip, "one.txt")
+    bool ok1 = e1 == ok
+    fmt.println(f"zip read one ok: {ok1}")
+    bool match1 = r1 == "content one"
+    fmt.println(f"zip read one match: {match1}")
+    string r2, err e2 = compress.zip_read(zip, "two.txt")
+    bool ok2 = e2 == ok
+    fmt.println(f"zip read two ok: {ok2}")
+    bool match2 = r2 == "content two"
+    fmt.println(f"zip read two match: {match2}")
+    string r3, err e3 = compress.zip_read(zip, "three.txt")
+    bool ok3 = e3 == ok
+    fmt.println(f"zip read three ok: {ok3}")
+    bool match3 = r3 == "content three"
+    fmt.println(f"zip read three match: {match3}")
+}
+
+fn test_zip_create_level_multi() -> void {
+    array<string> names = ["x.txt", "y.txt", "z.txt"]
+    array<string> contents = ["xxxx".repeat(100), "yyyy".repeat(100), "zzzz".repeat(100)]
+    string zip0, err e0 = compress.zip_create_level(names, contents, 0)
+    bool ok0 = e0 == ok
+    fmt.println(f"zip create level 0 ok: {ok0}")
+    string zip9, err e9 = compress.zip_create_level(names, contents, 9)
+    bool ok9 = e9 == ok
+    fmt.println(f"zip create level 9 ok: {ok9}")
+    bool level0_bigger = zip0.len() > zip9.len()
+    fmt.println(f"zip level 0 bigger than 9: {level0_bigger}")
+    string r0, err _ = compress.zip_read(zip0, "x.txt")
+    bool match0 = r0 == "xxxx".repeat(100)
+    fmt.println(f"zip level 0 read match: {match0}")
+    string r9, err _ = compress.zip_read(zip9, "z.txt")
+    bool match9 = r9 == "zzzz".repeat(100)
+    fmt.println(f"zip level 9 read match: {match9}")
+    array<string> list9, err _ = compress.zip_list(zip9)
+    bool count3 = list9.len() == 3
+    fmt.println(f"zip level 9 list count 3: {count3}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 07_zip_multi START =====")
+    test_zip_create_multi()
+    test_zip_list_multi()
+    test_zip_read_each()
+    test_zip_create_level_multi()
+    fmt.println("===== TEST 07_zip_multi END =====")
+    return 0
+}

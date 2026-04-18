@@ -1,0 +1,97 @@
+import "fmt"
+import "compress"
+
+fn test_roundtrip() -> void {
+    string data = "hello deflate world"
+    string compressed, err e1 = compress.deflate_compress(data)
+    bool ok1 = e1 == ok
+    fmt.println(f"deflate compress ok: {ok1}")
+    string decompressed, err e2 = compress.deflate_decompress(compressed)
+    bool ok2 = e2 == ok
+    fmt.println(f"deflate decompress ok: {ok2}")
+    bool match = decompressed == data
+    fmt.println(f"deflate roundtrip match: {match}")
+}
+
+fn test_empty() -> void {
+    string compressed, err e1 = compress.deflate_compress("")
+    bool ok1 = e1 == ok
+    fmt.println(f"deflate empty compress ok: {ok1}")
+    string decompressed, err e2 = compress.deflate_decompress(compressed)
+    bool ok2 = e2 == ok
+    fmt.println(f"deflate empty decompress ok: {ok2}")
+    bool empty = decompressed == ""
+    fmt.println(f"deflate empty roundtrip: {empty}")
+}
+
+fn test_level_0() -> void {
+    string data = "level zero test data"
+    string compressed, err e1 = compress.deflate_compress_level(data, 0)
+    bool ok1 = e1 == ok
+    fmt.println(f"deflate level0 compress ok: {ok1}")
+    string decompressed, err e2 = compress.deflate_decompress(compressed)
+    bool match = decompressed == data
+    fmt.println(f"deflate level0 roundtrip: {match}")
+}
+
+fn test_level_1() -> void {
+    string data = "level one test data with some content"
+    string compressed, err e1 = compress.deflate_compress_level(data, 1)
+    bool ok1 = e1 == ok
+    fmt.println(f"deflate level1 compress ok: {ok1}")
+    string decompressed, err e2 = compress.deflate_decompress(compressed)
+    bool match = decompressed == data
+    fmt.println(f"deflate level1 roundtrip: {match}")
+}
+
+fn test_level_6() -> void {
+    string data = "level six test data with some content"
+    string compressed, err e1 = compress.deflate_compress_level(data, 6)
+    bool ok1 = e1 == ok
+    fmt.println(f"deflate level6 compress ok: {ok1}")
+    string decompressed, err e2 = compress.deflate_decompress(compressed)
+    bool match = decompressed == data
+    fmt.println(f"deflate level6 roundtrip: {match}")
+}
+
+fn test_level_9() -> void {
+    string data = "level nine test data with some content"
+    string compressed, err e1 = compress.deflate_compress_level(data, 9)
+    bool ok1 = e1 == ok
+    fmt.println(f"deflate level9 compress ok: {ok1}")
+    string decompressed, err e2 = compress.deflate_decompress(compressed)
+    bool match = decompressed == data
+    fmt.println(f"deflate level9 roundtrip: {match}")
+}
+
+fn test_decompress_max() -> void {
+    string data = "decompress max test data"
+    string compressed, err e1 = compress.deflate_compress(data)
+    string decompressed, err e2 = compress.deflate_decompress_max(compressed, 1024)
+    bool ok2 = e2 == ok
+    fmt.println(f"deflate decompress_max ok: {ok2}")
+    bool match = decompressed == data
+    fmt.println(f"deflate decompress_max match: {match}")
+}
+
+fn test_decompress_max_too_small() -> void {
+    string data = "this is a string that should exceed the max bytes limit"
+    string compressed, err e1 = compress.deflate_compress(data)
+    string decompressed, err e2 = compress.deflate_decompress_max(compressed, 5)
+    bool failed = e2 != ok
+    fmt.println(f"deflate decompress_max too small fails: {failed}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 02_DEFLATE START =====")
+    test_roundtrip()
+    test_empty()
+    test_level_0()
+    test_level_1()
+    test_level_6()
+    test_level_9()
+    test_decompress_max()
+    test_decompress_max_too_small()
+    fmt.println("===== TEST 02_DEFLATE END =====")
+    return 0
+}
