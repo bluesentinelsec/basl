@@ -1,0 +1,67 @@
+import "fmt"
+import "crypto"
+
+fn test_cbc_roundtrip_1byte() -> void {
+    string key = "01234567890123456789012345678901"
+    string iv = "0123456789abcdef"
+    string plain = "X"
+    string ct, err e1 = crypto.aes_cbc_encrypt(key, iv, plain)
+    bool enc_ok = e1 == ok
+    fmt.println(f"cbc_1byte enc_ok: {enc_ok}")
+    string dec, err e2 = crypto.aes_cbc_decrypt(key, iv, ct)
+    bool dec_ok = e2 == ok
+    fmt.println(f"cbc_1byte dec_ok: {dec_ok}")
+    bool match = dec == plain
+    fmt.println(f"cbc_1byte match: {match}")
+}
+
+fn test_cbc_roundtrip_16bytes() -> void {
+    string key = "01234567890123456789012345678901"
+    string iv = "0123456789abcdef"
+    string plain = "0123456789abcdef"
+    string ct, err e1 = crypto.aes_cbc_encrypt(key, iv, plain)
+    bool enc_ok = e1 == ok
+    fmt.println(f"cbc_16byte enc_ok: {enc_ok}")
+    string dec, err e2 = crypto.aes_cbc_decrypt(key, iv, ct)
+    bool dec_ok = e2 == ok
+    fmt.println(f"cbc_16byte dec_ok: {dec_ok}")
+    bool match = dec == plain
+    fmt.println(f"cbc_16byte match: {match}")
+}
+
+fn test_cbc_roundtrip_33bytes() -> void {
+    string key = "01234567890123456789012345678901"
+    string iv = "0123456789abcdef"
+    string plain = "0123456789abcdef0123456789abcdefX"
+    string ct, err e1 = crypto.aes_cbc_encrypt(key, iv, plain)
+    bool enc_ok = e1 == ok
+    fmt.println(f"cbc_33byte enc_ok: {enc_ok}")
+    string dec, err e2 = crypto.aes_cbc_decrypt(key, iv, ct)
+    bool dec_ok = e2 == ok
+    fmt.println(f"cbc_33byte dec_ok: {dec_ok}")
+    bool match = dec == plain
+    fmt.println(f"cbc_33byte match: {match}")
+}
+
+fn test_cbc_ciphertext_differs() -> void {
+    string key = "01234567890123456789012345678901"
+    string iv = "0123456789abcdef"
+    string ct1, err e1 = crypto.aes_cbc_encrypt(key, iv, "plaintext A here")
+    string ct2, err e2 = crypto.aes_cbc_encrypt(key, iv, "plaintext B here")
+    bool ok1 = e1 == ok
+    bool ok2 = e2 == ok
+    fmt.println(f"cbc_differ enc_ok1: {ok1}")
+    fmt.println(f"cbc_differ enc_ok2: {ok2}")
+    bool differ = ct1 != ct2
+    fmt.println(f"cbc_differ differ: {differ}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 05_aes_cbc START =====")
+    test_cbc_roundtrip_1byte()
+    test_cbc_roundtrip_16bytes()
+    test_cbc_roundtrip_33bytes()
+    test_cbc_ciphertext_differs()
+    fmt.println("===== TEST 05_aes_cbc END =====")
+    return 0
+}

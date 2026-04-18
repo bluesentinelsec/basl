@@ -1,0 +1,83 @@
+import "fmt"
+import "crypto"
+
+fn test_keypair_length() -> void {
+    string kp, err e = crypto.ed25519_keypair()
+    bool ok1 = e == ok
+    fmt.println(f"keypair ok: {ok1}")
+    i32 klen = kp.len()
+    bool is192 = klen == 192
+    fmt.println(f"keypair 192 hex chars: {is192}")
+}
+
+fn test_sign_verify_roundtrip() -> void {
+    string kp, err _ = crypto.ed25519_keypair()
+    string priv_key, err _ = kp.substr(0, 128)
+    string pub_key, err _ = kp.substr(128, 64)
+    string sig, err e1 = crypto.ed25519_sign(priv_key, "hello world")
+    bool ok1 = e1 == ok
+    fmt.println(f"sign ok: {ok1}")
+    i32 slen = sig.len()
+    bool is128 = slen == 128
+    fmt.println(f"sig 128 hex chars: {is128}")
+    bool valid = crypto.ed25519_verify(pub_key, "hello world", sig)
+    fmt.println(f"verify roundtrip: {valid}")
+}
+
+fn test_wrong_message_fails() -> void {
+    string kp, err _ = crypto.ed25519_keypair()
+    string priv_key, err _ = kp.substr(0, 128)
+    string pub_key, err _ = kp.substr(128, 64)
+    string sig, err _ = crypto.ed25519_sign(priv_key, "correct message")
+    bool valid = crypto.ed25519_verify(pub_key, "wrong message", sig)
+    bool failed = valid == false
+    fmt.println(f"wrong message fails: {failed}")
+}
+
+fn test_wrong_key_fails() -> void {
+    string kp1, err _ = crypto.ed25519_keypair()
+    string kp2, err _ = crypto.ed25519_keypair()
+    string priv1, err _ = kp1.substr(0, 128)
+    string pub2, err _ = kp2.substr(128, 64)
+    string sig, err _ = crypto.ed25519_sign(priv1, "test message")
+    bool valid = crypto.ed25519_verify(pub2, "test message", sig)
+    bool failed = valid == false
+    fmt.println(f"wrong key fails: {failed}")
+}
+
+fn test_multiple_messages_same_key() -> void {
+    string kp, err _ = crypto.ed25519_keypair()
+    string priv_key, err _ = kp.substr(0, 128)
+    string pub_key, err _ = kp.substr(128, 64)
+    string sig1, err e1 = crypto.ed25519_sign(priv_key, "message one")
+    string sig2, err e2 = crypto.ed25519_sign(priv_key, "message two")
+    string sig3, err e3 = crypto.ed25519_sign(priv_key, "message three")
+    bool ok1 = e1 == ok
+    bool ok2 = e2 == ok
+    bool ok3 = e3 == ok
+    fmt.println(f"sign msg1 ok: {ok1}")
+    fmt.println(f"sign msg2 ok: {ok2}")
+    fmt.println(f"sign msg3 ok: {ok3}")
+    bool v1 = crypto.ed25519_verify(pub_key, "message one", sig1)
+    bool v2 = crypto.ed25519_verify(pub_key, "message two", sig2)
+    bool v3 = crypto.ed25519_verify(pub_key, "message three", sig3)
+    fmt.println(f"verify msg1: {v1}")
+    fmt.println(f"verify msg2: {v2}")
+    fmt.println(f"verify msg3: {v3}")
+    // sigs should differ
+    bool diff12 = sig1 != sig2
+    bool diff23 = sig2 != sig3
+    fmt.println(f"sigs differ 1v2: {diff12}")
+    fmt.println(f"sigs differ 2v3: {diff23}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 08_ed25519 START =====")
+    test_keypair_length()
+    test_sign_verify_roundtrip()
+    test_wrong_message_fails()
+    test_wrong_key_fails()
+    test_multiple_messages_same_key()
+    fmt.println("===== TEST 08_ed25519 END =====")
+    return 0
+}

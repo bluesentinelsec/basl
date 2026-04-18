@@ -1,0 +1,60 @@
+import "fmt"
+import "crypto"
+
+fn test_keypair_length() -> void {
+    string kp, err e = crypto.x25519_keypair()
+    bool ok1 = e == ok
+    fmt.println(f"keypair ok: {ok1}")
+    i32 klen = kp.len()
+    bool is128 = klen == 128
+    fmt.println(f"keypair 128 hex chars: {is128}")
+}
+
+fn test_dh_exchange() -> void {
+    string kp1, err e1 = crypto.x25519_keypair()
+    string kp2, err e2 = crypto.x25519_keypair()
+    bool ok1 = e1 == ok
+    bool ok2 = e2 == ok
+    fmt.println(f"keypair1 ok: {ok1}")
+    fmt.println(f"keypair2 ok: {ok2}")
+    // kp = priv(64 hex) + pub(64 hex)
+    string priv1, err _ = kp1.substr(0, 64)
+    string pub1, err _ = kp1.substr(64, 64)
+    string priv2, err _ = kp2.substr(0, 64)
+    string pub2, err _ = kp2.substr(64, 64)
+    // DH: shared1 = x25519(priv1, pub2), shared2 = x25519(priv2, pub1)
+    string shared1, err e3 = crypto.x25519(priv1, pub2)
+    string shared2, err e4 = crypto.x25519(priv2, pub1)
+    bool ok3 = e3 == ok
+    bool ok4 = e4 == ok
+    fmt.println(f"dh1 ok: {ok3}")
+    fmt.println(f"dh2 ok: {ok4}")
+    bool match = shared1 == shared2
+    fmt.println(f"shared secrets match: {match}")
+    i32 slen = shared1.len()
+    bool is64 = slen == 64
+    fmt.println(f"shared secret 64 hex chars: {is64}")
+}
+
+fn test_known_keys_consistent() -> void {
+    string kp, err _ = crypto.x25519_keypair()
+    string priv1, err _ = kp.substr(0, 64)
+    string pub1, err _ = kp.substr(64, 64)
+    string r1, err e1 = crypto.x25519(priv1, pub1)
+    string r2, err e2 = crypto.x25519(priv1, pub1)
+    bool ok1 = e1 == ok
+    bool ok2 = e2 == ok
+    fmt.println(f"consistent call1 ok: {ok1}")
+    fmt.println(f"consistent call2 ok: {ok2}")
+    bool match = r1 == r2
+    fmt.println(f"consistent output: {match}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 07_x25519 START =====")
+    test_keypair_length()
+    test_dh_exchange()
+    test_known_keys_consistent()
+    fmt.println("===== TEST 07_x25519 END =====")
+    return 0
+}

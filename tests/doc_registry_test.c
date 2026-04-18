@@ -456,9 +456,9 @@ TEST(DocRegistryTest, DescriptorBackedDocsRenderDerivedSignaturesForCrypto)
     ASSERT_NE(pbkdf2, NULL);
     ASSERT_NE(encrypt, NULL);
     EXPECT_STREQ(pbkdf2->signature, "crypto.pbkdf2(password: string, salt: string, iterations: i32, key_len: i32) -> "
-                                    "string");
+                                    "(string, err)");
     EXPECT_STREQ(pbkdf2->summary, "PBKDF2 key derivation.");
-    EXPECT_STREQ(encrypt->signature, "crypto.encrypt(key: string, nonce: string, plaintext: string) -> string");
+    EXPECT_STREQ(encrypt->signature, "crypto.encrypt(key: string, nonce: string, plaintext: string, aad: string) -> (string, err)");
     EXPECT_STREQ(encrypt->summary, "AES-256-GCM encryption.");
 }
 

@@ -1,0 +1,70 @@
+import "fmt"
+import "crypto"
+
+fn test_decrypt_wrong_key() -> void {
+    // encrypt with correct key, decrypt with wrong key
+    string key, err _ = crypto.random_bytes(32)
+    string nonce, err _ = crypto.random_bytes(12)
+    string ct, err e1 = crypto.encrypt(key, nonce, "secret data", "")
+    bool ok1 = e1 == ok
+    fmt.println(f"encrypt ok: {ok1}")
+    string wrong_key, err _ = crypto.random_bytes(32)
+    string pt, err e2 = crypto.decrypt(wrong_key, ct, "")
+    bool is_err = e2 != ok
+    fmt.println(f"decrypt wrong key err: {is_err}")
+}
+
+fn test_decrypt_corrupt_ciphertext() -> void {
+    string key, err _ = crypto.random_bytes(32)
+    string nonce, err _ = crypto.random_bytes(12)
+    string ct, err _ = crypto.encrypt(key, nonce, "secret data", "")
+    // corrupt by replacing with garbage of same length
+    string garbage, err _ = crypto.random_bytes(ct.len())
+    string pt, err e = crypto.decrypt(key, garbage, "")
+    bool is_err = e != ok
+    fmt.println(f"decrypt corrupt ct err: {is_err}")
+}
+
+fn test_hex_decode_invalid() -> void {
+    string r1, err e1 = crypto.hex_decode("xyz")
+    bool is_err1 = e1 != ok
+    fmt.println(f"hex decode odd length err: {is_err1}")
+    string r2, err e2 = crypto.hex_decode("gg")
+    bool is_err2 = e2 != ok
+    fmt.println(f"hex decode invalid chars err: {is_err2}")
+}
+
+fn test_aes_cbc_decrypt_wrong_key() -> void {
+    string key, err _ = crypto.random_bytes(32)
+    string iv, err _ = crypto.random_bytes(16)
+    string ct, err e1 = crypto.aes_cbc_encrypt(key, iv, "test plaintext!!")
+    bool ok1 = e1 == ok
+    fmt.println(f"aes cbc encrypt ok: {ok1}")
+    string wrong_key, err _ = crypto.random_bytes(32)
+    string pt, err e2 = crypto.aes_cbc_decrypt(wrong_key, iv, ct)
+    bool is_err = e2 != ok
+    fmt.println(f"aes cbc wrong key err: {is_err}")
+}
+
+fn test_chacha20_decrypt_wrong_key() -> void {
+    string key, err _ = crypto.random_bytes(32)
+    string nonce, err _ = crypto.random_bytes(12)
+    string ct, err e1 = crypto.chacha20_poly1305_encrypt(key, nonce, "secret", "")
+    bool ok1 = e1 == ok
+    fmt.println(f"chacha20 encrypt ok: {ok1}")
+    string wrong_key, err _ = crypto.random_bytes(32)
+    string pt, err e2 = crypto.chacha20_poly1305_decrypt(wrong_key, ct, "")
+    bool is_err = e2 != ok
+    fmt.println(f"chacha20 wrong key err: {is_err}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 10_error_handling START =====")
+    test_decrypt_wrong_key()
+    test_decrypt_corrupt_ciphertext()
+    test_hex_decode_invalid()
+    test_aes_cbc_decrypt_wrong_key()
+    test_chacha20_decrypt_wrong_key()
+    fmt.println("===== TEST 10_error_handling END =====")
+    return 0
+}

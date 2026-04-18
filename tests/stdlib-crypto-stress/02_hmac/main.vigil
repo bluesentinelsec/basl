@@ -1,0 +1,61 @@
+import "fmt"
+import "crypto"
+
+fn test_hmac_sha256() -> void {
+    string h, err e = crypto.hmac_sha256("key", "message")
+    bool ok = e == ok
+    fmt.println(f"hmac256 no_err: {ok}")
+    bool len_ok = h.len() == 64
+    fmt.println(f"hmac256 len_64: {len_ok}")
+    bool match = h == "6e9ef29b75fffc5b7abae527d58fdadb2fe42e7219011976917343065f58ed4a"
+    fmt.println(f"hmac256 known_val: {match}")
+}
+
+fn test_hmac_sha384() -> void {
+    string h, err e = crypto.hmac_sha384("key", "message")
+    bool ok = e == ok
+    fmt.println(f"hmac384 no_err: {ok}")
+    bool len_ok = h.len() == 96
+    fmt.println(f"hmac384 len_96: {len_ok}")
+}
+
+fn test_hmac_sha512() -> void {
+    string h, err e = crypto.hmac_sha512("key", "message")
+    bool ok = e == ok
+    fmt.println(f"hmac512 no_err: {ok}")
+    bool len_ok = h.len() == 128
+    fmt.println(f"hmac512 len_128: {len_ok}")
+}
+
+fn test_hmac_consistency() -> void {
+    string h1, err e1 = crypto.hmac_sha256("mykey", "mydata")
+    string h2, err e2 = crypto.hmac_sha256("mykey", "mydata")
+    bool ok1 = e1 == ok
+    bool ok2 = e2 == ok
+    fmt.println(f"hmac_consist no_err1: {ok1}")
+    fmt.println(f"hmac_consist no_err2: {ok2}")
+    bool match = h1 == h2
+    fmt.println(f"hmac_consist same: {match}")
+}
+
+fn test_hmac_different_keys() -> void {
+    string h1, err e1 = crypto.hmac_sha256("key1", "data")
+    string h2, err e2 = crypto.hmac_sha256("key2", "data")
+    bool ok1 = e1 == ok
+    bool ok2 = e2 == ok
+    fmt.println(f"hmac_diffkey no_err1: {ok1}")
+    fmt.println(f"hmac_diffkey no_err2: {ok2}")
+    bool differ = h1 != h2
+    fmt.println(f"hmac_diffkey differ: {differ}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 02_hmac START =====")
+    test_hmac_sha256()
+    test_hmac_sha384()
+    test_hmac_sha512()
+    test_hmac_consistency()
+    test_hmac_different_keys()
+    fmt.println("===== TEST 02_hmac END =====")
+    return 0
+}

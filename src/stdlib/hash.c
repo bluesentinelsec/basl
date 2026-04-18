@@ -2,19 +2,32 @@
 
 #include <stdint.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 
 #include "vigil/native_module.h"
+#include "vigil/runtime.h"
 #include "vigil/type.h"
 #include "vigil/value.h"
 #include "vigil/vm.h"
 
+#include "internal/vigil_internal.h"
 #include "internal/vigil_nanbox.h"
 
 /* Vendored crypto library for SHA-256/512. */
 extern void vigil_sha256(const uint8_t *data, size_t len, uint8_t out[32]);
 extern void vigil_sha512(const uint8_t *data, size_t len, uint8_t out[64]);
+
+/* ── Allocator helper ────────────────────────────────────────────── */
+
+static vigil_allocator_t get_alloc(vigil_vm_t *vm)
+{
+    const vigil_allocator_t *a = vigil_runtime_allocator(vigil_vm_runtime(vm));
+    if (a != NULL)
+        return *a;
+    return vigil_default_allocator();
+}
+
+/* ── Stack helpers ───────────────────────────────────────────────── */
 
 static bool get_str(vigil_vm_t *vm, size_t base, size_t idx, const char **s, size_t *len)
 {
@@ -40,6 +53,32 @@ static vigil_status_t push_str(vigil_vm_t *vm, const char *text, size_t len, vig
     st = vigil_vm_stack_push(vm, &val, error);
     vigil_value_release(&val);
     return st;
+}
+
+/* ── Multi-return helpers ────────────────────────────────────────── */
+
+static vigil_status_t push_str_and_ok(vigil_vm_t *vm, const char *text, size_t len, vigil_error_t *error)
+{
+    vigil_status_t s = push_str(vm, text, len, error);
+    if (s != VIGIL_STATUS_OK)
+        return s;
+    return vigil_runtime_push_ok_error(vigil_vm_runtime(vm), vm, error);
+}
+
+static vigil_status_t push_str_and_err(vigil_vm_t *vm, const char *msg, vigil_error_t *error)
+{
+    vigil_status_t s = push_str(vm, "", 0, error);
+    if (s != VIGIL_STATUS_OK)
+        return s;
+    vigil_object_t *err_obj = NULL;
+    s = vigil_error_object_new_cstr(vigil_vm_runtime(vm), msg, 1, &err_obj, error);
+    if (s != VIGIL_STATUS_OK)
+        return s;
+    vigil_value_t v;
+    vigil_value_init_object(&v, &err_obj);
+    s = vigil_vm_stack_push(vm, &v, error);
+    vigil_value_release(&v);
+    return s;
 }
 
 static void to_hex(const uint8_t *data, size_t len, char *out)
@@ -69,15 +108,22 @@ static const uint32_t md5_s[64] = {7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22, 
                                    4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23,
                                    6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21};
 
-static void md5_hash(const uint8_t *data, size_t len, uint8_t out[16])
+static void store_le64(uint8_t *p, uint64_t v)
+{
+    p[0] = (uint8_t)v; p[1] = (uint8_t)(v >> 8); p[2] = (uint8_t)(v >> 16); p[3] = (uint8_t)(v >> 24);
+    p[4] = (uint8_t)(v >> 32); p[5] = (uint8_t)(v >> 40); p[6] = (uint8_t)(v >> 48); p[7] = (uint8_t)(v >> 56);
+}
+
+static void md5_hash(const uint8_t *data, size_t len, uint8_t out[16], vigil_allocator_t *alloc)
 {
     uint32_t a0 = 0x67452301, b0 = 0xefcdab89, c0 = 0x98badcfe, d0 = 0x10325476;
     size_t padded_len = ((len + 8) / 64 + 1) * 64;
-    uint8_t *msg = (uint8_t *)calloc(1, padded_len);
+    uint8_t *msg = (uint8_t *)alloc->allocate(alloc->user_data, padded_len);
+    memset(msg, 0, padded_len);
     memcpy(msg, data, len);
     msg[len] = 0x80;
     uint64_t bit_len = (uint64_t)len * 8;
-    memcpy(msg + padded_len - 8, &bit_len, 8);
+    store_le64(msg + padded_len - 8, bit_len);
 
     for (size_t offset = 0; offset < padded_len; offset += 64)
     {
@@ -118,7 +164,7 @@ static void md5_hash(const uint8_t *data, size_t len, uint8_t out[16])
         c0 += c;
         d0 += d;
     }
-    free(msg);
+    alloc->deallocate(alloc->user_data, msg);
     memcpy(out, &a0, 4);
     memcpy(out + 4, &b0, 4);
     memcpy(out + 8, &c0, 4);
@@ -127,11 +173,12 @@ static void md5_hash(const uint8_t *data, size_t len, uint8_t out[16])
 
 /* ── SHA-1 (FIPS 180-4) ─────────────────────────────────────────── */
 
-static void sha1_hash(const uint8_t *data, size_t len, uint8_t out[20])
+static void sha1_hash(const uint8_t *data, size_t len, uint8_t out[20], vigil_allocator_t *alloc)
 {
     uint32_t h0 = 0x67452301, h1 = 0xEFCDAB89, h2 = 0x98BADCFE, h3 = 0x10325476, h4 = 0xC3D2E1F0;
     size_t padded_len = ((len + 8) / 64 + 1) * 64;
-    uint8_t *msg = (uint8_t *)calloc(1, padded_len);
+    uint8_t *msg = (uint8_t *)alloc->allocate(alloc->user_data, padded_len);
+    memset(msg, 0, padded_len);
     memcpy(msg, data, len);
     msg[len] = 0x80;
     uint64_t bit_len = (uint64_t)len * 8;
@@ -186,7 +233,7 @@ static void sha1_hash(const uint8_t *data, size_t len, uint8_t out[20])
         h3 += d;
         h4 += e;
     }
-    free(msg);
+    alloc->deallocate(alloc->user_data, msg);
     for (int i = 0; i < 4; i++)
     {
         out[i] = (uint8_t)(h0 >> (24 - i * 8));
@@ -240,8 +287,7 @@ static vigil_status_t hash_djb2(vigil_vm_t *vm, size_t arg_count, vigil_error_t 
     return vigil_vm_stack_push(vm, &val, error);
 }
 
-static vigil_status_t hash_digest(vigil_vm_t *vm, size_t arg_count, void (*fn)(const uint8_t *, size_t, uint8_t *),
-                                  size_t digest_len, vigil_error_t *error)
+static vigil_status_t hash_md5(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
 {
     size_t base = vigil_vm_stack_depth(vm) - arg_count;
     const char *data;
@@ -249,48 +295,100 @@ static vigil_status_t hash_digest(vigil_vm_t *vm, size_t arg_count, void (*fn)(c
     if (!get_str(vm, base, 0, &data, &len))
     {
         vigil_vm_stack_pop_n(vm, arg_count);
-        return push_str(vm, "", 0, error);
+        return push_str_and_err(vm, "md5: invalid argument", error);
     }
     vigil_vm_stack_pop_n(vm, arg_count);
-    uint8_t digest[64];
-    fn((const uint8_t *)data, len, digest);
-    char hex[128];
-    to_hex(digest, digest_len, hex);
-    return push_str(vm, hex, digest_len * 2, error);
-}
-
-static vigil_status_t hash_md5(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
-{
-    return hash_digest(vm, arg_count, md5_hash, 16, error);
+    vigil_allocator_t alloc = get_alloc(vm);
+    uint8_t digest[16];
+    md5_hash((const uint8_t *)data, len, digest, &alloc);
+    char hex[32];
+    to_hex(digest, 16, hex);
+    return push_str_and_ok(vm, hex, 32, error);
 }
 
 static vigil_status_t hash_sha1(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
 {
-    return hash_digest(vm, arg_count, sha1_hash, 20, error);
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    const char *data;
+    size_t len;
+    if (!get_str(vm, base, 0, &data, &len))
+    {
+        vigil_vm_stack_pop_n(vm, arg_count);
+        return push_str_and_err(vm, "sha1: invalid argument", error);
+    }
+    vigil_vm_stack_pop_n(vm, arg_count);
+    vigil_allocator_t alloc = get_alloc(vm);
+    uint8_t digest[20];
+    sha1_hash((const uint8_t *)data, len, digest, &alloc);
+    char hex[40];
+    to_hex(digest, 20, hex);
+    return push_str_and_ok(vm, hex, 40, error);
 }
 
 static vigil_status_t hash_sha256_fn(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
 {
-    return hash_digest(vm, arg_count, vigil_sha256, 32, error);
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    const char *data;
+    size_t len;
+    if (!get_str(vm, base, 0, &data, &len))
+    {
+        vigil_vm_stack_pop_n(vm, arg_count);
+        return push_str_and_err(vm, "sha256: invalid argument", error);
+    }
+    vigil_vm_stack_pop_n(vm, arg_count);
+    uint8_t digest[32];
+    vigil_sha256((const uint8_t *)data, len, digest);
+    char hex[64];
+    to_hex(digest, 32, hex);
+    return push_str_and_ok(vm, hex, 64, error);
 }
 
 static vigil_status_t hash_sha512_fn(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
 {
-    return hash_digest(vm, arg_count, vigil_sha512, 64, error);
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    const char *data;
+    size_t len;
+    if (!get_str(vm, base, 0, &data, &len))
+    {
+        vigil_vm_stack_pop_n(vm, arg_count);
+        return push_str_and_err(vm, "sha512: invalid argument", error);
+    }
+    vigil_vm_stack_pop_n(vm, arg_count);
+    uint8_t digest[64];
+    vigil_sha512((const uint8_t *)data, len, digest);
+    char hex[128];
+    to_hex(digest, 64, hex);
+    return push_str_and_ok(vm, hex, 128, error);
 }
+
+/* ── Doc strings ─────────────────────────────────────────────────── */
+
+static const vigil_native_symbol_doc_t doc_module = {
+    "Hash functions.",
+    "Non-cryptographic (FNV-1a, DJB2) and cryptographic (MD5, SHA-1, SHA-256, SHA-512) hashes.",
+    NULL,
+};
+static const vigil_native_symbol_doc_t doc_fnv1a = {"FNV-1a hash.", "Returns 64-bit integer hash.", "hash.fnv1a(\"hello\")"};
+static const vigil_native_symbol_doc_t doc_djb2 = {"DJB2 hash.", "Returns 64-bit integer hash.", "hash.djb2(\"hello\")"};
+static const vigil_native_symbol_doc_t doc_md5 = {"MD5 hash.", "Returns 32-character hex string. Not cryptographically secure.", "hash.md5(\"hello\")"};
+static const vigil_native_symbol_doc_t doc_sha1 = {"SHA-1 hash.", "Returns 40-character hex string. Not cryptographically secure.", "hash.sha1(\"hello\")"};
+static const vigil_native_symbol_doc_t doc_sha256 = {"SHA-256 hash.", "Returns 64-character hex string.", "hash.sha256(\"hello\")"};
+static const vigil_native_symbol_doc_t doc_sha512 = {"SHA-512 hash.", "Returns 128-character hex string.", "hash.sha512(\"hello\")"};
 
 /* ── Module descriptor ────────────────────────────────────────────── */
 
 static const int p_str[] = {VIGIL_TYPE_STRING};
+static const int str_err_returns[] = {VIGIL_TYPE_STRING, VIGIL_TYPE_ERR};
+static const char *const pn_data[] = {"data"};
 
 static const vigil_native_module_function_t hash_functions[] = {
-    {"fnv1a", 5U, hash_fnv1a, 1U, p_str, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
-    {"djb2", 4U, hash_djb2, 1U, p_str, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
-    {"md5", 3U, hash_md5, 1U, p_str, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
-    {"sha1", 4U, hash_sha1, 1U, p_str, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
-    {"sha256", 6U, hash_sha256_fn, 1U, p_str, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
-    {"sha512", 6U, hash_sha512_fn, 1U, p_str, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
+    {"fnv1a", 5U, hash_fnv1a, 1U, p_str, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U, pn_data, NULL, NULL, &doc_fnv1a},
+    {"djb2", 4U, hash_djb2, 1U, p_str, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U, pn_data, NULL, NULL, &doc_djb2},
+    {"md5", 3U, hash_md5, 1U, p_str, VIGIL_TYPE_STRING, 2U, str_err_returns, 0, NULL, NULL, 0U, pn_data, NULL, NULL, &doc_md5},
+    {"sha1", 4U, hash_sha1, 1U, p_str, VIGIL_TYPE_STRING, 2U, str_err_returns, 0, NULL, NULL, 0U, pn_data, NULL, NULL, &doc_sha1},
+    {"sha256", 6U, hash_sha256_fn, 1U, p_str, VIGIL_TYPE_STRING, 2U, str_err_returns, 0, NULL, NULL, 0U, pn_data, NULL, NULL, &doc_sha256},
+    {"sha512", 6U, hash_sha512_fn, 1U, p_str, VIGIL_TYPE_STRING, 2U, str_err_returns, 0, NULL, NULL, 0U, pn_data, NULL, NULL, &doc_sha512},
 };
 
 VIGIL_API const vigil_native_module_t vigil_stdlib_hash = {
-    "hash", 4U, hash_functions, sizeof(hash_functions) / sizeof(hash_functions[0]), NULL, 0U, NULL, NULL, 0U};
+    "hash", 4U, hash_functions, sizeof(hash_functions) / sizeof(hash_functions[0]), NULL, 0U, &doc_module, NULL, 0U};

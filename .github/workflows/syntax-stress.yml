@@ -66,6 +66,7 @@ jobs:
             --suite-dir tests/stdlib-csv-stress \
             --suite-dir tests/stdlib-yaml-stress \
             --suite-dir tests/stdlib-compress-stress \
+            --suite-dir tests/stdlib-crypto-stress \
             --work-dir ${{ runner.temp }}/syntax_stress \
             -j 4
 
@@ -90,5 +91,6 @@ jobs:
             --suite-dir tests/stdlib-csv-stress `
             --suite-dir tests/stdlib-yaml-stress `
             --suite-dir tests/stdlib-compress-stress `
+            --suite-dir tests/stdlib-crypto-stress `
             --work-dir "${{ runner.temp }}/syntax_stress" `
             -j 4

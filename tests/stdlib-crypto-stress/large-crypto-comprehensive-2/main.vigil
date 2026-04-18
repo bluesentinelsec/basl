@@ -1,0 +1,128 @@
+import "fmt"
+import "crypto"
+
+fn test_multi_algorithm_encrypt() -> void {
+    string data = "The quick brown fox jumps over the lazy dog"
+    // Keys and nonces
+    string key32, err _ = crypto.random_bytes(32)
+    string key16, err _ = crypto.random_bytes(16)
+    string nonce12, err _ = crypto.random_bytes(12)
+    string iv16, err _ = crypto.random_bytes(16)
+    // AES-256-GCM
+    string ct1, err e1 = crypto.encrypt(key32, nonce12, data, "")
+    bool ok1 = e1 == ok
+    fmt.println(f"aes256gcm encrypt ok: {ok1}")
+    string pt1, err e1d = crypto.decrypt(key32, ct1, "")
+    bool ok1d = e1d == ok
+    bool m1 = pt1 == data
+    fmt.println(f"aes256gcm decrypt ok: {ok1d}")
+    fmt.println(f"aes256gcm match: {m1}")
+    // AES-128-GCM
+    string ct2, err e2 = crypto.aes128_gcm_encrypt(key16, nonce12, data, "")
+    bool ok2 = e2 == ok
+    fmt.println(f"aes128gcm encrypt ok: {ok2}")
+    string pt2, err e2d = crypto.aes128_gcm_decrypt(key16, ct2, "")
+    bool ok2d = e2d == ok
+    bool m2 = pt2 == data
+    fmt.println(f"aes128gcm decrypt ok: {ok2d}")
+    fmt.println(f"aes128gcm match: {m2}")
+    // ChaCha20-Poly1305
+    string ct3, err e3 = crypto.chacha20_poly1305_encrypt(key32, nonce12, data, "")
+    bool ok3 = e3 == ok
+    fmt.println(f"chacha20 encrypt ok: {ok3}")
+    string pt3, err e3d = crypto.chacha20_poly1305_decrypt(key32, ct3, "")
+    bool ok3d = e3d == ok
+    bool m3 = pt3 == data
+    fmt.println(f"chacha20 decrypt ok: {ok3d}")
+    fmt.println(f"chacha20 match: {m3}")
+    // AES-CBC
+    string ct4, err e4 = crypto.aes_cbc_encrypt(key32, iv16, data)
+    bool ok4 = e4 == ok
+    fmt.println(f"aes cbc encrypt ok: {ok4}")
+    string pt4, err e4d = crypto.aes_cbc_decrypt(key32, iv16, ct4)
+    bool ok4d = e4d == ok
+    bool m4 = pt4 == data
+    fmt.println(f"aes cbc decrypt ok: {ok4d}")
+    fmt.println(f"aes cbc match: {m4}")
+}
+
+fn test_all_sha_variants() -> void {
+    string data = "hash me please"
+    string h224, err e1 = crypto.sha224(data)
+    string h256, err e2 = crypto.sha256(data)
+    string h384, err e3 = crypto.sha384(data)
+    string h512, err e4 = crypto.sha512(data)
+    bool ok1 = e1 == ok
+    bool ok2 = e2 == ok
+    bool ok3 = e3 == ok
+    bool ok4 = e4 == ok
+    fmt.println(f"sha224 ok: {ok1}")
+    fmt.println(f"sha256 ok: {ok2}")
+    fmt.println(f"sha384 ok: {ok3}")
+    fmt.println(f"sha512 ok: {ok4}")
+    // Check expected lengths
+    bool len224 = h224.len() == 56
+    bool len256 = h256.len() == 64
+    bool len384 = h384.len() == 96
+    bool len512 = h512.len() == 128
+    fmt.println(f"sha224 56 chars: {len224}")
+    fmt.println(f"sha256 64 chars: {len256}")
+    fmt.println(f"sha384 96 chars: {len384}")
+    fmt.println(f"sha512 128 chars: {len512}")
+    // All different
+    bool d12 = h224 != h256
+    bool d34 = h384 != h512
+    fmt.println(f"sha224 != sha256: {d12}")
+    fmt.println(f"sha384 != sha512: {d34}")
+}
+
+fn test_all_hmac_variants() -> void {
+    string key = "my-secret-key"
+    string data = "authenticate me"
+    string m256, err e1 = crypto.hmac_sha256(key, data)
+    string m384, err e2 = crypto.hmac_sha384(key, data)
+    string m512, err e3 = crypto.hmac_sha512(key, data)
+    bool ok1 = e1 == ok
+    bool ok2 = e2 == ok
+    bool ok3 = e3 == ok
+    fmt.println(f"hmac256 ok: {ok1}")
+    fmt.println(f"hmac384 ok: {ok2}")
+    fmt.println(f"hmac512 ok: {ok3}")
+    bool len256 = m256.len() == 64
+    bool len384 = m384.len() == 96
+    bool len512 = m512.len() == 128
+    fmt.println(f"hmac256 64 chars: {len256}")
+    fmt.println(f"hmac384 96 chars: {len384}")
+    fmt.println(f"hmac512 128 chars: {len512}")
+    // Consistency
+    string m256b, err _ = crypto.hmac_sha256(key, data)
+    bool consistent = m256 == m256b
+    fmt.println(f"hmac256 consistent: {consistent}")
+}
+
+fn test_password_encrypt_decrypt() -> void {
+    string password = "strong-password-123"
+    string plaintext = "sensitive information to protect"
+    string ct, err e1 = crypto.password_encrypt(password, plaintext)
+    bool ok1 = e1 == ok
+    fmt.println(f"password encrypt ok: {ok1}")
+    string pt, err e2 = crypto.password_decrypt(password, ct)
+    bool ok2 = e2 == ok
+    fmt.println(f"password decrypt ok: {ok2}")
+    bool match = pt == plaintext
+    fmt.println(f"password roundtrip match: {match}")
+    // Wrong password should fail
+    string bad, err e3 = crypto.password_decrypt("wrong-password", ct)
+    bool is_err = e3 != ok
+    fmt.println(f"wrong password err: {is_err}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST large-crypto-comprehensive-2 START =====")
+    test_multi_algorithm_encrypt()
+    test_all_sha_variants()
+    test_all_hmac_variants()
+    test_password_encrypt_decrypt()
+    fmt.println("===== TEST large-crypto-comprehensive-2 END =====")
+    return 0
+}
