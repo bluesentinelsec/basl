@@ -1,0 +1,79 @@
+import "fmt"
+import "compress"
+
+fn test_roundtrip() -> void {
+    string data = "hello zlib world"
+    string compressed, err e1 = compress.zlib_compress(data)
+    bool ok1 = e1 == ok
+    fmt.println(f"zlib compress ok: {ok1}")
+    string decompressed, err e2 = compress.zlib_decompress(compressed)
+    bool ok2 = e2 == ok
+    fmt.println(f"zlib decompress ok: {ok2}")
+    bool match = decompressed == data
+    fmt.println(f"zlib roundtrip match: {match}")
+}
+
+fn test_empty() -> void {
+    string compressed, err e1 = compress.zlib_compress("")
+    bool ok1 = e1 == ok
+    fmt.println(f"zlib empty compress ok: {ok1}")
+    string decompressed, err e2 = compress.zlib_decompress(compressed)
+    bool ok2 = e2 == ok
+    fmt.println(f"zlib empty decompress ok: {ok2}")
+    bool empty = decompressed == ""
+    fmt.println(f"zlib empty roundtrip: {empty}")
+}
+
+fn test_compressed_smaller() -> void {
+    string data = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    string compressed, err e1 = compress.zlib_compress(data)
+    bool smaller = compressed.len() < data.len()
+    fmt.println(f"zlib compressed smaller: {smaller}")
+}
+
+fn test_level() -> void {
+    string data = "zlib level test with repeated content repeated content repeated content"
+    string c1, err e1 = compress.zlib_compress_level(data, 1)
+    bool ok1 = e1 == ok
+    fmt.println(f"zlib level1 ok: {ok1}")
+    string d1, err e2 = compress.zlib_decompress(c1)
+    bool match1 = d1 == data
+    fmt.println(f"zlib level1 roundtrip: {match1}")
+
+    string c9, err e3 = compress.zlib_compress_level(data, 9)
+    bool ok9 = e3 == ok
+    fmt.println(f"zlib level9 ok: {ok9}")
+    string d9, err e4 = compress.zlib_decompress(c9)
+    bool match9 = d9 == data
+    fmt.println(f"zlib level9 roundtrip: {match9}")
+}
+
+fn test_decompress_max() -> void {
+    string data = "decompress max zlib test"
+    string compressed, err e1 = compress.zlib_compress(data)
+    string decompressed, err e2 = compress.zlib_decompress_max(compressed, 1024)
+    bool ok2 = e2 == ok
+    fmt.println(f"zlib decompress_max ok: {ok2}")
+    bool match = decompressed == data
+    fmt.println(f"zlib decompress_max match: {match}")
+}
+
+fn test_decompress_max_too_small() -> void {
+    string data = "this string should exceed the max bytes limit for zlib decompression"
+    string compressed, err e1 = compress.zlib_compress(data)
+    string decompressed, err e2 = compress.zlib_decompress_max(compressed, 5)
+    bool failed = e2 != ok
+    fmt.println(f"zlib decompress_max too small fails: {failed}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 03_ZLIB START =====")
+    test_roundtrip()
+    test_empty()
+    test_compressed_smaller()
+    test_level()
+    test_decompress_max()
+    test_decompress_max_too_small()
+    fmt.println("===== TEST 03_ZLIB END =====")
+    return 0
+}

@@ -1,0 +1,118 @@
+import "fmt"
+import "compress"
+
+fn build_large_string() -> string {
+    string s = ""
+    i32 i = 0
+    while i < 200 {
+        s = s + "Line " + string(i) + ": the quick brown fox jumps over the lazy dog\n"
+        i = i + 1
+    }
+    return s
+}
+
+fn test_large_deflate_roundtrip() -> void {
+    string data = build_large_string()
+    bool big_enough = data.len() > 10000
+    fmt.println(f"data over 10KB: {big_enough}")
+    string compressed, err e1 = compress.deflate_compress(data)
+    bool ok1 = e1 == ok
+    fmt.println(f"deflate compress ok: {ok1}")
+    string decompressed, err e2 = compress.deflate_decompress(compressed)
+    bool ok2 = e2 == ok
+    fmt.println(f"deflate decompress ok: {ok2}")
+    bool match1 = decompressed == data
+    fmt.println(f"deflate roundtrip match: {match1}")
+}
+
+fn test_large_zlib_roundtrip() -> void {
+    string data = build_large_string()
+    string compressed, err e1 = compress.zlib_compress(data)
+    bool ok1 = e1 == ok
+    fmt.println(f"zlib compress ok: {ok1}")
+    string decompressed, err e2 = compress.zlib_decompress(compressed)
+    bool ok2 = e2 == ok
+    fmt.println(f"zlib decompress ok: {ok2}")
+    bool match1 = decompressed == data
+    fmt.println(f"zlib roundtrip match: {match1}")
+}
+
+fn test_large_gzip_roundtrip() -> void {
+    string data = build_large_string()
+    string compressed, err e1 = compress.gzip_compress(data)
+    bool ok1 = e1 == ok
+    fmt.println(f"gzip compress ok: {ok1}")
+    string decompressed, err e2 = compress.gzip_decompress(compressed)
+    bool ok2 = e2 == ok
+    fmt.println(f"gzip decompress ok: {ok2}")
+    bool match1 = decompressed == data
+    fmt.println(f"gzip roundtrip match: {match1}")
+}
+
+fn test_large_lz4_roundtrip() -> void {
+    string data = build_large_string()
+    string compressed, err e1 = compress.lz4_compress(data)
+    bool ok1 = e1 == ok
+    fmt.println(f"lz4 compress ok: {ok1}")
+    string decompressed, err e2 = compress.lz4_decompress(compressed)
+    bool ok2 = e2 == ok
+    fmt.println(f"lz4 decompress ok: {ok2}")
+    bool match1 = decompressed == data
+    fmt.println(f"lz4 roundtrip match: {match1}")
+}
+
+fn test_compare_sizes() -> void {
+    string data = build_large_string()
+    i32 orig = data.len()
+    string dc, err _ = compress.deflate_compress(data)
+    string zc, err _ = compress.zlib_compress(data)
+    string gc, err _ = compress.gzip_compress(data)
+    string lc, err _ = compress.lz4_compress(data)
+    bool deflate_smaller = dc.len() < orig
+    fmt.println(f"deflate smaller: {deflate_smaller}")
+    bool zlib_smaller = zc.len() < orig
+    fmt.println(f"zlib smaller: {zlib_smaller}")
+    bool gzip_smaller = gc.len() < orig
+    fmt.println(f"gzip smaller: {gzip_smaller}")
+    bool lz4_smaller = lc.len() < orig
+    fmt.println(f"lz4 smaller: {lz4_smaller}")
+    // zlib = deflate + overhead
+    bool zlib_bigger_than_deflate = zc.len() > dc.len()
+    fmt.println(f"zlib bigger than deflate: {zlib_bigger_than_deflate}")
+    // gzip = deflate + overhead
+    bool gzip_bigger_than_deflate = gc.len() > dc.len()
+    fmt.println(f"gzip bigger than deflate: {gzip_bigger_than_deflate}")
+}
+
+fn test_checksums_before_after() -> void {
+    string data = build_large_string()
+    i64 crc_before = compress.crc32(data)
+    i64 adler_before = compress.adler32(data)
+    // Compress and decompress with gzip
+    string gz, err _ = compress.gzip_compress(data)
+    string restored, err _ = compress.gzip_decompress(gz)
+    i64 crc_after = compress.crc32(restored)
+    i64 adler_after = compress.adler32(restored)
+    bool crc_match = crc_before == crc_after
+    fmt.println(f"crc32 match after roundtrip: {crc_match}")
+    bool adler_match = adler_before == adler_after
+    fmt.println(f"adler32 match after roundtrip: {adler_match}")
+    // Also check with lz4
+    string lc, err _ = compress.lz4_compress(data)
+    string lr, err _ = compress.lz4_decompress(lc)
+    i64 crc_lz4 = compress.crc32(lr)
+    bool crc_lz4_match = crc_before == crc_lz4
+    fmt.println(f"crc32 match after lz4 roundtrip: {crc_lz4_match}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST large-compress-comprehensive-1 START =====")
+    test_large_deflate_roundtrip()
+    test_large_zlib_roundtrip()
+    test_large_gzip_roundtrip()
+    test_large_lz4_roundtrip()
+    test_compare_sizes()
+    test_checksums_before_after()
+    fmt.println("===== TEST large-compress-comprehensive-1 END =====")
+    return 0
+}

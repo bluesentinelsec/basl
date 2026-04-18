@@ -1,0 +1,83 @@
+import "fmt"
+import "compress"
+
+fn test_tar_gz_create() -> void {
+    array<string> names = ["readme.md", "data.txt"]
+    array<string> contents = ["# Hello", "some data here"]
+    string tgz, err e = compress.tar_gz_create(names, contents)
+    bool ok1 = e == ok
+    fmt.println(f"tar gz create ok: {ok1}")
+    bool nonempty = tgz.len() > 0
+    fmt.println(f"tar gz create nonempty: {nonempty}")
+}
+
+fn test_tar_gz_list() -> void {
+    array<string> names = ["a.txt", "b.txt", "c.txt"]
+    array<string> contents = ["aaa", "bbb", "ccc"]
+    string tgz, err _ = compress.tar_gz_create(names, contents)
+    array<string> listed, err e = compress.tar_gz_list(tgz)
+    bool ok1 = e == ok
+    fmt.println(f"tar gz list ok: {ok1}")
+    bool count3 = listed.len() == 3
+    fmt.println(f"tar gz list count 3: {count3}")
+    bool has_a = listed[0] == "a.txt"
+    fmt.println(f"tar gz list has a: {has_a}")
+    bool has_b = listed[1] == "b.txt"
+    fmt.println(f"tar gz list has b: {has_b}")
+    bool has_c = listed[2] == "c.txt"
+    fmt.println(f"tar gz list has c: {has_c}")
+}
+
+fn test_tar_gz_read() -> void {
+    array<string> names = ["file1.txt", "file2.txt"]
+    array<string> contents = ["content of file1", "content of file2"]
+    string tgz, err _ = compress.tar_gz_create(names, contents)
+    string r1, err e1 = compress.tar_gz_read(tgz, "file1.txt")
+    bool ok1 = e1 == ok
+    fmt.println(f"tar gz read file1 ok: {ok1}")
+    bool match1 = r1 == "content of file1"
+    fmt.println(f"tar gz read file1 match: {match1}")
+    string r2, err e2 = compress.tar_gz_read(tgz, "file2.txt")
+    bool ok2 = e2 == ok
+    fmt.println(f"tar gz read file2 ok: {ok2}")
+    bool match2 = r2 == "content of file2"
+    fmt.println(f"tar gz read file2 match: {match2}")
+}
+
+fn test_tar_gz_roundtrip_multi() -> void {
+    array<string> names = ["src/main.vigil", "src/util.vigil", "README.md", "config.json"]
+    array<string> contents = [
+        "fn main() -> i32 { return 0 }",
+        "fn helper() -> string { return \"ok\" }",
+        "# My Project",
+        "{\"version\": 1}"
+    ]
+    string tgz, err _ = compress.tar_gz_create(names, contents)
+    array<string> listed, err _ = compress.tar_gz_list(tgz)
+    bool count4 = listed.len() == 4
+    fmt.println(f"tar gz roundtrip count 4: {count4}")
+    i32 i = 0
+    bool all_match = true
+    while i < 4 {
+        string r, err _ = compress.tar_gz_read(tgz, names[i])
+        if r != contents[i] {
+            all_match = false
+        }
+        i = i + 1
+    }
+    fmt.println(f"tar gz roundtrip all match: {all_match}")
+    // Verify compressed is smaller than uncompressed tar
+    string tar, err _ = compress.tar_create(names, contents)
+    bool smaller = tgz.len() < tar.len()
+    fmt.println(f"tar gz smaller than tar: {smaller}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 09_tar_gz START =====")
+    test_tar_gz_create()
+    test_tar_gz_list()
+    test_tar_gz_read()
+    test_tar_gz_roundtrip_multi()
+    fmt.println("===== TEST 09_tar_gz END =====")
+    return 0
+}

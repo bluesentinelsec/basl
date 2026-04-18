@@ -68,7 +68,7 @@ pub fn count_json_array(string data) -> i32 {
 
 // Compress data and report compression ratio.
 pub fn compress_data(string data) -> string {
-    string compressed = compress.gzip_compress(data)
+    string compressed, err e = compress.gzip_compress(data)
     i32 orig_len = data.len()
     i32 comp_len = compressed.len()
     f64 ratio = 0.0
@@ -82,7 +82,8 @@ pub fn compress_data(string data) -> string {
 
 // Decompress data.
 pub fn decompress_data(string data) -> string {
-    return compress.gzip_decompress(data)
+    string result, err e = compress.gzip_decompress(data)
+    return result
 }
 
 // Save data to a file.

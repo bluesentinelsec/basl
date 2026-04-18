@@ -1,0 +1,80 @@
+import "fmt"
+import "compress"
+
+fn test_roundtrip() -> void {
+    string data = "hello lz4 world"
+    string compressed, err e1 = compress.lz4_compress(data)
+    bool ok1 = e1 == ok
+    fmt.println(f"lz4 compress ok: {ok1}")
+    string decompressed, err e2 = compress.lz4_decompress(compressed)
+    bool ok2 = e2 == ok
+    fmt.println(f"lz4 decompress ok: {ok2}")
+    bool match = decompressed == data
+    fmt.println(f"lz4 roundtrip match: {match}")
+}
+
+fn test_empty() -> void {
+    string compressed, err e1 = compress.lz4_compress("")
+    bool ok1 = e1 == ok
+    fmt.println(f"lz4 empty compress ok: {ok1}")
+    string decompressed, err e2 = compress.lz4_decompress(compressed)
+    bool ok2 = e2 == ok
+    fmt.println(f"lz4 empty decompress ok: {ok2}")
+    bool empty = decompressed == ""
+    fmt.println(f"lz4 empty roundtrip: {empty}")
+}
+
+fn test_level() -> void {
+    string data = "lz4 level test with repeated content repeated content repeated content"
+    string c1, err e1 = compress.lz4_compress_level(data, 1)
+    bool ok1 = e1 == ok
+    fmt.println(f"lz4 level1 ok: {ok1}")
+    string d1, err e2 = compress.lz4_decompress(c1)
+    bool match1 = d1 == data
+    fmt.println(f"lz4 level1 roundtrip: {match1}")
+
+    string c9, err e3 = compress.lz4_compress_level(data, 9)
+    bool ok9 = e3 == ok
+    fmt.println(f"lz4 level9 ok: {ok9}")
+    string d9, err e4 = compress.lz4_decompress(c9)
+    bool match9 = d9 == data
+    fmt.println(f"lz4 level9 roundtrip: {match9}")
+}
+
+fn test_decompress_max() -> void {
+    string data = "decompress max lz4 test"
+    string compressed, err e1 = compress.lz4_compress(data)
+    string decompressed, err e2 = compress.lz4_decompress_max(compressed, 1024)
+    bool ok2 = e2 == ok
+    fmt.println(f"lz4 decompress_max ok: {ok2}")
+    bool match = decompressed == data
+    fmt.println(f"lz4 decompress_max match: {match}")
+}
+
+fn test_decompress_max_too_small() -> void {
+    string data = "this string should exceed the max bytes limit for lz4 decompression"
+    string compressed, err e1 = compress.lz4_compress(data)
+    string decompressed, err e2 = compress.lz4_decompress_max(compressed, 5)
+    bool failed = e2 != ok
+    fmt.println(f"lz4 decompress_max too small fails: {failed}")
+}
+
+fn test_fast_compression() -> void {
+    string data = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    string compressed, err e1 = compress.lz4_compress(data)
+    bool ok1 = e1 == ok
+    fmt.println(f"lz4 fast compress ok: {ok1}")
+    fmt.println(f"lz4 compressed smaller: {compressed.len() < data.len()}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 05_LZ4 START =====")
+    test_roundtrip()
+    test_empty()
+    test_level()
+    test_decompress_max()
+    test_decompress_max_too_small()
+    test_fast_compression()
+    fmt.println("===== TEST 05_LZ4 END =====")
+    return 0
+}

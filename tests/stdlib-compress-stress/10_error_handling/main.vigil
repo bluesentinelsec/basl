@@ -1,0 +1,109 @@
+import "fmt"
+import "compress"
+
+fn test_deflate_corrupt() -> void {
+    string r, err e = compress.deflate_decompress("not compressed data")
+    bool is_err = e != ok
+    fmt.println(f"deflate corrupt err: {is_err}")
+}
+
+fn test_zlib_corrupt() -> void {
+    string r, err e = compress.zlib_decompress("not compressed data")
+    bool is_err = e != ok
+    fmt.println(f"zlib corrupt err: {is_err}")
+}
+
+fn test_gzip_corrupt() -> void {
+    string r, err e = compress.gzip_decompress("not compressed data")
+    bool is_err = e != ok
+    fmt.println(f"gzip corrupt err: {is_err}")
+}
+
+fn test_lz4_corrupt() -> void {
+    string r, err e = compress.lz4_decompress("not compressed data")
+    bool is_err = e != ok
+    fmt.println(f"lz4 corrupt err: {is_err}")
+}
+
+fn test_gzip_truncated() -> void {
+    string gz, err _ = compress.gzip_compress("Hello World test data for truncation")
+    string trunc, err _ = gz.substr(0, 10)
+    string r, err e = compress.gzip_decompress(trunc)
+    bool is_err = e != ok
+    fmt.println(f"gzip truncated err: {is_err}")
+}
+
+fn test_zlib_truncated() -> void {
+    string zc, err _ = compress.zlib_compress("Hello World test data for truncation")
+    string trunc, err _ = zc.substr(0, 5)
+    string r, err e = compress.zlib_decompress(trunc)
+    bool is_err = e != ok
+    fmt.println(f"zlib truncated err: {is_err}")
+}
+
+fn test_lz4_truncated() -> void {
+    string lc, err _ = compress.lz4_compress("Hello World test data for truncation")
+    string trunc, err _ = lc.substr(0, 3)
+    string r, err e = compress.lz4_decompress(trunc)
+    bool is_err = e != ok
+    fmt.println(f"lz4 truncated err: {is_err}")
+}
+
+fn test_zip_read_nonexistent() -> void {
+    array<string> names = ["exists.txt"]
+    array<string> contents = ["data"]
+    string zip, err _ = compress.zip_create(names, contents)
+    string r, err e = compress.zip_read(zip, "missing.txt")
+    bool is_err = e != ok
+    fmt.println(f"zip read nonexistent err: {is_err}")
+}
+
+fn test_tar_read_nonexistent() -> void {
+    array<string> names = ["exists.txt"]
+    array<string> contents = ["data"]
+    string tar, err _ = compress.tar_create(names, contents)
+    string r, err e = compress.tar_read(tar, "missing.txt")
+    bool is_err = e != ok
+    fmt.println(f"tar read nonexistent err: {is_err}")
+}
+
+fn test_zip_list_invalid() -> void {
+    array<string> listed, err e = compress.zip_list("garbage data")
+    bool is_err = e != ok
+    fmt.println(f"zip list invalid err: {is_err}")
+}
+
+fn test_tar_list_invalid() -> void {
+    array<string> listed, err e = compress.tar_list("garbage data")
+    bool is_err = e != ok
+    fmt.println(f"tar list invalid err: {is_err}")
+}
+
+fn test_cross_format() -> void {
+    string zdata, err _ = compress.zlib_compress("cross format test")
+    string r1, err e1 = compress.gzip_decompress(zdata)
+    bool gzip_err = e1 != ok
+    fmt.println(f"zlib as gzip err: {gzip_err}")
+    string gdata, err _ = compress.gzip_compress("cross format test")
+    string r2, err e2 = compress.zlib_decompress(gdata)
+    bool zlib_err = e2 != ok
+    fmt.println(f"gzip as zlib err: {zlib_err}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 10_error_handling START =====")
+    test_deflate_corrupt()
+    test_zlib_corrupt()
+    test_gzip_corrupt()
+    test_lz4_corrupt()
+    test_gzip_truncated()
+    test_zlib_truncated()
+    test_lz4_truncated()
+    test_zip_read_nonexistent()
+    test_tar_read_nonexistent()
+    test_zip_list_invalid()
+    test_tar_list_invalid()
+    test_cross_format()
+    fmt.println("===== TEST 10_error_handling END =====")
+    return 0
+}
