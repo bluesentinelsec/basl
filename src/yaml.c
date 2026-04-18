@@ -25,9 +25,12 @@ typedef struct
     size_t pos;
     size_t line;
     size_t col;
+    size_t depth;
     vigil_allocator_t alloc;
     vigil_error_t *error;
 } yaml_parser_t;
+
+#define YAML_MAX_DEPTH 64
 
 /* ── Helpers ─────────────────────────────────────────────────────── */
 
@@ -124,6 +127,9 @@ static void set_error(yaml_parser_t *p, const char *msg)
 /* ── Forward declarations ────────────────────────────────────────── */
 
 static vigil_status_t parse_value(yaml_parser_t *p, size_t min_indent, vigil_json_value_t **out);
+static vigil_status_t parse_flow_value(yaml_parser_t *p, vigil_json_value_t **out);
+static vigil_status_t parse_flow_mapping(yaml_parser_t *p, vigil_json_value_t **out);
+static vigil_status_t parse_flow_sequence(yaml_parser_t *p, vigil_json_value_t **out);
 
 /* ── Scalar parsing ──────────────────────────────────────────────── */
 
@@ -389,7 +395,11 @@ static vigil_status_t parse_inline_value(yaml_parser_t *p, vigil_json_value_t **
 {
     char c = peek(p);
     vigil_status_t s;
-    if (c == '"' || c == '\'')
+    if (c == '{')
+        s = parse_flow_mapping(p, out);
+    else if (c == '[')
+        s = parse_flow_sequence(p, out);
+    else if (c == '"' || c == '\'')
         s = parse_quoted_string(p, c, out);
     else if (c == '|' || c == '>')
         s = parse_block_scalar(p, c, out);
@@ -551,17 +561,227 @@ static vigil_status_t parse_mapping(yaml_parser_t *p, size_t map_indent, vigil_j
     return VIGIL_STATUS_OK;
 }
 
+/* ── Flow collection parsing ──────────────────────────────────────── */
+
+static void skip_flow_ws(yaml_parser_t *p)
+{
+    while (peek(p) == ' ' || peek(p) == '\t' || peek(p) == '\n' || peek(p) == '\r')
+        advance(p);
+}
+
+static vigil_status_t parse_flow_value(yaml_parser_t *p, vigil_json_value_t **out)
+{
+    skip_flow_ws(p);
+    char c = peek(p);
+    if (c == '{')
+        return parse_flow_mapping(p, out);
+    if (c == '[')
+        return parse_flow_sequence(p, out);
+    if (c == '"' || c == '\'')
+        return parse_quoted_string(p, c, out);
+
+    /* Plain scalar in flow context — ends at , } ] : */
+    size_t start = p->pos;
+    while (peek(p) && peek(p) != ',' && peek(p) != '}' && peek(p) != ']' && peek(p) != '\n')
+    {
+        if (peek(p) == ':' && (peek_at(p, 1) == ' ' || peek_at(p, 1) == ',' || peek_at(p, 1) == '}'))
+            break;
+        advance(p);
+    }
+    size_t end = p->pos;
+    while (end > start && p->src[end - 1] == ' ')
+        end--;
+    size_t len = end - start;
+    const char *str = p->src + start;
+
+    if (len == 4 && strncmp(str, "true", 4) == 0)
+        return vigil_json_bool_new(&p->alloc, 1, out, p->error);
+    if (len == 5 && strncmp(str, "false", 5) == 0)
+        return vigil_json_bool_new(&p->alloc, 0, out, p->error);
+    if (len == 4 && strncmp(str, "null", 4) == 0)
+        return vigil_json_null_new(&p->alloc, out, p->error);
+    if (len == 1 && str[0] == '~')
+        return vigil_json_null_new(&p->alloc, out, p->error);
+    if (len == 0)
+        return vigil_json_null_new(&p->alloc, out, p->error);
+
+    /* Try number */
+    char *numstr = (char *)yaml_alloc(p, len + 1);
+    if (!numstr)
+        return VIGIL_STATUS_OUT_OF_MEMORY;
+    memcpy(numstr, str, len);
+    numstr[len] = '\0';
+    char *endptr;
+    double num = strtod(numstr, &endptr);
+    if (endptr == numstr + len)
+    {
+        yaml_dealloc(p, numstr);
+        return vigil_json_number_new(&p->alloc, num, out, p->error);
+    }
+    yaml_dealloc(p, numstr);
+    return vigil_json_string_new(&p->alloc, str, len, out, p->error);
+}
+
+static vigil_status_t parse_flow_mapping(yaml_parser_t *p, vigil_json_value_t **out)
+{
+    advance(p); /* skip '{' */
+    vigil_status_t s = vigil_json_object_new(&p->alloc, out, p->error);
+    if (s != VIGIL_STATUS_OK)
+        return s;
+
+    skip_flow_ws(p);
+    if (peek(p) == '}')
+    {
+        advance(p);
+        return VIGIL_STATUS_OK;
+    }
+
+    while (p->pos < p->len)
+    {
+        skip_flow_ws(p);
+        /* Parse key */
+        const char *key;
+        size_t key_len;
+        if (peek(p) == '"' || peek(p) == '\'')
+        {
+            vigil_json_value_t *key_val = NULL;
+            s = parse_quoted_string(p, peek(p), &key_val);
+            if (s != VIGIL_STATUS_OK)
+            {
+                vigil_json_free(out);
+                return s;
+            }
+            key = vigil_json_string_value(key_val);
+            key_len = vigil_json_string_length(key_val);
+            skip_flow_ws(p);
+            if (peek(p) == ':')
+                advance(p);
+            skip_flow_ws(p);
+            vigil_json_value_t *val = NULL;
+            s = parse_flow_value(p, &val);
+            if (s != VIGIL_STATUS_OK)
+            {
+                vigil_json_free(&key_val);
+                vigil_json_free(out);
+                return s;
+            }
+            s = vigil_json_object_set(*out, key, key_len, val, p->error);
+            vigil_json_free(&key_val);
+            if (s != VIGIL_STATUS_OK)
+            {
+                vigil_json_free(&val);
+                vigil_json_free(out);
+                return s;
+            }
+        }
+        else
+        {
+            size_t key_start = p->pos;
+            while (peek(p) && peek(p) != ':' && peek(p) != '}' && peek(p) != ',' && peek(p) != '\n')
+                advance(p);
+            size_t key_end = p->pos;
+            while (key_end > key_start && p->src[key_end - 1] == ' ')
+                key_end--;
+            key = p->src + key_start;
+            key_len = key_end - key_start;
+
+            if (peek(p) == ':')
+                advance(p);
+            skip_flow_ws(p);
+            vigil_json_value_t *val = NULL;
+            s = parse_flow_value(p, &val);
+            if (s != VIGIL_STATUS_OK)
+            {
+                vigil_json_free(out);
+                return s;
+            }
+            s = vigil_json_object_set(*out, key, key_len, val, p->error);
+            if (s != VIGIL_STATUS_OK)
+            {
+                vigil_json_free(&val);
+                vigil_json_free(out);
+                return s;
+            }
+        }
+
+        skip_flow_ws(p);
+        if (peek(p) == ',')
+        {
+            advance(p);
+            continue;
+        }
+        break;
+    }
+    skip_flow_ws(p);
+    if (peek(p) == '}')
+        advance(p);
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t parse_flow_sequence(yaml_parser_t *p, vigil_json_value_t **out)
+{
+    advance(p); /* skip '[' */
+    vigil_status_t s = vigil_json_array_new(&p->alloc, out, p->error);
+    if (s != VIGIL_STATUS_OK)
+        return s;
+
+    skip_flow_ws(p);
+    if (peek(p) == ']')
+    {
+        advance(p);
+        return VIGIL_STATUS_OK;
+    }
+
+    while (p->pos < p->len)
+    {
+        skip_flow_ws(p);
+        vigil_json_value_t *item = NULL;
+        s = parse_flow_value(p, &item);
+        if (s != VIGIL_STATUS_OK)
+        {
+            vigil_json_free(out);
+            return s;
+        }
+        s = vigil_json_array_push(*out, item, p->error);
+        if (s != VIGIL_STATUS_OK)
+        {
+            vigil_json_free(&item);
+            vigil_json_free(out);
+            return s;
+        }
+        skip_flow_ws(p);
+        if (peek(p) == ',')
+        {
+            advance(p);
+            continue;
+        }
+        break;
+    }
+    skip_flow_ws(p);
+    if (peek(p) == ']')
+        advance(p);
+    return VIGIL_STATUS_OK;
+}
+
 /* ── Main value parser ───────────────────────────────────────────── */
 
 static vigil_status_t parse_value(yaml_parser_t *p, size_t min_indent, vigil_json_value_t **out)
 {
+    vigil_status_t s;
+    if (p->depth >= YAML_MAX_DEPTH)
+    {
+        set_error(p, "maximum nesting depth exceeded");
+        return VIGIL_STATUS_SYNTAX_ERROR;
+    }
+    p->depth++;
+
     skip_blank_lines(p);
 
     size_t indent = measure_indent(p);
     if (indent < min_indent && p->pos < p->len)
     {
-        /* Dedented - return null */
-        return vigil_json_null_new(&p->alloc, out, p->error);
+        s = vigil_json_null_new(&p->alloc, out, p->error);
+        goto done;
     }
 
     /* Skip to content */
@@ -570,42 +790,62 @@ static vigil_status_t parse_value(yaml_parser_t *p, size_t min_indent, vigil_jso
 
     char c = peek(p);
 
+    /* Flow collection */
+    if (c == '{')
+    {
+        s = parse_flow_mapping(p, out);
+        goto done;
+    }
+    if (c == '[')
+    {
+        s = parse_flow_sequence(p, out);
+        goto done;
+    }
+
     /* Block scalar */
     if (c == '|' || c == '>')
     {
-        return parse_block_scalar(p, c, out);
+        s = parse_block_scalar(p, c, out);
+        goto done;
     }
 
     /* Quoted string */
     if (c == '"' || c == '\'')
     {
-        return parse_quoted_string(p, c, out);
+        s = parse_quoted_string(p, c, out);
+        goto done;
     }
 
     /* Sequence */
     if (c == '-' && (peek_at(p, 1) == ' ' || peek_at(p, 1) == '\n'))
     {
-        /* Rewind to start of line for sequence parsing */
         p->pos -= indent;
         p->col -= indent;
-        return parse_sequence(p, indent, out);
+        s = parse_sequence(p, indent, out);
+        goto done;
     }
 
     /* Check if this is a mapping (look for key: pattern) */
-    size_t scan = p->pos;
-    while (scan < p->len && p->src[scan] != '\n' && p->src[scan] != ':')
-        scan++;
-    if (scan < p->len && p->src[scan] == ':' &&
-        (scan + 1 >= p->len || p->src[scan + 1] == ' ' || p->src[scan + 1] == '\n'))
     {
-        /* Rewind to start of line for mapping parsing */
-        p->pos -= indent;
-        p->col -= indent;
-        return parse_mapping(p, indent, out);
+        size_t scan = p->pos;
+        while (scan < p->len && p->src[scan] != '\n' && p->src[scan] != ':')
+            scan++;
+        if (scan < p->len && p->src[scan] == ':' &&
+            (scan + 1 >= p->len || p->src[scan + 1] == ' ' || p->src[scan + 1] == '\n'))
+        {
+            p->pos -= indent;
+            p->col -= indent;
+            s = parse_mapping(p, indent, out);
+            goto done;
+        }
     }
 
     /* Plain scalar */
-    return parse_plain_scalar(p, out);
+    s = parse_plain_scalar(p, out);
+
+done:
+    p->depth--;
+    return s;
 }
 
 /* ── Public API ──────────────────────────────────────────────────── */
@@ -624,8 +864,19 @@ vigil_status_t vigil_yaml_parse(const char *yaml, size_t length, const vigil_all
                        .pos = 0,
                        .line = 1,
                        .col = 1,
+                       .depth = 0,
                        .alloc = allocator ? *allocator : vigil_default_allocator(),
                        .error = error};
+
+    /* Skip document start marker if present */
+    if (length >= 3 && yaml[0] == '-' && yaml[1] == '-' && yaml[2] == '-')
+    {
+        p.pos = 3;
+        p.col = 4;
+        skip_spaces(&p);
+        if (peek(&p) == '\n')
+            advance(&p);
+    }
 
     *out = NULL;
     return parse_value(&p, 0, out);

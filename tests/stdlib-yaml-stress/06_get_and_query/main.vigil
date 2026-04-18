@@ -1,0 +1,88 @@
+import "fmt"
+import "yaml"
+
+fn test_get_dot_paths() -> void {
+    string doc = "server:\n  host: localhost\n  port: 8080"
+    string h, err e1 = yaml.get(doc, "server.host")
+    fmt.println(f"dot host: {h}")
+    string p, err e2 = yaml.get(doc, "server.port")
+    fmt.println(f"dot port: {p}")
+}
+
+fn test_get_bracket_paths() -> void {
+    string doc = "items:\n  - a\n  - b\n  - c"
+    string v0, err _ = yaml.get(doc, "items[0]")
+    fmt.println(f"bracket [0]: {v0}")
+    string v2, err _ = yaml.get(doc, "items[2]")
+    fmt.println(f"bracket [2]: {v2}")
+}
+
+fn test_get_nested_paths() -> void {
+    string doc = "a:\n  b:\n    c: deep"
+    string v, err e = yaml.get(doc, "a.b.c")
+    fmt.println(f"nested a.b.c: {v}")
+}
+
+fn test_has() -> void {
+    string doc = "name: test\ncount: 5"
+    bool h1 = yaml.has(doc, "name")
+    fmt.println(f"has name: {h1}")
+    bool h2 = yaml.has(doc, "missing")
+    fmt.println(f"has missing: {h2}")
+}
+
+fn test_type() -> void {
+    string doc = "s: hello\nn: 42\nb: true\nnul: null\narr:\n  - 1\nobj:\n  k: v"
+    string ts = yaml.type(doc, "s")
+    fmt.println(f"type s: {ts}")
+    string tn = yaml.type(doc, "n")
+    fmt.println(f"type n: {tn}")
+    string tb = yaml.type(doc, "b")
+    fmt.println(f"type b: {tb}")
+    string tnu = yaml.type(doc, "nul")
+    fmt.println(f"type nul: {tnu}")
+    string ta = yaml.type(doc, "arr")
+    fmt.println(f"type arr: {ta}")
+    string to = yaml.type(doc, "obj")
+    fmt.println(f"type obj: {to}")
+}
+
+fn test_keys() -> void {
+    string doc = "x: 1\ny: 2\nz: 3"
+    array<string> k, err e = yaml.keys(doc, "")
+    bool ok1 = e == ok
+    fmt.println(f"keys ok: {ok1}")
+    k.sort()
+    fmt.println(f"keys: {", ".join(k)}")
+}
+
+fn test_len() -> void {
+    string doc = "arr:\n  - a\n  - b\n  - c\nobj:\n  x: 1\n  y: 2"
+    i32 al, err e1 = yaml.len(doc, "arr")
+    fmt.println(f"len arr: {al}")
+    i32 ol, err e2 = yaml.len(doc, "obj")
+    fmt.println(f"len obj: {ol}")
+}
+
+fn test_set() -> void {
+    string doc = "name: old\ncount: 1"
+    string updated, err e = yaml.set(doc, "name", "new")
+    bool ok1 = e == ok
+    fmt.println(f"set ok: {ok1}")
+    string v, err _ = yaml.get(updated, "name")
+    fmt.println(f"set name: {v}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 06_get_and_query START =====")
+    test_get_dot_paths()
+    test_get_bracket_paths()
+    test_get_nested_paths()
+    test_has()
+    test_type()
+    test_keys()
+    test_len()
+    test_set()
+    fmt.println("===== TEST 06_get_and_query END =====")
+    return 0
+}

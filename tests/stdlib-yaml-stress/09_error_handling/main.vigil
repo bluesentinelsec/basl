@@ -1,0 +1,74 @@
+import "fmt"
+import "yaml"
+
+fn test_parse_errors() -> void {
+    string v1, err e1 = yaml.parse(":\n  :\n    - :\n  bad: [")
+    bool is_err1 = e1 != ok
+    fmt.println(f"malformed yaml: {is_err1}")
+
+    string v2, err e2 = yaml.parse("key: [unclosed")
+    bool is_err2 = e2 != ok
+    fmt.println(f"unclosed bracket: {is_err2}")
+}
+
+fn test_get_nonexistent_path() -> void {
+    string doc = "name: Alice\nage: 30\n"
+    string v1, err e1 = yaml.get(doc, "missing")
+    bool is_err1 = e1 != ok
+    fmt.println(f"missing top-level: {is_err1}")
+
+    string v2, err e2 = yaml.get(doc, "name.deep.path")
+    bool is_err2 = e2 != ok
+    fmt.println(f"missing nested: {is_err2}")
+
+    string v3, err e3 = yaml.get(doc, "items[0]")
+    bool is_err3 = e3 != ok
+    fmt.println(f"missing array index: {is_err3}")
+}
+
+fn test_keys_on_non_object() -> void {
+    string doc = "items:\n  - one\n  - two\n"
+    array<string> k1, err e1 = yaml.keys(doc, "items")
+    bool is_err1 = e1 != ok
+    fmt.println(f"keys on array: {is_err1}")
+
+    string scalar_doc = "value: 42\n"
+    array<string> k2, err e2 = yaml.keys(scalar_doc, "value")
+    bool is_err2 = e2 != ok
+    fmt.println(f"keys on scalar: {is_err2}")
+}
+
+fn test_len_on_scalar() -> void {
+    string doc = "name: Alice\ncount: 5\n"
+    i32 l1, err e1 = yaml.len(doc, "name")
+    bool is_err1 = e1 != ok
+    fmt.println(f"len on string scalar: {is_err1}")
+
+    i32 l2, err e2 = yaml.len(doc, "count")
+    bool is_err2 = e2 != ok
+    fmt.println(f"len on number scalar: {is_err2}")
+}
+
+fn test_read_file_missing() -> void {
+    string v1, err e1 = yaml.read_file("/nonexistent/path/missing.yaml")
+    bool is_err1 = e1 != ok
+    fmt.println(f"read missing file: {is_err1}")
+}
+
+fn test_set_on_invalid_yaml() -> void {
+    string v1, err e1 = yaml.set(":\n  bad: [", "key", "value")
+    bool is_err1 = e1 != ok
+    fmt.println(f"set on invalid yaml: {is_err1}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 09_ERROR_HANDLING START =====")
+    test_parse_errors()
+    test_get_nonexistent_path()
+    test_keys_on_non_object()
+    test_len_on_scalar()
+    test_read_file_missing()
+    test_set_on_invalid_yaml()
+    fmt.println("===== TEST 09_ERROR_HANDLING END =====")
+    return 0
+}

@@ -403,7 +403,7 @@ TEST(DocRegistryTest, DescriptorBackedDocsRenderDerivedSignaturesForUrlYamlCsvAn
     ASSERT_NE(csv_parse, NULL);
     ASSERT_NE(log_set_level, NULL);
     EXPECT_STREQ(url_scheme->signature, "url.scheme(url: string) -> string");
-    EXPECT_STREQ(yaml_get->signature, "yaml.get(yaml: string, path: string) -> string");
+    EXPECT_STREQ(yaml_get->signature, "yaml.get(yaml: string, path: string) -> (string, err)");
     EXPECT_STREQ(csv_parse->signature, "csv.parse(data: string, delimiter: string) -> (array<array<string>>, err)");
     EXPECT_STREQ(log_set_level->signature, "log.set_level(level: string) -> void");
 }

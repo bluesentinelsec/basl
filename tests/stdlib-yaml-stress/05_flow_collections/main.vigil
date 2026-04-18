@@ -1,0 +1,68 @@
+import "fmt"
+import "yaml"
+
+fn test_flow_mapping() -> void {
+    string j, err e = yaml.parse("{a: 1, b: 2}")
+    bool ok1 = e == ok
+    fmt.println(f"flow map parse ok: {ok1}")
+    string a, err _ = yaml.get("{a: 1, b: 2}", "a")
+    fmt.println(f"flow map a: {a}")
+    string b, err _ = yaml.get("{a: 1, b: 2}", "b")
+    fmt.println(f"flow map b: {b}")
+}
+
+fn test_flow_sequence() -> void {
+    string j, err e = yaml.parse("[1, 2, 3]")
+    bool ok1 = e == ok
+    fmt.println(f"flow seq parse ok: {ok1}")
+    fmt.println(f"flow seq json: {j}")
+}
+
+fn test_nested_flow() -> void {
+    string j, err e = yaml.parse("{a: {b: 1}}")
+    bool ok1 = e == ok
+    fmt.println(f"nested flow parse ok: {ok1}")
+    string v, err _ = yaml.get("{a: {b: 1}}", "a.b")
+    fmt.println(f"nested flow a.b: {v}")
+}
+
+fn test_flow_in_block() -> void {
+    string doc = "top:\n  inner: {x: 1, y: 2}"
+    string x, err e1 = yaml.get(doc, "top.inner.x")
+    fmt.println(f"flow in block x: {x}")
+    string y, err e2 = yaml.get(doc, "top.inner.y")
+    fmt.println(f"flow in block y: {y}")
+}
+
+fn test_mixed_flow_and_block() -> void {
+    string doc = "name: test\nitems: [10, 20, 30]\nmeta: {k: v}"
+    string name, err _ = yaml.get(doc, "name")
+    fmt.println(f"mixed name: {name}")
+    string i1, err _ = yaml.get(doc, "items[1]")
+    fmt.println(f"mixed items[1]: {i1}")
+    string k, err _ = yaml.get(doc, "meta.k")
+    fmt.println(f"mixed meta.k: {k}")
+}
+
+fn test_empty_flow() -> void {
+    string j1, err e1 = yaml.parse("{}")
+    bool ok1 = e1 == ok
+    fmt.println(f"empty map parse ok: {ok1}")
+    fmt.println(f"empty map json: {j1}")
+    string j2, err e2 = yaml.parse("[]")
+    bool ok2 = e2 == ok
+    fmt.println(f"empty seq parse ok: {ok2}")
+    fmt.println(f"empty seq json: {j2}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 05_flow_collections START =====")
+    test_flow_mapping()
+    test_flow_sequence()
+    test_nested_flow()
+    test_flow_in_block()
+    test_mixed_flow_and_block()
+    test_empty_flow()
+    fmt.println("===== TEST 05_flow_collections END =====")
+    return 0
+}

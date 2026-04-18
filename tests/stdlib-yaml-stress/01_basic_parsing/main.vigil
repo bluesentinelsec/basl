@@ -1,0 +1,96 @@
+import "fmt"
+import "yaml"
+
+fn test_string_scalar() -> void {
+    string json, err e = yaml.parse("name: hello")
+    bool ok = e == ok
+    fmt.println(f"string_scalar ok: {ok}")
+    string val, err e2 = yaml.get("name: hello", "name")
+    fmt.println(f"string_scalar val: {val}")
+}
+
+fn test_int_scalar() -> void {
+    string val, err e = yaml.get("age: 42", "age")
+    bool ok = e == ok
+    fmt.println(f"int_scalar ok: {ok}")
+    fmt.println(f"int_scalar val: {val}")
+}
+
+fn test_float_scalar() -> void {
+    string val, err e = yaml.get("pi: 3.14", "pi")
+    bool ok = e == ok
+    fmt.println(f"float_scalar ok: {ok}")
+    fmt.println(f"float_scalar val: {val}")
+}
+
+fn test_bool_scalars() -> void {
+    string val_t, err e1 = yaml.get("flag: true", "flag")
+    string val_f, err e2 = yaml.get("flag: false", "flag")
+    fmt.println(f"bool_true val: {val_t}")
+    fmt.println(f"bool_false val: {val_f}")
+}
+
+fn test_null_scalar() -> void {
+    string val, err e = yaml.get("empty: null", "empty")
+    string t = yaml.type("empty: null", "empty")
+    fmt.println(f"null_type: {t}")
+}
+
+fn test_tilde_null() -> void {
+    string t = yaml.type("empty: ~", "empty")
+    fmt.println(f"tilde_null_type: {t}")
+}
+
+fn test_simple_mapping() -> void {
+    string input = "name: Alice\nage: 30\ncity: NYC"
+    string n, err e1 = yaml.get(input, "name")
+    string a, err e2 = yaml.get(input, "age")
+    string c, err e3 = yaml.get(input, "city")
+    fmt.println(f"map name: {n}")
+    fmt.println(f"map age: {a}")
+    fmt.println(f"map city: {c}")
+}
+
+fn test_simple_sequence() -> void {
+    string input = "items:\n  - apple\n  - banana\n  - cherry"
+    string v0, err e1 = yaml.get(input, "items[0]")
+    string v1, err e2 = yaml.get(input, "items[1]")
+    string v2, err e3 = yaml.get(input, "items[2]")
+    i32 length, err e4 = yaml.len(input, "items")
+    fmt.println(f"seq v0: {v0}")
+    fmt.println(f"seq v1: {v1}")
+    fmt.println(f"seq v2: {v2}")
+    fmt.println(f"seq len: {length}")
+}
+
+fn test_comments() -> void {
+    string input = "# top comment\nname: Bob\n# middle comment\nage: 25"
+    string n, err e1 = yaml.get(input, "name")
+    string a, err e2 = yaml.get(input, "age")
+    fmt.println(f"comment name: {n}")
+    fmt.println(f"comment age: {a}")
+}
+
+fn test_inline_comments() -> void {
+    string input = "name: Carol # inline comment\nage: 35 # another"
+    string n, err e1 = yaml.get(input, "name")
+    string a, err e2 = yaml.get(input, "age")
+    fmt.println(f"inline name: {n}")
+    fmt.println(f"inline age: {a}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 01_BASIC_PARSING START =====")
+    test_string_scalar()
+    test_int_scalar()
+    test_float_scalar()
+    test_bool_scalars()
+    test_null_scalar()
+    test_tilde_null()
+    test_simple_mapping()
+    test_simple_sequence()
+    test_comments()
+    test_inline_comments()
+    fmt.println("===== TEST 01_BASIC_PARSING END =====")
+    return 0
+}

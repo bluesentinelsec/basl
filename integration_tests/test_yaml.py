@@ -11,29 +11,24 @@ VIGIL_BIN = os.environ.get("VIGIL_BIN", "./build/vigil")
 
 
 def run_vigil(code: str) -> tuple[int, str, str]:
-    """Run VIGIL code and return (exit_code, stdout, stderr)."""
     with tempfile.TemporaryDirectory(prefix="vigil_yaml_") as tmpdir:
         path = Path(tmpdir) / "test.vigil"
         path.write_text(code)
         result = subprocess.run(
             [VIGIL_BIN, "run", str(path)],
-            capture_output=True,
-            text=True,
-            timeout=10,
+            capture_output=True, text=True, timeout=10,
         )
         return result.returncode, result.stdout, result.stderr
 
 
 class YamlParseTest(unittest.TestCase):
-    """Tests for yaml.parse()"""
-
     def test_parse_mapping(self):
-        code = '''import "yaml"
+        code = r'''import "yaml"
 import "fmt"
 fn main() -> i32 {
-    string y = "name: test\\ncount: 42"
-    string j = yaml.parse(y)
-    if j == "{\\"name\\":\\"test\\",\\"count\\":42}" { return 0 }
+    string j, err e = yaml.parse("name: test\ncount: 42")
+    if e != ok { return 1 }
+    if j == "{\"name\":\"test\",\"count\":42}" { return 0 }
     fmt.println(j)
     return 1
 }'''
@@ -41,12 +36,12 @@ fn main() -> i32 {
         self.assertEqual(rc, 0, f"stdout: {out}, stderr: {err}")
 
     def test_parse_sequence(self):
-        code = '''import "yaml"
+        code = r'''import "yaml"
 import "fmt"
 fn main() -> i32 {
-    string y = "- a\\n- b\\n- c"
-    string j = yaml.parse(y)
-    if j == "[\\"a\\",\\"b\\",\\"c\\"]" { return 0 }
+    string j, err e = yaml.parse("- a\n- b\n- c")
+    if e != ok { return 1 }
+    if j == "[\"a\",\"b\",\"c\"]" { return 0 }
     fmt.println(j)
     return 1
 }'''
@@ -54,12 +49,12 @@ fn main() -> i32 {
         self.assertEqual(rc, 0, f"stdout: {out}, stderr: {err}")
 
     def test_parse_nested(self):
-        code = '''import "yaml"
+        code = r'''import "yaml"
 import "fmt"
 fn main() -> i32 {
-    string y = "items:\\n  - x\\n  - y"
-    string j = yaml.parse(y)
-    if j == "{\\"items\\":[\\"x\\",\\"y\\"]}" { return 0 }
+    string j, err e = yaml.parse("items:\n  - x\n  - y")
+    if e != ok { return 1 }
+    if j == "{\"items\":[\"x\",\"y\"]}" { return 0 }
     fmt.println(j)
     return 1
 }'''
@@ -68,53 +63,51 @@ fn main() -> i32 {
 
 
 class YamlGetTest(unittest.TestCase):
-    """Tests for yaml.get()"""
-
     def test_get_string(self):
-        code = '''import "yaml"
+        code = r'''import "yaml"
 fn main() -> i32 {
-    string y = "name: test"
-    if yaml.get(y, "name") == "test" { return 0 }
+    string v, err e = yaml.get("name: test", "name")
+    if v == "test" { return 0 }
     return 1
 }'''
         rc, out, err = run_vigil(code)
         self.assertEqual(rc, 0, f"stderr: {err}")
 
     def test_get_nested(self):
-        code = '''import "yaml"
+        code = r'''import "yaml"
 fn main() -> i32 {
-    string y = "server:\\n  host: localhost"
-    if yaml.get(y, "server.host") == "localhost" { return 0 }
+    string v, err e = yaml.get("server:\n  host: localhost", "server.host")
+    if v == "localhost" { return 0 }
     return 1
 }'''
         rc, out, err = run_vigil(code)
         self.assertEqual(rc, 0, f"stderr: {err}")
 
     def test_get_array_index(self):
-        code = '''import "yaml"
+        code = r'''import "yaml"
 fn main() -> i32 {
-    string y = "items:\\n  - a\\n  - b\\n  - c"
-    if yaml.get(y, "items[1]") == "b" { return 0 }
+    string v, err e = yaml.get("items:\n  - a\n  - b\n  - c", "items[1]")
+    if v == "b" { return 0 }
     return 1
 }'''
         rc, out, err = run_vigil(code)
         self.assertEqual(rc, 0, f"stderr: {err}")
 
     def test_get_number(self):
-        code = '''import "yaml"
+        code = r'''import "yaml"
 fn main() -> i32 {
-    string y = "count: 42"
-    if yaml.get(y, "count") == "42" { return 0 }
+    string v, err e = yaml.get("count: 42", "count")
+    if v == "42" { return 0 }
     return 1
 }'''
         rc, out, err = run_vigil(code)
         self.assertEqual(rc, 0, f"stderr: {err}")
 
     def test_get_bool(self):
-        code = '''import "yaml"
+        code = r'''import "yaml"
 fn main() -> i32 {
-    string y = "enabled: true"
-    if yaml.get(y, "enabled") == "true" { return 0 }
+    string v, err e = yaml.get("enabled: true", "enabled")
+    if v == "true" { return 0 }
     return 1
 }'''
         rc, out, err = run_vigil(code)
@@ -122,23 +115,21 @@ fn main() -> i32 {
 
 
 class YamlFeaturesTest(unittest.TestCase):
-    """Tests for YAML features"""
-
     def test_comments(self):
-        code = '''import "yaml"
+        code = r'''import "yaml"
 fn main() -> i32 {
-    string y = "# comment\\nname: test  # inline"
-    if yaml.get(y, "name") == "test" { return 0 }
+    string v, err e = yaml.get("# comment\nname: test  # inline", "name")
+    if v == "test" { return 0 }
     return 1
 }'''
         rc, out, err = run_vigil(code)
         self.assertEqual(rc, 0, f"stderr: {err}")
 
     def test_quoted_string(self):
-        code = '''import "yaml"
+        code = r'''import "yaml"
 fn main() -> i32 {
-    string y = "msg: \\"hello world\\""
-    if yaml.get(y, "msg") == "hello world" { return 0 }
+    string v, err e = yaml.get("msg: \"hello world\"", "msg")
+    if v == "hello world" { return 0 }
     return 1
 }'''
         rc, out, err = run_vigil(code)

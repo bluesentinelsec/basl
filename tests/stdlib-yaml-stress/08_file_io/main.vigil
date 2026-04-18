@@ -1,0 +1,48 @@
+import "fmt"
+import "yaml"
+import "fs"
+
+fn test_write_and_read_roundtrip() -> void {
+    string base = fs.join(fs.temp_dir(), "vigil_yaml_08")
+    err _ = fs.remove_all(base)
+    err _ = fs.mkdir_all(base)
+
+    string path = fs.join(base, "test.yaml")
+    string json_in = "{\"name\":\"Alice\",\"age\":30}"
+    err we = yaml.write_file(path, json_in)
+    bool wok = we == ok
+    fmt.println(f"write ok: {wok}")
+    bool exists = fs.exists(path)
+    fmt.println(f"file exists: {exists}")
+
+    string json_out, err re = yaml.read_file(path)
+    bool rok = re == ok
+    fmt.println(f"read ok: {rok}")
+    string n, err _ = yaml.get(json_out, "name")
+    fmt.println(f"read name: {n}")
+    string a, err _ = yaml.get(json_out, "age")
+    fmt.println(f"read age: {a}")
+
+    err _ = fs.remove_all(base)
+}
+
+fn test_missing_file() -> void {
+    string j, err e = yaml.read_file("/nonexistent/path/missing.yaml")
+    bool is_err = e != ok
+    fmt.println(f"missing file err: {is_err}")
+}
+
+fn test_write_error() -> void {
+    err we = yaml.write_file("/nonexistent/dir/file.yaml", "{\"a\":1}")
+    bool is_err = we != ok
+    fmt.println(f"write err: {is_err}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 08_file_io START =====")
+    test_write_and_read_roundtrip()
+    test_missing_file()
+    test_write_error()
+    fmt.println("===== TEST 08_file_io END =====")
+    return 0
+}
