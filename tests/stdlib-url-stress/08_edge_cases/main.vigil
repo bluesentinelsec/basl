@@ -1,0 +1,70 @@
+import "fmt"
+import "url"
+
+fn test_minimal_url() -> void {
+    string val, err e = url.scheme("http://x")
+    bool ok = e == ok
+    bool correct = val == "http"
+    fmt.println(f"minimal scheme ok: {ok}")
+    fmt.println(f"minimal scheme val: {correct}")
+}
+
+fn test_minimal_host() -> void {
+    string val, err e = url.host("http://x")
+    bool ok = e == ok
+    bool correct = val == "x"
+    fmt.println(f"minimal host ok: {ok}")
+    fmt.println(f"minimal host val: {correct}")
+}
+
+fn test_scheme_only() -> void {
+    string val, err e = url.scheme("http://")
+    bool ok = e == ok
+    bool correct = val == "http"
+    fmt.println(f"scheme only ok: {ok}")
+    fmt.println(f"scheme only val: {correct}")
+}
+
+fn test_no_path() -> void {
+    string val, err e = url.path("http://example.com")
+    bool ok = e == ok
+    fmt.println(f"no path ok: {ok}")
+    fmt.println(f"no path val: [{val}]")
+}
+
+fn test_ip_host() -> void {
+    string val, err e = url.host("http://192.168.1.1:8080/api")
+    bool ok = e == ok
+    bool correct = val == "192.168.1.1"
+    fmt.println(f"ip host ok: {ok}")
+    fmt.println(f"ip host val: {correct}")
+}
+
+fn test_ip_port() -> void {
+    string val, err e = url.port("http://192.168.1.1:8080/api")
+    bool ok = e == ok
+    bool correct = val == "8080"
+    fmt.println(f"ip port ok: {ok}")
+    fmt.println(f"ip port val: {correct}")
+}
+
+fn test_trailing_slash() -> void {
+    string val, err e = url.path("https://example.com/")
+    bool ok = e == ok
+    bool correct = val == "/"
+    fmt.println(f"trailing slash ok: {ok}")
+    fmt.println(f"trailing slash val: {correct}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 08_edge_cases START =====")
+    test_minimal_url()
+    test_minimal_host()
+    test_scheme_only()
+    test_no_path()
+    test_ip_host()
+    test_ip_port()
+    test_trailing_slash()
+    fmt.println("===== TEST 08_edge_cases END =====")
+    return 0
+}

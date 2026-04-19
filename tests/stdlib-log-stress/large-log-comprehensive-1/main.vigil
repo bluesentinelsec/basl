@@ -1,0 +1,77 @@
+import "fmt"
+import "log"
+
+fn test_all_levels() -> void {
+    err e1 = log.set_level("debug")
+    bool ok1 = e1 == ok
+    fmt.println(f"level_debug: {ok1}")
+    log.debug("debug msg")
+    log.info("info msg")
+    log.warn("warn msg")
+    log.error("error msg")
+    fmt.println("all_levels_logged: true")
+}
+
+fn test_all_formats() -> void {
+    log.set_format("text")
+    log.info("text format")
+    fmt.println("format_text: true")
+
+    log.set_format("json")
+    log.info("json format")
+    fmt.println("format_json: true")
+
+    log.set_format("text")
+    fmt.println("format_restored: true")
+}
+
+fn test_error_paths() -> void {
+    err e1 = log.set_level("invalid")
+    bool f1 = e1 != ok
+    fmt.println(f"err_invalid: {f1}")
+
+    err e2 = log.set_level("")
+    bool f2 = e2 != ok
+    fmt.println(f"err_empty: {f2}")
+
+    err e3 = log.set_level("DEBUG")
+    bool f3 = e3 != ok
+    fmt.println(f"err_uppercase: {f3}")
+
+    // valid still works
+    err e4 = log.set_level("info")
+    bool ok4 = e4 == ok
+    fmt.println(f"valid_after_errs: {ok4}")
+}
+
+fn test_level_transitions() -> void {
+    err e1 = log.set_level("error")
+    bool ok1 = e1 == ok
+    log.error("error level")
+    fmt.println(f"transition_error: {ok1}")
+
+    err e2 = log.set_level("warn")
+    bool ok2 = e2 == ok
+    log.warn("warn level")
+    fmt.println(f"transition_warn: {ok2}")
+
+    err e3 = log.set_level("info")
+    bool ok3 = e3 == ok
+    log.info("info level")
+    fmt.println(f"transition_info: {ok3}")
+
+    err e4 = log.set_level("debug")
+    bool ok4 = e4 == ok
+    log.debug("debug level")
+    fmt.println(f"transition_debug: {ok4}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST stdlib-log-stress START =====")
+    test_all_levels()
+    test_all_formats()
+    test_error_paths()
+    test_level_transitions()
+    fmt.println("===== TEST stdlib-log-stress END =====")
+    return 0
+}

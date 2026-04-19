@@ -1,0 +1,30 @@
+import "fmt"
+import "log"
+
+fn main() -> i32 {
+    fmt.println("===== TEST stdlib-log-stress START =====")
+
+    log.set_format("text")
+    log.info("text format message")
+    fmt.println("set_format_text: true")
+
+    log.set_format("json")
+    log.info("json format message")
+    fmt.println("set_format_json: true")
+
+    // switch back
+    log.set_format("text")
+    log.info("text again")
+    fmt.println("format_switch_back: true")
+
+    // switch multiple times
+    log.set_format("json")
+    log.set_format("text")
+    log.set_format("json")
+    log.set_format("text")
+    log.info("after multiple switches")
+    fmt.println("multiple_switches: true")
+
+    fmt.println("===== TEST stdlib-log-stress END =====")
+    return 0
+}

@@ -1,0 +1,62 @@
+import "fmt"
+import "url"
+
+fn test_http() -> void {
+    string val, err e = url.scheme("http://example.com")
+    bool ok = e == ok
+    bool correct = val == "http"
+    fmt.println(f"scheme http ok: {ok}")
+    fmt.println(f"scheme http val: {correct}")
+}
+
+fn test_https() -> void {
+    string val, err e = url.scheme("https://example.com")
+    bool ok = e == ok
+    bool correct = val == "https"
+    fmt.println(f"scheme https ok: {ok}")
+    fmt.println(f"scheme https val: {correct}")
+}
+
+fn test_ftp() -> void {
+    string val, err e = url.scheme("ftp://files.example.com/readme")
+    bool ok = e == ok
+    bool correct = val == "ftp"
+    fmt.println(f"scheme ftp ok: {ok}")
+    fmt.println(f"scheme ftp val: {correct}")
+}
+
+fn test_custom() -> void {
+    string val, err e = url.scheme("myapp://open/page")
+    bool ok = e == ok
+    bool correct = val == "myapp"
+    fmt.println(f"scheme custom ok: {ok}")
+    fmt.println(f"scheme custom val: {correct}")
+}
+
+fn test_mailto() -> void {
+    string val, err e = url.scheme("mailto:[email]")
+    bool ok = e == ok
+    bool correct = val == "mailto"
+    fmt.println(f"scheme mailto ok: {ok}")
+    fmt.println(f"scheme mailto val: {correct}")
+}
+
+fn test_ssh() -> void {
+    string val, err e = url.scheme("ssh://git@host/repo")
+    bool ok = e == ok
+    bool correct = val == "ssh"
+    fmt.println(f"scheme ssh ok: {ok}")
+    fmt.println(f"scheme ssh val: {correct}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 01_scheme START =====")
+    test_http()
+    test_https()
+    test_ftp()
+    test_custom()
+    test_mailto()
+    test_ssh()
+    fmt.println("===== TEST 01_scheme END =====")
+    return 0
+}

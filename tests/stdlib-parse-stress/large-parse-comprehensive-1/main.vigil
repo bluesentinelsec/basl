@@ -1,0 +1,101 @@
+import "fmt"
+import "parse"
+
+fn test_i32_suite() -> void {
+    i32 v1, err e1 = parse.i32("0")
+    bool ok1 = e1 == ok
+    bool z = v1 == 0
+    fmt.println(f"c1 i32 zero ok: {ok1}")
+    fmt.println(f"c1 i32 zero val: {z}")
+
+    i32 v2, err e2 = parse.i32("2147483647")
+    bool ok2 = e2 == ok
+    bool max = v2 == 2147483647
+    fmt.println(f"c1 i32 max ok: {ok2}")
+    fmt.println(f"c1 i32 max val: {max}")
+
+    i32 v3, err e3 = parse.i32("-2147483648")
+    bool ok3 = e3 == ok
+    fmt.println(f"c1 i32 min ok: {ok3}")
+    fmt.println(f"c1 i32 min val: {v3}")
+
+    i32 v4, err e4 = parse.i32("2147483648")
+    bool fail4 = e4 != ok
+    fmt.println(f"c1 i32 overflow fail: {fail4}")
+}
+
+fn test_i64_suite() -> void {
+    i64 v1, err e1 = parse.i64("0")
+    bool ok1 = e1 == ok
+    bool z = v1 == i64(0)
+    fmt.println(f"c1 i64 zero ok: {ok1}")
+    fmt.println(f"c1 i64 zero val: {z}")
+
+    i64 v2, err e2 = parse.i64("9223372036854775807")
+    bool ok2 = e2 == ok
+    bool max = v2 == i64(9223372036854775807)
+    fmt.println(f"c1 i64 max ok: {ok2}")
+    fmt.println(f"c1 i64 max val: {max}")
+
+    i64 v3, err e3 = parse.i64("abc")
+    bool fail3 = e3 != ok
+    fmt.println(f"c1 i64 abc fail: {fail3}")
+}
+
+fn test_f64_suite() -> void {
+    f64 v1, err e1 = parse.f64("3.14")
+    bool ok1 = e1 == ok
+    fmt.println(f"c1 f64 pi ok: {ok1}")
+    fmt.println(f"c1 f64 pi val: {v1}")
+
+    f64 v2, err e2 = parse.f64("1e10")
+    bool ok2 = e2 == ok
+    fmt.println(f"c1 f64 sci ok: {ok2}")
+
+    f64 v3, err e3 = parse.f64("not_num")
+    bool fail3 = e3 != ok
+    fmt.println(f"c1 f64 fail: {fail3}")
+}
+
+fn test_bool_suite() -> void {
+    bool v1, err e1 = parse.bool("true")
+    bool ok1 = e1 == ok
+    fmt.println(f"c1 bool true ok: {ok1}")
+    fmt.println(f"c1 bool true val: {v1}")
+
+    bool v2, err e2 = parse.bool("false")
+    bool ok2 = e2 == ok
+    bool is_f = v2 == false
+    fmt.println(f"c1 bool false ok: {ok2}")
+    fmt.println(f"c1 bool false val: {is_f}")
+
+    bool v3, err e3 = parse.bool("maybe")
+    bool fail3 = e3 != ok
+    fmt.println(f"c1 bool maybe fail: {fail3}")
+}
+
+fn test_errors() -> void {
+    i32 v1, err e1 = parse.i32("")
+    bool f1 = e1 != ok
+    i64 v2, err e2 = parse.i64("")
+    bool f2 = e2 != ok
+    f64 v3, err e3 = parse.f64("")
+    bool f3 = e3 != ok
+    bool v4, err e4 = parse.bool("")
+    bool f4 = e4 != ok
+    fmt.println(f"c1 empty i32 fail: {f1}")
+    fmt.println(f"c1 empty i64 fail: {f2}")
+    fmt.println(f"c1 empty f64 fail: {f3}")
+    fmt.println(f"c1 empty bool fail: {f4}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST large-parse-comprehensive-1 START =====")
+    test_i32_suite()
+    test_i64_suite()
+    test_f64_suite()
+    test_bool_suite()
+    test_errors()
+    fmt.println("===== TEST large-parse-comprehensive-1 END =====")
+    return 0
+}

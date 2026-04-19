@@ -8,11 +8,13 @@
 #include <time.h>
 
 #include "vigil/native_module.h"
+#include "vigil/runtime.h"
 #include "vigil/stdlib.h"
 #include "vigil/type.h"
 #include "vigil/value.h"
 #include "vigil/vm.h"
 
+#include "internal/vigil_internal.h"
 #include "internal/vigil_nanbox.h"
 #include "platform/platform.h"
 
@@ -96,9 +98,7 @@ static void format_time(char *buf, size_t len)
 {
     time_t now;
     struct tm *tm_info;
-#ifdef _WIN32
     struct tm tm_storage;
-#endif
 
     if (g_time_format == LOG_TIME_NONE)
     {
@@ -118,7 +118,7 @@ static void format_time(char *buf, size_t len)
     localtime_s(&tm_storage, &now);
     tm_info = &tm_storage;
 #else
-    tm_info = localtime(&now);
+    tm_info = localtime_r(&now, &tm_storage);
 #endif
     if (tm_info)
     {
@@ -133,13 +133,28 @@ static void format_time(char *buf, size_t len)
 static void escape_json_string(const char *src, char *dst, size_t dst_len)
 {
     size_t i = 0;
-    while (*src && i < dst_len - 2)
+    while (*src && i < dst_len - 7)
     {
-        if (*src == '"' || *src == '\\')
+        unsigned char c = (unsigned char)*src;
+        if (c == '"' || c == '\\')
         {
             dst[i++] = '\\';
+            dst[i++] = (char)c;
         }
-        dst[i++] = *src++;
+        else if (c == '\n') { dst[i++] = '\\'; dst[i++] = 'n'; }
+        else if (c == '\t') { dst[i++] = '\\'; dst[i++] = 't'; }
+        else if (c == '\r') { dst[i++] = '\\'; dst[i++] = 'r'; }
+        else if (c == '\b') { dst[i++] = '\\'; dst[i++] = 'b'; }
+        else if (c == '\f') { dst[i++] = '\\'; dst[i++] = 'f'; }
+        else if (c < 0x20)
+        {
+            i += (size_t)snprintf(dst + i, dst_len - i, "\\u%04x", c);
+        }
+        else
+        {
+            dst[i++] = (char)c;
+        }
+        src++;
     }
     dst[i] = '\0';
 }
@@ -394,13 +409,30 @@ static vigil_status_t log_error_l(vigil_vm_t *vm, size_t arg_count, vigil_error_
 }
 
 /* Configuration functions */
+static vigil_status_t push_ok(vigil_vm_t *vm, vigil_error_t *error)
+{
+    return vigil_runtime_push_ok_error(vigil_vm_runtime(vm), vm, error);
+}
+
+static vigil_status_t push_err(vigil_vm_t *vm, const char *msg, vigil_error_t *error)
+{
+    vigil_object_t *err_obj = NULL;
+    vigil_status_t s = vigil_error_object_new_cstr(vigil_vm_runtime(vm), msg, 1, &err_obj, error);
+    if (s != VIGIL_STATUS_OK)
+        return s;
+    vigil_value_t v;
+    vigil_value_init_object(&v, &err_obj);
+    s = vigil_vm_stack_push(vm, &v, error);
+    vigil_value_release(&v);
+    return s;
+}
+
 static vigil_status_t log_set_level(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
 {
     size_t base = vigil_vm_stack_depth(vm) - arg_count;
     const char *level_str = NULL;
     vigil_value_t v;
-
-    (void)error;
+    int new_level = -1;
 
     if (arg_count > 0)
     {
@@ -418,17 +450,24 @@ static vigil_status_t log_set_level(vigil_vm_t *vm, size_t arg_count, vigil_erro
     if (level_str)
     {
         if (strcmp(level_str, "debug") == 0)
-            g_min_level = LOG_LEVEL_DEBUG;
+            new_level = LOG_LEVEL_DEBUG;
         else if (strcmp(level_str, "info") == 0)
-            g_min_level = LOG_LEVEL_INFO;
+            new_level = LOG_LEVEL_INFO;
         else if (strcmp(level_str, "warn") == 0)
-            g_min_level = LOG_LEVEL_WARN;
+            new_level = LOG_LEVEL_WARN;
         else if (strcmp(level_str, "error") == 0)
-            g_min_level = LOG_LEVEL_ERROR;
+            new_level = LOG_LEVEL_ERROR;
     }
 
     vigil_vm_stack_pop_n(vm, arg_count);
-    return VIGIL_STATUS_OK;
+
+    if (!level_str)
+        return push_err(vm, "set_level: expected a string argument", error);
+    if (new_level < 0)
+        return push_err(vm, "set_level: invalid level; expected debug, info, warn, or error", error);
+
+    g_min_level = new_level;
+    return push_ok(vm, error);
 }
 
 static vigil_status_t log_set_format(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
@@ -730,7 +769,7 @@ static const vigil_native_module_function_t log_functions[] = {
      log_logger_msg_param_names, NULL, NULL, &vigil_log_warn_l_doc},
     {"error_l", 7U, log_error_l, 2U, i64_str_params, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, NULL, 0U,
      log_logger_msg_param_names, NULL, NULL, &vigil_log_error_l_doc},
-    {"set_level", 9U, log_set_level, 1U, str_param, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, NULL, 0U, log_level_param_names,
+    {"set_level", 9U, log_set_level, 1U, str_param, VIGIL_TYPE_ERR, 1U, NULL, 0, NULL, NULL, 0U, log_level_param_names,
      NULL, NULL, &vigil_log_set_level_doc},
     {"set_format", 10U, log_set_format, 1U, str_param, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, NULL, 0U,
      log_format_param_names, NULL, NULL, &vigil_log_set_format_doc},

@@ -1,0 +1,24 @@
+import "fmt"
+import "log"
+
+fn main() -> i32 {
+    fmt.println("===== TEST stdlib-log-stress START =====")
+
+    err e = log.set_level("debug")
+    bool ok1 = e == ok
+    fmt.println(f"set_level_debug: {ok1}")
+
+    log.debug("debug message 1")
+    log.debug("debug message 2")
+    log.debug("debug message 3")
+    fmt.println("debug_no_crash: true")
+
+    // debug should also allow higher levels
+    log.info("info after debug level")
+    log.warn("warn after debug level")
+    log.error("error after debug level")
+    fmt.println("higher_levels_ok: true")
+
+    fmt.println("===== TEST stdlib-log-stress END =====")
+    return 0
+}

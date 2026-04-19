@@ -1,0 +1,70 @@
+import "fmt"
+import "parse"
+
+fn test_true() -> void {
+    bool val, err e = parse.bool("true")
+    bool ok = e == ok
+    fmt.println(f"bool true ok: {ok}")
+    fmt.println(f"bool true val: {val}")
+}
+
+fn test_false() -> void {
+    bool val, err e = parse.bool("false")
+    bool ok = e == ok
+    bool is_false = val == false
+    fmt.println(f"bool false ok: {ok}")
+    fmt.println(f"bool false val: {is_false}")
+}
+
+fn test_one() -> void {
+    bool val, err e = parse.bool("1")
+    bool ok = e == ok
+    fmt.println(f"bool 1 ok: {ok}")
+    fmt.println(f"bool 1 val: {val}")
+}
+
+fn test_zero() -> void {
+    bool val, err e = parse.bool("0")
+    bool ok = e == ok
+    bool is_false = val == false
+    fmt.println(f"bool 0 ok: {ok}")
+    fmt.println(f"bool 0 val: {is_false}")
+}
+
+fn test_invalid_yes() -> void {
+    bool val, err e = parse.bool("yes")
+    bool failed = e != ok
+    fmt.println(f"bool yes fail: {failed}")
+}
+
+fn test_invalid_random() -> void {
+    bool val, err e = parse.bool("abc")
+    bool failed = e != ok
+    fmt.println(f"bool abc fail: {failed}")
+}
+
+fn test_invalid_empty() -> void {
+    bool val, err e = parse.bool("")
+    bool failed = e != ok
+    fmt.println(f"bool empty fail: {failed}")
+}
+
+fn test_invalid_number() -> void {
+    bool val, err e = parse.bool("2")
+    bool failed = e != ok
+    fmt.println(f"bool 2 fail: {failed}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 04_bool START =====")
+    test_true()
+    test_false()
+    test_one()
+    test_zero()
+    test_invalid_yes()
+    test_invalid_random()
+    test_invalid_empty()
+    test_invalid_number()
+    fmt.println("===== TEST 04_bool END =====")
+    return 0
+}

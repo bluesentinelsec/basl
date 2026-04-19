@@ -1,0 +1,73 @@
+import "fmt"
+import "parse"
+
+fn test_empty_i32() -> void {
+    i32 val, err e = parse.i32("")
+    bool failed = e != ok
+    fmt.println(f"empty i32 fail: {failed}")
+}
+
+fn test_single_digit() -> void {
+    i32 val, err e = parse.i32("7")
+    bool ok = e == ok
+    bool correct = val == 7
+    fmt.println(f"single digit ok: {ok}")
+    fmt.println(f"single digit val: {correct}")
+}
+
+fn test_single_char() -> void {
+    i32 val, err e = parse.i32("a")
+    bool failed = e != ok
+    fmt.println(f"single char fail: {failed}")
+}
+
+fn test_very_long_string() -> void {
+    i32 val, err e = parse.i32("99999999999999999999999999999999999999999999999999")
+    bool failed = e != ok
+    fmt.println(f"very long fail: {failed}")
+}
+
+fn test_minus_only() -> void {
+    i32 val, err e = parse.i32("-")
+    bool failed = e != ok
+    fmt.println(f"minus only fail: {failed}")
+}
+
+fn test_plus_prefix() -> void {
+    i32 val, err e = parse.i32("+42")
+    bool failed = e != ok
+    fmt.println(f"plus prefix fail: {failed}")
+}
+
+fn test_f64_dot_only() -> void {
+    f64 val, err e = parse.f64(".")
+    bool failed = e != ok
+    fmt.println(f"dot only fail: {failed}")
+}
+
+fn test_bool_empty() -> void {
+    bool val, err e = parse.bool("")
+    bool failed = e != ok
+    fmt.println(f"bool empty fail: {failed}")
+}
+
+fn test_i64_very_long() -> void {
+    i64 val, err e = parse.i64("99999999999999999999999999999999999999999999999999")
+    bool failed = e != ok
+    fmt.println(f"i64 very long fail: {failed}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 08_edge_cases START =====")
+    test_empty_i32()
+    test_single_digit()
+    test_single_char()
+    test_very_long_string()
+    test_minus_only()
+    test_plus_prefix()
+    test_f64_dot_only()
+    test_bool_empty()
+    test_i64_very_long()
+    fmt.println("===== TEST 08_edge_cases END =====")
+    return 0
+}

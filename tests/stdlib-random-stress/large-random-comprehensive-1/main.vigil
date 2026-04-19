@@ -1,0 +1,80 @@
+import "fmt"
+import "random"
+
+fn test_all_functions() -> void {
+    random.seed(42)
+    i32 v1 = random.i32()
+    i64 v2 = random.i64()
+    f64 v3 = random.f64()
+    i32 v4 = random.range(1, 10)
+    f64 v5 = random.gaussian()
+    fmt.println(f"i32_val: {v1}")
+    fmt.println(f"i64_val: {v2}")
+    fmt.println(f"f64_val: {v3}")
+    fmt.println(f"range_val: {v4}")
+    fmt.println(f"gaussian_val: {v5}")
+}
+
+fn test_full_reproducibility() -> void {
+    random.seed(42)
+    i32 a1 = random.i32()
+    i64 a2 = random.i64()
+    f64 a3 = random.f64()
+    i32 a4 = random.range(1, 10)
+    f64 a5 = random.gaussian()
+
+    random.seed(42)
+    i32 b1 = random.i32()
+    i64 b2 = random.i64()
+    f64 b3 = random.f64()
+    i32 b4 = random.range(1, 10)
+    f64 b5 = random.gaussian()
+
+    bool m1 = a1 == b1
+    bool m2 = a2 == b2
+    bool m3 = a3 == b3
+    bool m4 = a4 == b4
+    bool m5 = a5 == b5
+    fmt.println(f"full_repro_i32: {m1}")
+    fmt.println(f"full_repro_i64: {m2}")
+    fmt.println(f"full_repro_f64: {m3}")
+    fmt.println(f"full_repro_range: {m4}")
+    fmt.println(f"full_repro_gaussian: {m5}")
+}
+
+fn test_multiple_seeds() -> void {
+    random.seed(1)
+    i32 s1 = random.i32()
+    random.seed(2)
+    i32 s2 = random.i32()
+    random.seed(3)
+    i32 s3 = random.i32()
+    bool d12 = s1 != s2
+    bool d23 = s2 != s3
+    fmt.println(f"diff_seeds_1_2: {d12}")
+    fmt.println(f"diff_seeds_2_3: {d23}")
+}
+
+fn test_range_bounds() -> void {
+    random.seed(55)
+    bool ok = true
+    i32 i = 0
+    while i < 200 {
+        i32 v = random.range(5, 15)
+        if v < 5 || v > 15 {
+            ok = false
+        }
+        i = i + 1
+    }
+    fmt.println(f"range_bounds_200: {ok}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST stdlib-random-stress START =====")
+    test_all_functions()
+    test_full_reproducibility()
+    test_multiple_seeds()
+    test_range_bounds()
+    fmt.println("===== TEST stdlib-random-stress END =====")
+    return 0
+}

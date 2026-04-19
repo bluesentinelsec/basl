@@ -25,8 +25,18 @@ class LogLevelTest(unittest.TestCase):
     def test_set_level_info(self):
         code = '''import "log"
 fn main() -> i32 {
-    log.set_level("info")
+    guard err e = log.set_level("info") { return 1 }
     return 0
+}'''
+        rc, out, err = run_vigil(code)
+        self.assertEqual(rc, 0, f"stderr: {err}")
+
+    def test_set_level_invalid(self):
+        code = '''import "log"
+fn main() -> i32 {
+    err e = log.set_level("bogus")
+    if e != ok { return 0 }
+    return 1
 }'''
         rc, out, err = run_vigil(code)
         self.assertEqual(rc, 0, f"stderr: {err}")
@@ -36,7 +46,7 @@ class LogOutputTest(unittest.TestCase):
     def test_info(self):
         code = '''import "log"
 fn main() -> i32 {
-    log.set_level("info")
+    guard err e = log.set_level("info") { return 1 }
     log.info("test message")
     return 0
 }'''
@@ -47,7 +57,7 @@ fn main() -> i32 {
     def test_warn(self):
         code = '''import "log"
 fn main() -> i32 {
-    log.set_level("warn")
+    guard err e = log.set_level("warn") { return 1 }
     log.warn("warning message")
     return 0
 }'''
@@ -58,7 +68,7 @@ fn main() -> i32 {
     def test_error(self):
         code = '''import "log"
 fn main() -> i32 {
-    log.set_level("error")
+    guard err e = log.set_level("error") { return 1 }
     log.error("error message")
     return 0
 }'''
@@ -69,7 +79,7 @@ fn main() -> i32 {
     def test_debug_filtered(self):
         code = '''import "log"
 fn main() -> i32 {
-    log.set_level("info")
+    guard err e = log.set_level("info") { return 1 }
     log.debug("debug message")
     return 0
 }'''
@@ -80,7 +90,7 @@ fn main() -> i32 {
     def test_debug_shown(self):
         code = '''import "log"
 fn main() -> i32 {
-    log.set_level("debug")
+    guard err e = log.set_level("debug") { return 1 }
     log.debug("debug message")
     return 0
 }'''

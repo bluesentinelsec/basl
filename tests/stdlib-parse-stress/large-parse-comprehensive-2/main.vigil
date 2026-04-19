@@ -1,0 +1,98 @@
+import "fmt"
+import "parse"
+
+fn test_many_i32() -> void {
+    i32 v1, err e1 = parse.i32("1")
+    bool ok1 = e1 == ok
+    bool c1 = v1 == 1
+    fmt.println(f"c2 i32 1 ok: {ok1}")
+    fmt.println(f"c2 i32 1 val: {c1}")
+
+    i32 v2, err e2 = parse.i32("-1")
+    bool ok2 = e2 == ok
+    bool c2 = v2 == -1
+    fmt.println(f"c2 i32 -1 ok: {ok2}")
+    fmt.println(f"c2 i32 -1 val: {c2}")
+
+    i32 v3, err e3 = parse.i32("100")
+    bool ok3 = e3 == ok
+    bool c3 = v3 == 100
+    fmt.println(f"c2 i32 100 ok: {ok3}")
+    fmt.println(f"c2 i32 100 val: {c3}")
+
+    i32 v4, err e4 = parse.i32("-999")
+    bool ok4 = e4 == ok
+    bool c4 = v4 == -999
+    fmt.println(f"c2 i32 -999 ok: {ok4}")
+    fmt.println(f"c2 i32 -999 val: {c4}")
+}
+
+fn test_many_i64() -> void {
+    i64 v1, err e1 = parse.i64("1000000000000")
+    bool ok1 = e1 == ok
+    bool c1 = v1 == i64(1000000000000)
+    fmt.println(f"c2 i64 1T ok: {ok1}")
+    fmt.println(f"c2 i64 1T val: {c1}")
+
+    i64 v2, err e2 = parse.i64("-1000000000000")
+    bool ok2 = e2 == ok
+    bool c2 = v2 == i64(-1000000000000)
+    fmt.println(f"c2 i64 -1T ok: {ok2}")
+    fmt.println(f"c2 i64 -1T val: {c2}")
+}
+
+fn test_many_f64() -> void {
+    f64 v1, err e1 = parse.f64("0.001")
+    bool ok1 = e1 == ok
+    fmt.println(f"c2 f64 0.001 ok: {ok1}")
+    fmt.println(f"c2 f64 0.001 val: {v1}")
+
+    f64 v2, err e2 = parse.f64("-0.001")
+    bool ok2 = e2 == ok
+    fmt.println(f"c2 f64 -0.001 ok: {ok2}")
+    fmt.println(f"c2 f64 -0.001 val: {v2}")
+
+    f64 v3, err e3 = parse.f64("1e-10")
+    bool ok3 = e3 == ok
+    fmt.println(f"c2 f64 1e-10 ok: {ok3}")
+}
+
+fn test_many_bool() -> void {
+    bool v1, err e1 = parse.bool("1")
+    bool ok1 = e1 == ok
+    fmt.println(f"c2 bool 1 ok: {ok1}")
+    fmt.println(f"c2 bool 1 val: {v1}")
+
+    bool v2, err e2 = parse.bool("0")
+    bool ok2 = e2 == ok
+    bool is_f = v2 == false
+    fmt.println(f"c2 bool 0 ok: {ok2}")
+    fmt.println(f"c2 bool 0 val: {is_f}")
+}
+
+fn test_consistency() -> void {
+    i32 a, err ea = parse.i32("42")
+    i32 b, err eb = parse.i32("42")
+    bool both_ok = ea == ok
+    bool same = a == b
+    fmt.println(f"c2 consistency ok: {both_ok}")
+    fmt.println(f"c2 consistency same: {same}")
+
+    i32 c, err ec = parse.i32("bad")
+    i32 d, err ed = parse.i32("bad")
+    bool both_fail = ec != ok
+    bool both_fail2 = ed != ok
+    fmt.println(f"c2 err consistency 1: {both_fail}")
+    fmt.println(f"c2 err consistency 2: {both_fail2}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST large-parse-comprehensive-2 START =====")
+    test_many_i32()
+    test_many_i64()
+    test_many_f64()
+    test_many_bool()
+    test_consistency()
+    fmt.println("===== TEST large-parse-comprehensive-2 END =====")
+    return 0
+}

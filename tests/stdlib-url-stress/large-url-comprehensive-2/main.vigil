@@ -1,0 +1,105 @@
+import "fmt"
+import "url"
+
+fn test_many_schemes() -> void {
+    string s1, err e1 = url.scheme("http://a.com")
+    bool ok1 = s1 == "http"
+    string s2, err e2 = url.scheme("https://b.com")
+    bool ok2 = s2 == "https"
+    string s3, err e3 = url.scheme("ftp://c.com")
+    bool ok3 = s3 == "ftp"
+    fmt.println(f"lc2 http: {ok1}")
+    fmt.println(f"lc2 https: {ok2}")
+    fmt.println(f"lc2 ftp: {ok3}")
+}
+
+fn test_many_hosts() -> void {
+    string h1, err e1 = url.host("https://one.example.com/a")
+    bool ok1 = h1 == "one.example.com"
+    string h2, err e2 = url.host("https://two.example.com/b")
+    bool ok2 = h2 == "two.example.com"
+    string h3, err e3 = url.host("http://localhost/c")
+    bool ok3 = h3 == "localhost"
+    fmt.println(f"lc2 host1: {ok1}")
+    fmt.println(f"lc2 host2: {ok2}")
+    fmt.println(f"lc2 host3: {ok3}")
+}
+
+fn test_error_paths() -> void {
+    string v1, err e1 = url.scheme("")
+    bool f1 = e1 != ok
+    string v2, err e2 = url.host("")
+    bool f2 = e2 != ok
+    string v3, err e3 = url.port("")
+    bool f3 = e3 != ok
+    string v4, err e4 = url.path("")
+    bool f4 = e4 != ok
+    string v5, err e5 = url.query("")
+    bool f5 = e5 != ok
+    string v6, err e6 = url.fragment("")
+    bool f6 = e6 != ok
+    fmt.println(f"lc2 empty scheme fail: {f1}")
+    fmt.println(f"lc2 empty host fail: {f2}")
+    fmt.println(f"lc2 empty port fail: {f3}")
+    fmt.println(f"lc2 empty path fail: {f4}")
+    fmt.println(f"lc2 empty query fail: {f5}")
+    fmt.println(f"lc2 empty fragment fail: {f6}")
+}
+
+fn test_encode_errors() -> void {
+    string v1, err e1 = url.decode("%ZZ")
+    bool f1 = e1 != ok
+    fmt.println(f"lc2 decode invalid fail: {f1}")
+}
+
+fn test_many_roundtrips() -> void {
+    string enc1, err e1 = url.encode("test one")
+    string dec1, err e2 = url.decode(enc1)
+    bool m1 = dec1 == "test one"
+
+    string enc2, err e3 = url.encode("a=1&b=2")
+    string dec2, err e4 = url.decode(enc2)
+    bool m2 = dec2 == "a=1&b=2"
+
+    string enc3, err e5 = url.encode("path/with spaces")
+    string dec3, err e6 = url.decode(enc3)
+    bool m3 = dec3 == "path/with spaces"
+
+    fmt.println(f"lc2 rt1: {m1}")
+    fmt.println(f"lc2 rt2: {m2}")
+    fmt.println(f"lc2 rt3: {m3}")
+}
+
+fn test_complex_url() -> void {
+    string u = "https://user:pw@host.io:443/a/b?x=1&y=2#z"
+    string s, err e1 = url.scheme(u)
+    string h, err e2 = url.host(u)
+    string p, err e3 = url.port(u)
+    string pa, err e4 = url.path(u)
+    string q, err e5 = url.query(u)
+    string f, err e6 = url.fragment(u)
+    bool s_ok = s == "https"
+    bool h_ok = h == "host.io"
+    bool p_ok = p == "443"
+    bool pa_ok = pa == "/a/b"
+    bool q_ok = q == "x=1&y=2"
+    bool f_ok = f == "z"
+    fmt.println(f"lc2 complex scheme: {s_ok}")
+    fmt.println(f"lc2 complex host: {h_ok}")
+    fmt.println(f"lc2 complex port: {p_ok}")
+    fmt.println(f"lc2 complex path: {pa_ok}")
+    fmt.println(f"lc2 complex query: {q_ok}")
+    fmt.println(f"lc2 complex fragment: {f_ok}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST large-url-comprehensive-2 START =====")
+    test_many_schemes()
+    test_many_hosts()
+    test_error_paths()
+    test_encode_errors()
+    test_many_roundtrips()
+    test_complex_url()
+    fmt.println("===== TEST large-url-comprehensive-2 END =====")
+    return 0
+}

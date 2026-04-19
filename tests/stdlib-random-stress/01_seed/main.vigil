@@ -1,0 +1,31 @@
+import "fmt"
+import "random"
+
+fn main() -> i32 {
+    fmt.println("===== TEST stdlib-random-stress START =====")
+
+    random.seed(42)
+    i32 a1 = random.i32()
+    i32 a2 = random.i32()
+    i32 a3 = random.i32()
+
+    random.seed(42)
+    i32 b1 = random.i32()
+    i32 b2 = random.i32()
+    i32 b3 = random.i32()
+
+    bool m1 = a1 == b1
+    bool m2 = a2 == b2
+    bool m3 = a3 == b3
+    fmt.println(f"seed_match_1: {m1}")
+    fmt.println(f"seed_match_2: {m2}")
+    fmt.println(f"seed_match_3: {m3}")
+
+    random.seed(99)
+    i32 c1 = random.i32()
+    bool diff = c1 != a1
+    fmt.println(f"different_seed_differs: {diff}")
+
+    fmt.println("===== TEST stdlib-random-stress END =====")
+    return 0
+}

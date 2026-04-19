@@ -1,0 +1,37 @@
+import "fmt"
+import "random"
+
+fn main() -> i32 {
+    fmt.println("===== TEST stdlib-random-stress START =====")
+
+    random.seed(33)
+    i32 first = random.i32()
+    bool all_same = true
+    i32 i = 0
+    while i < 100 {
+        i32 v = random.i32()
+        if v != first {
+            all_same = false
+        }
+        i = i + 1
+    }
+    bool not_all_same = !all_same
+    fmt.println(f"i32_not_all_same: {not_all_same}")
+
+    random.seed(33)
+    f64 first_f = random.f64()
+    bool all_same_f = true
+    i = 0
+    while i < 100 {
+        f64 v = random.f64()
+        if v != first_f {
+            all_same_f = false
+        }
+        i = i + 1
+    }
+    bool not_all_same_f = !all_same_f
+    fmt.println(f"f64_not_all_same: {not_all_same_f}")
+
+    fmt.println("===== TEST stdlib-random-stress END =====")
+    return 0
+}

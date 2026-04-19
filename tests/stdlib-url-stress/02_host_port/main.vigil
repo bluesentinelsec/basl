@@ -1,0 +1,70 @@
+import "fmt"
+import "url"
+
+fn test_host() -> void {
+    string val, err e = url.host("https://example.com/path")
+    bool ok = e == ok
+    bool correct = val == "example.com"
+    fmt.println(f"host ok: {ok}")
+    fmt.println(f"host val: {correct}")
+}
+
+fn test_host_with_port() -> void {
+    string val, err e = url.host("https://example.com:8080/path")
+    bool ok = e == ok
+    bool correct = val == "example.com"
+    fmt.println(f"host with port ok: {ok}")
+    fmt.println(f"host with port val: {correct}")
+}
+
+fn test_port() -> void {
+    string val, err e = url.port("https://example.com:8080/path")
+    bool ok = e == ok
+    bool correct = val == "8080"
+    fmt.println(f"port ok: {ok}")
+    fmt.println(f"port val: {correct}")
+}
+
+fn test_port_443() -> void {
+    string val, err e = url.port("https://example.com:443/path")
+    bool ok = e == ok
+    bool correct = val == "443"
+    fmt.println(f"port 443 ok: {ok}")
+    fmt.println(f"port 443 val: {correct}")
+}
+
+fn test_no_port() -> void {
+    string val, err e = url.port("https://example.com/path")
+    bool ok = e == ok
+    fmt.println(f"no port ok: {ok}")
+    fmt.println(f"no port val: [{val}]")
+}
+
+fn test_subdomain() -> void {
+    string val, err e = url.host("https://api.v2.example.com/data")
+    bool ok = e == ok
+    bool correct = val == "api.v2.example.com"
+    fmt.println(f"subdomain ok: {ok}")
+    fmt.println(f"subdomain val: {correct}")
+}
+
+fn test_localhost() -> void {
+    string val, err e = url.host("http://localhost:3000/api")
+    bool ok = e == ok
+    bool correct = val == "localhost"
+    fmt.println(f"localhost ok: {ok}")
+    fmt.println(f"localhost val: {correct}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 02_host_port START =====")
+    test_host()
+    test_host_with_port()
+    test_port()
+    test_port_443()
+    test_no_port()
+    test_subdomain()
+    test_localhost()
+    fmt.println("===== TEST 02_host_port END =====")
+    return 0
+}

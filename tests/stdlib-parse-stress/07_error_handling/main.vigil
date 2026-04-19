@@ -1,0 +1,64 @@
+import "fmt"
+import "parse"
+
+fn test_i32_error() -> void {
+    i32 val, err e = parse.i32("xyz")
+    bool failed = e != ok
+    fmt.println(f"i32 err: {failed}")
+}
+
+fn test_i64_error() -> void {
+    i64 val, err e = parse.i64("xyz")
+    bool failed = e != ok
+    fmt.println(f"i64 err: {failed}")
+}
+
+fn test_f64_error() -> void {
+    f64 val, err e = parse.f64("xyz")
+    bool failed = e != ok
+    fmt.println(f"f64 err: {failed}")
+}
+
+fn test_bool_error() -> void {
+    bool val, err e = parse.bool("xyz")
+    bool failed = e != ok
+    fmt.println(f"bool err: {failed}")
+}
+
+fn test_i32_special_chars() -> void {
+    i32 val, err e = parse.i32("!@#$")
+    bool failed = e != ok
+    fmt.println(f"i32 special err: {failed}")
+}
+
+fn test_i64_special_chars() -> void {
+    i64 val, err e = parse.i64("!@#$")
+    bool failed = e != ok
+    fmt.println(f"i64 special err: {failed}")
+}
+
+fn test_f64_double_dot() -> void {
+    f64 val, err e = parse.f64("1.2.3")
+    bool failed = e != ok
+    fmt.println(f"f64 double dot err: {failed}")
+}
+
+fn test_bool_mixed_case() -> void {
+    bool val, err e = parse.bool("True")
+    bool failed = e != ok
+    fmt.println(f"bool mixed case err: {failed}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 07_error_handling START =====")
+    test_i32_error()
+    test_i64_error()
+    test_f64_error()
+    test_bool_error()
+    test_i32_special_chars()
+    test_i64_special_chars()
+    test_f64_double_dot()
+    test_bool_mixed_case()
+    fmt.println("===== TEST 07_error_handling END =====")
+    return 0
+}

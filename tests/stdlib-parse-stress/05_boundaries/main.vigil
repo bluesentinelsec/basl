@@ -1,0 +1,73 @@
+import "fmt"
+import "parse"
+
+fn test_i32_max() -> void {
+    i32 val, err e = parse.i32("2147483647")
+    bool ok = e == ok
+    bool correct = val == 2147483647
+    fmt.println(f"i32 max ok: {ok}")
+    fmt.println(f"i32 max val: {correct}")
+}
+
+fn test_i32_min() -> void {
+    i32 val, err e = parse.i32("-2147483648")
+    bool ok = e == ok
+    fmt.println(f"i32 min ok: {ok}")
+    fmt.println(f"i32 min val: {val}")
+}
+
+fn test_i32_overflow() -> void {
+    i32 val, err e = parse.i32("2147483648")
+    bool failed = e != ok
+    fmt.println(f"i32 overflow fail: {failed}")
+}
+
+fn test_i32_underflow() -> void {
+    i32 val, err e = parse.i32("-2147483649")
+    bool failed = e != ok
+    fmt.println(f"i32 underflow fail: {failed}")
+}
+
+fn test_i64_max() -> void {
+    i64 val, err e = parse.i64("9223372036854775807")
+    bool ok = e == ok
+    bool correct = val == i64(9223372036854775807)
+    fmt.println(f"i64 max ok: {ok}")
+    fmt.println(f"i64 max val: {correct}")
+}
+
+fn test_i64_overflow() -> void {
+    i64 val, err e = parse.i64("9223372036854775808")
+    bool failed = e != ok
+    fmt.println(f"i64 overflow fail: {failed}")
+}
+
+fn test_i32_max_minus_one() -> void {
+    i32 val, err e = parse.i32("2147483646")
+    bool ok = e == ok
+    bool correct = val == 2147483646
+    fmt.println(f"i32 max-1 ok: {ok}")
+    fmt.println(f"i32 max-1 val: {correct}")
+}
+
+fn test_i32_min_plus_one() -> void {
+    i32 val, err e = parse.i32("-2147483647")
+    bool ok = e == ok
+    bool correct = val == -2147483647
+    fmt.println(f"i32 min+1 ok: {ok}")
+    fmt.println(f"i32 min+1 val: {correct}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 05_boundaries START =====")
+    test_i32_max()
+    test_i32_min()
+    test_i32_overflow()
+    test_i32_underflow()
+    test_i64_max()
+    test_i64_overflow()
+    test_i32_max_minus_one()
+    test_i32_min_plus_one()
+    fmt.println("===== TEST 05_boundaries END =====")
+    return 0
+}

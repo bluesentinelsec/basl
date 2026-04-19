@@ -1,0 +1,67 @@
+import "fmt"
+import "url"
+
+fn test_encode_space() -> void {
+    string val, err e = url.encode("hello world")
+    bool ok = e == ok
+    bool correct = val == "hello%20world"
+    fmt.println(f"encode space ok: {ok}")
+    fmt.println(f"encode space val: {correct}")
+}
+
+fn test_encode_special() -> void {
+    string val, err e = url.encode("a&b=c")
+    bool ok = e == ok
+    fmt.println(f"encode special ok: {ok}")
+    fmt.println(f"encode special val: {val}")
+}
+
+fn test_encode_empty() -> void {
+    string val, err e = url.encode("")
+    bool ok = e == ok
+    bool empty = val == ""
+    fmt.println(f"encode empty ok: {ok}")
+    fmt.println(f"encode empty val: {empty}")
+}
+
+fn test_encode_already_safe() -> void {
+    string val, err e = url.encode("hello")
+    bool ok = e == ok
+    bool correct = val == "hello"
+    fmt.println(f"encode safe ok: {ok}")
+    fmt.println(f"encode safe val: {correct}")
+}
+
+fn test_encode_slash() -> void {
+    string val, err e = url.encode("/path/to/file")
+    bool ok = e == ok
+    fmt.println(f"encode slash ok: {ok}")
+    fmt.println(f"encode slash val: {val}")
+}
+
+fn test_encode_unicode() -> void {
+    string val, err e = url.encode("caf\xc3\xa9")
+    bool ok = e == ok
+    fmt.println(f"encode unicode ok: {ok}")
+    fmt.println(f"encode unicode val: {val}")
+}
+
+fn test_encode_at_sign() -> void {
+    string val, err e = url.encode("[email]")
+    bool ok = e == ok
+    fmt.println(f"encode at ok: {ok}")
+    fmt.println(f"encode at val: {val}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 05_encode START =====")
+    test_encode_space()
+    test_encode_special()
+    test_encode_empty()
+    test_encode_already_safe()
+    test_encode_slash()
+    test_encode_unicode()
+    test_encode_at_sign()
+    fmt.println("===== TEST 05_encode END =====")
+    return 0
+}

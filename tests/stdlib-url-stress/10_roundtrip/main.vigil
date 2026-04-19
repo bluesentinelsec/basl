@@ -1,0 +1,60 @@
+import "fmt"
+import "url"
+
+fn test_roundtrip_space() -> void {
+    string encoded, err e1 = url.encode("hello world")
+    string decoded, err e2 = url.decode(encoded)
+    bool ok1 = e1 == ok
+    bool ok2 = e2 == ok
+    bool match = decoded == "hello world"
+    fmt.println(f"rt space encode ok: {ok1}")
+    fmt.println(f"rt space decode ok: {ok2}")
+    fmt.println(f"rt space match: {match}")
+}
+
+fn test_roundtrip_special() -> void {
+    string encoded, err e1 = url.encode("a&b=c?d#e")
+    string decoded, err e2 = url.decode(encoded)
+    bool match = decoded == "a&b=c?d#e"
+    fmt.println(f"rt special match: {match}")
+}
+
+fn test_roundtrip_empty() -> void {
+    string encoded, err e1 = url.encode("")
+    string decoded, err e2 = url.decode(encoded)
+    bool match = decoded == ""
+    fmt.println(f"rt empty match: {match}")
+}
+
+fn test_roundtrip_plain() -> void {
+    string encoded, err e1 = url.encode("simple")
+    string decoded, err e2 = url.decode(encoded)
+    bool match = decoded == "simple"
+    fmt.println(f"rt plain match: {match}")
+}
+
+fn test_roundtrip_numbers() -> void {
+    string encoded, err e1 = url.encode("key=123&val=456")
+    string decoded, err e2 = url.decode(encoded)
+    bool match = decoded == "key=123&val=456"
+    fmt.println(f"rt numbers match: {match}")
+}
+
+fn test_roundtrip_path() -> void {
+    string encoded, err e1 = url.encode("/path/to/resource")
+    string decoded, err e2 = url.decode(encoded)
+    bool match = decoded == "/path/to/resource"
+    fmt.println(f"rt path match: {match}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 10_roundtrip START =====")
+    test_roundtrip_space()
+    test_roundtrip_special()
+    test_roundtrip_empty()
+    test_roundtrip_plain()
+    test_roundtrip_numbers()
+    test_roundtrip_path()
+    fmt.println("===== TEST 10_roundtrip END =====")
+    return 0
+}

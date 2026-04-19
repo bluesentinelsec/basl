@@ -1,0 +1,27 @@
+import "fmt"
+import "log"
+
+fn main() -> i32 {
+    fmt.println("===== TEST stdlib-log-stress START =====")
+
+    // Test structured-style logging by including key=value in messages
+    err e = log.set_level("info")
+    bool ok1 = e == ok
+    fmt.println(f"set_level_info: {ok1}")
+
+    log.info("request method=GET path=/api/users status=200")
+    fmt.println("structured_info: true")
+
+    log.warn("slow_query duration=1500ms table=users")
+    fmt.println("structured_warn: true")
+
+    log.error("connection_failed host=db.local port=5432 retries=3")
+    fmt.println("structured_error: true")
+
+    log.set_format("json")
+    log.info("json structured key=value pairs=work")
+    fmt.println("structured_json: true")
+
+    fmt.println("===== TEST stdlib-log-stress END =====")
+    return 0
+}

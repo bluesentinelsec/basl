@@ -1,0 +1,43 @@
+import "fmt"
+import "random"
+
+fn main() -> i32 {
+    fmt.println("===== TEST stdlib-random-stress START =====")
+
+    random.seed(77)
+    bool all_ok = true
+    i32 i = 0
+    while i < 500 {
+        i32 v = random.range(0, 9)
+        if v < 0 || v > 9 {
+            all_ok = false
+        }
+        i = i + 1
+    }
+    fmt.println(f"range_0_9_bounds_500: {all_ok}")
+
+    bool f64_ok = true
+    i = 0
+    while i < 500 {
+        f64 v = random.f64()
+        if v < 0.0 || v >= 1.0 {
+            f64_ok = false
+        }
+        i = i + 1
+    }
+    fmt.println(f"f64_bounds_500: {f64_ok}")
+
+    bool large_ok = true
+    i = 0
+    while i < 200 {
+        i32 v = random.range(-1000, 1000)
+        if v < -1000 || v > 1000 {
+            large_ok = false
+        }
+        i = i + 1
+    }
+    fmt.println(f"range_large_bounds_200: {large_ok}")
+
+    fmt.println("===== TEST stdlib-random-stress END =====")
+    return 0
+}

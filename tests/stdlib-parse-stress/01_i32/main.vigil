@@ -1,0 +1,73 @@
+import "fmt"
+import "parse"
+
+fn test_success() -> void {
+    i32 val, err e = parse.i32("42")
+    bool ok = e == ok
+    fmt.println(f"i32 parse ok: {ok}")
+    fmt.println(f"i32 parse val: {val}")
+}
+
+fn test_zero() -> void {
+    i32 val, err e = parse.i32("0")
+    bool ok = e == ok
+    bool is_zero = val == 0
+    fmt.println(f"i32 zero ok: {ok}")
+    fmt.println(f"i32 zero val: {is_zero}")
+}
+
+fn test_negative() -> void {
+    i32 val, err e = parse.i32("-123")
+    bool ok = e == ok
+    bool correct = val == -123
+    fmt.println(f"i32 neg ok: {ok}")
+    fmt.println(f"i32 neg val: {correct}")
+}
+
+fn test_failure_alpha() -> void {
+    i32 val, err e = parse.i32("abc")
+    bool failed = e != ok
+    fmt.println(f"i32 alpha fail: {failed}")
+}
+
+fn test_failure_float() -> void {
+    i32 val, err e = parse.i32("3.14")
+    bool failed = e != ok
+    fmt.println(f"i32 float fail: {failed}")
+}
+
+fn test_failure_empty() -> void {
+    i32 val, err e = parse.i32("")
+    bool failed = e != ok
+    fmt.println(f"i32 empty fail: {failed}")
+}
+
+fn test_large_positive() -> void {
+    i32 val, err e = parse.i32("999999")
+    bool ok = e == ok
+    bool correct = val == 999999
+    fmt.println(f"i32 large ok: {ok}")
+    fmt.println(f"i32 large val: {correct}")
+}
+
+fn test_negative_one() -> void {
+    i32 val, err e = parse.i32("-1")
+    bool ok = e == ok
+    bool correct = val == -1
+    fmt.println(f"i32 neg1 ok: {ok}")
+    fmt.println(f"i32 neg1 val: {correct}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 01_i32 START =====")
+    test_success()
+    test_zero()
+    test_negative()
+    test_failure_alpha()
+    test_failure_float()
+    test_failure_empty()
+    test_large_positive()
+    test_negative_one()
+    fmt.println("===== TEST 01_i32 END =====")
+    return 0
+}

@@ -1,0 +1,80 @@
+import "fmt"
+import "url"
+
+fn test_all_components() -> void {
+    string u = "https://api.example.com:9090/v1/items?page=1&size=10#header"
+    string s, err e1 = url.scheme(u)
+    string h, err e2 = url.host(u)
+    string p, err e3 = url.port(u)
+    string pa, err e4 = url.path(u)
+    string q, err e5 = url.query(u)
+    string f, err e6 = url.fragment(u)
+    bool s_ok = s == "https"
+    bool h_ok = h == "api.example.com"
+    bool p_ok = p == "9090"
+    bool pa_ok = pa == "/v1/items"
+    bool q_ok = q == "page=1&size=10"
+    bool f_ok = f == "header"
+    fmt.println(f"lc1 scheme: {s_ok}")
+    fmt.println(f"lc1 host: {h_ok}")
+    fmt.println(f"lc1 port: {p_ok}")
+    fmt.println(f"lc1 path: {pa_ok}")
+    fmt.println(f"lc1 query: {q_ok}")
+    fmt.println(f"lc1 fragment: {f_ok}")
+}
+
+fn test_encode_decode() -> void {
+    string enc, err e1 = url.encode("hello world & more")
+    bool enc_ok = e1 == ok
+    fmt.println(f"lc1 encode ok: {enc_ok}")
+    fmt.println(f"lc1 encode val: {enc}")
+
+    string dec, err e2 = url.decode("hello%20world%20%26%20more")
+    bool dec_ok = e2 == ok
+    bool dec_correct = dec == "hello world & more"
+    fmt.println(f"lc1 decode ok: {dec_ok}")
+    fmt.println(f"lc1 decode val: {dec_correct}")
+}
+
+fn test_roundtrip_encode() -> void {
+    string original = "data with spaces & symbols!"
+    string enc, err e1 = url.encode(original)
+    string dec, err e2 = url.decode(enc)
+    bool match = dec == original
+    fmt.println(f"lc1 roundtrip match: {match}")
+}
+
+fn test_http_url() -> void {
+    string u = "http://localhost:3000/api/health"
+    string s, err e1 = url.scheme(u)
+    string h, err e2 = url.host(u)
+    string p, err e3 = url.port(u)
+    string pa, err e4 = url.path(u)
+    bool s_ok = s == "http"
+    bool h_ok = h == "localhost"
+    bool p_ok = p == "3000"
+    bool pa_ok = pa == "/api/health"
+    fmt.println(f"lc1 http scheme: {s_ok}")
+    fmt.println(f"lc1 http host: {h_ok}")
+    fmt.println(f"lc1 http port: {p_ok}")
+    fmt.println(f"lc1 http path: {pa_ok}")
+}
+
+fn test_ftp_url() -> void {
+    string s, err e = url.scheme("ftp://files.example.com/pub/readme.txt")
+    bool ok = e == ok
+    bool correct = s == "ftp"
+    fmt.println(f"lc1 ftp ok: {ok}")
+    fmt.println(f"lc1 ftp val: {correct}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST large-url-comprehensive-1 START =====")
+    test_all_components()
+    test_encode_decode()
+    test_roundtrip_encode()
+    test_http_url()
+    test_ftp_url()
+    fmt.println("===== TEST large-url-comprehensive-1 END =====")
+    return 0
+}

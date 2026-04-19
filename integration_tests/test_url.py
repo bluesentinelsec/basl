@@ -30,7 +30,8 @@ class UrlSchemeTest(unittest.TestCase):
     def test_scheme_https(self):
         code = '''import "url"
 fn main() -> i32 {
-    if url.scheme("https://example.com") == "https" { return 0 }
+    string s, err e = url.scheme("https://example.com")
+    if s == "https" { return 0 }
     return 1
 }'''
         rc, out, err = run_vigil(code)
@@ -39,7 +40,8 @@ fn main() -> i32 {
     def test_scheme_http(self):
         code = '''import "url"
 fn main() -> i32 {
-    if url.scheme("http://example.com") == "http" { return 0 }
+    string s, err e = url.scheme("http://example.com")
+    if s == "http" { return 0 }
     return 1
 }'''
         rc, out, err = run_vigil(code)
@@ -52,7 +54,8 @@ class UrlHostTest(unittest.TestCase):
     def test_host_simple(self):
         code = '''import "url"
 fn main() -> i32 {
-    if url.host("https://example.com/path") == "example.com" { return 0 }
+    string s, err e = url.host("https://example.com/path")
+    if s == "example.com" { return 0 }
     return 1
 }'''
         rc, out, err = run_vigil(code)
@@ -61,7 +64,8 @@ fn main() -> i32 {
     def test_host_with_port(self):
         code = '''import "url"
 fn main() -> i32 {
-    if url.host("https://example.com:8080/path") == "example.com" { return 0 }
+    string s, err e = url.host("https://example.com:8080/path")
+    if s == "example.com" { return 0 }
     return 1
 }'''
         rc, out, err = run_vigil(code)
@@ -74,7 +78,8 @@ class UrlPortTest(unittest.TestCase):
     def test_port_present(self):
         code = '''import "url"
 fn main() -> i32 {
-    if url.port("https://example.com:8080") == "8080" { return 0 }
+    string s, err e = url.port("https://example.com:8080")
+    if s == "8080" { return 0 }
     return 1
 }'''
         rc, out, err = run_vigil(code)
@@ -83,7 +88,8 @@ fn main() -> i32 {
     def test_port_absent(self):
         code = '''import "url"
 fn main() -> i32 {
-    if url.port("https://example.com") == "" { return 0 }
+    string s, err e = url.port("https://example.com")
+    if s == "" { return 0 }
     return 1
 }'''
         rc, out, err = run_vigil(code)
@@ -96,7 +102,8 @@ class UrlPathTest(unittest.TestCase):
     def test_path_simple(self):
         code = '''import "url"
 fn main() -> i32 {
-    if url.path("https://example.com/foo/bar") == "/foo/bar" { return 0 }
+    string s, err e = url.path("https://example.com/foo/bar")
+    if s == "/foo/bar" { return 0 }
     return 1
 }'''
         rc, out, err = run_vigil(code)
@@ -109,7 +116,22 @@ class UrlQueryTest(unittest.TestCase):
     def test_query_simple(self):
         code = '''import "url"
 fn main() -> i32 {
-    if url.query("https://example.com?a=1&b=2") == "a=1&b=2" { return 0 }
+    string s, err e = url.query("https://example.com?a=1&b=2")
+    if s == "a=1&b=2" { return 0 }
+    return 1
+}'''
+        rc, out, err = run_vigil(code)
+        self.assertEqual(rc, 0, f"stderr: {err}")
+
+
+class UrlFragmentTest(unittest.TestCase):
+    """Tests for url.fragment()"""
+
+    def test_fragment_simple(self):
+        code = '''import "url"
+fn main() -> i32 {
+    string s, err e = url.fragment("https://example.com#section")
+    if s == "section" { return 0 }
     return 1
 }'''
         rc, out, err = run_vigil(code)
@@ -122,7 +144,8 @@ class UrlEncodeDecodeTest(unittest.TestCase):
     def test_encode_spaces(self):
         code = '''import "url"
 fn main() -> i32 {
-    if url.encode("hello world") == "hello+world" { return 0 }
+    string s, err e = url.encode("hello world")
+    if s == "hello+world" { return 0 }
     return 1
 }'''
         rc, out, err = run_vigil(code)
@@ -131,7 +154,8 @@ fn main() -> i32 {
     def test_decode_percent(self):
         code = '''import "url"
 fn main() -> i32 {
-    if url.decode("hello%20world") == "hello world" { return 0 }
+    string s, err e = url.decode("hello%20world")
+    if s == "hello world" { return 0 }
     return 1
 }'''
         rc, out, err = run_vigil(code)
@@ -140,7 +164,8 @@ fn main() -> i32 {
     def test_decode_plus(self):
         code = '''import "url"
 fn main() -> i32 {
-    if url.decode("hello+world") == "hello world" { return 0 }
+    string s, err e = url.decode("hello+world")
+    if s == "hello world" { return 0 }
     return 1
 }'''
         rc, out, err = run_vigil(code)

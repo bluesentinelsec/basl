@@ -1,0 +1,27 @@
+import "fmt"
+import "log"
+
+fn main() -> i32 {
+    fmt.println("===== TEST stdlib-log-stress START =====")
+
+    log.set_format("json")
+    fmt.println("set_format_json: true")
+
+    err e = log.set_level("debug")
+    bool ok1 = e == ok
+    fmt.println(f"set_level_debug: {ok1}")
+
+    log.debug("json debug msg")
+    log.info("json info msg")
+    log.warn("json warn msg")
+    log.error("json error msg")
+    fmt.println("json_format_no_crash: true")
+
+    // switch back to text
+    log.set_format("text")
+    log.info("back to text")
+    fmt.println("text_format_restored: true")
+
+    fmt.println("===== TEST stdlib-log-stress END =====")
+    return 0
+}

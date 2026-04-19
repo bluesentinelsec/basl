@@ -1,0 +1,92 @@
+import "fmt"
+import "log"
+
+fn test_many_messages() -> void {
+    err e = log.set_level("debug")
+    bool ok1 = e == ok
+    fmt.println(f"set_level: {ok1}")
+
+    i32 i = 0
+    while i < 100 {
+        log.debug(f"bulk debug {i}")
+        i = i + 1
+    }
+    fmt.println("100_debug: true")
+
+    i = 0
+    while i < 100 {
+        log.info(f"bulk info {i}")
+        i = i + 1
+    }
+    fmt.println("100_info: true")
+
+    i = 0
+    while i < 100 {
+        log.warn(f"bulk warn {i}")
+        i = i + 1
+    }
+    fmt.println("100_warn: true")
+
+    i = 0
+    while i < 100 {
+        log.error(f"bulk error {i}")
+        i = i + 1
+    }
+    fmt.println("100_error: true")
+}
+
+fn test_format_switching() -> void {
+    i32 i = 0
+    while i < 20 {
+        log.set_format("json")
+        log.info(f"json msg {i}")
+        log.set_format("text")
+        log.info(f"text msg {i}")
+        i = i + 1
+    }
+    fmt.println("format_switching_20: true")
+}
+
+fn test_level_cycling() -> void {
+    i32 i = 0
+    while i < 10 {
+        err e1 = log.set_level("debug")
+        log.debug(f"cycle debug {i}")
+        err e2 = log.set_level("info")
+        log.info(f"cycle info {i}")
+        err e3 = log.set_level("warn")
+        log.warn(f"cycle warn {i}")
+        err e4 = log.set_level("error")
+        log.error(f"cycle error {i}")
+        i = i + 1
+    }
+    fmt.println("level_cycling_10: true")
+}
+
+fn test_mixed_valid_invalid() -> void {
+    err e1 = log.set_level("info")
+    bool ok1 = e1 == ok
+    err e2 = log.set_level("bad")
+    bool f2 = e2 != ok
+    err e3 = log.set_level("warn")
+    bool ok3 = e3 == ok
+    err e4 = log.set_level("nope")
+    bool f4 = e4 != ok
+    err e5 = log.set_level("error")
+    bool ok5 = e5 == ok
+    fmt.println(f"mixed_valid_1: {ok1}")
+    fmt.println(f"mixed_invalid_1: {f2}")
+    fmt.println(f"mixed_valid_2: {ok3}")
+    fmt.println(f"mixed_invalid_2: {f4}")
+    fmt.println(f"mixed_valid_3: {ok5}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST stdlib-log-stress START =====")
+    test_many_messages()
+    test_format_switching()
+    test_level_cycling()
+    test_mixed_valid_invalid()
+    fmt.println("===== TEST stdlib-log-stress END =====")
+    return 0
+}
