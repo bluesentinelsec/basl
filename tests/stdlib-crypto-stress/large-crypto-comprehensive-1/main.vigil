@@ -1,0 +1,99 @@
+import "fmt"
+import "crypto"
+
+fn build_large_string() -> string {
+    string s = ""
+    i32 i = 0
+    while i < 100 {
+        s = s + "Line " + string(i) + ": the quick brown fox jumps over the lazy dog\n"
+        i = i + 1
+    }
+    return s
+}
+
+fn test_full_encryption_workflow() -> void {
+    // Generate X25519 keypairs for two parties
+    string kp1, err e1 = crypto.x25519_keypair()
+    string kp2, err e2 = crypto.x25519_keypair()
+    bool ok1 = e1 == ok
+    bool ok2 = e2 == ok
+    fmt.println(f"x25519 kp1 ok: {ok1}")
+    fmt.println(f"x25519 kp2 ok: {ok2}")
+    // Extract keys
+    string priv1, err _ = kp1.substr(0, 64)
+    string pub1, err _ = kp1.substr(64, 64)
+    string priv2, err _ = kp2.substr(0, 64)
+    string pub2, err _ = kp2.substr(64, 64)
+    // Derive shared secret
+    string shared, err e3 = crypto.x25519(priv1, pub2)
+    bool ok3 = e3 == ok
+    fmt.println(f"shared secret ok: {ok3}")
+    // Use HKDF to derive encryption key (32 bytes = 64 hex chars)
+    string derived_hex, err e4 = crypto.hkdf_sha256(shared, "salt-value", "encryption-key", 32)
+    bool ok4 = e4 == ok
+    fmt.println(f"hkdf derive ok: {ok4}")
+    // Decode hex key to raw bytes for encryption
+    string enc_key, err e5 = crypto.hex_decode(derived_hex)
+    bool ok5 = e5 == ok
+    fmt.println(f"key decode ok: {ok5}")
+    i32 klen = enc_key.len()
+    bool is32 = klen == 32
+    fmt.println(f"key is 32 bytes: {is32}")
+    // Encrypt with AES-256-GCM
+    string nonce, err _ = crypto.random_bytes(12)
+    string plaintext = "Top secret message for the workflow test"
+    string ct, err e6 = crypto.encrypt(enc_key, nonce, plaintext, "")
+    bool ok6 = e6 == ok
+    fmt.println(f"encrypt ok: {ok6}")
+    // Decrypt
+    string decrypted, err e7 = crypto.decrypt(enc_key, ct, "")
+    bool ok7 = e7 == ok
+    fmt.println(f"decrypt ok: {ok7}")
+    bool match = decrypted == plaintext
+    fmt.println(f"decrypt matches original: {match}")
+}
+
+fn test_hash_large_string() -> void {
+    string data = build_large_string()
+    bool big_enough = data.len() > 1000
+    fmt.println(f"data over 1KB: {big_enough}")
+    string h256, err e1 = crypto.sha256(data)
+    bool ok1 = e1 == ok
+    fmt.println(f"sha256 large ok: {ok1}")
+    i32 hlen = h256.len()
+    bool is64 = hlen == 64
+    fmt.println(f"sha256 64 hex chars: {is64}")
+    // Hash again for consistency
+    string h256b, err _ = crypto.sha256(data)
+    bool consistent = h256 == h256b
+    fmt.println(f"sha256 consistent: {consistent}")
+}
+
+fn test_ed25519_sign_verify() -> void {
+    string kp, err e1 = crypto.ed25519_keypair()
+    bool ok1 = e1 == ok
+    fmt.println(f"ed25519 keypair ok: {ok1}")
+    string priv_key, err _ = kp.substr(0, 128)
+    string pub_key, err _ = kp.substr(128, 64)
+    // Use a fixed message to avoid nondeterminism
+    string message = "important document to sign"
+    string sig, err e2 = crypto.ed25519_sign(priv_key, message)
+    bool ok2 = e2 == ok
+    fmt.println(f"ed25519 sign ok: {ok2}")
+    // Verify the signature
+    bool valid = crypto.ed25519_verify(pub_key, message, sig)
+    fmt.println(f"ed25519 verify: {valid}")
+    // Tampered message should fail
+    bool tampered = crypto.ed25519_verify(pub_key, "tampered document", sig)
+    bool tamper_ok = tampered == false
+    fmt.println(f"tampered verify fails: {tamper_ok}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST large-crypto-comprehensive-1 START =====")
+    test_full_encryption_workflow()
+    test_hash_large_string()
+    test_ed25519_sign_verify()
+    fmt.println("===== TEST large-crypto-comprehensive-1 END =====")
+    return 0
+}

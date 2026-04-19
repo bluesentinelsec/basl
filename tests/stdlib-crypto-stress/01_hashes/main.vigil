@@ -1,0 +1,84 @@
+import "fmt"
+import "crypto"
+
+fn test_sha256_empty() -> void {
+    string h, err e = crypto.sha256("")
+    bool ok = e == ok
+    fmt.println(f"sha256_empty no_err: {ok}")
+    bool match = h == "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    fmt.println(f"sha256_empty match: {match}")
+    bool len_ok = h.len() == 64
+    fmt.println(f"sha256_empty len_64: {len_ok}")
+}
+
+fn test_sha256_hello() -> void {
+    string h, err e = crypto.sha256("hello")
+    bool ok = e == ok
+    fmt.println(f"sha256_hello no_err: {ok}")
+    bool match = h == "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
+    fmt.println(f"sha256_hello match: {match}")
+    bool len_ok = h.len() == 64
+    fmt.println(f"sha256_hello len_64: {len_ok}")
+}
+
+fn test_sha224_empty() -> void {
+    string h, err e = crypto.sha224("")
+    bool ok = e == ok
+    fmt.println(f"sha224_empty no_err: {ok}")
+    bool len_ok = h.len() == 56
+    fmt.println(f"sha224_empty len_56: {len_ok}")
+}
+
+fn test_sha224_hello() -> void {
+    string h, err e = crypto.sha224("hello")
+    bool ok = e == ok
+    fmt.println(f"sha224_hello no_err: {ok}")
+    bool len_ok = h.len() == 56
+    fmt.println(f"sha224_hello len_56: {len_ok}")
+}
+
+fn test_sha384_empty() -> void {
+    string h, err e = crypto.sha384("")
+    bool ok = e == ok
+    fmt.println(f"sha384_empty no_err: {ok}")
+    bool len_ok = h.len() == 96
+    fmt.println(f"sha384_empty len_96: {len_ok}")
+}
+
+fn test_sha384_hello() -> void {
+    string h, err e = crypto.sha384("hello")
+    bool ok = e == ok
+    fmt.println(f"sha384_hello no_err: {ok}")
+    bool len_ok = h.len() == 96
+    fmt.println(f"sha384_hello len_96: {len_ok}")
+}
+
+fn test_sha512_empty() -> void {
+    string h, err e = crypto.sha512("")
+    bool ok = e == ok
+    fmt.println(f"sha512_empty no_err: {ok}")
+    bool len_ok = h.len() == 128
+    fmt.println(f"sha512_empty len_128: {len_ok}")
+}
+
+fn test_sha512_hello() -> void {
+    string h, err e = crypto.sha512("hello")
+    bool ok = e == ok
+    fmt.println(f"sha512_hello no_err: {ok}")
+    bool len_ok = h.len() == 128
+    fmt.println(f"sha512_hello len_128: {len_ok}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 01_hashes START =====")
+    test_sha256_empty()
+    test_sha256_hello()
+    test_sha224_empty()
+    test_sha224_hello()
+    test_sha384_empty()
+    test_sha384_hello()
+    test_sha512_empty()
+    test_sha512_hello()
+    fmt.println("===== TEST 01_hashes END =====")
+    return 0
+}

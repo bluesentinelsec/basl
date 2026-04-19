@@ -1,0 +1,75 @@
+import "fmt"
+import "crypto"
+
+fn test_pbkdf2_known() -> void {
+    string key, err e = crypto.pbkdf2("password", "salt", 1, 20)
+    bool ok = e == ok
+    fmt.println(f"pbkdf2_known no_err: {ok}")
+    bool prefix = key.starts_with("120fb6cf")
+    fmt.println(f"pbkdf2_known prefix: {prefix}")
+    // 20 bytes = 40 hex chars
+    bool len_ok = key.len() == 40
+    fmt.println(f"pbkdf2_known len_40: {len_ok}")
+}
+
+fn test_pbkdf2_consistency() -> void {
+    string k1, err e1 = crypto.pbkdf2("pass", "salt", 100, 32)
+    string k2, err e2 = crypto.pbkdf2("pass", "salt", 100, 32)
+    bool ok1 = e1 == ok
+    bool ok2 = e2 == ok
+    fmt.println(f"pbkdf2_consist no_err1: {ok1}")
+    fmt.println(f"pbkdf2_consist no_err2: {ok2}")
+    bool match = k1 == k2
+    fmt.println(f"pbkdf2_consist same: {match}")
+}
+
+fn test_hkdf_output_length() -> void {
+    string out, err e = crypto.hkdf_sha256("input-key-material", "salt", "info", 32)
+    bool ok = e == ok
+    fmt.println(f"hkdf_len no_err: {ok}")
+    // 32 bytes = 64 hex chars
+    bool len_ok = out.len() == 64
+    fmt.println(f"hkdf_len len_64: {len_ok}")
+}
+
+fn test_hkdf_short_output() -> void {
+    string out, err e = crypto.hkdf_sha256("ikm", "salt", "info", 16)
+    bool ok = e == ok
+    fmt.println(f"hkdf_short no_err: {ok}")
+    // 16 bytes = 32 hex chars
+    bool len_ok = out.len() == 32
+    fmt.println(f"hkdf_short len_32: {len_ok}")
+}
+
+fn test_password_roundtrip() -> void {
+    string plain = "hello world"
+    string ct, err e1 = crypto.password_encrypt("my secret password", plain)
+    bool enc_ok = e1 == ok
+    fmt.println(f"pwenc_rt enc_ok: {enc_ok}")
+    string dec, err e2 = crypto.password_decrypt("my secret password", ct)
+    bool dec_ok = e2 == ok
+    fmt.println(f"pwenc_rt dec_ok: {dec_ok}")
+    bool match = dec == plain
+    fmt.println(f"pwenc_rt match: {match}")
+}
+
+fn test_password_wrong_fails() -> void {
+    string ct, err e1 = crypto.password_encrypt("correct password", "secret data")
+    bool enc_ok = e1 == ok
+    fmt.println(f"pwenc_wrong enc_ok: {enc_ok}")
+    string dec, err e2 = crypto.password_decrypt("wrong password", ct)
+    bool fail = e2 != ok
+    fmt.println(f"pwenc_wrong fail: {fail}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 06_kdf START =====")
+    test_pbkdf2_known()
+    test_pbkdf2_consistency()
+    test_hkdf_output_length()
+    test_hkdf_short_output()
+    test_password_roundtrip()
+    test_password_wrong_fails()
+    fmt.println("===== TEST 06_kdf END =====")
+    return 0
+}

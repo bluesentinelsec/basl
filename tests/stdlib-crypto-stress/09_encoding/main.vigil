@@ -1,0 +1,112 @@
+import "fmt"
+import "crypto"
+
+fn test_hex_roundtrip() -> void {
+    string encoded, err e1 = crypto.hex_encode("hello world")
+    bool ok1 = e1 == ok
+    fmt.println(f"hex encode ok: {ok1}")
+    string decoded, err e2 = crypto.hex_decode(encoded)
+    bool ok2 = e2 == ok
+    fmt.println(f"hex decode ok: {ok2}")
+    bool match = decoded == "hello world"
+    fmt.println(f"hex roundtrip match: {match}")
+}
+
+fn test_base64_roundtrip() -> void {
+    string encoded, err e1 = crypto.base64_encode("hello world")
+    bool ok1 = e1 == ok
+    fmt.println(f"base64 encode ok: {ok1}")
+    string decoded, err e2 = crypto.base64_decode(encoded)
+    bool ok2 = e2 == ok
+    fmt.println(f"base64 decode ok: {ok2}")
+    bool match = decoded == "hello world"
+    fmt.println(f"base64 roundtrip match: {match}")
+}
+
+fn test_hex_known_value() -> void {
+    string encoded, err e = crypto.hex_encode("hello")
+    bool ok1 = e == ok
+    fmt.println(f"hex encode hello ok: {ok1}")
+    bool match = encoded == "68656c6c6f"
+    fmt.println(f"hex hello = 68656c6c6f: {match}")
+}
+
+fn test_base64_known_value() -> void {
+    string encoded, err e = crypto.base64_encode("hello")
+    bool ok1 = e == ok
+    fmt.println(f"base64 encode hello ok: {ok1}")
+    bool match = encoded == "aGVsbG8="
+    fmt.println(f"base64 hello = aGVsbG8=: {match}")
+}
+
+fn test_empty_input() -> void {
+    string hex_enc, err e1 = crypto.hex_encode("")
+    bool ok1 = e1 == ok
+    bool hex_empty = hex_enc == ""
+    fmt.println(f"hex encode empty ok: {ok1}")
+    fmt.println(f"hex encode empty is empty: {hex_empty}")
+    string hex_dec, err e2 = crypto.hex_decode("")
+    bool ok2 = e2 == ok
+    bool hex_dec_empty = hex_dec == ""
+    fmt.println(f"hex decode empty ok: {ok2}")
+    fmt.println(f"hex decode empty is empty: {hex_dec_empty}")
+    string b64_enc, err e3 = crypto.base64_encode("")
+    bool ok3 = e3 == ok
+    bool b64_empty = b64_enc == ""
+    fmt.println(f"base64 encode empty ok: {ok3}")
+    fmt.println(f"base64 encode empty is empty: {b64_empty}")
+    string b64_dec, err e4 = crypto.base64_decode("")
+    bool ok4 = e4 == ok
+    bool b64_dec_empty = b64_dec == ""
+    fmt.println(f"base64 decode empty ok: {ok4}")
+    fmt.println(f"base64 decode empty is empty: {b64_dec_empty}")
+}
+
+fn test_random_bytes_length() -> void {
+    string r1, err e1 = crypto.random_bytes(16)
+    bool ok1 = e1 == ok
+    fmt.println(f"random 16 ok: {ok1}")
+    i32 rlen = r1.len()
+    bool is16 = rlen == 16
+    fmt.println(f"random 16 length: {is16}")
+    string r2, err e2 = crypto.random_bytes(32)
+    bool ok2 = e2 == ok
+    i32 rlen2 = r2.len()
+    bool is32 = rlen2 == 32
+    fmt.println(f"random 32 ok: {ok2}")
+    fmt.println(f"random 32 length: {is32}")
+}
+
+fn test_random_bytes_uniqueness() -> void {
+    string r1, err _ = crypto.random_bytes(32)
+    string r2, err _ = crypto.random_bytes(32)
+    bool diff = r1 != r2
+    fmt.println(f"random bytes unique: {diff}")
+}
+
+fn test_constant_time_eq() -> void {
+    bool eq1 = crypto.constant_time_eq("hello", "hello")
+    fmt.println(f"ct_eq same: {eq1}")
+    bool eq2 = crypto.constant_time_eq("hello", "world")
+    bool not_eq = eq2 == false
+    fmt.println(f"ct_eq diff: {not_eq}")
+    bool eq3 = crypto.constant_time_eq("", "")
+    fmt.println(f"ct_eq empty: {eq3}")
+    bool eq4 = crypto.constant_time_eq("short", "longer string")
+    bool diff_len = eq4 == false
+    fmt.println(f"ct_eq diff len: {diff_len}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 09_encoding START =====")
+    test_hex_roundtrip()
+    test_base64_roundtrip()
+    test_hex_known_value()
+    test_base64_known_value()
+    test_empty_input()
+    test_random_bytes_length()
+    test_random_bytes_uniqueness()
+    test_constant_time_eq()
+    fmt.println("===== TEST 09_encoding END =====")
+    return 0
+}

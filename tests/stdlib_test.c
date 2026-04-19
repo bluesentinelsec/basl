@@ -2005,7 +2005,8 @@ TEST(VigilStdlibCryptoTest, Sha256Empty)
                       "\n"
                       "import \"crypto\";\n"
                       "fn main() -> i32 {\n"
-                      "    string h = crypto.sha256(\"\");\n"
+                      "    string h, err e = crypto.sha256(\"\");\n"
+                      "    if e != ok { return 2; }\n"
                       "    if h != \"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\" { return 1; }\n"
                       "    return 0;\n"
                       "}\n"),
@@ -2019,7 +2020,8 @@ TEST(VigilStdlibCryptoTest, Sha256Hello)
                       "\n"
                       "import \"crypto\";\n"
                       "fn main() -> i32 {\n"
-                      "    string h = crypto.sha256(\"hello\");\n"
+                      "    string h, err e = crypto.sha256(\"hello\");\n"
+                      "    if e != ok { return 2; }\n"
                       "    if h != \"2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824\" { return 1; }\n"
                       "    return 0;\n"
                       "}\n"),
@@ -2034,7 +2036,8 @@ TEST(VigilStdlibCryptoTest, Sha512Hello)
                             "\n"
                             "import \"crypto\";\n"
                             "fn main() -> i32 {\n"
-                            "    string h = crypto.sha512(\"hello\");\n"
+                            "    string h, err e = crypto.sha512(\"hello\");\n"
+                            "    if e != ok { return 2; }\n"
                             "    if !h.starts_with(\"9b71d224bd62f3785d96d46ad3ea3d73\") { return 1; }\n"
                             "    return 0;\n"
                             "}\n"),
@@ -2050,7 +2053,8 @@ TEST(VigilStdlibCryptoTest, HmacSha256)
                       "\n"
                       "import \"crypto\";\n"
                       "fn main() -> i32 {\n"
-                      "    string h = crypto.hmac_sha256(\"key\", \"message\");\n"
+                      "    string h, err e = crypto.hmac_sha256(\"key\", \"message\");\n"
+                      "    if e != ok { return 2; }\n"
                       "    if h != \"6e9ef29b75fffc5b7abae527d58fdadb2fe42e7219011976917343065f58ed4a\" { return 1; }\n"
                       "    return 0;\n"
                       "}\n"),
@@ -2064,7 +2068,9 @@ TEST(VigilStdlibCryptoTest, HexEncode)
     EXPECT_EQ(RunWithStdlib(vigil_test_failed_, "\n"
                                                 "import \"crypto\";\n"
                                                 "fn main() -> i32 {\n"
-                                                "    if crypto.hex_encode(\"ABC\") != \"414243\" { return 1; }\n"
+                                                "    string h, err e = crypto.hex_encode(\"ABC\");\n"
+                                                "    if e != ok { return 2; }\n"
+                                                "    if h != \"414243\" { return 1; }\n"
                                                 "    return 0;\n"
                                                 "}\n"),
               0);
@@ -2075,7 +2081,9 @@ TEST(VigilStdlibCryptoTest, HexDecode)
     EXPECT_EQ(RunWithStdlib(vigil_test_failed_, "\n"
                                                 "import \"crypto\";\n"
                                                 "fn main() -> i32 {\n"
-                                                "    if crypto.hex_decode(\"414243\") != \"ABC\" { return 1; }\n"
+                                                "    string d, err e = crypto.hex_decode(\"414243\");\n"
+                                                "    if e != ok { return 2; }\n"
+                                                "    if d != \"ABC\" { return 1; }\n"
                                                 "    return 0;\n"
                                                 "}\n"),
               0);
@@ -2088,7 +2096,9 @@ TEST(VigilStdlibCryptoTest, Base64Encode)
     EXPECT_EQ(RunWithStdlib(vigil_test_failed_, "\n"
                                                 "import \"crypto\";\n"
                                                 "fn main() -> i32 {\n"
-                                                "    if crypto.base64_encode(\"hello\") != \"aGVsbG8=\" { return 1; }\n"
+                                                "    string b, err e = crypto.base64_encode(\"hello\");\n"
+                                                "    if e != ok { return 2; }\n"
+                                                "    if b != \"aGVsbG8=\" { return 1; }\n"
                                                 "    return 0;\n"
                                                 "}\n"),
               0);
@@ -2099,7 +2109,9 @@ TEST(VigilStdlibCryptoTest, Base64Decode)
     EXPECT_EQ(RunWithStdlib(vigil_test_failed_, "\n"
                                                 "import \"crypto\";\n"
                                                 "fn main() -> i32 {\n"
-                                                "    if crypto.base64_decode(\"aGVsbG8=\") != \"hello\" { return 1; }\n"
+                                                "    string d, err e = crypto.base64_decode(\"aGVsbG8=\");\n"
+                                                "    if e != ok { return 2; }\n"
+                                                "    if d != \"hello\" { return 1; }\n"
                                                 "    return 0;\n"
                                                 "}\n"),
               0);
@@ -2112,11 +2124,14 @@ TEST(VigilStdlibCryptoTest, EncryptDecryptRoundtrip)
     EXPECT_EQ(RunWithStdlib(vigil_test_failed_, "\n"
                                                 "import \"crypto\";\n"
                                                 "fn main() -> i32 {\n"
-                                                "    string key = crypto.random_bytes(32);\n"
-                                                "    string nonce = crypto.random_bytes(12);\n"
+                                                "    string key, err e1 = crypto.random_bytes(32);\n"
+                                                "    string nonce, err e2 = crypto.random_bytes(12);\n"
+                                                "    if e1 != ok || e2 != ok { return 2; }\n"
                                                 "    string plaintext = \"secret message\";\n"
-                                                "    string encrypted = crypto.encrypt(key, nonce, plaintext);\n"
-                                                "    string decrypted = crypto.decrypt(key, encrypted);\n"
+                                                "    string encrypted, err e3 = crypto.encrypt(key, nonce, plaintext, \"\");\n"
+                                                "    if e3 != ok { return 3; }\n"
+                                                "    string decrypted, err e4 = crypto.decrypt(key, encrypted, \"\");\n"
+                                                "    if e4 != ok { return 4; }\n"
                                                 "    if decrypted != plaintext { return 1; }\n"
                                                 "    return 0;\n"
                                                 "}\n"),
@@ -2144,7 +2159,8 @@ TEST(VigilStdlibCryptoTest, RandomBytesLength)
     EXPECT_EQ(RunWithStdlib(vigil_test_failed_, "\n"
                                                 "import \"crypto\";\n"
                                                 "fn main() -> i32 {\n"
-                                                "    string r = crypto.random_bytes(32);\n"
+                                                "    string r, err e = crypto.random_bytes(32);\n"
+                                                "    if e != ok { return 2; }\n"
                                                 "    if r.len() != 32 { return 1; }\n"
                                                 "    return 0;\n"
                                                 "}\n"),
@@ -2160,8 +2176,10 @@ TEST(VigilStdlibCryptoTest, PasswordEncryptDecrypt)
                             "import \"crypto\";\n"
                             "fn main() -> i32 {\n"
                             "    string plaintext = \"secret message\";\n"
-                            "    string encrypted = crypto.password_encrypt(\"my password\", plaintext);\n"
-                            "    string decrypted = crypto.password_decrypt(\"my password\", encrypted);\n"
+                            "    string encrypted, err e1 = crypto.password_encrypt(\"my password\", plaintext);\n"
+                            "    if e1 != ok { return 2; }\n"
+                            "    string decrypted, err e2 = crypto.password_decrypt(\"my password\", encrypted);\n"
+                            "    if e2 != ok { return 3; }\n"
                             "    if decrypted != plaintext { return 1; }\n"
                             "    return 0;\n"
                             "}\n"),
@@ -2174,9 +2192,10 @@ TEST(VigilStdlibCryptoTest, PasswordDecryptWrongPassword)
                             "\n"
                             "import \"crypto\";\n"
                             "fn main() -> i32 {\n"
-                            "    string encrypted = crypto.password_encrypt(\"correct\", \"secret\");\n"
-                            "    string decrypted = crypto.password_decrypt(\"wrong\", encrypted);\n"
-                            "    if decrypted != \"\" { return 1; }\n"
+                            "    string encrypted, err e1 = crypto.password_encrypt(\"correct\", \"secret\");\n"
+                            "    if e1 != ok { return 2; }\n"
+                            "    string decrypted, err e2 = crypto.password_decrypt(\"wrong\", encrypted);\n"
+                            "    if e2 == ok { return 1; }\n"
                             "    return 0;\n"
                             "}\n"),
               0);

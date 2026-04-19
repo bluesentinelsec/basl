@@ -1,0 +1,64 @@
+import "fmt"
+import "crypto"
+
+fn test_chacha_roundtrip() -> void {
+    string key = "01234567890123456789012345678901"
+    string nonce = "abcdefghijkl"
+    string plain = "hello chacha20-poly1305"
+    string ct, err e1 = crypto.chacha20_poly1305_encrypt(key, nonce, plain, "")
+    bool enc_ok = e1 == ok
+    fmt.println(f"chacha_rt enc_ok: {enc_ok}")
+    string dec, err e2 = crypto.chacha20_poly1305_decrypt(key, ct, "")
+    bool dec_ok = e2 == ok
+    fmt.println(f"chacha_rt dec_ok: {dec_ok}")
+    bool match = dec == plain
+    fmt.println(f"chacha_rt match: {match}")
+}
+
+fn test_chacha_with_aad() -> void {
+    string key = "01234567890123456789012345678901"
+    string nonce = "abcdefghijkl"
+    string plain = "chacha aad test"
+    string aad = "associated data"
+    string ct, err e1 = crypto.chacha20_poly1305_encrypt(key, nonce, plain, aad)
+    bool enc_ok = e1 == ok
+    fmt.println(f"chacha_aad enc_ok: {enc_ok}")
+    string dec, err e2 = crypto.chacha20_poly1305_decrypt(key, ct, aad)
+    bool dec_ok = e2 == ok
+    fmt.println(f"chacha_aad dec_ok: {dec_ok}")
+    bool match = dec == plain
+    fmt.println(f"chacha_aad match: {match}")
+}
+
+fn test_chacha_wrong_key() -> void {
+    string key1 = "01234567890123456789012345678901"
+    string key2 = "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+    string nonce = "abcdefghijkl"
+    string ct, err e1 = crypto.chacha20_poly1305_encrypt(key1, nonce, "secret", "")
+    bool enc_ok = e1 == ok
+    fmt.println(f"chacha_wrongkey enc_ok: {enc_ok}")
+    string dec, err e2 = crypto.chacha20_poly1305_decrypt(key2, ct, "")
+    bool fail = e2 != ok
+    fmt.println(f"chacha_wrongkey fail: {fail}")
+}
+
+fn test_chacha_wrong_aad() -> void {
+    string key = "01234567890123456789012345678901"
+    string nonce = "abcdefghijkl"
+    string ct, err e1 = crypto.chacha20_poly1305_encrypt(key, nonce, "secret", "good-aad")
+    bool enc_ok = e1 == ok
+    fmt.println(f"chacha_wrongaad enc_ok: {enc_ok}")
+    string dec, err e2 = crypto.chacha20_poly1305_decrypt(key, ct, "bad-aad")
+    bool fail = e2 != ok
+    fmt.println(f"chacha_wrongaad fail: {fail}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 04_chacha20 START =====")
+    test_chacha_roundtrip()
+    test_chacha_with_aad()
+    test_chacha_wrong_key()
+    test_chacha_wrong_aad()
+    fmt.println("===== TEST 04_chacha20 END =====")
+    return 0
+}
