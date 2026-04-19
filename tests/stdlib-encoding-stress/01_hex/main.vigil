@@ -1,0 +1,53 @@
+import "fmt"
+import "encoding"
+
+fn test_hex_encode_known() -> void {
+    string result, err e = encoding.hex_encode("hello")
+    bool ok = e == ok
+    fmt.println(f"hex_encode ok: {ok}")
+    fmt.println(f"hex_encode hello: {result}")
+
+    string r2, err e2 = encoding.hex_encode("ABC")
+    fmt.println(f"hex_encode ABC: {r2}")
+
+    string r3, err e3 = encoding.hex_encode("0123")
+    fmt.println(f"hex_encode 0123: {r3}")
+}
+
+fn test_hex_decode_known() -> void {
+    string result, err e = encoding.hex_decode("68656c6c6f")
+    bool ok = e == ok
+    fmt.println(f"hex_decode ok: {ok}")
+    fmt.println(f"hex_decode hello: {result}")
+
+    string r2, err e2 = encoding.hex_decode("414243")
+    fmt.println(f"hex_decode ABC: {r2}")
+
+    string r3, err e3 = encoding.hex_decode("30313233")
+    fmt.println(f"hex_decode 0123: {r3}")
+}
+
+fn test_hex_roundtrip() -> void {
+    string input = "roundtrip test!"
+    string encoded, err e1 = encoding.hex_encode(input)
+    string decoded, err e2 = encoding.hex_decode(encoded)
+    bool match = decoded == input
+    fmt.println(f"hex roundtrip match: {match}")
+}
+
+fn test_hex_uppercase_decode() -> void {
+    string result, err e = encoding.hex_decode("48454C4C4F")
+    bool ok = e == ok
+    fmt.println(f"hex upper decode ok: {ok}")
+    fmt.println(f"hex upper decode val: {result}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 01_hex START =====")
+    test_hex_encode_known()
+    test_hex_decode_known()
+    test_hex_roundtrip()
+    test_hex_uppercase_decode()
+    fmt.println("===== TEST 01_hex END =====")
+    return 0
+}

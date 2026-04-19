@@ -1,0 +1,66 @@
+import "fmt"
+import "xml"
+
+fn test_child() -> void {
+    string src = "<root><child>hello</child></root>"
+    xml.Document doc, err e = xml.Document.parse(src)
+    xml.Element root, err re = doc.root()
+    xml.Element child, err ce = root.child("child")
+    bool ok = ce == ok
+    fmt.println(f"child ok: {ok}")
+    string tag = child.tag()
+    fmt.println(f"child tag: {tag}")
+    string text = child.text()
+    fmt.println(f"child text: {text}")
+}
+
+fn test_children() -> void {
+    string src = "<root><a>1</a><b>2</b><c>3</c></root>"
+    xml.Document doc, err e = xml.Document.parse(src)
+    xml.Element root, err re = doc.root()
+    array<xml.Element> kids = root.children()
+    i32 count = kids.len()
+    fmt.println(f"children count: {count}")
+    string t0 = kids[0].tag()
+    fmt.println(f"child 0 tag: {t0}")
+    string t1 = kids[1].tag()
+    fmt.println(f"child 1 tag: {t1}")
+    string t2 = kids[2].tag()
+    fmt.println(f"child 2 tag: {t2}")
+}
+
+fn test_deep_nesting() -> void {
+    string src = "<a><b><c><d>deep</d></c></b></a>"
+    xml.Document doc, err e = xml.Document.parse(src)
+    xml.Element root, err re = doc.root()
+    xml.Element b, err e1 = root.child("b")
+    xml.Element c, err e2 = b.child("c")
+    xml.Element d, err e3 = c.child("d")
+    bool ok = e3 == ok
+    fmt.println(f"deep child ok: {ok}")
+    string text = d.text()
+    fmt.println(f"deep text: {text}")
+}
+
+fn test_multiple_same_children() -> void {
+    string src = "<list><item>a</item><item>b</item><item>c</item></list>"
+    xml.Document doc, err e = xml.Document.parse(src)
+    xml.Element root, err re = doc.root()
+    array<xml.Element> kids = root.children()
+    i32 count = kids.len()
+    fmt.println(f"same children count: {count}")
+    string v0 = kids[0].text()
+    string v2 = kids[2].text()
+    fmt.println(f"item 0: {v0}")
+    fmt.println(f"item 2: {v2}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 02_NESTED_ELEMENTS START =====")
+    test_child()
+    test_children()
+    test_deep_nesting()
+    test_multiple_same_children()
+    fmt.println("===== TEST 02_NESTED_ELEMENTS END =====")
+    return 0
+}

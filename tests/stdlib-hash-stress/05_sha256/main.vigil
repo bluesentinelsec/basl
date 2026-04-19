@@ -1,0 +1,44 @@
+import "fmt"
+import "hash"
+
+fn test_empty() -> void {
+    string h, err e = hash.sha256("")
+    bool ok = e == ok
+    i32 len = h.len()
+    bool len_ok = len == 64
+    fmt.println(f"sha256_empty_ok: {ok}")
+    fmt.println(f"sha256_empty_length_64: {len_ok}")
+}
+
+fn test_hello() -> void {
+    string h, err e = hash.sha256("hello")
+    bool ok = e == ok
+    i32 len = h.len()
+    bool len_ok = len == 64
+    fmt.println(f"sha256_hello_ok: {ok}")
+    fmt.println(f"sha256_hello_length_64: {len_ok}")
+}
+
+fn test_output_length() -> void {
+    string h, err e = hash.sha256("test data for sha256")
+    i32 len = h.len()
+    bool ok = len == 64
+    fmt.println(f"sha256_output_length_64: {ok}")
+}
+
+fn test_consistency() -> void {
+    string h1, err e1 = hash.sha256("consistent")
+    string h2, err e2 = hash.sha256("consistent")
+    bool ok = h1 == h2
+    fmt.println(f"sha256_consistency: {ok}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 05_sha256 START =====")
+    test_empty()
+    test_hello()
+    test_output_length()
+    test_consistency()
+    fmt.println("===== TEST 05_sha256 END =====")
+    return 0
+}

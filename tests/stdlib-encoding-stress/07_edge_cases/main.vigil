@@ -1,0 +1,88 @@
+import "fmt"
+import "encoding"
+
+fn test_empty_hex() -> void {
+    string enc, err e1 = encoding.hex_encode("")
+    bool enc_ok = e1 == ok
+    fmt.println(f"hex encode empty ok: {enc_ok}")
+    fmt.println(f"hex encode empty val: {enc}")
+
+    string dec, err e2 = encoding.hex_decode("")
+    bool dec_ok = e2 == ok
+    fmt.println(f"hex decode empty ok: {dec_ok}")
+    fmt.println(f"hex decode empty val: {dec}")
+}
+
+fn test_empty_base64() -> void {
+    string enc, err e1 = encoding.base64_encode("")
+    bool enc_ok = e1 == ok
+    fmt.println(f"b64 encode empty ok: {enc_ok}")
+    fmt.println(f"b64 encode empty val: {enc}")
+
+    string dec, err e2 = encoding.base64_decode("")
+    bool dec_ok = e2 == ok
+    fmt.println(f"b64 decode empty ok: {dec_ok}")
+    fmt.println(f"b64 decode empty val: {dec}")
+}
+
+fn test_empty_base32() -> void {
+    string enc, err e1 = encoding.base32_encode("")
+    bool enc_ok = e1 == ok
+    fmt.println(f"b32 encode empty ok: {enc_ok}")
+    fmt.println(f"b32 encode empty val: {enc}")
+
+    string dec, err e2 = encoding.base32_decode("")
+    bool dec_ok = e2 == ok
+    fmt.println(f"b32 decode empty ok: {dec_ok}")
+    fmt.println(f"b32 decode empty val: {dec}")
+}
+
+fn test_empty_base64url() -> void {
+    string enc, err e1 = encoding.base64url_encode("")
+    bool enc_ok = e1 == ok
+    fmt.println(f"b64url encode empty ok: {enc_ok}")
+
+    string dec, err e2 = encoding.base64url_decode("")
+    bool dec_ok = e2 == ok
+    fmt.println(f"b64url decode empty ok: {dec_ok}")
+}
+
+fn test_single_byte() -> void {
+    string hex_enc, err e1 = encoding.hex_encode("A")
+    fmt.println(f"single byte hex: {hex_enc}")
+
+    string b64_enc, err e2 = encoding.base64_encode("A")
+    fmt.println(f"single byte b64: {b64_enc}")
+
+    string b32_enc, err e3 = encoding.base32_encode("A")
+    fmt.println(f"single byte b32: {b32_enc}")
+
+    string url_enc, err e4 = encoding.base64url_encode("A")
+    fmt.println(f"single byte b64url: {url_enc}")
+}
+
+fn test_padding_variations() -> void {
+    // 1 byte -> 2 pad in b64, 6 pad in b32
+    string b64_1, err e1 = encoding.base64_encode("a")
+    fmt.println(f"pad 1 byte b64: {b64_1}")
+
+    // 2 bytes -> 1 pad in b64, 4 pad in b32
+    string b64_2, err e2 = encoding.base64_encode("ab")
+    fmt.println(f"pad 2 byte b64: {b64_2}")
+
+    // 3 bytes -> 0 pad in b64
+    string b64_3, err e3 = encoding.base64_encode("abc")
+    fmt.println(f"pad 3 byte b64: {b64_3}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 07_edge_cases START =====")
+    test_empty_hex()
+    test_empty_base64()
+    test_empty_base32()
+    test_empty_base64url()
+    test_single_byte()
+    test_padding_variations()
+    fmt.println("===== TEST 07_edge_cases END =====")
+    return 0
+}

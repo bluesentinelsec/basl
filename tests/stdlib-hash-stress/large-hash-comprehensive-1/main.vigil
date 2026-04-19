@@ -1,0 +1,77 @@
+import "fmt"
+import "hash"
+
+fn build_large_data() -> string {
+    string chunk = "abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ!@"
+    string data = ""
+    for (i32 i = 0; i < 20; i++) {
+        data = data + chunk
+    }
+    return data
+}
+
+fn test_fnv1a_large() -> void {
+    string data = build_large_data()
+    i64 h = hash.fnv1a(data)
+    bool ok = h != i64(0)
+    fmt.println(f"large_fnv1a_nonzero: {ok}")
+}
+
+fn test_djb2_large() -> void {
+    string data = build_large_data()
+    i64 h = hash.djb2(data)
+    bool ok = h != i64(0)
+    fmt.println(f"large_djb2_nonzero: {ok}")
+}
+
+fn test_md5_large() -> void {
+    string data = build_large_data()
+    string h, err e = hash.md5(data)
+    bool ok = e == ok
+    i32 len = h.len()
+    bool len_ok = len == 32
+    fmt.println(f"large_md5_ok: {ok}")
+    fmt.println(f"large_md5_len: {len_ok}")
+}
+
+fn test_sha1_large() -> void {
+    string data = build_large_data()
+    string h, err e = hash.sha1(data)
+    bool ok = e == ok
+    i32 len = h.len()
+    bool len_ok = len == 40
+    fmt.println(f"large_sha1_ok: {ok}")
+    fmt.println(f"large_sha1_len: {len_ok}")
+}
+
+fn test_sha256_large() -> void {
+    string data = build_large_data()
+    string h, err e = hash.sha256(data)
+    bool ok = e == ok
+    i32 len = h.len()
+    bool len_ok = len == 64
+    fmt.println(f"large_sha256_ok: {ok}")
+    fmt.println(f"large_sha256_len: {len_ok}")
+}
+
+fn test_sha512_large() -> void {
+    string data = build_large_data()
+    string h, err e = hash.sha512(data)
+    bool ok = e == ok
+    i32 len = h.len()
+    bool len_ok = len == 128
+    fmt.println(f"large_sha512_ok: {ok}")
+    fmt.println(f"large_sha512_len: {len_ok}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST large-hash-comprehensive-1 START =====")
+    test_fnv1a_large()
+    test_djb2_large()
+    test_md5_large()
+    test_sha1_large()
+    test_sha256_large()
+    test_sha512_large()
+    fmt.println("===== TEST large-hash-comprehensive-1 END =====")
+    return 0
+}

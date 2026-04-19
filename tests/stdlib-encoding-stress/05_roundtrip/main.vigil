@@ -1,0 +1,69 @@
+import "fmt"
+import "encoding"
+
+fn test_hex_roundtrip() -> void {
+    string input = "The quick brown fox jumps over the lazy dog"
+    string encoded, err e1 = encoding.hex_encode(input)
+    string decoded, err e2 = encoding.hex_decode(encoded)
+    bool match = decoded == input
+    fmt.println(f"hex roundtrip: {match}")
+}
+
+fn test_base64_roundtrip() -> void {
+    string input = "The quick brown fox jumps over the lazy dog"
+    string encoded, err e1 = encoding.base64_encode(input)
+    string decoded, err e2 = encoding.base64_decode(encoded)
+    bool match = decoded == input
+    fmt.println(f"b64 roundtrip: {match}")
+}
+
+fn test_base32_roundtrip() -> void {
+    string input = "The quick brown fox jumps over the lazy dog"
+    string encoded, err e1 = encoding.base32_encode(input)
+    string decoded, err e2 = encoding.base32_decode(encoded)
+    bool match = decoded == input
+    fmt.println(f"b32 roundtrip: {match}")
+}
+
+fn test_base64url_roundtrip() -> void {
+    string input = "The quick brown fox jumps over the lazy dog"
+    string encoded, err e1 = encoding.base64url_encode(input)
+    string decoded, err e2 = encoding.base64url_decode(encoded)
+    bool match = decoded == input
+    fmt.println(f"b64url roundtrip: {match}")
+}
+
+fn test_all_printable_ascii() -> void {
+    string input = " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~"
+
+    string hex_enc, err e1 = encoding.hex_encode(input)
+    string hex_dec, err e2 = encoding.hex_decode(hex_enc)
+    bool hex_ok = hex_dec == input
+    fmt.println(f"ascii hex roundtrip: {hex_ok}")
+
+    string b64_enc, err e3 = encoding.base64_encode(input)
+    string b64_dec, err e4 = encoding.base64_decode(b64_enc)
+    bool b64_ok = b64_dec == input
+    fmt.println(f"ascii b64 roundtrip: {b64_ok}")
+
+    string b32_enc, err e5 = encoding.base32_encode(input)
+    string b32_dec, err e6 = encoding.base32_decode(b32_enc)
+    bool b32_ok = b32_dec == input
+    fmt.println(f"ascii b32 roundtrip: {b32_ok}")
+
+    string url_enc, err e7 = encoding.base64url_encode(input)
+    string url_dec, err e8 = encoding.base64url_decode(url_enc)
+    bool url_ok = url_dec == input
+    fmt.println(f"ascii b64url roundtrip: {url_ok}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 05_roundtrip START =====")
+    test_hex_roundtrip()
+    test_base64_roundtrip()
+    test_base32_roundtrip()
+    test_base64url_roundtrip()
+    test_all_printable_ascii()
+    fmt.println("===== TEST 05_roundtrip END =====")
+    return 0
+}

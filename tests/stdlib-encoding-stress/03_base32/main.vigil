@@ -1,0 +1,57 @@
+import "fmt"
+import "encoding"
+
+fn test_base32_encode_known() -> void {
+    string result, err e = encoding.base32_encode("hello")
+    bool ok = e == ok
+    fmt.println(f"b32_encode ok: {ok}")
+    fmt.println(f"b32_encode hello: {result}")
+
+    string r2, err e2 = encoding.base32_encode("foo")
+    fmt.println(f"b32_encode foo: {r2}")
+
+    string r3, err e3 = encoding.base32_encode("foob")
+    fmt.println(f"b32_encode foob: {r3}")
+
+    string r4, err e4 = encoding.base32_encode("fooba")
+    fmt.println(f"b32_encode fooba: {r4}")
+
+    string r5, err e5 = encoding.base32_encode("foobar")
+    fmt.println(f"b32_encode foobar: {r5}")
+}
+
+fn test_base32_decode_known() -> void {
+    string result, err e = encoding.base32_decode("NBSWY3DP")
+    bool ok = e == ok
+    fmt.println(f"b32_decode ok: {ok}")
+    fmt.println(f"b32_decode hello: {result}")
+
+    string r2, err e2 = encoding.base32_decode("MZXW6===")
+    fmt.println(f"b32_decode foo: {r2}")
+
+    string r3, err e3 = encoding.base32_decode("MZXW6YQ=")
+    fmt.println(f"b32_decode foob: {r3}")
+
+    string r4, err e4 = encoding.base32_decode("MZXW6YTB")
+    fmt.println(f"b32_decode fooba: {r4}")
+
+    string r5, err e5 = encoding.base32_decode("MZXW6YTBOI======")
+    fmt.println(f"b32_decode foobar: {r5}")
+}
+
+fn test_base32_roundtrip() -> void {
+    string input = "base32 roundtrip!"
+    string encoded, err e1 = encoding.base32_encode(input)
+    string decoded, err e2 = encoding.base32_decode(encoded)
+    bool match = decoded == input
+    fmt.println(f"b32 roundtrip match: {match}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 03_base32 START =====")
+    test_base32_encode_known()
+    test_base32_decode_known()
+    test_base32_roundtrip()
+    fmt.println("===== TEST 03_base32 END =====")
+    return 0
+}

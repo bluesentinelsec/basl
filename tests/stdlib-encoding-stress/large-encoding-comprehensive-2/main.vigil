@@ -1,0 +1,123 @@
+import "fmt"
+import "encoding"
+
+fn test_cross_format_same_input() -> void {
+    string data = "cross-format"
+    string hex, err e1 = encoding.hex_encode(data)
+    string b64, err e2 = encoding.base64_encode(data)
+    string b32, err e3 = encoding.base32_encode(data)
+    string url, err e4 = encoding.base64url_encode(data)
+
+    // All should succeed
+    bool hex_ok = e1 == ok
+    bool b64_ok = e2 == ok
+    bool b32_ok = e3 == ok
+    bool url_ok = e4 == ok
+    fmt.println(f"cross hex ok: {hex_ok}")
+    fmt.println(f"cross b64 ok: {b64_ok}")
+    fmt.println(f"cross b32 ok: {b32_ok}")
+    fmt.println(f"cross url ok: {url_ok}")
+
+    // All decode back to same input
+    string d1, err de1 = encoding.hex_decode(hex)
+    string d2, err de2 = encoding.base64_decode(b64)
+    string d3, err de3 = encoding.base32_decode(b32)
+    string d4, err de4 = encoding.base64url_decode(url)
+
+    bool m1 = d1 == data
+    bool m2 = d2 == data
+    bool m3 = d3 == data
+    bool m4 = d4 == data
+    fmt.println(f"cross hex decode match: {m1}")
+    fmt.println(f"cross b64 decode match: {m2}")
+    fmt.println(f"cross b32 decode match: {m3}")
+    fmt.println(f"cross url decode match: {m4}")
+}
+
+fn test_hex_is_longer_than_base64() -> void {
+    string data = "size comparison test"
+    string hex, err e1 = encoding.hex_encode(data)
+    string b64, err e2 = encoding.base64_encode(data)
+    // Hex is always 2x input length; base64 is ~4/3x
+    bool hex_longer = hex.len() > b64.len()
+    fmt.println(f"hex longer than b64: {hex_longer}")
+}
+
+fn test_error_wrong_format_decode() -> void {
+    // Encode as hex, try to decode as base32
+    string hex, err e1 = encoding.hex_encode("test")
+    string bad, err e2 = encoding.base32_decode(hex)
+    bool is_err = e2 != ok
+    fmt.println(f"hex as b32 err: {is_err}")
+}
+
+fn test_error_paths_all_formats() -> void {
+    // Hex: odd length
+    string r1, err e1 = encoding.hex_decode("a")
+    bool err1 = e1 != ok
+    fmt.println(f"hex odd err: {err1}")
+
+    // Hex: invalid char
+    string r2, err e2 = encoding.hex_decode("zz")
+    bool err2 = e2 != ok
+    fmt.println(f"hex bad char err: {err2}")
+
+    // Base64: bad chars
+    string r3, err e3 = encoding.base64_decode("@@@@")
+    bool err3 = e3 != ok
+    fmt.println(f"b64 bad char err: {err3}")
+
+    // Base32: bad chars
+    string r4, err e4 = encoding.base32_decode("0189")
+    bool err4 = e4 != ok
+    fmt.println(f"b32 bad char err: {err4}")
+
+    // Base64url: bad chars
+    string r5, err e5 = encoding.base64url_decode("@@@@")
+    bool err5 = e5 != ok
+    fmt.println(f"b64url bad char err: {err5}")
+}
+
+fn test_encode_decode_symmetry() -> void {
+    // Verify encode(decode(encode(x))) == encode(x)
+    string data = "symmetry"
+    string hex1, err e1 = encoding.hex_encode(data)
+    string dec1, err e2 = encoding.hex_decode(hex1)
+    string hex2, err e3 = encoding.hex_encode(dec1)
+    bool sym_hex = hex1 == hex2
+    fmt.println(f"hex symmetry: {sym_hex}")
+
+    string b64_1, err e4 = encoding.base64_encode(data)
+    string dec2, err e5 = encoding.base64_decode(b64_1)
+    string b64_2, err e6 = encoding.base64_encode(dec2)
+    bool sym_b64 = b64_1 == b64_2
+    fmt.println(f"b64 symmetry: {sym_b64}")
+
+    string b32_1, err e7 = encoding.base32_encode(data)
+    string dec3, err e8 = encoding.base32_decode(b32_1)
+    string b32_2, err e9 = encoding.base32_encode(dec3)
+    bool sym_b32 = b32_1 == b32_2
+    fmt.println(f"b32 symmetry: {sym_b32}")
+}
+
+fn test_base64_vs_base64url_same_simple() -> void {
+    // For data without +/ in output, both should produce same result
+    string data = "simple"
+    string b64, err e1 = encoding.base64_encode(data)
+    string url, err e2 = encoding.base64url_encode(data)
+    bool no_special = b64.contains("+") == false
+    // If no + or / in standard, they should match
+    fmt.println(f"b64 no special: {no_special}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST large-encoding-comprehensive-2 START =====")
+    test_cross_format_same_input()
+    test_hex_is_longer_than_base64()
+    test_error_wrong_format_decode()
+    test_error_paths_all_formats()
+    test_encode_decode_symmetry()
+    test_base64_vs_base64url_same_simple()
+    fmt.println("===== TEST large-encoding-comprehensive-2 END =====")
+    return 0
+}

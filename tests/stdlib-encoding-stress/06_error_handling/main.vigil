@@ -1,0 +1,66 @@
+import "fmt"
+import "encoding"
+
+fn test_hex_odd_length() -> void {
+    string result, err e = encoding.hex_decode("abc")
+    bool is_err = e != ok
+    fmt.println(f"hex odd length err: {is_err}")
+}
+
+fn test_hex_bad_chars() -> void {
+    string result, err e = encoding.hex_decode("ZZZZ")
+    bool is_err = e != ok
+    fmt.println(f"hex bad chars err: {is_err}")
+
+    string r2, err e2 = encoding.hex_decode("gh")
+    bool is_err2 = e2 != ok
+    fmt.println(f"hex g char err: {is_err2}")
+
+    string r3, err e3 = encoding.hex_decode("!!@@")
+    bool is_err3 = e3 != ok
+    fmt.println(f"hex symbols err: {is_err3}")
+}
+
+fn test_base64_invalid() -> void {
+    string result, err e = encoding.base64_decode("!!!!")
+    bool is_err = e != ok
+    fmt.println(f"b64 invalid err: {is_err}")
+
+    string r2, err e2 = encoding.base64_decode("abc")
+    bool is_err2 = e2 != ok
+    fmt.println(f"b64 bad padding err: {is_err2}")
+}
+
+fn test_base32_invalid() -> void {
+    string result, err e = encoding.base32_decode("12345678")
+    bool is_err = e != ok
+    fmt.println(f"b32 invalid digits err: {is_err}")
+
+    string r2, err e2 = encoding.base32_decode("!!!!")
+    bool is_err2 = e2 != ok
+    fmt.println(f"b32 symbols err: {is_err2}")
+}
+
+fn test_base64url_invalid() -> void {
+    string result, err e = encoding.base64url_decode("!!!!")
+    bool is_err = e != ok
+    fmt.println(f"b64url invalid err: {is_err}")
+}
+
+fn test_hex_mixed_valid_invalid() -> void {
+    string result, err e = encoding.hex_decode("48656c6c6fZZ")
+    bool is_err = e != ok
+    fmt.println(f"hex mixed err: {is_err}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 06_error_handling START =====")
+    test_hex_odd_length()
+    test_hex_bad_chars()
+    test_base64_invalid()
+    test_base32_invalid()
+    test_base64url_invalid()
+    test_hex_mixed_valid_invalid()
+    fmt.println("===== TEST 06_error_handling END =====")
+    return 0
+}

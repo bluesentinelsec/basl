@@ -1,0 +1,57 @@
+import "fmt"
+import "xml"
+
+fn test_text() -> void {
+    string src = "<msg>Hello World</msg>"
+    xml.Document doc, err e = xml.Document.parse(src)
+    xml.Element root, err re = doc.root()
+    string text = root.text()
+    fmt.println(f"text: {text}")
+}
+
+fn test_all_text() -> void {
+    string src = "<p>Hello <b>bold</b> world</p>"
+    xml.Document doc, err e = xml.Document.parse(src)
+    xml.Element root, err re = doc.root()
+    string all = root.all_text()
+    fmt.println(f"all_text: {all}")
+}
+
+fn test_text_vs_all_text() -> void {
+    string src = "<div>before<span>inner</span>after</div>"
+    xml.Document doc, err e = xml.Document.parse(src)
+    xml.Element root, err re = doc.root()
+    string text = root.text()
+    fmt.println(f"div text: {text}")
+    string all = root.all_text()
+    fmt.println(f"div all_text: {all}")
+}
+
+fn test_nested_all_text() -> void {
+    string src = "<root><a>one<b>two<c>three</c></b></a></root>"
+    xml.Document doc, err e = xml.Document.parse(src)
+    xml.Element root, err re = doc.root()
+    xml.Element a, err ae = root.child("a")
+    string all = a.all_text()
+    fmt.println(f"nested all_text: {all}")
+}
+
+fn test_empty_text() -> void {
+    string src = "<empty></empty>"
+    xml.Document doc, err e = xml.Document.parse(src)
+    xml.Element root, err re = doc.root()
+    string text = root.text()
+    bool is_empty = text == ""
+    fmt.println(f"empty text is empty: {is_empty}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 04_TEXT_CONTENT START =====")
+    test_text()
+    test_all_text()
+    test_text_vs_all_text()
+    test_nested_all_text()
+    test_empty_text()
+    fmt.println("===== TEST 04_TEXT_CONTENT END =====")
+    return 0
+}

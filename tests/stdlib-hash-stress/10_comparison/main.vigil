@@ -1,0 +1,40 @@
+import "fmt"
+import "hash"
+
+fn test_crypto_algos_differ() -> void {
+    string m, err e1 = hash.md5("hello")
+    string s1, err e2 = hash.sha1("hello")
+    string s2, err e3 = hash.sha256("hello")
+    string s5, err e4 = hash.sha512("hello")
+    bool md5_sha1 = m != s1
+    bool md5_sha256 = m != s2
+    bool sha1_sha256 = s1 != s2
+    bool sha256_sha512 = s2 != s5
+    fmt.println(f"md5_vs_sha1_differ: {md5_sha1}")
+    fmt.println(f"md5_vs_sha256_differ: {md5_sha256}")
+    fmt.println(f"sha1_vs_sha256_differ: {sha1_sha256}")
+    fmt.println(f"sha256_vs_sha512_differ: {sha256_sha512}")
+}
+
+fn test_non_crypto_algos_differ() -> void {
+    i64 f = hash.fnv1a("hello")
+    i64 d = hash.djb2("hello")
+    bool differ = f != d
+    fmt.println(f"fnv1a_vs_djb2_differ: {differ}")
+}
+
+fn test_same_input_different_algo() -> void {
+    string m, err e1 = hash.md5("test")
+    string s, err e2 = hash.sha256("test")
+    bool differ = m != s
+    fmt.println(f"md5_vs_sha256_test_differ: {differ}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 10_comparison START =====")
+    test_crypto_algos_differ()
+    test_non_crypto_algos_differ()
+    test_same_input_different_algo()
+    fmt.println("===== TEST 10_comparison END =====")
+    return 0
+}

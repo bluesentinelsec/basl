@@ -1,0 +1,67 @@
+import "fmt"
+import "hash"
+
+fn test_empty_string() -> void {
+    i64 f = hash.fnv1a("")
+    i64 d = hash.djb2("")
+    string m, err e1 = hash.md5("")
+    string s1, err e2 = hash.sha1("")
+    string s2, err e3 = hash.sha256("")
+    string s5, err e4 = hash.sha512("")
+    bool f_ok = f != i64(0)
+    bool d_ok = d != i64(0)
+    bool m_ok = e1 == ok
+    bool s1_ok = e2 == ok
+    bool s2_ok = e3 == ok
+    bool s5_ok = e4 == ok
+    fmt.println(f"empty_fnv1a_nonzero: {f_ok}")
+    fmt.println(f"empty_djb2_nonzero: {d_ok}")
+    fmt.println(f"empty_md5_ok: {m_ok}")
+    fmt.println(f"empty_sha1_ok: {s1_ok}")
+    fmt.println(f"empty_sha256_ok: {s2_ok}")
+    fmt.println(f"empty_sha512_ok: {s5_ok}")
+}
+
+fn test_single_char() -> void {
+    i64 f = hash.fnv1a("x")
+    i64 d = hash.djb2("x")
+    string m, err e1 = hash.md5("x")
+    string s, err e2 = hash.sha256("x")
+    bool f_ok = f != i64(0)
+    bool d_ok = d != i64(0)
+    i32 m_len = m.len()
+    bool m_ok = m_len == 32
+    i32 s_len = s.len()
+    bool s_ok = s_len == 64
+    fmt.println(f"single_char_fnv1a_nonzero: {f_ok}")
+    fmt.println(f"single_char_djb2_nonzero: {d_ok}")
+    fmt.println(f"single_char_md5_len: {m_ok}")
+    fmt.println(f"single_char_sha256_len: {s_ok}")
+}
+
+fn test_long_string() -> void {
+    string long = "abcdefghijklmnopqrstuvwxyz0123456789abcdefghijklmnopqrstuvwxyz0123456789abcdefghijklmnopqrstuvwxyz0123456789abcdefghijklmnopqrstuvwxyz0123456789abcdefghijklmnopqrstuvwxyz0123456789abcdefghijklmnopqrstuvwxyz0123456789abcdefghijklmnopqrstuvwxyz0123456789abcdefghijklmnopqrstuvwxyz0123456789"
+    i64 f = hash.fnv1a(long)
+    i64 d = hash.djb2(long)
+    string m, err e1 = hash.md5(long)
+    string s, err e2 = hash.sha512(long)
+    bool f_ok = f != i64(0)
+    bool d_ok = d != i64(0)
+    i32 m_len = m.len()
+    bool m_ok = m_len == 32
+    i32 s_len = s.len()
+    bool s_ok = s_len == 128
+    fmt.println(f"long_fnv1a_nonzero: {f_ok}")
+    fmt.println(f"long_djb2_nonzero: {d_ok}")
+    fmt.println(f"long_md5_len: {m_ok}")
+    fmt.println(f"long_sha512_len: {s_ok}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 09_edge_cases START =====")
+    test_empty_string()
+    test_single_char()
+    test_long_string()
+    fmt.println("===== TEST 09_edge_cases END =====")
+    return 0
+}

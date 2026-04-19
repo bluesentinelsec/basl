@@ -36,7 +36,7 @@ static vigil_status_t xml_push_err(vigil_vm_t *vm, const char *message, size_t m
     vigil_value_t val;
     vigil_status_t status;
     (void)message_len;
-    status = vigil_error_object_new_cstr(vigil_vm_runtime(vm), message != NULL ? message : "", 10, &err_obj, error);
+    status = vigil_error_object_new_cstr(vigil_vm_runtime(vm), message != NULL ? message : "", 1, &err_obj, error);
     if (status != VIGIL_STATUS_OK)
         return status;
     vigil_value_init_object(&val, &err_obj);
@@ -175,6 +175,7 @@ static vigil_status_t xml_doc_root(vigil_vm_t *vm, size_t arg_count, vigil_error
     size_t elem_class;
     vigil_value_t self_val;
     vigil_object_t *self_obj;
+    vigil_status_t status;
 
     doc = xml_get_doc_ptr(vm, vigil_vm_stack_depth(vm) - arg_count);
     self_val = vigil_vm_stack_get(vm, vigil_vm_stack_depth(vm) - arg_count);
@@ -186,10 +187,25 @@ static vigil_status_t xml_doc_root(vigil_vm_t *vm, size_t arg_count, vigil_error
     vigil_vm_stack_pop_n(vm, arg_count);
     if (doc == NULL || doc->root == NULL)
     {
-        vigil_error_set_literal(error, VIGIL_STATUS_INVALID_ARGUMENT, "document has no root element");
-        return VIGIL_STATUS_INVALID_ARGUMENT;
+        /* Push a nil element and an error, matching child() pattern */
+        vigil_value_t fields[ELEM_FIELD_COUNT];
+        vigil_object_t *nil_inst = NULL;
+        vigil_value_t nil_val;
+        vigil_value_init_int(&fields[ELEM_FIELD_PTR], 0);
+        status = vigil_instance_object_new(vigil_vm_runtime(vm), elem_class, fields, ELEM_FIELD_COUNT, &nil_inst, error);
+        if (status != VIGIL_STATUS_OK)
+            return status;
+        vigil_value_init_object(&nil_val, &nil_inst);
+        status = vigil_vm_stack_push(vm, &nil_val, error);
+        vigil_value_release(&nil_val);
+        if (status != VIGIL_STATUS_OK)
+            return status;
+        return xml_push_err(vm, "document has no root element", 28U, error);
     }
-    return xml_wrap_element(vm, elem_class, doc->root, error);
+    status = xml_wrap_element(vm, elem_class, doc->root, error);
+    if (status != VIGIL_STATUS_OK)
+        return status;
+    return xml_push_ok_err(vm, error);
 }
 
 static vigil_status_t xml_doc_version(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
@@ -504,7 +520,7 @@ static const vigil_native_class_field_t xml_elem_fields[] = {
 static const vigil_native_class_method_t xml_doc_methods[] = {
     {"parse", 5U, xml_doc_parse, 1U, str_param, VIGIL_TYPE_OBJECT, 2U, obj_err_returns, 1, "Document", 8U, 0,
      xml_text_param_names, NULL, "xml.Document", &xml_parse_doc},
-    {"root", 4U, xml_doc_root, 0U, NULL, VIGIL_TYPE_OBJECT, 1U, NULL, 0, "Element", 7U, 0, NULL, NULL, "xml.Element",
+    {"root", 4U, xml_doc_root, 0U, NULL, VIGIL_TYPE_OBJECT, 2U, obj_err_returns, 0, "Element", 7U, 0, NULL, NULL, "xml.Element",
      &xml_root_doc},
     {"version", 7U, xml_doc_version, 0U, NULL, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, 0U, 0, NULL, NULL, NULL,
      &xml_version_doc},
@@ -521,10 +537,10 @@ static const vigil_native_class_method_t xml_elem_methods[] = {
      &xml_all_text_doc},
     {"attr", 4U, xml_elem_attr, 1U, str_param, VIGIL_TYPE_STRING, 2U, str_bool_returns, 0, NULL, 0U, 0,
      xml_name_param_names, NULL, NULL, &xml_attr_doc},
-    {"children", 8U, xml_elem_children, 0U, NULL, VIGIL_TYPE_OBJECT, 1U, NULL, 0, NULL, 0U, 0, NULL, NULL, NULL,
-     &xml_children_doc},
-    {"children_by_tag", 15U, xml_elem_children_by_tag, 1U, str_param, VIGIL_TYPE_OBJECT, 1U, NULL, 0, NULL, 0U, 0,
-     xml_tag_param_names, NULL, NULL, &xml_children_by_tag_doc},
+    {"children", 8U, xml_elem_children, 0U, NULL, VIGIL_TYPE_OBJECT, 1U, NULL, 0, "xml.Element", 11U, VIGIL_TYPE_OBJECT,
+     NULL, NULL, "array<xml.Element>", &xml_children_doc},
+    {"children_by_tag", 15U, xml_elem_children_by_tag, 1U, str_param, VIGIL_TYPE_OBJECT, 1U, NULL, 0, "xml.Element",
+     11U, VIGIL_TYPE_OBJECT, xml_tag_param_names, NULL, "array<xml.Element>", &xml_children_by_tag_doc},
     {"child", 5U, xml_elem_child, 1U, str_param, VIGIL_TYPE_OBJECT, 2U, obj_err_returns, 0, NULL, 0U, 0,
      xml_tag_param_names, NULL, "xml.Element", &xml_child_doc},
 };

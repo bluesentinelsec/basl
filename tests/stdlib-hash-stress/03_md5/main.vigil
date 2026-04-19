@@ -1,0 +1,42 @@
+import "fmt"
+import "hash"
+
+fn test_empty_vector() -> void {
+    string h, err e = hash.md5("")
+    bool ok = e == ok
+    bool match = h == "d41d8cd98f00b204e9800998ecf8427e"
+    fmt.println(f"md5_empty_ok: {ok}")
+    fmt.println(f"md5_empty_vector: {match}")
+}
+
+fn test_hello_vector() -> void {
+    string h, err e = hash.md5("hello")
+    bool ok = e == ok
+    bool match = h == "5d41402abc4b2a76b9719d911017c592"
+    fmt.println(f"md5_hello_ok: {ok}")
+    fmt.println(f"md5_hello_vector: {match}")
+}
+
+fn test_output_length() -> void {
+    string h, err e = hash.md5("test data")
+    i32 len = h.len()
+    bool ok = len == 32
+    fmt.println(f"md5_output_length_32: {ok}")
+}
+
+fn test_consistency() -> void {
+    string h1, err e1 = hash.md5("consistent")
+    string h2, err e2 = hash.md5("consistent")
+    bool ok = h1 == h2
+    fmt.println(f"md5_consistency: {ok}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 03_md5 START =====")
+    test_empty_vector()
+    test_hello_vector()
+    test_output_length()
+    test_consistency()
+    fmt.println("===== TEST 03_md5 END =====")
+    return 0
+}

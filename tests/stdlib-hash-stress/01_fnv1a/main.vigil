@@ -1,0 +1,52 @@
+import "fmt"
+import "hash"
+
+fn test_basic_inputs() -> void {
+    i64 h1 = hash.fnv1a("hello")
+    i64 h2 = hash.fnv1a("world")
+    i64 h3 = hash.fnv1a("hello world")
+    bool ok1 = h1 != i64(0)
+    bool ok2 = h2 != i64(0)
+    bool ok3 = h3 != i64(0)
+    fmt.println(f"fnv1a_hello_nonzero: {ok1}")
+    fmt.println(f"fnv1a_world_nonzero: {ok2}")
+    fmt.println(f"fnv1a_hello_world_nonzero: {ok3}")
+}
+
+fn test_consistency() -> void {
+    i64 h1 = hash.fnv1a("test")
+    i64 h2 = hash.fnv1a("test")
+    bool ok = h1 == h2
+    fmt.println(f"fnv1a_consistency: {ok}")
+}
+
+fn test_different_inputs_differ() -> void {
+    i64 h1 = hash.fnv1a("abc")
+    i64 h2 = hash.fnv1a("def")
+    bool differ = h1 != h2
+    fmt.println(f"fnv1a_different_inputs_differ: {differ}")
+}
+
+fn test_empty_string() -> void {
+    i64 h = hash.fnv1a("")
+    bool ok = h != i64(0)
+    fmt.println(f"fnv1a_empty_nonzero: {ok}")
+}
+
+fn test_single_char() -> void {
+    i64 h1 = hash.fnv1a("a")
+    i64 h2 = hash.fnv1a("b")
+    bool differ = h1 != h2
+    fmt.println(f"fnv1a_single_char_differ: {differ}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 01_fnv1a START =====")
+    test_basic_inputs()
+    test_consistency()
+    test_different_inputs_differ()
+    test_empty_string()
+    test_single_char()
+    fmt.println("===== TEST 01_fnv1a END =====")
+    return 0
+}

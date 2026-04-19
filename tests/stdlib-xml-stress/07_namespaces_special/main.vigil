@@ -1,0 +1,61 @@
+import "fmt"
+import "xml"
+
+fn test_self_closing() -> void {
+    string src = "<root><br/><hr/><img src=\"pic.png\"/></root>"
+    xml.Document doc, err e = xml.Document.parse(src)
+    xml.Element root, err re = doc.root()
+    array<xml.Element> kids = root.children()
+    i32 count = kids.len()
+    fmt.println(f"self-closing children: {count}")
+    string t0 = kids[0].tag()
+    fmt.println(f"child 0 tag: {t0}")
+    string t2 = kids[2].tag()
+    fmt.println(f"child 2 tag: {t2}")
+    string imgval, bool found = kids[2].attr("src")
+    fmt.println(f"img src: {imgval}")
+}
+
+fn test_cdata() -> void {
+    string src = "<script><![CDATA[if (a < b && c > d) { return true; }]]></script>"
+    xml.Document doc, err e = xml.Document.parse(src)
+    bool ok = e == ok
+    fmt.println(f"cdata parse ok: {ok}")
+    xml.Element root, err re = doc.root()
+    string text = root.text()
+    bool has_lt = text.contains("<")
+    fmt.println(f"cdata has lt: {has_lt}")
+}
+
+fn test_special_chars() -> void {
+    string src = "<data>&lt;tag&gt; &amp; &quot;quoted&quot;</data>"
+    xml.Document doc, err e = xml.Document.parse(src)
+    xml.Element root, err re = doc.root()
+    string text = root.text()
+    bool has_amp = text.contains("&")
+    fmt.println(f"special has amp: {has_amp}")
+    bool has_lt = text.contains("<")
+    fmt.println(f"special has lt: {has_lt}")
+}
+
+fn test_namespace_prefix() -> void {
+    string src = "<root xmlns:ns=\"http://example.com\"><ns:item>val</ns:item></root>"
+    xml.Document doc, err e = xml.Document.parse(src)
+    bool ok = e == ok
+    fmt.println(f"namespace parse ok: {ok}")
+    xml.Element root, err re = doc.root()
+    array<xml.Element> kids = root.children()
+    i32 count = kids.len()
+    bool has_child = count > 0
+    fmt.println(f"namespace has child: {has_child}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 07_NAMESPACES_SPECIAL START =====")
+    test_self_closing()
+    test_cdata()
+    test_special_chars()
+    test_namespace_prefix()
+    fmt.println("===== TEST 07_NAMESPACES_SPECIAL END =====")
+    return 0
+}
