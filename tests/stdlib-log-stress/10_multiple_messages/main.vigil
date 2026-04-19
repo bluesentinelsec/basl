@@ -1,0 +1,41 @@
+import "fmt"
+import "log"
+
+fn main() -> i32 {
+    fmt.println("===== TEST stdlib-log-stress START =====")
+
+    err e = log.set_level("debug")
+    bool ok1 = e == ok
+    fmt.println(f"set_level: {ok1}")
+
+    i32 i = 0
+    while i < 50 {
+        log.debug(f"debug msg {i}")
+        i = i + 1
+    }
+    fmt.println("50_debug_no_crash: true")
+
+    i = 0
+    while i < 50 {
+        log.info(f"info msg {i}")
+        i = i + 1
+    }
+    fmt.println("50_info_no_crash: true")
+
+    i = 0
+    while i < 50 {
+        log.warn(f"warn msg {i}")
+        i = i + 1
+    }
+    fmt.println("50_warn_no_crash: true")
+
+    i = 0
+    while i < 50 {
+        log.error(f"error msg {i}")
+        i = i + 1
+    }
+    fmt.println("50_error_no_crash: true")
+
+    fmt.println("===== TEST stdlib-log-stress END =====")
+    return 0
+}

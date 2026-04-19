@@ -1,0 +1,29 @@
+import "fmt"
+import "log"
+
+fn main() -> i32 {
+    fmt.println("===== TEST stdlib-log-stress START =====")
+
+    err e1 = log.set_level("invalid_level")
+    bool fail1 = e1 != ok
+    fmt.println(f"invalid_returns_err: {fail1}")
+
+    err e2 = log.set_level("CRITICAL")
+    bool fail2 = e2 != ok
+    fmt.println(f"critical_returns_err: {fail2}")
+
+    err e3 = log.set_level("warning")
+    bool fail3 = e3 != ok
+    fmt.println(f"warning_returns_err: {fail3}")
+
+    // valid level still works after errors
+    err e4 = log.set_level("info")
+    bool ok4 = e4 == ok
+    fmt.println(f"valid_after_errors: {ok4}")
+
+    log.info("still works after errors")
+    fmt.println("log_after_errors: true")
+
+    fmt.println("===== TEST stdlib-log-stress END =====")
+    return 0
+}

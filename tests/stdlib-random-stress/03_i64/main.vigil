@@ -1,0 +1,26 @@
+import "fmt"
+import "random"
+
+fn main() -> i32 {
+    fmt.println("===== TEST stdlib-random-stress START =====")
+
+    random.seed(1)
+    i64 a = random.i64()
+    i64 b = random.i64()
+    i64 c = random.i64()
+
+    fmt.println(f"i64_a: {a}")
+    fmt.println(f"i64_b: {b}")
+    fmt.println(f"i64_c: {c}")
+
+    bool ab = a != b
+    bool bc = b != c
+    fmt.println(f"a_differs_b: {ab}")
+    fmt.println(f"b_differs_c: {bc}")
+
+    bool big = a > i64(1000000) || a < i64(-1000000)
+    fmt.println(f"has_large_magnitude: {big}")
+
+    fmt.println("===== TEST stdlib-random-stress END =====")
+    return 0
+}

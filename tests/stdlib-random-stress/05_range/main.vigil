@@ -1,0 +1,32 @@
+import "fmt"
+import "random"
+
+fn main() -> i32 {
+    fmt.println("===== TEST stdlib-random-stress START =====")
+
+    random.seed(7)
+    bool all_in_bounds = true
+    i32 i = 0
+    while i < 100 {
+        i32 v = random.range(10, 20)
+        if v < 10 || v > 20 {
+            all_in_bounds = false
+        }
+        i = i + 1
+    }
+    fmt.println(f"range_10_20_in_bounds: {all_in_bounds}")
+
+    bool neg_ok = true
+    i = 0
+    while i < 50 {
+        i32 v = random.range(-100, -50)
+        if v < -100 || v > -50 {
+            neg_ok = false
+        }
+        i = i + 1
+    }
+    fmt.println(f"range_neg_in_bounds: {neg_ok}")
+
+    fmt.println("===== TEST stdlib-random-stress END =====")
+    return 0
+}

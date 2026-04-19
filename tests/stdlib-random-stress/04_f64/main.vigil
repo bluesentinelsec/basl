@@ -1,0 +1,27 @@
+import "fmt"
+import "random"
+
+fn main() -> i32 {
+    fmt.println("===== TEST stdlib-random-stress START =====")
+
+    random.seed(10)
+    bool all_in_range = true
+    i32 i = 0
+    while i < 100 {
+        f64 v = random.f64()
+        if v < 0.0 || v >= 1.0 {
+            all_in_range = false
+        }
+        i = i + 1
+    }
+    fmt.println(f"all_in_0_1: {all_in_range}")
+
+    random.seed(10)
+    f64 a = random.f64()
+    f64 b = random.f64()
+    bool diff = a != b
+    fmt.println(f"f64_differs: {diff}")
+
+    fmt.println("===== TEST stdlib-random-stress END =====")
+    return 0
+}

@@ -1,0 +1,68 @@
+import "fmt"
+import "parse"
+
+fn test_negative_zero_f64() -> void {
+    f64 val, err e = parse.f64("-0.0")
+    bool ok = e == ok
+    fmt.println(f"f64 neg zero ok: {ok}")
+    fmt.println(f"f64 neg zero val: {val}")
+}
+
+fn test_inf_string() -> void {
+    f64 val, err e = parse.f64("inf")
+    bool failed = e != ok
+    fmt.println(f"f64 inf fail: {failed}")
+}
+
+fn test_nan_string() -> void {
+    f64 val, err e = parse.f64("nan")
+    bool failed = e != ok
+    fmt.println(f"f64 nan fail: {failed}")
+}
+
+fn test_negative_inf() -> void {
+    f64 val, err e = parse.f64("-inf")
+    bool failed = e != ok
+    fmt.println(f"f64 neg inf fail: {failed}")
+}
+
+fn test_positive_zero() -> void {
+    f64 val, err e = parse.f64("0.0")
+    bool ok = e == ok
+    fmt.println(f"f64 pos zero ok: {ok}")
+    fmt.println(f"f64 pos zero val: {val}")
+}
+
+fn test_very_small() -> void {
+    f64 val, err e = parse.f64("5e-324")
+    bool ok = e == ok
+    fmt.println(f"f64 very small ok: {ok}")
+}
+
+fn test_very_large() -> void {
+    f64 val, err e = parse.f64("1e308")
+    bool ok = e == ok
+    fmt.println(f"f64 very large ok: {ok}")
+}
+
+fn test_i32_negative_zero() -> void {
+    i32 val, err e = parse.i32("-0")
+    bool ok = e == ok
+    bool is_zero = val == 0
+    fmt.println(f"i32 neg zero ok: {ok}")
+    fmt.println(f"i32 neg zero val: {is_zero}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 09_special_values START =====")
+    test_negative_zero_f64()
+    test_inf_string()
+    test_nan_string()
+    test_negative_inf()
+    test_positive_zero()
+    test_very_small()
+    test_very_large()
+    test_i32_negative_zero()
+    fmt.println("===== TEST 09_special_values END =====")
+    return 0
+}

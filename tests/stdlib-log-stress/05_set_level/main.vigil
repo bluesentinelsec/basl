@@ -1,0 +1,39 @@
+import "fmt"
+import "log"
+
+fn main() -> i32 {
+    fmt.println("===== TEST stdlib-log-stress START =====")
+
+    // valid levels
+    err e1 = log.set_level("debug")
+    bool ok1 = e1 == ok
+    fmt.println(f"valid_debug: {ok1}")
+
+    err e2 = log.set_level("info")
+    bool ok2 = e2 == ok
+    fmt.println(f"valid_info: {ok2}")
+
+    err e3 = log.set_level("warn")
+    bool ok3 = e3 == ok
+    fmt.println(f"valid_warn: {ok3}")
+
+    err e4 = log.set_level("error")
+    bool ok4 = e4 == ok
+    fmt.println(f"valid_error: {ok4}")
+
+    // invalid levels
+    err e5 = log.set_level("invalid")
+    bool fail1 = e5 != ok
+    fmt.println(f"invalid_level_fails: {fail1}")
+
+    err e6 = log.set_level("")
+    bool fail2 = e6 != ok
+    fmt.println(f"empty_level_fails: {fail2}")
+
+    err e7 = log.set_level("TRACE")
+    bool fail3 = e7 != ok
+    fmt.println(f"trace_level_fails: {fail3}")
+
+    fmt.println("===== TEST stdlib-log-stress END =====")
+    return 0
+}

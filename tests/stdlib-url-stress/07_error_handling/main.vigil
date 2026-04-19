@@ -1,0 +1,64 @@
+import "fmt"
+import "url"
+
+fn test_empty_url_scheme() -> void {
+    string val, err e = url.scheme("")
+    bool failed = e != ok
+    fmt.println(f"empty scheme fail: {failed}")
+}
+
+fn test_empty_url_host() -> void {
+    string val, err e = url.host("")
+    bool failed = e != ok
+    fmt.println(f"empty host fail: {failed}")
+}
+
+fn test_no_scheme() -> void {
+    string val, err e = url.scheme("example.com/path")
+    bool failed = e != ok
+    fmt.println(f"no scheme fail: {failed}")
+}
+
+fn test_malformed_scheme() -> void {
+    string val, err e = url.scheme("://missing")
+    bool failed = e != ok
+    fmt.println(f"malformed scheme fail: {failed}")
+}
+
+fn test_just_colon() -> void {
+    string val, err e = url.scheme(":")
+    bool failed = e != ok
+    fmt.println(f"just colon fail: {failed}")
+}
+
+fn test_empty_port() -> void {
+    string val, err e = url.port("")
+    bool failed = e != ok
+    fmt.println(f"empty port fail: {failed}")
+}
+
+fn test_empty_path() -> void {
+    string val, err e = url.path("")
+    bool failed = e != ok
+    fmt.println(f"empty path fail: {failed}")
+}
+
+fn test_empty_query() -> void {
+    string val, err e = url.query("")
+    bool failed = e != ok
+    fmt.println(f"empty query fail: {failed}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 07_error_handling START =====")
+    test_empty_url_scheme()
+    test_empty_url_host()
+    test_no_scheme()
+    test_malformed_scheme()
+    test_just_colon()
+    test_empty_port()
+    test_empty_path()
+    test_empty_query()
+    fmt.println("===== TEST 07_error_handling END =====")
+    return 0
+}

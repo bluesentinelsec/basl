@@ -1,0 +1,60 @@
+import "fmt"
+import "url"
+
+fn test_fragment() -> void {
+    string val, err e = url.fragment("https://example.com/page#section1")
+    bool ok = e == ok
+    bool correct = val == "section1"
+    fmt.println(f"fragment ok: {ok}")
+    fmt.println(f"fragment val: {correct}")
+}
+
+fn test_fragment_with_query() -> void {
+    string val, err e = url.fragment("https://example.com/page?q=1#top")
+    bool ok = e == ok
+    bool correct = val == "top"
+    fmt.println(f"fragment query ok: {ok}")
+    fmt.println(f"fragment query val: {correct}")
+}
+
+fn test_no_fragment() -> void {
+    string val, err e = url.fragment("https://example.com/page")
+    bool ok = e == ok
+    fmt.println(f"no fragment ok: {ok}")
+    fmt.println(f"no fragment val: [{val}]")
+}
+
+fn test_empty_fragment() -> void {
+    string val, err e = url.fragment("https://example.com/page#")
+    bool ok = e == ok
+    fmt.println(f"empty fragment ok: {ok}")
+    fmt.println(f"empty fragment val: [{val}]")
+}
+
+fn test_fragment_with_dash() -> void {
+    string val, err e = url.fragment("https://example.com#my-section")
+    bool ok = e == ok
+    bool correct = val == "my-section"
+    fmt.println(f"fragment dash ok: {ok}")
+    fmt.println(f"fragment dash val: {correct}")
+}
+
+fn test_fragment_long() -> void {
+    string val, err e = url.fragment("https://example.com#heading-with-many-words")
+    bool ok = e == ok
+    bool correct = val == "heading-with-many-words"
+    fmt.println(f"fragment long ok: {ok}")
+    fmt.println(f"fragment long val: {correct}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 04_fragment START =====")
+    test_fragment()
+    test_fragment_with_query()
+    test_no_fragment()
+    test_empty_fragment()
+    test_fragment_with_dash()
+    test_fragment_long()
+    fmt.println("===== TEST 04_fragment END =====")
+    return 0
+}

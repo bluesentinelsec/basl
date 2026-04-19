@@ -563,25 +563,36 @@ static vigil_status_t gzip_decompress_fn(vigil_vm_t *vm, size_t arg_count, vigil
     vigil_allocator_t alloc = get_alloc(vm);
 
     src = get_bytes_data(vigil_vm_stack_get(vm, base), &src_len);
-    vigil_vm_stack_pop_n(vm, arg_count);
 
     if (!src || src_len < 18)
+    {
+        vigil_vm_stack_pop_n(vm, arg_count);
         return push_bytes_and_err(vm, "invalid gzip data", error);
+    }
 
     const unsigned char *usrc = (const unsigned char *)src;
     if (usrc[0] != 0x1f || usrc[1] != 0x8b)
+    {
+        vigil_vm_stack_pop_n(vm, arg_count);
         return push_bytes_and_err(vm, "not gzip format", error);
+    }
 
     size_t hdr_len = gzip_skip_header(usrc, src_len);
     if (hdr_len == 0)
+    {
+        vigil_vm_stack_pop_n(vm, arg_count);
         return push_bytes_and_err(vm, "invalid gzip header", error);
+    }
 
     size_t deflate_len = src_len - hdr_len - 8;
     size_t dst_cap = 1024 * 64;
     size_t dst_len = 0;
     unsigned char *dst = (unsigned char *)alloc.allocate(alloc.user_data, dst_cap);
     if (!dst)
+    {
+        vigil_vm_stack_pop_n(vm, arg_count);
         return push_bytes_and_err(vm, "allocation failed", error);
+    }
 
     tinfl_decompressor decomp;
     tinfl_init(&decomp);
@@ -601,6 +612,7 @@ static vigil_status_t gzip_decompress_fn(vigil_vm_t *vm, size_t arg_count, vigil
         if (status < 0)
         {
             alloc.deallocate(alloc.user_data, dst);
+            vigil_vm_stack_pop_n(vm, arg_count);
             return push_bytes_and_err(vm, "gzip decompression failed", error);
         }
         if (status == TINFL_STATUS_HAS_MORE_OUTPUT || dst_len >= dst_cap)
@@ -610,6 +622,7 @@ static vigil_status_t gzip_decompress_fn(vigil_vm_t *vm, size_t arg_count, vigil
             if (!new_dst)
             {
                 alloc.deallocate(alloc.user_data, dst);
+                vigil_vm_stack_pop_n(vm, arg_count);
                 return push_bytes_and_err(vm, "allocation failed during decompression", error);
             }
             dst = new_dst;
@@ -617,6 +630,7 @@ static vigil_status_t gzip_decompress_fn(vigil_vm_t *vm, size_t arg_count, vigil
         }
     }
 
+    vigil_vm_stack_pop_n(vm, arg_count);
     vigil_status_t ret = push_bytes_and_ok(vm, dst, dst_len, error);
     alloc.deallocate(alloc.user_data, dst);
     return ret;
@@ -1118,12 +1132,16 @@ static vigil_status_t tar_read_fn(vigil_vm_t *vm, size_t arg_count, vigil_error_
 
     tar_data = get_bytes_data(vigil_vm_stack_get(vm, base), &tar_len);
     name = get_bytes_data(vigil_vm_stack_get(vm, base + 1), &name_len);
-    vigil_vm_stack_pop_n(vm, arg_count);
 
     if (!tar_data || tar_len == 0 || !name || name_len == 0)
     {
+        vigil_vm_stack_pop_n(vm, arg_count);
         return push_bytes_and_err(vm, "invalid tar data or filename", error);
     }
+
+    /* Search for the named entry — do all work before popping */
+    const char *found_data = NULL;
+    size_t found_size = 0;
 
     while (pos + 512 <= tar_len)
     {
@@ -1157,12 +1175,32 @@ static vigil_status_t tar_read_fn(vigil_vm_t *vm, size_t arg_count, vigil_error_
         {
             if (pos + 512 + file_size <= tar_len)
             {
-                return push_bytes_and_ok(vm, tar_data + pos + 512, file_size, error);
+                found_data = tar_data + pos + 512;
+                found_size = file_size;
             }
             break;
         }
 
         pos += 512 + ((file_size + 511) & ~511);
+    }
+
+    /* Copy found data before popping — stack pop may free the backing string */
+    vigil_allocator_t alloc = get_alloc(vm);
+    char *result_copy = NULL;
+    if (found_data)
+    {
+        result_copy = (char *)alloc.allocate(alloc.user_data, found_size);
+        if (result_copy)
+            memcpy(result_copy, found_data, found_size);
+    }
+
+    vigil_vm_stack_pop_n(vm, arg_count);
+
+    if (result_copy)
+    {
+        vigil_status_t rs = push_bytes_and_ok(vm, result_copy, found_size, error);
+        alloc.deallocate(alloc.user_data, result_copy);
+        return rs;
     }
 
     return push_bytes_and_err(vm, "file not found in tar archive", error);

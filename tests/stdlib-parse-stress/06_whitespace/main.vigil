@@ -1,0 +1,71 @@
+import "fmt"
+import "parse"
+
+fn test_leading_space() -> void {
+    i32 val, err e = parse.i32(" 42")
+    bool failed = e != ok
+    fmt.println(f"leading space fail: {failed}")
+}
+
+fn test_trailing_space() -> void {
+    i32 val, err e = parse.i32("42 ")
+    bool failed = e != ok
+    fmt.println(f"trailing space fail: {failed}")
+}
+
+fn test_both_spaces() -> void {
+    i32 val, err e = parse.i32(" 42 ")
+    bool failed = e != ok
+    fmt.println(f"both spaces fail: {failed}")
+}
+
+fn test_empty_string() -> void {
+    i32 val, err e = parse.i32("")
+    bool failed = e != ok
+    fmt.println(f"empty i32 fail: {failed}")
+}
+
+fn test_only_spaces() -> void {
+    i32 val, err e = parse.i32("   ")
+    bool failed = e != ok
+    fmt.println(f"only spaces fail: {failed}")
+}
+
+fn test_tab() -> void {
+    i32 val, err e = parse.i32("\t42")
+    bool failed = e != ok
+    fmt.println(f"tab fail: {failed}")
+}
+
+fn test_f64_leading_space() -> void {
+    f64 val, err e = parse.f64(" 3.14")
+    bool failed = e != ok
+    fmt.println(f"f64 leading space fail: {failed}")
+}
+
+fn test_bool_trailing_space() -> void {
+    bool val, err e = parse.bool("true ")
+    bool failed = e != ok
+    fmt.println(f"bool trailing space fail: {failed}")
+}
+
+fn test_i64_empty() -> void {
+    i64 val, err e = parse.i64("")
+    bool failed = e != ok
+    fmt.println(f"i64 empty fail: {failed}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 06_whitespace START =====")
+    test_leading_space()
+    test_trailing_space()
+    test_both_spaces()
+    test_empty_string()
+    test_only_spaces()
+    test_tab()
+    test_f64_leading_space()
+    test_bool_trailing_space()
+    test_i64_empty()
+    fmt.println("===== TEST 06_whitespace END =====")
+    return 0
+}

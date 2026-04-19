@@ -1,0 +1,70 @@
+import "fmt"
+import "url"
+
+fn test_path() -> void {
+    string val, err e = url.path("https://example.com/foo/bar")
+    bool ok = e == ok
+    bool correct = val == "/foo/bar"
+    fmt.println(f"path ok: {ok}")
+    fmt.println(f"path val: {correct}")
+}
+
+fn test_root_path() -> void {
+    string val, err e = url.path("https://example.com/")
+    bool ok = e == ok
+    bool correct = val == "/"
+    fmt.println(f"root path ok: {ok}")
+    fmt.println(f"root path val: {correct}")
+}
+
+fn test_query() -> void {
+    string val, err e = url.query("https://example.com/search?q=hello&lang=en")
+    bool ok = e == ok
+    bool correct = val == "q=hello&lang=en"
+    fmt.println(f"query ok: {ok}")
+    fmt.println(f"query val: {correct}")
+}
+
+fn test_query_single() -> void {
+    string val, err e = url.query("https://example.com?key=value")
+    bool ok = e == ok
+    bool correct = val == "key=value"
+    fmt.println(f"query single ok: {ok}")
+    fmt.println(f"query single val: {correct}")
+}
+
+fn test_no_query() -> void {
+    string val, err e = url.query("https://example.com/path")
+    bool ok = e == ok
+    fmt.println(f"no query ok: {ok}")
+    fmt.println(f"no query val: [{val}]")
+}
+
+fn test_deep_path() -> void {
+    string val, err e = url.path("https://example.com/a/b/c/d/e")
+    bool ok = e == ok
+    bool correct = val == "/a/b/c/d/e"
+    fmt.println(f"deep path ok: {ok}")
+    fmt.println(f"deep path val: {correct}")
+}
+
+fn test_path_with_query() -> void {
+    string val, err e = url.path("https://example.com/page?id=1")
+    bool ok = e == ok
+    bool correct = val == "/page"
+    fmt.println(f"path with query ok: {ok}")
+    fmt.println(f"path with query val: {correct}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 03_path_query START =====")
+    test_path()
+    test_root_path()
+    test_query()
+    test_query_single()
+    test_no_query()
+    test_deep_path()
+    test_path_with_query()
+    fmt.println("===== TEST 03_path_query END =====")
+    return 0
+}

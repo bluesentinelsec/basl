@@ -1,0 +1,35 @@
+import "fmt"
+import "random"
+
+fn main() -> i32 {
+    fmt.println("===== TEST stdlib-random-stress START =====")
+
+    // range(n, n) should return n
+    random.seed(1)
+    i32 v1 = random.range(0, 0)
+    bool z = v1 == 0
+    fmt.println(f"range_0_0: {z}")
+
+    i32 v2 = random.range(5, 5)
+    bool five = v2 == 5
+    fmt.println(f"range_5_5: {five}")
+
+    // seed(0) should work
+    random.seed(0)
+    i32 a = random.i32()
+    fmt.println(f"seed_0_works: true")
+
+    // negative seed
+    random.seed(-42)
+    i32 b = random.i32()
+    fmt.println(f"neg_seed_works: true")
+
+    // negative seed reproducibility
+    random.seed(-42)
+    i32 c = random.i32()
+    bool neg_repro = b == c
+    fmt.println(f"neg_seed_repro: {neg_repro}")
+
+    fmt.println("===== TEST stdlib-random-stress END =====")
+    return 0
+}

@@ -1,0 +1,68 @@
+import "fmt"
+import "url"
+
+fn test_decode_space() -> void {
+    string val, err e = url.decode("hello%20world")
+    bool ok = e == ok
+    bool correct = val == "hello world"
+    fmt.println(f"decode space ok: {ok}")
+    fmt.println(f"decode space val: {correct}")
+}
+
+fn test_decode_plus() -> void {
+    string val, err e = url.decode("hello+world")
+    bool ok = e == ok
+    fmt.println(f"decode plus ok: {ok}")
+    fmt.println(f"decode plus val: {val}")
+}
+
+fn test_decode_special() -> void {
+    string val, err e = url.decode("a%26b%3Dc")
+    bool ok = e == ok
+    bool correct = val == "a&b=c"
+    fmt.println(f"decode special ok: {ok}")
+    fmt.println(f"decode special val: {correct}")
+}
+
+fn test_decode_empty() -> void {
+    string val, err e = url.decode("")
+    bool ok = e == ok
+    bool empty = val == ""
+    fmt.println(f"decode empty ok: {ok}")
+    fmt.println(f"decode empty val: {empty}")
+}
+
+fn test_decode_no_encoding() -> void {
+    string val, err e = url.decode("hello")
+    bool ok = e == ok
+    bool correct = val == "hello"
+    fmt.println(f"decode plain ok: {ok}")
+    fmt.println(f"decode plain val: {correct}")
+}
+
+fn test_decode_multiple() -> void {
+    string val, err e = url.decode("%48%65%6C%6C%6F")
+    bool ok = e == ok
+    bool correct = val == "Hello"
+    fmt.println(f"decode multi ok: {ok}")
+    fmt.println(f"decode multi val: {correct}")
+}
+
+fn test_decode_invalid() -> void {
+    string val, err e = url.decode("%ZZ")
+    bool failed = e != ok
+    fmt.println(f"decode invalid fail: {failed}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 06_decode START =====")
+    test_decode_space()
+    test_decode_plus()
+    test_decode_special()
+    test_decode_empty()
+    test_decode_no_encoding()
+    test_decode_multiple()
+    test_decode_invalid()
+    fmt.println("===== TEST 06_decode END =====")
+    return 0
+}

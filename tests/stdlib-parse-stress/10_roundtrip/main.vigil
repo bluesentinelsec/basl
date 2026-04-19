@@ -1,0 +1,66 @@
+import "fmt"
+import "parse"
+
+fn test_i32_roundtrip() -> void {
+    i32 val, err e = parse.i32("12345")
+    bool ok = e == ok
+    string s = f"{val}"
+    bool match = s == "12345"
+    fmt.println(f"i32 roundtrip ok: {ok}")
+    fmt.println(f"i32 roundtrip match: {match}")
+}
+
+fn test_i32_neg_roundtrip() -> void {
+    i32 val, err e = parse.i32("-678")
+    bool ok = e == ok
+    string s = f"{val}"
+    bool match = s == "-678"
+    fmt.println(f"i32 neg roundtrip ok: {ok}")
+    fmt.println(f"i32 neg roundtrip match: {match}")
+}
+
+fn test_i64_roundtrip() -> void {
+    i64 val, err e = parse.i64("9876543210")
+    bool ok = e == ok
+    string s = f"{val}"
+    bool match = s == "9876543210"
+    fmt.println(f"i64 roundtrip ok: {ok}")
+    fmt.println(f"i64 roundtrip match: {match}")
+}
+
+fn test_f64_roundtrip() -> void {
+    f64 val, err e = parse.f64("3.14")
+    bool ok = e == ok
+    fmt.println(f"f64 roundtrip ok: {ok}")
+    fmt.println(f"f64 roundtrip val: {val}")
+}
+
+fn test_bool_roundtrip() -> void {
+    bool val, err e = parse.bool("true")
+    bool ok = e == ok
+    string s = f"{val}"
+    bool match = s == "true"
+    fmt.println(f"bool roundtrip ok: {ok}")
+    fmt.println(f"bool roundtrip match: {match}")
+}
+
+fn test_zero_roundtrip() -> void {
+    i32 val, err e = parse.i32("0")
+    bool ok = e == ok
+    string s = f"{val}"
+    bool match = s == "0"
+    fmt.println(f"zero roundtrip ok: {ok}")
+    fmt.println(f"zero roundtrip match: {match}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 10_roundtrip START =====")
+    test_i32_roundtrip()
+    test_i32_neg_roundtrip()
+    test_i64_roundtrip()
+    test_f64_roundtrip()
+    test_bool_roundtrip()
+    test_zero_roundtrip()
+    fmt.println("===== TEST 10_roundtrip END =====")
+    return 0
+}

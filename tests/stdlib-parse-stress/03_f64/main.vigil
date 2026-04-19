@@ -1,0 +1,70 @@
+import "fmt"
+import "parse"
+
+fn test_integer() -> void {
+    f64 val, err e = parse.f64("42")
+    bool ok = e == ok
+    fmt.println(f"f64 int ok: {ok}")
+    fmt.println(f"f64 int val: {val}")
+}
+
+fn test_decimal() -> void {
+    f64 val, err e = parse.f64("3.14159")
+    bool ok = e == ok
+    fmt.println(f"f64 dec ok: {ok}")
+    fmt.println(f"f64 dec val: {val}")
+}
+
+fn test_scientific() -> void {
+    f64 val, err e = parse.f64("1.5e10")
+    bool ok = e == ok
+    fmt.println(f"f64 sci ok: {ok}")
+    fmt.println(f"f64 sci val: {val}")
+}
+
+fn test_negative_exponent() -> void {
+    f64 val, err e = parse.f64("2.5e-3")
+    bool ok = e == ok
+    fmt.println(f"f64 negexp ok: {ok}")
+    fmt.println(f"f64 negexp val: {val}")
+}
+
+fn test_negative() -> void {
+    f64 val, err e = parse.f64("-99.5")
+    bool ok = e == ok
+    fmt.println(f"f64 neg ok: {ok}")
+    fmt.println(f"f64 neg val: {val}")
+}
+
+fn test_zero() -> void {
+    f64 val, err e = parse.f64("0.0")
+    bool ok = e == ok
+    fmt.println(f"f64 zero ok: {ok}")
+    fmt.println(f"f64 zero val: {val}")
+}
+
+fn test_failure() -> void {
+    f64 val, err e = parse.f64("hello")
+    bool failed = e != ok
+    fmt.println(f"f64 fail: {failed}")
+}
+
+fn test_large_scientific() -> void {
+    f64 val, err e = parse.f64("1.7976931348623157e308")
+    bool ok = e == ok
+    fmt.println(f"f64 large_sci ok: {ok}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 03_f64 START =====")
+    test_integer()
+    test_decimal()
+    test_scientific()
+    test_negative_exponent()
+    test_negative()
+    test_zero()
+    test_failure()
+    test_large_scientific()
+    fmt.println("===== TEST 03_f64 END =====")
+    return 0
+}

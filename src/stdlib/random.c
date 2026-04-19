@@ -27,21 +27,25 @@ static uint64_t xorshift128plus(void)
     return result;
 }
 
+/* Box-Muller cached spare (used by gaussian). */
+static double gaussian_spare;
+static int gaussian_has_spare = 0;
+
 /* ── random.seed(n: i32) ─────────────────────────────────────────── */
 
 static vigil_status_t vigil_random_seed(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
 {
     vigil_value_t v;
     int32_t seed;
-    (void)arg_count;
     (void)error;
 
     v = vigil_vm_stack_get(vm, vigil_vm_stack_depth(vm) - 1U);
-    vigil_vm_stack_pop_n(vm, 1U);
+    vigil_vm_stack_pop_n(vm, arg_count);
     seed = vigil_nanbox_decode_i32(v);
 
     rng_state[0] = (uint64_t)(uint32_t)seed;
     rng_state[1] = (uint64_t)(uint32_t)seed ^ 0x6a09e667bb67ae85ULL;
+    gaussian_has_spare = 0;
     /* Warm up */
     (void)xorshift128plus();
     (void)xorshift128plus();
@@ -120,8 +124,6 @@ static vigil_status_t vigil_random_range(vigil_vm_t *vm, size_t arg_count, vigil
 #include <math.h>
 
 /* Cached spare value for Box-Muller (generates pairs). */
-static double gaussian_spare;
-static int gaussian_has_spare = 0;
 
 static vigil_status_t vigil_random_gaussian(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
 {

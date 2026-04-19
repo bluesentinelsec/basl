@@ -1,0 +1,76 @@
+import "fmt"
+import "url"
+
+fn test_userinfo_host() -> void {
+    string val, err e = url.host("https://user:pass@example.com/path")
+    bool ok = e == ok
+    bool correct = val == "example.com"
+    fmt.println(f"userinfo host ok: {ok}")
+    fmt.println(f"userinfo host val: {correct}")
+}
+
+fn test_userinfo_scheme() -> void {
+    string val, err e = url.scheme("https://user:pass@example.com/path")
+    bool ok = e == ok
+    bool correct = val == "https"
+    fmt.println(f"userinfo scheme ok: {ok}")
+    fmt.println(f"userinfo scheme val: {correct}")
+}
+
+fn test_multi_query_params() -> void {
+    string val, err e = url.query("https://example.com/search?q=test&page=2&sort=asc")
+    bool ok = e == ok
+    bool correct = val == "q=test&page=2&sort=asc"
+    fmt.println(f"multi query ok: {ok}")
+    fmt.println(f"multi query val: {correct}")
+}
+
+fn test_deep_path() -> void {
+    string val, err e = url.path("https://example.com/api/v2/users/123/posts")
+    bool ok = e == ok
+    bool correct = val == "/api/v2/users/123/posts"
+    fmt.println(f"deep path ok: {ok}")
+    fmt.println(f"deep path val: {correct}")
+}
+
+fn test_all_components() -> void {
+    string u = "https://example.com:8443/api/data?format=json#results"
+    string s, err e1 = url.scheme(u)
+    string h, err e2 = url.host(u)
+    string p, err e3 = url.port(u)
+    string pa, err e4 = url.path(u)
+    string q, err e5 = url.query(u)
+    string f, err e6 = url.fragment(u)
+    bool s_ok = s == "https"
+    bool h_ok = h == "example.com"
+    bool p_ok = p == "8443"
+    bool pa_ok = pa == "/api/data"
+    bool q_ok = q == "format=json"
+    bool f_ok = f == "results"
+    fmt.println(f"all scheme: {s_ok}")
+    fmt.println(f"all host: {h_ok}")
+    fmt.println(f"all port: {p_ok}")
+    fmt.println(f"all path: {pa_ok}")
+    fmt.println(f"all query: {q_ok}")
+    fmt.println(f"all fragment: {f_ok}")
+}
+
+fn test_query_with_encoded() -> void {
+    string val, err e = url.query("https://example.com/s?q=hello%20world&lang=en")
+    bool ok = e == ok
+    bool correct = val == "q=hello%20world&lang=en"
+    fmt.println(f"encoded query ok: {ok}")
+    fmt.println(f"encoded query val: {correct}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 09_complex_urls START =====")
+    test_userinfo_host()
+    test_userinfo_scheme()
+    test_multi_query_params()
+    test_deep_path()
+    test_all_components()
+    test_query_with_encoded()
+    fmt.println("===== TEST 09_complex_urls END =====")
+    return 0
+}

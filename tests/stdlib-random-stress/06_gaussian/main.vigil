@@ -1,0 +1,28 @@
+import "fmt"
+import "random"
+
+fn main() -> i32 {
+    fmt.println("===== TEST stdlib-random-stress START =====")
+
+    random.seed(5)
+    f64 sum = 0.0
+    i32 count = 1000
+    i32 i = 0
+    while i < count {
+        f64 v = random.gaussian()
+        sum = sum + v
+        i = i + 1
+    }
+    f64 mean = sum / 1000.0
+    bool near_zero = mean > -0.5 && mean < 0.5
+    fmt.println(f"gaussian_mean_near_zero: {near_zero}")
+
+    random.seed(5)
+    f64 a = random.gaussian()
+    f64 b = random.gaussian()
+    bool diff = a != b
+    fmt.println(f"gaussian_values_differ: {diff}")
+
+    fmt.println("===== TEST stdlib-random-stress END =====")
+    return 0
+}

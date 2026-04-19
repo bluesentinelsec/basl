@@ -1,0 +1,98 @@
+import "fmt"
+import "random"
+
+fn test_f64_statistics() -> void {
+    random.seed(100)
+    f64 sum = 0.0
+    f64 min_v = 1.0
+    f64 max_v = 0.0
+    i32 i = 0
+    while i < 1000 {
+        f64 v = random.f64()
+        sum = sum + v
+        if v < min_v {
+            min_v = v
+        }
+        if v > max_v {
+            max_v = v
+        }
+        i = i + 1
+    }
+    f64 mean = sum / 1000.0
+    bool mean_ok = mean > 0.3 && mean < 0.7
+    bool min_ok = min_v >= 0.0
+    bool max_ok = max_v < 1.0
+    fmt.println(f"f64_mean_reasonable: {mean_ok}")
+    fmt.println(f"f64_min_ge_0: {min_ok}")
+    fmt.println(f"f64_max_lt_1: {max_ok}")
+}
+
+fn test_gaussian_statistics() -> void {
+    random.seed(200)
+    f64 sum = 0.0
+    i32 within_3sigma = 0
+    i32 i = 0
+    while i < 1000 {
+        f64 v = random.gaussian()
+        sum = sum + v
+        if v > -3.0 && v < 3.0 {
+            within_3sigma = within_3sigma + 1
+        }
+        i = i + 1
+    }
+    f64 mean = sum / 1000.0
+    bool mean_ok = mean > -0.5 && mean < 0.5
+    bool sigma_ok = within_3sigma > 950
+    fmt.println(f"gaussian_mean_ok: {mean_ok}")
+    fmt.println(f"gaussian_3sigma_ok: {sigma_ok}")
+}
+
+fn test_range_coverage() -> void {
+    random.seed(300)
+    bool seen_0 = false
+    bool seen_9 = false
+    i32 i = 0
+    while i < 500 {
+        i32 v = random.range(0, 9)
+        if v == 0 {
+            seen_0 = true
+        }
+        if v == 9 {
+            seen_9 = true
+        }
+        i = i + 1
+    }
+    fmt.println(f"range_seen_min: {seen_0}")
+    fmt.println(f"range_seen_max: {seen_9}")
+}
+
+fn test_i32_variety() -> void {
+    random.seed(400)
+    i32 pos = 0
+    i32 neg = 0
+    i32 i = 0
+    while i < 500 {
+        i32 v = random.i32()
+        if v > 0 {
+            pos = pos + 1
+        }
+        if v < 0 {
+            neg = neg + 1
+        }
+        i = i + 1
+    }
+    bool has_pos = pos > 0
+    bool has_neg = neg > 0
+    fmt.println(f"i32_has_positive: {has_pos}")
+    fmt.println(f"i32_has_negative: {has_neg}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST stdlib-random-stress START =====")
+    test_f64_statistics()
+    test_gaussian_statistics()
+    test_range_coverage()
+    test_i32_variety()
+    fmt.println("===== TEST stdlib-random-stress END =====")
+    return 0
+}

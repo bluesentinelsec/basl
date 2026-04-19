@@ -1,0 +1,29 @@
+import "fmt"
+import "log"
+
+fn main() -> i32 {
+    fmt.println("===== TEST stdlib-log-stress START =====")
+
+    err e = log.set_level("debug")
+    bool ok1 = e == ok
+    fmt.println(f"set_level: {ok1}")
+
+    // empty message
+    log.info("")
+    fmt.println("empty_msg: true")
+
+    // long message
+    log.info("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+    fmt.println("long_msg: true")
+
+    // special characters
+    log.info("special: !@#$%^&*()_+-=[]{}|;':\",./<>?")
+    fmt.println("special_chars: true")
+
+    // newline in message
+    log.info("line1\nline2")
+    fmt.println("newline_msg: true")
+
+    fmt.println("===== TEST stdlib-log-stress END =====")
+    return 0
+}

@@ -70,6 +70,10 @@ jobs:
             --suite-dir tests/stdlib-xml-stress \
             --suite-dir tests/stdlib-encoding-stress \
             --suite-dir tests/stdlib-hash-stress \
+            --suite-dir tests/stdlib-parse-stress \
+            --suite-dir tests/stdlib-url-stress \
+            --suite-dir tests/stdlib-random-stress \
+            --suite-dir tests/stdlib-log-stress \
             --work-dir ${{ runner.temp }}/syntax_stress \
             -j 4
 
@@ -98,5 +102,9 @@ jobs:
             --suite-dir tests/stdlib-xml-stress `
             --suite-dir tests/stdlib-encoding-stress `
             --suite-dir tests/stdlib-hash-stress `
+            --suite-dir tests/stdlib-parse-stress `
+            --suite-dir tests/stdlib-url-stress `
+            --suite-dir tests/stdlib-random-stress `
+            --suite-dir tests/stdlib-log-stress `
             --work-dir "${{ runner.temp }}/syntax_stress" `
             -j 4

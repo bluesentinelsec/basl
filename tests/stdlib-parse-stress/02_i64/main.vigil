@@ -1,0 +1,68 @@
+import "fmt"
+import "parse"
+
+fn test_success() -> void {
+    i64 val, err e = parse.i64("100")
+    bool ok = e == ok
+    bool correct = val == i64(100)
+    fmt.println(f"i64 parse ok: {ok}")
+    fmt.println(f"i64 parse val: {correct}")
+}
+
+fn test_large_positive() -> void {
+    i64 val, err e = parse.i64("9223372036854775807")
+    bool ok = e == ok
+    bool correct = val == i64(9223372036854775807)
+    fmt.println(f"i64 max ok: {ok}")
+    fmt.println(f"i64 max val: {correct}")
+}
+
+fn test_large_negative() -> void {
+    i64 val, err e = parse.i64("-9223372036854775808")
+    bool ok = e == ok
+    fmt.println(f"i64 min ok: {ok}")
+    fmt.println(f"i64 min val: {val}")
+}
+
+fn test_beyond_i32() -> void {
+    i64 val, err e = parse.i64("3000000000")
+    bool ok = e == ok
+    bool correct = val == i64(3000000000)
+    fmt.println(f"i64 beyond_i32 ok: {ok}")
+    fmt.println(f"i64 beyond_i32 val: {correct}")
+}
+
+fn test_zero() -> void {
+    i64 val, err e = parse.i64("0")
+    bool ok = e == ok
+    bool is_zero = val == i64(0)
+    fmt.println(f"i64 zero ok: {ok}")
+    fmt.println(f"i64 zero val: {is_zero}")
+}
+
+fn test_negative() -> void {
+    i64 val, err e = parse.i64("-5000000000")
+    bool ok = e == ok
+    bool correct = val == i64(-5000000000)
+    fmt.println(f"i64 neg ok: {ok}")
+    fmt.println(f"i64 neg val: {correct}")
+}
+
+fn test_failure() -> void {
+    i64 val, err e = parse.i64("not_a_number")
+    bool failed = e != ok
+    fmt.println(f"i64 fail: {failed}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 02_i64 START =====")
+    test_success()
+    test_large_positive()
+    test_large_negative()
+    test_beyond_i32()
+    test_zero()
+    test_negative()
+    test_failure()
+    fmt.println("===== TEST 02_i64 END =====")
+    return 0
+}
