@@ -1455,9 +1455,13 @@ static int unpackneg(gf r[4], const uint8_t p[32]) {
     pow2523(t, t); M(t, t, num); M(t, t, den); M(t, t, den);
     M(r[0], t, den);
     S(chk, r[0]); M(chk, chk, den);
-    if (vn((const uint8_t *)chk, (const uint8_t *)num, sizeof(gf))) M(r[0], r[0], I_const);
+    /* Compare via pack25519 to ensure canonical reduction */
+    uint8_t chk_bytes[32], num_bytes[32];
+    pack25519(chk_bytes, chk); pack25519(num_bytes, num);
+    if (vn(chk_bytes, num_bytes, 32)) M(r[0], r[0], I_const);
     S(chk, r[0]); M(chk, chk, den);
-    if (vn((const uint8_t *)chk, (const uint8_t *)num, sizeof(gf))) return -1;
+    pack25519(chk_bytes, chk); pack25519(num_bytes, num);
+    if (vn(chk_bytes, num_bytes, 32)) return -1;
     if (par25519(r[0]) == (p[31] >> 7)) Z(r[0], gf0, r[0]);
     M(r[3], r[0], r[1]);
     return 0;

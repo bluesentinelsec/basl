@@ -895,20 +895,9 @@ static vigil_status_t crypto_ed25519_sign(vigil_vm_t *vm, size_t arg_count, vigi
         return push_bytes_and_err(vm, "ed25519_sign: invalid hex", error);
     }
 
-    /* Copy message before popping — stack pop may release the backing string */
-    vigil_allocator_t alloc = get_alloc(vm);
-    uint8_t *msg_copy = (uint8_t *)alloc.allocate(alloc.user_data, msg_len + 1);
-    if (!msg_copy)
-    {
-        vigil_vm_stack_pop_n(vm, arg_count);
-        return push_bytes_and_err(vm, "ed25519_sign: out of memory", error);
-    }
-    memcpy(msg_copy, message, msg_len);
-
+    /* Do all work before popping — args hold references to string objects */
+    vigil_ed25519_sign(sig, message, msg_len, priv);
     vigil_vm_stack_pop_n(vm, arg_count);
-
-    vigil_ed25519_sign(sig, msg_copy, msg_len, priv);
-    alloc.deallocate(alloc.user_data, msg_copy);
 
     char hex[128];
     bytes_to_hex(sig, 64, hex);
@@ -944,20 +933,9 @@ static vigil_status_t crypto_ed25519_verify(vigil_vm_t *vm, size_t arg_count, vi
         return push_bool(vm, 0, error);
     }
 
-    /* Copy message before popping — stack pop may release the backing string object */
-    vigil_allocator_t alloc = get_alloc(vm);
-    uint8_t *msg_copy = (uint8_t *)alloc.allocate(alloc.user_data, msg_len + 1);
-    if (!msg_copy)
-    {
-        vigil_vm_stack_pop_n(vm, arg_count);
-        return push_bool(vm, 0, error);
-    }
-    memcpy(msg_copy, message, msg_len);
-
+    /* Do all work before popping — args hold references to string objects */
+    int result = vigil_ed25519_verify(sig, message, msg_len, pub);
     vigil_vm_stack_pop_n(vm, arg_count);
-
-    int result = vigil_ed25519_verify(sig, msg_copy, msg_len, pub);
-    alloc.deallocate(alloc.user_data, msg_copy);
     return push_bool(vm, result == 0, error);
 }
 
