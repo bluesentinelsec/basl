@@ -43,6 +43,7 @@ typedef struct
     int coverage;
     int include_deps;
     int min_coverage_set;
+    int transpile;
     double min_coverage;
     vigil_coverage_output_format_t coverage_format;
     const char *filter;
@@ -757,6 +758,11 @@ static int cmd_test_parse_core_arg(int argc, char **argv, int *index, test_optio
         options->verbose = 1;
         return 1;
     }
+    if (strcmp(argv[*index], "--transpile") == 0)
+    {
+        options->transpile = 1;
+        return 1;
+    }
     if (strcmp(argv[*index], "-run") != 0 && strcmp(argv[*index], "--run") != 0)
         return 0;
     *index += 1;
@@ -773,7 +779,7 @@ static int cmd_test_print_help_and_exit(const char *arg)
 {
     if (!cmd_test_is_help_flag(arg))
         return 0;
-    printf("Usage: vigil test [--run pattern] [-v] [--coverage] [path...]\n\n"
+    printf("Usage: vigil test [--run pattern] [-v] [--coverage] [--transpile] [path...]\n\n"
            "Recursively finds and runs VIGIL test files (*_test.vigil).\n"
            "In a project root, defaults to the ./test directory.\n\n"
            "Flags:\n"
@@ -782,7 +788,8 @@ static int cmd_test_print_help_and_exit(const char *arg)
            "      --coverage          Collect line and branch coverage\n"
            "      --format            Coverage output format: text|json\n"
            "      --min-coverage      Fail if total line coverage is below N percent\n"
-           "      --include-deps      Include imported user modules outside the project root\n");
+           "      --include-deps      Include imported user modules outside the project root\n"
+           "      --transpile         Transpile each test to C, build, and compare output\n");
     return 1;
 }
 
@@ -797,6 +804,7 @@ static int cmd_test_parse_args(int argc, char **argv, test_options_t *options, s
     options->min_coverage = 0.0;
     options->coverage_format = VIGIL_COVERAGE_OUTPUT_TEXT;
     options->filter = NULL;
+    options->transpile = 0;
     for (index = 2; index < argc; index += 1)
     {
         int parse_status;
@@ -924,6 +932,245 @@ static void report_test_result(const test_result_state_t *state, const char *nam
     fprintf(state->stream, "--- FAIL: %s (%s)\n    %s\n", name, state->test_file_path, err_msg);
 }
 
+static int run_transpile_validation(const char *test_file_path, const char *source, size_t source_length,
+                                    const str_list_t *function_names, FILE *stream, int verbose)
+{
+    char vigil_bin[4096];
+    char *tmp_base = NULL;
+    char tmp_dir[2048];
+    char wrapper_path[2200];
+    char c_out_dir[2200];
+    char build_dir[2200];
+    char exe_path[2400];
+    char *wrapper_src = NULL;
+    size_t wrapper_len;
+    char *interp_stdout = NULL;
+    char *interp_stderr = NULL;
+    char *bin_stdout = NULL;
+    char *bin_stderr = NULL;
+    int exit_code = 0;
+    int result = 0;
+    vigil_error_t error;
+
+    memset(&error, 0, sizeof(error));
+
+    /* a. Get vigil binary path */
+    if (vigil_platform_self_exe(vigil_bin, sizeof(vigil_bin), &error) != VIGIL_STATUS_OK)
+    {
+        fprintf(stream, "  transpile: cannot find vigil binary: %s\n", vigil_error_message(&error));
+        return 1;
+    }
+
+    /* b. Create temp directory */
+    if (vigil_platform_temp_dir(NULL, &tmp_base, &error) != VIGIL_STATUS_OK)
+    {
+        fprintf(stream, "  transpile: cannot get temp dir: %s\n", vigil_error_message(&error));
+        return 1;
+    }
+    snprintf(tmp_dir, sizeof(tmp_dir), "%s/vigil_transpile_test_%d", tmp_base, vigil_platform_getpid());
+    free(tmp_base);
+    if (vigil_platform_mkdir_p(tmp_dir, &error) != VIGIL_STATUS_OK)
+    {
+        fprintf(stream, "  transpile: cannot create temp dir: %s\n", vigil_error_message(&error));
+        return 1;
+    }
+
+    /* c. Build wrapper source */
+    {
+        size_t cap = source_length + 1024 + function_names->count * 256;
+        size_t pos = 0;
+        int has_test_import = (strstr(source, "import \"test\"") != NULL);
+
+        wrapper_src = (char *)malloc(cap);
+        if (!wrapper_src)
+        {
+            result = 1;
+            goto cleanup;
+        }
+
+        if (!has_test_import)
+        {
+            pos += (size_t)snprintf(wrapper_src + pos, cap - pos, "import \"test\"\n");
+        }
+        memcpy(wrapper_src + pos, source, source_length);
+        pos += source_length;
+        pos += (size_t)snprintf(wrapper_src + pos, cap - pos, "\n\nfn main() -> i32 {\n");
+        pos += (size_t)snprintf(wrapper_src + pos, cap - pos, "    test.T t = test.T()\n");
+        for (size_t i = 0; i < function_names->count; i++)
+        {
+            pos += (size_t)snprintf(wrapper_src + pos, cap - pos, "    %s(t)\n", function_names->items[i]);
+        }
+        pos += (size_t)snprintf(wrapper_src + pos, cap - pos, "    return 0\n}\n");
+        wrapper_len = pos;
+    }
+
+    /* d. Write wrapper */
+    snprintf(wrapper_path, sizeof(wrapper_path), "%s/transpile_test.vigil", tmp_dir);
+    if (vigil_platform_write_file(wrapper_path, wrapper_src, wrapper_len, &error) != VIGIL_STATUS_OK)
+    {
+        fprintf(stream, "  transpile: cannot write wrapper: %s\n", vigil_error_message(&error));
+        result = 1;
+        goto cleanup;
+    }
+
+    /* e. Run interpreter */
+    {
+        const char *argv[] = {vigil_bin, "run", wrapper_path, NULL};
+        if (vigil_platform_exec(NULL, argv, &interp_stdout, &interp_stderr, &exit_code, &error) != VIGIL_STATUS_OK)
+        {
+            fprintf(stream, "  transpile: interpreter exec failed: %s\n", vigil_error_message(&error));
+            result = 1;
+            goto cleanup;
+        }
+        if (exit_code != 0)
+        {
+            fprintf(stream, "  transpile: interpreter returned %d for %s\n    %s\n", exit_code, test_file_path,
+                    interp_stderr ? interp_stderr : "");
+            result = 1;
+            goto cleanup;
+        }
+    }
+
+    /* f. Transpile */
+    snprintf(c_out_dir, sizeof(c_out_dir), "%s/c-out", tmp_dir);
+    {
+        const char *argv[] = {vigil_bin, "transpile", wrapper_path, "-o", c_out_dir, NULL};
+        char *t_stdout = NULL;
+        char *t_stderr = NULL;
+        int t_exit = 0;
+        if (vigil_platform_exec(NULL, argv, &t_stdout, &t_stderr, &t_exit, &error) != VIGIL_STATUS_OK)
+        {
+            fprintf(stream, "  transpile: transpile exec failed: %s\n", vigil_error_message(&error));
+            result = 1;
+            free(t_stdout);
+            free(t_stderr);
+            goto cleanup;
+        }
+        if (t_exit != 0)
+        {
+            fprintf(stream, "  transpile: transpile failed for %s\n    %s\n", test_file_path,
+                    t_stderr ? t_stderr : "");
+            result = 1;
+            free(t_stdout);
+            free(t_stderr);
+            goto cleanup;
+        }
+        free(t_stdout);
+        free(t_stderr);
+    }
+
+    /* g. CMake configure */
+    snprintf(build_dir, sizeof(build_dir), "%s/c-out/build", tmp_dir);
+    {
+        const char *argv[] = {"cmake", "-B", build_dir, "-S", c_out_dir, "-DCMAKE_BUILD_TYPE=Release", NULL};
+        char *cm_stdout = NULL;
+        char *cm_stderr = NULL;
+        int cm_exit = 0;
+        if (vigil_platform_exec(NULL, argv, &cm_stdout, &cm_stderr, &cm_exit, &error) != VIGIL_STATUS_OK)
+        {
+            fprintf(stream, "  transpile: cmake configure failed: %s\n", vigil_error_message(&error));
+            result = 1;
+            free(cm_stdout);
+            free(cm_stderr);
+            goto cleanup;
+        }
+        if (cm_exit != 0)
+        {
+            fprintf(stream, "  transpile: cmake configure failed for %s\n    %s\n", test_file_path,
+                    cm_stderr ? cm_stderr : "");
+            result = 1;
+            free(cm_stdout);
+            free(cm_stderr);
+            goto cleanup;
+        }
+        free(cm_stdout);
+        free(cm_stderr);
+    }
+
+    /* h. CMake build */
+    {
+        const char *argv[] = {"cmake", "--build", build_dir, "--config", "Release", NULL};
+        char *cb_stdout = NULL;
+        char *cb_stderr = NULL;
+        int cb_exit = 0;
+        if (vigil_platform_exec(NULL, argv, &cb_stdout, &cb_stderr, &cb_exit, &error) != VIGIL_STATUS_OK)
+        {
+            fprintf(stream, "  transpile: cmake build failed: %s\n", vigil_error_message(&error));
+            result = 1;
+            free(cb_stdout);
+            free(cb_stderr);
+            goto cleanup;
+        }
+        if (cb_exit != 0)
+        {
+            fprintf(stream, "  transpile: cmake build failed for %s\n    %s\n", test_file_path,
+                    cb_stderr ? cb_stderr : "");
+            result = 1;
+            free(cb_stdout);
+            free(cb_stderr);
+            goto cleanup;
+        }
+        free(cb_stdout);
+        free(cb_stderr);
+    }
+
+    /* i. Run the built executable */
+#ifdef _WIN32
+    {
+        int exists = 0;
+        snprintf(exe_path, sizeof(exe_path), "%s/Release/vigil_app.exe", build_dir);
+        vigil_platform_file_exists(exe_path, &exists);
+        if (!exists)
+        {
+            snprintf(exe_path, sizeof(exe_path), "%s/vigil_app.exe", build_dir);
+        }
+    }
+#else
+    snprintf(exe_path, sizeof(exe_path), "%s/vigil_app", build_dir);
+#endif
+    {
+        const char *argv[] = {exe_path, NULL};
+        if (vigil_platform_exec(NULL, argv, &bin_stdout, &bin_stderr, &exit_code, &error) != VIGIL_STATUS_OK)
+        {
+            fprintf(stream, "  transpile: cannot run built exe: %s\n", vigil_error_message(&error));
+            result = 1;
+            goto cleanup;
+        }
+        if (exit_code != 0)
+        {
+            fprintf(stream, "  transpile: built exe returned %d for %s\n    %s\n", exit_code, test_file_path,
+                    bin_stderr ? bin_stderr : "");
+            result = 1;
+            goto cleanup;
+        }
+    }
+
+    /* j. Compare outputs */
+    if (strcmp(interp_stdout ? interp_stdout : "", bin_stdout ? bin_stdout : "") != 0)
+    {
+        fprintf(stream, "--- FAIL: transpile mismatch (%s)\n    interpreter: %s\n    compiled:    %s\n",
+                test_file_path, interp_stdout ? interp_stdout : "", bin_stdout ? bin_stdout : "");
+        result = 1;
+        goto cleanup;
+    }
+
+    /* k. Report success if verbose */
+    if (verbose)
+    {
+        fprintf(stream, "    transpile: PASS (%s)\n", test_file_path);
+    }
+
+cleanup:
+    free(wrapper_src);
+    free(interp_stdout);
+    free(interp_stderr);
+    free(bin_stdout);
+    free(bin_stderr);
+    /* l. Clean up temp dir */
+    vigil_platform_remove_all(tmp_dir, &error);
+    return result;
+}
+
 static int run_test_file(const char *test_file_path, const test_options_t *options, vigil_coverage_session_t *coverage,
                          int *total_pass, int *total_fail)
 {
@@ -984,6 +1231,17 @@ static int run_test_file(const char *test_file_path, const test_options_t *optio
         result = run_one_test(&request, err_msg, sizeof(err_msg));
         elapsed = (double)(clock() - test_start) / CLOCKS_PER_SEC;
         report_test_result(&result_state, name, elapsed, result, err_msg);
+    }
+
+    if (options->transpile && !file_failed && function_names.count > 0U)
+    {
+        if (run_transpile_validation(test_file_path, source, source_length, &function_names, stream,
+                                     options->verbose) != 0)
+        {
+            file_failed = 1;
+            *total_fail += 1;
+            exit_code = 1;
+        }
     }
 
     if (file_failed)
