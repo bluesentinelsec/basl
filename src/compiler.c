@@ -13470,6 +13470,8 @@ static vigil_status_t alloc_class_inits(vigil_program_state_t *program, vigil_ru
         const vigil_class_decl_t *decl = &program->classes[i];
         vigil_runtime_class_field_init_t *field_inits = NULL;
 
+        class_inits[i].name = decl->name;
+        class_inits[i].name_length = decl->name_length;
         class_inits[i].field_count = decl->field_count;
         if (decl->field_count != 0U)
         {

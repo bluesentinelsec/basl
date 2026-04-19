@@ -1,0 +1,109 @@
+import "fmt"
+import "reflect"
+
+struct Vec3 {
+    f64 x
+    f64 y
+    f64 z
+}
+
+class User {
+    string name
+    i32 age
+    bool admin
+
+    fn init(string name, i32 age, bool admin) -> void {
+        self.name = name
+        self.age = age
+        self.admin = admin
+    }
+}
+
+fn test_cross_type_inspection() -> void {
+    Vec3 v = Vec3(1.0, 2.0, 3.0)
+    User u = User("alice", 30, true)
+
+    bool ok1 = reflect.type_name(v) == "Vec3"
+    bool ok2 = reflect.type_name(u) == "User"
+    fmt.println(f"type_name_vec3: {ok1}")
+    fmt.println(f"type_name_user: {ok2}")
+
+    bool ok3 = reflect.type_kind(v) == "class"
+    bool ok4 = reflect.type_kind(u) == "class"
+    fmt.println(f"kind_struct_is_class: {ok3}")
+    fmt.println(f"kind_class_is_class: {ok4}")
+}
+
+fn test_compare_field_counts() -> void {
+    Vec3 v = Vec3(0.0, 0.0, 0.0)
+    User u = User("", 0, false)
+
+    i32 vc = reflect.field_count(v)
+    i32 uc = reflect.field_count(u)
+    bool ok1 = vc == 3
+    bool ok2 = uc == 3
+    bool ok3 = vc == uc
+    fmt.println(f"vec3_field_count: {ok1}")
+    fmt.println(f"user_field_count: {ok2}")
+    fmt.println(f"counts_equal: {ok3}")
+}
+
+fn test_struct_set_field_conversion() -> void {
+    Vec3 v = Vec3(0.0, 0.0, 0.0)
+
+    err e1 = reflect.set_field(v, "x", "42.5")
+    string v1, err _ = reflect.get_field(v, "x")
+    bool ok1 = v1 == "42.5"
+    fmt.println(f"struct_set_f64: {ok1}")
+
+    err e2 = reflect.set_field(v, "y", "-1.0")
+    string v2, err _ = reflect.get_field(v, "y")
+    bool ok2 = v2 == "-1"
+    fmt.println(f"struct_set_negative: {ok2}")
+}
+
+fn test_class_set_field_conversion() -> void {
+    User u = User("bob", 25, false)
+
+    err e1 = reflect.set_field(u, "age", "99")
+    string v1, err _ = reflect.get_field(u, "age")
+    bool ok1 = v1 == "99"
+    fmt.println(f"class_set_i32: {ok1}")
+
+    err e2 = reflect.set_field(u, "admin", "true")
+    string v2, err _ = reflect.get_field(u, "admin")
+    bool ok2 = v2 == "true"
+    fmt.println(f"class_set_bool: {ok2}")
+
+    err e3 = reflect.set_field(u, "name", "charlie")
+    string v3, err _ = reflect.get_field(u, "name")
+    bool ok3 = v3 == "charlie"
+    fmt.println(f"class_set_string: {ok3}")
+}
+
+fn test_cross_field_types() -> void {
+    Vec3 v = Vec3(1.0, 2.0, 3.0)
+    User u = User("d", 1, true)
+
+    bool ok1 = reflect.field_type(v, "x") == "f64"
+    bool ok2 = reflect.field_type(v, "y") == "f64"
+    bool ok3 = reflect.field_type(u, "name") == "string"
+    bool ok4 = reflect.field_type(u, "age") == "i32"
+    bool ok5 = reflect.field_type(u, "admin") == "bool"
+    fmt.println(f"vec3_x_type: {ok1}")
+    fmt.println(f"vec3_y_type: {ok2}")
+    fmt.println(f"user_name_type: {ok3}")
+    fmt.println(f"user_age_type: {ok4}")
+    fmt.println(f"user_admin_type: {ok5}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST stdlib-reflect-stress START =====")
+    test_cross_type_inspection()
+    test_compare_field_counts()
+    test_struct_set_field_conversion()
+    test_class_set_field_conversion()
+    test_cross_field_types()
+    fmt.println("===== TEST stdlib-reflect-stress END =====")
+    return 0
+}

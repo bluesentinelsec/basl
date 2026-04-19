@@ -1,0 +1,105 @@
+import "fmt"
+import "reflect"
+
+class Profile {
+    string username
+    i32 level
+    f64 rating
+    bool verified
+
+    fn init(string username, i32 level, f64 rating, bool verified) -> void {
+        self.username = username
+        self.level = level
+        self.rating = rating
+        self.verified = verified
+    }
+}
+
+fn test_type_inspection() -> void {
+    Profile p = Profile("alice", 5, 4.8, true)
+
+    bool ok1 = reflect.type_name(p) == "Profile"
+    fmt.println(f"type_name_profile: {ok1}")
+
+    bool ok2 = reflect.type_kind(p) == "class"
+    fmt.println(f"type_kind_profile: {ok2}")
+
+    bool ok3 = reflect.is_nil(p) == false
+    fmt.println(f"is_nil_profile: {ok3}")
+
+    bool ok4 = reflect.is_numeric(p) == false
+    fmt.println(f"is_numeric_profile: {ok4}")
+}
+
+fn test_field_enumeration() -> void {
+    Profile p = Profile("bob", 3, 3.5, false)
+
+    i32 fc = reflect.field_count(p)
+    bool ok1 = fc == 4
+    fmt.println(f"field_count_4: {ok1}")
+
+    array<string> names = reflect.fields(p)
+    bool ok2 = names.len() == 4
+    fmt.println(f"fields_length_4: {ok2}")
+
+    i32 i = 0
+    bool all_exist = true
+    while i < names.len() {
+        if reflect.has_field(p, names[i]) == false {
+            all_exist = false
+        }
+        i = i + 1
+    }
+    fmt.println(f"all_fields_exist: {all_exist}")
+}
+
+fn test_get_set_roundtrip() -> void {
+    Profile p = Profile("carol", 10, 5.0, true)
+
+    string v1, err _ = reflect.get_field(p, "username")
+    bool ok1 = v1 == "carol"
+    fmt.println(f"get_username: {ok1}")
+
+    err e1 = reflect.set_field(p, "username", "dave")
+    string v2, err _ = reflect.get_field(p, "username")
+    bool ok2 = v2 == "dave"
+    fmt.println(f"set_get_username: {ok2}")
+
+    err e2 = reflect.set_field(p, "level", "20")
+    string v3, err _ = reflect.get_field(p, "level")
+    bool ok3 = v3 == "20"
+    fmt.println(f"set_get_level: {ok3}")
+
+    err e3 = reflect.set_field(p, "rating", "4.2")
+    string v4, err _ = reflect.get_field(p, "rating")
+    bool ok4 = v4 == "4.2"
+    fmt.println(f"set_get_rating: {ok4}")
+
+    err e4 = reflect.set_field(p, "verified", "false")
+    string v5, err _ = reflect.get_field(p, "verified")
+    bool ok5 = v5 == "false"
+    fmt.println(f"set_get_verified: {ok5}")
+}
+
+fn test_field_types() -> void {
+    Profile p = Profile("eve", 1, 1.0, false)
+
+    bool ok1 = reflect.field_type(p, "username") == "string"
+    bool ok2 = reflect.field_type(p, "level") == "i32"
+    bool ok3 = reflect.field_type(p, "rating") == "f64"
+    bool ok4 = reflect.field_type(p, "verified") == "bool"
+    fmt.println(f"ftype_username: {ok1}")
+    fmt.println(f"ftype_level: {ok2}")
+    fmt.println(f"ftype_rating: {ok3}")
+    fmt.println(f"ftype_verified: {ok4}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST stdlib-reflect-stress START =====")
+    test_type_inspection()
+    test_field_enumeration()
+    test_get_set_roundtrip()
+    test_field_types()
+    fmt.println("===== TEST stdlib-reflect-stress END =====")
+    return 0
+}

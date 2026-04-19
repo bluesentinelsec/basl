@@ -80,6 +80,8 @@ typedef struct vigil_runtime_class_field
 
 typedef struct vigil_runtime_class
 {
+    const char *name;
+    size_t name_length;
     vigil_runtime_class_field_t *fields;
     size_t field_count;
     vigil_runtime_interface_impl_t *interface_impls;
@@ -1977,6 +1979,8 @@ static vigil_status_t alloc_class_table(vigil_runtime_t *runtime, const vigil_ru
         size_t interface_count = classes_init[class_index].interface_impl_count;
         size_t i;
 
+        classes[class_index].name = classes_init[class_index].name;
+        classes[class_index].name_length = classes_init[class_index].name_length;
         classes[class_index].field_count = field_count;
         if (field_count != 0U)
         {
@@ -2453,6 +2457,17 @@ size_t vigil_function_object_class_field_count(const vigil_object_t *function, s
         return 0U;
     }
     return function_object->classes[class_index].field_count;
+}
+
+VIGIL_API const char *vigil_runtime_class_name(const vigil_object_t *function, size_t class_index,
+                                               size_t *out_length)
+{
+    const vigil_function_object_t *fn = vigil_function_object_cast(function);
+    if (fn == NULL || fn->classes == NULL || class_index >= fn->class_count)
+        return NULL;
+    if (out_length != NULL)
+        *out_length = fn->classes[class_index].name_length;
+    return fn->classes[class_index].name;
 }
 
 int vigil_function_object_get_array_type(const vigil_object_t *function, size_t array_index,

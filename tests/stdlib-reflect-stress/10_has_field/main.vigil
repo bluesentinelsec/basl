@@ -1,0 +1,38 @@
+import "fmt"
+import "reflect"
+
+struct Coord {
+    f64 x
+    f64 y
+    f64 z
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST stdlib-reflect-stress START =====")
+
+    Coord c = Coord(1.0, 2.0, 3.0)
+
+    bool h1 = reflect.has_field(c, "x")
+    fmt.println(f"has_field_x: {h1}")
+
+    bool h2 = reflect.has_field(c, "y")
+    fmt.println(f"has_field_y: {h2}")
+
+    bool h3 = reflect.has_field(c, "z")
+    fmt.println(f"has_field_z: {h3}")
+
+    bool h4 = reflect.has_field(c, "w")
+    bool ok4 = h4 == false
+    fmt.println(f"has_field_missing_w: {ok4}")
+
+    bool h5 = reflect.has_field(c, "")
+    bool ok5 = h5 == false
+    fmt.println(f"has_field_empty: {ok5}")
+
+    bool h6 = reflect.has_field(c, "X")
+    bool ok6 = h6 == false
+    fmt.println(f"has_field_case_sensitive: {ok6}")
+
+    fmt.println("===== TEST stdlib-reflect-stress END =====")
+    return 0
+}

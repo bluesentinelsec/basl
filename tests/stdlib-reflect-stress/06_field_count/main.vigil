@@ -1,0 +1,49 @@
+import "fmt"
+import "reflect"
+
+struct Single {
+    i32 x
+}
+
+struct Pair {
+    i32 a
+    i32 b
+}
+
+class Big {
+    string f1
+    i32 f2
+    f64 f3
+    bool f4
+    string f5
+
+    fn init(string f1, i32 f2, f64 f3, bool f4, string f5) -> void {
+        self.f1 = f1
+        self.f2 = f2
+        self.f3 = f3
+        self.f4 = f4
+        self.f5 = f5
+    }
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST stdlib-reflect-stress START =====")
+
+    Single s = Single(0)
+    i32 c0 = reflect.field_count(s)
+    bool ok0 = c0 == 1
+    fmt.println(f"field_count_one: {ok0}")
+
+    Pair p = Pair(1, 2)
+    i32 c2 = reflect.field_count(p)
+    bool ok2 = c2 == 2
+    fmt.println(f"field_count_two: {ok2}")
+
+    Big bg = Big("x", 1, 2.0, true, "y")
+    i32 c3 = reflect.field_count(bg)
+    bool ok3 = c3 == 5
+    fmt.println(f"field_count_five: {ok3}")
+
+    fmt.println("===== TEST stdlib-reflect-stress END =====")
+    return 0
+}

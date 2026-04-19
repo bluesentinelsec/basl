@@ -1,0 +1,45 @@
+import "fmt"
+import "reflect"
+
+class Item {
+    string label
+    i32 qty
+    f64 price
+    bool available
+
+    fn init(string label, i32 qty, f64 price, bool available) -> void {
+        self.label = label
+        self.qty = qty
+        self.price = price
+        self.available = available
+    }
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST stdlib-reflect-stress START =====")
+
+    Item it = Item("old", 1, 1.0, false)
+
+    err e1 = reflect.set_field(it, "label", "new")
+    string v1, err _ = reflect.get_field(it, "label")
+    bool ok1 = v1 == "new"
+    fmt.println(f"set_field_string: {ok1}")
+
+    err e2 = reflect.set_field(it, "qty", "99")
+    string v2, err _ = reflect.get_field(it, "qty")
+    bool ok2 = v2 == "99"
+    fmt.println(f"set_field_i32: {ok2}")
+
+    err e3 = reflect.set_field(it, "price", "19.99")
+    string v3, err _ = reflect.get_field(it, "price")
+    bool ok3 = v3 == "19.99"
+    fmt.println(f"set_field_f64: {ok3}")
+
+    err e4 = reflect.set_field(it, "available", "true")
+    string v4, err _ = reflect.get_field(it, "available")
+    bool ok4 = v4 == "true"
+    fmt.println(f"set_field_bool: {ok4}")
+
+    fmt.println("===== TEST stdlib-reflect-stress END =====")
+    return 0
+}

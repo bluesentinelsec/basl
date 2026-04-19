@@ -54,6 +54,7 @@ extern "C"
 #endif
     extern VIGIL_API const vigil_native_module_t vigil_stdlib_parse;
     extern VIGIL_API const vigil_native_module_t vigil_stdlib_random;
+    extern VIGIL_API const vigil_native_module_t vigil_stdlib_reflect;
 #ifdef VIGIL_HAS_STDLIB_READLINE
     extern VIGIL_API const vigil_native_module_t vigil_stdlib_readline;
 #endif
@@ -104,6 +105,7 @@ extern "C"
             {"os",       2U, &vigil_stdlib_os},                                                                        \
             {"parse",    5U, &vigil_stdlib_parse},                                                                     \
             {"random",   6U, &vigil_stdlib_random},                                                                    \
+            {"reflect",  7U, &vigil_stdlib_reflect},                                                                   \
             VIGIL_STDLIB_READLINE_ENTRY                                                                                \
             {"regex",    5U, &vigil_stdlib_regex},                                                                     \
             {"strings",  7U, &vigil_stdlib_strings},                                                                   \

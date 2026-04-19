@@ -1,0 +1,45 @@
+import "fmt"
+import "reflect"
+
+class Record {
+    string name
+    i32 count
+    f64 score
+    bool active
+
+    fn init(string name, i32 count, f64 score, bool active) -> void {
+        self.name = name
+        self.count = count
+        self.score = score
+        self.active = active
+    }
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST stdlib-reflect-stress START =====")
+
+    Record r = Record("test", 42, 9.5, true)
+
+    string v1, err e1 = reflect.get_field(r, "name")
+    bool ok1 = v1 == "test"
+    fmt.println(f"get_field_string: {ok1}")
+
+    string v2, err e2 = reflect.get_field(r, "count")
+    bool ok2 = v2 == "42"
+    fmt.println(f"get_field_i32: {ok2}")
+
+    string v3, err e3 = reflect.get_field(r, "score")
+    bool ok3 = v3 == "9.5"
+    fmt.println(f"get_field_f64: {ok3}")
+
+    string v4, err e4 = reflect.get_field(r, "active")
+    bool ok4 = v4 == "true"
+    fmt.println(f"get_field_bool: {ok4}")
+
+    string v5, err e5 = reflect.get_field(r, "missing")
+    bool ok5 = e5 != ok
+    fmt.println(f"get_field_missing_err: {ok5}")
+
+    fmt.println("===== TEST stdlib-reflect-stress END =====")
+    return 0
+}

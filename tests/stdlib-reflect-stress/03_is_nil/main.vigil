@@ -1,0 +1,37 @@
+import "fmt"
+import "reflect"
+
+fn main() -> i32 {
+    fmt.println("===== TEST stdlib-reflect-stress START =====")
+
+    i32 a = 0
+    bool ok1 = reflect.is_nil(a) == false
+    fmt.println(f"is_nil_i32: {ok1}")
+
+    string s = "hello"
+    bool ok2 = reflect.is_nil(s) == false
+    fmt.println(f"is_nil_string: {ok2}")
+
+    string empty = ""
+    bool ok3 = reflect.is_nil(empty) == false
+    fmt.println(f"is_nil_empty_string: {ok3}")
+
+    bool b = true
+    bool ok4 = reflect.is_nil(b) == false
+    fmt.println(f"is_nil_bool: {ok4}")
+
+    f64 f = 0.0
+    bool ok5 = reflect.is_nil(f) == false
+    fmt.println(f"is_nil_f64: {ok5}")
+
+    i64 big = i64(0)
+    bool ok6 = reflect.is_nil(big) == false
+    fmt.println(f"is_nil_i64: {ok6}")
+
+    array<i32> arr = [1, 2]
+    bool ok7 = reflect.is_nil(arr) == false
+    fmt.println(f"is_nil_array: {ok7}")
+
+    fmt.println("===== TEST stdlib-reflect-stress END =====")
+    return 0
+}
