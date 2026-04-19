@@ -22,6 +22,7 @@ set(VIGIL_STDLIB_ALWAYS_SOURCES
     src/stdlib/os.c
     src/stdlib/parse.c
     src/stdlib/random.c
+    src/stdlib/reflect.c
     src/stdlib/regex.c
     src/stdlib/regex_engine.c
     src/stdlib/strings.c

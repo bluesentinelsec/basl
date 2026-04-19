@@ -1,0 +1,73 @@
+import "fmt"
+import "reflect"
+
+struct Point {
+    f64 x
+    f64 y
+}
+
+class Person {
+    string name
+    i32 age
+    bool active
+
+    fn init(string name, i32 age, bool active) -> void {
+        self.name = name
+        self.age = age
+        self.active = active
+    }
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST stdlib-reflect-stress START =====")
+
+    Point p = Point(1.0, 2.0)
+    array<string> pf = reflect.fields(p)
+    i32 plen = pf.len()
+    bool ok1 = plen == 2
+    fmt.println(f"fields_struct_count: {ok1}")
+
+    bool has_x = false
+    bool has_y = false
+    i32 i = 0
+    while i < plen {
+        if pf[i] == "x" {
+            has_x = true
+        }
+        if pf[i] == "y" {
+            has_y = true
+        }
+        i = i + 1
+    }
+    fmt.println(f"fields_struct_has_x: {has_x}")
+    fmt.println(f"fields_struct_has_y: {has_y}")
+
+    Person per = Person("Bob", 25, true)
+    array<string> cf = reflect.fields(per)
+    i32 clen = cf.len()
+    bool ok2 = clen == 3
+    fmt.println(f"fields_class_count: {ok2}")
+
+    bool has_name = false
+    bool has_age = false
+    bool has_active = false
+    i32 j = 0
+    while j < clen {
+        if cf[j] == "name" {
+            has_name = true
+        }
+        if cf[j] == "age" {
+            has_age = true
+        }
+        if cf[j] == "active" {
+            has_active = true
+        }
+        j = j + 1
+    }
+    fmt.println(f"fields_class_has_name: {has_name}")
+    fmt.println(f"fields_class_has_age: {has_age}")
+    fmt.println(f"fields_class_has_active: {has_active}")
+
+    fmt.println("===== TEST stdlib-reflect-stress END =====")
+    return 0
+}

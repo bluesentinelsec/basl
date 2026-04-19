@@ -1,0 +1,41 @@
+import "fmt"
+import "reflect"
+
+fn main() -> i32 {
+    fmt.println("===== TEST stdlib-reflect-stress START =====")
+
+    i32 a = 42
+    bool ok1 = reflect.is_numeric(a) == true
+    fmt.println(f"is_numeric_i32: {ok1}")
+
+    i64 b = i64(100)
+    bool ok2 = reflect.is_numeric(b) == true
+    fmt.println(f"is_numeric_i64: {ok2}")
+
+    f64 c = 3.14
+    bool ok3 = reflect.is_numeric(c) == true
+    fmt.println(f"is_numeric_f64: {ok3}")
+
+    string d = "hello"
+    bool ok4 = reflect.is_numeric(d) == false
+    fmt.println(f"is_numeric_string: {ok4}")
+
+    bool e = true
+    bool ok5 = reflect.is_numeric(e) == false
+    fmt.println(f"is_numeric_bool: {ok5}")
+
+    string empty = ""
+    bool ok6 = reflect.is_numeric(empty) == false
+    fmt.println(f"is_numeric_empty_string: {ok6}")
+
+    i32 zero = 0
+    bool ok7 = reflect.is_numeric(zero) == true
+    fmt.println(f"is_numeric_zero: {ok7}")
+
+    f64 neg = -1.5
+    bool ok8 = reflect.is_numeric(neg) == true
+    fmt.println(f"is_numeric_negative: {ok8}")
+
+    fmt.println("===== TEST stdlib-reflect-stress END =====")
+    return 0
+}

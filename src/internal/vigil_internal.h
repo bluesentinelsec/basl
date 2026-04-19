@@ -96,6 +96,8 @@ typedef struct vigil_runtime_class_field_init
 
 typedef struct vigil_runtime_class_init
 {
+    const char *name;
+    size_t name_length;
     const vigil_runtime_class_field_init_t *fields;
     size_t field_count;
     const vigil_runtime_interface_impl_init_t *interface_impls;

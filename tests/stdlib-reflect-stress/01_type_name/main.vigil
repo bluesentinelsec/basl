@@ -1,0 +1,54 @@
+import "fmt"
+import "reflect"
+
+struct Point {
+    f64 x
+    f64 y
+}
+
+class Person {
+    string name
+    i32 age
+
+    fn init(string name, i32 age) -> void {
+        self.name = name
+        self.age = age
+    }
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST stdlib-reflect-stress START =====")
+
+    i32 a = 42
+    f64 b = 3.14
+    bool c = true
+    string d = "hello"
+
+    bool ok1 = reflect.type_name(a) == "i32"
+    bool ok2 = reflect.type_name(b) == "f64"
+    bool ok3 = reflect.type_name(c) == "bool"
+    bool ok4 = reflect.type_name(d) == "string"
+    fmt.println(f"type_name_i32: {ok1}")
+    fmt.println(f"type_name_f64: {ok2}")
+    fmt.println(f"type_name_bool: {ok3}")
+    fmt.println(f"type_name_string: {ok4}")
+
+    Point p = Point(1.0, 2.0)
+    bool ok5 = reflect.type_name(p) == "Point"
+    fmt.println(f"type_name_struct: {ok5}")
+
+    Person per = Person("Alice", 30)
+    bool ok6 = reflect.type_name(per) == "Person"
+    fmt.println(f"type_name_class: {ok6}")
+
+    array<i32> arr = [1, 2, 3]
+    bool ok7 = reflect.type_name(arr) == "array"
+    fmt.println(f"type_name_array: {ok7}")
+
+    map<string, i32> m = {"a": 1}
+    bool ok8 = reflect.type_name(m) == "map"
+    fmt.println(f"type_name_map: {ok8}")
+
+    fmt.println("===== TEST stdlib-reflect-stress END =====")
+    return 0
+}

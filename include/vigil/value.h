@@ -118,6 +118,9 @@ extern "C"
     VIGIL_API size_t vigil_function_object_return_count(const vigil_object_t *object);
     VIGIL_API const vigil_chunk_t *vigil_function_object_chunk(const vigil_object_t *object);
 
+    VIGIL_API const char *vigil_runtime_class_name(const vigil_object_t *function, size_t class_index,
+                                                   size_t *out_length);
+
     VIGIL_API vigil_status_t vigil_closure_object_new(vigil_runtime_t *runtime, vigil_object_t *function,
                                                       const vigil_value_t *captures, size_t capture_count,
                                                       vigil_object_t **out_object, vigil_error_t *error);

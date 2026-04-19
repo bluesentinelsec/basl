@@ -1,0 +1,52 @@
+import "fmt"
+import "reflect"
+
+struct Vec2 {
+    f64 x
+    f64 y
+}
+
+class Animal {
+    string name
+
+    fn init(string name) -> void {
+        self.name = name
+    }
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST stdlib-reflect-stress START =====")
+
+    i32 a = 10
+    f64 c = 1.5
+    bool d = false
+    string e = "test"
+
+    bool ok1 = reflect.type_kind(a) == "i32"
+    bool ok3 = reflect.type_kind(c) == "f64"
+    bool ok4 = reflect.type_kind(d) == "bool"
+    bool ok5 = reflect.type_kind(e) == "string"
+    fmt.println(f"kind_i32: {ok1}")
+    fmt.println(f"kind_f64: {ok3}")
+    fmt.println(f"kind_bool: {ok4}")
+    fmt.println(f"kind_string: {ok5}")
+
+    array<i32> arr = [1, 2]
+    bool ok6 = reflect.type_kind(arr) == "array"
+    fmt.println(f"kind_array: {ok6}")
+
+    map<string, i32> m = {"x": 1}
+    bool ok7 = reflect.type_kind(m) == "map"
+    fmt.println(f"kind_map: {ok7}")
+
+    Vec2 v = Vec2(0.0, 0.0)
+    bool ok8 = reflect.type_kind(v) == "class"
+    fmt.println(f"kind_struct: {ok8}")
+
+    Animal ani = Animal("dog")
+    bool ok9 = reflect.type_kind(ani) == "class"
+    fmt.println(f"kind_class: {ok9}")
+
+    fmt.println("===== TEST stdlib-reflect-stress END =====")
+    return 0
+}

@@ -74,6 +74,7 @@ jobs:
             --suite-dir tests/stdlib-url-stress \
             --suite-dir tests/stdlib-random-stress \
             --suite-dir tests/stdlib-log-stress \
+            --suite-dir tests/stdlib-reflect-stress \
             --work-dir ${{ runner.temp }}/syntax_stress \
             -j 4
 
@@ -106,5 +107,6 @@ jobs:
             --suite-dir tests/stdlib-url-stress `
             --suite-dir tests/stdlib-random-stress `
             --suite-dir tests/stdlib-log-stress `
+            --suite-dir tests/stdlib-reflect-stress `
             --work-dir "${{ runner.temp }}/syntax_stress" `
             -j 4

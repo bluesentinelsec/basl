@@ -90,7 +90,7 @@ _STDLIB_SOURCES = [
     "args.c", "atomic.c", "compress.c", "crypto.c", "csv.c", "encoding.c",
     "ffi.c", "fmt.c", "fs.c", "hash.c", "http.c", "json.c", "log.c",
     "math.c", "net.c", "os.c", "parse.c", "random.c", "readline.c",
-    "regex.c", "regex_engine.c", "regex.h", "strings.c", "test.c",
+    "regex.c", "regex_engine.c", "regex.h", "reflect.c", "strings.c", "test.c",
     "thread.c", "time.c", "unsafe.c", "url.c", "uuid.c", "xml.c", "yaml.c",
 ]
 for s in _STDLIB_SOURCES:

@@ -1,0 +1,37 @@
+import "fmt"
+import "reflect"
+
+class Mixed {
+    string name
+    i32 count
+    f64 ratio
+    bool flag
+
+    fn init(string name, i32 count, f64 ratio, bool flag) -> void {
+        self.name = name
+        self.count = count
+        self.ratio = ratio
+        self.flag = flag
+    }
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST stdlib-reflect-stress START =====")
+
+    Mixed m = Mixed("x", 1, 0.5, true)
+
+    bool ok1 = reflect.field_type(m, "name") == "string"
+    fmt.println(f"field_type_string: {ok1}")
+
+    bool ok2 = reflect.field_type(m, "count") == "i32"
+    fmt.println(f"field_type_i32: {ok2}")
+
+    bool ok3 = reflect.field_type(m, "ratio") == "f64"
+    fmt.println(f"field_type_f64: {ok3}")
+
+    bool ok4 = reflect.field_type(m, "flag") == "bool"
+    fmt.println(f"field_type_bool: {ok4}")
+
+    fmt.println("===== TEST stdlib-reflect-stress END =====")
+    return 0
+}
