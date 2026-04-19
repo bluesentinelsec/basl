@@ -1,0 +1,77 @@
+import "fmt"
+import "xml"
+
+fn test_empty_element() -> void {
+    string src = "<empty/>"
+    xml.Document doc, err e = xml.Document.parse(src)
+    xml.Element root, err re = doc.root()
+    string tag = root.tag()
+    fmt.println(f"empty tag: {tag}")
+    string text = root.text()
+    bool is_empty = text == ""
+    fmt.println(f"empty text is blank: {is_empty}")
+    array<xml.Element> kids = root.children()
+    i32 count = kids.len()
+    bool no_kids = count == 0
+    fmt.println(f"empty no children: {no_kids}")
+}
+
+fn test_whitespace_text() -> void {
+    string src = "<ws>  \n  </ws>"
+    xml.Document doc, err e = xml.Document.parse(src)
+    xml.Element root, err re = doc.root()
+    string text = root.text()
+    i32 tlen = text.len()
+    bool has_ws = tlen > 0
+    fmt.println(f"whitespace text non-empty: {has_ws}")
+}
+
+fn test_single_root() -> void {
+    string src = "<solo/>"
+    xml.Document doc, err e = xml.Document.parse(src)
+    bool ok = e == ok
+    fmt.println(f"single root ok: {ok}")
+    xml.Element root, err re = doc.root()
+    string tag = root.tag()
+    fmt.println(f"single root tag: {tag}")
+}
+
+fn test_empty_children_list() -> void {
+    string src = "<leaf>text only</leaf>"
+    xml.Document doc, err e = xml.Document.parse(src)
+    xml.Element root, err re = doc.root()
+    array<xml.Element> kids = root.children()
+    i32 count = kids.len()
+    bool is_zero = count == 0
+    fmt.println(f"leaf no children: {is_zero}")
+}
+
+fn test_long_tag_name() -> void {
+    string src = "<very_long_element_name_for_testing>val</very_long_element_name_for_testing>"
+    xml.Document doc, err e = xml.Document.parse(src)
+    xml.Element root, err re = doc.root()
+    string tag = root.tag()
+    fmt.println(f"long tag: {tag}")
+}
+
+fn test_attr_empty_value() -> void {
+    string src = "<el attr=\"\"/>"
+    xml.Document doc, err e = xml.Document.parse(src)
+    xml.Element root, err re = doc.root()
+    string val, bool found = root.attr("attr")
+    fmt.println(f"empty attr found: {found}")
+    bool is_empty = val == ""
+    fmt.println(f"empty attr value blank: {is_empty}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 09_EDGE_CASES START =====")
+    test_empty_element()
+    test_whitespace_text()
+    test_single_root()
+    test_empty_children_list()
+    test_long_tag_name()
+    test_attr_empty_value()
+    fmt.println("===== TEST 09_EDGE_CASES END =====")
+    return 0
+}

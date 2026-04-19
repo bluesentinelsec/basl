@@ -1,0 +1,61 @@
+import "fmt"
+import "encoding"
+
+fn test_special_chars() -> void {
+    string input = "tab\there\nnewline\r\nCRLF"
+    string hex_enc, err e1 = encoding.hex_encode(input)
+    string hex_dec, err e2 = encoding.hex_decode(hex_enc)
+    bool hex_match = hex_dec == input
+    fmt.println(f"special chars hex roundtrip: {hex_match}")
+
+    string b64_enc, err e3 = encoding.base64_encode(input)
+    string b64_dec, err e4 = encoding.base64_decode(b64_enc)
+    bool b64_match = b64_dec == input
+    fmt.println(f"special chars b64 roundtrip: {b64_match}")
+}
+
+fn test_null_like_patterns() -> void {
+    string input = "\x00\x00\x00"
+    string hex_enc, err e1 = encoding.hex_encode(input)
+    fmt.println(f"null hex: {hex_enc}")
+
+    string hex_dec, err e2 = encoding.hex_decode(hex_enc)
+    bool match = hex_dec == input
+    fmt.println(f"null hex roundtrip: {match}")
+}
+
+fn test_high_bytes() -> void {
+    string input = "\xff\xfe\xfd\x80\x7f"
+    string hex_enc, err e1 = encoding.hex_encode(input)
+    string hex_dec, err e2 = encoding.hex_decode(hex_enc)
+    bool match = hex_dec == input
+    fmt.println(f"high bytes hex roundtrip: {match}")
+
+    string b64_enc, err e3 = encoding.base64_encode(input)
+    string b64_dec, err e4 = encoding.base64_decode(b64_enc)
+    bool b64_match = b64_dec == input
+    fmt.println(f"high bytes b64 roundtrip: {b64_match}")
+}
+
+fn test_unicode_strings() -> void {
+    string input = "Hello, 世界! 🌍"
+    string hex_enc, err e1 = encoding.hex_encode(input)
+    string hex_dec, err e2 = encoding.hex_decode(hex_enc)
+    bool hex_match = hex_dec == input
+    fmt.println(f"unicode hex roundtrip: {hex_match}")
+
+    string b64_enc, err e3 = encoding.base64_encode(input)
+    string b64_dec, err e4 = encoding.base64_decode(b64_enc)
+    bool b64_match = b64_dec == input
+    fmt.println(f"unicode b64 roundtrip: {b64_match}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 08_binary_data START =====")
+    test_special_chars()
+    test_null_like_patterns()
+    test_high_bytes()
+    test_unicode_strings()
+    fmt.println("===== TEST 08_binary_data END =====")
+    return 0
+}

@@ -1,0 +1,58 @@
+import "fmt"
+import "xml"
+
+fn test_invalid_xml() -> void {
+    string src = "<root><unclosed>"
+    xml.Document doc, err e = xml.Document.parse(src)
+    bool ok = e == ok
+    fmt.println(f"invalid xml ok: {ok}")
+}
+
+fn test_empty_string() -> void {
+    string src = ""
+    xml.Document doc, err e = xml.Document.parse(src)
+    bool ok = e == ok
+    fmt.println(f"empty string ok: {ok}")
+}
+
+fn test_missing_child() -> void {
+    string src = "<root><a>1</a></root>"
+    xml.Document doc, err e = xml.Document.parse(src)
+    xml.Element root, err re = doc.root()
+    xml.Element missing, err me = root.child("nonexistent")
+    bool ok = me == ok
+    fmt.println(f"missing child ok: {ok}")
+}
+
+fn test_malformed_tag() -> void {
+    string src = "<root><123bad/></root>"
+    xml.Document doc, err e = xml.Document.parse(src)
+    bool ok = e == ok
+    fmt.println(f"malformed tag ok: {ok}")
+}
+
+fn test_mismatched_tags() -> void {
+    string src = "<open></close>"
+    xml.Document doc, err e = xml.Document.parse(src)
+    bool ok = e == ok
+    fmt.println(f"mismatched tags ok: {ok}")
+}
+
+fn test_just_text() -> void {
+    string src = "not xml at all"
+    xml.Document doc, err e = xml.Document.parse(src)
+    bool ok = e == ok
+    fmt.println(f"just text ok: {ok}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 08_ERROR_HANDLING START =====")
+    test_invalid_xml()
+    test_empty_string()
+    test_missing_child()
+    test_malformed_tag()
+    test_mismatched_tags()
+    test_just_text()
+    fmt.println("===== TEST 08_ERROR_HANDLING END =====")
+    return 0
+}

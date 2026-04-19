@@ -108,6 +108,16 @@ static const uint32_t md5_s[64] = {7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22, 
                                    4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23,
                                    6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21};
 
+static uint32_t load_le32(const uint8_t *p)
+{
+    return (uint32_t)p[0] | ((uint32_t)p[1] << 8) | ((uint32_t)p[2] << 16) | ((uint32_t)p[3] << 24);
+}
+
+static void store_le32(uint8_t *p, uint32_t v)
+{
+    p[0] = (uint8_t)v; p[1] = (uint8_t)(v >> 8); p[2] = (uint8_t)(v >> 16); p[3] = (uint8_t)(v >> 24);
+}
+
 static void store_le64(uint8_t *p, uint64_t v)
 {
     p[0] = (uint8_t)v; p[1] = (uint8_t)(v >> 8); p[2] = (uint8_t)(v >> 16); p[3] = (uint8_t)(v >> 24);
@@ -127,7 +137,9 @@ static void md5_hash(const uint8_t *data, size_t len, uint8_t out[16], vigil_all
 
     for (size_t offset = 0; offset < padded_len; offset += 64)
     {
-        uint32_t *m = (uint32_t *)(msg + offset);
+        uint32_t m[16];
+        for (int j = 0; j < 16; j++)
+            m[j] = load_le32(msg + offset + (size_t)j * 4);
         uint32_t a = a0, b = b0, c = c0, d = d0;
         for (int i = 0; i < 64; i++)
         {
@@ -165,10 +177,10 @@ static void md5_hash(const uint8_t *data, size_t len, uint8_t out[16], vigil_all
         d0 += d;
     }
     alloc->deallocate(alloc->user_data, msg);
-    memcpy(out, &a0, 4);
-    memcpy(out + 4, &b0, 4);
-    memcpy(out + 8, &c0, 4);
-    memcpy(out + 12, &d0, 4);
+    store_le32(out, a0);
+    store_le32(out + 4, b0);
+    store_le32(out + 8, c0);
+    store_le32(out + 12, d0);
 }
 
 /* ── SHA-1 (FIPS 180-4) ─────────────────────────────────────────── */

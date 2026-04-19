@@ -1,0 +1,140 @@
+import "fmt"
+import "xml"
+
+fn test_many_children() -> void {
+    string src = "<list>"
+    for (i32 i = 0; i < 20; i++) {
+        src = src + f"<item id=\"{i}\">value_{i}</item>"
+    }
+    src = src + "</list>"
+
+    xml.Document doc, err e = xml.Document.parse(src)
+    bool ok = e == ok
+    fmt.println(f"many children parse ok: {ok}")
+
+    xml.Element root, err re = doc.root()
+    array<xml.Element> items = root.children_by_tag("item")
+    i32 count = items.len()
+    fmt.println(f"many children count: {count}")
+
+    string first = items[0].text()
+    fmt.println(f"first item: {first}")
+    string last = items[19].text()
+    fmt.println(f"last item: {last}")
+
+    string id0, bool f0 = items[0].attr("id")
+    fmt.println(f"first id: {id0}")
+    string id19, bool f19 = items[19].attr("id")
+    fmt.println(f"last id: {id19}")
+}
+
+fn test_mixed_content_tree() -> void {
+    string src = "<html>" +
+        "<head><title>Test Page</title></head>" +
+        "<body>" +
+        "<h1>Header</h1>" +
+        "<p>Paragraph with <b>bold</b> and <i>italic</i> text</p>" +
+        "<ul>" +
+        "<li class=\"first\">Item 1</li>" +
+        "<li class=\"second\">Item 2</li>" +
+        "<li class=\"third\">Item 3</li>" +
+        "</ul>" +
+        "</body>" +
+        "</html>"
+
+    xml.Document doc, err e = xml.Document.parse(src)
+    xml.Element root, err re = doc.root()
+    string tag = root.tag()
+    fmt.println(f"html root: {tag}")
+
+    xml.Element head, err he = root.child("head")
+    xml.Element title, err te = head.child("title")
+    string ttext = title.text()
+    fmt.println(f"title: {ttext}")
+
+    xml.Element body, err be = root.child("body")
+    xml.Element h1, err h1e = body.child("h1")
+    string h1text = h1.text()
+    fmt.println(f"h1: {h1text}")
+
+    xml.Element p, err pe = body.child("p")
+    string pall = p.all_text()
+    fmt.println(f"p all_text: {pall}")
+
+    xml.Element ul, err ue = body.child("ul")
+    array<xml.Element> lis = ul.children_by_tag("li")
+    i32 li_count = lis.len()
+    fmt.println(f"li count: {li_count}")
+
+    string cls, bool cf = lis[0].attr("class")
+    fmt.println(f"first li class: {cls}")
+    string li2text = lis[2].text()
+    fmt.println(f"third li text: {li2text}")
+}
+
+fn test_attrs_and_children_combined() -> void {
+    string src = "<product id=\"p1\" category=\"electronics\">" +
+        "<name>Widget</name>" +
+        "<price currency=\"USD\">29.99</price>" +
+        "<tags><tag>sale</tag><tag>new</tag><tag>featured</tag></tags>" +
+        "</product>"
+
+    xml.Document doc, err e = xml.Document.parse(src)
+    xml.Element root, err re = doc.root()
+
+    string pid, bool pf = root.attr("id")
+    fmt.println(f"product id: {pid}")
+    string cat, bool cf = root.attr("category")
+    fmt.println(f"product category: {cat}")
+
+    xml.Element name, err ne = root.child("name")
+    string ntext = name.text()
+    fmt.println(f"product name: {ntext}")
+
+    xml.Element price, err pre = root.child("price")
+    string ptext = price.text()
+    fmt.println(f"price: {ptext}")
+    string curr, bool curf = price.attr("currency")
+    fmt.println(f"currency: {curr}")
+
+    xml.Element tags, err tge = root.child("tags")
+    array<xml.Element> tag_list = tags.children_by_tag("tag")
+    i32 tag_count = tag_list.len()
+    fmt.println(f"tag count: {tag_count}")
+    string t0 = tag_list[0].text()
+    string t2 = tag_list[2].text()
+    fmt.println(f"first tag: {t0}")
+    fmt.println(f"last tag: {t2}")
+}
+
+fn test_roundtrip_complex() -> void {
+    string src = "<data version=\"2\"><items><item key=\"a\">1</item><item key=\"b\">2</item></items></data>"
+    xml.Document doc, err e = xml.Document.parse(src)
+    string out = doc.to_string()
+    xml.Document doc2, err e2 = xml.Document.parse(out)
+    bool ok = e2 == ok
+    fmt.println(f"complex roundtrip ok: {ok}")
+
+    xml.Element root2, err re = doc2.root()
+    string ver, bool vf = root2.attr("version")
+    fmt.println(f"roundtrip version attr: {ver}")
+
+    xml.Element items2, err ie = root2.child("items")
+    array<xml.Element> item_list = items2.children_by_tag("item")
+    i32 count = item_list.len()
+    fmt.println(f"roundtrip item count: {count}")
+    string k0, bool kf = item_list[0].attr("key")
+    fmt.println(f"roundtrip first key: {k0}")
+    string v1 = item_list[1].text()
+    fmt.println(f"roundtrip second val: {v1}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST LARGE-XML-COMPREHENSIVE-2 START =====")
+    test_many_children()
+    test_mixed_content_tree()
+    test_attrs_and_children_combined()
+    test_roundtrip_complex()
+    fmt.println("===== TEST LARGE-XML-COMPREHENSIVE-2 END =====")
+    return 0
+}

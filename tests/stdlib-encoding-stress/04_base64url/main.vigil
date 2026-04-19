@@ -1,0 +1,58 @@
+import "fmt"
+import "encoding"
+
+fn test_base64url_encode_known() -> void {
+    string result, err e = encoding.base64url_encode("hello")
+    bool ok = e == ok
+    fmt.println(f"b64url_encode ok: {ok}")
+    fmt.println(f"b64url_encode hello: {result}")
+
+    // Data that would produce + and / in standard base64
+    string r2, err e2 = encoding.base64url_encode("subjects?_d")
+    bool no_plus = r2.contains("+") == false
+    bool no_slash = r2.contains("/") == false
+    fmt.println(f"b64url no plus: {no_plus}")
+    fmt.println(f"b64url no slash: {no_slash}")
+
+    string r3, err e3 = encoding.base64url_encode("i\xb7\x1d\xfb\xe8")
+    bool no_plus2 = r3.contains("+") == false
+    bool no_slash2 = r3.contains("/") == false
+    fmt.println(f"b64url binary no plus: {no_plus2}")
+    fmt.println(f"b64url binary no slash: {no_slash2}")
+}
+
+fn test_base64url_decode_known() -> void {
+    string result, err e = encoding.base64url_decode("aGVsbG8=")
+    bool ok = e == ok
+    fmt.println(f"b64url_decode ok: {ok}")
+    fmt.println(f"b64url_decode hello: {result}")
+}
+
+fn test_base64url_roundtrip() -> void {
+    string input = "base64url roundtrip!"
+    string encoded, err e1 = encoding.base64url_encode(input)
+    string decoded, err e2 = encoding.base64url_decode(encoded)
+    bool match = decoded == input
+    fmt.println(f"b64url roundtrip match: {match}")
+}
+
+fn test_base64url_vs_standard() -> void {
+    // Encode same data with both, verify url-safe chars
+    string data = "test>>data??with+special/chars"
+    string url_enc, err e1 = encoding.base64url_encode(data)
+    string std_enc, err e2 = encoding.base64_encode(data)
+    bool url_no_plus = url_enc.contains("+") == false
+    bool url_no_slash = url_enc.contains("/") == false
+    fmt.println(f"url safe no plus: {url_no_plus}")
+    fmt.println(f"url safe no slash: {url_no_slash}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 04_base64url START =====")
+    test_base64url_encode_known()
+    test_base64url_decode_known()
+    test_base64url_roundtrip()
+    test_base64url_vs_standard()
+    fmt.println("===== TEST 04_base64url END =====")
+    return 0
+}

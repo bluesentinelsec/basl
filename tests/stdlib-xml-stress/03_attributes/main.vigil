@@ -1,0 +1,56 @@
+import "fmt"
+import "xml"
+
+fn test_attr_found() -> void {
+    string src = "<user name=\"Alice\" age=\"30\"/>"
+    xml.Document doc, err e = xml.Document.parse(src)
+    xml.Element root, err re = doc.root()
+    string name, bool found = root.attr("name")
+    fmt.println(f"attr name found: {found}")
+    fmt.println(f"attr name: {name}")
+    string age, bool afound = root.attr("age")
+    fmt.println(f"attr age found: {afound}")
+    fmt.println(f"attr age: {age}")
+}
+
+fn test_attr_not_found() -> void {
+    string src = "<user name=\"Bob\"/>"
+    xml.Document doc, err e = xml.Document.parse(src)
+    xml.Element root, err re = doc.root()
+    string val, bool found = root.attr("email")
+    fmt.println(f"missing attr found: {found}")
+}
+
+fn test_multiple_attrs() -> void {
+    string src = "<div id=\"main\" class=\"container\" style=\"color:red\">text</div>"
+    xml.Document doc, err e = xml.Document.parse(src)
+    xml.Element root, err re = doc.root()
+    string id, bool f1 = root.attr("id")
+    fmt.println(f"id: {id}")
+    string cls, bool f2 = root.attr("class")
+    fmt.println(f"class: {cls}")
+    string style, bool f3 = root.attr("style")
+    fmt.println(f"style: {style}")
+    bool all_found = f1 && f2 && f3
+    fmt.println(f"all found: {all_found}")
+}
+
+fn test_attr_on_nested() -> void {
+    string src = "<root><item key=\"val\">data</item></root>"
+    xml.Document doc, err e = xml.Document.parse(src)
+    xml.Element root, err re = doc.root()
+    xml.Element item, err ce = root.child("item")
+    string key, bool found = item.attr("key")
+    fmt.println(f"nested attr found: {found}")
+    fmt.println(f"nested attr key: {key}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 03_ATTRIBUTES START =====")
+    test_attr_found()
+    test_attr_not_found()
+    test_multiple_attrs()
+    test_attr_on_nested()
+    fmt.println("===== TEST 03_ATTRIBUTES END =====")
+    return 0
+}

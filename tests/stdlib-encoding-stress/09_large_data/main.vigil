@@ -1,0 +1,67 @@
+import "fmt"
+import "encoding"
+
+fn build_large_string() -> string {
+    string chunk = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+    string result = ""
+    i32 i = 0
+    while i < 30 {
+        result = result + chunk
+        i = i + 1
+    }
+    return result
+}
+
+fn test_large_hex() -> void {
+    string input = build_large_string()
+    string encoded, err e1 = encoding.hex_encode(input)
+    bool enc_ok = e1 == ok
+    fmt.println(f"large hex encode ok: {enc_ok}")
+
+    string decoded, err e2 = encoding.hex_decode(encoded)
+    bool match = decoded == input
+    fmt.println(f"large hex roundtrip: {match}")
+}
+
+fn test_large_base64() -> void {
+    string input = build_large_string()
+    string encoded, err e1 = encoding.base64_encode(input)
+    bool enc_ok = e1 == ok
+    fmt.println(f"large b64 encode ok: {enc_ok}")
+
+    string decoded, err e2 = encoding.base64_decode(encoded)
+    bool match = decoded == input
+    fmt.println(f"large b64 roundtrip: {match}")
+}
+
+fn test_large_base32() -> void {
+    string input = build_large_string()
+    string encoded, err e1 = encoding.base32_encode(input)
+    bool enc_ok = e1 == ok
+    fmt.println(f"large b32 encode ok: {enc_ok}")
+
+    string decoded, err e2 = encoding.base32_decode(encoded)
+    bool match = decoded == input
+    fmt.println(f"large b32 roundtrip: {match}")
+}
+
+fn test_large_base64url() -> void {
+    string input = build_large_string()
+    string encoded, err e1 = encoding.base64url_encode(input)
+    bool enc_ok = e1 == ok
+    fmt.println(f"large b64url encode ok: {enc_ok}")
+
+    string decoded, err e2 = encoding.base64url_decode(encoded)
+    bool match = decoded == input
+    fmt.println(f"large b64url roundtrip: {match}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 09_large_data START =====")
+    test_large_hex()
+    test_large_base64()
+    test_large_base32()
+    test_large_base64url()
+    fmt.println("===== TEST 09_large_data END =====")
+    return 0
+}

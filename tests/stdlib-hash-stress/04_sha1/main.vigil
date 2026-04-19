@@ -1,0 +1,42 @@
+import "fmt"
+import "hash"
+
+fn test_empty_vector() -> void {
+    string h, err e = hash.sha1("")
+    bool ok = e == ok
+    bool match = h == "da39a3ee5e6b4b0d3255bfef95601890afd80709"
+    fmt.println(f"sha1_empty_ok: {ok}")
+    fmt.println(f"sha1_empty_vector: {match}")
+}
+
+fn test_hello_vector() -> void {
+    string h, err e = hash.sha1("hello")
+    bool ok = e == ok
+    bool match = h == "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+    fmt.println(f"sha1_hello_ok: {ok}")
+    fmt.println(f"sha1_hello_vector: {match}")
+}
+
+fn test_output_length() -> void {
+    string h, err e = hash.sha1("test data")
+    i32 len = h.len()
+    bool ok = len == 40
+    fmt.println(f"sha1_output_length_40: {ok}")
+}
+
+fn test_consistency() -> void {
+    string h1, err e1 = hash.sha1("consistent")
+    string h2, err e2 = hash.sha1("consistent")
+    bool ok = h1 == h2
+    fmt.println(f"sha1_consistency: {ok}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 04_sha1 START =====")
+    test_empty_vector()
+    test_hello_vector()
+    test_output_length()
+    test_consistency()
+    fmt.println("===== TEST 04_sha1 END =====")
+    return 0
+}

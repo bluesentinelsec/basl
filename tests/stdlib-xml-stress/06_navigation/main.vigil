@@ -1,0 +1,67 @@
+import "fmt"
+import "xml"
+
+fn test_children_by_tag() -> void {
+    string src = "<root><item>a</item><other>x</other><item>b</item><item>c</item></root>"
+    xml.Document doc, err e = xml.Document.parse(src)
+    xml.Element root, err re = doc.root()
+    array<xml.Element> items = root.children_by_tag("item")
+    i32 count = items.len()
+    fmt.println(f"items count: {count}")
+    string v0 = items[0].text()
+    string v1 = items[1].text()
+    string v2 = items[2].text()
+    fmt.println(f"item 0: {v0}")
+    fmt.println(f"item 1: {v1}")
+    fmt.println(f"item 2: {v2}")
+}
+
+fn test_children_by_tag_empty() -> void {
+    string src = "<root><a>1</a></root>"
+    xml.Document doc, err e = xml.Document.parse(src)
+    xml.Element root, err re = doc.root()
+    array<xml.Element> none = root.children_by_tag("missing")
+    i32 count = none.len()
+    bool is_zero = count == 0
+    fmt.println(f"missing tag count zero: {is_zero}")
+}
+
+fn test_deep_navigation() -> void {
+    string src = "<catalog><section name=\"books\"><item><title>A</title><price>10</price></item><item><title>B</title><price>20</price></item></section></catalog>"
+    xml.Document doc, err e = xml.Document.parse(src)
+    xml.Element root, err re = doc.root()
+    xml.Element section, err se = root.child("section")
+    string sname, bool found = section.attr("name")
+    fmt.println(f"section name: {sname}")
+    array<xml.Element> items = section.children_by_tag("item")
+    i32 count = items.len()
+    fmt.println(f"items in section: {count}")
+    xml.Element title0, err t0e = items[0].child("title")
+    string t0 = title0.text()
+    fmt.println(f"first title: {t0}")
+    xml.Element price1, err p1e = items[1].child("price")
+    string p1 = price1.text()
+    fmt.println(f"second price: {p1}")
+}
+
+fn test_all_children_tags() -> void {
+    string src = "<root><a/><b/><c/><a/></root>"
+    xml.Document doc, err e = xml.Document.parse(src)
+    xml.Element root, err re = doc.root()
+    array<xml.Element> all = root.children()
+    i32 total = all.len()
+    fmt.println(f"total children: {total}")
+    array<xml.Element> a_elems = root.children_by_tag("a")
+    i32 a_count = a_elems.len()
+    fmt.println(f"a count: {a_count}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 06_NAVIGATION START =====")
+    test_children_by_tag()
+    test_children_by_tag_empty()
+    test_deep_navigation()
+    test_all_children_tags()
+    fmt.println("===== TEST 06_NAVIGATION END =====")
+    return 0
+}

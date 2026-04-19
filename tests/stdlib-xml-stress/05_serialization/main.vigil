@@ -1,0 +1,57 @@
+import "fmt"
+import "xml"
+
+fn test_to_string() -> void {
+    string src = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><root><child>text</child></root>"
+    xml.Document doc, err e = xml.Document.parse(src)
+    string out = doc.to_string()
+    bool has_root = out.contains("<root>")
+    fmt.println(f"to_string has root: {has_root}")
+    bool has_child = out.contains("<child>")
+    fmt.println(f"to_string has child: {has_child}")
+    bool has_text = out.contains("text")
+    fmt.println(f"to_string has text: {has_text}")
+}
+
+fn test_version() -> void {
+    string src = "<?xml version=\"1.0\"?><r/>"
+    xml.Document doc, err e = xml.Document.parse(src)
+    string ver = doc.version()
+    fmt.println(f"version: {ver}")
+}
+
+fn test_encoding() -> void {
+    string src = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><r/>"
+    xml.Document doc, err e = xml.Document.parse(src)
+    string enc = doc.encoding()
+    fmt.println(f"encoding: {enc}")
+}
+
+fn test_to_string_preserves_attrs() -> void {
+    string src = "<item id=\"1\" name=\"test\">val</item>"
+    xml.Document doc, err e = xml.Document.parse(src)
+    string out = doc.to_string()
+    bool has_id = out.contains("id=")
+    fmt.println(f"serialized has id: {has_id}")
+    bool has_name = out.contains("name=")
+    fmt.println(f"serialized has name: {has_name}")
+}
+
+fn test_to_string_nested() -> void {
+    string src = "<a><b><c>deep</c></b></a>"
+    xml.Document doc, err e = xml.Document.parse(src)
+    string out = doc.to_string()
+    bool has_deep = out.contains("deep")
+    fmt.println(f"nested serialized has deep: {has_deep}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 05_SERIALIZATION START =====")
+    test_to_string()
+    test_version()
+    test_encoding()
+    test_to_string_preserves_attrs()
+    test_to_string_nested()
+    fmt.println("===== TEST 05_SERIALIZATION END =====")
+    return 0
+}

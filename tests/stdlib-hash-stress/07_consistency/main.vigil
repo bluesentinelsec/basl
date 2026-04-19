@@ -1,0 +1,65 @@
+import "fmt"
+import "hash"
+
+fn test_fnv1a_consistency() -> void {
+    i64 a = hash.fnv1a("same input")
+    i64 b = hash.fnv1a("same input")
+    i64 c = hash.fnv1a("same input")
+    bool ab = a == b
+    bool bc = b == c
+    fmt.println(f"fnv1a_repeat_ab: {ab}")
+    fmt.println(f"fnv1a_repeat_bc: {bc}")
+}
+
+fn test_djb2_consistency() -> void {
+    i64 a = hash.djb2("same input")
+    i64 b = hash.djb2("same input")
+    i64 c = hash.djb2("same input")
+    bool ab = a == b
+    bool bc = b == c
+    fmt.println(f"djb2_repeat_ab: {ab}")
+    fmt.println(f"djb2_repeat_bc: {bc}")
+}
+
+fn test_md5_consistency() -> void {
+    string a, err e1 = hash.md5("same input")
+    string b, err e2 = hash.md5("same input")
+    string c, err e3 = hash.md5("same input")
+    bool ab = a == b
+    bool bc = b == c
+    fmt.println(f"md5_repeat_ab: {ab}")
+    fmt.println(f"md5_repeat_bc: {bc}")
+}
+
+fn test_sha1_consistency() -> void {
+    string a, err e1 = hash.sha1("same input")
+    string b, err e2 = hash.sha1("same input")
+    bool ab = a == b
+    fmt.println(f"sha1_repeat: {ab}")
+}
+
+fn test_sha256_consistency() -> void {
+    string a, err e1 = hash.sha256("same input")
+    string b, err e2 = hash.sha256("same input")
+    bool ab = a == b
+    fmt.println(f"sha256_repeat: {ab}")
+}
+
+fn test_sha512_consistency() -> void {
+    string a, err e1 = hash.sha512("same input")
+    string b, err e2 = hash.sha512("same input")
+    bool ab = a == b
+    fmt.println(f"sha512_repeat: {ab}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 07_consistency START =====")
+    test_fnv1a_consistency()
+    test_djb2_consistency()
+    test_md5_consistency()
+    test_sha1_consistency()
+    test_sha256_consistency()
+    test_sha512_consistency()
+    fmt.println("===== TEST 07_consistency END =====")
+    return 0
+}

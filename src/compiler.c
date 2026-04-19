@@ -7042,8 +7042,12 @@ static void vigil_parser_set_native_method_return_type(vigil_parser_state_t *sta
     {
         if (method->return_type == VIGIL_TYPE_OBJECT && method->return_element_type != 0)
         {
-            vigil_parser_type_t elem_type =
-                vigil_binding_type_primitive((vigil_type_kind_t)method->return_element_type);
+            vigil_parser_type_t elem_type;
+            if (method->return_element_type == VIGIL_TYPE_OBJECT)
+                elem_type = vigil_binding_type_class(
+                    vigil_parser_resolve_return_class(state, method, class_index));
+            else
+                elem_type = vigil_binding_type_primitive((vigil_type_kind_t)method->return_element_type);
             size_t arr_idx;
             if (vigil_program_find_array_type(state->program, elem_type, &arr_idx))
             {
@@ -7079,8 +7083,12 @@ static void vigil_parser_set_native_method_return_type(vigil_parser_state_t *sta
                resolve the array element type instead of treating it as a class. */
             if (method->return_types[0] == VIGIL_TYPE_OBJECT && method->return_element_type != 0)
             {
-                vigil_parser_type_t elem_type =
-                    vigil_binding_type_primitive((vigil_type_kind_t)method->return_element_type);
+                vigil_parser_type_t elem_type;
+                if (method->return_element_type == VIGIL_TYPE_OBJECT)
+                    elem_type = vigil_binding_type_class(
+                        vigil_parser_resolve_return_class(state, method, class_index));
+                else
+                    elem_type = vigil_binding_type_primitive((vigil_type_kind_t)method->return_element_type);
                 size_t arr_idx;
                 if (vigil_program_find_array_type(state->program, elem_type, &arr_idx))
                     first_type = vigil_binding_type_array(arr_idx);

@@ -1,0 +1,55 @@
+import "fmt"
+import "xml"
+
+fn test_simple_parse() -> void {
+    string src = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><greeting>Hello</greeting>"
+    xml.Document doc, err e = xml.Document.parse(src)
+    bool parse_ok = e == ok
+    fmt.println(f"simple parse ok: {parse_ok}")
+    xml.Element root, err re = doc.root()
+    bool root_ok = re == ok
+    fmt.println(f"root ok: {root_ok}")
+    string tag = root.tag()
+    fmt.println(f"root tag: {tag}")
+    string text = root.text()
+    fmt.println(f"root text: {text}")
+}
+
+fn test_version_encoding() -> void {
+    string src = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><root/>"
+    xml.Document doc, err e = xml.Document.parse(src)
+    string ver = doc.version()
+    fmt.println(f"version: {ver}")
+    string enc = doc.encoding()
+    fmt.println(f"encoding: {enc}")
+}
+
+fn test_no_prolog() -> void {
+    string src = "<item>content</item>"
+    xml.Document doc, err e = xml.Document.parse(src)
+    bool ok = e == ok
+    fmt.println(f"no prolog parse ok: {ok}")
+    xml.Element root, err re = doc.root()
+    string tag = root.tag()
+    fmt.println(f"no prolog tag: {tag}")
+    string text = root.text()
+    fmt.println(f"no prolog text: {text}")
+}
+
+fn test_numeric_text() -> void {
+    string src = "<count>42</count>"
+    xml.Document doc, err e = xml.Document.parse(src)
+    xml.Element root, err re = doc.root()
+    string text = root.text()
+    fmt.println(f"numeric text: {text}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 01_BASIC_PARSING START =====")
+    test_simple_parse()
+    test_version_encoding()
+    test_no_prolog()
+    test_numeric_text()
+    fmt.println("===== TEST 01_BASIC_PARSING END =====")
+    return 0
+}

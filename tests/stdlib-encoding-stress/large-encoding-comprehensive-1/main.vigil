@@ -1,0 +1,134 @@
+import "fmt"
+import "encoding"
+
+fn test_rfc_vectors_hex() -> void {
+    // RFC 4648 test vectors for hex
+    string r0, err e0 = encoding.hex_encode("")
+    fmt.println(f"hex vec empty: {r0}")
+
+    string r1, err e1 = encoding.hex_encode("f")
+    fmt.println(f"hex vec f: {r1}")
+
+    string r2, err e2 = encoding.hex_encode("fo")
+    fmt.println(f"hex vec fo: {r2}")
+
+    string r3, err e3 = encoding.hex_encode("foo")
+    fmt.println(f"hex vec foo: {r3}")
+
+    string r4, err e4 = encoding.hex_encode("foob")
+    fmt.println(f"hex vec foob: {r4}")
+
+    string r5, err e5 = encoding.hex_encode("fooba")
+    fmt.println(f"hex vec fooba: {r5}")
+
+    string r6, err e6 = encoding.hex_encode("foobar")
+    fmt.println(f"hex vec foobar: {r6}")
+}
+
+fn test_rfc_vectors_base64() -> void {
+    // RFC 4648 test vectors
+    string r0, err e0 = encoding.base64_encode("")
+    fmt.println(f"b64 vec empty: {r0}")
+
+    string r1, err e1 = encoding.base64_encode("f")
+    fmt.println(f"b64 vec f: {r1}")
+
+    string r2, err e2 = encoding.base64_encode("fo")
+    fmt.println(f"b64 vec fo: {r2}")
+
+    string r3, err e3 = encoding.base64_encode("foo")
+    fmt.println(f"b64 vec foo: {r3}")
+
+    string r4, err e4 = encoding.base64_encode("foob")
+    fmt.println(f"b64 vec foob: {r4}")
+
+    string r5, err e5 = encoding.base64_encode("fooba")
+    fmt.println(f"b64 vec fooba: {r5}")
+
+    string r6, err e6 = encoding.base64_encode("foobar")
+    fmt.println(f"b64 vec foobar: {r6}")
+}
+
+fn test_rfc_vectors_base32() -> void {
+    // RFC 4648 test vectors
+    string r0, err e0 = encoding.base32_encode("")
+    fmt.println(f"b32 vec empty: {r0}")
+
+    string r1, err e1 = encoding.base32_encode("f")
+    fmt.println(f"b32 vec f: {r1}")
+
+    string r2, err e2 = encoding.base32_encode("fo")
+    fmt.println(f"b32 vec fo: {r2}")
+
+    string r3, err e3 = encoding.base32_encode("foo")
+    fmt.println(f"b32 vec foo: {r3}")
+
+    string r4, err e4 = encoding.base32_encode("foob")
+    fmt.println(f"b32 vec foob: {r4}")
+
+    string r5, err e5 = encoding.base32_encode("fooba")
+    fmt.println(f"b32 vec fooba: {r5}")
+
+    string r6, err e6 = encoding.base32_encode("foobar")
+    fmt.println(f"b32 vec foobar: {r6}")
+}
+
+fn test_all_formats_roundtrip() -> void {
+    string inputs = "Hello, World!"
+
+    string hex_enc, err he1 = encoding.hex_encode(inputs)
+    string hex_dec, err he2 = encoding.hex_decode(hex_enc)
+    bool hex_ok = hex_dec == inputs
+    fmt.println(f"all fmt hex rt: {hex_ok}")
+
+    string b64_enc, err be1 = encoding.base64_encode(inputs)
+    string b64_dec, err be2 = encoding.base64_decode(b64_enc)
+    bool b64_ok = b64_dec == inputs
+    fmt.println(f"all fmt b64 rt: {b64_ok}")
+
+    string b32_enc, err te1 = encoding.base32_encode(inputs)
+    string b32_dec, err te2 = encoding.base32_decode(b32_enc)
+    bool b32_ok = b32_dec == inputs
+    fmt.println(f"all fmt b32 rt: {b32_ok}")
+
+    string url_enc, err ue1 = encoding.base64url_encode(inputs)
+    string url_dec, err ue2 = encoding.base64url_decode(url_enc)
+    bool url_ok = url_dec == inputs
+    fmt.println(f"all fmt b64url rt: {url_ok}")
+}
+
+fn test_known_b64_values() -> void {
+    string r1, err e1 = encoding.base64_encode("hello")
+    bool ok1 = r1 == "aGVsbG8="
+    fmt.println(f"b64 hello known: {ok1}")
+
+    string r2, err e2 = encoding.base64_encode("Hello, World!")
+    bool ok2 = r2 == "SGVsbG8sIFdvcmxkIQ=="
+    fmt.println(f"b64 hello world known: {ok2}")
+
+    string r3, err e3 = encoding.base64_encode("abc")
+    bool ok3 = r3 == "YWJj"
+    fmt.println(f"b64 abc known: {ok3}")
+}
+
+fn test_known_hex_values() -> void {
+    string r1, err e1 = encoding.hex_encode("hello")
+    bool ok1 = r1 == "68656c6c6f"
+    fmt.println(f"hex hello known: {ok1}")
+
+    string r2, err e2 = encoding.hex_encode("AB")
+    bool ok2 = r2 == "4142"
+    fmt.println(f"hex AB known: {ok2}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST large-encoding-comprehensive-1 START =====")
+    test_rfc_vectors_hex()
+    test_rfc_vectors_base64()
+    test_rfc_vectors_base32()
+    test_all_formats_roundtrip()
+    test_known_b64_values()
+    test_known_hex_values()
+    fmt.println("===== TEST large-encoding-comprehensive-1 END =====")
+    return 0
+}

@@ -1,0 +1,44 @@
+import "fmt"
+import "hash"
+
+fn test_empty() -> void {
+    string h, err e = hash.sha512("")
+    bool ok = e == ok
+    i32 len = h.len()
+    bool len_ok = len == 128
+    fmt.println(f"sha512_empty_ok: {ok}")
+    fmt.println(f"sha512_empty_length_128: {len_ok}")
+}
+
+fn test_hello() -> void {
+    string h, err e = hash.sha512("hello")
+    bool ok = e == ok
+    i32 len = h.len()
+    bool len_ok = len == 128
+    fmt.println(f"sha512_hello_ok: {ok}")
+    fmt.println(f"sha512_hello_length_128: {len_ok}")
+}
+
+fn test_output_length() -> void {
+    string h, err e = hash.sha512("test data for sha512")
+    i32 len = h.len()
+    bool ok = len == 128
+    fmt.println(f"sha512_output_length_128: {ok}")
+}
+
+fn test_consistency() -> void {
+    string h1, err e1 = hash.sha512("consistent")
+    string h2, err e2 = hash.sha512("consistent")
+    bool ok = h1 == h2
+    fmt.println(f"sha512_consistency: {ok}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 06_sha512 START =====")
+    test_empty()
+    test_hello()
+    test_output_length()
+    test_consistency()
+    fmt.println("===== TEST 06_sha512 END =====")
+    return 0
+}

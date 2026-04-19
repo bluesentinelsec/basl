@@ -1,0 +1,67 @@
+import "fmt"
+import "encoding"
+
+fn test_hex_of_base64() -> void {
+    string data = "chain test"
+    string b64, err e1 = encoding.base64_encode(data)
+    string hex_of_b64, err e2 = encoding.hex_encode(b64)
+    bool enc_ok = e2 == ok
+    fmt.println(f"hex of b64 encode ok: {enc_ok}")
+
+    // Reverse: hex_decode then base64_decode
+    string b64_back, err e3 = encoding.hex_decode(hex_of_b64)
+    string original, err e4 = encoding.base64_decode(b64_back)
+    bool match = original == data
+    fmt.println(f"hex of b64 roundtrip: {match}")
+}
+
+fn test_base64_of_hex() -> void {
+    string data = "reverse chain"
+    string hex, err e1 = encoding.hex_encode(data)
+    string b64_of_hex, err e2 = encoding.base64_encode(hex)
+    bool enc_ok = e2 == ok
+    fmt.println(f"b64 of hex encode ok: {enc_ok}")
+
+    string hex_back, err e3 = encoding.base64_decode(b64_of_hex)
+    string original, err e4 = encoding.hex_decode(hex_back)
+    bool match = original == data
+    fmt.println(f"b64 of hex roundtrip: {match}")
+}
+
+fn test_base32_of_base64() -> void {
+    string data = "double encode"
+    string b64, err e1 = encoding.base64_encode(data)
+    string b32_of_b64, err e2 = encoding.base32_encode(b64)
+    bool enc_ok = e2 == ok
+    fmt.println(f"b32 of b64 encode ok: {enc_ok}")
+
+    string b64_back, err e3 = encoding.base32_decode(b32_of_b64)
+    string original, err e4 = encoding.base64_decode(b64_back)
+    bool match = original == data
+    fmt.println(f"b32 of b64 roundtrip: {match}")
+}
+
+fn test_triple_chain() -> void {
+    string data = "triple"
+    string b64, err e1 = encoding.base64_encode(data)
+    string hex, err e2 = encoding.hex_encode(b64)
+    string b32, err e3 = encoding.base32_encode(hex)
+    bool enc_ok = e3 == ok
+    fmt.println(f"triple chain encode ok: {enc_ok}")
+
+    string hex_back, err e4 = encoding.base32_decode(b32)
+    string b64_back, err e5 = encoding.hex_decode(hex_back)
+    string original, err e6 = encoding.base64_decode(b64_back)
+    bool match = original == data
+    fmt.println(f"triple chain roundtrip: {match}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 10_mixed START =====")
+    test_hex_of_base64()
+    test_base64_of_hex()
+    test_base32_of_base64()
+    test_triple_chain()
+    fmt.println("===== TEST 10_mixed END =====")
+    return 0
+}

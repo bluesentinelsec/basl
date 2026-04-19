@@ -1,0 +1,51 @@
+import "fmt"
+import "encoding"
+
+fn test_base64_encode_known() -> void {
+    string result, err e = encoding.base64_encode("hello")
+    bool ok = e == ok
+    fmt.println(f"b64_encode ok: {ok}")
+    fmt.println(f"b64_encode hello: {result}")
+
+    string r2, err e2 = encoding.base64_encode("Man")
+    fmt.println(f"b64_encode Man: {r2}")
+
+    string r3, err e3 = encoding.base64_encode("Ma")
+    fmt.println(f"b64_encode Ma: {r3}")
+
+    string r4, err e4 = encoding.base64_encode("M")
+    fmt.println(f"b64_encode M: {r4}")
+}
+
+fn test_base64_decode_known() -> void {
+    string result, err e = encoding.base64_decode("aGVsbG8=")
+    bool ok = e == ok
+    fmt.println(f"b64_decode ok: {ok}")
+    fmt.println(f"b64_decode hello: {result}")
+
+    string r2, err e2 = encoding.base64_decode("TWFu")
+    fmt.println(f"b64_decode Man: {r2}")
+
+    string r3, err e3 = encoding.base64_decode("TWE=")
+    fmt.println(f"b64_decode Ma: {r3}")
+
+    string r4, err e4 = encoding.base64_decode("TQ==")
+    fmt.println(f"b64_decode M: {r4}")
+}
+
+fn test_base64_roundtrip() -> void {
+    string input = "base64 roundtrip!"
+    string encoded, err e1 = encoding.base64_encode(input)
+    string decoded, err e2 = encoding.base64_decode(encoded)
+    bool match = decoded == input
+    fmt.println(f"b64 roundtrip match: {match}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 02_base64 START =====")
+    test_base64_encode_known()
+    test_base64_decode_known()
+    test_base64_roundtrip()
+    fmt.println("===== TEST 02_base64 END =====")
+    return 0
+}

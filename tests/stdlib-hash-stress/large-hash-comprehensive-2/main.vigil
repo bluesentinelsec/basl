@@ -1,0 +1,68 @@
+import "fmt"
+import "hash"
+
+fn test_multiple_inputs() -> void {
+    string inputs_a = "The quick brown fox jumps over the lazy dog"
+    string inputs_b = "Pack my box with five dozen liquor jugs"
+    string inputs_c = "How vexingly quick daft zebras jump"
+
+    string ma, err e1 = hash.md5(inputs_a)
+    string mb, err e2 = hash.md5(inputs_b)
+    string mc, err e3 = hash.md5(inputs_c)
+    bool ab = ma != mb
+    bool bc = mb != mc
+    bool ac = ma != mc
+    fmt.println(f"multi_md5_ab_differ: {ab}")
+    fmt.println(f"multi_md5_bc_differ: {bc}")
+    fmt.println(f"multi_md5_ac_differ: {ac}")
+}
+
+fn test_cross_algorithm() -> void {
+    string input = "cross-algorithm verification data"
+    i64 f = hash.fnv1a(input)
+    i64 d = hash.djb2(input)
+    string m, err e1 = hash.md5(input)
+    string s1, err e2 = hash.sha1(input)
+    string s2, err e3 = hash.sha256(input)
+    string s5, err e4 = hash.sha512(input)
+
+    bool f_ok = f != i64(0)
+    bool d_ok = d != i64(0)
+    i32 m_len = m.len()
+    bool m_ok = m_len == 32
+    i32 s1_len = s1.len()
+    bool s1_ok = s1_len == 40
+    i32 s2_len = s2.len()
+    bool s2_ok = s2_len == 64
+    i32 s5_len = s5.len()
+    bool s5_ok = s5_len == 128
+
+    fmt.println(f"cross_fnv1a_nonzero: {f_ok}")
+    fmt.println(f"cross_djb2_nonzero: {d_ok}")
+    fmt.println(f"cross_md5_len: {m_ok}")
+    fmt.println(f"cross_sha1_len: {s1_ok}")
+    fmt.println(f"cross_sha256_len: {s2_ok}")
+    fmt.println(f"cross_sha512_len: {s5_ok}")
+}
+
+fn test_consistency_across_inputs() -> void {
+    string a1, err e1 = hash.sha256("input one")
+    string a2, err e2 = hash.sha256("input one")
+    string b1, err e3 = hash.sha256("input two")
+    string b2, err e4 = hash.sha256("input two")
+    bool a_match = a1 == a2
+    bool b_match = b1 == b2
+    bool ab_differ = a1 != b1
+    fmt.println(f"consistency_a_match: {a_match}")
+    fmt.println(f"consistency_b_match: {b_match}")
+    fmt.println(f"consistency_ab_differ: {ab_differ}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST large-hash-comprehensive-2 START =====")
+    test_multiple_inputs()
+    test_cross_algorithm()
+    test_consistency_across_inputs()
+    fmt.println("===== TEST large-hash-comprehensive-2 END =====")
+    return 0
+}

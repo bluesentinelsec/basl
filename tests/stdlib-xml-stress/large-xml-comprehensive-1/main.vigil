@@ -1,0 +1,121 @@
+import "fmt"
+import "xml"
+
+fn test_config_document() -> void {
+    string src = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" +
+        "<config>" +
+        "<server host=\"localhost\" port=\"8080\">" +
+        "<workers>4</workers>" +
+        "<timeout>30</timeout>" +
+        "</server>" +
+        "<database>" +
+        "<driver>postgres</driver>" +
+        "<host>db.example.com</host>" +
+        "<port>5432</port>" +
+        "<name>myapp</name>" +
+        "</database>" +
+        "<logging level=\"info\">" +
+        "<file>/var/log/app.log</file>" +
+        "<rotate>true</rotate>" +
+        "</logging>" +
+        "</config>"
+
+    xml.Document doc, err e = xml.Document.parse(src)
+    bool ok = e == ok
+    fmt.println(f"config parse ok: {ok}")
+    string ver = doc.version()
+    fmt.println(f"config version: {ver}")
+
+    xml.Element root, err re = doc.root()
+    string tag = root.tag()
+    fmt.println(f"config root tag: {tag}")
+
+    // Navigate server section
+    xml.Element server, err se = root.child("server")
+    string shost, bool f1 = server.attr("host")
+    fmt.println(f"server host: {shost}")
+    string sport, bool f2 = server.attr("port")
+    fmt.println(f"server port: {sport}")
+    xml.Element workers, err we = server.child("workers")
+    string wtext = workers.text()
+    fmt.println(f"workers: {wtext}")
+
+    // Navigate database section
+    xml.Element db, err de = root.child("database")
+    array<xml.Element> db_kids = db.children()
+    i32 db_count = db_kids.len()
+    fmt.println(f"db children: {db_count}")
+    xml.Element driver, err dre = db.child("driver")
+    string drv = driver.text()
+    fmt.println(f"db driver: {drv}")
+
+    // Navigate logging section
+    xml.Element logging, err le = root.child("logging")
+    string lvl, bool lf = logging.attr("level")
+    fmt.println(f"log level: {lvl}")
+    xml.Element logfile, err lfe = logging.child("file")
+    string lpath = logfile.text()
+    fmt.println(f"log file: {lpath}")
+}
+
+fn test_multi_level_navigation() -> void {
+    string src = "<org>" +
+        "<dept name=\"eng\">" +
+        "<team name=\"backend\"><member>Alice</member><member>Bob</member></team>" +
+        "<team name=\"frontend\"><member>Carol</member></team>" +
+        "</dept>" +
+        "<dept name=\"sales\">" +
+        "<team name=\"east\"><member>Dave</member></team>" +
+        "</dept>" +
+        "</org>"
+
+    xml.Document doc, err e = xml.Document.parse(src)
+    xml.Element root, err re = doc.root()
+
+    array<xml.Element> depts = root.children_by_tag("dept")
+    i32 dept_count = depts.len()
+    fmt.println(f"dept count: {dept_count}")
+
+    string d0name, bool f0 = depts[0].attr("name")
+    fmt.println(f"dept 0: {d0name}")
+
+    array<xml.Element> teams = depts[0].children_by_tag("team")
+    i32 team_count = teams.len()
+    fmt.println(f"eng teams: {team_count}")
+
+    string t0name, bool tf = teams[0].attr("name")
+    fmt.println(f"first team: {t0name}")
+
+    array<xml.Element> members = teams[0].children_by_tag("member")
+    i32 mem_count = members.len()
+    fmt.println(f"backend members: {mem_count}")
+    string m0 = members[0].text()
+    fmt.println(f"first member: {m0}")
+}
+
+fn test_serialization_complex() -> void {
+    string src = "<root attr=\"val\"><a><b>text</b></a><c/></root>"
+    xml.Document doc, err e = xml.Document.parse(src)
+    string out = doc.to_string()
+    bool has_attr = out.contains("attr=")
+    fmt.println(f"complex serial has attr: {has_attr}")
+    bool has_b = out.contains("<b>")
+    fmt.println(f"complex serial has b: {has_b}")
+
+    // Re-parse and verify
+    xml.Document doc2, err e2 = xml.Document.parse(out)
+    xml.Element root2, err re = doc2.root()
+    xml.Element a2, err ae = root2.child("a")
+    xml.Element b2, err be = a2.child("b")
+    string btext = b2.text()
+    fmt.println(f"complex roundtrip b text: {btext}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST LARGE-XML-COMPREHENSIVE-1 START =====")
+    test_config_document()
+    test_multi_level_navigation()
+    test_serialization_complex()
+    fmt.println("===== TEST LARGE-XML-COMPREHENSIVE-1 END =====")
+    return 0
+}

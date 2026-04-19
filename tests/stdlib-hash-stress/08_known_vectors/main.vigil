@@ -1,0 +1,36 @@
+import "fmt"
+import "hash"
+
+fn test_md5_empty() -> void {
+    string h, err e = hash.md5("")
+    bool ok = h == "d41d8cd98f00b204e9800998ecf8427e"
+    fmt.println(f"md5_empty_vector: {ok}")
+}
+
+fn test_md5_hello() -> void {
+    string h, err e = hash.md5("hello")
+    bool ok = h == "5d41402abc4b2a76b9719d911017c592"
+    fmt.println(f"md5_hello_vector: {ok}")
+}
+
+fn test_sha1_empty() -> void {
+    string h, err e = hash.sha1("")
+    bool ok = h == "da39a3ee5e6b4b0d3255bfef95601890afd80709"
+    fmt.println(f"sha1_empty_vector: {ok}")
+}
+
+fn test_sha1_hello() -> void {
+    string h, err e = hash.sha1("hello")
+    bool ok = h == "aaf4c61ddcc5e8a2dabede0f3b482cd9aea9434d"
+    fmt.println(f"sha1_hello_vector: {ok}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 08_known_vectors START =====")
+    test_md5_empty()
+    test_md5_hello()
+    test_sha1_empty()
+    test_sha1_hello()
+    fmt.println("===== TEST 08_known_vectors END =====")
+    return 0
+}

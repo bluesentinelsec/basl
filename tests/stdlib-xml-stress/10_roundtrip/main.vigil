@@ -1,0 +1,68 @@
+import "fmt"
+import "xml"
+
+fn test_simple_roundtrip() -> void {
+    string src = "<root><child>hello</child></root>"
+    xml.Document doc, err e = xml.Document.parse(src)
+    string out = doc.to_string()
+    xml.Document doc2, err e2 = xml.Document.parse(out)
+    bool ok = e2 == ok
+    fmt.println(f"roundtrip reparse ok: {ok}")
+    xml.Element root2, err re = doc2.root()
+    string tag = root2.tag()
+    fmt.println(f"roundtrip root tag: {tag}")
+    xml.Element child2, err ce = root2.child("child")
+    string text = child2.text()
+    fmt.println(f"roundtrip child text: {text}")
+}
+
+fn test_attrs_roundtrip() -> void {
+    string src = "<item id=\"42\" type=\"book\">content</item>"
+    xml.Document doc, err e = xml.Document.parse(src)
+    string out = doc.to_string()
+    xml.Document doc2, err e2 = xml.Document.parse(out)
+    xml.Element root2, err re = doc2.root()
+    string id, bool f1 = root2.attr("id")
+    fmt.println(f"roundtrip id: {id}")
+    string typ, bool f2 = root2.attr("type")
+    fmt.println(f"roundtrip type: {typ}")
+    string text = root2.text()
+    fmt.println(f"roundtrip text: {text}")
+}
+
+fn test_nested_roundtrip() -> void {
+    string src = "<a><b><c>deep</c></b></a>"
+    xml.Document doc, err e = xml.Document.parse(src)
+    string out = doc.to_string()
+    xml.Document doc2, err e2 = xml.Document.parse(out)
+    xml.Element root2, err re = doc2.root()
+    xml.Element b, err be = root2.child("b")
+    xml.Element c, err ce = b.child("c")
+    string text = c.text()
+    fmt.println(f"nested roundtrip text: {text}")
+}
+
+fn test_multi_children_roundtrip() -> void {
+    string src = "<list><x>1</x><y>2</y><z>3</z></list>"
+    xml.Document doc, err e = xml.Document.parse(src)
+    string out = doc.to_string()
+    xml.Document doc2, err e2 = xml.Document.parse(out)
+    xml.Element root2, err re = doc2.root()
+    array<xml.Element> kids = root2.children()
+    i32 count = kids.len()
+    fmt.println(f"roundtrip children count: {count}")
+    string v0 = kids[0].text()
+    string v2 = kids[2].text()
+    fmt.println(f"roundtrip child 0: {v0}")
+    fmt.println(f"roundtrip child 2: {v2}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 10_ROUNDTRIP START =====")
+    test_simple_roundtrip()
+    test_attrs_roundtrip()
+    test_nested_roundtrip()
+    test_multi_children_roundtrip()
+    fmt.println("===== TEST 10_ROUNDTRIP END =====")
+    return 0
+}
