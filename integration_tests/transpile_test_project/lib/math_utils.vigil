@@ -1,0 +1,25 @@
+fn add(i32 a, i32 b) -> i32 {
+    return a + b
+}
+
+fn multiply(i32 a, i32 b) -> i32 {
+    return a * b
+}
+
+fn factorial(i32 n) -> i32 {
+    if n <= 1 { return 1 }
+    return n * factorial(n - 1)
+}
+
+fn fibonacci(i32 n) -> i32 {
+    if n <= 0 { return 0 }
+    if n == 1 { return 1 }
+    i32 a = 0
+    i32 b = 1
+    for (i32 i = 2; i <= n; i++) {
+        i32 temp = a + b
+        a = b
+        b = temp
+    }
+    return b
+}

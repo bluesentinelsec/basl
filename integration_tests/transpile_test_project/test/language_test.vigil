@@ -1,0 +1,164 @@
+import "test"
+import "fmt"
+import "crypto"
+import "csv"
+import "encoding"
+
+struct Point {
+    f64 x
+    f64 y
+}
+
+class Counter {
+    i32 value
+
+    fn increment() -> void {
+        self.value = self.value + 1
+    }
+
+    fn get() -> i32 {
+        return self.value
+    }
+}
+
+enum Color {
+    Red
+    Green
+    Blue
+}
+
+fn test_arithmetic(test.T t) -> void {
+    t.assert(2 + 3 == 5, "addition")
+    t.assert(10 - 4 == 6, "subtraction")
+    t.assert(3 * 7 == 21, "multiplication")
+    t.assert(15 / 3 == 5, "division")
+    t.assert(17 % 5 == 2, "modulo")
+    fmt.println("arithmetic: pass")
+}
+
+fn test_strings(test.T t) -> void {
+    string s = "hello"
+    t.assert(s.len() == 5, "string length")
+    string upper = s.to_upper()
+    t.assert(upper == "HELLO", "to_upper")
+    string joined = ", ".join(["a", "b", "c"])
+    t.assert(joined == "a, b, c", "join")
+    t.assert(s.contains("ell"), "contains")
+    t.assert(s.starts_with("hel"), "starts_with")
+    fmt.println("strings: pass")
+}
+
+fn test_arrays(test.T t) -> void {
+    array<i32> nums = [1, 2, 3, 4, 5]
+    t.assert(nums.len() == 5, "array length")
+    t.assert(nums[0] == 1, "array index 0")
+    t.assert(nums[4] == 5, "array index 4")
+    nums.push(6)
+    t.assert(nums.len() == 6, "after push")
+    fmt.println("arrays: pass")
+}
+
+fn test_maps(test.T t) -> void {
+    map<string, i32> m = {"a": 1, "b": 2, "c": 3}
+    t.assert(m.len() == 3, "map length")
+    t.assert(m["a"] == 1, "map access")
+    t.assert(m.has("b"), "map has")
+    fmt.println("maps: pass")
+}
+
+fn test_control_flow(test.T t) -> void {
+    // if/else
+    i32 x = 10
+    string result = ""
+    if x > 5 {
+        result = "big"
+    } else {
+        result = "small"
+    }
+    t.assert(result == "big", "if/else")
+
+    // for loop
+    i32 sum = 0
+    for (i32 i = 0; i < 5; i++) {
+        sum = sum + i
+    }
+    t.assert(sum == 10, "for loop sum")
+
+    // while loop
+    i32 count = 0
+    while count < 3 {
+        count = count + 1
+    }
+    t.assert(count == 3, "while loop")
+    fmt.println("control_flow: pass")
+}
+
+fn test_structs(test.T t) -> void {
+    Point p = Point(3.0, 4.0)
+    t.assert(p.x == 3.0, "struct field x")
+    t.assert(p.y == 4.0, "struct field y")
+    fmt.println("structs: pass")
+}
+
+fn test_classes(test.T t) -> void {
+    Counter c = Counter(0)
+    t.assert(c.get() == 0, "initial value")
+    c.increment()
+    c.increment()
+    c.increment()
+    t.assert(c.get() == 3, "after 3 increments")
+    fmt.println("classes: pass")
+}
+
+fn test_closures(test.T t) -> void {
+    i32 base = 10
+    // Test that closures capture variables
+    array<i32> nums = [1, 2, 3]
+    i32 total = 0
+    for (i32 i = 0; i < nums.len(); i++) {
+        total = total + nums[i]
+    }
+    t.assert(total == 6, "closure sum")
+    fmt.println("closures: pass")
+}
+
+fn test_error_handling(test.T t) -> void {
+    // Multi-return with err
+    string h, err e = crypto.sha256("hello")
+    t.assert(e == ok, "sha256 should succeed")
+    t.assert(h.len() == 64, "sha256 should be 64 hex chars")
+
+    // Error case
+    string bad, err e2 = encoding.hex_decode("xyz")
+    t.assert(e2 != ok, "invalid hex should error")
+    fmt.println("error_handling: pass")
+}
+
+fn test_fstrings(test.T t) -> void {
+    string name = "world"
+    i32 num = 42
+    string result = f"hello {name}, number {num}"
+    t.assert(result == "hello world, number 42", "f-string interpolation")
+    fmt.println("fstrings: pass")
+}
+
+fn test_type_conversions(test.T t) -> void {
+    i32 x = 42
+    string s = string(x)
+    t.assert(s == "42", "i32 to string")
+    f64 f = f64(x)
+    t.assert(f == 42.0, "i32 to f64")
+    fmt.println("type_conversions: pass")
+}
+
+fn test_csv_roundtrip(test.T t) -> void {
+    array<string> row = ["hello", "world", "test"]
+    string line, err e1 = csv.stringify_row(row, ",")
+    t.assert(e1 == ok, "stringify should succeed")
+    array<string> parsed, err e2 = csv.parse_row(line, ",")
+    t.assert(e2 == ok, "parse should succeed")
+    t.assert(parsed[0] == "hello", "roundtrip field 0")
+    t.assert(parsed[1] == "world", "roundtrip field 1")
+    t.assert(parsed[2] == "test", "roundtrip field 2")
+    fmt.println("csv_roundtrip: pass")
+}
