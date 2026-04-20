@@ -20,14 +20,14 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "internal/vigil_internal.h"
+#include "internal/vigil_nanbox.h"
 #include "platform/platform.h"
 #include "vigil/native_module.h"
 #include "vigil/runtime.h"
 #include "vigil/type.h"
 #include "vigil/value.h"
 #include "vigil/vm.h"
-
-#include "internal/vigil_nanbox.h"
 
 /* ── Dynamic handle registry ─────────────────────────────────────── */
 
@@ -119,6 +119,30 @@ static volatile int64_t *lookup_atomic_cell(int64_t handle)
     return cell;
 }
 
+static vigil_status_t push_i64_and_ok(vigil_vm_t *vm, int64_t val, vigil_error_t *error)
+{
+    vigil_status_t s = push_i64(vm, val, error);
+    if (s != VIGIL_STATUS_OK)
+        return s;
+    return vigil_runtime_push_ok_error(vigil_vm_runtime(vm), vm, error);
+}
+
+static vigil_status_t push_i64_and_err(vigil_vm_t *vm, const char *msg, vigil_error_t *error)
+{
+    vigil_status_t s = push_i64(vm, 0, error);
+    if (s != VIGIL_STATUS_OK)
+        return s;
+    vigil_object_t *obj = NULL;
+    s = vigil_error_object_new_cstr(vigil_vm_runtime(vm), msg, 1, &obj, error);
+    if (s != VIGIL_STATUS_OK)
+        return s;
+    vigil_value_t v;
+    vigil_value_init_object(&v, &obj);
+    s = vigil_vm_stack_push(vm, &v, error);
+    vigil_value_release(&v);
+    return s;
+}
+
 /* ── Functions ───────────────────────────────────────────────── */
 
 static vigil_status_t atomic_new(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
@@ -133,20 +157,23 @@ static vigil_status_t atomic_new(vigil_vm_t *vm, size_t arg_count, vigil_error_t
     if (!ensure_capacity_locked((size_t)(vigil_atomic_load(&g_atomic_count) + 1)))
     {
         registry_unlock();
-        return push_i64(vm, -1, error);
+        return push_i64_and_err(vm, "atomic.new: registry capacity exceeded", error);
     }
-    cell = (volatile int64_t *)malloc(sizeof(*cell));
-    if (cell == NULL)
+
+    void *mem = NULL;
+    vigil_status_t st = vigil_runtime_alloc(vigil_vm_runtime(vm), sizeof(int64_t), &mem, error);
+    if (st != VIGIL_STATUS_OK || mem == NULL)
     {
         registry_unlock();
-        return push_i64(vm, -1, error);
+        return push_i64_and_err(vm, "atomic.new: allocation failed", error);
     }
+    cell = (volatile int64_t *)mem;
     handle = g_atomic_count;
     vigil_atomic_store(cell, initial);
     g_atomics[handle] = cell;
     g_atomic_count++;
     registry_unlock();
-    return push_i64(vm, handle, error);
+    return push_i64_and_ok(vm, handle, error);
 }
 
 static vigil_status_t atomic_load_fn(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
@@ -304,6 +331,7 @@ static vigil_status_t atomic_fence_fn(vigil_vm_t *vm, size_t arg_count, vigil_er
 static const int i64_param[] = {VIGIL_TYPE_I64};
 static const int i64_i64_param[] = {VIGIL_TYPE_I64, VIGIL_TYPE_I64};
 static const int i64_i64_i64_param[] = {VIGIL_TYPE_I64, VIGIL_TYPE_I64, VIGIL_TYPE_I64};
+static const int i64_err_returns[] = {VIGIL_TYPE_I64, VIGIL_TYPE_ERR};
 static const char *const atomic_initial_param_names[] = {"initial"};
 static const char *const atomic_handle_param_names[] = {"a"};
 static const char *const atomic_handle_value_param_names[] = {"a", "val"};
@@ -394,8 +422,8 @@ static const vigil_native_symbol_doc_t vigil_atomic_fence_doc = {
 };
 
 static const vigil_native_module_function_t atomic_funcs[] = {
-    {"new", 3U, atomic_new, 1U, i64_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U, atomic_initial_param_names,
-     NULL, NULL, &vigil_atomic_new_doc},
+    {"new", 3U, atomic_new, 1U, i64_param, VIGIL_TYPE_I64, 2U, i64_err_returns, 0, NULL, NULL, 0U,
+     atomic_initial_param_names, NULL, NULL, &vigil_atomic_new_doc},
     {"load", 4U, atomic_load_fn, 1U, i64_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U, atomic_handle_param_names,
      NULL, NULL, &vigil_atomic_load_doc},
     {"store", 5U, atomic_store_fn, 2U, i64_i64_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U,

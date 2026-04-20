@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "internal/vigil_internal.h"
 #include "vigil/native_module.h"
 #include "vigil/type.h"
 #include "vigil/value.h"
@@ -25,7 +26,7 @@ static vigil_status_t push_string(vigil_vm_t *vm, const char *text, size_t len, 
     return status;
 }
 
-/* uuid.v4() -> string
+/* uuid.v4() -> (string, err)
  * Generate a random UUID v4: xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
  * where y is one of 8, 9, a, b. */
 static vigil_status_t uuid_v4(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
@@ -46,14 +47,33 @@ static vigil_status_t uuid_v4(vigil_vm_t *vm, size_t arg_count, vigil_error_t *e
              bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7], bytes[8], bytes[9], bytes[10],
              bytes[11], bytes[12], bytes[13], bytes[14], bytes[15]);
 
-    return push_string(vm, buf, 36, error);
+    vigil_status_t s = push_string(vm, buf, 36, error);
+    if (s != VIGIL_STATUS_OK)
+        return s;
+    return vigil_runtime_push_ok_error(vigil_vm_runtime(vm), vm, error);
 }
 
 /* ── Module descriptor ────────────────────────────────────────────── */
 
+static const vigil_native_symbol_doc_t vigil_uuid_module_doc = {
+    "UUID generation.",
+    "The uuid module provides cryptographically random UUID v4 generation.",
+    NULL,
+};
+
+static const vigil_native_symbol_doc_t vigil_uuid_v4_doc = {
+    "Generate a random UUID v4.",
+    "Returns a 36-character UUID string in the format xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx.",
+    "string id, err e = uuid.v4()",
+};
+
+static const int uuid_str_err_returns[] = {VIGIL_TYPE_STRING, VIGIL_TYPE_ERR};
+
 static const vigil_native_module_function_t uuid_functions[] = {
-    {"v4", 2U, uuid_v4, 0U, NULL, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL},
+    {"v4", 2U, uuid_v4, 0U, NULL, VIGIL_TYPE_STRING, 2U, uuid_str_err_returns, 0, NULL, NULL, 0U, NULL, NULL, NULL,
+     &vigil_uuid_v4_doc},
 };
 
 VIGIL_API const vigil_native_module_t vigil_stdlib_uuid = {
-    "uuid", 4U, uuid_functions, sizeof(uuid_functions) / sizeof(uuid_functions[0]), NULL, 0U, NULL, NULL, 0U};
+    "uuid", 4U, uuid_functions, sizeof(uuid_functions) / sizeof(uuid_functions[0]), NULL, 0U, &vigil_uuid_module_doc,
+    NULL, 0U};
