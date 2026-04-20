@@ -1,0 +1,94 @@
+import "fmt"
+import "reflect"
+
+class Calculator {
+    i32 value
+
+    fn add(i32 n) -> void {
+        self.value = self.value + n
+    }
+
+    fn subtract(i32 n) -> void {
+        self.value = self.value - n
+    }
+
+    fn get() -> i32 {
+        return self.value
+    }
+
+    fn reset() -> void {
+        self.value = 0
+    }
+}
+
+class Empty {
+    i32 x
+}
+
+struct Point {
+    f64 x
+    f64 y
+}
+
+fn test_method_count() -> void {
+    Calculator c = Calculator(0)
+    i32 mc = reflect.method_count(c)
+    bool ok = mc == 4
+    fmt.println(f"calc method count 4: {ok}")
+
+    Empty e = Empty(0)
+    i32 ec = reflect.method_count(e)
+    bool ok2 = ec == 0
+    fmt.println(f"empty method count 0: {ok2}")
+
+    Point p = Point(1.0, 2.0)
+    i32 pc = reflect.method_count(p)
+    bool ok3 = pc == 0
+    fmt.println(f"struct method count 0: {ok3}")
+}
+
+fn test_methods_list() -> void {
+    Calculator c = Calculator(0)
+    array<string> methods = reflect.methods(c)
+    bool ok = methods.len() == 4
+    fmt.println(f"methods len 4: {ok}")
+    bool has_add = methods[0] == "add"
+    fmt.println(f"method 0 add: {has_add}")
+}
+
+fn test_has_method() -> void {
+    Calculator c = Calculator(0)
+    bool has_add = reflect.has_method(c, "add")
+    bool has_sub = reflect.has_method(c, "subtract")
+    bool has_get = reflect.has_method(c, "get")
+    bool has_reset = reflect.has_method(c, "reset")
+    bool has_fly = reflect.has_method(c, "fly")
+    bool has_empty = reflect.has_method(c, "")
+    fmt.println(f"has add: {has_add}")
+    fmt.println(f"has subtract: {has_sub}")
+    fmt.println(f"has get: {has_get}")
+    fmt.println(f"has reset: {has_reset}")
+    fmt.println(f"has fly: {has_fly}")
+    fmt.println(f"has empty: {has_empty}")
+}
+
+fn test_method_on_non_instance() -> void {
+    i32 x = 42
+    i32 mc = reflect.method_count(x)
+    bool ok = mc == 0
+    fmt.println(f"int method count 0: {ok}")
+
+    array<string> methods = reflect.methods(x)
+    bool ok2 = methods.len() == 0
+    fmt.println(f"int methods empty: {ok2}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 11_methods START =====")
+    test_method_count()
+    test_methods_list()
+    test_has_method()
+    test_method_on_non_instance()
+    fmt.println("===== TEST 11_methods END =====")
+    return 0
+}

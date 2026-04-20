@@ -543,20 +543,299 @@ static vigil_status_t reflect_has_field_fn(vigil_vm_t *vm, size_t arg_count, vig
     return vigil_vm_stack_push(vm, &result, error);
 }
 
+/* ── Phase 3: Method inspection ──────────────────────────────── */
+
+static vigil_status_t reflect_methods_fn(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    vigil_value_t v = vigil_vm_stack_get(vm, base);
+    vigil_vm_stack_pop_n(vm, arg_count);
+
+    vigil_object_t *inst = as_instance(v);
+    if (!inst)
+    {
+        vigil_object_t *arr = NULL;
+        vigil_status_t s = vigil_array_object_new(vigil_vm_runtime(vm), NULL, 0, &arr, error);
+        if (s != VIGIL_STATUS_OK)
+            return s;
+        vigil_value_t val;
+        vigil_value_init_object(&val, &arr);
+        s = vigil_vm_stack_push(vm, &val, error);
+        vigil_value_release(&val);
+        return s;
+    }
+
+    size_t ci = vigil_instance_object_class_index(inst);
+    const vigil_object_t *fn = reflect_current_function(vm);
+    size_t mc = vigil_function_object_class_method_count(fn, ci);
+
+    vigil_object_t *arr = NULL;
+    vigil_status_t s = vigil_array_object_new(vigil_vm_runtime(vm), NULL, 0, &arr, error);
+    if (s != VIGIL_STATUS_OK)
+        return s;
+
+    for (size_t i = 0; i < mc; i++)
+    {
+        const char *name = NULL;
+        size_t name_len = 0;
+        if (vigil_function_object_get_class_method(fn, ci, i, &name, &name_len, NULL, NULL) && name)
+        {
+            vigil_object_t *str_obj = NULL;
+            s = vigil_string_object_new(vigil_vm_runtime(vm), name, name_len, &str_obj, error);
+            if (s != VIGIL_STATUS_OK)
+            {
+                vigil_object_release(&arr);
+                return s;
+            }
+            vigil_value_t sv;
+            vigil_value_init_object(&sv, &str_obj);
+            s = vigil_array_object_append(arr, &sv, error);
+            vigil_value_release(&sv);
+            if (s != VIGIL_STATUS_OK)
+            {
+                vigil_object_release(&arr);
+                return s;
+            }
+        }
+    }
+
+    vigil_value_t val;
+    vigil_value_init_object(&val, &arr);
+    s = vigil_vm_stack_push(vm, &val, error);
+    vigil_value_release(&val);
+    return s;
+}
+
+static vigil_status_t reflect_method_count_fn(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    vigil_value_t v = vigil_vm_stack_get(vm, base);
+    vigil_vm_stack_pop_n(vm, arg_count);
+
+    vigil_object_t *inst = as_instance(v);
+    vigil_value_t result;
+    if (!inst)
+    {
+        vigil_value_init_int(&result, 0);
+    }
+    else
+    {
+        size_t ci = vigil_instance_object_class_index(inst);
+        const vigil_object_t *fn = reflect_current_function(vm);
+        vigil_value_init_int(&result, (int64_t)vigil_function_object_class_method_count(fn, ci));
+    }
+    return vigil_vm_stack_push(vm, &result, error);
+}
+
+static vigil_status_t reflect_has_method_fn(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    vigil_value_t v = vigil_vm_stack_get(vm, base);
+    size_t name_len = 0;
+    const char *name = get_str_arg(vm, base, 1, &name_len);
+    vigil_vm_stack_pop_n(vm, arg_count);
+
+    vigil_object_t *inst = as_instance(v);
+    vigil_value_t result;
+    if (!inst || !name)
+    {
+        vigil_value_init_bool(&result, 0);
+        return vigil_vm_stack_push(vm, &result, error);
+    }
+
+    size_t ci = vigil_instance_object_class_index(inst);
+    const vigil_object_t *fn = reflect_current_function(vm);
+    size_t mc = vigil_function_object_class_method_count(fn, ci);
+    int found = 0;
+    for (size_t i = 0; i < mc; i++)
+    {
+        const char *mname = NULL;
+        size_t mlen = 0;
+        if (vigil_function_object_get_class_method(fn, ci, i, &mname, &mlen, NULL, NULL))
+        {
+            if (mlen == name_len && memcmp(mname, name, name_len) == 0)
+            {
+                found = 1;
+                break;
+            }
+        }
+    }
+    vigil_value_init_bool(&result, found);
+    return vigil_vm_stack_push(vm, &result, error);
+}
+
+/* ── Phase 4: Enum reflection ────────────────────────────────── */
+
+static vigil_status_t reflect_enum_members_fn(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    size_t name_len = 0;
+    const char *name = get_str_arg(vm, base, 0, &name_len);
+    vigil_vm_stack_pop_n(vm, arg_count);
+
+    const vigil_object_t *fn = reflect_current_function(vm);
+    if (!fn || !name)
+    {
+        /* Return empty array + error. */
+        vigil_object_t *arr = NULL;
+        vigil_status_t s = vigil_array_object_new(vigil_vm_runtime(vm), NULL, 0, &arr, error);
+        if (s != VIGIL_STATUS_OK)
+            return s;
+        vigil_value_t val;
+        vigil_value_init_object(&val, &arr);
+        s = vigil_vm_stack_push(vm, &val, error);
+        vigil_value_release(&val);
+        if (s != VIGIL_STATUS_OK)
+            return s;
+        return push_err_only(vm, "enum not found", error);
+    }
+
+    size_t ec = vigil_function_object_enum_count(fn);
+    for (size_t i = 0; i < ec; i++)
+    {
+        const char *ename = NULL;
+        size_t elen = 0;
+        size_t mcount = 0;
+        if (vigil_function_object_get_enum(fn, i, &ename, &elen, &mcount))
+        {
+            if (elen == name_len && memcmp(ename, name, name_len) == 0)
+            {
+                /* Found the enum — build array of member names. */
+                vigil_object_t *arr = NULL;
+                vigil_status_t s = vigil_array_object_new(vigil_vm_runtime(vm), NULL, 0, &arr, error);
+                if (s != VIGIL_STATUS_OK)
+                    return s;
+                for (size_t mi = 0; mi < mcount; mi++)
+                {
+                    const char *mname = NULL;
+                    size_t mlen = 0;
+                    if (vigil_function_object_get_enum_member(fn, i, mi, &mname, &mlen, NULL) && mname)
+                    {
+                        vigil_object_t *str_obj = NULL;
+                        s = vigil_string_object_new(vigil_vm_runtime(vm), mname, mlen, &str_obj, error);
+                        if (s != VIGIL_STATUS_OK)
+                        {
+                            vigil_object_release(&arr);
+                            return s;
+                        }
+                        vigil_value_t sv;
+                        vigil_value_init_object(&sv, &str_obj);
+                        s = vigil_array_object_append(arr, &sv, error);
+                        vigil_value_release(&sv);
+                        if (s != VIGIL_STATUS_OK)
+                        {
+                            vigil_object_release(&arr);
+                            return s;
+                        }
+                    }
+                }
+                vigil_value_t val;
+                vigil_value_init_object(&val, &arr);
+                s = vigil_vm_stack_push(vm, &val, error);
+                vigil_value_release(&val);
+                if (s != VIGIL_STATUS_OK)
+                    return s;
+                return push_ok_err(vm, error);
+            }
+        }
+    }
+
+    /* Enum not found. */
+    vigil_object_t *arr = NULL;
+    vigil_status_t s = vigil_array_object_new(vigil_vm_runtime(vm), NULL, 0, &arr, error);
+    if (s != VIGIL_STATUS_OK)
+        return s;
+    vigil_value_t val;
+    vigil_value_init_object(&val, &arr);
+    s = vigil_vm_stack_push(vm, &val, error);
+    vigil_value_release(&val);
+    if (s != VIGIL_STATUS_OK)
+        return s;
+    return push_err_only(vm, "enum not found", error);
+}
+
+static vigil_status_t reflect_enum_value_fn(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+{
+    size_t base = vigil_vm_stack_depth(vm) - arg_count;
+    size_t enum_name_len = 0;
+    const char *enum_name = get_str_arg(vm, base, 0, &enum_name_len);
+    size_t member_name_len = 0;
+    const char *member_name = get_str_arg(vm, base, 1, &member_name_len);
+    vigil_vm_stack_pop_n(vm, arg_count);
+
+    const vigil_object_t *fn = reflect_current_function(vm);
+    if (!fn || !enum_name || !member_name)
+    {
+        vigil_value_t zero;
+        vigil_value_init_int(&zero, 0);
+        vigil_status_t s = vigil_vm_stack_push(vm, &zero, error);
+        if (s != VIGIL_STATUS_OK)
+            return s;
+        return push_err_only(vm, "enum or member not found", error);
+    }
+
+    size_t ec = vigil_function_object_enum_count(fn);
+    for (size_t i = 0; i < ec; i++)
+    {
+        const char *ename = NULL;
+        size_t elen = 0;
+        size_t mcount = 0;
+        if (vigil_function_object_get_enum(fn, i, &ename, &elen, &mcount))
+        {
+            if (elen == enum_name_len && memcmp(ename, enum_name, enum_name_len) == 0)
+            {
+                for (size_t mi = 0; mi < mcount; mi++)
+                {
+                    const char *mname = NULL;
+                    size_t mlen = 0;
+                    int64_t mval = 0;
+                    if (vigil_function_object_get_enum_member(fn, i, mi, &mname, &mlen, &mval))
+                    {
+                        if (mlen == member_name_len && memcmp(mname, member_name, member_name_len) == 0)
+                        {
+                            vigil_value_t result;
+                            vigil_value_init_int(&result, mval);
+                            vigil_status_t s = vigil_vm_stack_push(vm, &result, error);
+                            if (s != VIGIL_STATUS_OK)
+                                return s;
+                            return push_ok_err(vm, error);
+                        }
+                    }
+                }
+                /* Member not found in this enum. */
+                break;
+            }
+        }
+    }
+
+    vigil_value_t zero;
+    vigil_value_init_int(&zero, 0);
+    vigil_status_t s = vigil_vm_stack_push(vm, &zero, error);
+    if (s != VIGIL_STATUS_OK)
+        return s;
+    return push_err_only(vm, "enum or member not found", error);
+}
+
 /* ── Module definition ───────────────────────────────────────── */
 
 static const int obj_param[] = {VIGIL_TYPE_OBJECT};
 static const int obj_str_params[] = {VIGIL_TYPE_OBJECT, VIGIL_TYPE_STRING};
 static const int obj_str_str_params[] = {VIGIL_TYPE_OBJECT, VIGIL_TYPE_STRING, VIGIL_TYPE_STRING};
+static const int str_param[] = {VIGIL_TYPE_STRING};
+static const int str_str_params[] = {VIGIL_TYPE_STRING, VIGIL_TYPE_STRING};
 
 static const int str_err_returns[] = {VIGIL_TYPE_STRING, VIGIL_TYPE_ERR};
 static const int err_returns[] = {VIGIL_TYPE_ERR};
+static const int i64_err_returns[] = {VIGIL_TYPE_I64, VIGIL_TYPE_ERR};
+static const int arr_err_returns[] = {VIGIL_TYPE_OBJECT, VIGIL_TYPE_ERR};
 
 static const vigil_native_type_t array_string_ret = VIGIL_NATIVE_TYPE_ARRAY(VIGIL_TYPE_STRING);
 
 static const char *const val_param_names[] = {"value"};
 static const char *const val_name_param_names[] = {"value", "name"};
 static const char *const val_name_val_param_names[] = {"value", "name", "new_value"};
+static const char *const enum_name_param_names[] = {"enum_name"};
+static const char *const enum_member_param_names[] = {"enum_name", "member_name"};
 
 static const vigil_native_symbol_doc_t reflect_module_doc = {
     "Runtime reflection and type introspection.",
@@ -614,6 +893,31 @@ static const vigil_native_symbol_doc_t doc_has_field = {
     "Returns true if the instance has a field with the given name.",
     "bool has = reflect.has_field(instance, \"name\")",
 };
+static const vigil_native_symbol_doc_t doc_methods = {
+    "Get method names of an instance.",
+    "Returns an array of method name strings for a class instance.",
+    "array<string> names = reflect.methods(instance)",
+};
+static const vigil_native_symbol_doc_t doc_method_count = {
+    "Get the number of methods.",
+    "Returns the method count for a class instance, or 0 for non-instances.",
+    "i32 count = reflect.method_count(instance)",
+};
+static const vigil_native_symbol_doc_t doc_has_method = {
+    "Check if a method exists.",
+    "Returns true if the instance has a method with the given name.",
+    "bool has = reflect.has_method(instance, \"name\")",
+};
+static const vigil_native_symbol_doc_t doc_enum_members = {
+    "Get member names of an enum.",
+    "Returns an array of member name strings for the named enum type.",
+    "array<string> members, err e = reflect.enum_members(\"Color\")",
+};
+static const vigil_native_symbol_doc_t doc_enum_value = {
+    "Get the value of an enum member.",
+    "Returns the integer value of the named member in the named enum.",
+    "i64 val, err e = reflect.enum_value(\"Color\", \"Red\")",
+};
 
 static const vigil_native_module_function_t reflect_funcs[] = {
     /* Phase 1: type queries */
@@ -638,6 +942,18 @@ static const vigil_native_module_function_t reflect_funcs[] = {
      val_name_param_names, NULL, NULL, &doc_field_type},
     {"has_field", 9U, reflect_has_field_fn, 2U, obj_str_params, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U,
      val_name_param_names, NULL, NULL, &doc_has_field},
+    /* Phase 3: method inspection */
+    {"methods", 7U, reflect_methods_fn, 1U, obj_param, VIGIL_TYPE_OBJECT, 1U, NULL, VIGIL_TYPE_STRING, NULL,
+     &array_string_ret, 0U, val_param_names, NULL, NULL, &doc_methods},
+    {"method_count", 12U, reflect_method_count_fn, 1U, obj_param, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, NULL, 0U,
+     val_param_names, NULL, NULL, &doc_method_count},
+    {"has_method", 10U, reflect_has_method_fn, 2U, obj_str_params, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U,
+     val_name_param_names, NULL, NULL, &doc_has_method},
+    /* Phase 4: enum reflection */
+    {"enum_members", 12U, reflect_enum_members_fn, 1U, str_param, VIGIL_TYPE_OBJECT, 2U, arr_err_returns,
+     VIGIL_TYPE_STRING, NULL, &array_string_ret, 0U, enum_name_param_names, NULL, NULL, &doc_enum_members},
+    {"enum_value", 10U, reflect_enum_value_fn, 2U, str_str_params, VIGIL_TYPE_I64, 2U, i64_err_returns, 0, NULL, NULL,
+     0U, enum_member_param_names, NULL, NULL, &doc_enum_value},
 };
 
 VIGIL_API const vigil_native_module_t vigil_stdlib_reflect = {
