@@ -1,14 +1,25 @@
 /* strings.c — strings module: Builder class for efficient string concatenation. */
 
-#include <stdlib.h>
 #include <string.h>
 
 #include "vigil/native_module.h"
+#include "vigil/runtime.h"
 #include "vigil/type.h"
 #include "vigil/value.h"
 #include "vigil/vm.h"
 
+#include "internal/vigil_internal.h"
 #include "internal/vigil_nanbox.h"
+
+/* ── Allocator helpers ───────────────────────────────────────────── */
+
+static vigil_allocator_t get_alloc(vigil_vm_t *vm)
+{
+    const vigil_allocator_t *a = vigil_runtime_allocator(vigil_vm_runtime(vm));
+    if (a != NULL)
+        return *a;
+    return vigil_default_allocator();
+}
 
 /* ── Builder handle registry ─────────────────────────────────────── */
 
@@ -17,19 +28,24 @@ typedef struct
     char *data;
     size_t len;
     size_t cap;
+    vigil_allocator_t alloc;
 } builder_t;
 
 #define MAX_BUILDERS 256
 static builder_t *builders[MAX_BUILDERS];
 
-static int64_t builder_alloc(void)
+static int64_t builder_alloc(vigil_allocator_t alloc)
 {
     for (int64_t i = 0; i < MAX_BUILDERS; i++)
     {
         if (builders[i] == NULL)
         {
-            builders[i] = (builder_t *)calloc(1, sizeof(builder_t));
-            return builders[i] ? i : -1;
+            builders[i] = (builder_t *)alloc.allocate(alloc.user_data, sizeof(builder_t));
+            if (!builders[i])
+                return -1;
+            memset(builders[i], 0, sizeof(builder_t));
+            builders[i]->alloc = alloc;
+            return i;
         }
     }
     return -1;
@@ -46,8 +62,9 @@ static void builder_free(int64_t h)
 {
     if (h >= 0 && h < MAX_BUILDERS && builders[h])
     {
-        free(builders[h]->data);
-        free(builders[h]);
+        vigil_allocator_t alloc = builders[h]->alloc;
+        alloc.deallocate(alloc.user_data, builders[h]->data);
+        alloc.deallocate(alloc.user_data, builders[h]);
         builders[h] = NULL;
     }
 }
@@ -59,7 +76,7 @@ static void builder_append(builder_t *b, const char *s, size_t len)
         size_t new_cap = b->cap == 0 ? 64 : b->cap;
         while (new_cap < b->len + len)
             new_cap *= 2;
-        b->data = (char *)realloc(b->data, new_cap);
+        b->data = (char *)b->alloc.reallocate(b->alloc.user_data, b->data, new_cap);
         b->cap = new_cap;
     }
     memcpy(b->data + b->len, s, len);
@@ -109,10 +126,11 @@ static int64_t get_builder_handle(vigil_vm_t *vm, size_t base)
 }
 
 /* Builder() -> Builder */
-static vigil_status_t builder_new(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
+static vigil_status_t builder_new_fn(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
 {
     vigil_vm_stack_pop_n(vm, arg_count);
-    int64_t h = builder_alloc();
+    vigil_allocator_t alloc = get_alloc(vm);
+    int64_t h = builder_alloc(alloc);
     vigil_value_t val = vigil_nanbox_encode_int(h);
     return vigil_vm_stack_push(vm, &val, error);
 }
@@ -180,6 +198,58 @@ static vigil_status_t builder_destroy(vigil_vm_t *vm, size_t arg_count, vigil_er
     return VIGIL_STATUS_OK;
 }
 
+/* ── Documentation ───────────────────────────────────────────────── */
+
+static const vigil_native_symbol_doc_t vigil_strings_module_doc = {
+    "String utilities and Builder for efficient concatenation.",
+    "The strings module provides the Builder class for constructing strings "
+    "incrementally without repeated allocation.",
+    NULL,
+};
+
+static const vigil_native_symbol_doc_t doc_builder_class = {
+    "Mutable string builder for efficient concatenation.",
+    "Builder accumulates string fragments in a dynamic buffer and produces "
+    "the final string with to_string(). Call destroy() to release resources.",
+    "var b = strings.Builder.new()\nb.write(\"hello \")\nb.write(\"world\")\nstring s = b.to_string()\nb.destroy()",
+};
+
+static const vigil_native_symbol_doc_t doc_builder_new = {
+    "Create a new Builder.",
+    "Returns a fresh Builder instance with an empty buffer.",
+    "var b = strings.Builder.new()",
+};
+
+static const vigil_native_symbol_doc_t doc_builder_write = {
+    "Append a string to the builder.",
+    "Writes the given string to the internal buffer, growing it as needed.",
+    "b.write(\"hello\")",
+};
+
+static const vigil_native_symbol_doc_t doc_builder_to_string = {
+    "Return the accumulated string.",
+    "Returns the contents of the buffer as a string without consuming the builder.",
+    "string s = b.to_string()",
+};
+
+static const vigil_native_symbol_doc_t doc_builder_len = {
+    "Return the current length in bytes.",
+    "Returns the number of bytes written to the builder so far.",
+    "i32 n = b.len()",
+};
+
+static const vigil_native_symbol_doc_t doc_builder_clear = {
+    "Reset the builder to empty.",
+    "Clears the buffer length to zero without deallocating memory.",
+    "b.clear()",
+};
+
+static const vigil_native_symbol_doc_t doc_builder_destroy = {
+    "Free the builder resources.",
+    "Releases the internal buffer and the builder handle. The builder must not be used after this call.",
+    "b.destroy()",
+};
+
 /* ── Class descriptor ────────────────────────────────────────────── */
 
 static const vigil_native_class_field_t builder_fields[] = {
@@ -190,20 +260,20 @@ static const int p_str[] = {VIGIL_TYPE_STRING};
 
 /* clang-format off */
 static const vigil_native_class_method_t builder_methods[] = {
-    {"new", 3U, builder_new, 0U, NULL, VIGIL_TYPE_OBJECT, 1U, NULL, 1, "Builder", 7U, 0, NULL, NULL, NULL, NULL},
-    {"write", 5U, builder_write, 1U, p_str, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, 0U, 0, NULL, NULL, NULL, NULL},
-    {"to_string", 9U, builder_to_string, 0U, NULL, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, 0U, 0, NULL, NULL, NULL,
-     NULL},
-    {"len", 3U, builder_len, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, 0U, 0, NULL, NULL, NULL, NULL},
-    {"clear", 5U, builder_clear, 0U, NULL, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, 0U, 0, NULL, NULL, NULL, NULL},
-    {"destroy", 7U, builder_destroy, 0U, NULL, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, 0U, 0, NULL, NULL, NULL, NULL},
+    {"new", 3U, builder_new_fn, 0U, NULL, VIGIL_TYPE_OBJECT, 1U, NULL, 1, "Builder", 7U, 0, NULL, NULL, NULL, &doc_builder_new},
+    {"write", 5U, builder_write, 1U, p_str, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, 0U, 0, NULL, NULL, NULL, &doc_builder_write},
+    {"to_string", 9U, builder_to_string, 0U, NULL, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, 0U, 0, NULL, NULL, NULL, &doc_builder_to_string},
+    {"len", 3U, builder_len, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, 0U, 0, NULL, NULL, NULL, &doc_builder_len},
+    {"clear", 5U, builder_clear, 0U, NULL, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, 0U, 0, NULL, NULL, NULL, &doc_builder_clear},
+    {"destroy", 7U, builder_destroy, 0U, NULL, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, 0U, 0, NULL, NULL, NULL, &doc_builder_destroy},
 };
 /* clang-format on */
 
 static const vigil_native_class_t strings_classes[] = {
     {"Builder", 7U, builder_fields, BUILDER_FIELD_COUNT, builder_methods,
-     sizeof(builder_methods) / sizeof(builder_methods[0]), NULL, NULL},
+     sizeof(builder_methods) / sizeof(builder_methods[0]), NULL, &doc_builder_class},
 };
 
 VIGIL_API const vigil_native_module_t vigil_stdlib_strings = {
-    "strings", 7U, NULL, 0U, strings_classes, sizeof(strings_classes) / sizeof(strings_classes[0]), NULL, NULL, 0U};
+    "strings", 7U, NULL, 0U, strings_classes, sizeof(strings_classes) / sizeof(strings_classes[0]),
+    &vigil_strings_module_doc, NULL, 0U};

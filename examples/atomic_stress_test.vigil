@@ -81,15 +81,21 @@ i64 rb_seq_base = i64(0)
 i64 rb_val_base = i64(0)
 
 fn rb_init() -> void {
-    rb_head = atomic.new(i64(0))
-    rb_tail = atomic.new(i64(0))
-    rb_enqueue_count = atomic.new(i64(0))
-    rb_dequeue_count = atomic.new(i64(0))
+    i64 h1, err _ = atomic.new(i64(0))
+    rb_head = h1
+    i64 h2, err _ = atomic.new(i64(0))
+    rb_tail = h2
+    i64 h3, err _ = atomic.new(i64(0))
+    rb_enqueue_count = h3
+    i64 h4, err _ = atomic.new(i64(0))
+    rb_dequeue_count = h4
     // Allocate sequence and value slots
     // seq[i] starts at i (the turn number), val[i] starts at 0
-    rb_seq_base = atomic.new(i64(0))
+    i64 h5, err _ = atomic.new(i64(0))
+    rb_seq_base = h5
     // slot 0 seq = 0
-    rb_val_base = atomic.new(i64(0))
+    i64 h6, err _ = atomic.new(i64(0))
+    rb_val_base = h6
     // slot 0 val = 0
     // We already allocated slot 0 for both; allocate the rest
     for (i64 i = i64(1); i < QUEUE_CAPACITY; i++) {
@@ -219,22 +225,26 @@ i64 metrics_gauge_min_base = i64(0)
 i64 metrics_op_count = i64(0)
 
 fn metrics_init() -> void {
-    metrics_counter_base = atomic.new(i64(0))
+    i64 h1, err _ = atomic.new(i64(0))
+    metrics_counter_base = h1
     for (i64 i = i64(1); i < METRICS_SHARDS; i++) {
         atomic.new(i64(0))
     }
 
-    metrics_gauge_max_base = atomic.new(i64(0))
+    i64 h2, err _ = atomic.new(i64(0))
+    metrics_gauge_max_base = h2
     for (i64 i = i64(1); i < METRICS_SHARDS; i++) {
         atomic.new(i64(0))
     }
 
-    metrics_gauge_min_base = atomic.new(i64(999999))
+    i64 h3, err _ = atomic.new(i64(999999))
+    metrics_gauge_min_base = h3
     for (i64 i = i64(1); i < METRICS_SHARDS; i++) {
         atomic.new(i64(999999))
     }
 
-    metrics_op_count = atomic.new(i64(0))
+    i64 h4, err _ = atomic.new(i64(0))
+    metrics_op_count = h4
 }
 
 
@@ -339,9 +349,12 @@ i64 spinlock_counter = i64(0)
 i64 spinlock_contention = i64(0)
 // counts CAS failures (contention metric)
 fn spinlock_init() -> void {
-    spinlock_atom = atomic.new(i64(0))
-    spinlock_counter = atomic.new(i64(0))
-    spinlock_contention = atomic.new(i64(0))
+    i64 h1, err _ = atomic.new(i64(0))
+    spinlock_atom = h1
+    i64 h2, err _ = atomic.new(i64(0))
+    spinlock_counter = h2
+    i64 h3, err _ = atomic.new(i64(0))
+    spinlock_contention = h3
 }
 
 
@@ -383,12 +396,17 @@ i64 stack_pop_count = i64(0)
 const i64 STACK_POOL_SIZE = i64(330)
 // must be >= STACK_PUSHERS * STACK_OPS
 fn stack_init() -> void {
-    stack_top = atomic.new(i64(- 1))
-    stack_alloc_idx = atomic.new(i64(0))
-    stack_push_count = atomic.new(i64(0))
-    stack_pop_count = atomic.new(i64(0))
+    i64 h1, err _ = atomic.new(i64(- 1))
+    stack_top = h1
+    i64 h2, err _ = atomic.new(i64(0))
+    stack_alloc_idx = h2
+    i64 h3, err _ = atomic.new(i64(0))
+    stack_push_count = h3
+    i64 h4, err _ = atomic.new(i64(0))
+    stack_pop_count = h4
     // Allocate node pool: each node = 2 handles (value, next)
-    stack_node_base = atomic.new(i64(0))
+    i64 h5, err _ = atomic.new(i64(0))
+    stack_node_base = h5
     // node 0 value
     atomic.new(i64(0))
     // node 0 next
@@ -469,9 +487,12 @@ i64 barrier_flag = i64(0)
 i64 barrier_result = i64(0)
 
 fn barrier_init(i64 n) -> void {
-    barrier_count = atomic.new(n)
-    barrier_flag = atomic.new(i64(0))
-    barrier_result = atomic.new(i64(0))
+    i64 h1, err _ = atomic.new(n)
+    barrier_count = h1
+    i64 h2, err _ = atomic.new(i64(0))
+    barrier_flag = h2
+    i64 h3, err _ = atomic.new(i64(0))
+    barrier_result = h3
 }
 
 // Each thread calls this; last one to arrive sets the flag
@@ -505,7 +526,8 @@ i64 mutex_counter = i64(0)
 // atomic used as plain storage (protected by mutex)
 fn mutex_ref_init() -> void {
     mutex_handle = thread.mutex()
-    mutex_counter = atomic.new(i64(0))
+    i64 h1, err _ = atomic.new(i64(0))
+    mutex_counter = h1
 }
 
 // ============================================================================
@@ -524,10 +546,14 @@ i64 bitmap_atom = i64(0)
 i64 xor_atom = i64(0)
 
 fn new_ops_init() -> void {
-    xchg_lock = atomic.new(i64(0))
-    xchg_counter = atomic.new(i64(0))
-    bitmap_atom = atomic.new(i64(0))
-    xor_atom = atomic.new(i64(0))
+    i64 h1, err _ = atomic.new(i64(0))
+    xchg_lock = h1
+    i64 h2, err _ = atomic.new(i64(0))
+    xchg_counter = h2
+    i64 h3, err _ = atomic.new(i64(0))
+    bitmap_atom = h3
+    i64 h4, err _ = atomic.new(i64(0))
+    xor_atom = h4
 }
 
 
@@ -674,10 +700,10 @@ fn run_new_ops_test() -> bool {
 fn run_ring_buffer_test() -> bool {
     fmt.println("=== Section 1: Lock-free MPMC Ring Buffer ===")
     rb_init()
-    i64 shutdown = atomic.new(i64(0))
-    i64 produced_total = atomic.new(i64(0))
-    i64 consumed_total = atomic.new(i64(0))
-    i64 consumed_sum = atomic.new(i64(0))
+    i64 shutdown, err _ = atomic.new(i64(0))
+    i64 produced_total, err _ = atomic.new(i64(0))
+    i64 consumed_total, err _ = atomic.new(i64(0))
+    i64 consumed_sum, err _ = atomic.new(i64(0))
     i64 t0 = time.now_ms()
     // Spawn producers: each enqueues ITEMS_PER_PROD items (values 1..N)
     array<i64> prod_threads = []

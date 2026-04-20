@@ -304,18 +304,18 @@ fn main() -> i32 {
     i64 q_mtx = thread.mutex()
     i64 q_not_full = thread.cond()
     i64 q_not_empty = thread.cond()
-    i64 q_head = atomic.new(i64(0))
-    i64 q_tail = atomic.new(i64(0))
-    i64 q_count = atomic.new(i64(0))
-    i64 q_base = atomic.new(i64(0))
+    i64 q_head, err _ = atomic.new(i64(0))
+    i64 q_tail, err _ = atomic.new(i64(0))
+    i64 q_count, err _ = atomic.new(i64(0))
+    i64 q_base, err _ = atomic.new(i64(0))
     for (i64 i = i64(1); i < QUEUE_CAPACITY; i = i + i64(1)) {
         atomic.new(i64(0))
     }
 
-    i64 done_flag = atomic.new(i64(0))
-    i64 produced_total = atomic.new(i64(0))
-    i64 consumed_sum = atomic.new(i64(0))
-    i64 consumed_count = atomic.new(i64(0))
+    i64 done_flag, err _ = atomic.new(i64(0))
+    i64 produced_total, err _ = atomic.new(i64(0))
+    i64 consumed_sum, err _ = atomic.new(i64(0))
+    i64 consumed_count, err _ = atomic.new(i64(0))
     i64 t4 = time.now_ms()
     // Spawn producers
     array<i64> prod_handles = []
@@ -386,8 +386,8 @@ fn main() -> i32 {
     fmt.println("")
     fmt.println("[4] Reader-writer lock contention...")
     i64 rw = thread.rwlock()
-    i64 shared_val = atomic.new(i64(0))
-    i64 read_sum = atomic.new(i64(0))
+    i64 shared_val, err _ = atomic.new(i64(0))
+    i64 read_sum, err _ = atomic.new(i64(0))
     i64 t6 = time.now_ms()
     array<i64> rw_handles = []
     for (i64 i = i64(0); i < RW_READERS; i = i + i64(1)) {
@@ -432,7 +432,7 @@ fn main() -> i32 {
     fmt.println("")
     fmt.println("[5] try_lock spin + yield stress...")
     i64 tl_mtx = thread.mutex()
-    i64 tl_counter = atomic.new(i64(0))
+    i64 tl_counter, err _ = atomic.new(i64(0))
     i64 t8 = time.now_ms()
     array<i64> tl_handles = []
     for (i64 i = i64(0); i < TRYLOCK_THREADS; i = i + i64(1)) {
@@ -464,7 +464,7 @@ fn main() -> i32 {
     // ── Section 6: CAS-based lock-free counter ──────────────────────────
     fmt.println("")
     fmt.println("[6] CAS lock-free counter...")
-    i64 cas_counter = atomic.new(i64(0))
+    i64 cas_counter, err _ = atomic.new(i64(0))
     i64 t10 = time.now_ms()
     array<i64> cas_handles = []
     for (i64 i = i64(0); i < CAS_THREADS; i = i + i64(1)) {
@@ -497,8 +497,8 @@ fn main() -> i32 {
     fmt.println(f"[7] Broadcast barrier ({BROADCAST_THREADS} threads)...")
     i64 bar_mtx = thread.mutex()
     i64 bar_cond = thread.cond()
-    i64 bar_arrived = atomic.new(i64(0))
-    i64 bar_result = atomic.new(i64(0))
+    i64 bar_arrived, err _ = atomic.new(i64(0))
+    i64 bar_result, err _ = atomic.new(i64(0))
     i64 t12 = time.now_ms()
     array<i64> bar_handles = []
     for (i64 i = i64(0); i < BROADCAST_THREADS; i = i + i64(1)) {
@@ -529,7 +529,7 @@ fn main() -> i32 {
     // ── Section 8: Detached fire-and-forget threads ─────────────────────
     fmt.println("")
     fmt.println(f"[8] Detached threads ({DETACH_THREADS} fire-and-forget)...")
-    i64 detach_counter = atomic.new(i64(0))
+    i64 detach_counter, err _ = atomic.new(i64(0))
     i64 t14 = time.now_ms()
     for (i64 i = i64(0); i < DETACH_THREADS; i = i + i64(1)) {
         i64 t = thread.spawn(
