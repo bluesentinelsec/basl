@@ -1,0 +1,18 @@
+name = "gui"
+description = "SDL3-based cross-platform widget toolkit"
+module = "gui"
+
+sources = ["gui.c", "backends/gui_sdl.c"]
+
+requires = ["sdl"]
+
+[transpile]
+compile_definition = "VIGIL_PLUGIN_SDL_ENABLED"
+
+[platforms]
+windows = true
+macos = true
+linux = true
+ios = false
+android = false
+emscripten = false

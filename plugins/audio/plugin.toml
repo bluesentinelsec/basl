@@ -1,0 +1,23 @@
+name = "audio"
+description = "Audio playback and recording via miniaudio"
+module = "audio"
+
+sources = ["audio.c"]
+
+[transpile]
+marker = "NEEDS_AUDIO"
+compile_definition = "VIGIL_PLUGIN_AUDIO_ENABLED"
+
+[[transpile.fetch_content]]
+name = "miniaudio"
+url = "https://github.com/mackron/miniaudio.git"
+tag = "0.11.21"
+include_dir = true
+
+[platforms]
+windows = true
+macos = true
+linux = true
+ios = false
+android = false
+emscripten = false

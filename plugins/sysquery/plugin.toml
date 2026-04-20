@@ -1,0 +1,21 @@
+name = "sysquery"
+description = "OS metadata queries and system enumeration"
+module = "sysquery"
+
+[sources]
+common = ["sysquery.c", "sysquery_common.c"]
+macos = ["sysquery_darwin.c"]
+linux = ["sysquery_linux.c"]
+windows = ["sysquery_win32.c"]
+fallback = ["sysquery_stub.c"]
+
+[libraries]
+windows = ["iphlpapi", "ws2_32", "advapi32"]
+
+[platforms]
+windows = true
+macos = true
+linux = true
+ios = false
+android = false
+emscripten = false
