@@ -2275,6 +2275,208 @@ static int try_run_packaged(int argc, char **argv)
 
 /* ── fmt command ─────────────────────────────────────────────────── */
 
+static const char *toml_group1[] = {"name", "description", "version", "type", "org", NULL};
+static const char *toml_group2[] = {"author", "license", "homepage", "repository", "readme", NULL};
+static const char *toml_group3[] = {"keywords", "platforms", NULL};
+
+static int toml_key_in_group(const char *line, const char **group)
+{
+    while (*line == ' ' || *line == '\t')
+        line++;
+    for (int i = 0; group[i]; i++)
+    {
+        size_t klen = strlen(group[i]);
+        if (strncmp(line, group[i], klen) == 0 && (line[klen] == ' ' || line[klen] == '='))
+            return 1;
+    }
+    return 0;
+}
+
+static int toml_key_group_id(const char *line)
+{
+    if (toml_key_in_group(line, toml_group1))
+        return 1;
+    if (toml_key_in_group(line, toml_group2))
+        return 2;
+    if (toml_key_in_group(line, toml_group3))
+        return 3;
+    return 0;
+}
+
+static int fmt_toml_file(const char *file_path, int check_only)
+{
+    char *data = NULL;
+    size_t data_len = 0;
+    vigil_error_t error = {0};
+    char *out = NULL;
+    size_t out_len = 0, out_cap = 0;
+    int in_section = 0;
+    int prev_group = 0;
+    int prev_was_blank = 1;
+    int first_line = 1;
+
+    if (vigil_platform_read_file(NULL, file_path, &data, &data_len, &error) != VIGIL_STATUS_OK)
+    {
+        fprintf(stderr, "error: %s\n", vigil_error_message(&error));
+        return 1;
+    }
+
+    out_cap = data_len + 256;
+    out = malloc(out_cap);
+    out_len = 0;
+
+#define TOML_APPEND(s, l)                                                                                              \
+    do                                                                                                                  \
+    {                                                                                                                   \
+        if (out_len + (l) >= out_cap)                                                                                  \
+        {                                                                                                               \
+            out_cap = (out_cap + (l)) * 2;                                                                             \
+            out = realloc(out, out_cap);                                                                                \
+        }                                                                                                               \
+        memcpy(out + out_len, (s), (l));                                                                               \
+        out_len += (l);                                                                                                 \
+    } while (0)
+
+    const char *p = data;
+    while (*p)
+    {
+        /* Extract one line */
+        const char *eol = p;
+        while (*eol && *eol != '\n')
+            eol++;
+        size_t line_len = (size_t)(eol - p);
+
+        /* Trim trailing whitespace */
+        size_t trimmed = line_len;
+        while (trimmed > 0 && (p[trimmed - 1] == ' ' || p[trimmed - 1] == '\t' || p[trimmed - 1] == '\r'))
+            trimmed--;
+
+        /* Classify line */
+        const char *stripped = p;
+        while (stripped < p + trimmed && (*stripped == ' ' || *stripped == '\t'))
+            stripped++;
+        size_t stripped_len = (size_t)((p + trimmed) - stripped);
+
+        int is_blank = (stripped_len == 0);
+        int is_comment = (stripped_len > 0 && stripped[0] == '#');
+        int is_section = (stripped_len > 0 && stripped[0] == '[');
+        int is_kv = 0;
+        if (!is_blank && !is_comment && !is_section)
+            is_kv = 1;
+
+        /* Section header: blank line before it (unless first line or already blank) */
+        if (is_section)
+        {
+            if (!first_line && !prev_was_blank)
+            {
+                TOML_APPEND("\n", 1);
+            }
+            in_section = 1;
+            prev_group = 0;
+            TOML_APPEND(stripped, stripped_len);
+            TOML_APPEND("\n", 1);
+            prev_was_blank = 0;
+            first_line = 0;
+        }
+        else if (is_blank)
+        {
+            if (!prev_was_blank && !first_line)
+            {
+                TOML_APPEND("\n", 1);
+                prev_was_blank = 1;
+            }
+        }
+        else if (is_comment)
+        {
+            TOML_APPEND(stripped, stripped_len);
+            TOML_APPEND("\n", 1);
+            prev_was_blank = 0;
+            first_line = 0;
+        }
+        else if (is_kv)
+        {
+            /* Grouping logic for top-level keys */
+            if (!in_section)
+            {
+                int grp = toml_key_group_id(stripped);
+                if (grp > 0 && prev_group > 0 && grp != prev_group && !prev_was_blank)
+                {
+                    TOML_APPEND("\n", 1);
+                }
+                if (grp > 0)
+                    prev_group = grp;
+            }
+
+            /* Normalize key = value spacing */
+            const char *eq = memchr(stripped, '=', stripped_len);
+            if (eq)
+            {
+                /* key part: trim trailing spaces before = */
+                size_t key_len = (size_t)(eq - stripped);
+                while (key_len > 0 && (stripped[key_len - 1] == ' ' || stripped[key_len - 1] == '\t'))
+                    key_len--;
+                /* value part: skip spaces after = */
+                const char *val = eq + 1;
+                while (val < stripped + stripped_len && (*val == ' ' || *val == '\t'))
+                    val++;
+                size_t val_len = (size_t)((stripped + stripped_len) - val);
+
+                TOML_APPEND(stripped, key_len);
+                TOML_APPEND(" = ", 3);
+                TOML_APPEND(val, val_len);
+                TOML_APPEND("\n", 1);
+            }
+            else
+            {
+                TOML_APPEND(stripped, stripped_len);
+                TOML_APPEND("\n", 1);
+            }
+            prev_was_blank = 0;
+            first_line = 0;
+        }
+
+        p = (*eol) ? eol + 1 : eol;
+    }
+
+    /* Ensure single trailing newline */
+    while (out_len > 1 && out[out_len - 1] == '\n' && out[out_len - 2] == '\n')
+        out_len--;
+    if (out_len == 0 || out[out_len - 1] != '\n')
+    {
+        TOML_APPEND("\n", 1);
+    }
+
+#undef TOML_APPEND
+
+    /* Compare */
+    if (out_len == data_len && memcmp(data, out, out_len) == 0)
+    {
+        free(out);
+        free(data);
+        return 0;
+    }
+
+    if (check_only)
+    {
+        fprintf(stderr, "%s\n", file_path);
+        free(out);
+        free(data);
+        return 1;
+    }
+
+    if (vigil_platform_write_file(file_path, out, out_len, &error) != VIGIL_STATUS_OK)
+    {
+        fprintf(stderr, "error: %s\n", vigil_error_message(&error));
+        free(out);
+        free(data);
+        return 1;
+    }
+
+    free(out);
+    free(data);
+    return 0;
+}
+
 static int fmt_one_file(const char *file_path, int check_only)
 {
     vigil_runtime_t *runtime = NULL;
@@ -2380,8 +2582,69 @@ cleanup:
     return exit_code;
 }
 
+static int ends_with(const char *s, const char *suffix)
+{
+    size_t slen = strlen(s), suflen = strlen(suffix);
+    return slen >= suflen && strcmp(s + slen - suflen, suffix) == 0;
+}
+
+static int fmt_walk_dir(const char *dir, int check_only);
+
+static vigil_status_t fmt_walk_cb(const char *name, int is_dir, void *ud)
+{
+    int *ctx = (int *)ud; /* ctx[0] = check_only, ctx[1] = result, ctx[2..] = parent path chars */
+    int check_only = ctx[0];
+    char *parent = (char *)&ctx[2];
+    char path[4096];
+    vigil_error_t err = {0};
+    vigil_platform_path_join(parent, name, path, sizeof(path), &err);
+
+    if (is_dir)
+    {
+        if (strcmp(name, "deps") == 0 || strcmp(name, "build") == 0 || strcmp(name, ".git") == 0)
+            return VIGIL_STATUS_OK;
+        int rc = fmt_walk_dir(path, check_only);
+        if (rc != 0)
+            ctx[1] = rc;
+    }
+    else if (ends_with(name, ".vigil"))
+    {
+        int rc = fmt_one_file(path, check_only);
+        if (rc != 0)
+            ctx[1] = rc;
+    }
+    else if (strcmp(name, "vigil.toml") == 0 || strcmp(name, "plugin.toml") == 0)
+    {
+        int rc = fmt_toml_file(path, check_only);
+        if (rc != 0)
+            ctx[1] = rc;
+    }
+    return VIGIL_STATUS_OK;
+}
+
+static int fmt_walk_dir(const char *dir, int check_only)
+{
+    vigil_error_t err = {0};
+    /* Pack context: [0]=check_only, [1]=result, [2..]=path string */
+    char ctx_buf[4096 + 2 * sizeof(int)];
+    int *ctx = (int *)ctx_buf;
+    ctx[0] = check_only;
+    ctx[1] = 0;
+    snprintf((char *)&ctx[2], sizeof(ctx_buf) - 2 * sizeof(int), "%s", dir);
+    vigil_platform_list_dir(dir, fmt_walk_cb, ctx, &err);
+    return ctx[1];
+}
+
 static int cmd_fmt(const char *file_path, int check_only)
 {
+    if (ends_with(file_path, ".toml"))
+        return fmt_toml_file(file_path, check_only);
+
+    int is_dir = 0;
+    vigil_platform_is_directory(file_path, &is_dir);
+    if (is_dir)
+        return fmt_walk_dir(file_path, check_only);
+
     return fmt_one_file(file_path, check_only);
 }
 
@@ -4821,12 +5084,8 @@ static int dispatch_doc(const parsed_args_t *args)
 
 static int dispatch_fmt(const parsed_args_t *args)
 {
-    if (args->fmt_file == NULL)
-    {
-        fprintf(stderr, "error: missing file argument\n");
-        return 2;
-    }
-    return cmd_fmt(args->fmt_file, args->fmt_check);
+    const char *target = args->fmt_file ? args->fmt_file : ".";
+    return cmd_fmt(target, args->fmt_check);
 }
 
 static int dispatch_package(const parsed_args_t *args)
