@@ -1,0 +1,90 @@
+import "fmt"
+import "reflect"
+
+enum Direction {
+    North
+    South
+    East
+    West
+}
+
+enum Priority {
+    Low
+    Medium
+    High
+    Critical
+}
+
+fn test_enum_members() -> void {
+    array<string> members, err e = reflect.enum_members("Direction")
+    bool ok = e == ok
+    fmt.println(f"direction members ok: {ok}")
+    bool len4 = members.len() == 4
+    fmt.println(f"direction len 4: {len4}")
+    bool n = members[0] == "North"
+    bool s = members[1] == "South"
+    bool ea = members[2] == "East"
+    bool w = members[3] == "West"
+    fmt.println(f"north: {n}")
+    fmt.println(f"south: {s}")
+    fmt.println(f"east: {ea}")
+    fmt.println(f"west: {w}")
+}
+
+fn test_enum_values() -> void {
+    i64 n, err e1 = reflect.enum_value("Direction", "North")
+    i64 s, err e2 = reflect.enum_value("Direction", "South")
+    i64 ea, err e3 = reflect.enum_value("Direction", "East")
+    i64 w, err e4 = reflect.enum_value("Direction", "West")
+    bool ok1 = e1 == ok
+    bool ok2 = e2 == ok
+    bool ok3 = e3 == ok
+    bool ok4 = e4 == ok
+    fmt.println(f"north ok: {ok1}")
+    fmt.println(f"south ok: {ok2}")
+    fmt.println(f"east ok: {ok3}")
+    fmt.println(f"west ok: {ok4}")
+    bool v0 = n == i64(0)
+    bool v1 = s == i64(1)
+    bool v2 = ea == i64(2)
+    bool v3 = w == i64(3)
+    fmt.println(f"north 0: {v0}")
+    fmt.println(f"south 1: {v1}")
+    fmt.println(f"east 2: {v2}")
+    fmt.println(f"west 3: {v3}")
+}
+
+fn test_multiple_enums() -> void {
+    array<string> pm, err e1 = reflect.enum_members("Priority")
+    bool ok = e1 == ok
+    fmt.println(f"priority ok: {ok}")
+    bool len4 = pm.len() == 4
+    fmt.println(f"priority len 4: {len4}")
+    i64 crit, err e2 = reflect.enum_value("Priority", "Critical")
+    bool v3 = crit == i64(3)
+    fmt.println(f"critical 3: {v3}")
+}
+
+fn test_enum_errors() -> void {
+    array<string> bad, err e1 = reflect.enum_members("NonExistent")
+    bool err1 = e1 != ok
+    fmt.println(f"bad enum err: {err1}")
+
+    i64 bad_val, err e2 = reflect.enum_value("Direction", "Unknown")
+    bool err2 = e2 != ok
+    fmt.println(f"bad member err: {err2}")
+
+    i64 bad_val2, err e3 = reflect.enum_value("NonExistent", "Foo")
+    bool err3 = e3 != ok
+    fmt.println(f"bad enum+member err: {err3}")
+}
+
+fn main() -> i32 {
+    fmt.println("===== TEST 12_enums START =====")
+    test_enum_members()
+    test_enum_values()
+    test_multiple_enums()
+    test_enum_errors()
+    fmt.println("===== TEST 12_enums END =====")
+    return 0
+}

@@ -13506,7 +13506,43 @@ static vigil_status_t alloc_class_inits(vigil_program_state_t *program, vigil_ru
 
         class_inits[i].interface_impl_count = decl->interface_impl_count;
         if (decl->interface_impl_count == 0U)
+        {
+            /* Still copy method metadata even without interfaces. */
+            class_inits[i].method_count = decl->method_count;
+            if (decl->method_count != 0U)
+            {
+                vigil_runtime_class_method_init_t *method_inits = NULL;
+                memory = NULL;
+                status = vigil_runtime_alloc(program->registry->runtime,
+                                             decl->method_count * sizeof(*method_inits), &memory, program->error);
+                if (status != VIGIL_STATUS_OK)
+                {
+                    size_t ci;
+                    for (ci = 0U; ci <= i; ++ci)
+                    {
+                        memory = (void *)class_inits[ci].fields;
+                        vigil_runtime_free(program->registry->runtime, &memory);
+                        memory = (void *)class_inits[ci].interface_impls;
+                        vigil_runtime_free(program->registry->runtime, &memory);
+                        memory = (void *)class_inits[ci].methods;
+                        vigil_runtime_free(program->registry->runtime, &memory);
+                    }
+                    memory = class_inits;
+                    vigil_runtime_free(program->registry->runtime, &memory);
+                    return status;
+                }
+                method_inits = (vigil_runtime_class_method_init_t *)memory;
+                for (size_t mi = 0U; mi < decl->method_count; ++mi)
+                {
+                    method_inits[mi].name = decl->methods[mi].name;
+                    method_inits[mi].name_length = decl->methods[mi].name_length;
+                    method_inits[mi].is_public = decl->methods[mi].is_public;
+                    method_inits[mi].function_index = decl->methods[mi].function_index;
+                }
+                class_inits[i].methods = method_inits;
+            }
             continue;
+        }
 
         memory = NULL;
         status = vigil_runtime_alloc(program->registry->runtime,
@@ -13539,6 +13575,41 @@ static vigil_status_t alloc_class_inits(vigil_program_state_t *program, vigil_ru
                 impls[impl_index].function_count = decl->interface_impls[impl_index].function_count;
             }
         }
+
+        /* Copy method metadata. */
+        class_inits[i].method_count = decl->method_count;
+        if (decl->method_count != 0U)
+        {
+            vigil_runtime_class_method_init_t *method_inits = NULL;
+            memory = NULL;
+            status = vigil_runtime_alloc(program->registry->runtime,
+                                         decl->method_count * sizeof(*method_inits), &memory, program->error);
+            if (status != VIGIL_STATUS_OK)
+            {
+                size_t ci;
+                for (ci = 0U; ci <= i; ++ci)
+                {
+                    memory = (void *)class_inits[ci].fields;
+                    vigil_runtime_free(program->registry->runtime, &memory);
+                    memory = (void *)class_inits[ci].interface_impls;
+                    vigil_runtime_free(program->registry->runtime, &memory);
+                    memory = (void *)class_inits[ci].methods;
+                    vigil_runtime_free(program->registry->runtime, &memory);
+                }
+                memory = class_inits;
+                vigil_runtime_free(program->registry->runtime, &memory);
+                return status;
+            }
+            method_inits = (vigil_runtime_class_method_init_t *)memory;
+            for (size_t mi = 0U; mi < decl->method_count; ++mi)
+            {
+                method_inits[mi].name = decl->methods[mi].name;
+                method_inits[mi].name_length = decl->methods[mi].name_length;
+                method_inits[mi].is_public = decl->methods[mi].is_public;
+                method_inits[mi].function_index = decl->methods[mi].function_index;
+            }
+            class_inits[i].methods = method_inits;
+        }
     }
     *out_class_inits = class_inits;
     return VIGIL_STATUS_OK;
@@ -13556,9 +13627,78 @@ static void free_class_inits(vigil_program_state_t *program, vigil_runtime_class
         vigil_runtime_free(program->registry->runtime, &memory);
         memory = (void *)class_inits[i].interface_impls;
         vigil_runtime_free(program->registry->runtime, &memory);
+        memory = (void *)class_inits[i].methods;
+        vigil_runtime_free(program->registry->runtime, &memory);
     }
     memory = class_inits;
     vigil_runtime_free(program->registry->runtime, &memory);
+}
+
+static void free_enum_inits(vigil_program_state_t *program, vigil_runtime_enum_init_t *enum_inits, size_t count)
+{
+    size_t i;
+    void *memory;
+    if (enum_inits == NULL)
+        return;
+    for (i = 0U; i < count; ++i)
+    {
+        memory = enum_inits[i].members;
+        vigil_runtime_free(program->registry->runtime, &memory);
+    }
+    memory = enum_inits;
+    vigil_runtime_free(program->registry->runtime, &memory);
+}
+
+static vigil_status_t alloc_enum_inits(vigil_program_state_t *program, vigil_runtime_enum_init_t **out_enum_inits,
+                                       size_t *out_count)
+{
+    vigil_status_t status;
+    void *memory = NULL;
+    vigil_runtime_enum_init_t *enum_inits;
+    size_t i;
+
+    *out_enum_inits = NULL;
+    *out_count = 0U;
+    if (program->enum_count == 0U)
+        return VIGIL_STATUS_OK;
+
+    status = vigil_runtime_alloc(program->registry->runtime, program->enum_count * sizeof(*enum_inits), &memory,
+                                 program->error);
+    if (status != VIGIL_STATUS_OK)
+        return status;
+
+    enum_inits = (vigil_runtime_enum_init_t *)memory;
+    memset(enum_inits, 0, program->enum_count * sizeof(*enum_inits));
+    for (i = 0U; i < program->enum_count; ++i)
+    {
+        const vigil_enum_decl_t *decl = &program->enums[i];
+        enum_inits[i].name = decl->name;
+        enum_inits[i].name_length = decl->name_length;
+        enum_inits[i].member_count = decl->member_count;
+        if (decl->member_count != 0U)
+        {
+            vigil_runtime_enum_member_init_t *members = NULL;
+            memory = NULL;
+            status = vigil_runtime_alloc(program->registry->runtime, decl->member_count * sizeof(*members), &memory,
+                                         program->error);
+            if (status != VIGIL_STATUS_OK)
+            {
+                free_enum_inits(program, enum_inits, i);
+                return status;
+            }
+            members = (vigil_runtime_enum_member_init_t *)memory;
+            for (size_t mi = 0U; mi < decl->member_count; ++mi)
+            {
+                members[mi].name = decl->members[mi].name;
+                members[mi].name_length = decl->members[mi].name_length;
+                members[mi].value = decl->members[mi].value;
+            }
+            enum_inits[i].members = members;
+        }
+    }
+    *out_enum_inits = enum_inits;
+    *out_count = program->enum_count;
+    return VIGIL_STATUS_OK;
 }
 
 static vigil_runtime_resolved_type_t vigil_runtime_type_from_binding(vigil_binding_type_t type)
@@ -13579,6 +13719,8 @@ static vigil_status_t vigil_compile_attach_entrypoint(vigil_program_state_t *pro
     vigil_runtime_class_init_t *class_inits = NULL;
     vigil_runtime_array_type_init_t *array_type_inits = NULL;
     vigil_runtime_map_type_init_t *map_type_inits = NULL;
+    vigil_runtime_enum_init_t *enum_inits = NULL;
+    size_t enum_init_count = 0U;
     size_t i;
     void *memory = NULL;
     vigil_runtime_function_attach_init_t attach_init;
@@ -13663,6 +13805,12 @@ static vigil_status_t vigil_compile_attach_entrypoint(vigil_program_state_t *pro
     attach_init.map_types = map_type_inits;
     attach_init.map_type_count = program->map_type_count;
 
+    status = alloc_enum_inits(program, &enum_inits, &enum_init_count);
+    if (status != VIGIL_STATUS_OK)
+        goto cleanup;
+    attach_init.enum_inits = enum_inits;
+    attach_init.enum_init_count = enum_init_count;
+
     status = vigil_function_object_attach_siblings(program->functions.functions[program->functions.main_index].object,
                                                    function_table, program->functions.count,
                                                    program->functions.main_index, &attach_init, program->error);
@@ -13684,6 +13832,7 @@ cleanup:
         vigil_runtime_free(program->registry->runtime, &memory);
     }
     free_class_inits(program, class_inits);
+    free_enum_inits(program, enum_inits, enum_init_count);
     if (status != VIGIL_STATUS_OK)
     {
         memory = function_table;

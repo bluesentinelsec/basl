@@ -94,6 +94,14 @@ typedef struct vigil_runtime_class_field_init
     int is_public;
 } vigil_runtime_class_field_init_t;
 
+typedef struct vigil_runtime_class_method_init
+{
+    const char *name;
+    size_t name_length;
+    int is_public;
+    size_t function_index;
+} vigil_runtime_class_method_init_t;
+
 typedef struct vigil_runtime_class_init
 {
     const char *name;
@@ -102,7 +110,24 @@ typedef struct vigil_runtime_class_init
     size_t field_count;
     const vigil_runtime_interface_impl_init_t *interface_impls;
     size_t interface_impl_count;
+    const vigil_runtime_class_method_init_t *methods;
+    size_t method_count;
 } vigil_runtime_class_init_t;
+
+typedef struct vigil_runtime_enum_member_init
+{
+    const char *name;
+    size_t name_length;
+    int64_t value;
+} vigil_runtime_enum_member_init_t;
+
+typedef struct vigil_runtime_enum_init
+{
+    const char *name;
+    size_t name_length;
+    vigil_runtime_enum_member_init_t *members;
+    size_t member_count;
+} vigil_runtime_enum_init_t;
 
 typedef struct vigil_runtime_array_type_init
 {
@@ -125,6 +150,8 @@ typedef struct vigil_runtime_function_attach_init
     size_t array_type_count;
     const vigil_runtime_map_type_init_t *map_types;
     size_t map_type_count;
+    const vigil_runtime_enum_init_t *enum_inits;
+    size_t enum_init_count;
 } vigil_runtime_function_attach_init_t;
 
 vigil_allocator_t vigil_default_allocator(void);
@@ -184,5 +211,16 @@ size_t vigil_runtime_list_vms(vigil_runtime_t *runtime, vigil_vm_t **out_vms, si
  *  Called by vigil_debugger_attach / vigil_debugger_detach. */
 void vigil_runtime_set_debug_hook(vigil_runtime_t *runtime, int (*hook)(vigil_vm_t *vm, void *userdata),
                                   void *userdata);
+
+/* ── Phase 3/4 reflection accessors ─────────────────────────────── */
+size_t vigil_function_object_class_method_count(const vigil_object_t *function, size_t class_index);
+int vigil_function_object_get_class_method(const vigil_object_t *function, size_t class_index, size_t method_index,
+                                           const char **out_name, size_t *out_name_length, int *out_is_public,
+                                           size_t *out_function_index);
+size_t vigil_function_object_enum_count(const vigil_object_t *function);
+int vigil_function_object_get_enum(const vigil_object_t *function, size_t enum_index, const char **out_name,
+                                   size_t *out_name_length, size_t *out_member_count);
+int vigil_function_object_get_enum_member(const vigil_object_t *function, size_t enum_index, size_t member_index,
+                                          const char **out_name, size_t *out_name_length, int64_t *out_value);
 
 #endif

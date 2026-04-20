@@ -30,6 +30,21 @@ typedef struct vigil_error_object
     int64_t kind;
 } vigil_error_object_t;
 
+typedef struct vigil_runtime_enum_member
+{
+    const char *name;
+    size_t name_length;
+    int64_t value;
+} vigil_runtime_enum_member_t;
+
+typedef struct vigil_runtime_enum
+{
+    const char *name;
+    size_t name_length;
+    vigil_runtime_enum_member_t *members;
+    size_t member_count;
+} vigil_runtime_enum_t;
+
 typedef struct vigil_function_object
 {
     vigil_object_t base;
@@ -53,6 +68,9 @@ typedef struct vigil_function_object
     struct vigil_runtime_map_type *map_types;
     size_t map_type_count;
     int owns_map_type_table;
+    vigil_runtime_enum_t *enums;
+    size_t enum_count;
+    int owns_enum_table;
 } vigil_function_object_t;
 
 typedef struct vigil_closure_object
@@ -78,6 +96,14 @@ typedef struct vigil_runtime_class_field
     int is_public;
 } vigil_runtime_class_field_t;
 
+typedef struct vigil_runtime_class_method
+{
+    const char *name;
+    size_t name_length;
+    int is_public;
+    size_t function_index;
+} vigil_runtime_class_method_t;
+
 typedef struct vigil_runtime_class
 {
     const char *name;
@@ -86,6 +112,8 @@ typedef struct vigil_runtime_class
     size_t field_count;
     vigil_runtime_interface_impl_t *interface_impls;
     size_t interface_impl_count;
+    vigil_runtime_class_method_t *methods;
+    size_t method_count;
 } vigil_runtime_class_t;
 
 typedef struct vigil_runtime_array_type
@@ -233,6 +261,8 @@ static void free_class_table(vigil_runtime_t *runtime, vigil_runtime_class_t *cl
 
         memory = classes[class_index].interface_impls;
         vigil_runtime_free(runtime, &memory);
+        memory = classes[class_index].methods;
+        vigil_runtime_free(runtime, &memory);
     }
 
     memory = classes;
@@ -251,6 +281,19 @@ static void free_map_type_table(vigil_runtime_t *runtime, vigil_runtime_map_type
     vigil_runtime_free(runtime, &memory);
 }
 
+static void free_enum_table(vigil_runtime_t *runtime, vigil_runtime_enum_t *enums, size_t enum_count)
+{
+    size_t i;
+    void *memory;
+    for (i = 0U; i < enum_count; ++i)
+    {
+        memory = enums[i].members;
+        vigil_runtime_free(runtime, &memory);
+    }
+    memory = enums;
+    vigil_runtime_free(runtime, &memory);
+}
+
 static void destroy_function_owned_metadata(vigil_function_object_t *obj, vigil_runtime_t *runtime)
 {
     if (obj->owns_class_table && obj->classes != NULL)
@@ -259,6 +302,8 @@ static void destroy_function_owned_metadata(vigil_function_object_t *obj, vigil_
         free_array_type_table(runtime, obj->array_types);
     if (obj->owns_map_type_table && obj->map_types != NULL)
         free_map_type_table(runtime, obj->map_types);
+    if (obj->owns_enum_table && obj->enums != NULL)
+        free_enum_table(runtime, obj->enums, obj->enum_count);
 }
 
 static void destroy_function_table(vigil_function_object_t *obj, vigil_runtime_t *runtime)
@@ -1999,6 +2044,28 @@ static vigil_status_t alloc_class_table(vigil_runtime_t *runtime, const vigil_ru
         classes[class_index].interface_impl_count = interface_count;
         if (interface_count == 0U)
         {
+            /* Still need to copy methods even if no interfaces. */
+            size_t mc = classes_init[class_index].method_count;
+            classes[class_index].method_count = mc;
+            if (mc != 0U && classes_init[class_index].methods != NULL)
+            {
+                memory = NULL;
+                if (vigil_runtime_alloc(runtime, mc * sizeof(vigil_runtime_class_method_t), &memory, error) !=
+                    VIGIL_STATUS_OK)
+                {
+                    free_class_table(runtime, classes, class_count);
+                    return VIGIL_STATUS_OUT_OF_MEMORY;
+                }
+                classes[class_index].methods = (vigil_runtime_class_method_t *)memory;
+                for (i = 0U; i < mc; ++i)
+                {
+                    classes[class_index].methods[i].name = classes_init[class_index].methods[i].name;
+                    classes[class_index].methods[i].name_length = classes_init[class_index].methods[i].name_length;
+                    classes[class_index].methods[i].is_public = classes_init[class_index].methods[i].is_public;
+                    classes[class_index].methods[i].function_index =
+                        classes_init[class_index].methods[i].function_index;
+                }
+            }
             continue;
         }
 
@@ -2037,6 +2104,31 @@ static vigil_status_t alloc_class_table(vigil_runtime_t *runtime, const vigil_ru
             memcpy(classes[class_index].interface_impls[i].function_indices,
                    classes_init[class_index].interface_impls[i].function_indices,
                    method_count * sizeof(*classes[class_index].interface_impls[i].function_indices));
+        }
+
+        /* Copy class methods. */
+        {
+            size_t mc = classes_init[class_index].method_count;
+            classes[class_index].method_count = mc;
+            if (mc != 0U && classes_init[class_index].methods != NULL)
+            {
+                memory = NULL;
+                if (vigil_runtime_alloc(runtime, mc * sizeof(vigil_runtime_class_method_t), &memory, error) !=
+                    VIGIL_STATUS_OK)
+                {
+                    free_class_table(runtime, classes, class_count);
+                    return VIGIL_STATUS_OUT_OF_MEMORY;
+                }
+                classes[class_index].methods = (vigil_runtime_class_method_t *)memory;
+                for (i = 0U; i < mc; ++i)
+                {
+                    classes[class_index].methods[i].name = classes_init[class_index].methods[i].name;
+                    classes[class_index].methods[i].name_length = classes_init[class_index].methods[i].name_length;
+                    classes[class_index].methods[i].is_public = classes_init[class_index].methods[i].is_public;
+                    classes[class_index].methods[i].function_index =
+                        classes_init[class_index].methods[i].function_index;
+                }
+            }
         }
     }
 
@@ -2090,6 +2182,50 @@ static vigil_status_t alloc_map_type_table(vigil_runtime_t *runtime,
     map_types = (vigil_runtime_map_type_t *)memory;
     memcpy(map_types, map_types_init, map_type_count * sizeof(*map_types));
     *out_map_types = map_types;
+    return VIGIL_STATUS_OK;
+}
+
+static vigil_status_t alloc_enum_table(vigil_runtime_t *runtime, const vigil_runtime_enum_init_t *enum_inits,
+                                       size_t enum_count, vigil_runtime_enum_t **out_enums, vigil_error_t *error)
+{
+    vigil_runtime_enum_t *enums;
+    void *memory;
+    size_t i;
+
+    *out_enums = NULL;
+    if (enum_count == 0U || enum_inits == NULL)
+        return VIGIL_STATUS_OK;
+
+    memory = NULL;
+    if (vigil_runtime_alloc(runtime, enum_count * sizeof(*enums), &memory, error) != VIGIL_STATUS_OK)
+        return VIGIL_STATUS_OUT_OF_MEMORY;
+
+    enums = (vigil_runtime_enum_t *)memory;
+    memset(enums, 0, enum_count * sizeof(*enums));
+    for (i = 0U; i < enum_count; ++i)
+    {
+        enums[i].name = enum_inits[i].name;
+        enums[i].name_length = enum_inits[i].name_length;
+        enums[i].member_count = enum_inits[i].member_count;
+        if (enum_inits[i].member_count != 0U && enum_inits[i].members != NULL)
+        {
+            memory = NULL;
+            if (vigil_runtime_alloc(runtime, enum_inits[i].member_count * sizeof(vigil_runtime_enum_member_t), &memory,
+                                    error) != VIGIL_STATUS_OK)
+            {
+                free_enum_table(runtime, enums, i);
+                return VIGIL_STATUS_OUT_OF_MEMORY;
+            }
+            enums[i].members = (vigil_runtime_enum_member_t *)memory;
+            for (size_t mi = 0U; mi < enum_inits[i].member_count; ++mi)
+            {
+                enums[i].members[mi].name = enum_inits[i].members[mi].name;
+                enums[i].members[mi].name_length = enum_inits[i].members[mi].name_length;
+                enums[i].members[mi].value = enum_inits[i].members[mi].value;
+            }
+        }
+    }
+    *out_enums = enums;
     return VIGIL_STATUS_OK;
 }
 
@@ -2165,6 +2301,8 @@ typedef struct vigil_function_attach_tables
     vigil_runtime_class_t *classes;
     vigil_runtime_array_type_t *array_types;
     vigil_runtime_map_type_t *map_types;
+    vigil_runtime_enum_t *enums;
+    size_t enum_count;
 } vigil_function_attach_tables_t;
 
 static vigil_status_t apply_function_attach_metadata(vigil_object_t **functions, size_t function_count,
@@ -2199,6 +2337,9 @@ static vigil_status_t apply_function_attach_metadata(vigil_object_t **functions,
         function_object->map_types = tables->map_types;
         function_object->map_type_count = init->map_type_count;
         function_object->owns_map_type_table = 0;
+        function_object->enums = tables->enums;
+        function_object->enum_count = tables->enum_count;
+        function_object->owns_enum_table = 0;
     }
 
     return VIGIL_STATUS_OK;
@@ -2267,6 +2408,16 @@ vigil_status_t vigil_function_object_attach_siblings(vigil_object_t *owner_funct
         }
     }
 
+    if (init->enum_init_count != 0U && init->enum_inits != NULL)
+    {
+        status = alloc_enum_table(runtime, init->enum_inits, init->enum_init_count, &tables.enums, error);
+        if (status != VIGIL_STATUS_OK)
+        {
+            goto cleanup;
+        }
+        tables.enum_count = init->enum_init_count;
+    }
+
     status = apply_function_attach_metadata(functions, function_count, init, &tables, error);
     if (status != VIGIL_STATUS_OK)
         goto cleanup;
@@ -2276,6 +2427,7 @@ vigil_status_t vigil_function_object_attach_siblings(vigil_object_t *owner_funct
     owner->owns_class_table = 1;
     owner->owns_array_type_table = 1;
     owner->owns_map_type_table = 1;
+    owner->owns_enum_table = 1;
     return VIGIL_STATUS_OK;
 
 cleanup:
@@ -2294,6 +2446,10 @@ cleanup:
     if (tables.map_types != NULL)
     {
         free_map_type_table(runtime, tables.map_types);
+    }
+    if (tables.enums != NULL)
+    {
+        free_enum_table(runtime, tables.enums, tables.enum_count);
     }
     return status;
 }
@@ -2468,6 +2624,78 @@ VIGIL_API const char *vigil_runtime_class_name(const vigil_object_t *function, s
     if (out_length != NULL)
         *out_length = fn->classes[class_index].name_length;
     return fn->classes[class_index].name;
+}
+
+size_t vigil_function_object_class_method_count(const vigil_object_t *function, size_t class_index)
+{
+    const vigil_function_object_t *fn = vigil_function_object_cast(function);
+    if (fn == NULL || fn->classes == NULL || class_index >= fn->class_count)
+        return 0U;
+    return fn->classes[class_index].method_count;
+}
+
+int vigil_function_object_get_class_method(const vigil_object_t *function, size_t class_index, size_t method_index,
+                                           const char **out_name, size_t *out_name_length, int *out_is_public,
+                                           size_t *out_function_index)
+{
+    const vigil_function_object_t *fn = vigil_function_object_cast(function);
+    const vigil_runtime_class_method_t *m;
+    if (fn == NULL || fn->classes == NULL || class_index >= fn->class_count)
+        return 0;
+    if (method_index >= fn->classes[class_index].method_count || fn->classes[class_index].methods == NULL)
+        return 0;
+    m = &fn->classes[class_index].methods[method_index];
+    if (out_name)
+        *out_name = m->name;
+    if (out_name_length)
+        *out_name_length = m->name_length;
+    if (out_is_public)
+        *out_is_public = m->is_public;
+    if (out_function_index)
+        *out_function_index = m->function_index;
+    return 1;
+}
+
+size_t vigil_function_object_enum_count(const vigil_object_t *function)
+{
+    const vigil_function_object_t *fn = vigil_function_object_cast(function);
+    if (fn == NULL)
+        return 0U;
+    return fn->enum_count;
+}
+
+int vigil_function_object_get_enum(const vigil_object_t *function, size_t enum_index, const char **out_name,
+                                   size_t *out_name_length, size_t *out_member_count)
+{
+    const vigil_function_object_t *fn = vigil_function_object_cast(function);
+    if (fn == NULL || fn->enums == NULL || enum_index >= fn->enum_count)
+        return 0;
+    if (out_name)
+        *out_name = fn->enums[enum_index].name;
+    if (out_name_length)
+        *out_name_length = fn->enums[enum_index].name_length;
+    if (out_member_count)
+        *out_member_count = fn->enums[enum_index].member_count;
+    return 1;
+}
+
+int vigil_function_object_get_enum_member(const vigil_object_t *function, size_t enum_index, size_t member_index,
+                                          const char **out_name, size_t *out_name_length, int64_t *out_value)
+{
+    const vigil_function_object_t *fn = vigil_function_object_cast(function);
+    const vigil_runtime_enum_member_t *m;
+    if (fn == NULL || fn->enums == NULL || enum_index >= fn->enum_count)
+        return 0;
+    if (member_index >= fn->enums[enum_index].member_count || fn->enums[enum_index].members == NULL)
+        return 0;
+    m = &fn->enums[enum_index].members[member_index];
+    if (out_name)
+        *out_name = m->name;
+    if (out_name_length)
+        *out_name_length = m->name_length;
+    if (out_value)
+        *out_value = m->value;
+    return 1;
 }
 
 int vigil_function_object_get_array_type(const vigil_object_t *function, size_t array_index,
