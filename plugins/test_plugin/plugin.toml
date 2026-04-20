@@ -1,0 +1,13 @@
+name = "test_plugin"
+description = "Test plugin for CI validation"
+module = "test_plugin"
+
+sources = ["test_plugin.c"]
+
+[platforms]
+windows = true
+macos = true
+linux = true
+ios = true
+android = true
+emscripten = true

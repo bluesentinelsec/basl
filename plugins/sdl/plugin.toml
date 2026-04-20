@@ -1,0 +1,25 @@
+name = "sdl"
+description = "SDL3 graphics, input, and window management"
+module = "sdl"
+
+sources = ["sdl.c", "vigil_image.c", "vigil_font.c"]
+headers = ["vigil_image.h", "vigil_font.h"]
+
+[transpile]
+marker = "NEEDS_SDL"
+compile_definition = "VIGIL_PLUGIN_SDL_ENABLED"
+
+[[transpile.fetch_content]]
+name = "SDL3"
+url = "https://github.com/libsdl-org/SDL.git"
+tag = "release-3.4.2"
+cmake_target = "SDL3::SDL3-static"
+cmake_options = { SDL_SHARED = "OFF", SDL_STATIC = "ON", SDL_TEST_LIBRARY = "OFF", SDL_INSTALL = "OFF" }
+
+[platforms]
+windows = true
+macos = true
+linux = true
+ios = false
+android = false
+emscripten = false

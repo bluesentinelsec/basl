@@ -132,15 +132,23 @@ for f in ["stb_image.h", "stb_truetype.h", "stb_vorbis.c"]:
     _add("deps/stb", f"deps/stb/{f}")
 
 # Plugin sources
-_PLUGINS = {
-    "sdl": ["sdl.c", "vigil_image.c", "vigil_font.c", "vigil_image.h", "vigil_font.h"],
-    "gui": ["gui.c", "gui_backend.h", "backends/gui_sdl.c"],
-    "audio": ["audio.c"],
-    "sysquery": ["sysquery.c", "sysquery_common.c", "sysquery_platform.h",
-                 "sysquery_linux.c", "sysquery_darwin.c", "sysquery_win32.c", "sysquery_stub.c"],
-    "tiled": ["tiled.c"],
-    "test_plugin": ["test_plugin.c"],
-}
+# Discover plugins from plugin.toml manifests
+_PLUGINS = {}
+_plugins_dir = os.path.join(os.path.dirname(__file__), "..", "plugins")
+if os.path.isdir(_plugins_dir):
+    for _pname in sorted(os.listdir(_plugins_dir)):
+        _pdir = os.path.join(_plugins_dir, _pname)
+        if not os.path.isdir(_pdir):
+            continue
+        # Collect all .c and .h files in the plugin directory (including subdirs)
+        _files = []
+        for _root, _dirs, _fnames in os.walk(_pdir):
+            for _f in sorted(_fnames):
+                if _f.endswith((".c", ".h")):
+                    _rel = os.path.relpath(os.path.join(_root, _f), _pdir)
+                    _files.append(_rel)
+        if _files:
+            _PLUGINS[_pname] = _files
 for plugin, files in _PLUGINS.items():
     for f in files:
         _add(f"plugins/{plugin}", f"plugins/{plugin}/{f}")

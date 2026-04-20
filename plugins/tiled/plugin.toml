@@ -1,0 +1,13 @@
+name = "tiled"
+description = "Tiled map parser for .tmj/.tmx files"
+module = "tiled"
+
+sources = ["tiled.c"]
+
+[platforms]
+windows = true
+macos = true
+linux = true
+ios = true
+android = true
+emscripten = true
