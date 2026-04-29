@@ -187,7 +187,10 @@ static int vigil_aot_is_numeric_constant(const vigil_value_t *value)
         return 0;
     }
 
-    return !vigil_nanbox_has_object(*value);
+    /* Only inline signed integers are supported by the AOT numeric codegen.
+       Reject doubles, unsigned integers, booleans, nil, and heap-allocated
+       bigints (which require pointer dereferencing the AOT path cannot do). */
+    return vigil_nanbox_is_int_inline(*value);
 }
 
 /* Check that every CALL_NATIVE in the chunk targets a native function
@@ -295,10 +298,8 @@ static int vigil_aot_chunk_is_numeric_subset(const vigil_reg_chunk_t *rc)
         case VREG_LT_I32_IMM_JMP:
         case VREG_TO_I32:
         case VREG_TO_I64:
-        case VREG_CALL:
         case VREG_CALL_SELF:
         case VREG_CALL_NATIVE:
-        case VREG_TAIL_CALL:
         case VREG_RETURN:
         case VREG_RELEASE:
             break;
@@ -917,11 +918,23 @@ static vigil_status_t vigil_aot_build_numeric(const vigil_reg_chunk_t *rc, vigil
         case VREG_NEG: {
             uint8_t a = VREG_GET_A(instr), b = VREG_GET_B(instr);
             if (v && promoted[a] && promoted[b])
+            {
+                /* Check for INT64_MIN (negation overflows). */
+                MIR_append_insn(ctx, func,
+                                MIR_new_insn(ctx, MIR_BEQ, MIR_new_label_op(ctx, labels[rc->code_count]),
+                                             MIR_new_reg_op(ctx, v[b]),
+                                             MIR_new_int_op(ctx, (int64_t)INT64_MIN)));
                 MIR_append_insn(ctx, func, MIR_new_insn(ctx, MIR_NEG, MIR_new_reg_op(ctx, v[a]),
                                 MIR_new_reg_op(ctx, v[b])));
+            }
             else
             {
-                V_DEC_I32(tmp0_reg, b);
+                /* Decode as full 64-bit integer — NEG is type-agnostic. */
+                V_DEC_I64(tmp0_reg, b);
+                MIR_append_insn(ctx, func,
+                                MIR_new_insn(ctx, MIR_BEQ, MIR_new_label_op(ctx, labels[rc->code_count]),
+                                             MIR_new_reg_op(ctx, tmp0_reg),
+                                             MIR_new_int_op(ctx, (int64_t)INT64_MIN)));
                 MIR_append_insn(ctx, func, MIR_new_insn(ctx, MIR_NEG, MIR_new_reg_op(ctx, tmp2_reg),
                                 MIR_new_reg_op(ctx, tmp0_reg)));
                 V_ENC(tmp2_reg, a);
@@ -985,6 +998,13 @@ static vigil_status_t vigil_aot_build_numeric(const vigil_reg_chunk_t *rc, vigil
             }
             V_DEC_I32(tmp0_reg, VREG_GET_B(instr));
             V_DEC_I32(tmp1_reg, VREG_GET_C(instr));
+            if (op == VREG_SHL || op == VREG_SHR)
+            {
+                /* Reject shift amounts >= 64 (undefined in C, error in the interpreter). */
+                MIR_append_insn(ctx, func,
+                                MIR_new_insn(ctx, MIR_BGE, MIR_new_label_op(ctx, labels[rc->code_count]),
+                                             MIR_new_reg_op(ctx, tmp1_reg), MIR_new_int_op(ctx, 64)));
+            }
             MIR_append_insn(ctx, func, MIR_new_insn(ctx, mo, MIR_new_reg_op(ctx, tmp2_reg),
                             MIR_new_reg_op(ctx, tmp0_reg), MIR_new_reg_op(ctx, tmp1_reg)));
             V_ENC(tmp2_reg, VREG_GET_A(instr));
@@ -1093,7 +1113,16 @@ static vigil_status_t vigil_aot_build_numeric(const vigil_reg_chunk_t *rc, vigil
             }
             MIR_append_insn(ctx, func, MIR_new_insn(ctx, MIR_JMP, MIR_new_label_op(ctx, labels[ip + 3U])));
             MIR_append_insn(ctx, func, loop_cont);
-            MIR_append_insn(ctx, func, MIR_new_insn(ctx, MIR_JMP, MIR_new_label_op(ctx, labels[ip + 2U])));
+            {
+                /* The third word of FORLOOP is a JMP instruction encoding the
+                   back-jump offset.  Decode it to find the real target label
+                   instead of referencing labels[ip+2] which is never placed
+                   (it falls inside this multi-word instruction). */
+                vigil_reg_instr_t back_jmp = rc->code[ip + 2U];
+                int16_t back_off = VREG_GET_sBx(back_jmp);
+                size_t back_target = (size_t)((int32_t)(ip + 2U) + 1 + (int32_t)back_off);
+                MIR_append_insn(ctx, func, MIR_new_insn(ctx, MIR_JMP, MIR_new_label_op(ctx, labels[back_target])));
+            }
             continue;
         }
         case VREG_EQ_I32:
