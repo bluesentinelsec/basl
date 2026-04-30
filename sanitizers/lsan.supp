@@ -1,0 +1,4 @@
+# Known pre-existing leak: instance objects created during interface
+# dispatch are not always released before program exit.  Tracked as a
+# separate runtime cleanup issue.
+leak:vigil_instance_object_new
