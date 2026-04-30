@@ -352,7 +352,6 @@ static int vigil_aot_chunk_is_numeric_subset(const vigil_reg_chunk_t *rc)
     return 1;
 }
 
-/* Forward declaration removed — wrapper disabled, see vigil_aot_build. */
 
 static void vigil_aot_emit_reload_regs(MIR_context_t ctx, MIR_item_t func, MIR_reg_t regs_reg, MIR_reg_t vm_reg,
                                        MIR_reg_t frame_count_reg, MIR_reg_t frames_reg, MIR_reg_t frame_ptr_reg,
@@ -1760,7 +1759,9 @@ int vigil_aot_supported(void)
 }
 
 #if defined(VIGIL_ENABLE_AOT)
-#if 0 /* wrapper disabled — correctness issue with multi-file class programs */
+/* Thin MIR-JIT trampoline for non-numeric functions.  Wraps
+   vigil_regvm_execute so every function goes through the same AOT cache
+   dispatch path, avoiding the per-call branch in vigil_reg_execute_cached. */
 static vigil_status_t vigil_aot_build_wrapper(const vigil_reg_chunk_t *rc, vigil_aot_cache_t **out_cache,
                                               vigil_error_t *error)
 {
@@ -1835,7 +1836,6 @@ static vigil_status_t vigil_aot_build_wrapper(const vigil_reg_chunk_t *rc, vigil
     *out_cache = cache;
     return VIGIL_STATUS_OK;
 }
-#endif /* wrapper disabled */
 
 static vigil_status_t vigil_aot_build(const vigil_reg_chunk_t *rc, vigil_aot_cache_t **out_cache,
                                       vigil_error_t *error)
@@ -1845,9 +1845,7 @@ static vigil_status_t vigil_aot_build(const vigil_reg_chunk_t *rc, vigil_aot_cac
         return vigil_aot_build_numeric(rc, out_cache, error);
     }
 
-    /* Non-numeric functions fall back to interpreter at call time. */
-    vigil_error_set_literal(error, VIGIL_STATUS_UNSUPPORTED, "AOT: non-numeric function");
-    return VIGIL_STATUS_UNSUPPORTED;
+    return vigil_aot_build_wrapper(rc, out_cache, error);
 }
 #endif
 
