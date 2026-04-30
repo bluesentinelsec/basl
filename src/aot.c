@@ -235,10 +235,78 @@ static int vigil_aot_chunk_is_numeric_subset(const vigil_reg_chunk_t *rc)
         return 0;
     }
 
+    /* If the function has object arguments, AOT cannot safely compile it:
+       AOT codegen does no refcount management, so any write to an arg
+       register would drop a reference without releasing.  Without static
+       arg-type info we must conservatively reject any function that both
+       takes arguments and writes to (or releases) an arg register.  See
+       issue #561. */
+    uint8_t arg_count_for_check = rc->arity;
+
     while (ip < rc->code_count)
     {
         vigil_reg_instr_t instr = rc->code[ip];
         uint8_t op = VREG_GET_OP(instr);
+
+        if (arg_count_for_check > 0U)
+        {
+            uint8_t a = VREG_GET_A(instr);
+            int writes_a = 0;
+            switch (op)
+            {
+            case VREG_MOVE:
+            case VREG_LOAD_K:
+            case VREG_LOAD_NIL:
+            case VREG_LOAD_TRUE:
+            case VREG_LOAD_FALSE:
+            case VREG_ADD_I32:
+            case VREG_SUB_I32:
+            case VREG_MUL_I32:
+            case VREG_DIV_I32:
+            case VREG_MOD_I32:
+            case VREG_ADD_I64:
+            case VREG_SUB_I64:
+            case VREG_MUL_I64:
+            case VREG_DIV_I64:
+            case VREG_MOD_I64:
+            case VREG_ADDI:
+            case VREG_SUBI:
+            case VREG_ADDI_I64:
+            case VREG_SUBI_I64:
+            case VREG_INC_I32:
+            case VREG_INC_I64:
+            case VREG_NEG:
+            case VREG_NOT:
+            case VREG_BNOT:
+            case VREG_BAND:
+            case VREG_BOR:
+            case VREG_BXOR:
+            case VREG_SHL:
+            case VREG_SHR:
+            case VREG_EQ_I32:
+            case VREG_NE_I32:
+            case VREG_LT_I32:
+            case VREG_LE_I32:
+            case VREG_GT_I32:
+            case VREG_GE_I32:
+            case VREG_DUP:
+            case VREG_TESTSET:
+            case VREG_TO_I32:
+            case VREG_TO_I64:
+            case VREG_CALL_SELF:
+            case VREG_CALL_NATIVE:
+            case VREG_RELEASE:
+                writes_a = 1;
+                break;
+            default:
+                break;
+            }
+            if (writes_a && a < arg_count_for_check)
+                return 0;
+            /* FORLOOP touches a range starting at A. */
+            if ((op == VREG_FORLOOP_I32 || op == VREG_FORLOOP_I64) && a < arg_count_for_check)
+                return 0;
+        }
 
         switch (op)
         {
