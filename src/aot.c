@@ -235,76 +235,21 @@ static int vigil_aot_chunk_is_numeric_subset(const vigil_reg_chunk_t *rc)
         return 0;
     }
 
-    /* If the function has object arguments, AOT cannot safely compile it:
-       AOT codegen does no refcount management, so any write to an arg
-       register would drop a reference without releasing.  Without static
-       arg-type info we must conservatively reject any function that both
-       takes arguments and writes to (or releases) an arg register.  See
-       issue #561. */
-    uint8_t arg_count_for_check = rc->arity;
-
     while (ip < rc->code_count)
     {
         vigil_reg_instr_t instr = rc->code[ip];
         uint8_t op = VREG_GET_OP(instr);
 
-        if (arg_count_for_check > 0U)
+        /* MOVE/DUP that read from an arg slot (which may hold an object) into
+           a different slot would propagate the pointer without retaining it.
+           AOT does not emit retains, so this leaves a dangling reference once
+           the source arg is released at exit.  Reject — interpreter handles
+           it via VIGIL_VM_VALUE_COPY. */
+        if (rc->arity > 0U && (op == VREG_MOVE || op == VREG_DUP))
         {
             uint8_t a = VREG_GET_A(instr);
-            int writes_a = 0;
-            switch (op)
-            {
-            case VREG_MOVE:
-            case VREG_LOAD_K:
-            case VREG_LOAD_NIL:
-            case VREG_LOAD_TRUE:
-            case VREG_LOAD_FALSE:
-            case VREG_ADD_I32:
-            case VREG_SUB_I32:
-            case VREG_MUL_I32:
-            case VREG_DIV_I32:
-            case VREG_MOD_I32:
-            case VREG_ADD_I64:
-            case VREG_SUB_I64:
-            case VREG_MUL_I64:
-            case VREG_DIV_I64:
-            case VREG_MOD_I64:
-            case VREG_ADDI:
-            case VREG_SUBI:
-            case VREG_ADDI_I64:
-            case VREG_SUBI_I64:
-            case VREG_INC_I32:
-            case VREG_INC_I64:
-            case VREG_NEG:
-            case VREG_NOT:
-            case VREG_BNOT:
-            case VREG_BAND:
-            case VREG_BOR:
-            case VREG_BXOR:
-            case VREG_SHL:
-            case VREG_SHR:
-            case VREG_EQ_I32:
-            case VREG_NE_I32:
-            case VREG_LT_I32:
-            case VREG_LE_I32:
-            case VREG_GT_I32:
-            case VREG_GE_I32:
-            case VREG_DUP:
-            case VREG_TESTSET:
-            case VREG_TO_I32:
-            case VREG_TO_I64:
-            case VREG_CALL_SELF:
-            case VREG_CALL_NATIVE:
-            case VREG_RELEASE:
-                writes_a = 1;
-                break;
-            default:
-                break;
-            }
-            if (writes_a && a < arg_count_for_check)
-                return 0;
-            /* FORLOOP touches a range starting at A. */
-            if ((op == VREG_FORLOOP_I32 || op == VREG_FORLOOP_I64) && a < arg_count_for_check)
+            uint8_t b = VREG_GET_B(instr);
+            if (b < rc->arity && a != b)
                 return 0;
         }
 
@@ -478,6 +423,8 @@ static vigil_status_t vigil_aot_build_numeric(const vigil_reg_chunk_t *rc, vigil
     MIR_item_t call_native_import;
     MIR_item_t fail_proto;
     MIR_item_t fail_import;
+    MIR_item_t release_proto;
+    MIR_item_t release_import;
     MIR_item_t self_proto;
     MIR_type_t res_type = MIR_T_I64;
     MIR_reg_t status_reg;
@@ -550,6 +497,11 @@ static vigil_status_t vigil_aot_build_numeric(const vigil_reg_chunk_t *rc, vigil
     fail_proto = MIR_new_proto(ctx, "vigil_aot_numeric_fail_proto", 1U, &res_type, 3U, MIR_T_I64, "status", MIR_T_P,
                                "message", MIR_T_P, "error");
     fail_import = MIR_new_import(ctx, "vigil_aot_numeric_fail");
+    /* vigil_value_release(vigil_value_t *value) — used to drop object refs
+       held in arg slots that AOT codegen would otherwise overwrite without
+       refcount management.  See issue #561. */
+    release_proto = MIR_new_proto(ctx, "vigil_value_release_proto", 0U, NULL, 1U, MIR_T_P, "value");
+    release_import = MIR_new_import(ctx, "vigil_value_release");
     func = MIR_new_func(ctx, func_name, 1U, &res_type, 3U, MIR_T_P, "vm", MIR_T_P, "out_value", MIR_T_P, "error");
 
     status_reg = MIR_new_func_reg(ctx, func->u.func, MIR_T_I64, "$status");
@@ -858,6 +810,17 @@ static vigil_status_t vigil_aot_build_numeric(const vigil_reg_chunk_t *rc, vigil
             V_LOAD(ri);
     }
 
+/* Emit a vigil_value_release(&R[slot]) call.  Used to drop possible-object
+   references in arg slots before AOT codegen overwrites them, since AOT
+   does no refcount management on its own.  See issue #561. */
+#define EMIT_VALUE_RELEASE(slot_idx) do { \
+    MIR_append_insn(ctx, func, MIR_new_insn(ctx, MIR_ADD, MIR_new_reg_op(ctx, tmp0_reg), \
+                     MIR_new_reg_op(ctx, regs_reg), \
+                     MIR_new_int_op(ctx, (int64_t)((size_t)(slot_idx) * sizeof(vigil_value_t))))); \
+    MIR_append_insn(ctx, func, MIR_new_call_insn(ctx, 3U, MIR_new_ref_op(ctx, release_proto), \
+                     MIR_new_ref_op(ctx, release_import), MIR_new_reg_op(ctx, tmp0_reg))); \
+} while (0)
+
     for (ip = 0U; ip < rc->code_count; ip += vigil_aot_instr_words(rc, ip))
     {
         vigil_reg_instr_t instr = rc->code[ip];
@@ -865,6 +828,42 @@ static vigil_status_t vigil_aot_build_numeric(const vigil_reg_chunk_t *rc, vigil
         int16_t off;
 
         MIR_append_insn(ctx, func, labels[ip]);
+
+        /* Refcount management for arg slots: AOT codegen otherwise overwrites
+           an arg register without releasing any object reference it may hold.
+           Before any op that writes to an arg slot, drop the prior value.
+           For non-object values (NIL/int) vigil_value_release is a no-op, so
+           emitting unconditionally is safe — and avoids fragile per-op state
+           tracking across branches.  See issue #561. */
+        if (rc->arity > 0U)
+        {
+            uint8_t a = VREG_GET_A(instr);
+            int op_writes_a = 0;
+            switch (op)
+            {
+            case VREG_MOVE: case VREG_LOAD_K: case VREG_LOAD_NIL:
+            case VREG_LOAD_TRUE: case VREG_LOAD_FALSE:
+            case VREG_ADD_I32: case VREG_SUB_I32: case VREG_MUL_I32:
+            case VREG_DIV_I32: case VREG_MOD_I32:
+            case VREG_ADD_I64: case VREG_SUB_I64: case VREG_MUL_I64:
+            case VREG_DIV_I64: case VREG_MOD_I64:
+            case VREG_ADDI: case VREG_SUBI: case VREG_ADDI_I64: case VREG_SUBI_I64:
+            case VREG_INC_I32: case VREG_INC_I64:
+            case VREG_NEG: case VREG_NOT: case VREG_BNOT:
+            case VREG_BAND: case VREG_BOR: case VREG_BXOR: case VREG_SHL: case VREG_SHR:
+            case VREG_EQ_I32: case VREG_NE_I32: case VREG_LT_I32:
+            case VREG_LE_I32: case VREG_GT_I32: case VREG_GE_I32:
+            case VREG_DUP: case VREG_TESTSET:
+            case VREG_TO_I32: case VREG_TO_I64:
+            case VREG_FORLOOP_I32: case VREG_FORLOOP_I64:
+                op_writes_a = 1;
+                break;
+            default:
+                break;
+            }
+            if (op_writes_a && a < rc->arity)
+                EMIT_VALUE_RELEASE(a);
+        }
 
         switch (op)
         {
@@ -1618,7 +1617,10 @@ static vigil_status_t vigil_aot_build_numeric(const vigil_reg_chunk_t *rc, vigil
             continue;
         }
         case VREG_RELEASE:
-            vigil_aot_emit_store_constant(ctx, func, regs_reg, VREG_GET_A(instr), VIGIL_NANBOX_NIL);
+            /* Actually drop the reference if the slot holds an object —
+               vigil_value_release also clears the slot to NIL.  Then sync
+               the v[] register if the slot is held in one. */
+            EMIT_VALUE_RELEASE(VREG_GET_A(instr));
             MIR_append_insn(ctx, func, MIR_new_insn(ctx, MIR_MOV, MIR_new_reg_op(ctx, V(VREG_GET_A(instr))),
                             MIR_new_uint_op(ctx, VIGIL_NANBOX_NIL)));
             break;
@@ -1626,6 +1628,22 @@ static vigil_status_t vigil_aot_build_numeric(const vigil_reg_chunk_t *rc, vigil
             vigil_aot_emit_reload_regs(ctx, func, regs_reg, vm_reg, tmp0_reg, tmp1_reg, tmp2_reg, tmp3_reg,
                                        status_reg);
             V_FLUSH_ALL();
+            /* Release any arg slots that aren't part of the return value
+               window.  The translator forces RETURN A=0 (return values at
+               R[0..count-1]).  Any arg slot at index >= count still holds
+               its original (possibly object) reference and would otherwise
+               leak — the interpreter's r_cleanup releases these but AOT
+               must do so explicitly.  See issue #561. */
+            {
+                uint8_t ret_count_b = VREG_GET_B(instr);
+                uint8_t ret_base_a = VREG_GET_A(instr);
+                for (uint16_t ai = 0; ai < rc->arity; ai++)
+                {
+                    if (ai >= ret_base_a && ai < (uint16_t)(ret_base_a + ret_count_b))
+                        continue;
+                    EMIT_VALUE_RELEASE(ai);
+                }
+            }
             if (VREG_GET_B(instr) > 0U)
             {
                 uint8_t ret_slot = VREG_GET_A(instr);
@@ -1690,6 +1708,7 @@ static vigil_status_t vigil_aot_build_numeric(const vigil_reg_chunk_t *rc, vigil
     MIR_load_external(ctx, "vigil_aot_numeric_call", (void *)vigil_aot_numeric_call);
     MIR_load_external(ctx, "vigil_aot_numeric_call_native", (void *)vigil_aot_numeric_call_native);
     MIR_load_external(ctx, "vigil_aot_numeric_fail", (void *)vigil_aot_numeric_fail);
+    MIR_load_external(ctx, "vigil_value_release", (void *)vigil_value_release);
     MIR_gen_init(ctx);
     cache->generator_initialized = 1;
     MIR_link(ctx, MIR_set_gen_interface, NULL);
