@@ -3020,11 +3020,14 @@ static void target_change_to_direct_calls (MIR_context_t ctx) {
     MIR_func_t ref_func = ref_func_item->u.func;
     uint8_t *addr_loc, *addr_before, *addr = ref_func->machine_code;
     uint8_t *call_addr = call_refs_addr[i].call_addr;
-    int32_t off = *(int32_t *) (call_addr + 2);
+    int32_t off;
+    memcpy(&off, call_addr + 2, sizeof(off));
     int call32_p = FALSE;
     if (call_addr[0] == 0xff) { /* call *rel32(rip) */
       addr_loc = call_addr + 6 + off;
-      addr_before = (uint8_t *) *(uint64_t *) addr_loc;
+      uint64_t addr_val;
+      memcpy(&addr_val, addr_loc, sizeof(addr_val));
+      addr_before = (uint8_t *) addr_val;
       if (addr_before == addr) continue;
       _MIR_change_code (ctx, addr_loc, (uint8_t *) &addr, sizeof (uint64_t));
     } else { /* rex call rel32(rip) */

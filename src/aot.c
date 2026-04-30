@@ -187,7 +187,10 @@ static int vigil_aot_is_numeric_constant(const vigil_value_t *value)
         return 0;
     }
 
-    return !vigil_nanbox_has_object(*value);
+    /* Only inline signed integers are supported by the AOT numeric codegen.
+       Reject doubles, unsigned integers, booleans, nil, and heap-allocated
+       bigints (which require pointer dereferencing the AOT path cannot do). */
+    return vigil_nanbox_is_int_inline(*value);
 }
 
 /* Check that every CALL_NATIVE in the chunk targets a native function
@@ -236,6 +239,19 @@ static int vigil_aot_chunk_is_numeric_subset(const vigil_reg_chunk_t *rc)
     {
         vigil_reg_instr_t instr = rc->code[ip];
         uint8_t op = VREG_GET_OP(instr);
+
+        /* MOVE/DUP that read from an arg slot (which may hold an object) into
+           a different slot would propagate the pointer without retaining it.
+           AOT does not emit retains, so this leaves a dangling reference once
+           the source arg is released at exit.  Reject — interpreter handles
+           it via VIGIL_VM_VALUE_COPY. */
+        if (rc->arity > 0U && (op == VREG_MOVE || op == VREG_DUP))
+        {
+            uint8_t a = VREG_GET_A(instr);
+            uint8_t b = VREG_GET_B(instr);
+            if (b < rc->arity && a != b)
+                return 0;
+        }
 
         switch (op)
         {
@@ -295,10 +311,8 @@ static int vigil_aot_chunk_is_numeric_subset(const vigil_reg_chunk_t *rc)
         case VREG_LT_I32_IMM_JMP:
         case VREG_TO_I32:
         case VREG_TO_I64:
-        case VREG_CALL:
         case VREG_CALL_SELF:
         case VREG_CALL_NATIVE:
-        case VREG_TAIL_CALL:
         case VREG_RETURN:
         case VREG_RELEASE:
             break;
@@ -338,7 +352,6 @@ static int vigil_aot_chunk_is_numeric_subset(const vigil_reg_chunk_t *rc)
     return 1;
 }
 
-/* Forward declaration removed — wrapper disabled, see vigil_aot_build. */
 
 static void vigil_aot_emit_reload_regs(MIR_context_t ctx, MIR_item_t func, MIR_reg_t regs_reg, MIR_reg_t vm_reg,
                                        MIR_reg_t frame_count_reg, MIR_reg_t frames_reg, MIR_reg_t frame_ptr_reg,
@@ -409,6 +422,8 @@ static vigil_status_t vigil_aot_build_numeric(const vigil_reg_chunk_t *rc, vigil
     MIR_item_t call_native_import;
     MIR_item_t fail_proto;
     MIR_item_t fail_import;
+    MIR_item_t release_proto;
+    MIR_item_t release_import;
     MIR_item_t self_proto;
     MIR_type_t res_type = MIR_T_I64;
     MIR_reg_t status_reg;
@@ -481,6 +496,11 @@ static vigil_status_t vigil_aot_build_numeric(const vigil_reg_chunk_t *rc, vigil
     fail_proto = MIR_new_proto(ctx, "vigil_aot_numeric_fail_proto", 1U, &res_type, 3U, MIR_T_I64, "status", MIR_T_P,
                                "message", MIR_T_P, "error");
     fail_import = MIR_new_import(ctx, "vigil_aot_numeric_fail");
+    /* vigil_value_release(vigil_value_t *value) — used to drop object refs
+       held in arg slots that AOT codegen would otherwise overwrite without
+       refcount management.  See issue #561. */
+    release_proto = MIR_new_proto(ctx, "vigil_value_release_proto", 0U, NULL, 1U, MIR_T_P, "value");
+    release_import = MIR_new_import(ctx, "vigil_value_release");
     func = MIR_new_func(ctx, func_name, 1U, &res_type, 3U, MIR_T_P, "vm", MIR_T_P, "out_value", MIR_T_P, "error");
 
     status_reg = MIR_new_func_reg(ctx, func->u.func, MIR_T_I64, "$status");
@@ -587,9 +607,17 @@ static vigil_status_t vigil_aot_build_numeric(const vigil_reg_chunk_t *rc, vigil
         }
     }
 
-    for (ip = 0U; ip <= rc->code_count; ++ip)
+    /* Only allocate labels at instruction-start positions.  Multi-word
+       instructions (CALL_SELF=2, CALL_NATIVE=2, FORLOOP=3) occupy
+       consecutive slots; intermediate positions never need labels. */
     {
-        labels[ip] = MIR_new_label(ctx);
+        size_t lip = 0U;
+        while (lip < rc->code_count)
+        {
+            labels[lip] = MIR_new_label(ctx);
+            lip += vigil_aot_instr_words(rc, lip);
+        }
+        labels[rc->code_count] = MIR_new_label(ctx); /* overflow / exit label */
     }
     error_label = MIR_new_label(ctx);
 
@@ -781,6 +809,17 @@ static vigil_status_t vigil_aot_build_numeric(const vigil_reg_chunk_t *rc, vigil
             V_LOAD(ri);
     }
 
+/* Emit a vigil_value_release(&R[slot]) call.  Used to drop possible-object
+   references in arg slots before AOT codegen overwrites them, since AOT
+   does no refcount management on its own.  See issue #561. */
+#define EMIT_VALUE_RELEASE(slot_idx) do { \
+    MIR_append_insn(ctx, func, MIR_new_insn(ctx, MIR_ADD, MIR_new_reg_op(ctx, tmp0_reg), \
+                     MIR_new_reg_op(ctx, regs_reg), \
+                     MIR_new_int_op(ctx, (int64_t)((size_t)(slot_idx) * sizeof(vigil_value_t))))); \
+    MIR_append_insn(ctx, func, MIR_new_call_insn(ctx, 3U, MIR_new_ref_op(ctx, release_proto), \
+                     MIR_new_ref_op(ctx, release_import), MIR_new_reg_op(ctx, tmp0_reg))); \
+} while (0)
+
     for (ip = 0U; ip < rc->code_count; ip += vigil_aot_instr_words(rc, ip))
     {
         vigil_reg_instr_t instr = rc->code[ip];
@@ -788,6 +827,42 @@ static vigil_status_t vigil_aot_build_numeric(const vigil_reg_chunk_t *rc, vigil
         int16_t off;
 
         MIR_append_insn(ctx, func, labels[ip]);
+
+        /* Refcount management for arg slots: AOT codegen otherwise overwrites
+           an arg register without releasing any object reference it may hold.
+           Before any op that writes to an arg slot, drop the prior value.
+           For non-object values (NIL/int) vigil_value_release is a no-op, so
+           emitting unconditionally is safe — and avoids fragile per-op state
+           tracking across branches.  See issue #561. */
+        if (rc->arity > 0U)
+        {
+            uint8_t a = VREG_GET_A(instr);
+            int op_writes_a = 0;
+            switch (op)
+            {
+            case VREG_MOVE: case VREG_LOAD_K: case VREG_LOAD_NIL:
+            case VREG_LOAD_TRUE: case VREG_LOAD_FALSE:
+            case VREG_ADD_I32: case VREG_SUB_I32: case VREG_MUL_I32:
+            case VREG_DIV_I32: case VREG_MOD_I32:
+            case VREG_ADD_I64: case VREG_SUB_I64: case VREG_MUL_I64:
+            case VREG_DIV_I64: case VREG_MOD_I64:
+            case VREG_ADDI: case VREG_SUBI: case VREG_ADDI_I64: case VREG_SUBI_I64:
+            case VREG_INC_I32: case VREG_INC_I64:
+            case VREG_NEG: case VREG_NOT: case VREG_BNOT:
+            case VREG_BAND: case VREG_BOR: case VREG_BXOR: case VREG_SHL: case VREG_SHR:
+            case VREG_EQ_I32: case VREG_NE_I32: case VREG_LT_I32:
+            case VREG_LE_I32: case VREG_GT_I32: case VREG_GE_I32:
+            case VREG_DUP: case VREG_TESTSET:
+            case VREG_TO_I32: case VREG_TO_I64:
+            case VREG_FORLOOP_I32: case VREG_FORLOOP_I64:
+                op_writes_a = 1;
+                break;
+            default:
+                break;
+            }
+            if (op_writes_a && a < rc->arity)
+                EMIT_VALUE_RELEASE(a);
+        }
 
         switch (op)
         {
@@ -917,11 +992,23 @@ static vigil_status_t vigil_aot_build_numeric(const vigil_reg_chunk_t *rc, vigil
         case VREG_NEG: {
             uint8_t a = VREG_GET_A(instr), b = VREG_GET_B(instr);
             if (v && promoted[a] && promoted[b])
+            {
+                /* Check for INT64_MIN (negation overflows). */
+                MIR_append_insn(ctx, func,
+                                MIR_new_insn(ctx, MIR_BEQ, MIR_new_label_op(ctx, labels[rc->code_count]),
+                                             MIR_new_reg_op(ctx, v[b]),
+                                             MIR_new_int_op(ctx, (int64_t)INT64_MIN)));
                 MIR_append_insn(ctx, func, MIR_new_insn(ctx, MIR_NEG, MIR_new_reg_op(ctx, v[a]),
                                 MIR_new_reg_op(ctx, v[b])));
+            }
             else
             {
-                V_DEC_I32(tmp0_reg, b);
+                /* Decode as full 64-bit integer — NEG is type-agnostic. */
+                V_DEC_I64(tmp0_reg, b);
+                MIR_append_insn(ctx, func,
+                                MIR_new_insn(ctx, MIR_BEQ, MIR_new_label_op(ctx, labels[rc->code_count]),
+                                             MIR_new_reg_op(ctx, tmp0_reg),
+                                             MIR_new_int_op(ctx, (int64_t)INT64_MIN)));
                 MIR_append_insn(ctx, func, MIR_new_insn(ctx, MIR_NEG, MIR_new_reg_op(ctx, tmp2_reg),
                                 MIR_new_reg_op(ctx, tmp0_reg)));
                 V_ENC(tmp2_reg, a);
@@ -985,6 +1072,13 @@ static vigil_status_t vigil_aot_build_numeric(const vigil_reg_chunk_t *rc, vigil
             }
             V_DEC_I32(tmp0_reg, VREG_GET_B(instr));
             V_DEC_I32(tmp1_reg, VREG_GET_C(instr));
+            if (op == VREG_SHL || op == VREG_SHR)
+            {
+                /* Reject shift amounts >= 64 (undefined in C, error in the interpreter). */
+                MIR_append_insn(ctx, func,
+                                MIR_new_insn(ctx, MIR_BGE, MIR_new_label_op(ctx, labels[rc->code_count]),
+                                             MIR_new_reg_op(ctx, tmp1_reg), MIR_new_int_op(ctx, 64)));
+            }
             MIR_append_insn(ctx, func, MIR_new_insn(ctx, mo, MIR_new_reg_op(ctx, tmp2_reg),
                             MIR_new_reg_op(ctx, tmp0_reg), MIR_new_reg_op(ctx, tmp1_reg)));
             V_ENC(tmp2_reg, VREG_GET_A(instr));
@@ -1093,7 +1187,16 @@ static vigil_status_t vigil_aot_build_numeric(const vigil_reg_chunk_t *rc, vigil
             }
             MIR_append_insn(ctx, func, MIR_new_insn(ctx, MIR_JMP, MIR_new_label_op(ctx, labels[ip + 3U])));
             MIR_append_insn(ctx, func, loop_cont);
-            MIR_append_insn(ctx, func, MIR_new_insn(ctx, MIR_JMP, MIR_new_label_op(ctx, labels[ip + 2U])));
+            {
+                /* The third word of FORLOOP is a JMP instruction encoding the
+                   back-jump offset.  Decode it to find the real target label
+                   instead of referencing labels[ip+2] which is never placed
+                   (it falls inside this multi-word instruction). */
+                vigil_reg_instr_t back_jmp = rc->code[ip + 2U];
+                int16_t back_off = VREG_GET_sBx(back_jmp);
+                size_t back_target = (size_t)((int32_t)(ip + 2U) + 1 + (int32_t)back_off);
+                MIR_append_insn(ctx, func, MIR_new_insn(ctx, MIR_JMP, MIR_new_label_op(ctx, labels[back_target])));
+            }
             continue;
         }
         case VREG_EQ_I32:
@@ -1513,7 +1616,10 @@ static vigil_status_t vigil_aot_build_numeric(const vigil_reg_chunk_t *rc, vigil
             continue;
         }
         case VREG_RELEASE:
-            vigil_aot_emit_store_constant(ctx, func, regs_reg, VREG_GET_A(instr), VIGIL_NANBOX_NIL);
+            /* Actually drop the reference if the slot holds an object —
+               vigil_value_release also clears the slot to NIL.  Then sync
+               the v[] register if the slot is held in one. */
+            EMIT_VALUE_RELEASE(VREG_GET_A(instr));
             MIR_append_insn(ctx, func, MIR_new_insn(ctx, MIR_MOV, MIR_new_reg_op(ctx, V(VREG_GET_A(instr))),
                             MIR_new_uint_op(ctx, VIGIL_NANBOX_NIL)));
             break;
@@ -1521,6 +1627,22 @@ static vigil_status_t vigil_aot_build_numeric(const vigil_reg_chunk_t *rc, vigil
             vigil_aot_emit_reload_regs(ctx, func, regs_reg, vm_reg, tmp0_reg, tmp1_reg, tmp2_reg, tmp3_reg,
                                        status_reg);
             V_FLUSH_ALL();
+            /* Release any arg slots that aren't part of the return value
+               window.  The translator forces RETURN A=0 (return values at
+               R[0..count-1]).  Any arg slot at index >= count still holds
+               its original (possibly object) reference and would otherwise
+               leak — the interpreter's r_cleanup releases these but AOT
+               must do so explicitly.  See issue #561. */
+            {
+                uint8_t ret_count_b = VREG_GET_B(instr);
+                uint8_t ret_base_a = VREG_GET_A(instr);
+                for (uint16_t ai = 0; ai < rc->arity; ai++)
+                {
+                    if (ai >= ret_base_a && ai < (uint16_t)(ret_base_a + ret_count_b))
+                        continue;
+                    EMIT_VALUE_RELEASE(ai);
+                }
+            }
             if (VREG_GET_B(instr) > 0U)
             {
                 uint8_t ret_slot = VREG_GET_A(instr);
@@ -1585,6 +1707,7 @@ static vigil_status_t vigil_aot_build_numeric(const vigil_reg_chunk_t *rc, vigil
     MIR_load_external(ctx, "vigil_aot_numeric_call", (void *)vigil_aot_numeric_call);
     MIR_load_external(ctx, "vigil_aot_numeric_call_native", (void *)vigil_aot_numeric_call_native);
     MIR_load_external(ctx, "vigil_aot_numeric_fail", (void *)vigil_aot_numeric_fail);
+    MIR_load_external(ctx, "vigil_value_release", (void *)vigil_value_release);
     MIR_gen_init(ctx);
     cache->generator_initialized = 1;
     MIR_link(ctx, MIR_set_gen_interface, NULL);
@@ -1636,7 +1759,9 @@ int vigil_aot_supported(void)
 }
 
 #if defined(VIGIL_ENABLE_AOT)
-#if 0 /* wrapper disabled — correctness issue with multi-file class programs */
+/* Thin MIR-JIT trampoline for non-numeric functions.  Wraps
+   vigil_regvm_execute so every function goes through the same AOT cache
+   dispatch path, avoiding the per-call branch in vigil_reg_execute_cached. */
 static vigil_status_t vigil_aot_build_wrapper(const vigil_reg_chunk_t *rc, vigil_aot_cache_t **out_cache,
                                               vigil_error_t *error)
 {
@@ -1711,7 +1836,6 @@ static vigil_status_t vigil_aot_build_wrapper(const vigil_reg_chunk_t *rc, vigil
     *out_cache = cache;
     return VIGIL_STATUS_OK;
 }
-#endif /* wrapper disabled */
 
 static vigil_status_t vigil_aot_build(const vigil_reg_chunk_t *rc, vigil_aot_cache_t **out_cache,
                                       vigil_error_t *error)
@@ -1721,9 +1845,7 @@ static vigil_status_t vigil_aot_build(const vigil_reg_chunk_t *rc, vigil_aot_cac
         return vigil_aot_build_numeric(rc, out_cache, error);
     }
 
-    /* Non-numeric functions fall back to interpreter at call time. */
-    vigil_error_set_literal(error, VIGIL_STATUS_UNSUPPORTED, "AOT: non-numeric function");
-    return VIGIL_STATUS_UNSUPPORTED;
+    return vigil_aot_build_wrapper(rc, out_cache, error);
 }
 #endif
 
