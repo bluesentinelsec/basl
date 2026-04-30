@@ -400,7 +400,6 @@ jobs:
     env:
       ASAN_OPTIONS: detect_leaks=1:halt_on_error=1:detect_odr_violation=0
       UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
-      VIGIL_NO_AOT: 1
 
     steps:
       - uses: actions/checkout@v6
