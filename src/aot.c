@@ -588,9 +588,17 @@ static vigil_status_t vigil_aot_build_numeric(const vigil_reg_chunk_t *rc, vigil
         }
     }
 
-    for (ip = 0U; ip <= rc->code_count; ++ip)
+    /* Only allocate labels at instruction-start positions.  Multi-word
+       instructions (CALL_SELF=2, CALL_NATIVE=2, FORLOOP=3) occupy
+       consecutive slots; intermediate positions never need labels. */
     {
-        labels[ip] = MIR_new_label(ctx);
+        size_t lip = 0U;
+        while (lip < rc->code_count)
+        {
+            labels[lip] = MIR_new_label(ctx);
+            lip += vigil_aot_instr_words(rc, lip);
+        }
+        labels[rc->code_count] = MIR_new_label(ctx); /* overflow / exit label */
     }
     error_label = MIR_new_label(ctx);
 
