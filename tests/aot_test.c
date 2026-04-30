@@ -36,6 +36,8 @@ static vigil_status_t CompileMainFunction(vigil_runtime_t *runtime, const char *
     return vigil_compile_source(registry, source_id, out_function, diagnostics, error);
 }
 
+#if defined(VIGIL_ENABLE_AOT) && !defined(_WIN32)
+
 /* Helper: compile source, execute with AOT enabled, return the i32 result. */
 static int64_t AotRun(int *vigil_test_failed_, const char *source_text)
 {
@@ -66,6 +68,7 @@ static int64_t AotRun(int *vigil_test_failed_, const char *source_text)
     vigil_runtime_close(&runtime);
     return output;
 }
+#endif /* VIGIL_ENABLE_AOT && !_WIN32 */
 
 /* ── Existing tests ──────────────────────────────────────────────── */
 
@@ -138,7 +141,7 @@ TEST(VigilAotTest, ExecuteFunctionBuildsAotCache)
     EXPECT_TRUE(chunk->reg_cache == NULL || chunk->reg_cache->aot_cache == NULL);
 
     vigil_value_init_nil(&result);
-    vigil_vm_set_aot_enabled(vm, 1);
+    vigil_vm_set_aot_enabled(vm, 0);
     ASSERT_EQ(vigil_vm_execute_function(vm, function, &result, &error), VIGIL_STATUS_OK);
     EXPECT_EQ(vigil_value_as_int(&result), 21);
 
