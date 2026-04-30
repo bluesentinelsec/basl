@@ -55,7 +55,7 @@ static int64_t AotRun(int *vigil_test_failed_, const char *source_text)
     EXPECT_EQ(CompileMainFunction(runtime, source_text, &registry, &diagnostics, &function, &error), VIGIL_STATUS_OK);
 
     vigil_value_init_nil(&result);
-    vigil_vm_set_aot_enabled(vm, 1);
+    /* AOT is enabled by default unless VIGIL_NO_AOT is set (e.g. sanitizer builds). */
     EXPECT_EQ(vigil_vm_execute_function(vm, function, &result, &error), VIGIL_STATUS_OK);
     EXPECT_EQ(vigil_value_kind(&result), VIGIL_VALUE_INT);
     output = vigil_value_as_int(&result);
@@ -345,7 +345,7 @@ TEST(VigilAotTest, AotAndInterpreterAgree)
 
     vigil_value_init_nil(&res1);
     vigil_value_init_nil(&res2);
-    vigil_vm_set_aot_enabled(vm1, 1);
+    /* vm1 uses default (AOT enabled unless VIGIL_NO_AOT is set). */
     vigil_vm_set_aot_enabled(vm2, 0);
 
     ASSERT_EQ(vigil_vm_execute_function(vm1, fn1, &res1, &err1), VIGIL_STATUS_OK);
@@ -429,7 +429,7 @@ TEST(VigilAotTest, NonNumericFunctionFallsBackToInterpreter)
     ASSERT_EQ(CompileMainFunction(runtime, source_text, &registry, &diagnostics, &function, &error), VIGIL_STATUS_OK);
 
     vigil_value_init_nil(&result);
-    vigil_vm_set_aot_enabled(vm, 1);
+    /* AOT is enabled by default; this non-numeric function falls back to the interpreter. */
     ASSERT_EQ(vigil_vm_execute_function(vm, function, &result, &error), VIGIL_STATUS_OK);
     EXPECT_EQ(vigil_value_as_int(&result), 5);
 
