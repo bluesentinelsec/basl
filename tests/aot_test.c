@@ -162,127 +162,118 @@ TEST(VigilAotTest, ReturnsConstant)
 
 TEST(VigilAotTest, ExecutesI32Arithmetic)
 {
-    EXPECT_EQ(AotRun(vigil_test_failed_,
-                     "fn main() -> i32 {\n"
-                     "    i32 a = 10\n"
-                     "    i32 b = 3\n"
-                     "    return (a + b) * (a - b) / b\n"
-                     "}\n"),
+    EXPECT_EQ(AotRun(vigil_test_failed_, "fn main() -> i32 {\n"
+                                         "    i32 a = 10\n"
+                                         "    i32 b = 3\n"
+                                         "    return (a + b) * (a - b) / b\n"
+                                         "}\n"),
               30);
 }
 
 TEST(VigilAotTest, ExecutesI64Arithmetic)
 {
-    EXPECT_EQ(AotRun(vigil_test_failed_,
-                     "fn main() -> i32 {\n"
-                     "    i64 a = i64(1000000);\n"
-                     "    i64 b = i64(2000000);\n"
-                     "    i64 c = a + b;\n"
-                     "    return i32(c / i64(1000000));\n"
-                     "}\n"),
+    EXPECT_EQ(AotRun(vigil_test_failed_, "fn main() -> i32 {\n"
+                                         "    i64 a = i64(1000000);\n"
+                                         "    i64 b = i64(2000000);\n"
+                                         "    i64 c = a + b;\n"
+                                         "    return i32(c / i64(1000000));\n"
+                                         "}\n"),
               3);
 }
 
 TEST(VigilAotTest, ExecutesBitwiseOperations)
 {
-    EXPECT_EQ(AotRun(vigil_test_failed_,
-                     "fn main() -> i32 {\n"
-                     "    i32 a = 0xFF\n"
-                     "    i32 b = 0x0F\n"
-                     "    i32 band = a & b\n"
-                     "    i32 bor = a | 0x100\n"
-                     "    i32 bxor = band ^ 5\n"
-                     "    i32 shl = 1 << 4\n"
-                     "    i32 shr = 32 >> 2\n"
-                     "    return band + shl + shr\n"
-                     "}\n"),
+    EXPECT_EQ(AotRun(vigil_test_failed_, "fn main() -> i32 {\n"
+                                         "    i32 a = 0xFF\n"
+                                         "    i32 b = 0x0F\n"
+                                         "    i32 band = a & b\n"
+                                         "    i32 bor = a | 0x100\n"
+                                         "    i32 bxor = band ^ 5\n"
+                                         "    i32 shl = 1 << 4\n"
+                                         "    i32 shr = 32 >> 2\n"
+                                         "    return band + shl + shr\n"
+                                         "}\n"),
               15 + 16 + 8);
 }
 
 TEST(VigilAotTest, ExecutesIfElseBranching)
 {
-    EXPECT_EQ(AotRun(vigil_test_failed_,
-                     "fn main() -> i32 {\n"
-                     "    i32 x = 10\n"
-                     "    if x > 5 {\n"
-                     "        return 1\n"
-                     "    } else {\n"
-                     "        return 0\n"
-                     "    }\n"
-                     "}\n"),
+    EXPECT_EQ(AotRun(vigil_test_failed_, "fn main() -> i32 {\n"
+                                         "    i32 x = 10\n"
+                                         "    if x > 5 {\n"
+                                         "        return 1\n"
+                                         "    } else {\n"
+                                         "        return 0\n"
+                                         "    }\n"
+                                         "}\n"),
               1);
 }
 
 TEST(VigilAotTest, ExecutesWhileLoop)
 {
-    EXPECT_EQ(AotRun(vigil_test_failed_,
-                     "fn main() -> i32 {\n"
-                     "    i32 sum = 0\n"
-                     "    i32 i = 0\n"
-                     "    while i < 10 {\n"
-                     "        sum = sum + i\n"
-                     "        i = i + 1\n"
-                     "    }\n"
-                     "    return sum\n"
-                     "}\n"),
+    EXPECT_EQ(AotRun(vigil_test_failed_, "fn main() -> i32 {\n"
+                                         "    i32 sum = 0\n"
+                                         "    i32 i = 0\n"
+                                         "    while i < 10 {\n"
+                                         "        sum = sum + i\n"
+                                         "        i = i + 1\n"
+                                         "    }\n"
+                                         "    return sum\n"
+                                         "}\n"),
               45);
 }
 
 TEST(VigilAotTest, ExecutesForLoop)
 {
-    EXPECT_EQ(AotRun(vigil_test_failed_,
-                     "fn main() -> i32 {\n"
-                     "    i32 sum = 0;\n"
-                     "    for (i32 i = 0; i < 5; i++) {\n"
-                     "        sum += i;\n"
-                     "    }\n"
-                     "    return sum;\n"
-                     "}\n"),
+    EXPECT_EQ(AotRun(vigil_test_failed_, "fn main() -> i32 {\n"
+                                         "    i32 sum = 0;\n"
+                                         "    for (i32 i = 0; i < 5; i++) {\n"
+                                         "        sum += i;\n"
+                                         "    }\n"
+                                         "    return sum;\n"
+                                         "}\n"),
               10);
 }
 
 TEST(VigilAotTest, ExecutesNestedLoops)
 {
-    EXPECT_EQ(AotRun(vigil_test_failed_,
-                     "fn main() -> i32 {\n"
-                     "    i32 count = 0;\n"
-                     "    for (i32 i = 0; i < 3; i++) {\n"
-                     "        for (i32 j = 0; j < 4; j++) {\n"
-                     "            count += 1;\n"
-                     "        }\n"
-                     "    }\n"
-                     "    return count;\n"
-                     "}\n"),
+    EXPECT_EQ(AotRun(vigil_test_failed_, "fn main() -> i32 {\n"
+                                         "    i32 count = 0;\n"
+                                         "    for (i32 i = 0; i < 3; i++) {\n"
+                                         "        for (i32 j = 0; j < 4; j++) {\n"
+                                         "            count += 1;\n"
+                                         "        }\n"
+                                         "    }\n"
+                                         "    return count;\n"
+                                         "}\n"),
               12);
 }
 
 TEST(VigilAotTest, ExecutesRecursiveFibonacci)
 {
-    EXPECT_EQ(AotRun(vigil_test_failed_,
-                     "fn fib(i32 n) -> i32 {\n"
-                     "    if n < 2 { return n }\n"
-                     "    return fib(n - 1) + fib(n - 2)\n"
-                     "}\n"
-                     "fn main() -> i32 { return fib(10) }\n"),
+    EXPECT_EQ(AotRun(vigil_test_failed_, "fn fib(i32 n) -> i32 {\n"
+                                         "    if n < 2 { return n }\n"
+                                         "    return fib(n - 1) + fib(n - 2)\n"
+                                         "}\n"
+                                         "fn main() -> i32 { return fib(10) }\n"),
               55);
 }
 
 TEST(VigilAotTest, ExecutesI32Comparisons)
 {
-    EXPECT_EQ(AotRun(vigil_test_failed_,
-                     "fn check(i32 a, i32 b) -> i32 {\n"
-                     "    i32 r = 0\n"
-                     "    if a < b  { r = r + 1 }\n"
-                     "    if a <= b { r = r + 2 }\n"
-                     "    if a > b  { r = r + 4 }\n"
-                     "    if a >= b { r = r + 8 }\n"
-                     "    if a == b { r = r + 16 }\n"
-                     "    if a != b { r = r + 32 }\n"
-                     "    return r\n"
-                     "}\n"
-                     "fn main() -> i32 {\n"
-                     "    return check(3, 5) * 100 + check(5, 5)\n"
-                     "}\n"),
+    EXPECT_EQ(AotRun(vigil_test_failed_, "fn check(i32 a, i32 b) -> i32 {\n"
+                                         "    i32 r = 0\n"
+                                         "    if a < b  { r = r + 1 }\n"
+                                         "    if a <= b { r = r + 2 }\n"
+                                         "    if a > b  { r = r + 4 }\n"
+                                         "    if a >= b { r = r + 8 }\n"
+                                         "    if a == b { r = r + 16 }\n"
+                                         "    if a != b { r = r + 32 }\n"
+                                         "    return r\n"
+                                         "}\n"
+                                         "fn main() -> i32 {\n"
+                                         "    return check(3, 5) * 100 + check(5, 5)\n"
+                                         "}\n"),
               /* check(3,5): <,<=,!=  = 1+2+32 = 35 */
               /* check(5,5): <=,>=,== = 2+8+16 = 26 */
               35 * 100 + 26);
@@ -290,32 +281,29 @@ TEST(VigilAotTest, ExecutesI32Comparisons)
 
 TEST(VigilAotTest, ExecutesNegation)
 {
-    EXPECT_EQ(AotRun(vigil_test_failed_,
-                     "fn main() -> i32 {\n"
-                     "    i32 a = 7\n"
-                     "    return -a\n"
-                     "}\n"),
+    EXPECT_EQ(AotRun(vigil_test_failed_, "fn main() -> i32 {\n"
+                                         "    i32 a = 7\n"
+                                         "    return -a\n"
+                                         "}\n"),
               -7);
 }
 
 TEST(VigilAotTest, ExecutesBitwiseNot)
 {
-    EXPECT_EQ(AotRun(vigil_test_failed_,
-                     "fn main() -> i32 {\n"
-                     "    i32 a = 0\n"
-                     "    return ~a\n"
-                     "}\n"),
+    EXPECT_EQ(AotRun(vigil_test_failed_, "fn main() -> i32 {\n"
+                                         "    i32 a = 0\n"
+                                         "    return ~a\n"
+                                         "}\n"),
               -1);
 }
 
 TEST(VigilAotTest, ExecutesI32DivisionAndModulo)
 {
-    EXPECT_EQ(AotRun(vigil_test_failed_,
-                     "fn main() -> i32 {\n"
-                     "    i32 a = 17\n"
-                     "    i32 b = 5\n"
-                     "    return a / b * 10 + a % b\n"
-                     "}\n"),
+    EXPECT_EQ(AotRun(vigil_test_failed_, "fn main() -> i32 {\n"
+                                         "    i32 a = 17\n"
+                                         "    i32 b = 5\n"
+                                         "    return a / b * 10 + a % b\n"
+                                         "}\n"),
               32);
 }
 
@@ -369,41 +357,39 @@ TEST(VigilAotTest, AotAndInterpreterAgree)
 
 TEST(VigilAotTest, ExecutesI64ForLoop)
 {
-    EXPECT_EQ(AotRun(vigil_test_failed_,
-                     "fn main() -> i32 {\n"
-                     "    i64 sum = i64(0);\n"
-                     "    for (i64 i = i64(0); i < i64(100); i++) {\n"
-                     "        sum += i;\n"
-                     "    }\n"
-                     "    return i32(sum / i64(100));\n"
-                     "}\n"),
+    EXPECT_EQ(AotRun(vigil_test_failed_, "fn main() -> i32 {\n"
+                                         "    i64 sum = i64(0);\n"
+                                         "    for (i64 i = i64(0); i < i64(100); i++) {\n"
+                                         "        sum += i;\n"
+                                         "    }\n"
+                                         "    return i32(sum / i64(100));\n"
+                                         "}\n"),
               49);
 }
 
 TEST(VigilAotTest, ExecutesDeepRecursion)
 {
-    EXPECT_EQ(AotRun(vigil_test_failed_,
-                     "fn sum_to(i32 n) -> i32 {\n"
-                     "    if n <= 0 { return 0 }\n"
-                     "    return n + sum_to(n - 1)\n"
-                     "}\n"
-                     "fn main() -> i32 { return sum_to(20) }\n"),
+    EXPECT_EQ(AotRun(vigil_test_failed_, "fn sum_to(i32 n) -> i32 {\n"
+                                         "    if n <= 0 { return 0 }\n"
+                                         "    return n + sum_to(n - 1)\n"
+                                         "}\n"
+                                         "fn main() -> i32 { return sum_to(20) }\n"),
               210);
 }
 
 TEST(VigilAotTest, ExecutesMultipleReturnPaths)
 {
-    EXPECT_EQ(AotRun(vigil_test_failed_,
-                     "fn classify(i32 n) -> i32 {\n"
-                     "    if n < 0 { return -1 }\n"
-                     "    if n == 0 { return 0 }\n"
-                     "    if n < 10 { return 1 }\n"
-                     "    if n < 100 { return 2 }\n"
-                     "    return 3\n"
-                     "}\n"
-                     "fn main() -> i32 {\n"
-                     "    return classify(-5) + classify(0) * 10 + classify(7) * 100 + classify(50) * 1000 + classify(200) * 10000\n"
-                     "}\n"),
+    EXPECT_EQ(AotRun(vigil_test_failed_, "fn classify(i32 n) -> i32 {\n"
+                                         "    if n < 0 { return -1 }\n"
+                                         "    if n == 0 { return 0 }\n"
+                                         "    if n < 10 { return 1 }\n"
+                                         "    if n < 100 { return 2 }\n"
+                                         "    return 3\n"
+                                         "}\n"
+                                         "fn main() -> i32 {\n"
+                                         "    return classify(-5) + classify(0) * 10 + classify(7) * 100 + "
+                                         "classify(50) * 1000 + classify(200) * 10000\n"
+                                         "}\n"),
               -1 + 0 + 100 + 2000 + 30000);
 }
 

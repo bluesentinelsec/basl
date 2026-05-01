@@ -225,7 +225,7 @@ extern "C"
     /* Returns the best available backend for this platform, or NULL. */
     const gui_backend_t *gui_backend_select(void);
 
-/* Platform backends — SDL is the sole backend. */
+    /* Platform backends — SDL is the sole backend. */
     extern const gui_backend_t gui_backend_sdl;
 
 #ifdef __cplusplus

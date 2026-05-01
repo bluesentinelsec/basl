@@ -141,11 +141,31 @@ static void escape_json_string(const char *src, char *dst, size_t dst_len)
             dst[i++] = '\\';
             dst[i++] = (char)c;
         }
-        else if (c == '\n') { dst[i++] = '\\'; dst[i++] = 'n'; }
-        else if (c == '\t') { dst[i++] = '\\'; dst[i++] = 't'; }
-        else if (c == '\r') { dst[i++] = '\\'; dst[i++] = 'r'; }
-        else if (c == '\b') { dst[i++] = '\\'; dst[i++] = 'b'; }
-        else if (c == '\f') { dst[i++] = '\\'; dst[i++] = 'f'; }
+        else if (c == '\n')
+        {
+            dst[i++] = '\\';
+            dst[i++] = 'n';
+        }
+        else if (c == '\t')
+        {
+            dst[i++] = '\\';
+            dst[i++] = 't';
+        }
+        else if (c == '\r')
+        {
+            dst[i++] = '\\';
+            dst[i++] = 'r';
+        }
+        else if (c == '\b')
+        {
+            dst[i++] = '\\';
+            dst[i++] = 'b';
+        }
+        else if (c == '\f')
+        {
+            dst[i++] = '\\';
+            dst[i++] = 'f';
+        }
         else if (c < 0x20)
         {
             i += (size_t)snprintf(dst + i, dst_len - i, "\\u%04x", c);

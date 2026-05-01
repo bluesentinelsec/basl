@@ -38,15 +38,19 @@ enum
 /* ── Handle registry ─────────────────────────────────────────────── */
 
 #define MAX_JSON_HANDLES 512
-typedef struct {
+typedef struct
+{
     vigil_json_value_t *tree;
     int owned; /* 1 if this handle owns the tree and should free it */
 } json_handle_t;
 static json_handle_t json_handles[MAX_JSON_HANDLES];
 
-static int64_t json_handle_alloc(vigil_json_value_t *tree, int owned) {
-    for (int64_t i = 0; i < MAX_JSON_HANDLES; i++) {
-        if (json_handles[i].tree == NULL) {
+static int64_t json_handle_alloc(vigil_json_value_t *tree, int owned)
+{
+    for (int64_t i = 0; i < MAX_JSON_HANDLES; i++)
+    {
+        if (json_handles[i].tree == NULL)
+        {
             json_handles[i].tree = tree;
             json_handles[i].owned = owned;
             return i;
@@ -54,12 +58,16 @@ static int64_t json_handle_alloc(vigil_json_value_t *tree, int owned) {
     }
     return -1;
 }
-static vigil_json_value_t *json_handle_get(int64_t h) {
-    if (h < 0 || h >= MAX_JSON_HANDLES) return NULL;
+static vigil_json_value_t *json_handle_get(int64_t h)
+{
+    if (h < 0 || h >= MAX_JSON_HANDLES)
+        return NULL;
     return json_handles[h].tree;
 }
-static void json_handle_free(int64_t h) {
-    if (h >= 0 && h < MAX_JSON_HANDLES && json_handles[h].tree) {
+static void json_handle_free(int64_t h)
+{
+    if (h >= 0 && h < MAX_JSON_HANDLES && json_handles[h].tree)
+    {
         if (json_handles[h].owned)
             vigil_json_free(&json_handles[h].tree);
         json_handles[h].tree = NULL;
@@ -73,13 +81,20 @@ static const char *json_type_name(vigil_json_type_t type)
 {
     switch (type)
     {
-    case VIGIL_JSON_NULL:   return "null";
-    case VIGIL_JSON_BOOL:   return "bool";
-    case VIGIL_JSON_NUMBER: return "number";
-    case VIGIL_JSON_STRING: return "string";
-    case VIGIL_JSON_ARRAY:  return "array";
-    case VIGIL_JSON_OBJECT: return "object";
-    default:                return "invalid";
+    case VIGIL_JSON_NULL:
+        return "null";
+    case VIGIL_JSON_BOOL:
+        return "bool";
+    case VIGIL_JSON_NUMBER:
+        return "number";
+    case VIGIL_JSON_STRING:
+        return "string";
+    case VIGIL_JSON_ARRAY:
+        return "array";
+    case VIGIL_JSON_OBJECT:
+        return "object";
+    default:
+        return "invalid";
     }
 }
 
@@ -288,8 +303,8 @@ static vigil_status_t json_push_object_and_ok(vigil_vm_t *vm, vigil_object_t **o
 
 /* ── Wrap helpers ────────────────────────────────────────────────── */
 
-static vigil_status_t json_wrap_tree(vigil_runtime_t *runtime, size_t class_index, vigil_json_value_t *tree,
-                                     int owned, vigil_object_t **out_instance, vigil_error_t *error)
+static vigil_status_t json_wrap_tree(vigil_runtime_t *runtime, size_t class_index, vigil_json_value_t *tree, int owned,
+                                     vigil_object_t **out_instance, vigil_error_t *error)
 {
     const vigil_allocator_t *allocator = vigil_runtime_allocator(runtime);
     vigil_status_t status;
@@ -731,8 +746,7 @@ static vigil_status_t json_decode_class(vigil_vm_t *vm, const vigil_object_t *fu
             case VIGIL_TYPE_F64:
                 vigil_value_init_float(&fields[field_index], 0.0);
                 break;
-            case VIGIL_TYPE_STRING:
-            {
+            case VIGIL_TYPE_STRING: {
                 vigil_object_t *empty = NULL;
                 status = vigil_string_object_new(vigil_vm_runtime(vm), "", 0U, &empty, error);
                 if (status != VIGIL_STATUS_OK)
@@ -1033,16 +1047,43 @@ static vigil_status_t json_read_file(vigil_vm_t *vm, const char *path, char **ou
         *out_message = NULL;
 
 #ifdef _WIN32
-    { errno_t open_status = fopen_s(&file, path, "rb"); if (open_status != 0) file = NULL; }
+    {
+        errno_t open_status = fopen_s(&file, path, "rb");
+        if (open_status != 0)
+            file = NULL;
+    }
 #else
     file = fopen(path, "rb");
 #endif
 
-    if (file == NULL) { if (out_message) *out_message = "read: could not open file"; return VIGIL_STATUS_OK; }
-    if (fseek(file, 0L, SEEK_END) != 0) { if (out_message) *out_message = "read: could not seek file"; fclose(file); return VIGIL_STATUS_OK; }
+    if (file == NULL)
+    {
+        if (out_message)
+            *out_message = "read: could not open file";
+        return VIGIL_STATUS_OK;
+    }
+    if (fseek(file, 0L, SEEK_END) != 0)
+    {
+        if (out_message)
+            *out_message = "read: could not seek file";
+        fclose(file);
+        return VIGIL_STATUS_OK;
+    }
     size_long = ftell(file);
-    if (size_long < 0) { if (out_message) *out_message = "read: could not size file"; fclose(file); return VIGIL_STATUS_OK; }
-    if (fseek(file, 0L, SEEK_SET) != 0) { if (out_message) *out_message = "read: could not rewind file"; fclose(file); return VIGIL_STATUS_OK; }
+    if (size_long < 0)
+    {
+        if (out_message)
+            *out_message = "read: could not size file";
+        fclose(file);
+        return VIGIL_STATUS_OK;
+    }
+    if (fseek(file, 0L, SEEK_SET) != 0)
+    {
+        if (out_message)
+            *out_message = "read: could not rewind file";
+        fclose(file);
+        return VIGIL_STATUS_OK;
+    }
 
     size = (size_t)size_long;
     data = (char *)allocator->allocate(allocator->user_data, size + 1U);
@@ -1059,7 +1100,8 @@ static vigil_status_t json_read_file(vigil_vm_t *vm, const char *path, char **ou
     if (read_count != size && read_error)
     {
         allocator->deallocate(allocator->user_data, data);
-        if (out_message != NULL) *out_message = "read: could not read file";
+        if (out_message != NULL)
+            *out_message = "read: could not read file";
         return VIGIL_STATUS_OK;
     }
 
@@ -1075,18 +1117,39 @@ static vigil_status_t json_write_file(vigil_vm_t *vm, const char *path, const ch
     FILE *file = NULL;
     size_t write_count;
     (void)vm;
-    if (out_message != NULL) *out_message = NULL;
+    if (out_message != NULL)
+        *out_message = NULL;
 
 #ifdef _WIN32
-    { errno_t open_status = fopen_s(&file, path, "wb"); if (open_status != 0) file = NULL; }
+    {
+        errno_t open_status = fopen_s(&file, path, "wb");
+        if (open_status != 0)
+            file = NULL;
+    }
 #else
     file = fopen(path, "wb");
 #endif
 
-    if (file == NULL) { if (out_message) *out_message = "write: could not open file"; return VIGIL_STATUS_OK; }
+    if (file == NULL)
+    {
+        if (out_message)
+            *out_message = "write: could not open file";
+        return VIGIL_STATUS_OK;
+    }
     write_count = fwrite(text, 1U, length, file);
-    if (write_count != length) { fclose(file); if (out_message) *out_message = "write: could not write file"; return VIGIL_STATUS_OK; }
-    if (fclose(file) != 0) { if (out_message) *out_message = "write: could not close file"; return VIGIL_STATUS_OK; }
+    if (write_count != length)
+    {
+        fclose(file);
+        if (out_message)
+            *out_message = "write: could not write file";
+        return VIGIL_STATUS_OK;
+    }
+    if (fclose(file) != 0)
+    {
+        if (out_message)
+            *out_message = "write: could not close file";
+        return VIGIL_STATUS_OK;
+    }
     return VIGIL_STATUS_OK;
 }
 
@@ -1112,14 +1175,24 @@ static vigil_status_t json_value_parse(vigil_vm_t *vm, size_t arg_count, vigil_e
     }
 
     status = json_parse_text(vm, text, length, &json, &message);
-    if (status != VIGIL_STATUS_OK) { vigil_vm_stack_pop_n(vm, arg_count); return status; }
-    if (json == NULL) { vigil_vm_stack_pop_n(vm, arg_count); return json_push_nil_and_err(vm, message, JSON_ERR_PARSE, error); }
+    if (status != VIGIL_STATUS_OK)
+    {
+        vigil_vm_stack_pop_n(vm, arg_count);
+        return status;
+    }
+    if (json == NULL)
+    {
+        vigil_vm_stack_pop_n(vm, arg_count);
+        return json_push_nil_and_err(vm, message, JSON_ERR_PARSE, error);
+    }
 
     status = json_wrap_tree(runtime, class_index, json, 1, &instance, error);
     /* json_wrap_tree takes ownership on success; on failure json is leaked — free it */
-    if (status != VIGIL_STATUS_OK) vigil_json_free(&json);
+    if (status != VIGIL_STATUS_OK)
+        vigil_json_free(&json);
     vigil_vm_stack_pop_n(vm, arg_count);
-    if (status != VIGIL_STATUS_OK) return status;
+    if (status != VIGIL_STATUS_OK)
+        return status;
     return json_push_object_and_ok(vm, &instance, error);
 }
 
@@ -1147,18 +1220,37 @@ static vigil_status_t json_value_read(vigil_vm_t *vm, size_t arg_count, vigil_er
     }
 
     status = json_read_file(vm, path, &text, &length, &message, error);
-    if (status != VIGIL_STATUS_OK) { vigil_vm_stack_pop_n(vm, arg_count); return status; }
-    if (text == NULL) { vigil_vm_stack_pop_n(vm, arg_count); return json_push_nil_and_err(vm, message, JSON_ERR_IO, error); }
+    if (status != VIGIL_STATUS_OK)
+    {
+        vigil_vm_stack_pop_n(vm, arg_count);
+        return status;
+    }
+    if (text == NULL)
+    {
+        vigil_vm_stack_pop_n(vm, arg_count);
+        return json_push_nil_and_err(vm, message, JSON_ERR_IO, error);
+    }
 
     status = json_parse_text(vm, text, length, &json, &message);
-    if (allocator != NULL) allocator->deallocate(allocator->user_data, text);
-    if (status != VIGIL_STATUS_OK) { vigil_vm_stack_pop_n(vm, arg_count); return status; }
-    if (json == NULL) { vigil_vm_stack_pop_n(vm, arg_count); return json_push_nil_and_err(vm, message, JSON_ERR_PARSE, error); }
+    if (allocator != NULL)
+        allocator->deallocate(allocator->user_data, text);
+    if (status != VIGIL_STATUS_OK)
+    {
+        vigil_vm_stack_pop_n(vm, arg_count);
+        return status;
+    }
+    if (json == NULL)
+    {
+        vigil_vm_stack_pop_n(vm, arg_count);
+        return json_push_nil_and_err(vm, message, JSON_ERR_PARSE, error);
+    }
 
     status = json_wrap_tree(runtime, class_index, json, 1, &instance, error);
-    if (status != VIGIL_STATUS_OK) vigil_json_free(&json);
+    if (status != VIGIL_STATUS_OK)
+        vigil_json_free(&json);
     vigil_vm_stack_pop_n(vm, arg_count);
-    if (status != VIGIL_STATUS_OK) return status;
+    if (status != VIGIL_STATUS_OK)
+        return status;
     return json_push_object_and_ok(vm, &instance, error);
 }
 
@@ -1187,17 +1279,29 @@ static vigil_status_t json_value_is_kind(vigil_vm_t *vm, size_t arg_count, vigil
 }
 
 static vigil_status_t json_value_is_null(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
-{ return json_value_is_kind(vm, arg_count, error, VIGIL_JSON_NULL); }
+{
+    return json_value_is_kind(vm, arg_count, error, VIGIL_JSON_NULL);
+}
 static vigil_status_t json_value_is_bool(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
-{ return json_value_is_kind(vm, arg_count, error, VIGIL_JSON_BOOL); }
+{
+    return json_value_is_kind(vm, arg_count, error, VIGIL_JSON_BOOL);
+}
 static vigil_status_t json_value_is_number(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
-{ return json_value_is_kind(vm, arg_count, error, VIGIL_JSON_NUMBER); }
+{
+    return json_value_is_kind(vm, arg_count, error, VIGIL_JSON_NUMBER);
+}
 static vigil_status_t json_value_is_string(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
-{ return json_value_is_kind(vm, arg_count, error, VIGIL_JSON_STRING); }
+{
+    return json_value_is_kind(vm, arg_count, error, VIGIL_JSON_STRING);
+}
 static vigil_status_t json_value_is_array(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
-{ return json_value_is_kind(vm, arg_count, error, VIGIL_JSON_ARRAY); }
+{
+    return json_value_is_kind(vm, arg_count, error, VIGIL_JSON_ARRAY);
+}
 static vigil_status_t json_value_is_object(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
-{ return json_value_is_kind(vm, arg_count, error, VIGIL_JSON_OBJECT); }
+{
+    return json_value_is_kind(vm, arg_count, error, VIGIL_JSON_OBJECT);
+}
 
 static vigil_status_t json_value_len(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error)
 {
@@ -1300,7 +1404,8 @@ static vigil_status_t json_value_at(vigil_vm_t *vm, size_t arg_count, vigil_erro
     /* Child is not owned — it belongs to the parent tree */
     status = json_wrap_tree(vigil_vm_runtime(vm), class_index, (vigil_json_value_t *)child, 0, &instance, error);
     vigil_vm_stack_pop_n(vm, arg_count);
-    if (status != VIGIL_STATUS_OK) return status;
+    if (status != VIGIL_STATUS_OK)
+        return status;
     return json_push_object_and_ok(vm, &instance, error);
 }
 
@@ -1341,7 +1446,8 @@ static vigil_status_t json_value_get(vigil_vm_t *vm, size_t arg_count, vigil_err
 
     status = json_wrap_tree(vigil_vm_runtime(vm), class_index, (vigil_json_value_t *)child, 0, &instance, error);
     vigil_vm_stack_pop_n(vm, arg_count);
-    if (status != VIGIL_STATUS_OK) return status;
+    if (status != VIGIL_STATUS_OK)
+        return status;
     return json_push_object_and_ok(vm, &instance, error);
 }
 
@@ -1354,9 +1460,8 @@ static vigil_status_t json_value_has(vigil_vm_t *vm, size_t arg_count, vigil_err
     bool has = false;
 
     (void)key_length;
-    if (json_get_string_arg(vm, base + 1U, &key, &key_length) &&
-        tree != NULL && vigil_json_type(tree) == VIGIL_JSON_OBJECT &&
-        vigil_json_object_get(tree, key) != NULL)
+    if (json_get_string_arg(vm, base + 1U, &key, &key_length) && tree != NULL &&
+        vigil_json_type(tree) == VIGIL_JSON_OBJECT && vigil_json_object_get(tree, key) != NULL)
         has = true;
 
     vigil_vm_stack_pop_n(vm, arg_count);
@@ -1380,12 +1485,14 @@ static vigil_status_t json_value_keys(vigil_vm_t *vm, size_t arg_count, vigil_er
     {
         status = vigil_array_object_new(runtime, NULL, 0U, &array, error);
         vigil_vm_stack_pop_n(vm, arg_count);
-        if (status != VIGIL_STATUS_OK) return status;
+        if (status != VIGIL_STATUS_OK)
+            return status;
         return json_push_object(vm, &array, error);
     }
 
     status = vigil_array_object_new(runtime, NULL, 0U, &array, error);
-    if (status != VIGIL_STATUS_OK) return status;
+    if (status != VIGIL_STATUS_OK)
+        return status;
 
     for (index = 0U; index < vigil_json_object_count(tree); ++index)
     {
@@ -1396,13 +1503,25 @@ static vigil_status_t json_value_keys(vigil_vm_t *vm, size_t arg_count, vigil_er
         vigil_value_t key_value;
 
         status = vigil_json_object_entry(tree, index, &key, &key_length, &value);
-        if (status != VIGIL_STATUS_OK) { vigil_object_release(&array); return status; }
+        if (status != VIGIL_STATUS_OK)
+        {
+            vigil_object_release(&array);
+            return status;
+        }
         status = vigil_string_object_new(runtime, key, key_length, &string, error);
-        if (status != VIGIL_STATUS_OK) { vigil_object_release(&array); return status; }
+        if (status != VIGIL_STATUS_OK)
+        {
+            vigil_object_release(&array);
+            return status;
+        }
         vigil_value_init_object(&key_value, &string);
         status = vigil_array_object_append(array, &key_value, error);
         vigil_value_release(&key_value);
-        if (status != VIGIL_STATUS_OK) { vigil_object_release(&array); return status; }
+        if (status != VIGIL_STATUS_OK)
+        {
+            vigil_object_release(&array);
+            return status;
+        }
     }
 
     vigil_vm_stack_pop_n(vm, arg_count);
@@ -1455,8 +1574,10 @@ static vigil_status_t json_value_write(vigil_vm_t *vm, size_t arg_count, vigil_e
 
     status = json_write_file(vm, path, text, text_length, &message);
     vigil_vm_stack_pop_n(vm, arg_count);
-    if (status != VIGIL_STATUS_OK) return status;
-    if (message != NULL) return json_push_err_kind(vm, message, JSON_ERR_IO, error);
+    if (status != VIGIL_STATUS_OK)
+        return status;
+    if (message != NULL)
+        return json_push_err_kind(vm, message, JSON_ERR_IO, error);
     return vigil_runtime_push_ok_error(vigil_vm_runtime(vm), vm, error);
 }
 
@@ -1471,9 +1592,18 @@ static vigil_status_t json_value_static_object(vigil_vm_t *vm, size_t arg_count,
     vigil_status_t status;
 
     status = vigil_json_object_new(json_runtime_allocator(vm), &tree, error);
-    if (status != VIGIL_STATUS_OK) { vigil_vm_stack_pop_n(vm, arg_count); return status; }
+    if (status != VIGIL_STATUS_OK)
+    {
+        vigil_vm_stack_pop_n(vm, arg_count);
+        return status;
+    }
     status = json_wrap_tree(vigil_vm_runtime(vm), class_index, tree, 1, &instance, error);
-    if (status != VIGIL_STATUS_OK) { vigil_json_free(&tree); vigil_vm_stack_pop_n(vm, arg_count); return status; }
+    if (status != VIGIL_STATUS_OK)
+    {
+        vigil_json_free(&tree);
+        vigil_vm_stack_pop_n(vm, arg_count);
+        return status;
+    }
     vigil_vm_stack_pop_n(vm, arg_count);
     return json_push_object(vm, &instance, error);
 }
@@ -1487,9 +1617,18 @@ static vigil_status_t json_value_static_array(vigil_vm_t *vm, size_t arg_count, 
     vigil_status_t status;
 
     status = vigil_json_array_new(json_runtime_allocator(vm), &tree, error);
-    if (status != VIGIL_STATUS_OK) { vigil_vm_stack_pop_n(vm, arg_count); return status; }
+    if (status != VIGIL_STATUS_OK)
+    {
+        vigil_vm_stack_pop_n(vm, arg_count);
+        return status;
+    }
     status = json_wrap_tree(vigil_vm_runtime(vm), class_index, tree, 1, &instance, error);
-    if (status != VIGIL_STATUS_OK) { vigil_json_free(&tree); vigil_vm_stack_pop_n(vm, arg_count); return status; }
+    if (status != VIGIL_STATUS_OK)
+    {
+        vigil_json_free(&tree);
+        vigil_vm_stack_pop_n(vm, arg_count);
+        return status;
+    }
     vigil_vm_stack_pop_n(vm, arg_count);
     return json_push_object(vm, &instance, error);
 }
@@ -1510,9 +1649,18 @@ static vigil_status_t json_value_static_from_string(vigil_vm_t *vm, size_t arg_c
         return json_push_nil_and_err(vm, "from_string: expected string", JSON_ERR_TYPE, error);
     }
     status = vigil_json_string_new(json_runtime_allocator(vm), text, length, &tree, error);
-    if (status != VIGIL_STATUS_OK) { vigil_vm_stack_pop_n(vm, arg_count); return status; }
+    if (status != VIGIL_STATUS_OK)
+    {
+        vigil_vm_stack_pop_n(vm, arg_count);
+        return status;
+    }
     status = json_wrap_tree(vigil_vm_runtime(vm), class_index, tree, 1, &instance, error);
-    if (status != VIGIL_STATUS_OK) { vigil_json_free(&tree); vigil_vm_stack_pop_n(vm, arg_count); return status; }
+    if (status != VIGIL_STATUS_OK)
+    {
+        vigil_json_free(&tree);
+        vigil_vm_stack_pop_n(vm, arg_count);
+        return status;
+    }
     vigil_vm_stack_pop_n(vm, arg_count);
     return json_push_object(vm, &instance, error);
 }
@@ -1528,9 +1676,18 @@ static vigil_status_t json_value_static_from_number(vigil_vm_t *vm, size_t arg_c
     vigil_status_t status;
 
     status = vigil_json_number_new(json_runtime_allocator(vm), number, &tree, error);
-    if (status != VIGIL_STATUS_OK) { vigil_vm_stack_pop_n(vm, arg_count); return status; }
+    if (status != VIGIL_STATUS_OK)
+    {
+        vigil_vm_stack_pop_n(vm, arg_count);
+        return status;
+    }
     status = json_wrap_tree(vigil_vm_runtime(vm), class_index, tree, 1, &instance, error);
-    if (status != VIGIL_STATUS_OK) { vigil_json_free(&tree); vigil_vm_stack_pop_n(vm, arg_count); return status; }
+    if (status != VIGIL_STATUS_OK)
+    {
+        vigil_json_free(&tree);
+        vigil_vm_stack_pop_n(vm, arg_count);
+        return status;
+    }
     vigil_vm_stack_pop_n(vm, arg_count);
     return json_push_object(vm, &instance, error);
 }
@@ -1546,9 +1703,18 @@ static vigil_status_t json_value_static_from_int(vigil_vm_t *vm, size_t arg_coun
     vigil_status_t status;
 
     status = vigil_json_number_new(json_runtime_allocator(vm), (double)integer, &tree, error);
-    if (status != VIGIL_STATUS_OK) { vigil_vm_stack_pop_n(vm, arg_count); return status; }
+    if (status != VIGIL_STATUS_OK)
+    {
+        vigil_vm_stack_pop_n(vm, arg_count);
+        return status;
+    }
     status = json_wrap_tree(vigil_vm_runtime(vm), class_index, tree, 1, &instance, error);
-    if (status != VIGIL_STATUS_OK) { vigil_json_free(&tree); vigil_vm_stack_pop_n(vm, arg_count); return status; }
+    if (status != VIGIL_STATUS_OK)
+    {
+        vigil_json_free(&tree);
+        vigil_vm_stack_pop_n(vm, arg_count);
+        return status;
+    }
     vigil_vm_stack_pop_n(vm, arg_count);
     return json_push_object(vm, &instance, error);
 }
@@ -1564,9 +1730,18 @@ static vigil_status_t json_value_static_from_bool(vigil_vm_t *vm, size_t arg_cou
     vigil_status_t status;
 
     status = vigil_json_bool_new(json_runtime_allocator(vm), b ? 1 : 0, &tree, error);
-    if (status != VIGIL_STATUS_OK) { vigil_vm_stack_pop_n(vm, arg_count); return status; }
+    if (status != VIGIL_STATUS_OK)
+    {
+        vigil_vm_stack_pop_n(vm, arg_count);
+        return status;
+    }
     status = json_wrap_tree(vigil_vm_runtime(vm), class_index, tree, 1, &instance, error);
-    if (status != VIGIL_STATUS_OK) { vigil_json_free(&tree); vigil_vm_stack_pop_n(vm, arg_count); return status; }
+    if (status != VIGIL_STATUS_OK)
+    {
+        vigil_json_free(&tree);
+        vigil_vm_stack_pop_n(vm, arg_count);
+        return status;
+    }
     vigil_vm_stack_pop_n(vm, arg_count);
     return json_push_object(vm, &instance, error);
 }
@@ -1580,9 +1755,18 @@ static vigil_status_t json_value_static_null(vigil_vm_t *vm, size_t arg_count, v
     vigil_status_t status;
 
     status = vigil_json_null_new(json_runtime_allocator(vm), &tree, error);
-    if (status != VIGIL_STATUS_OK) { vigil_vm_stack_pop_n(vm, arg_count); return status; }
+    if (status != VIGIL_STATUS_OK)
+    {
+        vigil_vm_stack_pop_n(vm, arg_count);
+        return status;
+    }
     status = json_wrap_tree(vigil_vm_runtime(vm), class_index, tree, 1, &instance, error);
-    if (status != VIGIL_STATUS_OK) { vigil_json_free(&tree); vigil_vm_stack_pop_n(vm, arg_count); return status; }
+    if (status != VIGIL_STATUS_OK)
+    {
+        vigil_json_free(&tree);
+        vigil_vm_stack_pop_n(vm, arg_count);
+        return status;
+    }
     vigil_vm_stack_pop_n(vm, arg_count);
     return json_push_object(vm, &instance, error);
 }
@@ -1630,14 +1814,22 @@ static vigil_status_t json_value_set(vigil_vm_t *vm, size_t arg_count, vigil_err
         char *emitted = NULL;
         size_t emitted_length = 0U;
         status = vigil_json_emit(val_tree, &emitted, &emitted_length, error);
-        if (status != VIGIL_STATUS_OK) { vigil_vm_stack_pop_n(vm, arg_count); return status; }
+        if (status != VIGIL_STATUS_OK)
+        {
+            vigil_vm_stack_pop_n(vm, arg_count);
+            return status;
+        }
         {
             vigil_error_t parse_err = {0};
             status = vigil_json_parse(allocator, emitted, emitted_length, &copy, &parse_err);
         }
         if (allocator != NULL && emitted != NULL)
             allocator->deallocate(allocator->user_data, emitted);
-        if (status != VIGIL_STATUS_OK) { vigil_vm_stack_pop_n(vm, arg_count); return status; }
+        if (status != VIGIL_STATUS_OK)
+        {
+            vigil_vm_stack_pop_n(vm, arg_count);
+            return status;
+        }
     }
 
     status = vigil_json_object_set(tree, key, key_length, copy, error);
@@ -1650,7 +1842,8 @@ static vigil_status_t json_value_set(vigil_vm_t *vm, size_t arg_count, vigil_err
 
     status = json_sync_raw(vm, self, tree, error);
     vigil_vm_stack_pop_n(vm, arg_count);
-    if (status != VIGIL_STATUS_OK) return status;
+    if (status != VIGIL_STATUS_OK)
+        return status;
     return vigil_runtime_push_ok_error(vigil_vm_runtime(vm), vm, error);
 }
 
@@ -1679,7 +1872,11 @@ static vigil_status_t json_value_remove(vigil_vm_t *vm, size_t arg_count, vigil_
 
     /* Rebuild the object without the target key (no public remove API) */
     status = vigil_json_object_new(json_runtime_allocator(vm), &new_obj, error);
-    if (status != VIGIL_STATUS_OK) { vigil_vm_stack_pop_n(vm, arg_count); return status; }
+    if (status != VIGIL_STATUS_OK)
+    {
+        vigil_vm_stack_pop_n(vm, arg_count);
+        return status;
+    }
 
     count = vigil_json_object_count(tree);
     for (i = 0U; i < count; ++i)
@@ -1692,7 +1889,12 @@ static vigil_status_t json_value_remove(vigil_vm_t *vm, size_t arg_count, vigil_
         size_t emitted_length = 0U;
 
         status = vigil_json_object_entry(tree, i, &entry_key, &entry_key_length, &entry_value);
-        if (status != VIGIL_STATUS_OK) { vigil_json_free(&new_obj); vigil_vm_stack_pop_n(vm, arg_count); return status; }
+        if (status != VIGIL_STATUS_OK)
+        {
+            vigil_json_free(&new_obj);
+            vigil_vm_stack_pop_n(vm, arg_count);
+            return status;
+        }
 
         if (entry_key_length == key_length && memcmp(entry_key, key, key_length) == 0)
             continue; /* skip the removed key */
@@ -1701,18 +1903,34 @@ static vigil_status_t json_value_remove(vigil_vm_t *vm, size_t arg_count, vigil_
         {
             const vigil_allocator_t *allocator = json_runtime_allocator(vm);
             status = vigil_json_emit(entry_value, &emitted, &emitted_length, error);
-            if (status != VIGIL_STATUS_OK) { vigil_json_free(&new_obj); vigil_vm_stack_pop_n(vm, arg_count); return status; }
+            if (status != VIGIL_STATUS_OK)
+            {
+                vigil_json_free(&new_obj);
+                vigil_vm_stack_pop_n(vm, arg_count);
+                return status;
+            }
             {
                 vigil_error_t parse_err = {0};
                 status = vigil_json_parse(allocator, emitted, emitted_length, &copy, &parse_err);
             }
             if (allocator != NULL && emitted != NULL)
                 allocator->deallocate(allocator->user_data, emitted);
-            if (status != VIGIL_STATUS_OK) { vigil_json_free(&new_obj); vigil_vm_stack_pop_n(vm, arg_count); return status; }
+            if (status != VIGIL_STATUS_OK)
+            {
+                vigil_json_free(&new_obj);
+                vigil_vm_stack_pop_n(vm, arg_count);
+                return status;
+            }
         }
 
         status = vigil_json_object_set(new_obj, entry_key, entry_key_length, copy, error);
-        if (status != VIGIL_STATUS_OK) { vigil_json_free(&copy); vigil_json_free(&new_obj); vigil_vm_stack_pop_n(vm, arg_count); return status; }
+        if (status != VIGIL_STATUS_OK)
+        {
+            vigil_json_free(&copy);
+            vigil_json_free(&new_obj);
+            vigil_vm_stack_pop_n(vm, arg_count);
+            return status;
+        }
     }
 
     /* Replace the tree in the handle registry */
@@ -1733,7 +1951,8 @@ static vigil_status_t json_value_remove(vigil_vm_t *vm, size_t arg_count, vigil_
 
     status = json_sync_raw(vm, self, new_obj, error);
     vigil_vm_stack_pop_n(vm, arg_count);
-    if (status != VIGIL_STATUS_OK) return status;
+    if (status != VIGIL_STATUS_OK)
+        return status;
     return vigil_runtime_push_ok_error(vigil_vm_runtime(vm), vm, error);
 }
 
@@ -1769,14 +1988,22 @@ static vigil_status_t json_value_push(vigil_vm_t *vm, size_t arg_count, vigil_er
         char *emitted = NULL;
         size_t emitted_length = 0U;
         status = vigil_json_emit(val_tree, &emitted, &emitted_length, error);
-        if (status != VIGIL_STATUS_OK) { vigil_vm_stack_pop_n(vm, arg_count); return status; }
+        if (status != VIGIL_STATUS_OK)
+        {
+            vigil_vm_stack_pop_n(vm, arg_count);
+            return status;
+        }
         {
             vigil_error_t parse_err = {0};
             status = vigil_json_parse(allocator, emitted, emitted_length, &copy, &parse_err);
         }
         if (allocator != NULL && emitted != NULL)
             allocator->deallocate(allocator->user_data, emitted);
-        if (status != VIGIL_STATUS_OK) { vigil_vm_stack_pop_n(vm, arg_count); return status; }
+        if (status != VIGIL_STATUS_OK)
+        {
+            vigil_vm_stack_pop_n(vm, arg_count);
+            return status;
+        }
     }
 
     status = vigil_json_array_push(tree, copy, error);
@@ -1789,24 +2016,27 @@ static vigil_status_t json_value_push(vigil_vm_t *vm, size_t arg_count, vigil_er
 
     status = json_sync_raw(vm, self, tree, error);
     vigil_vm_stack_pop_n(vm, arg_count);
-    if (status != VIGIL_STATUS_OK) return status;
+    if (status != VIGIL_STATUS_OK)
+        return status;
     return vigil_runtime_push_ok_error(vigil_vm_runtime(vm), vm, error);
 }
 
 /* ── Pretty print ────────────────────────────────────────────────── */
 
-static vigil_status_t json_pretty_emit(vigil_vm_t *vm, const vigil_json_value_t *v, int indent, int depth,
-                                       char **buf, size_t *len, size_t *cap, vigil_error_t *error);
+static vigil_status_t json_pretty_emit(vigil_vm_t *vm, const vigil_json_value_t *v, int indent, int depth, char **buf,
+                                       size_t *len, size_t *cap, vigil_error_t *error);
 
 static void json_pretty_append(char **buf, size_t *len, size_t *cap, const char *s, size_t n,
                                const vigil_allocator_t *allocator)
 {
-    if (n == 0) return;
+    if (n == 0)
+        return;
     while (*len + n >= *cap)
     {
         size_t nc = *cap < 64 ? 64 : *cap * 2;
         char *nb = (char *)allocator->reallocate(allocator->user_data, *buf, nc);
-        if (!nb) return;
+        if (!nb)
+            return;
         *buf = nb;
         *cap = nc;
     }
@@ -1815,7 +2045,7 @@ static void json_pretty_append(char **buf, size_t *len, size_t *cap, const char 
 }
 
 static void json_pretty_indent(char **buf, size_t *len, size_t *cap, int indent, int depth,
-                                const vigil_allocator_t *allocator)
+                               const vigil_allocator_t *allocator)
 {
     int spaces = indent * depth;
     int i;
@@ -1823,11 +2053,15 @@ static void json_pretty_indent(char **buf, size_t *len, size_t *cap, int indent,
         json_pretty_append(buf, len, cap, " ", 1, allocator);
 }
 
-static vigil_status_t json_pretty_emit(vigil_vm_t *vm, const vigil_json_value_t *v, int indent, int depth,
-                                       char **buf, size_t *len, size_t *cap, vigil_error_t *error)
+static vigil_status_t json_pretty_emit(vigil_vm_t *vm, const vigil_json_value_t *v, int indent, int depth, char **buf,
+                                       size_t *len, size_t *cap, vigil_error_t *error)
 {
     const vigil_allocator_t *allocator = json_runtime_allocator(vm);
-    if (v == NULL) { json_pretty_append(buf, len, cap, "null", 4, allocator); return VIGIL_STATUS_OK; }
+    if (v == NULL)
+    {
+        json_pretty_append(buf, len, cap, "null", 4, allocator);
+        return VIGIL_STATUS_OK;
+    }
 
     switch (vigil_json_type(v))
     {
@@ -1840,8 +2074,7 @@ static vigil_status_t json_pretty_emit(vigil_vm_t *vm, const vigil_json_value_t 
         else
             json_pretty_append(buf, len, cap, "false", 5, allocator);
         break;
-    case VIGIL_JSON_NUMBER:
-    {
+    case VIGIL_JSON_NUMBER: {
         char tmp[64];
         int n;
         double val = vigil_json_number_value(v);
@@ -1849,45 +2082,55 @@ static vigil_status_t json_pretty_emit(vigil_vm_t *vm, const vigil_json_value_t 
             n = snprintf(tmp, sizeof(tmp), "%lld", (long long)(int64_t)val);
         else
             n = snprintf(tmp, sizeof(tmp), "%.17g", val);
-        if (n > 0) json_pretty_append(buf, len, cap, tmp, (size_t)n, allocator);
+        if (n > 0)
+            json_pretty_append(buf, len, cap, tmp, (size_t)n, allocator);
         break;
     }
-    case VIGIL_JSON_STRING:
-    {
+    case VIGIL_JSON_STRING: {
         /* Emit escaped string */
         const char *s = vigil_json_string_value(v);
         size_t slen = vigil_json_string_length(v);
         char *emitted = NULL;
         size_t emitted_len = 0U;
         vigil_status_t status = vigil_json_emit(v, &emitted, &emitted_len, error);
-        if (status != VIGIL_STATUS_OK) return status;
+        if (status != VIGIL_STATUS_OK)
+            return status;
         json_pretty_append(buf, len, cap, emitted, emitted_len, allocator);
-        if (allocator) allocator->deallocate(allocator->user_data, emitted);
-        (void)s; (void)slen;
+        if (allocator)
+            allocator->deallocate(allocator->user_data, emitted);
+        (void)s;
+        (void)slen;
         break;
     }
-    case VIGIL_JSON_ARRAY:
-    {
+    case VIGIL_JSON_ARRAY: {
         size_t count = vigil_json_array_count(v);
         size_t i;
-        if (count == 0) { json_pretty_append(buf, len, cap, "[]", 2, allocator); break; }
+        if (count == 0)
+        {
+            json_pretty_append(buf, len, cap, "[]", 2, allocator);
+            break;
+        }
         json_pretty_append(buf, len, cap, "[\n", 2, allocator);
         for (i = 0; i < count; i++)
         {
             json_pretty_indent(buf, len, cap, indent, depth + 1, allocator);
             json_pretty_emit(vm, vigil_json_array_get(v, i), indent, depth + 1, buf, len, cap, error);
-            if (i + 1 < count) json_pretty_append(buf, len, cap, ",", 1, allocator);
+            if (i + 1 < count)
+                json_pretty_append(buf, len, cap, ",", 1, allocator);
             json_pretty_append(buf, len, cap, "\n", 1, allocator);
         }
         json_pretty_indent(buf, len, cap, indent, depth, allocator);
         json_pretty_append(buf, len, cap, "]", 1, allocator);
         break;
     }
-    case VIGIL_JSON_OBJECT:
-    {
+    case VIGIL_JSON_OBJECT: {
         size_t count = vigil_json_object_count(v);
         size_t i;
-        if (count == 0) { json_pretty_append(buf, len, cap, "{}", 2, allocator); break; }
+        if (count == 0)
+        {
+            json_pretty_append(buf, len, cap, "{}", 2, allocator);
+            break;
+        }
         json_pretty_append(buf, len, cap, "{\n", 2, allocator);
         for (i = 0; i < count; i++)
         {
@@ -1900,7 +2143,8 @@ static vigil_status_t json_pretty_emit(vigil_vm_t *vm, const vigil_json_value_t 
             json_pretty_append(buf, len, cap, key, key_len, allocator);
             json_pretty_append(buf, len, cap, "\": ", 3, allocator);
             json_pretty_emit(vm, child, indent, depth + 1, buf, len, cap, error);
-            if (i + 1 < count) json_pretty_append(buf, len, cap, ",", 1, allocator);
+            if (i + 1 < count)
+                json_pretty_append(buf, len, cap, ",", 1, allocator);
             json_pretty_append(buf, len, cap, "\n", 1, allocator);
         }
         json_pretty_indent(buf, len, cap, indent, depth, allocator);
@@ -1927,18 +2171,22 @@ static vigil_status_t json_value_stringify_pretty(vigil_vm_t *vm, size_t arg_cou
         vigil_vm_stack_pop_n(vm, arg_count);
         return json_push_string(vm, "", 0U, error);
     }
-    if (indent < 0) indent = 0;
-    if (indent > 16) indent = 16;
+    if (indent < 0)
+        indent = 0;
+    if (indent > 16)
+        indent = 16;
 
     status = json_pretty_emit(vm, tree, indent, 0, &buf, &len, &cap, error);
     vigil_vm_stack_pop_n(vm, arg_count);
     if (status != VIGIL_STATUS_OK)
     {
-        if (allocator && buf) allocator->deallocate(allocator->user_data, buf);
+        if (allocator && buf)
+            allocator->deallocate(allocator->user_data, buf);
         return status;
     }
     status = json_push_string(vm, buf ? buf : "", len, error);
-    if (allocator && buf) allocator->deallocate(allocator->user_data, buf);
+    if (allocator && buf)
+        allocator->deallocate(allocator->user_data, buf);
     return status;
 }
 
@@ -1982,24 +2230,43 @@ static vigil_status_t json_value_merge(vigil_vm_t *vm, size_t arg_count, vigil_e
         const vigil_allocator_t *allocator = json_runtime_allocator(vm);
 
         status = vigil_json_object_entry(src_tree, i, &key, &key_len, &child);
-        if (status != VIGIL_STATUS_OK) { vigil_vm_stack_pop_n(vm, arg_count); return status; }
+        if (status != VIGIL_STATUS_OK)
+        {
+            vigil_vm_stack_pop_n(vm, arg_count);
+            return status;
+        }
 
         status = vigil_json_emit(child, &emitted, &emitted_len, error);
-        if (status != VIGIL_STATUS_OK) { vigil_vm_stack_pop_n(vm, arg_count); return status; }
+        if (status != VIGIL_STATUS_OK)
+        {
+            vigil_vm_stack_pop_n(vm, arg_count);
+            return status;
+        }
         {
             vigil_error_t parse_err = {0};
             status = vigil_json_parse(allocator, emitted, emitted_len, &copy, &parse_err);
         }
-        if (allocator && emitted) allocator->deallocate(allocator->user_data, emitted);
-        if (status != VIGIL_STATUS_OK) { vigil_vm_stack_pop_n(vm, arg_count); return status; }
+        if (allocator && emitted)
+            allocator->deallocate(allocator->user_data, emitted);
+        if (status != VIGIL_STATUS_OK)
+        {
+            vigil_vm_stack_pop_n(vm, arg_count);
+            return status;
+        }
 
         status = vigil_json_object_set(tree, key, key_len, copy, error);
-        if (status != VIGIL_STATUS_OK) { vigil_json_free(&copy); vigil_vm_stack_pop_n(vm, arg_count); return status; }
+        if (status != VIGIL_STATUS_OK)
+        {
+            vigil_json_free(&copy);
+            vigil_vm_stack_pop_n(vm, arg_count);
+            return status;
+        }
     }
 
     status = json_sync_raw(vm, self, tree, error);
     vigil_vm_stack_pop_n(vm, arg_count);
-    if (status != VIGIL_STATUS_OK) return status;
+    if (status != VIGIL_STATUS_OK)
+        return status;
     return vigil_runtime_push_ok_error(vigil_vm_runtime(vm), vm, error);
 }
 
@@ -2134,108 +2401,173 @@ static const char *const json_b_param_names[] = {"b"};
 
 static const vigil_native_symbol_doc_t vigil_json_module_doc = {
     "JSON parsing, traversal, and mutation.",
-    "Parse arbitrary JSON, inspect and mutate it dynamically through json.Value, and encode or decode structured values.",
+    "Parse arbitrary JSON, inspect and mutate it dynamically through json.Value, and encode or decode structured "
+    "values.",
     NULL,
 };
 static const vigil_native_symbol_doc_t vigil_json_encode_doc = {
-    "Encode a value as JSON.", "Serializes supported Vigil values into a JSON string.", NULL,
+    "Encode a value as JSON.",
+    "Serializes supported Vigil values into a JSON string.",
+    NULL,
 };
 static const vigil_native_symbol_doc_t vigil_json_decode_doc = {
     "Decode JSON into a prototype shape.",
-    "Decodes JSON text using the supplied prototype value to determine the target shape. Missing fields get defaults; extra fields are ignored.",
+    "Decodes JSON text using the supplied prototype value to determine the target shape. Missing fields get defaults; "
+    "extra fields are ignored.",
     NULL,
 };
 static const vigil_native_symbol_doc_t vigil_json_value_doc = {
     "Dynamic JSON value wrapper.",
-    "Stores a cached JSON tree with handle registry for efficient access. Supports traversal, mutation, and serialization.",
+    "Stores a cached JSON tree with handle registry for efficient access. Supports traversal, mutation, and "
+    "serialization.",
     NULL,
 };
 static const vigil_native_symbol_doc_t vigil_json_value_raw_doc = {
-    "Canonical JSON text.", "Stores the underlying JSON representation used by the wrapper.", NULL,
+    "Canonical JSON text.",
+    "Stores the underlying JSON representation used by the wrapper.",
+    NULL,
 };
 static const vigil_native_symbol_doc_t vigil_json_value_handle_doc = {
-    "Internal handle index.", "Index into the handle registry for the cached JSON tree.", NULL,
+    "Internal handle index.",
+    "Index into the handle registry for the cached JSON tree.",
+    NULL,
 };
 static const vigil_native_symbol_doc_t vigil_json_value_parse_doc = {
-    "Parse JSON text.", "Parses arbitrary JSON text and returns a json.Value wrapper.", NULL,
+    "Parse JSON text.",
+    "Parses arbitrary JSON text and returns a json.Value wrapper.",
+    NULL,
 };
 static const vigil_native_symbol_doc_t vigil_json_value_read_doc = {
-    "Read and parse JSON from a file.", "Loads a file from disk, parses it as JSON, and returns a json.Value wrapper.", NULL,
+    "Read and parse JSON from a file.",
+    "Loads a file from disk, parses it as JSON, and returns a json.Value wrapper.",
+    NULL,
 };
 static const vigil_native_symbol_doc_t vigil_json_value_kind_doc = {
-    "Get the JSON kind name.", "Returns one of null, bool, number, string, array, object, or invalid.", NULL,
+    "Get the JSON kind name.",
+    "Returns one of null, bool, number, string, array, object, or invalid.",
+    NULL,
 };
-static const vigil_native_symbol_doc_t vigil_json_value_is_null_doc = {"Check for null.", "Returns true when the value is null.", NULL};
-static const vigil_native_symbol_doc_t vigil_json_value_is_bool_doc = {"Check for bool.", "Returns true when the value is a JSON boolean.", NULL};
-static const vigil_native_symbol_doc_t vigil_json_value_is_number_doc = {"Check for number.", "Returns true when the value is a JSON number.", NULL};
-static const vigil_native_symbol_doc_t vigil_json_value_is_string_doc = {"Check for string.", "Returns true when the value is a JSON string.", NULL};
-static const vigil_native_symbol_doc_t vigil_json_value_is_array_doc = {"Check for array.", "Returns true when the value is a JSON array.", NULL};
-static const vigil_native_symbol_doc_t vigil_json_value_is_object_doc = {"Check for object.", "Returns true when the value is a JSON object.", NULL};
+static const vigil_native_symbol_doc_t vigil_json_value_is_null_doc = {"Check for null.",
+                                                                       "Returns true when the value is null.", NULL};
+static const vigil_native_symbol_doc_t vigil_json_value_is_bool_doc = {
+    "Check for bool.", "Returns true when the value is a JSON boolean.", NULL};
+static const vigil_native_symbol_doc_t vigil_json_value_is_number_doc = {
+    "Check for number.", "Returns true when the value is a JSON number.", NULL};
+static const vigil_native_symbol_doc_t vigil_json_value_is_string_doc = {
+    "Check for string.", "Returns true when the value is a JSON string.", NULL};
+static const vigil_native_symbol_doc_t vigil_json_value_is_array_doc = {
+    "Check for array.", "Returns true when the value is a JSON array.", NULL};
+static const vigil_native_symbol_doc_t vigil_json_value_is_object_doc = {
+    "Check for object.", "Returns true when the value is a JSON object.", NULL};
 static const vigil_native_symbol_doc_t vigil_json_value_len_doc = {
-    "Get object or array length.", "Returns the number of entries in an array or object value.", NULL,
+    "Get object or array length.",
+    "Returns the number of entries in an array or object value.",
+    NULL,
 };
 static const vigil_native_symbol_doc_t vigil_json_value_as_bool_doc = {
-    "Read a boolean value.", "Returns the underlying boolean when the value is a JSON boolean.", NULL,
+    "Read a boolean value.",
+    "Returns the underlying boolean when the value is a JSON boolean.",
+    NULL,
 };
 static const vigil_native_symbol_doc_t vigil_json_value_as_number_doc = {
-    "Read a numeric value.", "Returns the underlying number when the value is a JSON number.", NULL,
+    "Read a numeric value.",
+    "Returns the underlying number when the value is a JSON number.",
+    NULL,
 };
 static const vigil_native_symbol_doc_t vigil_json_value_as_string_doc = {
-    "Read a string value.", "Returns the underlying string when the value is a JSON string.", NULL,
+    "Read a string value.",
+    "Returns the underlying string when the value is a JSON string.",
+    NULL,
 };
 static const vigil_native_symbol_doc_t vigil_json_value_at_doc = {
-    "Read an array element.", "Returns the value at the given array index.", NULL,
+    "Read an array element.",
+    "Returns the value at the given array index.",
+    NULL,
 };
 static const vigil_native_symbol_doc_t vigil_json_value_get_doc = {
-    "Read an object member.", "Returns the value stored at the given object key.", NULL,
+    "Read an object member.",
+    "Returns the value stored at the given object key.",
+    NULL,
 };
 static const vigil_native_symbol_doc_t vigil_json_value_has_doc = {
-    "Check for an object member.", "Returns true when the key exists on the value and the value is an object.", NULL,
+    "Check for an object member.",
+    "Returns true when the key exists on the value and the value is an object.",
+    NULL,
 };
 static const vigil_native_symbol_doc_t vigil_json_value_keys_doc = {
-    "List object keys.", "Returns the object's keys in their stored order.", NULL,
+    "List object keys.",
+    "Returns the object's keys in their stored order.",
+    NULL,
 };
 static const vigil_native_symbol_doc_t vigil_json_value_stringify_doc = {
-    "Serialize the value to text.", "Returns the canonical JSON text currently stored by the wrapper.", NULL,
+    "Serialize the value to text.",
+    "Returns the canonical JSON text currently stored by the wrapper.",
+    NULL,
 };
 static const vigil_native_symbol_doc_t vigil_json_value_write_doc = {
-    "Write JSON to a file.", "Writes the stored JSON text to the target path.", NULL,
+    "Write JSON to a file.",
+    "Writes the stored JSON text to the target path.",
+    NULL,
 };
 static const vigil_native_symbol_doc_t vigil_json_value_object_doc = {
-    "Create an empty JSON object.", "Returns a new json.Value wrapping an empty object.", NULL,
+    "Create an empty JSON object.",
+    "Returns a new json.Value wrapping an empty object.",
+    NULL,
 };
 static const vigil_native_symbol_doc_t vigil_json_value_array_doc = {
-    "Create an empty JSON array.", "Returns a new json.Value wrapping an empty array.", NULL,
+    "Create an empty JSON array.",
+    "Returns a new json.Value wrapping an empty array.",
+    NULL,
 };
 static const vigil_native_symbol_doc_t vigil_json_value_from_string_doc = {
-    "Create a JSON string value.", "Wraps a Vigil string as a JSON string value.", NULL,
+    "Create a JSON string value.",
+    "Wraps a Vigil string as a JSON string value.",
+    NULL,
 };
 static const vigil_native_symbol_doc_t vigil_json_value_from_number_doc = {
-    "Create a JSON number value.", "Wraps an f64 as a JSON number value.", NULL,
+    "Create a JSON number value.",
+    "Wraps an f64 as a JSON number value.",
+    NULL,
 };
 static const vigil_native_symbol_doc_t vigil_json_value_from_int_doc = {
-    "Create a JSON integer value.", "Wraps an i32 as a JSON number value.", NULL,
+    "Create a JSON integer value.",
+    "Wraps an i32 as a JSON number value.",
+    NULL,
 };
 static const vigil_native_symbol_doc_t vigil_json_value_from_bool_doc = {
-    "Create a JSON boolean value.", "Wraps a bool as a JSON boolean value.", NULL,
+    "Create a JSON boolean value.",
+    "Wraps a bool as a JSON boolean value.",
+    NULL,
 };
 static const vigil_native_symbol_doc_t vigil_json_value_null_doc = {
-    "Create a JSON null value.", "Returns a new json.Value wrapping null.", NULL,
+    "Create a JSON null value.",
+    "Returns a new json.Value wrapping null.",
+    NULL,
 };
 static const vigil_native_symbol_doc_t vigil_json_value_set_doc = {
-    "Set an object key.", "Sets or updates a key on a JSON object. Regenerates the raw text.", NULL,
+    "Set an object key.",
+    "Sets or updates a key on a JSON object. Regenerates the raw text.",
+    NULL,
 };
 static const vigil_native_symbol_doc_t vigil_json_value_remove_doc = {
-    "Remove an object key.", "Removes a key from a JSON object. Regenerates the raw text.", NULL,
+    "Remove an object key.",
+    "Removes a key from a JSON object. Regenerates the raw text.",
+    NULL,
 };
 static const vigil_native_symbol_doc_t vigil_json_value_push_doc = {
-    "Append to an array.", "Appends a value to a JSON array. Regenerates the raw text.", NULL,
+    "Append to an array.",
+    "Appends a value to a JSON array. Regenerates the raw text.",
+    NULL,
 };
 static const vigil_native_symbol_doc_t vigil_json_value_stringify_pretty_doc = {
-    "Pretty-print JSON.", "Returns indented JSON text with the given indent width.", NULL,
+    "Pretty-print JSON.",
+    "Returns indented JSON text with the given indent width.",
+    NULL,
 };
 static const vigil_native_symbol_doc_t vigil_json_value_merge_doc = {
-    "Shallow merge objects.", "Copies all keys from source into this object. Source wins on conflicts.", NULL,
+    "Shallow merge objects.",
+    "Copies all keys from source into this object. Source wins on conflicts.",
+    NULL,
 };
 
 /* ── Field and method tables ─────────────────────────────────────── */

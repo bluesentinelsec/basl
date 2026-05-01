@@ -19,7 +19,7 @@ typedef struct vigil_transpile_ctx
 
 /* Emit C code for a single register chunk (one function body). */
 vigil_status_t vigil_transpile_emit_function(vigil_transpile_ctx_t *ctx, const vigil_reg_chunk_t *rc,
-                                             const char *func_name, uint8_t arity, uint8_t max_regs,
-                                             size_t func_index, size_t func_count);
+                                             const char *func_name, uint8_t arity, uint8_t max_regs, size_t func_index,
+                                             size_t func_count);
 
 #endif /* VIGIL_TRANSPILE_C_H */

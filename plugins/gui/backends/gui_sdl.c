@@ -1196,4 +1196,3 @@ const gui_backend_t gui_backend_sdl = {
     .choose_directory = sdl_stub_file,
     .ask_yes_no = sdl_stub_yesno,
 };
-

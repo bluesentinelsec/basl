@@ -174,8 +174,7 @@ static vigil_status_t reflect_type_name_fn(vigil_vm_t *vm, size_t arg_count, vig
             {
             case VIGIL_OBJECT_STRING:
                 return push_str(vm, "string", 6, error);
-            case VIGIL_OBJECT_INSTANCE:
-            {
+            case VIGIL_OBJECT_INSTANCE: {
                 size_t ci = vigil_instance_object_class_index(obj);
                 const vigil_object_t *fn = reflect_current_function(vm);
                 size_t name_len = 0;
@@ -433,8 +432,7 @@ static vigil_status_t reflect_set_field_fn(vigil_vm_t *vm, size_t arg_count, vig
     switch (ftype.kind)
     {
     case VIGIL_TYPE_I32:
-    case VIGIL_TYPE_I64:
-    {
+    case VIGIL_TYPE_I64: {
         char *end = NULL;
         long long parsed = strtoll(val_str, &end, 10);
         if (end == val_str || *end != '\0')
@@ -442,8 +440,7 @@ static vigil_status_t reflect_set_field_fn(vigil_vm_t *vm, size_t arg_count, vig
         vigil_value_init_int(&new_val, (int64_t)parsed);
         break;
     }
-    case VIGIL_TYPE_F64:
-    {
+    case VIGIL_TYPE_F64: {
         char *end = NULL;
         double parsed = strtod(val_str, &end);
         if (end == val_str || *end != '\0')
@@ -454,8 +451,7 @@ static vigil_status_t reflect_set_field_fn(vigil_vm_t *vm, size_t arg_count, vig
     case VIGIL_TYPE_BOOL:
         vigil_value_init_bool(&new_val, strcmp(val_str, "true") == 0);
         break;
-    case VIGIL_TYPE_STRING:
-    {
+    case VIGIL_TYPE_STRING: {
         vigil_object_t *str_obj = NULL;
         vigil_status_t s = vigil_string_object_new(vigil_vm_runtime(vm), val_str, val_len, &str_obj, error);
         if (s != VIGIL_STATUS_OK)
@@ -850,7 +846,8 @@ static const vigil_native_symbol_doc_t doc_type_name = {
 };
 static const vigil_native_symbol_doc_t doc_type_kind = {
     "Get the type kind of a value.",
-    "Returns the kind: \"i32\", \"i64\", \"f64\", \"bool\", \"string\", \"nil\", \"array\", \"map\", \"class\", or \"function\".",
+    "Returns the kind: \"i32\", \"i64\", \"f64\", \"bool\", \"string\", \"nil\", \"array\", \"map\", \"class\", or "
+    "\"function\".",
     "string kind = reflect.type_kind(value)",
 };
 static const vigil_native_symbol_doc_t doc_is_nil = {
@@ -925,8 +922,8 @@ static const vigil_native_module_function_t reflect_funcs[] = {
      val_param_names, NULL, NULL, &doc_type_name},
     {"type_kind", 9U, reflect_type_kind_fn, 1U, obj_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U,
      val_param_names, NULL, NULL, &doc_type_kind},
-    {"is_nil", 6U, reflect_is_nil_fn, 1U, obj_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U,
-     val_param_names, NULL, NULL, &doc_is_nil},
+    {"is_nil", 6U, reflect_is_nil_fn, 1U, obj_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U, val_param_names,
+     NULL, NULL, &doc_is_nil},
     {"is_numeric", 10U, reflect_is_numeric_fn, 1U, obj_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U,
      val_param_names, NULL, NULL, &doc_is_numeric},
     /* Phase 2: field inspection */
@@ -936,8 +933,8 @@ static const vigil_native_module_function_t reflect_funcs[] = {
      val_param_names, NULL, NULL, &doc_field_count},
     {"get_field", 9U, reflect_get_field_fn, 2U, obj_str_params, VIGIL_TYPE_STRING, 2U, str_err_returns, 0, NULL, NULL,
      0U, val_name_param_names, NULL, NULL, &doc_get_field},
-    {"set_field", 9U, reflect_set_field_fn, 3U, obj_str_str_params, VIGIL_TYPE_ERR, 1U, err_returns, 0, NULL, NULL,
-     0U, val_name_val_param_names, NULL, NULL, &doc_set_field},
+    {"set_field", 9U, reflect_set_field_fn, 3U, obj_str_str_params, VIGIL_TYPE_ERR, 1U, err_returns, 0, NULL, NULL, 0U,
+     val_name_val_param_names, NULL, NULL, &doc_set_field},
     {"field_type", 10U, reflect_field_type_fn, 2U, obj_str_params, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U,
      val_name_param_names, NULL, NULL, &doc_field_type},
     {"has_field", 9U, reflect_has_field_fn, 2U, obj_str_params, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U,
@@ -958,4 +955,4 @@ static const vigil_native_module_function_t reflect_funcs[] = {
 
 VIGIL_API const vigil_native_module_t vigil_stdlib_reflect = {
     "reflect", 7U, reflect_funcs, sizeof(reflect_funcs) / sizeof(reflect_funcs[0]), NULL, 0U, &reflect_module_doc,
-    NULL, 0U};
+    NULL,      0U};

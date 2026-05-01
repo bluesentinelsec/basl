@@ -1312,14 +1312,14 @@ static const vigil_native_symbol_doc_t vigil_fs_read_doc = {
     "Read a file into a string.", "Reads the entire file contents and returns (string, err).", NULL};
 static const vigil_native_symbol_doc_t vigil_fs_write_doc = {
     "Write a file.", "Creates or truncates a file and writes the supplied data. Returns err.", NULL};
-static const vigil_native_symbol_doc_t vigil_fs_append_doc = {"Append to a file.",
-                                                              "Appends the supplied data to the end of a file. Returns err.", NULL};
-static const vigil_native_symbol_doc_t vigil_fs_copy_doc = {"Copy a file.", "Copies a file from one path to another. Returns err.",
-                                                            NULL};
+static const vigil_native_symbol_doc_t vigil_fs_append_doc = {
+    "Append to a file.", "Appends the supplied data to the end of a file. Returns err.", NULL};
+static const vigil_native_symbol_doc_t vigil_fs_copy_doc = {
+    "Copy a file.", "Copies a file from one path to another. Returns err.", NULL};
 static const vigil_native_symbol_doc_t vigil_fs_move_doc = {"Move or rename a path.",
                                                             "Moves or renames a file or directory. Returns err.", NULL};
-static const vigil_native_symbol_doc_t vigil_fs_remove_doc = {
-    "Remove a file or empty directory.", "Deletes the path when possible and returns err.", NULL};
+static const vigil_native_symbol_doc_t vigil_fs_remove_doc = {"Remove a file or empty directory.",
+                                                              "Deletes the path when possible and returns err.", NULL};
 static const vigil_native_symbol_doc_t vigil_fs_remove_all_doc = {
     "Remove a path recursively.", "Deletes a file or directory tree recursively. Returns err.", NULL};
 static const vigil_native_symbol_doc_t vigil_fs_exists_doc = {"Check whether a path exists.",
@@ -1330,10 +1330,10 @@ static const vigil_native_symbol_doc_t vigil_fs_is_file_doc = {
     "Check whether a path is a file.", "Returns true when the target path exists and is a regular file.", NULL};
 static const vigil_native_symbol_doc_t vigil_fs_is_symlink_doc = {
     "Check whether a path is a symbolic link.", "Returns true when the target path is a symbolic link.", NULL};
-static const vigil_native_symbol_doc_t vigil_fs_mkdir_doc = {"Create a directory.", "Creates a single directory. Returns err.",
-                                                             NULL};
-static const vigil_native_symbol_doc_t vigil_fs_mkdir_all_doc = {"Create a directory tree.",
-                                                                 "Creates a directory and any missing parents. Returns err.", NULL};
+static const vigil_native_symbol_doc_t vigil_fs_mkdir_doc = {"Create a directory.",
+                                                             "Creates a single directory. Returns err.", NULL};
+static const vigil_native_symbol_doc_t vigil_fs_mkdir_all_doc = {
+    "Create a directory tree.", "Creates a directory and any missing parents. Returns err.", NULL};
 static const vigil_native_symbol_doc_t vigil_fs_list_doc = {"List directory entries.",
                                                             "Returns the immediate names in a directory.", NULL};
 static const vigil_native_symbol_doc_t vigil_fs_walk_doc = {
@@ -1392,16 +1392,16 @@ static const vigil_native_module_function_t vigil_fs_functions[] = {
     {"is_abs", 6U, fs_is_abs, 1U, str_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U, fs_path_param_names, NULL,
      NULL, &vigil_fs_is_abs_doc},
     /* File operations */
-    {"read", 4U, fs_read, 1U, str_param, VIGIL_TYPE_STRING, 2U, fs_str_err_returns, 0, NULL, NULL, 0U, fs_path_param_names, NULL,
-     NULL, &vigil_fs_read_doc},
+    {"read", 4U, fs_read, 1U, str_param, VIGIL_TYPE_STRING, 2U, fs_str_err_returns, 0, NULL, NULL, 0U,
+     fs_path_param_names, NULL, NULL, &vigil_fs_read_doc},
     {"write", 5U, fs_write, 2U, str_str_params, VIGIL_TYPE_ERR, 1U, NULL, 0, NULL, NULL, 0U, fs_src_dst_param_names,
      NULL, NULL, &vigil_fs_write_doc},
     {"append", 6U, fs_append, 2U, str_str_params, VIGIL_TYPE_ERR, 1U, NULL, 0, NULL, NULL, 0U, fs_src_dst_param_names,
      NULL, NULL, &vigil_fs_append_doc},
-    {"copy", 4U, fs_copy, 2U, str_str_params, VIGIL_TYPE_ERR, 1U, NULL, 0, NULL, NULL, 0U, fs_src_dst_param_names,
-     NULL, NULL, &vigil_fs_copy_doc},
-    {"move", 4U, fs_move, 2U, str_str_params, VIGIL_TYPE_ERR, 1U, NULL, 0, NULL, NULL, 0U, fs_src_dst_param_names,
-     NULL, NULL, &vigil_fs_move_doc},
+    {"copy", 4U, fs_copy, 2U, str_str_params, VIGIL_TYPE_ERR, 1U, NULL, 0, NULL, NULL, 0U, fs_src_dst_param_names, NULL,
+     NULL, &vigil_fs_copy_doc},
+    {"move", 4U, fs_move, 2U, str_str_params, VIGIL_TYPE_ERR, 1U, NULL, 0, NULL, NULL, 0U, fs_src_dst_param_names, NULL,
+     NULL, &vigil_fs_move_doc},
     {"remove", 6U, fs_remove, 1U, str_param, VIGIL_TYPE_ERR, 1U, NULL, 0, NULL, NULL, 0U, fs_path_param_names, NULL,
      NULL, &vigil_fs_remove_doc},
     {"remove_all", 10U, fs_remove_all, 1U, str_param, VIGIL_TYPE_ERR, 1U, NULL, 0, NULL, NULL, 0U, fs_path_param_names,
@@ -1415,8 +1415,8 @@ static const vigil_native_module_function_t vigil_fs_functions[] = {
     {"is_symlink", 10U, fs_is_symlink, 1U, str_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U, fs_path_param_names,
      NULL, NULL, &vigil_fs_is_symlink_doc},
     /* Directory operations */
-    {"mkdir", 5U, fs_mkdir, 1U, str_param, VIGIL_TYPE_ERR, 1U, NULL, 0, NULL, NULL, 0U, fs_path_param_names, NULL,
-     NULL, &vigil_fs_mkdir_doc},
+    {"mkdir", 5U, fs_mkdir, 1U, str_param, VIGIL_TYPE_ERR, 1U, NULL, 0, NULL, NULL, 0U, fs_path_param_names, NULL, NULL,
+     &vigil_fs_mkdir_doc},
     {"mkdir_all", 9U, fs_mkdir_all, 1U, str_param, VIGIL_TYPE_ERR, 1U, NULL, 0, NULL, NULL, 0U, fs_path_param_names,
      NULL, NULL, &vigil_fs_mkdir_all_doc},
     {"list", 4U, fs_list, 1U, str_param, VIGIL_TYPE_OBJECT, 1U, NULL, VIGIL_TYPE_STRING, NULL, NULL, 0U,
@@ -1451,8 +1451,8 @@ static const vigil_native_module_function_t vigil_fs_functions[] = {
     {"cwd", 3U, fs_cwd, 0U, NULL, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, &vigil_fs_cwd_doc},
     {"app_dir", 7U, fs_app_dir, 0U, NULL, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL,
      &vigil_fs_app_dir_doc},
-    {"chdir", 5U, fs_chdir, 1U, str_param, VIGIL_TYPE_ERR, 1U, NULL, 0, NULL, NULL, 0U, fs_path_param_names, NULL,
-     NULL, &vigil_fs_chdir_doc},
+    {"chdir", 5U, fs_chdir, 1U, str_param, VIGIL_TYPE_ERR, 1U, NULL, 0, NULL, NULL, 0U, fs_path_param_names, NULL, NULL,
+     &vigil_fs_chdir_doc},
     {"is_valid_name", 13U, fs_is_valid_name, 1U, str_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U,
      fs_name_param_names, NULL, NULL, &vigil_fs_is_valid_name_doc},
 };
@@ -2459,15 +2459,14 @@ static const vigil_native_class_method_t reader_methods[] = {
      fs_reader_open_param_names, NULL, "fs.Reader", &vigil_fs_reader_open_doc},
     {"read_line", 9U, reader_read_line, 0U, NULL, VIGIL_TYPE_STRING, 2U, str_err_returns, 0, NULL, 0U, 0, NULL, NULL,
      NULL, &vigil_fs_reader_read_line_doc},
-    {"read_bytes", 10U, reader_read_bytes, 1U, i32_1_param, VIGIL_TYPE_OBJECT, 2U, obj_err_returns,
-     0, NULL, 0U, VIGIL_TYPE_U8, fs_reader_read_bytes_param_names, NULL, NULL,
-     &vigil_fs_reader_read_bytes_doc},
+    {"read_bytes", 10U, reader_read_bytes, 1U, i32_1_param, VIGIL_TYPE_OBJECT, 2U, obj_err_returns, 0, NULL, 0U,
+     VIGIL_TYPE_U8, fs_reader_read_bytes_param_names, NULL, NULL, &vigil_fs_reader_read_bytes_doc},
     {"read_all", 8U, reader_read_all, 0U, NULL, VIGIL_TYPE_STRING, 2U, str_err_returns, 0, NULL, 0U, 0, NULL, NULL,
      NULL, &vigil_fs_reader_read_all_doc},
-    {"seek", 4U, reader_seek, 1U, i64_1_param, VIGIL_TYPE_ERR, 1U, NULL, 0, NULL, 0U, 0,
-     fs_offset_param_names, NULL, NULL, &vigil_fs_reader_seek_doc},
-    {"tell", 4U, reader_tell, 0U, NULL, VIGIL_TYPE_I64, 2U, i64_err_returns, 0, NULL, 0U, 0, NULL, NULL,
-     NULL, &vigil_fs_reader_tell_doc},
+    {"seek", 4U, reader_seek, 1U, i64_1_param, VIGIL_TYPE_ERR, 1U, NULL, 0, NULL, 0U, 0, fs_offset_param_names, NULL,
+     NULL, &vigil_fs_reader_seek_doc},
+    {"tell", 4U, reader_tell, 0U, NULL, VIGIL_TYPE_I64, 2U, i64_err_returns, 0, NULL, 0U, 0, NULL, NULL, NULL,
+     &vigil_fs_reader_tell_doc},
     {"close", 5U, reader_close, 0U, NULL, VIGIL_TYPE_ERR, 1U, NULL, 0, NULL, 0U, 0, NULL, NULL, NULL,
      &vigil_fs_reader_close_doc},
 };
@@ -2483,10 +2482,10 @@ static const vigil_native_class_method_t writer_methods[] = {
      fs_writer_write_param_names, NULL, NULL, &vigil_fs_writer_write_line_doc},
     {"write_bytes", 11U, writer_write_bytes, 1U, obj_1_param, VIGIL_TYPE_I32, 2U, i32_err_returns, 0, NULL, 0U, 0,
      fs_bytes_param_names, NULL, NULL, &vigil_fs_writer_write_bytes_doc},
-    {"seek", 4U, writer_seek, 1U, i64_1_param, VIGIL_TYPE_ERR, 1U, NULL, 0, NULL, 0U, 0,
-     fs_offset_param_names, NULL, NULL, &vigil_fs_writer_seek_doc},
-    {"tell", 4U, writer_tell, 0U, NULL, VIGIL_TYPE_I64, 2U, i64_err_returns, 0, NULL, 0U, 0, NULL, NULL,
-     NULL, &vigil_fs_writer_tell_doc},
+    {"seek", 4U, writer_seek, 1U, i64_1_param, VIGIL_TYPE_ERR, 1U, NULL, 0, NULL, 0U, 0, fs_offset_param_names, NULL,
+     NULL, &vigil_fs_writer_seek_doc},
+    {"tell", 4U, writer_tell, 0U, NULL, VIGIL_TYPE_I64, 2U, i64_err_returns, 0, NULL, 0U, 0, NULL, NULL, NULL,
+     &vigil_fs_writer_tell_doc},
     {"flush", 5U, writer_flush, 0U, NULL, VIGIL_TYPE_ERR, 1U, NULL, 0, NULL, 0U, 0, NULL, NULL, NULL,
      &vigil_fs_writer_flush_doc},
     {"close", 5U, writer_close, 0U, NULL, VIGIL_TYPE_ERR, 1U, NULL, 0, NULL, 0U, 0, NULL, NULL, NULL,

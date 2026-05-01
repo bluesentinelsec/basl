@@ -76,4 +76,4 @@ static const vigil_native_module_function_t uuid_functions[] = {
 
 VIGIL_API const vigil_native_module_t vigil_stdlib_uuid = {
     "uuid", 4U, uuid_functions, sizeof(uuid_functions) / sizeof(uuid_functions[0]), NULL, 0U, &vigil_uuid_module_doc,
-    NULL, 0U};
+    NULL,   0U};

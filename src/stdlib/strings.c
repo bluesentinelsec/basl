@@ -274,6 +274,12 @@ static const vigil_native_class_t strings_classes[] = {
      sizeof(builder_methods) / sizeof(builder_methods[0]), NULL, &doc_builder_class},
 };
 
-VIGIL_API const vigil_native_module_t vigil_stdlib_strings = {
-    "strings", 7U, NULL, 0U, strings_classes, sizeof(strings_classes) / sizeof(strings_classes[0]),
-    &vigil_strings_module_doc, NULL, 0U};
+VIGIL_API const vigil_native_module_t vigil_stdlib_strings = {"strings",
+                                                              7U,
+                                                              NULL,
+                                                              0U,
+                                                              strings_classes,
+                                                              sizeof(strings_classes) / sizeof(strings_classes[0]),
+                                                              &vigil_strings_module_doc,
+                                                              NULL,
+                                                              0U};

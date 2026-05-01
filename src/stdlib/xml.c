@@ -192,7 +192,8 @@ static vigil_status_t xml_doc_root(vigil_vm_t *vm, size_t arg_count, vigil_error
         vigil_object_t *nil_inst = NULL;
         vigil_value_t nil_val;
         vigil_value_init_int(&fields[ELEM_FIELD_PTR], 0);
-        status = vigil_instance_object_new(vigil_vm_runtime(vm), elem_class, fields, ELEM_FIELD_COUNT, &nil_inst, error);
+        status =
+            vigil_instance_object_new(vigil_vm_runtime(vm), elem_class, fields, ELEM_FIELD_COUNT, &nil_inst, error);
         if (status != VIGIL_STATUS_OK)
             return status;
         vigil_value_init_object(&nil_val, &nil_inst);
@@ -520,8 +521,8 @@ static const vigil_native_class_field_t xml_elem_fields[] = {
 static const vigil_native_class_method_t xml_doc_methods[] = {
     {"parse", 5U, xml_doc_parse, 1U, str_param, VIGIL_TYPE_OBJECT, 2U, obj_err_returns, 1, "Document", 8U, 0,
      xml_text_param_names, NULL, "xml.Document", &xml_parse_doc},
-    {"root", 4U, xml_doc_root, 0U, NULL, VIGIL_TYPE_OBJECT, 2U, obj_err_returns, 0, "Element", 7U, 0, NULL, NULL, "xml.Element",
-     &xml_root_doc},
+    {"root", 4U, xml_doc_root, 0U, NULL, VIGIL_TYPE_OBJECT, 2U, obj_err_returns, 0, "Element", 7U, 0, NULL, NULL,
+     "xml.Element", &xml_root_doc},
     {"version", 7U, xml_doc_version, 0U, NULL, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, 0U, 0, NULL, NULL, NULL,
      &xml_version_doc},
     {"encoding", 8U, xml_doc_encoding, 0U, NULL, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, 0U, 0, NULL, NULL, NULL,

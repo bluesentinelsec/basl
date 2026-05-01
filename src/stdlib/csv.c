@@ -663,21 +663,22 @@ static vigil_status_t csv_parse(vigil_vm_t *vm, size_t arg_count, vigil_error_t 
     const char *data, *delim_str;
     size_t data_len, delim_len;
 
-    if (!get_string_arg(vm, base, 0, &data, &data_len) ||
-        !get_string_arg(vm, base, 1, &delim_str, &delim_len) ||
+    if (!get_string_arg(vm, base, 0, &data, &data_len) || !get_string_arg(vm, base, 1, &delim_str, &delim_len) ||
         !csv_valid_delimiter(delim_str, delim_len))
     {
         vigil_vm_stack_pop_n(vm, arg_count);
         vigil_object_t *empty = NULL;
         vigil_status_t s = vigil_array_object_new(vigil_vm_runtime(vm), NULL, 0, &empty, error);
-        if (s != VIGIL_STATUS_OK) return s;
+        if (s != VIGIL_STATUS_OK)
+            return s;
         return push_obj_and_err(vm, &empty, "parse: invalid arguments or delimiter", error);
     }
     vigil_vm_stack_pop_n(vm, arg_count);
 
     vigil_object_t *rows = NULL;
     vigil_status_t s = csv_parse_rows(vm, data, data_len, delim_str[0], &rows, error);
-    if (s != VIGIL_STATUS_OK) return s;
+    if (s != VIGIL_STATUS_OK)
+        return s;
     return push_obj_and_ok(vm, &rows, error);
 }
 
@@ -689,13 +690,13 @@ static vigil_status_t csv_parse_row(vigil_vm_t *vm, size_t arg_count, vigil_erro
     const char *data, *delim_str;
     size_t data_len, delim_len;
 
-    if (!get_string_arg(vm, base, 0, &data, &data_len) ||
-        !get_string_arg(vm, base, 1, &delim_str, &delim_len))
+    if (!get_string_arg(vm, base, 0, &data, &data_len) || !get_string_arg(vm, base, 1, &delim_str, &delim_len))
     {
         vigil_vm_stack_pop_n(vm, arg_count);
         vigil_object_t *empty = NULL;
         vigil_status_t s = vigil_array_object_new(vigil_vm_runtime(vm), NULL, 0, &empty, error);
-        if (s != VIGIL_STATUS_OK) return s;
+        if (s != VIGIL_STATUS_OK)
+            return s;
         return push_obj_and_err(vm, &empty, "parse_row: invalid arguments", error);
     }
     if (!csv_valid_delimiter(delim_str, delim_len))
@@ -703,14 +704,16 @@ static vigil_status_t csv_parse_row(vigil_vm_t *vm, size_t arg_count, vigil_erro
         vigil_vm_stack_pop_n(vm, arg_count);
         vigil_object_t *empty = NULL;
         vigil_status_t s = vigil_array_object_new(vigil_vm_runtime(vm), NULL, 0, &empty, error);
-        if (s != VIGIL_STATUS_OK) return s;
+        if (s != VIGIL_STATUS_OK)
+            return s;
         return push_obj_and_err(vm, &empty, "parse_row: delimiter must be a single character", error);
     }
     vigil_vm_stack_pop_n(vm, arg_count);
 
     vigil_object_t *row = NULL;
     vigil_status_t s = csv_parse_single_row(vm, data, data_len, delim_str[0], &row, error);
-    if (s != VIGIL_STATUS_OK) return s;
+    if (s != VIGIL_STATUS_OK)
+        return s;
     return push_obj_and_ok(vm, &row, error);
 }
 
@@ -723,8 +726,7 @@ static vigil_status_t csv_stringify(vigil_vm_t *vm, size_t arg_count, vigil_erro
     const char *delim_str;
     size_t delim_len;
 
-    if (!get_string_arg(vm, base, 1, &delim_str, &delim_len) ||
-        !csv_valid_delimiter(delim_str, delim_len) ||
+    if (!get_string_arg(vm, base, 1, &delim_str, &delim_len) || !csv_valid_delimiter(delim_str, delim_len) ||
         !vigil_nanbox_is_object(rows_val))
     {
         vigil_vm_stack_pop_n(vm, arg_count);
@@ -742,7 +744,8 @@ static vigil_status_t csv_stringify(vigil_vm_t *vm, size_t arg_count, vigil_erro
     char *buf = NULL;
     size_t len = 0;
     vigil_status_t s = csv_stringify_rows_buf(vm, rows_arr, delim_str[0], &buf, &len, error);
-    if (s != VIGIL_STATUS_OK) return s;
+    if (s != VIGIL_STATUS_OK)
+        return s;
 
     s = push_str_and_ok(vm, buf ? buf : "", len, error);
     vigil_allocator_t alloc = get_alloc(vm);
@@ -786,7 +789,8 @@ static vigil_status_t csv_stringify_row(vigil_vm_t *vm, size_t arg_count, vigil_
     char *buf = NULL;
     size_t len = 0;
     vigil_status_t s = csv_stringify_single_row_buf(vm, row_arr, delim_str[0], &buf, &len, error);
-    if (s != VIGIL_STATUS_OK) return s;
+    if (s != VIGIL_STATUS_OK)
+        return s;
 
     s = push_str_and_ok(vm, buf ? buf : "", len, error);
     vigil_allocator_t alloc = get_alloc(vm);
@@ -802,14 +806,14 @@ static vigil_status_t csv_read_file(vigil_vm_t *vm, size_t arg_count, vigil_erro
     const char *path, *delim_str;
     size_t path_len, delim_len;
 
-    if (!get_string_arg(vm, base, 0, &path, &path_len) ||
-        !get_string_arg(vm, base, 1, &delim_str, &delim_len) ||
+    if (!get_string_arg(vm, base, 0, &path, &path_len) || !get_string_arg(vm, base, 1, &delim_str, &delim_len) ||
         !csv_valid_delimiter(delim_str, delim_len))
     {
         vigil_vm_stack_pop_n(vm, arg_count);
         vigil_object_t *empty = NULL;
         vigil_status_t s = vigil_array_object_new(vigil_vm_runtime(vm), NULL, 0, &empty, error);
-        if (s != VIGIL_STATUS_OK) return s;
+        if (s != VIGIL_STATUS_OK)
+            return s;
         return push_obj_and_err(vm, &empty, "read_file: invalid arguments", error);
     }
     vigil_vm_stack_pop_n(vm, arg_count);
@@ -819,19 +823,22 @@ static vigil_status_t csv_read_file(vigil_vm_t *vm, size_t arg_count, vigil_erro
     size_t data_len = 0;
     const char *msg = NULL;
     vigil_status_t s = csv_read_file_data(&alloc, path, &data, &data_len, &msg, error);
-    if (s != VIGIL_STATUS_OK) return s;
+    if (s != VIGIL_STATUS_OK)
+        return s;
     if (msg)
     {
         vigil_object_t *empty = NULL;
         s = vigil_array_object_new(vigil_vm_runtime(vm), NULL, 0, &empty, error);
-        if (s != VIGIL_STATUS_OK) return s;
+        if (s != VIGIL_STATUS_OK)
+            return s;
         return push_obj_and_err(vm, &empty, msg, error);
     }
 
     vigil_object_t *rows = NULL;
     s = csv_parse_rows(vm, data, data_len, delim_str[0], &rows, error);
     alloc.deallocate(alloc.user_data, data);
-    if (s != VIGIL_STATUS_OK) return s;
+    if (s != VIGIL_STATUS_OK)
+        return s;
     return push_obj_and_ok(vm, &rows, error);
 }
 
@@ -843,8 +850,7 @@ static vigil_status_t csv_write_file(vigil_vm_t *vm, size_t arg_count, vigil_err
     const char *path, *delim_str;
     size_t path_len, delim_len;
 
-    if (!get_string_arg(vm, base, 0, &path, &path_len) ||
-        !get_string_arg(vm, base, 2, &delim_str, &delim_len))
+    if (!get_string_arg(vm, base, 0, &path, &path_len) || !get_string_arg(vm, base, 2, &delim_str, &delim_len))
     {
         vigil_vm_stack_pop_n(vm, arg_count);
         return push_err_only(vm, "write_file: invalid arguments", error);
@@ -872,19 +878,21 @@ static vigil_status_t csv_write_file(vigil_vm_t *vm, size_t arg_count, vigil_err
     char *buf = NULL;
     size_t len = 0;
     vigil_status_t s = csv_stringify_rows_buf(vm, rows_arr, delim_str[0], &buf, &len, error);
-    if (s != VIGIL_STATUS_OK) return s;
+    if (s != VIGIL_STATUS_OK)
+        return s;
 
     const char *msg = NULL;
     s = csv_write_file_data(path, buf ? buf : "", len, &msg);
     vigil_allocator_t alloc = get_alloc(vm);
     alloc.deallocate(alloc.user_data, buf);
-    if (s != VIGIL_STATUS_OK) return s;
-    if (msg) return push_err_only(vm, msg, error);
+    if (s != VIGIL_STATUS_OK)
+        return s;
+    if (msg)
+        return push_err_only(vm, msg, error);
     return push_ok_only(vm, error);
 }
 
 /* ── csv.parse_with_header(data, delim) -> array<map<string,string>> */
-
 
 /* ── csv.parse_with_header(data, delim) -> (array<map<string,string>>, err) */
 
@@ -894,28 +902,30 @@ static vigil_status_t csv_parse_with_header(vigil_vm_t *vm, size_t arg_count, vi
     const char *data, *delim_str;
     size_t data_len, delim_len;
 
-    if (!get_string_arg(vm, base, 0, &data, &data_len) ||
-        !get_string_arg(vm, base, 1, &delim_str, &delim_len) ||
+    if (!get_string_arg(vm, base, 0, &data, &data_len) || !get_string_arg(vm, base, 1, &delim_str, &delim_len) ||
         !csv_valid_delimiter(delim_str, delim_len))
     {
         vigil_vm_stack_pop_n(vm, arg_count);
         vigil_object_t *empty = NULL;
         vigil_status_t s = vigil_array_object_new(vigil_vm_runtime(vm), NULL, 0, &empty, error);
-        if (s != VIGIL_STATUS_OK) return s;
+        if (s != VIGIL_STATUS_OK)
+            return s;
         return push_obj_and_err(vm, &empty, "parse_with_header: invalid arguments", error);
     }
     vigil_vm_stack_pop_n(vm, arg_count);
 
     vigil_object_t *rows = NULL;
     vigil_status_t s = csv_parse_rows(vm, data, data_len, delim_str[0], &rows, error);
-    if (s != VIGIL_STATUS_OK) return s;
+    if (s != VIGIL_STATUS_OK)
+        return s;
 
     size_t row_count = vigil_array_object_length(rows);
     if (row_count < 1)
     {
         vigil_object_t *result = NULL;
         s = vigil_array_object_new(vigil_vm_runtime(vm), NULL, 0, &result, error);
-        if (s != VIGIL_STATUS_OK) return s;
+        if (s != VIGIL_STATUS_OK)
+            return s;
         return push_obj_and_ok(vm, &result, error);
     }
 
@@ -927,7 +937,11 @@ static vigil_status_t csv_parse_with_header(vigil_vm_t *vm, size_t arg_count, vi
 
     vigil_object_t *result = NULL;
     s = vigil_array_object_new(vigil_vm_runtime(vm), NULL, 0, &result, error);
-    if (s != VIGIL_STATUS_OK) { vigil_value_release(&header_val); return s; }
+    if (s != VIGIL_STATUS_OK)
+    {
+        vigil_value_release(&header_val);
+        return s;
+    }
 
     for (size_t r = 1; r < row_count; r++)
     {
@@ -939,7 +953,12 @@ static vigil_status_t csv_parse_with_header(vigil_vm_t *vm, size_t arg_count, vi
 
         vigil_object_t *map = NULL;
         s = vigil_map_object_new(vigil_vm_runtime(vm), &map, error);
-        if (s != VIGIL_STATUS_OK) { vigil_value_release(&row_val); vigil_value_release(&header_val); return s; }
+        if (s != VIGIL_STATUS_OK)
+        {
+            vigil_value_release(&row_val);
+            vigil_value_release(&header_val);
+            return s;
+        }
 
         for (size_t c = 0; c < col_count; c++)
         {
@@ -955,14 +974,25 @@ static vigil_status_t csv_parse_with_header(vigil_vm_t *vm, size_t arg_count, vi
             {
                 vigil_object_t *empty_str = NULL;
                 s = vigil_string_object_new(vigil_vm_runtime(vm), "", 0, &empty_str, error);
-                if (s != VIGIL_STATUS_OK) { vigil_value_release(&key_val); vigil_value_release(&row_val); vigil_value_release(&header_val); return s; }
+                if (s != VIGIL_STATUS_OK)
+                {
+                    vigil_value_release(&key_val);
+                    vigil_value_release(&row_val);
+                    vigil_value_release(&header_val);
+                    return s;
+                }
                 vigil_value_init_object(&cell_val, &empty_str);
             }
 
             s = vigil_map_object_set(map, &key_val, &cell_val, error);
             vigil_value_release(&key_val);
             vigil_value_release(&cell_val);
-            if (s != VIGIL_STATUS_OK) { vigil_value_release(&row_val); vigil_value_release(&header_val); return s; }
+            if (s != VIGIL_STATUS_OK)
+            {
+                vigil_value_release(&row_val);
+                vigil_value_release(&header_val);
+                return s;
+            }
         }
 
         vigil_value_t map_val;
@@ -970,7 +1000,11 @@ static vigil_status_t csv_parse_with_header(vigil_vm_t *vm, size_t arg_count, vi
         s = vigil_array_object_append(result, &map_val, error);
         vigil_value_release(&map_val);
         vigil_value_release(&row_val);
-        if (s != VIGIL_STATUS_OK) { vigil_value_release(&header_val); return s; }
+        if (s != VIGIL_STATUS_OK)
+        {
+            vigil_value_release(&header_val);
+            return s;
+        }
     }
 
     vigil_value_release(&header_val);
@@ -985,14 +1019,14 @@ static vigil_status_t csv_read_file_with_header(vigil_vm_t *vm, size_t arg_count
     const char *path, *delim_str;
     size_t path_len, delim_len;
 
-    if (!get_string_arg(vm, base, 0, &path, &path_len) ||
-        !get_string_arg(vm, base, 1, &delim_str, &delim_len) ||
+    if (!get_string_arg(vm, base, 0, &path, &path_len) || !get_string_arg(vm, base, 1, &delim_str, &delim_len) ||
         !csv_valid_delimiter(delim_str, delim_len))
     {
         vigil_vm_stack_pop_n(vm, arg_count);
         vigil_object_t *empty = NULL;
         vigil_status_t s = vigil_array_object_new(vigil_vm_runtime(vm), NULL, 0, &empty, error);
-        if (s != VIGIL_STATUS_OK) return s;
+        if (s != VIGIL_STATUS_OK)
+            return s;
         return push_obj_and_err(vm, &empty, "read_file_with_header: invalid arguments", error);
     }
     vigil_vm_stack_pop_n(vm, arg_count);
@@ -1002,26 +1036,30 @@ static vigil_status_t csv_read_file_with_header(vigil_vm_t *vm, size_t arg_count
     size_t data_len = 0;
     const char *msg = NULL;
     vigil_status_t s = csv_read_file_data(&alloc, path, &data, &data_len, &msg, error);
-    if (s != VIGIL_STATUS_OK) return s;
+    if (s != VIGIL_STATUS_OK)
+        return s;
     if (msg)
     {
         vigil_object_t *empty = NULL;
         s = vigil_array_object_new(vigil_vm_runtime(vm), NULL, 0, &empty, error);
-        if (s != VIGIL_STATUS_OK) return s;
+        if (s != VIGIL_STATUS_OK)
+            return s;
         return push_obj_and_err(vm, &empty, msg, error);
     }
 
     vigil_object_t *rows = NULL;
     s = csv_parse_rows(vm, data, data_len, delim_str[0], &rows, error);
     alloc.deallocate(alloc.user_data, data);
-    if (s != VIGIL_STATUS_OK) return s;
+    if (s != VIGIL_STATUS_OK)
+        return s;
 
     size_t row_count = vigil_array_object_length(rows);
     if (row_count < 1)
     {
         vigil_object_t *result = NULL;
         s = vigil_array_object_new(vigil_vm_runtime(vm), NULL, 0, &result, error);
-        if (s != VIGIL_STATUS_OK) return s;
+        if (s != VIGIL_STATUS_OK)
+            return s;
         return push_obj_and_ok(vm, &result, error);
     }
 
@@ -1033,7 +1071,11 @@ static vigil_status_t csv_read_file_with_header(vigil_vm_t *vm, size_t arg_count
 
     vigil_object_t *result = NULL;
     s = vigil_array_object_new(vigil_vm_runtime(vm), NULL, 0, &result, error);
-    if (s != VIGIL_STATUS_OK) { vigil_value_release(&header_val); return s; }
+    if (s != VIGIL_STATUS_OK)
+    {
+        vigil_value_release(&header_val);
+        return s;
+    }
 
     for (size_t r = 1; r < row_count; r++)
     {
@@ -1045,7 +1087,12 @@ static vigil_status_t csv_read_file_with_header(vigil_vm_t *vm, size_t arg_count
 
         vigil_object_t *map = NULL;
         s = vigil_map_object_new(vigil_vm_runtime(vm), &map, error);
-        if (s != VIGIL_STATUS_OK) { vigil_value_release(&row_val); vigil_value_release(&header_val); return s; }
+        if (s != VIGIL_STATUS_OK)
+        {
+            vigil_value_release(&row_val);
+            vigil_value_release(&header_val);
+            return s;
+        }
 
         for (size_t c = 0; c < col_count; c++)
         {
@@ -1061,14 +1108,25 @@ static vigil_status_t csv_read_file_with_header(vigil_vm_t *vm, size_t arg_count
             {
                 vigil_object_t *empty_str = NULL;
                 s = vigil_string_object_new(vigil_vm_runtime(vm), "", 0, &empty_str, error);
-                if (s != VIGIL_STATUS_OK) { vigil_value_release(&key_val); vigil_value_release(&row_val); vigil_value_release(&header_val); return s; }
+                if (s != VIGIL_STATUS_OK)
+                {
+                    vigil_value_release(&key_val);
+                    vigil_value_release(&row_val);
+                    vigil_value_release(&header_val);
+                    return s;
+                }
                 vigil_value_init_object(&cell_val, &empty_str);
             }
 
             s = vigil_map_object_set(map, &key_val, &cell_val, error);
             vigil_value_release(&key_val);
             vigil_value_release(&cell_val);
-            if (s != VIGIL_STATUS_OK) { vigil_value_release(&row_val); vigil_value_release(&header_val); return s; }
+            if (s != VIGIL_STATUS_OK)
+            {
+                vigil_value_release(&row_val);
+                vigil_value_release(&header_val);
+                return s;
+            }
         }
 
         vigil_value_t map_val;
@@ -1076,7 +1134,11 @@ static vigil_status_t csv_read_file_with_header(vigil_vm_t *vm, size_t arg_count
         s = vigil_array_object_append(result, &map_val, error);
         vigil_value_release(&map_val);
         vigil_value_release(&row_val);
-        if (s != VIGIL_STATUS_OK) { vigil_value_release(&header_val); return s; }
+        if (s != VIGIL_STATUS_OK)
+        {
+            vigil_value_release(&header_val);
+            return s;
+        }
     }
 
     vigil_value_release(&header_val);
@@ -1088,8 +1150,7 @@ static vigil_status_t csv_field_count(vigil_vm_t *vm, size_t arg_count, vigil_er
     const char *data, *delim_str;
     size_t data_len, delim_len;
 
-    if (!get_string_arg(vm, base, 0, &data, &data_len) ||
-        !get_string_arg(vm, base, 1, &delim_str, &delim_len))
+    if (!get_string_arg(vm, base, 0, &data, &data_len) || !get_string_arg(vm, base, 1, &delim_str, &delim_len))
     {
         vigil_vm_stack_pop_n(vm, arg_count);
         return push_i32_and_err(vm, "field_count: invalid arguments", error);
@@ -1107,7 +1168,8 @@ static vigil_status_t csv_field_count(vigil_vm_t *vm, size_t arg_count, vigil_er
     /* Parse just the first row to count fields */
     vigil_object_t *row = NULL;
     vigil_status_t s = csv_parse_single_row(vm, data, data_len, delim_str[0], &row, error);
-    if (s != VIGIL_STATUS_OK) return s;
+    if (s != VIGIL_STATUS_OK)
+        return s;
 
     int32_t count = (int32_t)vigil_array_object_length(row);
     vigil_object_release(&row);
@@ -1180,8 +1242,7 @@ static vigil_status_t csv_has_header(vigil_vm_t *vm, size_t arg_count, vigil_err
     const char *data, *delim_str;
     size_t data_len, delim_len;
 
-    if (!get_string_arg(vm, base, 0, &data, &data_len) ||
-        !get_string_arg(vm, base, 1, &delim_str, &delim_len))
+    if (!get_string_arg(vm, base, 0, &data, &data_len) || !get_string_arg(vm, base, 1, &delim_str, &delim_len))
     {
         vigil_vm_stack_pop_n(vm, arg_count);
         return push_bool(vm, false, error);
@@ -1197,7 +1258,8 @@ static vigil_status_t csv_has_header(vigil_vm_t *vm, size_t arg_count, vigil_err
      * none are purely numeric, and there are at least 2 rows */
     vigil_object_t *rows = NULL;
     vigil_status_t s = csv_parse_rows(vm, data, data_len, delim_str[0], &rows, error);
-    if (s != VIGIL_STATUS_OK) return s;
+    if (s != VIGIL_STATUS_OK)
+        return s;
 
     size_t row_count = vigil_array_object_length(rows);
     if (row_count < 2)
@@ -1280,14 +1342,11 @@ static const int i32_err_returns[] = {VIGIL_TYPE_I32, VIGIL_TYPE_ERR};
 /* ── Extended type info ──────────────────────────────────────────── */
 
 static const vigil_native_type_t array_string_type = VIGIL_NATIVE_TYPE_ARRAY(VIGIL_TYPE_STRING);
-static const vigil_native_type_t array_array_string_ret = {
-    VIGIL_TYPE_OBJECT, 4, VIGIL_TYPE_OBJECT, 0, 0, &array_string_type
-};
+static const vigil_native_type_t array_array_string_ret = {VIGIL_TYPE_OBJECT, 4, VIGIL_TYPE_OBJECT, 0, 0,
+                                                           &array_string_type};
 static const vigil_native_type_t array_string_ret = VIGIL_NATIVE_TYPE_ARRAY(VIGIL_TYPE_STRING);
 static const vigil_native_type_t map_ss_type = VIGIL_NATIVE_TYPE_MAP(VIGIL_TYPE_STRING, VIGIL_TYPE_STRING);
-static const vigil_native_type_t array_map_ss_ret = {
-    VIGIL_TYPE_OBJECT, 4, VIGIL_TYPE_OBJECT, 0, 0, &map_ss_type
-};
+static const vigil_native_type_t array_map_ss_ret = {VIGIL_TYPE_OBJECT, 4, VIGIL_TYPE_OBJECT, 0, 0, &map_ss_type};
 
 /* Extended param types for stringify_row(row, delimiter) */
 static const vigil_native_type_t stringify_row_param_ext[] = {
@@ -1368,8 +1427,6 @@ static const vigil_native_symbol_doc_t doc_read_file_with_header = {
     "array<map<string, string>> records, err e = csv.read_file_with_header(\"data.csv\", \",\")",
 };
 
-
-
 static const vigil_native_symbol_doc_t doc_field_count = {
     "Count fields in first row.",
     "Returns the number of fields in the first row of CSV data.",
@@ -1396,12 +1453,12 @@ static const vigil_native_module_function_t csv_functions[] = {
      &array_array_string_ret, 0U, pn_data_delim, NULL, "array<array<string>>", &doc_parse},
 
     /* parse_row(line, delimiter) -> (array<string>, err) */
-    {"parse_row", 9U, csv_parse_row, 2U, str_str_param, VIGIL_TYPE_OBJECT, 2U, obj_err_returns, VIGIL_TYPE_STRING,
-     NULL, &array_string_ret, 0U, pn_line_delim, NULL, "array<string>", &doc_parse_row},
+    {"parse_row", 9U, csv_parse_row, 2U, str_str_param, VIGIL_TYPE_OBJECT, 2U, obj_err_returns, VIGIL_TYPE_STRING, NULL,
+     &array_string_ret, 0U, pn_line_delim, NULL, "array<string>", &doc_parse_row},
 
     /* stringify(rows, delimiter) -> (string, err) */
-    {"stringify", 9U, csv_stringify, 2U, obj_str_param, VIGIL_TYPE_STRING, 2U, str_err_returns, 0,
-     NULL, NULL, 0U, pn_rows_delim, tn_rows_delim, NULL, &doc_stringify},
+    {"stringify", 9U, csv_stringify, 2U, obj_str_param, VIGIL_TYPE_STRING, 2U, str_err_returns, 0, NULL, NULL, 0U,
+     pn_rows_delim, tn_rows_delim, NULL, &doc_stringify},
 
     /* stringify_row(row, delimiter) -> (string, err) */
     {"stringify_row", 13U, csv_stringify_row, 2U, obj_str_param, VIGIL_TYPE_STRING, 2U, str_err_returns, 0,
@@ -1412,17 +1469,16 @@ static const vigil_native_module_function_t csv_functions[] = {
      &array_array_string_ret, 0U, pn_path_delim, NULL, "array<array<string>>", &doc_read_file},
 
     /* write_file(path, rows, delimiter) -> err */
-    {"write_file", 10U, csv_write_file, 3U, str_obj_str_param, VIGIL_TYPE_ERR, 1U, NULL, 0, NULL,
-     NULL, 0U, pn_path_rows_delim, tn_path_rows_delim, NULL, &doc_write_file},
+    {"write_file", 10U, csv_write_file, 3U, str_obj_str_param, VIGIL_TYPE_ERR, 1U, NULL, 0, NULL, NULL, 0U,
+     pn_path_rows_delim, tn_path_rows_delim, NULL, &doc_write_file},
 
     /* parse_with_header(data, delimiter) -> (array<map<string,string>>, err) */
     {"parse_with_header", 17U, csv_parse_with_header, 2U, str_str_param, VIGIL_TYPE_OBJECT, 2U, obj_err_returns, 0,
      NULL, &array_map_ss_ret, 0U, pn_data_delim, NULL, "array<map<string, string>>", &doc_parse_with_header},
 
     /* read_file_with_header(path, delimiter) -> (array<map<string,string>>, err) */
-    {"read_file_with_header", 21U, csv_read_file_with_header, 2U, str_str_param, VIGIL_TYPE_OBJECT, 2U,
-     obj_err_returns, 0, NULL, &array_map_ss_ret, 0U, pn_path_delim, NULL, "array<map<string, string>>",
-     &doc_read_file_with_header},
+    {"read_file_with_header", 21U, csv_read_file_with_header, 2U, str_str_param, VIGIL_TYPE_OBJECT, 2U, obj_err_returns,
+     0, NULL, &array_map_ss_ret, 0U, pn_path_delim, NULL, "array<map<string, string>>", &doc_read_file_with_header},
 
     /* field_count(data, delimiter) -> (i32, err) */
     {"field_count", 11U, csv_field_count, 2U, str_str_param, VIGIL_TYPE_I32, 2U, i32_err_returns, 0, NULL, NULL, 0U,
@@ -1433,8 +1489,8 @@ static const vigil_native_module_function_t csv_functions[] = {
      &doc_row_count},
 
     /* has_header(data, delimiter) -> bool */
-    {"has_header", 10U, csv_has_header, 2U, str_str_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U,
-     pn_data_delim, NULL, NULL, &doc_has_header},
+    {"has_header", 10U, csv_has_header, 2U, str_str_param, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U, pn_data_delim,
+     NULL, NULL, &doc_has_header},
 };
 
 #define CSV_FUNCTION_COUNT (sizeof(csv_functions) / sizeof(csv_functions[0]))

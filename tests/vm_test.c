@@ -700,9 +700,9 @@ TEST(VigilVmTest, FusesPlainI32CompareJumpWithoutChainFallback)
 
     chunk = (vigil_chunk_t *)vigil_function_object_chunk(fixture.function);
     ASSERT_NE(chunk, NULL);
-    ASSERT_EQ(vigil_chunk_ensure_reg_cache(chunk, (uint8_t)vigil_function_object_arity(fixture.function), &reg_chunk,
-                                           &error),
-              VIGIL_STATUS_OK);
+    ASSERT_EQ(
+        vigil_chunk_ensure_reg_cache(chunk, (uint8_t)vigil_function_object_arity(fixture.function), &reg_chunk, &error),
+        VIGIL_STATUS_OK);
     ASSERT_NE(reg_chunk, NULL);
     EXPECT_TRUE(CountRegOpcode(reg_chunk, VREG_LT_I32_IMM_JMP) >= 1U);
     EXPECT_EQ(CountRegOpcode(reg_chunk, VREG_LT_I32_JMP), 0U);
@@ -728,9 +728,9 @@ TEST(VigilVmTest, FusesI32ImmediateAddAndSub)
 
     chunk = (vigil_chunk_t *)vigil_function_object_chunk(fixture.function);
     ASSERT_NE(chunk, NULL);
-    ASSERT_EQ(vigil_chunk_ensure_reg_cache(chunk, (uint8_t)vigil_function_object_arity(fixture.function), &reg_chunk,
-                                           &error),
-              VIGIL_STATUS_OK);
+    ASSERT_EQ(
+        vigil_chunk_ensure_reg_cache(chunk, (uint8_t)vigil_function_object_arity(fixture.function), &reg_chunk, &error),
+        VIGIL_STATUS_OK);
     ASSERT_NE(reg_chunk, NULL);
     EXPECT_EQ(CountRegOpcode(reg_chunk, VREG_ADDI), 1U);
     EXPECT_EQ(CountRegOpcode(reg_chunk, VREG_SUBI), 1U);
@@ -764,9 +764,9 @@ TEST(VigilVmTest, FusesI64ImmediateAddAndSub)
 
     chunk = (vigil_chunk_t *)vigil_function_object_chunk(fixture.function);
     ASSERT_NE(chunk, NULL);
-    ASSERT_EQ(vigil_chunk_ensure_reg_cache(chunk, (uint8_t)vigil_function_object_arity(fixture.function), &reg_chunk,
-                                           &error),
-              VIGIL_STATUS_OK);
+    ASSERT_EQ(
+        vigil_chunk_ensure_reg_cache(chunk, (uint8_t)vigil_function_object_arity(fixture.function), &reg_chunk, &error),
+        VIGIL_STATUS_OK);
     ASSERT_NE(reg_chunk, NULL);
     add_i64_imm_count = CountRegOpcode(reg_chunk, VREG_ADDI_I64);
     add_i64_count = CountRegOpcode(reg_chunk, VREG_ADD_I64);
@@ -803,9 +803,9 @@ TEST(VigilVmTest, AvoidsSingleArgCallPackingMove)
     ASSERT_NE(fib_function, NULL);
     chunk = (vigil_chunk_t *)vigil_function_object_chunk(fib_function);
     ASSERT_NE(chunk, NULL);
-    ASSERT_EQ(vigil_chunk_ensure_reg_cache(chunk, (uint8_t)vigil_function_object_arity(fib_function), &reg_chunk,
-                                           &error),
-              VIGIL_STATUS_OK);
+    ASSERT_EQ(
+        vigil_chunk_ensure_reg_cache(chunk, (uint8_t)vigil_function_object_arity(fib_function), &reg_chunk, &error),
+        VIGIL_STATUS_OK);
     ASSERT_NE(reg_chunk, NULL);
     EXPECT_TRUE(CountRegOpcode(reg_chunk, VREG_CALL_SELF) + CountRegOpcode(reg_chunk, VREG_CALL) +
                     CountRegOpcode(reg_chunk, VREG_TAIL_CALL) >=

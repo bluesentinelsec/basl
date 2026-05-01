@@ -374,9 +374,8 @@ static vigil_vm_frame_t *vigil_vm_current_frame(vigil_vm_t *vm)
     return &vm->frames[vm->frame_count - 1U];
 }
 
-vigil_status_t vigil_vm_push_frame(vigil_vm_t *vm, const vigil_object_t *callable,
-                                          const vigil_object_t *function, const vigil_chunk_t *chunk, size_t base_slot,
-                                          vigil_error_t *error)
+vigil_status_t vigil_vm_push_frame(vigil_vm_t *vm, const vigil_object_t *callable, const vigil_object_t *function,
+                                   const vigil_chunk_t *chunk, size_t base_slot, vigil_error_t *error)
 {
     vigil_status_t status;
     vigil_vm_frame_t *frame;
@@ -758,8 +757,7 @@ int vigil_vm_values_equal(const vigil_value_t *left, const vigil_value_t *right)
         /* Allow cross-kind numeric comparison (int vs uint). */
         int lk = vigil_value_kind(left);
         int rk = vigil_value_kind(right);
-        if ((lk == VIGIL_VALUE_INT || lk == VIGIL_VALUE_UINT) &&
-            (rk == VIGIL_VALUE_INT || rk == VIGIL_VALUE_UINT))
+        if ((lk == VIGIL_VALUE_INT || lk == VIGIL_VALUE_UINT) && (rk == VIGIL_VALUE_INT || rk == VIGIL_VALUE_UINT))
         {
             int64_t lv = (lk == VIGIL_VALUE_INT) ? vigil_value_as_int(left) : (int64_t)vigil_value_as_uint(left);
             int64_t rv = (rk == VIGIL_VALUE_INT) ? vigil_value_as_int(right) : (int64_t)vigil_value_as_uint(right);

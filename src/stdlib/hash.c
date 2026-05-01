@@ -115,13 +115,22 @@ static uint32_t load_le32(const uint8_t *p)
 
 static void store_le32(uint8_t *p, uint32_t v)
 {
-    p[0] = (uint8_t)v; p[1] = (uint8_t)(v >> 8); p[2] = (uint8_t)(v >> 16); p[3] = (uint8_t)(v >> 24);
+    p[0] = (uint8_t)v;
+    p[1] = (uint8_t)(v >> 8);
+    p[2] = (uint8_t)(v >> 16);
+    p[3] = (uint8_t)(v >> 24);
 }
 
 static void store_le64(uint8_t *p, uint64_t v)
 {
-    p[0] = (uint8_t)v; p[1] = (uint8_t)(v >> 8); p[2] = (uint8_t)(v >> 16); p[3] = (uint8_t)(v >> 24);
-    p[4] = (uint8_t)(v >> 32); p[5] = (uint8_t)(v >> 40); p[6] = (uint8_t)(v >> 48); p[7] = (uint8_t)(v >> 56);
+    p[0] = (uint8_t)v;
+    p[1] = (uint8_t)(v >> 8);
+    p[2] = (uint8_t)(v >> 16);
+    p[3] = (uint8_t)(v >> 24);
+    p[4] = (uint8_t)(v >> 32);
+    p[5] = (uint8_t)(v >> 40);
+    p[6] = (uint8_t)(v >> 48);
+    p[7] = (uint8_t)(v >> 56);
 }
 
 static void md5_hash(const uint8_t *data, size_t len, uint8_t out[16], vigil_allocator_t *alloc)
@@ -380,12 +389,18 @@ static const vigil_native_symbol_doc_t doc_module = {
     "Non-cryptographic (FNV-1a, DJB2) and cryptographic (MD5, SHA-1, SHA-256, SHA-512) hashes.",
     NULL,
 };
-static const vigil_native_symbol_doc_t doc_fnv1a = {"FNV-1a hash.", "Returns 64-bit integer hash.", "hash.fnv1a(\"hello\")"};
-static const vigil_native_symbol_doc_t doc_djb2 = {"DJB2 hash.", "Returns 64-bit integer hash.", "hash.djb2(\"hello\")"};
-static const vigil_native_symbol_doc_t doc_md5 = {"MD5 hash.", "Returns 32-character hex string. Not cryptographically secure.", "hash.md5(\"hello\")"};
-static const vigil_native_symbol_doc_t doc_sha1 = {"SHA-1 hash.", "Returns 40-character hex string. Not cryptographically secure.", "hash.sha1(\"hello\")"};
-static const vigil_native_symbol_doc_t doc_sha256 = {"SHA-256 hash.", "Returns 64-character hex string.", "hash.sha256(\"hello\")"};
-static const vigil_native_symbol_doc_t doc_sha512 = {"SHA-512 hash.", "Returns 128-character hex string.", "hash.sha512(\"hello\")"};
+static const vigil_native_symbol_doc_t doc_fnv1a = {"FNV-1a hash.", "Returns 64-bit integer hash.",
+                                                    "hash.fnv1a(\"hello\")"};
+static const vigil_native_symbol_doc_t doc_djb2 = {"DJB2 hash.", "Returns 64-bit integer hash.",
+                                                   "hash.djb2(\"hello\")"};
+static const vigil_native_symbol_doc_t doc_md5 = {
+    "MD5 hash.", "Returns 32-character hex string. Not cryptographically secure.", "hash.md5(\"hello\")"};
+static const vigil_native_symbol_doc_t doc_sha1 = {
+    "SHA-1 hash.", "Returns 40-character hex string. Not cryptographically secure.", "hash.sha1(\"hello\")"};
+static const vigil_native_symbol_doc_t doc_sha256 = {"SHA-256 hash.", "Returns 64-character hex string.",
+                                                     "hash.sha256(\"hello\")"};
+static const vigil_native_symbol_doc_t doc_sha512 = {"SHA-512 hash.", "Returns 128-character hex string.",
+                                                     "hash.sha512(\"hello\")"};
 
 /* ── Module descriptor ────────────────────────────────────────────── */
 
@@ -396,10 +411,14 @@ static const char *const pn_data[] = {"data"};
 static const vigil_native_module_function_t hash_functions[] = {
     {"fnv1a", 5U, hash_fnv1a, 1U, p_str, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U, pn_data, NULL, NULL, &doc_fnv1a},
     {"djb2", 4U, hash_djb2, 1U, p_str, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U, pn_data, NULL, NULL, &doc_djb2},
-    {"md5", 3U, hash_md5, 1U, p_str, VIGIL_TYPE_STRING, 2U, str_err_returns, 0, NULL, NULL, 0U, pn_data, NULL, NULL, &doc_md5},
-    {"sha1", 4U, hash_sha1, 1U, p_str, VIGIL_TYPE_STRING, 2U, str_err_returns, 0, NULL, NULL, 0U, pn_data, NULL, NULL, &doc_sha1},
-    {"sha256", 6U, hash_sha256_fn, 1U, p_str, VIGIL_TYPE_STRING, 2U, str_err_returns, 0, NULL, NULL, 0U, pn_data, NULL, NULL, &doc_sha256},
-    {"sha512", 6U, hash_sha512_fn, 1U, p_str, VIGIL_TYPE_STRING, 2U, str_err_returns, 0, NULL, NULL, 0U, pn_data, NULL, NULL, &doc_sha512},
+    {"md5", 3U, hash_md5, 1U, p_str, VIGIL_TYPE_STRING, 2U, str_err_returns, 0, NULL, NULL, 0U, pn_data, NULL, NULL,
+     &doc_md5},
+    {"sha1", 4U, hash_sha1, 1U, p_str, VIGIL_TYPE_STRING, 2U, str_err_returns, 0, NULL, NULL, 0U, pn_data, NULL, NULL,
+     &doc_sha1},
+    {"sha256", 6U, hash_sha256_fn, 1U, p_str, VIGIL_TYPE_STRING, 2U, str_err_returns, 0, NULL, NULL, 0U, pn_data, NULL,
+     NULL, &doc_sha256},
+    {"sha512", 6U, hash_sha512_fn, 1U, p_str, VIGIL_TYPE_STRING, 2U, str_err_returns, 0, NULL, NULL, 0U, pn_data, NULL,
+     NULL, &doc_sha512},
 };
 
 VIGIL_API const vigil_native_module_t vigil_stdlib_hash = {

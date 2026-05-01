@@ -7044,8 +7044,7 @@ static void vigil_parser_set_native_method_return_type(vigil_parser_state_t *sta
         {
             vigil_parser_type_t elem_type;
             if (method->return_element_type == VIGIL_TYPE_OBJECT)
-                elem_type = vigil_binding_type_class(
-                    vigil_parser_resolve_return_class(state, method, class_index));
+                elem_type = vigil_binding_type_class(vigil_parser_resolve_return_class(state, method, class_index));
             else
                 elem_type = vigil_binding_type_primitive((vigil_type_kind_t)method->return_element_type);
             size_t arr_idx;
@@ -7085,8 +7084,7 @@ static void vigil_parser_set_native_method_return_type(vigil_parser_state_t *sta
             {
                 vigil_parser_type_t elem_type;
                 if (method->return_element_type == VIGIL_TYPE_OBJECT)
-                    elem_type = vigil_binding_type_class(
-                        vigil_parser_resolve_return_class(state, method, class_index));
+                    elem_type = vigil_binding_type_class(vigil_parser_resolve_return_class(state, method, class_index));
                 else
                     elem_type = vigil_binding_type_primitive((vigil_type_kind_t)method->return_element_type);
                 size_t arr_idx;
@@ -7097,8 +7095,8 @@ static void vigil_parser_set_native_method_return_type(vigil_parser_state_t *sta
             }
             else
             {
-                first_type = vigil_parser_resolve_native_method_result_type(
-                    state, method, class_index, method->return_types[0]);
+                first_type =
+                    vigil_parser_resolve_native_method_result_type(state, method, class_index, method->return_types[0]);
             }
             vigil_expression_result_set_pair(
                 out_result, first_type,
@@ -13264,8 +13262,7 @@ vigil_status_t vigil_compile_seed_parameter_symbols(vigil_parser_state_t *state,
             param_spec.type = decl->params[i].type;
             param_spec.is_const = 1;
             param_spec.is_param = 1;
-            status =
-                vigil_binding_scope_stack_declare_local(&state->locals, &param_spec, NULL, state->program->error);
+            status = vigil_binding_scope_stack_declare_local(&state->locals, &param_spec, NULL, state->program->error);
         }
         if (status != VIGIL_STATUS_OK)
         {
@@ -13513,8 +13510,8 @@ static vigil_status_t alloc_class_inits(vigil_program_state_t *program, vigil_ru
             {
                 vigil_runtime_class_method_init_t *method_inits = NULL;
                 memory = NULL;
-                status = vigil_runtime_alloc(program->registry->runtime,
-                                             decl->method_count * sizeof(*method_inits), &memory, program->error);
+                status = vigil_runtime_alloc(program->registry->runtime, decl->method_count * sizeof(*method_inits),
+                                             &memory, program->error);
                 if (status != VIGIL_STATUS_OK)
                 {
                     size_t ci;
@@ -13582,8 +13579,8 @@ static vigil_status_t alloc_class_inits(vigil_program_state_t *program, vigil_ru
         {
             vigil_runtime_class_method_init_t *method_inits = NULL;
             memory = NULL;
-            status = vigil_runtime_alloc(program->registry->runtime,
-                                         decl->method_count * sizeof(*method_inits), &memory, program->error);
+            status = vigil_runtime_alloc(program->registry->runtime, decl->method_count * sizeof(*method_inits),
+                                         &memory, program->error);
             if (status != VIGIL_STATUS_OK)
             {
                 size_t ci;

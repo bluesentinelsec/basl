@@ -146,7 +146,8 @@ static struct tm *get_utc_tm(int64_t ts, struct tm *storage)
 {
     time_t t = (time_t)ts;
 #ifdef _WIN32
-    if (gmtime_s(storage, &t) != 0) return NULL;
+    if (gmtime_s(storage, &t) != 0)
+        return NULL;
     return storage;
 #else
     (void)storage;
@@ -159,17 +160,20 @@ static struct tm *get_utc_tm(int64_t ts, struct tm *storage)
 static vigil_status_t push_i64_and_ok(vigil_vm_t *vm, int64_t val, vigil_error_t *error)
 {
     vigil_status_t s = push_i64(vm, val, error);
-    if (s != VIGIL_STATUS_OK) return s;
+    if (s != VIGIL_STATUS_OK)
+        return s;
     return vigil_runtime_push_ok_error(vigil_vm_runtime(vm), vm, error);
 }
 
 static vigil_status_t push_i64_and_err(vigil_vm_t *vm, const char *msg, vigil_error_t *error)
 {
     vigil_status_t s = push_i64(vm, 0, error);
-    if (s != VIGIL_STATUS_OK) return s;
+    if (s != VIGIL_STATUS_OK)
+        return s;
     vigil_object_t *obj = NULL;
     s = vigil_error_object_new_cstr(vigil_vm_runtime(vm), msg, 1, &obj, error);
-    if (s != VIGIL_STATUS_OK) return s;
+    if (s != VIGIL_STATUS_OK)
+        return s;
     vigil_value_t v;
     vigil_value_init_object(&v, &obj);
     s = vigil_vm_stack_push(vm, &v, error);
@@ -191,8 +195,7 @@ static int32_t compute_utc_offset_for(int64_t ts)
     local_tm = *localtime(&t);
     utc_tm = *gmtime(&t);
 #endif
-    offset = (int32_t)((local_tm.tm_hour - utc_tm.tm_hour) * 3600 +
-                        (local_tm.tm_min - utc_tm.tm_min) * 60);
+    offset = (int32_t)((local_tm.tm_hour - utc_tm.tm_hour) * 3600 + (local_tm.tm_min - utc_tm.tm_min) * 60);
     if (local_tm.tm_mday != utc_tm.tm_mday)
     {
         if (local_tm.tm_mday > utc_tm.tm_mday || (local_tm.tm_mday == 1 && utc_tm.tm_mday > 1))
@@ -474,9 +477,9 @@ static vigil_status_t time_format(vigil_vm_t *vm, size_t arg_count, vigil_error_
 /* Portable strptime for Windows — handles common format codes. */
 static char *vigil_strptime(const char *s, const char *fmt, struct tm *tm)
 {
-    static const char *const abbrev_days[] = {"Sun","Mon","Tue","Wed","Thu","Fri","Sat"};
-    static const char *const abbrev_months[] = {"Jan","Feb","Mar","Apr","May","Jun",
-                                                 "Jul","Aug","Sep","Oct","Nov","Dec"};
+    static const char *const abbrev_days[] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
+    static const char *const abbrev_months[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                                                "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
     while (*fmt)
     {
         if (*fmt == '%')
@@ -485,81 +488,119 @@ static char *vigil_strptime(const char *s, const char *fmt, struct tm *tm)
             switch (*fmt)
             {
             case 'Y':
-                if (sscanf(s, "%d", &tm->tm_year) != 1) return NULL;
+                if (sscanf(s, "%d", &tm->tm_year) != 1)
+                    return NULL;
                 tm->tm_year -= 1900;
-                while (*s && (*s == '-' || (*s >= '0' && *s <= '9'))) s++;
+                while (*s && (*s == '-' || (*s >= '0' && *s <= '9')))
+                    s++;
                 break;
             case 'm':
-                if (sscanf(s, "%d", &tm->tm_mon) != 1) return NULL;
+                if (sscanf(s, "%d", &tm->tm_mon) != 1)
+                    return NULL;
                 tm->tm_mon -= 1;
-                while (*s >= '0' && *s <= '9') s++;
+                while (*s >= '0' && *s <= '9')
+                    s++;
                 break;
             case 'd':
-                if (sscanf(s, "%d", &tm->tm_mday) != 1) return NULL;
-                while (*s >= '0' && *s <= '9') s++;
+                if (sscanf(s, "%d", &tm->tm_mday) != 1)
+                    return NULL;
+                while (*s >= '0' && *s <= '9')
+                    s++;
                 break;
             case 'H':
-                if (sscanf(s, "%d", &tm->tm_hour) != 1) return NULL;
-                while (*s >= '0' && *s <= '9') s++;
+                if (sscanf(s, "%d", &tm->tm_hour) != 1)
+                    return NULL;
+                while (*s >= '0' && *s <= '9')
+                    s++;
                 break;
             case 'I':
-                if (sscanf(s, "%d", &tm->tm_hour) != 1) return NULL;
-                while (*s >= '0' && *s <= '9') s++;
+                if (sscanf(s, "%d", &tm->tm_hour) != 1)
+                    return NULL;
+                while (*s >= '0' && *s <= '9')
+                    s++;
                 break;
             case 'M':
-                if (sscanf(s, "%d", &tm->tm_min) != 1) return NULL;
-                while (*s >= '0' && *s <= '9') s++;
+                if (sscanf(s, "%d", &tm->tm_min) != 1)
+                    return NULL;
+                while (*s >= '0' && *s <= '9')
+                    s++;
                 break;
             case 'S':
-                if (sscanf(s, "%d", &tm->tm_sec) != 1) return NULL;
-                while (*s >= '0' && *s <= '9') s++;
+                if (sscanf(s, "%d", &tm->tm_sec) != 1)
+                    return NULL;
+                while (*s >= '0' && *s <= '9')
+                    s++;
                 break;
             case 'j':
-                if (sscanf(s, "%d", &tm->tm_yday) != 1) return NULL;
+                if (sscanf(s, "%d", &tm->tm_yday) != 1)
+                    return NULL;
                 tm->tm_yday -= 1;
-                while (*s >= '0' && *s <= '9') s++;
+                while (*s >= '0' && *s <= '9')
+                    s++;
                 break;
             case 'a': {
                 int i, found = 0;
-                for (i = 0; i < 7; i++) {
+                for (i = 0; i < 7; i++)
+                {
                     size_t len = strlen(abbrev_days[i]);
-                    if (strncmp(s, abbrev_days[i], len) == 0) {
-                        tm->tm_wday = i; s += len; found = 1; break;
+                    if (strncmp(s, abbrev_days[i], len) == 0)
+                    {
+                        tm->tm_wday = i;
+                        s += len;
+                        found = 1;
+                        break;
                     }
                 }
-                if (!found) return NULL;
+                if (!found)
+                    return NULL;
                 break;
             }
             case 'b': {
                 int i, found = 0;
-                for (i = 0; i < 12; i++) {
+                for (i = 0; i < 12; i++)
+                {
                     size_t len = strlen(abbrev_months[i]);
-                    if (strncmp(s, abbrev_months[i], len) == 0) {
-                        tm->tm_mon = i; s += len; found = 1; break;
+                    if (strncmp(s, abbrev_months[i], len) == 0)
+                    {
+                        tm->tm_mon = i;
+                        s += len;
+                        found = 1;
+                        break;
                     }
                 }
-                if (!found) return NULL;
+                if (!found)
+                    return NULL;
                 break;
             }
             case 'p':
-                if (strncmp(s, "PM", 2) == 0 || strncmp(s, "pm", 2) == 0) {
-                    if (tm->tm_hour < 12) tm->tm_hour += 12;
+                if (strncmp(s, "PM", 2) == 0 || strncmp(s, "pm", 2) == 0)
+                {
+                    if (tm->tm_hour < 12)
+                        tm->tm_hour += 12;
                     s += 2;
-                } else if (strncmp(s, "AM", 2) == 0 || strncmp(s, "am", 2) == 0) {
-                    if (tm->tm_hour == 12) tm->tm_hour = 0;
+                }
+                else if (strncmp(s, "AM", 2) == 0 || strncmp(s, "am", 2) == 0)
+                {
+                    if (tm->tm_hour == 12)
+                        tm->tm_hour = 0;
                     s += 2;
-                } else {
+                }
+                else
+                {
                     return NULL;
                 }
                 break;
             case 'n':
-                if (*s == '\n') s++;
+                if (*s == '\n')
+                    s++;
                 break;
             case 't':
-                if (*s == '\t') s++;
+                if (*s == '\t')
+                    s++;
                 break;
             case '%':
-                if (*s != '%') return NULL;
+                if (*s != '%')
+                    return NULL;
                 s++;
                 break;
             default:
@@ -569,8 +610,10 @@ static char *vigil_strptime(const char *s, const char *fmt, struct tm *tm)
         }
         else
         {
-            if (*s != *fmt) return NULL;
-            s++; fmt++;
+            if (*s != *fmt)
+                return NULL;
+            s++;
+            fmt++;
         }
     }
     return (char *)s;
@@ -738,8 +781,9 @@ static vigil_status_t time_diff_seconds(vigil_vm_t *vm, size_t arg_count, vigil_
 
 static int days_in_month(int year, int mon)
 {
-    static const int dim[] = {31,28,31,30,31,30,31,31,30,31,30,31};
-    if (mon < 0 || mon > 11) return 30;
+    static const int dim[] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+    if (mon < 0 || mon > 11)
+        return 30;
     if (mon == 1 && ((year % 4 == 0 && year % 100 != 0) || year % 400 == 0))
         return 29;
     return dim[mon];
@@ -758,16 +802,22 @@ static vigil_status_t time_add_months(vigil_vm_t *vm, size_t arg_count, vigil_er
     vigil_vm_stack_pop_n(vm, arg_count);
 
     tm = get_local_tm(ts, &storage);
-    if (!tm) return push_i64(vm, ts, error);
+    if (!tm)
+        return push_i64(vm, ts, error);
     val = *tm;
 
     total_months = val.tm_mon + n;
     val.tm_year += total_months / 12;
     val.tm_mon = total_months % 12;
-    if (val.tm_mon < 0) { val.tm_mon += 12; val.tm_year--; }
+    if (val.tm_mon < 0)
+    {
+        val.tm_mon += 12;
+        val.tm_year--;
+    }
 
     max_day = days_in_month(val.tm_year + 1900, val.tm_mon);
-    if (val.tm_mday > max_day) val.tm_mday = max_day;
+    if (val.tm_mday > max_day)
+        val.tm_mday = max_day;
     val.tm_isdst = -1;
 
     result = mktime(&val);
@@ -789,12 +839,14 @@ static vigil_status_t time_add_years(vigil_vm_t *vm, size_t arg_count, vigil_err
     vigil_vm_stack_pop_n(vm, arg_count);
 
     tm = get_local_tm(ts, &storage);
-    if (!tm) return push_i64(vm, ts, error);
+    if (!tm)
+        return push_i64(vm, ts, error);
     val = *tm;
 
     val.tm_year += n;
     max_day = days_in_month(val.tm_year + 1900, val.tm_mon);
-    if (val.tm_mday > max_day) val.tm_mday = max_day;
+    if (val.tm_mday > max_day)
+        val.tm_mday = max_day;
     val.tm_isdst = -1;
 
     result = mktime(&val);
@@ -837,9 +889,11 @@ static vigil_status_t time_format_utc(vigil_vm_t *vm, size_t arg_count, vigil_er
     vigil_vm_stack_pop_n(vm, arg_count);
 
     tm = get_utc_tm(ts, &storage);
-    if (!tm) return push_string(vm, "", 0, error);
+    if (!tm)
+        return push_string(vm, "", 0, error);
 
-    if (fmt_len >= sizeof(fmt_buf)) fmt_len = sizeof(fmt_buf) - 1;
+    if (fmt_len >= sizeof(fmt_buf))
+        fmt_len = sizeof(fmt_buf) - 1;
     memcpy(fmt_buf, fmt, fmt_len);
     fmt_buf[fmt_len] = '\0';
 
@@ -867,7 +921,8 @@ static vigil_status_t time_iso8601(vigil_vm_t *vm, size_t arg_count, vigil_error
     size_t len;
     vigil_vm_stack_pop_n(vm, arg_count);
     tm = get_local_tm(ts, &storage);
-    if (!tm) return push_string(vm, "", 0, error);
+    if (!tm)
+        return push_string(vm, "", 0, error);
     len = strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%S", tm);
     return push_string(vm, buf, len, error);
 }
@@ -882,12 +937,14 @@ static vigil_status_t time_rfc3339(vigil_vm_t *vm, size_t arg_count, vigil_error
     int n;
     vigil_vm_stack_pop_n(vm, arg_count);
     tm = get_local_tm(ts, &storage);
-    if (!tm) return push_string(vm, "", 0, error);
+    if (!tm)
+        return push_string(vm, "", 0, error);
     n = (int)strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%S", tm);
     off = compute_utc_offset_for(ts);
     off_h = off / 3600;
     off_m = (off % 3600) / 60;
-    if (off_m < 0) off_m = -off_m;
+    if (off_m < 0)
+        off_m = -off_m;
     n += snprintf(buf + n, sizeof(buf) - (size_t)n, "%+03d:%02d", off_h, off_m);
     return push_string(vm, buf, (size_t)n, error);
 }
@@ -900,20 +957,20 @@ static vigil_status_t time_rfc2822(vigil_vm_t *vm, size_t arg_count, vigil_error
     char buf[64];
     int32_t off, off_h, off_m;
     int n;
-    static const char *const wday[] = {"Sun","Mon","Tue","Wed","Thu","Fri","Sat"};
-    static const char *const mon[] = {"Jan","Feb","Mar","Apr","May","Jun",
-                                       "Jul","Aug","Sep","Oct","Nov","Dec"};
+    static const char *const wday[] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
+    static const char *const mon[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                                      "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
     vigil_vm_stack_pop_n(vm, arg_count);
     tm = get_local_tm(ts, &storage);
-    if (!tm) return push_string(vm, "", 0, error);
+    if (!tm)
+        return push_string(vm, "", 0, error);
     off = compute_utc_offset_for(ts);
     off_h = off / 3600;
     off_m = (off % 3600) / 60;
-    if (off_m < 0) off_m = -off_m;
-    n = snprintf(buf, sizeof(buf), "%s, %02d %s %04d %02d:%02d:%02d %+03d%02d",
-                 wday[tm->tm_wday], tm->tm_mday, mon[tm->tm_mon],
-                 tm->tm_year + 1900, tm->tm_hour, tm->tm_min, tm->tm_sec,
-                 off_h, off_m);
+    if (off_m < 0)
+        off_m = -off_m;
+    n = snprintf(buf, sizeof(buf), "%s, %02d %s %04d %02d:%02d:%02d %+03d%02d", wday[tm->tm_wday], tm->tm_mday,
+                 mon[tm->tm_mon], tm->tm_year + 1900, tm->tm_hour, tm->tm_min, tm->tm_sec, off_h, off_m);
     return push_string(vm, buf, (size_t)n, error);
 }
 
@@ -1092,73 +1149,114 @@ static const vigil_native_symbol_doc_t vigil_time_diff_days_doc = {
 };
 
 static const vigil_native_symbol_doc_t vigil_time_utc_year_doc = {
-    "Get UTC year from timestamp.", "Returns the calendar year in UTC.", "time.utc_year(time.now())",
+    "Get UTC year from timestamp.",
+    "Returns the calendar year in UTC.",
+    "time.utc_year(time.now())",
 };
 static const vigil_native_symbol_doc_t vigil_time_utc_month_doc = {
-    "Get UTC month from timestamp.", "Returns month 1-12 in UTC.", "time.utc_month(time.now())",
+    "Get UTC month from timestamp.",
+    "Returns month 1-12 in UTC.",
+    "time.utc_month(time.now())",
 };
 static const vigil_native_symbol_doc_t vigil_time_utc_day_doc = {
-    "Get UTC day from timestamp.", "Returns day of month 1-31 in UTC.", "time.utc_day(time.now())",
+    "Get UTC day from timestamp.",
+    "Returns day of month 1-31 in UTC.",
+    "time.utc_day(time.now())",
 };
 static const vigil_native_symbol_doc_t vigil_time_utc_hour_doc = {
-    "Get UTC hour from timestamp.", "Returns hour 0-23 in UTC.", "time.utc_hour(time.now())",
+    "Get UTC hour from timestamp.",
+    "Returns hour 0-23 in UTC.",
+    "time.utc_hour(time.now())",
 };
 static const vigil_native_symbol_doc_t vigil_time_utc_minute_doc = {
-    "Get UTC minute from timestamp.", "Returns minute 0-59 in UTC.", "time.utc_minute(time.now())",
+    "Get UTC minute from timestamp.",
+    "Returns minute 0-59 in UTC.",
+    "time.utc_minute(time.now())",
 };
 static const vigil_native_symbol_doc_t vigil_time_utc_second_doc = {
-    "Get UTC second from timestamp.", "Returns second 0-59 in UTC.", "time.utc_second(time.now())",
+    "Get UTC second from timestamp.",
+    "Returns second 0-59 in UTC.",
+    "time.utc_second(time.now())",
 };
 static const vigil_native_symbol_doc_t vigil_time_utc_weekday_doc = {
-    "Get UTC day of week.", "Returns 0 for Sunday through 6 for Saturday in UTC.", "time.utc_weekday(time.now())",
+    "Get UTC day of week.",
+    "Returns 0 for Sunday through 6 for Saturday in UTC.",
+    "time.utc_weekday(time.now())",
 };
 static const vigil_native_symbol_doc_t vigil_time_utc_yearday_doc = {
-    "Get UTC day of year.", "Returns day of year 1-366 in UTC.", "time.utc_yearday(time.now())",
+    "Get UTC day of year.",
+    "Returns day of year 1-366 in UTC.",
+    "time.utc_yearday(time.now())",
 };
 static const vigil_native_symbol_doc_t vigil_time_diff_hours_doc = {
-    "Get difference in hours.", "Returns the whole-hour difference between two timestamps.", "time.diff_hours(a, b)",
+    "Get difference in hours.",
+    "Returns the whole-hour difference between two timestamps.",
+    "time.diff_hours(a, b)",
 };
 static const vigil_native_symbol_doc_t vigil_time_diff_minutes_doc = {
-    "Get difference in minutes.", "Returns the whole-minute difference between two timestamps.",
+    "Get difference in minutes.",
+    "Returns the whole-minute difference between two timestamps.",
     "time.diff_minutes(a, b)",
 };
 static const vigil_native_symbol_doc_t vigil_time_diff_seconds_doc = {
-    "Get difference in seconds.", "Returns the second difference between two timestamps.", "time.diff_seconds(a, b)",
+    "Get difference in seconds.",
+    "Returns the second difference between two timestamps.",
+    "time.diff_seconds(a, b)",
 };
 static const vigil_native_symbol_doc_t vigil_time_add_months_doc = {
-    "Add months to timestamp.", "Calendar-aware: clamps day to month length.", "time.add_months(time.now(), 3)",
+    "Add months to timestamp.",
+    "Calendar-aware: clamps day to month length.",
+    "time.add_months(time.now(), 3)",
 };
 static const vigil_native_symbol_doc_t vigil_time_add_years_doc = {
-    "Add years to timestamp.", "Calendar-aware: clamps Feb 29 on non-leap years.", "time.add_years(time.now(), 1)",
+    "Add years to timestamp.",
+    "Calendar-aware: clamps Feb 29 on non-leap years.",
+    "time.add_years(time.now(), 1)",
 };
 static const vigil_native_symbol_doc_t vigil_time_to_utc_doc = {
-    "Convert local timestamp to UTC.", "Subtracts the local UTC offset.", "time.to_utc(time.now())",
+    "Convert local timestamp to UTC.",
+    "Subtracts the local UTC offset.",
+    "time.to_utc(time.now())",
 };
 static const vigil_native_symbol_doc_t vigil_time_from_utc_doc = {
-    "Convert UTC timestamp to local.", "Adds the local UTC offset.", "time.from_utc(ts)",
+    "Convert UTC timestamp to local.",
+    "Adds the local UTC offset.",
+    "time.from_utc(ts)",
 };
 static const vigil_native_symbol_doc_t vigil_time_format_utc_doc = {
-    "Format timestamp as UTC string.", "Uses gmtime instead of localtime.",
+    "Format timestamp as UTC string.",
+    "Uses gmtime instead of localtime.",
     "time.format_utc(time.now(), \"%Y-%m-%d %H:%M:%S\")",
 };
 static const vigil_native_symbol_doc_t vigil_time_monotonic_ns_doc = {
-    "Get monotonic clock in nanoseconds.", "Returns a monotonic timestamp for measuring elapsed time.",
+    "Get monotonic clock in nanoseconds.",
+    "Returns a monotonic timestamp for measuring elapsed time.",
     "i64 start = time.monotonic_ns()",
 };
 static const vigil_native_symbol_doc_t vigil_time_iso8601_doc = {
-    "Format as ISO 8601.", "Returns \"YYYY-MM-DDTHH:MM:SS\" in local time.", "time.iso8601(time.now())",
+    "Format as ISO 8601.",
+    "Returns \"YYYY-MM-DDTHH:MM:SS\" in local time.",
+    "time.iso8601(time.now())",
 };
 static const vigil_native_symbol_doc_t vigil_time_rfc3339_doc = {
-    "Format as RFC 3339.", "Returns \"YYYY-MM-DDTHH:MM:SS+HH:MM\" with UTC offset.", "time.rfc3339(time.now())",
+    "Format as RFC 3339.",
+    "Returns \"YYYY-MM-DDTHH:MM:SS+HH:MM\" with UTC offset.",
+    "time.rfc3339(time.now())",
 };
 static const vigil_native_symbol_doc_t vigil_time_rfc2822_doc = {
-    "Format as RFC 2822.", "Returns \"Day, DD Mon YYYY HH:MM:SS +HHMM\".", "time.rfc2822(time.now())",
+    "Format as RFC 2822.",
+    "Returns \"Day, DD Mon YYYY HH:MM:SS +HHMM\".",
+    "time.rfc2822(time.now())",
 };
 static const vigil_native_symbol_doc_t vigil_time_from_ms_doc = {
-    "Convert milliseconds to seconds.", "Returns ms / 1000.", "time.from_ms(ms)",
+    "Convert milliseconds to seconds.",
+    "Returns ms / 1000.",
+    "time.from_ms(ms)",
 };
 static const vigil_native_symbol_doc_t vigil_time_to_ms_doc = {
-    "Convert seconds to milliseconds.", "Returns ts * 1000.", "time.to_ms(time.now())",
+    "Convert seconds to milliseconds.",
+    "Returns ts * 1000.",
+    "time.to_ms(time.now())",
 };
 
 static const int i64_err_returns[] = {VIGIL_TYPE_I64, VIGIL_TYPE_ERR};
@@ -1207,14 +1305,14 @@ static const vigil_native_module_function_t time_functions[] = {
      time_ts_n_i64_param_names, NULL, NULL, &vigil_time_add_seconds_doc},
     {"diff_days", 9U, time_diff_days, 2U, i64_i64_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U,
      time_a_b_param_names, NULL, NULL, &vigil_time_diff_days_doc},
-    {"utc_year", 8U, time_utc_year, 1U, i64_param, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, NULL, 0U,
-     time_ts_param_names, NULL, NULL, &vigil_time_utc_year_doc},
-    {"utc_month", 9U, time_utc_month, 1U, i64_param, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, NULL, 0U,
-     time_ts_param_names, NULL, NULL, &vigil_time_utc_month_doc},
-    {"utc_day", 7U, time_utc_day, 1U, i64_param, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, NULL, 0U,
-     time_ts_param_names, NULL, NULL, &vigil_time_utc_day_doc},
-    {"utc_hour", 8U, time_utc_hour, 1U, i64_param, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, NULL, 0U,
-     time_ts_param_names, NULL, NULL, &vigil_time_utc_hour_doc},
+    {"utc_year", 8U, time_utc_year, 1U, i64_param, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, NULL, 0U, time_ts_param_names,
+     NULL, NULL, &vigil_time_utc_year_doc},
+    {"utc_month", 9U, time_utc_month, 1U, i64_param, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, NULL, 0U, time_ts_param_names,
+     NULL, NULL, &vigil_time_utc_month_doc},
+    {"utc_day", 7U, time_utc_day, 1U, i64_param, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, NULL, 0U, time_ts_param_names, NULL,
+     NULL, &vigil_time_utc_day_doc},
+    {"utc_hour", 8U, time_utc_hour, 1U, i64_param, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, NULL, 0U, time_ts_param_names,
+     NULL, NULL, &vigil_time_utc_hour_doc},
     {"utc_minute", 10U, time_utc_minute, 1U, i64_param, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, NULL, 0U,
      time_ts_param_names, NULL, NULL, &vigil_time_utc_minute_doc},
     {"utc_second", 10U, time_utc_second, 1U, i64_param, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, NULL, 0U,
@@ -1233,24 +1331,24 @@ static const vigil_native_module_function_t time_functions[] = {
      time_ts_n_i32_param_names, NULL, NULL, &vigil_time_add_months_doc},
     {"add_years", 9U, time_add_years, 2U, i64_i32_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U,
      time_ts_n_i32_param_names, NULL, NULL, &vigil_time_add_years_doc},
-    {"to_utc", 6U, time_to_utc, 1U, i64_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U,
-     time_ts_param_names, NULL, NULL, &vigil_time_to_utc_doc},
-    {"from_utc", 8U, time_from_utc, 1U, i64_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U,
-     time_ts_param_names, NULL, NULL, &vigil_time_from_utc_doc},
+    {"to_utc", 6U, time_to_utc, 1U, i64_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U, time_ts_param_names, NULL,
+     NULL, &vigil_time_to_utc_doc},
+    {"from_utc", 8U, time_from_utc, 1U, i64_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U, time_ts_param_names,
+     NULL, NULL, &vigil_time_from_utc_doc},
     {"format_utc", 10U, time_format_utc, 2U, i64_str_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U,
      time_ts_fmt_param_names, NULL, NULL, &vigil_time_format_utc_doc},
-    {"monotonic_ns", 12U, time_monotonic_ns, 0U, NULL, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U,
-     NULL, NULL, NULL, &vigil_time_monotonic_ns_doc},
-    {"iso8601", 7U, time_iso8601, 1U, i64_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U,
-     time_ts_param_names, NULL, NULL, &vigil_time_iso8601_doc},
-    {"rfc3339", 7U, time_rfc3339, 1U, i64_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U,
-     time_ts_param_names, NULL, NULL, &vigil_time_rfc3339_doc},
-    {"rfc2822", 7U, time_rfc2822, 1U, i64_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U,
-     time_ts_param_names, NULL, NULL, &vigil_time_rfc2822_doc},
-    {"from_ms", 7U, time_from_ms, 1U, i64_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U,
-     time_ms_param_names, NULL, NULL, &vigil_time_from_ms_doc},
-    {"to_ms", 5U, time_to_ms, 1U, i64_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U,
-     time_ts_param_names, NULL, NULL, &vigil_time_to_ms_doc},
+    {"monotonic_ns", 12U, time_monotonic_ns, 0U, NULL, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL,
+     &vigil_time_monotonic_ns_doc},
+    {"iso8601", 7U, time_iso8601, 1U, i64_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U, time_ts_param_names,
+     NULL, NULL, &vigil_time_iso8601_doc},
+    {"rfc3339", 7U, time_rfc3339, 1U, i64_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U, time_ts_param_names,
+     NULL, NULL, &vigil_time_rfc3339_doc},
+    {"rfc2822", 7U, time_rfc2822, 1U, i64_param, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U, time_ts_param_names,
+     NULL, NULL, &vigil_time_rfc2822_doc},
+    {"from_ms", 7U, time_from_ms, 1U, i64_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U, time_ms_param_names, NULL,
+     NULL, &vigil_time_from_ms_doc},
+    {"to_ms", 5U, time_to_ms, 1U, i64_param, VIGIL_TYPE_I64, 1U, NULL, 0, NULL, NULL, 0U, time_ts_param_names, NULL,
+     NULL, &vigil_time_to_ms_doc},
 };
 
 #define TIME_FUNCTION_COUNT (sizeof(time_functions) / sizeof(time_functions[0]))

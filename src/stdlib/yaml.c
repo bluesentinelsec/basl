@@ -215,8 +215,8 @@ static vigil_status_t yaml_value_to_string(vigil_vm_t *vm, const vigil_json_valu
         return push_str_and_ok(vm, buf, (size_t)n, error);
     }
     case VIGIL_JSON_BOOL:
-        return push_str_and_ok(vm, vigil_json_bool_value(val) ? "true" : "false",
-                               vigil_json_bool_value(val) ? 4 : 5, error);
+        return push_str_and_ok(vm, vigil_json_bool_value(val) ? "true" : "false", vigil_json_bool_value(val) ? 4 : 5,
+                               error);
     case VIGIL_JSON_NULL:
         return push_str_and_ok(vm, "null", 4, error);
     default: {
@@ -236,9 +236,8 @@ static vigil_status_t yaml_value_to_string(vigil_vm_t *vm, const vigil_json_valu
 /* ── Parse + navigate helper ─────────────────────────────────────── */
 
 static vigil_status_t yaml_parse_and_navigate(vigil_vm_t *vm, const char *yaml_str, size_t yaml_len,
-                                              const char *path_str, size_t path_len,
-                                              vigil_json_value_t **out_json, const vigil_json_value_t **out_node,
-                                              vigil_error_t *error)
+                                              const char *path_str, size_t path_len, vigil_json_value_t **out_json,
+                                              const vigil_json_value_t **out_node, vigil_error_t *error)
 {
     vigil_allocator_t alloc = get_alloc(vm);
     vigil_status_t s = vigil_yaml_parse(yaml_str, yaml_len, &alloc, out_json, error);
@@ -436,7 +435,8 @@ static vigil_status_t vigil_yaml_keys_fn(vigil_vm_t *vm, size_t arg_count, vigil
         vigil_vm_stack_pop_n(vm, arg_count);
         vigil_object_t *empty = NULL;
         vigil_status_t s = vigil_array_object_new(vigil_vm_runtime(vm), NULL, 0, &empty, error);
-        if (s != VIGIL_STATUS_OK) return s;
+        if (s != VIGIL_STATUS_OK)
+            return s;
         return push_obj_and_err(vm, &empty, "keys: invalid arguments", error);
     }
 
@@ -450,7 +450,8 @@ static vigil_status_t vigil_yaml_keys_fn(vigil_vm_t *vm, size_t arg_count, vigil
         vigil_json_free(&json);
         vigil_object_t *empty = NULL;
         s = vigil_array_object_new(vigil_vm_runtime(vm), NULL, 0, &empty, error);
-        if (s != VIGIL_STATUS_OK) return s;
+        if (s != VIGIL_STATUS_OK)
+            return s;
         return push_obj_and_err(vm, &empty, "keys: path is not an object", error);
     }
 
@@ -554,7 +555,7 @@ static void yaml_emit_indent(char **buf, size_t *len, size_t *cap, const vigil_a
 }
 
 static void yaml_emit_str(char **buf, size_t *len, size_t *cap, const vigil_allocator_t *alloc, const char *s,
-                           size_t slen)
+                          size_t slen)
 {
     while (*len + slen + 1 >= *cap)
     {
@@ -593,10 +594,10 @@ static int yaml_string_needs_quoting(const char *s, size_t len)
 }
 
 static void yaml_emit_value(const vigil_json_value_t *val, char **buf, size_t *len, size_t *cap,
-                             const vigil_allocator_t *alloc, size_t indent, int is_root);
+                            const vigil_allocator_t *alloc, size_t indent, int is_root);
 
 static void yaml_emit_quoted(char **buf, size_t *len, size_t *cap, const vigil_allocator_t *alloc, const char *s,
-                              size_t slen)
+                             size_t slen)
 {
     yaml_emit_str(buf, len, cap, alloc, "\"", 1);
     for (size_t i = 0; i < slen; i++)
@@ -625,7 +626,7 @@ static void yaml_emit_quoted(char **buf, size_t *len, size_t *cap, const vigil_a
 }
 
 static void yaml_emit_value(const vigil_json_value_t *val, char **buf, size_t *len, size_t *cap,
-                             const vigil_allocator_t *alloc, size_t indent, int is_root)
+                            const vigil_allocator_t *alloc, size_t indent, int is_root)
 {
     switch (vigil_json_type(val))
     {
@@ -902,8 +903,8 @@ static vigil_status_t vigil_yaml_set_fn(vigil_vm_t *vm, size_t arg_count, vigil_
 
 /* ── File I/O helpers ────────────────────────────────────────────── */
 
-static vigil_status_t yaml_read_file(const vigil_allocator_t *alloc, const char *path, char **out_data,
-                                     size_t *out_len, const char **out_msg, vigil_error_t *error)
+static vigil_status_t yaml_read_file(const vigil_allocator_t *alloc, const char *path, char **out_data, size_t *out_len,
+                                     const char **out_msg, vigil_error_t *error)
 {
     FILE *file = NULL;
     *out_data = NULL;
@@ -1171,8 +1172,8 @@ static const vigil_native_module_function_t vigil_yaml_functions[] = {
      pn_yaml_path, NULL, NULL, &doc_get},
 
     /* has(yaml, path) -> bool */
-    {"has", 3U, vigil_yaml_has_fn, 2U, str_str_params, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U, pn_yaml_path,
-     NULL, NULL, &doc_has},
+    {"has", 3U, vigil_yaml_has_fn, 2U, str_str_params, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U, pn_yaml_path, NULL,
+     NULL, &doc_has},
 
     /* type(yaml, path) -> string */
     {"type", 4U, vigil_yaml_type_fn, 2U, str_str_params, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U, pn_yaml_path,
@@ -1195,8 +1196,8 @@ static const vigil_native_module_function_t vigil_yaml_functions[] = {
      pn_yaml_path_value, NULL, NULL, &doc_set},
 
     /* read_file(path) -> (string, err) */
-    {"read_file", 9U, vigil_yaml_read_file_fn, 1U, str_param, VIGIL_TYPE_STRING, 2U, str_err_returns, 0, NULL, NULL,
-     0U, pn_path, NULL, NULL, &doc_read_file},
+    {"read_file", 9U, vigil_yaml_read_file_fn, 1U, str_param, VIGIL_TYPE_STRING, 2U, str_err_returns, 0, NULL, NULL, 0U,
+     pn_path, NULL, NULL, &doc_read_file},
 
     /* write_file(path, json) -> err */
     {"write_file", 10U, vigil_yaml_write_file_fn, 2U, str_str_params, VIGIL_TYPE_ERR, 1U, NULL, 0, NULL, NULL, 0U,

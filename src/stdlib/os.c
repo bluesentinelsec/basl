@@ -64,7 +64,8 @@ static vigil_status_t os_getenv(vigil_vm_t *vm, size_t arg_count, vigil_error_t 
     {
         vigil_vm_stack_pop_n(vm, arg_count);
         vigil_status_t s = push_cstr(vm, "", error);
-        if (s != VIGIL_STATUS_OK) return s;
+        if (s != VIGIL_STATUS_OK)
+            return s;
         vigil_value_t bv;
         vigil_value_init_bool(&bv, 0);
         return vigil_vm_stack_push(vm, &bv, error);
@@ -80,7 +81,8 @@ static vigil_status_t os_getenv(vigil_vm_t *vm, size_t arg_count, vigil_error_t 
     vigil_vm_stack_pop_n(vm, arg_count);
 
     vigil_status_t s = push_cstr(vm, val != NULL ? val : "", error);
-    if (s != VIGIL_STATUS_OK) return s;
+    if (s != VIGIL_STATUS_OK)
+        return s;
     vigil_value_t bv;
     vigil_value_init_bool(&bv, val != NULL);
     return vigil_vm_stack_push(vm, &bv, error);
@@ -170,13 +172,16 @@ static vigil_status_t os_exec(vigil_vm_t *vm, size_t arg_count, vigil_error_t *e
     {
         vigil_vm_stack_pop_n(vm, arg_count);
         s = push_cstr(vm, "", error);
-        if (s != VIGIL_STATUS_OK) return s;
+        if (s != VIGIL_STATUS_OK)
+            return s;
         s = push_cstr(vm, "", error);
-        if (s != VIGIL_STATUS_OK) return s;
+        if (s != VIGIL_STATUS_OK)
+            return s;
         vigil_value_t iv;
         vigil_value_init_int(&iv, -1);
         s = vigil_vm_stack_push(vm, &iv, error);
-        if (s != VIGIL_STATUS_OK) return s;
+        if (s != VIGIL_STATUS_OK)
+            return s;
         return push_err(vm, "exec: invalid program argument", error);
     }
 
@@ -201,19 +206,23 @@ static vigil_status_t os_exec(vigil_vm_t *vm, size_t arg_count, vigil_error_t *e
     {
         vigil_vm_stack_pop_n(vm, arg_count);
         s = push_cstr(vm, "", error);
-        if (s != VIGIL_STATUS_OK) return s;
+        if (s != VIGIL_STATUS_OK)
+            return s;
         s = push_cstr(vm, "", error);
-        if (s != VIGIL_STATUS_OK) return s;
+        if (s != VIGIL_STATUS_OK)
+            return s;
         vigil_value_t iv;
         vigil_value_init_int(&iv, -1);
         s = vigil_vm_stack_push(vm, &iv, error);
-        if (s != VIGIL_STATUS_OK) return s;
+        if (s != VIGIL_STATUS_OK)
+            return s;
         return push_err(vm, "exec: allocation failed", error);
     }
 
     /* Copy program name into a NUL-terminated buffer */
     char prog_buf[4096];
-    if (prog_len >= sizeof(prog_buf)) prog_len = sizeof(prog_buf) - 1;
+    if (prog_len >= sizeof(prog_buf))
+        prog_len = sizeof(prog_buf) - 1;
     memcpy(prog_buf, prog, prog_len);
     prog_buf[prog_len] = '\0';
     argv[0] = prog_buf;
@@ -230,7 +239,8 @@ static vigil_status_t os_exec(vigil_vm_t *vm, size_t arg_count, vigil_error_t *e
             {
                 const char *es = vigil_string_object_c_str(so);
                 size_t el = vigil_string_object_length(so);
-                if (el >= sizeof(arg_bufs[0])) el = sizeof(arg_bufs[0]) - 1;
+                if (el >= sizeof(arg_bufs[0]))
+                    el = sizeof(arg_bufs[0]) - 1;
                 memcpy(arg_bufs[i], es, el);
                 arg_bufs[i][el] = '\0';
                 argv[1 + i] = arg_bufs[i];
@@ -257,17 +267,26 @@ static vigil_status_t os_exec(vigil_vm_t *vm, size_t arg_count, vigil_error_t *e
 
     vigil_status_t ps;
     ps = push_cstr(vm, out_stdout ? out_stdout : "", error);
-    if (out_stdout) a->deallocate(a->user_data, out_stdout);
-    if (ps != VIGIL_STATUS_OK) { if (out_stderr) a->deallocate(a->user_data, out_stderr); return ps; }
+    if (out_stdout)
+        a->deallocate(a->user_data, out_stdout);
+    if (ps != VIGIL_STATUS_OK)
+    {
+        if (out_stderr)
+            a->deallocate(a->user_data, out_stderr);
+        return ps;
+    }
 
     ps = push_cstr(vm, out_stderr ? out_stderr : "", error);
-    if (out_stderr) a->deallocate(a->user_data, out_stderr);
-    if (ps != VIGIL_STATUS_OK) return ps;
+    if (out_stderr)
+        a->deallocate(a->user_data, out_stderr);
+    if (ps != VIGIL_STATUS_OK)
+        return ps;
 
     vigil_value_t iv;
     vigil_value_init_int(&iv, (int64_t)exit_code);
     ps = vigil_vm_stack_push(vm, &iv, error);
-    if (ps != VIGIL_STATUS_OK) return ps;
+    if (ps != VIGIL_STATUS_OK)
+        return ps;
 
     if (s != VIGIL_STATUS_OK)
         return push_err(vm, "exec: command failed", error);
@@ -288,7 +307,8 @@ static vigil_status_t os_exec_streaming(vigil_vm_t *vm, size_t arg_count, vigil_
         vigil_value_t iv;
         vigil_value_init_int(&iv, -1);
         s = vigil_vm_stack_push(vm, &iv, error);
-        if (s != VIGIL_STATUS_OK) return s;
+        if (s != VIGIL_STATUS_OK)
+            return s;
         return push_err(vm, "exec_streaming: invalid program argument", error);
     }
 
@@ -313,12 +333,14 @@ static vigil_status_t os_exec_streaming(vigil_vm_t *vm, size_t arg_count, vigil_
         vigil_value_t iv;
         vigil_value_init_int(&iv, -1);
         s = vigil_vm_stack_push(vm, &iv, error);
-        if (s != VIGIL_STATUS_OK) return s;
+        if (s != VIGIL_STATUS_OK)
+            return s;
         return push_err(vm, "exec_streaming: allocation failed", error);
     }
 
     char prog_buf[4096];
-    if (prog_len >= sizeof(prog_buf)) prog_len = sizeof(prog_buf) - 1;
+    if (prog_len >= sizeof(prog_buf))
+        prog_len = sizeof(prog_buf) - 1;
     memcpy(prog_buf, prog, prog_len);
     prog_buf[prog_len] = '\0';
     argv[0] = prog_buf;
@@ -334,7 +356,8 @@ static vigil_status_t os_exec_streaming(vigil_vm_t *vm, size_t arg_count, vigil_
             {
                 const char *es = vigil_string_object_c_str(so);
                 size_t el = vigil_string_object_length(so);
-                if (el >= sizeof(arg_bufs[0])) el = sizeof(arg_bufs[0]) - 1;
+                if (el >= sizeof(arg_bufs[0]))
+                    el = sizeof(arg_bufs[0]) - 1;
                 memcpy(arg_bufs[i], es, el);
                 arg_bufs[i][el] = '\0';
                 argv[1 + i] = arg_bufs[i];
@@ -361,7 +384,8 @@ static vigil_status_t os_exec_streaming(vigil_vm_t *vm, size_t arg_count, vigil_
     vigil_value_t iv;
     vigil_value_init_int(&iv, (int64_t)exit_code);
     vigil_status_t ps = vigil_vm_stack_push(vm, &iv, error);
-    if (ps != VIGIL_STATUS_OK) return ps;
+    if (ps != VIGIL_STATUS_OK)
+        return ps;
 
     if (s != VIGIL_STATUS_OK)
         return push_err(vm, "exec_streaming: command failed", error);
@@ -518,7 +542,7 @@ static vigil_status_t os_environ(vigil_vm_t *vm, size_t arg_count, vigil_error_t
     {
         for (size_t j = 0; j < env_count; j++)
             free(env[j]); /* alloc-check: exempt - platform-allocated */
-        free(env); /* alloc-check: exempt - platform-allocated */
+        free(env);        /* alloc-check: exempt - platform-allocated */
         vigil_object_release(&map);
         return s;
     }
@@ -624,31 +648,29 @@ static const vigil_native_symbol_doc_t os_interrupted_doc = {
 };
 
 static const vigil_native_module_function_t os_functions[] = {
-    {"getenv", 6U, os_getenv, 1U, p_str, VIGIL_TYPE_STRING, 2U, str_bool_returns, 0, NULL, NULL, 0U,
-     getenv_param_names, NULL, NULL, &os_getenv_doc},
-    {"setenv", 6U, os_setenv, 2U, p_str_str, VIGIL_TYPE_ERR, 1U, NULL, 0, NULL, NULL, 0U,
-     setenv_param_names, NULL, NULL, &os_setenv_doc},
-    {"unsetenv", 8U, os_unsetenv, 1U, p_str, VIGIL_TYPE_ERR, 1U, NULL, 0, NULL, NULL, 0U,
-     unsetenv_param_names, NULL, NULL, &os_unsetenv_doc},
+    {"getenv", 6U, os_getenv, 1U, p_str, VIGIL_TYPE_STRING, 2U, str_bool_returns, 0, NULL, NULL, 0U, getenv_param_names,
+     NULL, NULL, &os_getenv_doc},
+    {"setenv", 6U, os_setenv, 2U, p_str_str, VIGIL_TYPE_ERR, 1U, NULL, 0, NULL, NULL, 0U, setenv_param_names, NULL,
+     NULL, &os_setenv_doc},
+    {"unsetenv", 8U, os_unsetenv, 1U, p_str, VIGIL_TYPE_ERR, 1U, NULL, 0, NULL, NULL, 0U, unsetenv_param_names, NULL,
+     NULL, &os_unsetenv_doc},
     {"environ", 7U, os_environ, 0U, NULL, VIGIL_TYPE_OBJECT, 1U, NULL, 0, NULL,
-     &(const vigil_native_type_t)VIGIL_NATIVE_TYPE_MAP(VIGIL_TYPE_STRING, VIGIL_TYPE_STRING), 0U,
-     NULL, NULL, NULL, &os_environ_doc},
-    {"exit", 4U, os_exit_fn, 1U, p_i32, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, NULL, 0U,
-     exit_param_names, NULL, NULL, &os_exit_doc},
-    {"platform", 8U, os_platform, 0U, NULL, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U,
-     NULL, NULL, NULL, &os_platform_doc},
-    {"arch", 4U, os_arch, 0U, NULL, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U,
-     NULL, NULL, NULL, &os_arch_doc},
+     &(const vigil_native_type_t)VIGIL_NATIVE_TYPE_MAP(VIGIL_TYPE_STRING, VIGIL_TYPE_STRING), 0U, NULL, NULL, NULL,
+     &os_environ_doc},
+    {"exit", 4U, os_exit_fn, 1U, p_i32, VIGIL_TYPE_VOID, 0U, NULL, 0, NULL, NULL, 0U, exit_param_names, NULL, NULL,
+     &os_exit_doc},
+    {"platform", 8U, os_platform, 0U, NULL, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL,
+     &os_platform_doc},
+    {"arch", 4U, os_arch, 0U, NULL, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, &os_arch_doc},
     {"exec", 4U, os_exec, 2U, p_str_obj, VIGIL_TYPE_STRING, 4U, str_str_i32_err_returns, 0, exec_params_ext, NULL, 0U,
      exec_param_names, NULL, NULL, &os_exec_doc},
     {"exec_streaming", 14U, os_exec_streaming, 2U, p_str_obj, VIGIL_TYPE_I32, 2U, i32_err_returns, 0, exec_params_ext,
      NULL, 0U, exec_param_names, NULL, NULL, &os_exec_streaming_doc},
-    {"hostname", 8U, os_hostname, 0U, NULL, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U,
-     NULL, NULL, NULL, &os_hostname_doc},
-    {"pid", 3U, os_pid, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, NULL, 0U,
-     NULL, NULL, NULL, &os_pid_doc},
-    {"interrupted", 11U, os_interrupted, 0U, NULL, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U,
-     NULL, NULL, NULL, &os_interrupted_doc},
+    {"hostname", 8U, os_hostname, 0U, NULL, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL,
+     &os_hostname_doc},
+    {"pid", 3U, os_pid, 0U, NULL, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, &os_pid_doc},
+    {"interrupted", 11U, os_interrupted, 0U, NULL, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL,
+     &os_interrupted_doc},
 };
 
 VIGIL_API const vigil_native_module_t vigil_stdlib_os = {

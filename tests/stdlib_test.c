@@ -2121,20 +2121,21 @@ TEST(VigilStdlibCryptoTest, Base64Decode)
 
 TEST(VigilStdlibCryptoTest, EncryptDecryptRoundtrip)
 {
-    EXPECT_EQ(RunWithStdlib(vigil_test_failed_, "\n"
-                                                "import \"crypto\";\n"
-                                                "fn main() -> i32 {\n"
-                                                "    string key, err e1 = crypto.random_bytes(32);\n"
-                                                "    string nonce, err e2 = crypto.random_bytes(12);\n"
-                                                "    if e1 != ok || e2 != ok { return 2; }\n"
-                                                "    string plaintext = \"secret message\";\n"
-                                                "    string encrypted, err e3 = crypto.encrypt(key, nonce, plaintext, \"\");\n"
-                                                "    if e3 != ok { return 3; }\n"
-                                                "    string decrypted, err e4 = crypto.decrypt(key, encrypted, \"\");\n"
-                                                "    if e4 != ok { return 4; }\n"
-                                                "    if decrypted != plaintext { return 1; }\n"
-                                                "    return 0;\n"
-                                                "}\n"),
+    EXPECT_EQ(RunWithStdlib(vigil_test_failed_,
+                            "\n"
+                            "import \"crypto\";\n"
+                            "fn main() -> i32 {\n"
+                            "    string key, err e1 = crypto.random_bytes(32);\n"
+                            "    string nonce, err e2 = crypto.random_bytes(12);\n"
+                            "    if e1 != ok || e2 != ok { return 2; }\n"
+                            "    string plaintext = \"secret message\";\n"
+                            "    string encrypted, err e3 = crypto.encrypt(key, nonce, plaintext, \"\");\n"
+                            "    if e3 != ok { return 3; }\n"
+                            "    string decrypted, err e4 = crypto.decrypt(key, encrypted, \"\");\n"
+                            "    if e4 != ok { return 4; }\n"
+                            "    if decrypted != plaintext { return 1; }\n"
+                            "    return 0;\n"
+                            "}\n"),
               0);
 }
 
@@ -2720,19 +2721,20 @@ TEST(VigilStdlibCsvTest, ParseRowAndStringifyRow)
 {
     /* Covers csv_parse_field_buf (unquoted + quoted fields),
        csv_parse_row, csv_stringify_row, csv_write_field, csv_needs_quote. */
-    int64_t result = RunWithStdlib(vigil_test_failed_, "import \"csv\";\n"
-                                                       "fn main() -> i32 {\n"
-                                                       "    array<string> row, err e1 = csv.parse_row(\"a,b,c\", \",\");\n"
-                                                       "    if e1 != ok { return 1; }\n"
-                                                       "    if row.len() != 3 { return 2; }\n"
-                                                       "    if row[0] != \"a\" { return 3; }\n"
-                                                       "    string out, err e2 = csv.stringify_row(row, \",\");\n"
-                                                       "    if out != \"a,b,c\" { return 4; }\n"
-                                                       "    array<string> q, err e3 = csv.parse_row(\"\\\"x,y\\\",z\", \",\");\n"
-                                                       "    if q.len() != 2 { return 5; }\n"
-                                                       "    if q[0] != \"x,y\" { return 6; }\n"
-                                                       "    return 0;\n"
-                                                       "}\n");
+    int64_t result =
+        RunWithStdlib(vigil_test_failed_, "import \"csv\";\n"
+                                          "fn main() -> i32 {\n"
+                                          "    array<string> row, err e1 = csv.parse_row(\"a,b,c\", \",\");\n"
+                                          "    if e1 != ok { return 1; }\n"
+                                          "    if row.len() != 3 { return 2; }\n"
+                                          "    if row[0] != \"a\" { return 3; }\n"
+                                          "    string out, err e2 = csv.stringify_row(row, \",\");\n"
+                                          "    if out != \"a,b,c\" { return 4; }\n"
+                                          "    array<string> q, err e3 = csv.parse_row(\"\\\"x,y\\\",z\", \",\");\n"
+                                          "    if q.len() != 2 { return 5; }\n"
+                                          "    if q[0] != \"x,y\" { return 6; }\n"
+                                          "    return 0;\n"
+                                          "}\n");
     EXPECT_EQ(result, 0);
 }
 

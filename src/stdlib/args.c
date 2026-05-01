@@ -66,27 +66,27 @@ static void args_dealloc(vigil_vm_t *vm, void *ptr)
 
 enum
 {
-    F_PROG = 0,       /* string */
-    F_DESC,           /* string */
-    F_NAMES,          /* array<string> */
-    F_SHORTS,         /* array<string> */
-    F_TYPES,          /* array<string> */
-    F_DEFAULTS,       /* array<string> */
-    F_DESCS,          /* array<string> */
-    F_REQUIRED,       /* array<string> */
-    F_POS_NAMES,      /* array<string> */
-    F_POS_DESCS,      /* array<string> */
-    F_VALUES,         /* array<string>  key=value pairs after parse */
-    F_POSITIONALS,    /* array<string>  positional args after parse */
-    F_VERSION_STR,    /* string */
-    F_POS_REQUIRED,   /* array<string> */
-    F_POS_NARGS,      /* array<string> */
-    F_SUBCOMMANDS,    /* array<string>  "name:desc" pairs */
-    F_SUB_NAME,       /* string */
-    F_ENV_VARS,       /* array<string>  "name=ENV_VAR" pairs */
-    F_CONFIG_KEYS,    /* array<string>  "name=config_key" pairs */
-    F_CONFIG_DATA,    /* array<string>  "key=value" pairs from loaded config file */
-    F_SUB_PARSERS,    /* array<object>  child Parser instances for subcommands */
+    F_PROG = 0,     /* string */
+    F_DESC,         /* string */
+    F_NAMES,        /* array<string> */
+    F_SHORTS,       /* array<string> */
+    F_TYPES,        /* array<string> */
+    F_DEFAULTS,     /* array<string> */
+    F_DESCS,        /* array<string> */
+    F_REQUIRED,     /* array<string> */
+    F_POS_NAMES,    /* array<string> */
+    F_POS_DESCS,    /* array<string> */
+    F_VALUES,       /* array<string>  key=value pairs after parse */
+    F_POSITIONALS,  /* array<string>  positional args after parse */
+    F_VERSION_STR,  /* string */
+    F_POS_REQUIRED, /* array<string> */
+    F_POS_NARGS,    /* array<string> */
+    F_SUBCOMMANDS,  /* array<string>  "name:desc" pairs */
+    F_SUB_NAME,     /* string */
+    F_ENV_VARS,     /* array<string>  "name=ENV_VAR" pairs */
+    F_CONFIG_KEYS,  /* array<string>  "name=config_key" pairs */
+    F_CONFIG_DATA,  /* array<string>  "key=value" pairs from loaded config file */
+    F_SUB_PARSERS,  /* array<object>  child Parser instances for subcommands */
     FIELD_COUNT
 };
 
@@ -775,13 +775,13 @@ static const char *lookup_env_var(vigil_object_t *env_arr, const char *name)
  * 3 = version requested.  On success stores results in self's fields.
  * Does NOT touch the VM stack.
  */
-#define PARSE_OK      0
-#define PARSE_ERR     1
-#define PARSE_HELP    2
+#define PARSE_OK 0
+#define PARSE_ERR 1
+#define PARSE_HELP 2
 #define PARSE_VERSION 3
 
-static int parse_core(vigil_object_t *self, vigil_vm_t *vm, const char *const *argv, size_t argc,
-                      char *err_buf, size_t err_size, vigil_error_t *error);
+static int parse_core(vigil_object_t *self, vigil_vm_t *vm, const char *const *argv, size_t argc, char *err_buf,
+                      size_t err_size, vigil_error_t *error);
 
 /* Find short flag index by single character. Returns -1 if not found. */
 static int find_short_flag_idx(vigil_object_t *shorts_arr, char ch)
@@ -797,8 +797,8 @@ static int find_short_flag_idx(vigil_object_t *shorts_arr, char ch)
     return -1;
 }
 
-static int parse_core(vigil_object_t *self, vigil_vm_t *vm, const char *const *argv, size_t argc,
-                      char *err_buf, size_t err_size, vigil_error_t *error)
+static int parse_core(vigil_object_t *self, vigil_vm_t *vm, const char *const *argv, size_t argc, char *err_buf,
+                      size_t err_size, vigil_error_t *error)
 {
     vigil_runtime_t *rt = vigil_vm_runtime(vm);
     vigil_status_t s;
@@ -959,8 +959,7 @@ static int parse_core(vigil_object_t *self, vigil_vm_t *vm, const char *const *a
                     const char *const *child_argv = argv + pos + 1;
                     size_t child_argc = argc - pos - 1;
                     char child_err[256];
-                    int cr = parse_core(child, vm, child_argv, child_argc,
-                                        child_err, sizeof(child_err), error);
+                    int cr = parse_core(child, vm, child_argv, child_argc, child_err, sizeof(child_err), error);
                     if (cr == PARSE_ERR)
                     {
                         args_dealloc(vm, cli_set);
@@ -1916,29 +1915,29 @@ static const vigil_native_symbol_doc_t parser_desc_doc = {
     "Program description.", "Stores the description shown in generated help text.", "string desc = parser.desc"};
 static const vigil_native_symbol_doc_t parser_names_doc = {
     "Declared option names.", "Holds the long names for declared options.", "array<string> names = parser.names"};
-static const vigil_native_symbol_doc_t parser_shorts_doc = {
-    "Declared short option names.", "Holds the short aliases for declared options.",
-    "array<string> shorts = parser.shorts"};
+static const vigil_native_symbol_doc_t parser_shorts_doc = {"Declared short option names.",
+                                                            "Holds the short aliases for declared options.",
+                                                            "array<string> shorts = parser.shorts"};
 static const vigil_native_symbol_doc_t parser_types_doc = {
     "Declared option types.", "Stores the internal option type tags for each declared option.",
     "array<string> types = parser.types"};
-static const vigil_native_symbol_doc_t parser_defaults_doc = {
-    "Declared default values.", "Stores default string values for declared options.",
-    "array<string> defaults = parser.defaults"};
+static const vigil_native_symbol_doc_t parser_defaults_doc = {"Declared default values.",
+                                                              "Stores default string values for declared options.",
+                                                              "array<string> defaults = parser.defaults"};
 static const vigil_native_symbol_doc_t parser_descs_doc = {
     "Declared option descriptions.", "Stores help text for declared options.", "array<string> descs = parser.descs"};
-static const vigil_native_symbol_doc_t parser_required_doc = {
-    "Required-option markers.", "Stores whether each declared option is required.",
-    "array<string> required = parser.required"};
-static const vigil_native_symbol_doc_t parser_pos_names_doc = {
-    "Declared positional argument names.", "Stores names for declared positional arguments.",
-    "array<string> names = parser.pos_names"};
-static const vigil_native_symbol_doc_t parser_pos_descs_doc = {
-    "Declared positional argument descriptions.", "Stores help text for declared positional arguments.",
-    "array<string> descs = parser.pos_descs"};
-static const vigil_native_symbol_doc_t parser_values_doc = {
-    "Parsed option values.", "Stores parsed option values after a successful parse.",
-    "array<string> values = parser.values"};
+static const vigil_native_symbol_doc_t parser_required_doc = {"Required-option markers.",
+                                                              "Stores whether each declared option is required.",
+                                                              "array<string> required = parser.required"};
+static const vigil_native_symbol_doc_t parser_pos_names_doc = {"Declared positional argument names.",
+                                                               "Stores names for declared positional arguments.",
+                                                               "array<string> names = parser.pos_names"};
+static const vigil_native_symbol_doc_t parser_pos_descs_doc = {"Declared positional argument descriptions.",
+                                                               "Stores help text for declared positional arguments.",
+                                                               "array<string> descs = parser.pos_descs"};
+static const vigil_native_symbol_doc_t parser_values_doc = {"Parsed option values.",
+                                                            "Stores parsed option values after a successful parse.",
+                                                            "array<string> values = parser.values"};
 static const vigil_native_symbol_doc_t parser_positionals_doc = {
     "Parsed positional values.", "Stores parsed positional arguments after a successful parse.",
     "array<string> values = parser.positionals"};
@@ -1951,19 +1950,18 @@ static const vigil_native_symbol_doc_t parser_pos_nargs_doc = {
     "Positional nargs specifiers.", "Tracks the nargs mode for each positional (1, *, +, ?).",
     "array<string> nargs = parser.pos_nargs"};
 static const vigil_native_symbol_doc_t parser_subcommands_doc = {
-    "Declared subcommands.", "Stores subcommand name:desc pairs.",
-    "array<string> cmds = parser.subcommands"};
+    "Declared subcommands.", "Stores subcommand name:desc pairs.", "array<string> cmds = parser.subcommands"};
 static const vigil_native_symbol_doc_t parser_sub_name_doc = {
     "Matched subcommand.", "Stores the matched subcommand name after parse.", "string cmd = parser.sub_name"};
-static const vigil_native_symbol_doc_t parser_env_vars_doc = {
-    "Environment variable fallbacks.", "Stores name=ENV_VAR pairs for env var fallback.",
-    "array<string> envs = parser.env_vars"};
+static const vigil_native_symbol_doc_t parser_env_vars_doc = {"Environment variable fallbacks.",
+                                                              "Stores name=ENV_VAR pairs for env var fallback.",
+                                                              "array<string> envs = parser.env_vars"};
 static const vigil_native_symbol_doc_t parser_config_keys_doc = {
     "Config file key mappings.", "Stores name=config_key pairs for config file integration.",
     "array<string> keys = parser.config_keys"};
-static const vigil_native_symbol_doc_t parser_config_data_doc = {
-    "Loaded config data.", "Stores key=value pairs loaded from config file.",
-    "array<string> data = parser.config_data"};
+static const vigil_native_symbol_doc_t parser_config_data_doc = {"Loaded config data.",
+                                                                 "Stores key=value pairs loaded from config file.",
+                                                                 "array<string> data = parser.config_data"};
 static const vigil_native_symbol_doc_t parser_sub_parsers_doc = {
     "Child subcommand parsers.", "Stores Parser instances registered via add_subcommand.",
     "array<object> parsers = parser.sub_parsers"};
@@ -2184,8 +2182,8 @@ static const vigil_native_class_method_t parser_methods[] = {
     {"new", 3U, parser_new, 2U, str2_params, VIGIL_TYPE_OBJECT, 1U, NULL, 1, "Parser", 6U, 0, parser_new_param_names,
      NULL, NULL, &parser_new_doc},
     /* flag(name, short, desc) -> Parser */
-    {"flag", 4U, parser_flag, 3U, str3_params, VIGIL_TYPE_OBJECT, 1U, NULL, 0, "Parser", 6U, 0,
-     parser_flag_param_names, NULL, NULL, &parser_flag_doc},
+    {"flag", 4U, parser_flag, 3U, str3_params, VIGIL_TYPE_OBJECT, 1U, NULL, 0, "Parser", 6U, 0, parser_flag_param_names,
+     NULL, NULL, &parser_flag_doc},
     /* option(name, short, desc, default) -> Parser */
     {"option", 6U, parser_option, 4U, str4_params, VIGIL_TYPE_OBJECT, 1U, NULL, 0, "Parser", 6U, 0,
      parser_option_param_names, NULL, NULL, &parser_option_doc},
@@ -2202,8 +2200,8 @@ static const vigil_native_class_method_t parser_methods[] = {
     {"option_choice", 13U, parser_option_choice, 5U, str5_params, VIGIL_TYPE_OBJECT, 1U, NULL, 0, "Parser", 6U, 0,
      parser_option_choice_param_names, NULL, NULL, &parser_option_choice_doc},
     /* mark_required() -> Parser */
-    {"mark_required", 13U, parser_mark_required, 0U, NULL, VIGIL_TYPE_OBJECT, 1U, NULL, 0, "Parser", 6U, 0, NULL,
-     NULL, NULL, &parser_mark_required_doc},
+    {"mark_required", 13U, parser_mark_required, 0U, NULL, VIGIL_TYPE_OBJECT, 1U, NULL, 0, "Parser", 6U, 0, NULL, NULL,
+     NULL, &parser_mark_required_doc},
     /* version(ver) -> Parser */
     {"version", 7U, parser_version, 1U, str1_params, VIGIL_TYPE_OBJECT, 1U, NULL, 0, "Parser", 6U, 0,
      parser_version_param_names, NULL, NULL, &parser_version_doc},
@@ -2241,17 +2239,17 @@ static const vigil_native_class_method_t parser_methods[] = {
     {"load_config", 11U, parser_load_config, 1U, str1_params, VIGIL_TYPE_ERR, 1U, NULL, 0, NULL, 0U, 0,
      parser_load_config_param_names, NULL, NULL, &parser_load_config_doc},
     /* get(name) -> string */
-    {"get", 3U, parser_get, 1U, str1_params, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, 0U, 0, parser_name_param_names,
-     NULL, NULL, &parser_get_doc},
+    {"get", 3U, parser_get, 1U, str1_params, VIGIL_TYPE_STRING, 1U, NULL, 0, NULL, 0U, 0, parser_name_param_names, NULL,
+     NULL, &parser_get_doc},
     /* get_bool(name) -> bool */
     {"get_bool", 8U, parser_get_bool, 1U, str1_params, VIGIL_TYPE_BOOL, 1U, NULL, 0, NULL, 0U, 0,
      parser_name_param_names, NULL, NULL, &parser_get_bool_doc},
     /* get_int(name) -> i32 */
-    {"get_int", 7U, parser_get_int, 1U, str1_params, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, 0U, 0,
-     parser_name_param_names, NULL, NULL, &parser_get_int_doc},
+    {"get_int", 7U, parser_get_int, 1U, str1_params, VIGIL_TYPE_I32, 1U, NULL, 0, NULL, 0U, 0, parser_name_param_names,
+     NULL, NULL, &parser_get_int_doc},
     /* get_f64(name) -> f64 */
-    {"get_f64", 7U, parser_get_f64, 1U, str1_params, VIGIL_TYPE_F64, 1U, NULL, 0, NULL, 0U, 0,
-     parser_name_param_names, NULL, NULL, &parser_get_f64_doc},
+    {"get_f64", 7U, parser_get_f64, 1U, str1_params, VIGIL_TYPE_F64, 1U, NULL, 0, NULL, 0U, 0, parser_name_param_names,
+     NULL, NULL, &parser_get_f64_doc},
     /* get_multi(name) -> array<string> */
     {"get_multi", 9U, parser_get_multi, 1U, str1_params, VIGIL_TYPE_OBJECT, 1U, NULL, 0, NULL, 0U, VIGIL_TYPE_STRING,
      parser_name_param_names, NULL, NULL, &parser_get_multi_doc},

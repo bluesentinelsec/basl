@@ -2615,8 +2615,7 @@ size_t vigil_function_object_class_field_count(const vigil_object_t *function, s
     return function_object->classes[class_index].field_count;
 }
 
-VIGIL_API const char *vigil_runtime_class_name(const vigil_object_t *function, size_t class_index,
-                                               size_t *out_length)
+VIGIL_API const char *vigil_runtime_class_name(const vigil_object_t *function, size_t class_index, size_t *out_length)
 {
     const vigil_function_object_t *fn = vigil_function_object_cast(function);
     if (fn == NULL || fn->classes == NULL || class_index >= fn->class_count)

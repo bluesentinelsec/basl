@@ -1048,8 +1048,7 @@ static int run_transpile_validation(const char *test_file_path, const char *sour
         }
         if (t_exit != 0)
         {
-            fprintf(stream, "  transpile: transpile failed for %s\n    %s\n", test_file_path,
-                    t_stderr ? t_stderr : "");
+            fprintf(stream, "  transpile: transpile failed for %s\n    %s\n", test_file_path, t_stderr ? t_stderr : "");
             result = 1;
             free(t_stdout);
             free(t_stderr);
@@ -1148,8 +1147,8 @@ static int run_transpile_validation(const char *test_file_path, const char *sour
     /* j. Compare outputs */
     if (strcmp(interp_stdout ? interp_stdout : "", bin_stdout ? bin_stdout : "") != 0)
     {
-        fprintf(stream, "--- FAIL: transpile mismatch (%s)\n    interpreter: %s\n    compiled:    %s\n",
-                test_file_path, interp_stdout ? interp_stdout : "", bin_stdout ? bin_stdout : "");
+        fprintf(stream, "--- FAIL: transpile mismatch (%s)\n    interpreter: %s\n    compiled:    %s\n", test_file_path,
+                interp_stdout ? interp_stdout : "", bin_stdout ? bin_stdout : "");
         result = 1;
         goto cleanup;
     }

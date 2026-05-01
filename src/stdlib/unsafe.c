@@ -1071,8 +1071,14 @@ static const vigil_native_symbol_doc_t vigil_unsafe_cb_free_doc = {
     "unsafe.cb_free(0)",
 };
 
-#define F(n, nl, fn, pc, pt, rt) {n, nl, fn, pc, pt, rt, 1, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL}
-#define FV(n, nl, fn, pc, pt) {n, nl, fn, pc, pt, VIGIL_TYPE_VOID, 0, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL}
+#define F(n, nl, fn, pc, pt, rt)                                                                                       \
+    {                                                                                                                  \
+        n, nl, fn, pc, pt, rt, 1, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL                                      \
+    }
+#define FV(n, nl, fn, pc, pt)                                                                                          \
+    {                                                                                                                  \
+        n, nl, fn, pc, pt, VIGIL_TYPE_VOID, 0, NULL, 0, NULL, NULL, 0U, NULL, NULL, NULL, NULL                         \
+    }
 
 static const vigil_native_module_function_t vigil_unsafe_functions[] = {
     /* Buffer management */

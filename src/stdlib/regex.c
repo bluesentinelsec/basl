@@ -654,8 +654,8 @@ static vigil_status_t regex_escape(vigil_vm_t *vm, size_t arg_count, vigil_error
     for (size_t i = 0; i < input_len; i++)
     {
         char c = input[i];
-        if (c == '.' || c == '*' || c == '+' || c == '?' || c == '(' || c == ')' || c == '[' || c == ']' ||
-            c == '{' || c == '}' || c == '\\' || c == '^' || c == '$' || c == '|')
+        if (c == '.' || c == '*' || c == '+' || c == '?' || c == '(' || c == ')' || c == '[' || c == ']' || c == '{' ||
+            c == '}' || c == '\\' || c == '^' || c == '$' || c == '|')
         {
             buf[out++] = '\\';
         }

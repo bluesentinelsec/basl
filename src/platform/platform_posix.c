@@ -580,8 +580,13 @@ VIGIL_API int vigil_platform_getpid(void)
 #ifdef __EMSCRIPTEN__
 
 /* Emscripten/WASM has no signals. */
-VIGIL_API void vigil_platform_install_interrupt_handler(void) {}
-VIGIL_API int vigil_platform_interrupted(void) { return 0; }
+VIGIL_API void vigil_platform_install_interrupt_handler(void)
+{
+}
+VIGIL_API int vigil_platform_interrupted(void)
+{
+    return 0;
+}
 
 #else
 

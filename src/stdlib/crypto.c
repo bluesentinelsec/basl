@@ -845,8 +845,7 @@ static vigil_status_t crypto_x25519(vigil_vm_t *vm, size_t arg_count, vigil_erro
         return push_bytes_and_err(vm, "x25519: keys must be 64 hex chars (32 bytes)", error);
 
     uint8_t priv[32], pub[32], shared[32];
-    if (hex_to_bytes((const char *)priv_hex, 64, priv) != 0 ||
-        hex_to_bytes((const char *)pub_hex, 64, pub) != 0)
+    if (hex_to_bytes((const char *)priv_hex, 64, priv) != 0 || hex_to_bytes((const char *)pub_hex, 64, pub) != 0)
         return push_bytes_and_err(vm, "x25519: invalid hex", error);
 
     vigil_x25519(shared, priv, pub);
@@ -926,8 +925,7 @@ static vigil_status_t crypto_ed25519_verify(vigil_vm_t *vm, size_t arg_count, vi
     }
 
     uint8_t pub[32], sig[64];
-    if (hex_to_bytes((const char *)pub_hex, 64, pub) != 0 ||
-        hex_to_bytes((const char *)sig_hex, 128, sig) != 0)
+    if (hex_to_bytes((const char *)pub_hex, 64, pub) != 0 || hex_to_bytes((const char *)sig_hex, 128, sig) != 0)
     {
         vigil_vm_stack_pop_n(vm, arg_count);
         return push_bool(vm, 0, error);
@@ -1130,55 +1128,95 @@ static const vigil_native_symbol_doc_t doc_module = {
     NULL,
 };
 
-static const vigil_native_symbol_doc_t doc_sha224 = {"SHA-224 hash.", "Returns 56-character hex string.", "crypto.sha224(\"hello\")"};
-static const vigil_native_symbol_doc_t doc_sha256 = {"SHA-256 hash.", "Returns 64-character hex string.", "crypto.sha256(\"hello\")"};
-static const vigil_native_symbol_doc_t doc_sha384 = {"SHA-384 hash.", "Returns 96-character hex string.", "crypto.sha384(\"hello\")"};
-static const vigil_native_symbol_doc_t doc_sha512 = {"SHA-512 hash.", "Returns 128-character hex string.", "crypto.sha512(\"hello\")"};
+static const vigil_native_symbol_doc_t doc_sha224 = {"SHA-224 hash.", "Returns 56-character hex string.",
+                                                     "crypto.sha224(\"hello\")"};
+static const vigil_native_symbol_doc_t doc_sha256 = {"SHA-256 hash.", "Returns 64-character hex string.",
+                                                     "crypto.sha256(\"hello\")"};
+static const vigil_native_symbol_doc_t doc_sha384 = {"SHA-384 hash.", "Returns 96-character hex string.",
+                                                     "crypto.sha384(\"hello\")"};
+static const vigil_native_symbol_doc_t doc_sha512 = {"SHA-512 hash.", "Returns 128-character hex string.",
+                                                     "crypto.sha512(\"hello\")"};
 
-static const vigil_native_symbol_doc_t doc_hmac_sha256 = {"HMAC-SHA256.", "Returns 64-character hex string.", "crypto.hmac_sha256(\"key\", \"message\")"};
-static const vigil_native_symbol_doc_t doc_hmac_sha384 = {"HMAC-SHA384.", "Returns 96-character hex string.", "crypto.hmac_sha384(\"key\", \"message\")"};
-static const vigil_native_symbol_doc_t doc_hmac_sha512 = {"HMAC-SHA512.", "Returns 128-character hex string.", "crypto.hmac_sha512(\"key\", \"message\")"};
+static const vigil_native_symbol_doc_t doc_hmac_sha256 = {"HMAC-SHA256.", "Returns 64-character hex string.",
+                                                          "crypto.hmac_sha256(\"key\", \"message\")"};
+static const vigil_native_symbol_doc_t doc_hmac_sha384 = {"HMAC-SHA384.", "Returns 96-character hex string.",
+                                                          "crypto.hmac_sha384(\"key\", \"message\")"};
+static const vigil_native_symbol_doc_t doc_hmac_sha512 = {"HMAC-SHA512.", "Returns 128-character hex string.",
+                                                          "crypto.hmac_sha512(\"key\", \"message\")"};
 
-static const vigil_native_symbol_doc_t doc_pbkdf2 = {"PBKDF2 key derivation.", "Returns hex-encoded derived key. Use 100000+ iterations.", "crypto.pbkdf2(\"password\", \"salt\", 100000, 32)"};
-static const vigil_native_symbol_doc_t doc_hkdf_sha256 = {"HKDF-SHA256 key derivation.", "Returns hex-encoded derived key material.", "crypto.hkdf_sha256(ikm, salt, info, 32)"};
+static const vigil_native_symbol_doc_t doc_pbkdf2 = {"PBKDF2 key derivation.",
+                                                     "Returns hex-encoded derived key. Use 100000+ iterations.",
+                                                     "crypto.pbkdf2(\"password\", \"salt\", 100000, 32)"};
+static const vigil_native_symbol_doc_t doc_hkdf_sha256 = {"HKDF-SHA256 key derivation.",
+                                                          "Returns hex-encoded derived key material.",
+                                                          "crypto.hkdf_sha256(ikm, salt, info, 32)"};
 
-static const vigil_native_symbol_doc_t doc_encrypt = {"AES-256-GCM encryption.", "Key must be 32 bytes. Returns nonce||ciphertext||tag.", "crypto.encrypt(key, nonce, \"secret\", \"\")"};
-static const vigil_native_symbol_doc_t doc_decrypt = {"AES-256-GCM decryption.", "Returns error on authentication failure.", "crypto.decrypt(key, encrypted, \"\")"};
-static const vigil_native_symbol_doc_t doc_aes128_gcm_encrypt = {"AES-128-GCM encryption.", "Key must be 16 bytes. Returns nonce||ciphertext||tag.", "crypto.aes128_gcm_encrypt(key, nonce, \"secret\", \"\")"};
-static const vigil_native_symbol_doc_t doc_aes128_gcm_decrypt = {"AES-128-GCM decryption.", "Returns error on authentication failure.", "crypto.aes128_gcm_decrypt(key, encrypted, \"\")"};
-static const vigil_native_symbol_doc_t doc_chacha20_encrypt = {"ChaCha20-Poly1305 encryption.", "Key 32 bytes, nonce 12 bytes.", "crypto.chacha20_poly1305_encrypt(key, nonce, \"secret\", \"\")"};
-static const vigil_native_symbol_doc_t doc_chacha20_decrypt = {"ChaCha20-Poly1305 decryption.", "Returns error on authentication failure.", "crypto.chacha20_poly1305_decrypt(key, encrypted, \"\")"};
-static const vigil_native_symbol_doc_t doc_aes_cbc_encrypt = {"AES-CBC encryption with PKCS#7 padding.", "Key 32 bytes, IV 16 bytes.", "crypto.aes_cbc_encrypt(key, iv, \"secret\")"};
-static const vigil_native_symbol_doc_t doc_aes_cbc_decrypt = {"AES-CBC decryption with PKCS#7 unpadding.", "Key 32 bytes, IV 16 bytes.", "crypto.aes_cbc_decrypt(key, iv, ciphertext)"};
+static const vigil_native_symbol_doc_t doc_encrypt = {"AES-256-GCM encryption.",
+                                                      "Key must be 32 bytes. Returns nonce||ciphertext||tag.",
+                                                      "crypto.encrypt(key, nonce, \"secret\", \"\")"};
+static const vigil_native_symbol_doc_t doc_decrypt = {
+    "AES-256-GCM decryption.", "Returns error on authentication failure.", "crypto.decrypt(key, encrypted, \"\")"};
+static const vigil_native_symbol_doc_t doc_aes128_gcm_encrypt = {
+    "AES-128-GCM encryption.", "Key must be 16 bytes. Returns nonce||ciphertext||tag.",
+    "crypto.aes128_gcm_encrypt(key, nonce, \"secret\", \"\")"};
+static const vigil_native_symbol_doc_t doc_aes128_gcm_decrypt = {"AES-128-GCM decryption.",
+                                                                 "Returns error on authentication failure.",
+                                                                 "crypto.aes128_gcm_decrypt(key, encrypted, \"\")"};
+static const vigil_native_symbol_doc_t doc_chacha20_encrypt = {
+    "ChaCha20-Poly1305 encryption.", "Key 32 bytes, nonce 12 bytes.",
+    "crypto.chacha20_poly1305_encrypt(key, nonce, \"secret\", \"\")"};
+static const vigil_native_symbol_doc_t doc_chacha20_decrypt = {
+    "ChaCha20-Poly1305 decryption.", "Returns error on authentication failure.",
+    "crypto.chacha20_poly1305_decrypt(key, encrypted, \"\")"};
+static const vigil_native_symbol_doc_t doc_aes_cbc_encrypt = {"AES-CBC encryption with PKCS#7 padding.",
+                                                              "Key 32 bytes, IV 16 bytes.",
+                                                              "crypto.aes_cbc_encrypt(key, iv, \"secret\")"};
+static const vigil_native_symbol_doc_t doc_aes_cbc_decrypt = {"AES-CBC decryption with PKCS#7 unpadding.",
+                                                              "Key 32 bytes, IV 16 bytes.",
+                                                              "crypto.aes_cbc_decrypt(key, iv, ciphertext)"};
 
-static const vigil_native_symbol_doc_t doc_pw_encrypt = {"Password-based encryption.", "Uses PBKDF2 + AES-256-GCM.", "crypto.password_encrypt(\"my password\", \"secret\")"};
-static const vigil_native_symbol_doc_t doc_pw_decrypt = {"Password-based decryption.", "Returns error on wrong password.", "crypto.password_decrypt(\"my password\", encrypted)"};
+static const vigil_native_symbol_doc_t doc_pw_encrypt = {"Password-based encryption.", "Uses PBKDF2 + AES-256-GCM.",
+                                                         "crypto.password_encrypt(\"my password\", \"secret\")"};
+static const vigil_native_symbol_doc_t doc_pw_decrypt = {"Password-based decryption.",
+                                                         "Returns error on wrong password.",
+                                                         "crypto.password_decrypt(\"my password\", encrypted)"};
 
-static const vigil_native_symbol_doc_t doc_x25519_keypair = {"Generate X25519 keypair.", "Returns hex(private 32) + hex(public 32) = 128 chars.", "crypto.x25519_keypair()"};
-static const vigil_native_symbol_doc_t doc_x25519 = {"X25519 key exchange.", "Returns hex shared secret (64 chars).", "crypto.x25519(priv_hex, pub_hex)"};
-static const vigil_native_symbol_doc_t doc_ed25519_keypair = {"Generate Ed25519 keypair.", "Returns hex(private 64) + hex(public 32) = 192 chars.", "crypto.ed25519_keypair()"};
-static const vigil_native_symbol_doc_t doc_ed25519_sign = {"Ed25519 signature.", "Returns hex signature (128 chars).", "crypto.ed25519_sign(priv_hex, message)"};
-static const vigil_native_symbol_doc_t doc_ed25519_verify = {"Ed25519 verification.", "Returns true if signature is valid.", "crypto.ed25519_verify(pub_hex, message, sig_hex)"};
+static const vigil_native_symbol_doc_t doc_x25519_keypair = {
+    "Generate X25519 keypair.", "Returns hex(private 32) + hex(public 32) = 128 chars.", "crypto.x25519_keypair()"};
+static const vigil_native_symbol_doc_t doc_x25519 = {"X25519 key exchange.", "Returns hex shared secret (64 chars).",
+                                                     "crypto.x25519(priv_hex, pub_hex)"};
+static const vigil_native_symbol_doc_t doc_ed25519_keypair = {
+    "Generate Ed25519 keypair.", "Returns hex(private 64) + hex(public 32) = 192 chars.", "crypto.ed25519_keypair()"};
+static const vigil_native_symbol_doc_t doc_ed25519_sign = {"Ed25519 signature.", "Returns hex signature (128 chars).",
+                                                           "crypto.ed25519_sign(priv_hex, message)"};
+static const vigil_native_symbol_doc_t doc_ed25519_verify = {
+    "Ed25519 verification.", "Returns true if signature is valid.", "crypto.ed25519_verify(pub_hex, message, sig_hex)"};
 
-static const vigil_native_symbol_doc_t doc_random_bytes = {"Cryptographically secure random bytes.", "Returns raw bytes. Max 65536.", "crypto.random_bytes(32)"};
-static const vigil_native_symbol_doc_t doc_constant_time_eq = {"Constant-time comparison.", "Prevents timing attacks.", "crypto.constant_time_eq(hash1, hash2)"};
-static const vigil_native_symbol_doc_t doc_hex_encode = {"Encode bytes as hex.", "Returns lowercase hex string.", "crypto.hex_encode(data)"};
-static const vigil_native_symbol_doc_t doc_hex_decode = {"Decode hex to bytes.", "Returns error on invalid input.", "crypto.hex_decode(\"00ff\")"};
-static const vigil_native_symbol_doc_t doc_base64_encode = {"Encode bytes as base64.", "Standard base64 with padding.", "crypto.base64_encode(\"hello\")"};
-static const vigil_native_symbol_doc_t doc_base64_decode = {"Decode base64 to bytes.", "Returns error on invalid input.", "crypto.base64_decode(\"aGVsbG8=\")"};
+static const vigil_native_symbol_doc_t doc_random_bytes = {"Cryptographically secure random bytes.",
+                                                           "Returns raw bytes. Max 65536.", "crypto.random_bytes(32)"};
+static const vigil_native_symbol_doc_t doc_constant_time_eq = {"Constant-time comparison.", "Prevents timing attacks.",
+                                                               "crypto.constant_time_eq(hash1, hash2)"};
+static const vigil_native_symbol_doc_t doc_hex_encode = {"Encode bytes as hex.", "Returns lowercase hex string.",
+                                                         "crypto.hex_encode(data)"};
+static const vigil_native_symbol_doc_t doc_hex_decode = {"Decode hex to bytes.", "Returns error on invalid input.",
+                                                         "crypto.hex_decode(\"00ff\")"};
+static const vigil_native_symbol_doc_t doc_base64_encode = {"Encode bytes as base64.", "Standard base64 with padding.",
+                                                            "crypto.base64_encode(\"hello\")"};
+static const vigil_native_symbol_doc_t doc_base64_decode = {
+    "Decode base64 to bytes.", "Returns error on invalid input.", "crypto.base64_decode(\"aGVsbG8=\")"};
 
 /* ── Function table ──────────────────────────────────────────────── */
 
 static const vigil_native_module_function_t crypto_functions[] = {
     /* Hashes */
-    {"sha224", 6, crypto_sha224, 1, p_str, VIGIL_TYPE_STRING, 2, str_err_returns, 0, NULL, NULL, 0U,
-     pn_data, NULL, NULL, &doc_sha224},
-    {"sha256", 6, crypto_sha256, 1, p_str, VIGIL_TYPE_STRING, 2, str_err_returns, 0, NULL, NULL, 0U,
-     pn_data, NULL, NULL, &doc_sha256},
-    {"sha384", 6, crypto_sha384, 1, p_str, VIGIL_TYPE_STRING, 2, str_err_returns, 0, NULL, NULL, 0U,
-     pn_data, NULL, NULL, &doc_sha384},
-    {"sha512", 6, crypto_sha512, 1, p_str, VIGIL_TYPE_STRING, 2, str_err_returns, 0, NULL, NULL, 0U,
-     pn_data, NULL, NULL, &doc_sha512},
+    {"sha224", 6, crypto_sha224, 1, p_str, VIGIL_TYPE_STRING, 2, str_err_returns, 0, NULL, NULL, 0U, pn_data, NULL,
+     NULL, &doc_sha224},
+    {"sha256", 6, crypto_sha256, 1, p_str, VIGIL_TYPE_STRING, 2, str_err_returns, 0, NULL, NULL, 0U, pn_data, NULL,
+     NULL, &doc_sha256},
+    {"sha384", 6, crypto_sha384, 1, p_str, VIGIL_TYPE_STRING, 2, str_err_returns, 0, NULL, NULL, 0U, pn_data, NULL,
+     NULL, &doc_sha384},
+    {"sha512", 6, crypto_sha512, 1, p_str, VIGIL_TYPE_STRING, 2, str_err_returns, 0, NULL, NULL, 0U, pn_data, NULL,
+     NULL, &doc_sha512},
 
     /* MACs */
     {"hmac_sha256", 11, crypto_hmac_sha256, 2, p_2str, VIGIL_TYPE_STRING, 2, str_err_returns, 0, NULL, NULL, 0U,
@@ -1189,58 +1227,58 @@ static const vigil_native_module_function_t crypto_functions[] = {
      pn_key_data, NULL, NULL, &doc_hmac_sha512},
 
     /* KDFs */
-    {"pbkdf2", 6, crypto_pbkdf2, 4, p_pbkdf2, VIGIL_TYPE_STRING, 2, str_err_returns, 0, NULL, NULL, 0U,
-     pn_pbkdf2, NULL, NULL, &doc_pbkdf2},
+    {"pbkdf2", 6, crypto_pbkdf2, 4, p_pbkdf2, VIGIL_TYPE_STRING, 2, str_err_returns, 0, NULL, NULL, 0U, pn_pbkdf2, NULL,
+     NULL, &doc_pbkdf2},
     {"hkdf_sha256", 11, crypto_hkdf_sha256, 4, p_hkdf, VIGIL_TYPE_STRING, 2, str_err_returns, 0, NULL, NULL, 0U,
      pn_hkdf, NULL, NULL, &doc_hkdf_sha256},
 
     /* Symmetric encryption */
-    {"encrypt", 7, crypto_encrypt, 4, p_4str, VIGIL_TYPE_STRING, 2, str_err_returns, 0, NULL, NULL, 0U,
-     pn_encrypt, NULL, NULL, &doc_encrypt},
-    {"decrypt", 7, crypto_decrypt, 3, p_3str, VIGIL_TYPE_STRING, 2, str_err_returns, 0, NULL, NULL, 0U,
-     pn_decrypt, NULL, NULL, &doc_decrypt},
-    {"aes128_gcm_encrypt", 18, crypto_aes128_gcm_encrypt, 4, p_4str, VIGIL_TYPE_STRING, 2, str_err_returns, 0, NULL, NULL, 0U,
-     pn_encrypt, NULL, NULL, &doc_aes128_gcm_encrypt},
-    {"aes128_gcm_decrypt", 18, crypto_aes128_gcm_decrypt, 3, p_3str, VIGIL_TYPE_STRING, 2, str_err_returns, 0, NULL, NULL, 0U,
-     pn_decrypt, NULL, NULL, &doc_aes128_gcm_decrypt},
-    {"chacha20_poly1305_encrypt", 25, crypto_chacha20_poly1305_encrypt, 4, p_4str, VIGIL_TYPE_STRING, 2, str_err_returns, 0, NULL, NULL, 0U,
-     pn_encrypt, NULL, NULL, &doc_chacha20_encrypt},
-    {"chacha20_poly1305_decrypt", 25, crypto_chacha20_poly1305_decrypt, 3, p_3str, VIGIL_TYPE_STRING, 2, str_err_returns, 0, NULL, NULL, 0U,
-     pn_decrypt, NULL, NULL, &doc_chacha20_decrypt},
+    {"encrypt", 7, crypto_encrypt, 4, p_4str, VIGIL_TYPE_STRING, 2, str_err_returns, 0, NULL, NULL, 0U, pn_encrypt,
+     NULL, NULL, &doc_encrypt},
+    {"decrypt", 7, crypto_decrypt, 3, p_3str, VIGIL_TYPE_STRING, 2, str_err_returns, 0, NULL, NULL, 0U, pn_decrypt,
+     NULL, NULL, &doc_decrypt},
+    {"aes128_gcm_encrypt", 18, crypto_aes128_gcm_encrypt, 4, p_4str, VIGIL_TYPE_STRING, 2, str_err_returns, 0, NULL,
+     NULL, 0U, pn_encrypt, NULL, NULL, &doc_aes128_gcm_encrypt},
+    {"aes128_gcm_decrypt", 18, crypto_aes128_gcm_decrypt, 3, p_3str, VIGIL_TYPE_STRING, 2, str_err_returns, 0, NULL,
+     NULL, 0U, pn_decrypt, NULL, NULL, &doc_aes128_gcm_decrypt},
+    {"chacha20_poly1305_encrypt", 25, crypto_chacha20_poly1305_encrypt, 4, p_4str, VIGIL_TYPE_STRING, 2,
+     str_err_returns, 0, NULL, NULL, 0U, pn_encrypt, NULL, NULL, &doc_chacha20_encrypt},
+    {"chacha20_poly1305_decrypt", 25, crypto_chacha20_poly1305_decrypt, 3, p_3str, VIGIL_TYPE_STRING, 2,
+     str_err_returns, 0, NULL, NULL, 0U, pn_decrypt, NULL, NULL, &doc_chacha20_decrypt},
     {"aes_cbc_encrypt", 15, crypto_aes_cbc_encrypt, 3, p_3str, VIGIL_TYPE_STRING, 2, str_err_returns, 0, NULL, NULL, 0U,
      pn_cbc_enc, NULL, NULL, &doc_aes_cbc_encrypt},
     {"aes_cbc_decrypt", 15, crypto_aes_cbc_decrypt, 3, p_3str, VIGIL_TYPE_STRING, 2, str_err_returns, 0, NULL, NULL, 0U,
      pn_cbc_dec, NULL, NULL, &doc_aes_cbc_decrypt},
 
     /* Password-based */
-    {"password_encrypt", 16, crypto_password_encrypt, 2, p_2str, VIGIL_TYPE_STRING, 2, str_err_returns, 0, NULL, NULL, 0U,
-     pn_pw_enc, NULL, NULL, &doc_pw_encrypt},
-    {"password_decrypt", 16, crypto_password_decrypt, 2, p_2str, VIGIL_TYPE_STRING, 2, str_err_returns, 0, NULL, NULL, 0U,
-     pn_pw_dec, NULL, NULL, &doc_pw_decrypt},
+    {"password_encrypt", 16, crypto_password_encrypt, 2, p_2str, VIGIL_TYPE_STRING, 2, str_err_returns, 0, NULL, NULL,
+     0U, pn_pw_enc, NULL, NULL, &doc_pw_encrypt},
+    {"password_decrypt", 16, crypto_password_decrypt, 2, p_2str, VIGIL_TYPE_STRING, 2, str_err_returns, 0, NULL, NULL,
+     0U, pn_pw_dec, NULL, NULL, &doc_pw_decrypt},
 
     /* Key exchange */
     {"x25519_keypair", 14, crypto_x25519_keypair, 0, NULL, VIGIL_TYPE_STRING, 2, str_err_returns, 0, NULL, NULL, 0U,
      NULL, NULL, NULL, &doc_x25519_keypair},
-    {"x25519", 6, crypto_x25519, 2, p_2str, VIGIL_TYPE_STRING, 2, str_err_returns, 0, NULL, NULL, 0U,
-     pn_x25519, NULL, NULL, &doc_x25519},
+    {"x25519", 6, crypto_x25519, 2, p_2str, VIGIL_TYPE_STRING, 2, str_err_returns, 0, NULL, NULL, 0U, pn_x25519, NULL,
+     NULL, &doc_x25519},
 
     /* Signatures */
     {"ed25519_keypair", 15, crypto_ed25519_keypair, 0, NULL, VIGIL_TYPE_STRING, 2, str_err_returns, 0, NULL, NULL, 0U,
      NULL, NULL, NULL, &doc_ed25519_keypair},
     {"ed25519_sign", 12, crypto_ed25519_sign, 2, p_2str, VIGIL_TYPE_STRING, 2, str_err_returns, 0, NULL, NULL, 0U,
      pn_ed_sign, NULL, NULL, &doc_ed25519_sign},
-    {"ed25519_verify", 14, crypto_ed25519_verify, 3, p_3str, VIGIL_TYPE_BOOL, 1, NULL, 0, NULL, NULL, 0U,
-     pn_ed_verify, NULL, NULL, &doc_ed25519_verify},
+    {"ed25519_verify", 14, crypto_ed25519_verify, 3, p_3str, VIGIL_TYPE_BOOL, 1, NULL, 0, NULL, NULL, 0U, pn_ed_verify,
+     NULL, NULL, &doc_ed25519_verify},
 
     /* Utilities */
     {"random_bytes", 12, crypto_random_bytes, 1, p_i32, VIGIL_TYPE_STRING, 2, str_err_returns, 0, NULL, NULL, 0U,
      pn_len, NULL, NULL, &doc_random_bytes},
-    {"constant_time_eq", 16, crypto_constant_time_eq, 2, p_2str, VIGIL_TYPE_BOOL, 1, NULL, 0, NULL, NULL, 0U,
-     pn_ab, NULL, NULL, &doc_constant_time_eq},
-    {"hex_encode", 10, crypto_hex_encode, 1, p_str, VIGIL_TYPE_STRING, 2, str_err_returns, 0, NULL, NULL, 0U,
-     pn_data, NULL, NULL, &doc_hex_encode},
-    {"hex_decode", 10, crypto_hex_decode, 1, p_str, VIGIL_TYPE_STRING, 2, str_err_returns, 0, NULL, NULL, 0U,
-     pn_hex, NULL, NULL, &doc_hex_decode},
+    {"constant_time_eq", 16, crypto_constant_time_eq, 2, p_2str, VIGIL_TYPE_BOOL, 1, NULL, 0, NULL, NULL, 0U, pn_ab,
+     NULL, NULL, &doc_constant_time_eq},
+    {"hex_encode", 10, crypto_hex_encode, 1, p_str, VIGIL_TYPE_STRING, 2, str_err_returns, 0, NULL, NULL, 0U, pn_data,
+     NULL, NULL, &doc_hex_encode},
+    {"hex_decode", 10, crypto_hex_decode, 1, p_str, VIGIL_TYPE_STRING, 2, str_err_returns, 0, NULL, NULL, 0U, pn_hex,
+     NULL, NULL, &doc_hex_decode},
     {"base64_encode", 13, crypto_base64_encode_fn, 1, p_str, VIGIL_TYPE_STRING, 2, str_err_returns, 0, NULL, NULL, 0U,
      pn_data, NULL, NULL, &doc_base64_encode},
     {"base64_decode", 13, crypto_base64_decode_fn, 1, p_str, VIGIL_TYPE_STRING, 2, str_err_returns, 0, NULL, NULL, 0U,
@@ -1248,5 +1286,5 @@ static const vigil_native_module_function_t crypto_functions[] = {
 };
 
 VIGIL_API const vigil_native_module_t vigil_stdlib_crypto = {
-    "crypto", 6, crypto_functions, sizeof(crypto_functions) / sizeof(crypto_functions[0]),
-    NULL, 0, &doc_module, NULL, 0U};
+    "crypto", 6, crypto_functions, sizeof(crypto_functions) / sizeof(crypto_functions[0]), NULL, 0, &doc_module,
+    NULL,     0U};

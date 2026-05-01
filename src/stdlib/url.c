@@ -74,12 +74,30 @@ static vigil_status_t push_str_and_err(vigil_vm_t *vm, const char *msg, vigil_er
 
 typedef const char *(*url_field_fn)(const vigil_url_t *url);
 
-static const char *field_scheme(const vigil_url_t *u) { return u->scheme; }
-static const char *field_host(const vigil_url_t *u) { return u->host; }
-static const char *field_port(const vigil_url_t *u) { return u->port; }
-static const char *field_path(const vigil_url_t *u) { return u->path; }
-static const char *field_query(const vigil_url_t *u) { return u->raw_query; }
-static const char *field_fragment(const vigil_url_t *u) { return u->fragment; }
+static const char *field_scheme(const vigil_url_t *u)
+{
+    return u->scheme;
+}
+static const char *field_host(const vigil_url_t *u)
+{
+    return u->host;
+}
+static const char *field_port(const vigil_url_t *u)
+{
+    return u->port;
+}
+static const char *field_path(const vigil_url_t *u)
+{
+    return u->path;
+}
+static const char *field_query(const vigil_url_t *u)
+{
+    return u->raw_query;
+}
+static const char *field_fragment(const vigil_url_t *u)
+{
+    return u->fragment;
+}
 
 static vigil_status_t url_component_fn(vigil_vm_t *vm, size_t arg_count, vigil_error_t *error, url_field_fn field,
                                        const char *name)

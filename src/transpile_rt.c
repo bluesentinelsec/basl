@@ -29,8 +29,7 @@ static inline void tc_safe_release(vigil_value_t *v)
     *v = 0;
 }
 
-vigil_status_t vigil_tc_to_string(vigil_tc_t *tc, vigil_value_t *dst, const vigil_value_t *src,
-                                  vigil_error_t *error)
+vigil_status_t vigil_tc_to_string(vigil_tc_t *tc, vigil_value_t *dst, const vigil_value_t *src, vigil_error_t *error)
 {
     vigil_value_t encoded = *src;
     int owns_encoded = 0;
@@ -54,8 +53,8 @@ vigil_status_t vigil_tc_to_string(vigil_tc_t *tc, vigil_value_t *dst, const vigi
     return status;
 }
 
-vigil_status_t vigil_tc_call_native(vigil_tc_t *tc, vigil_value_t *regs, uint8_t arg_base,
-                                    uint8_t arg_count, uint32_t const_idx, vigil_error_t *error)
+vigil_status_t vigil_tc_call_native(vigil_tc_t *tc, vigil_value_t *regs, uint8_t arg_base, uint8_t arg_count,
+                                    uint32_t const_idx, vigil_error_t *error)
 {
     vigil_vm_t *vm = tc->vm;
     const vigil_value_t *native_val;
@@ -86,8 +85,8 @@ vigil_status_t vigil_tc_call_native(vigil_tc_t *tc, vigil_value_t *regs, uint8_t
     /* Ensure the VM has a frame. Push a dummy frame if needed. */
     if (vm->frame_count == 0U)
     {
-        status = vigil_vm_push_frame(vm, (vigil_object_t *)tc->function, (vigil_object_t *)tc->function, NULL, 0U,
-                                     error);
+        status =
+            vigil_vm_push_frame(vm, (vigil_object_t *)tc->function, (vigil_object_t *)tc->function, NULL, 0U, error);
         if (status != VIGIL_STATUS_OK)
             return status;
     }
@@ -194,14 +193,13 @@ vigil_status_t vigil_tc_get_error_msg(vigil_tc_t *tc, vigil_value_t *dst, const 
     return VIGIL_STATUS_OK;
 }
 
-vigil_status_t vigil_tc_format_f64(vigil_tc_t *tc, vigil_value_t *dst, const vigil_value_t *val,
-                                   uint8_t precision, vigil_error_t *error)
+vigil_status_t vigil_tc_format_f64(vigil_tc_t *tc, vigil_value_t *dst, const vigil_value_t *val, uint8_t precision,
+                                   vigil_error_t *error)
 {
     return vigil_vm_format_f64_value(tc->vm, val, (uint32_t)precision, dst, error);
 }
 
-vigil_status_t vigil_tc_parse_i32(vigil_tc_t *tc, vigil_value_t *dst, const vigil_value_t *src,
-                                  vigil_error_t *error)
+vigil_status_t vigil_tc_parse_i32(vigil_tc_t *tc, vigil_value_t *dst, const vigil_value_t *src, vigil_error_t *error)
 {
     vigil_object_t *obj = vigil_value_as_object(src);
     const char *s = vigil_string_object_c_str(obj);
@@ -232,8 +230,7 @@ vigil_status_t vigil_tc_parse_i32(vigil_tc_t *tc, vigil_value_t *dst, const vigi
     return VIGIL_STATUS_OK;
 }
 
-vigil_status_t vigil_tc_parse_f64(vigil_tc_t *tc, vigil_value_t *dst, const vigil_value_t *src,
-                                  vigil_error_t *error)
+vigil_status_t vigil_tc_parse_f64(vigil_tc_t *tc, vigil_value_t *dst, const vigil_value_t *src, vigil_error_t *error)
 {
     vigil_object_t *obj = vigil_value_as_object(src);
     const char *s = vigil_string_object_c_str(obj);
@@ -263,23 +260,20 @@ vigil_status_t vigil_tc_parse_f64(vigil_tc_t *tc, vigil_value_t *dst, const vigi
     return VIGIL_STATUS_OK;
 }
 
-vigil_status_t vigil_tc_parse_bool(vigil_tc_t *tc, vigil_value_t *dst, const vigil_value_t *src,
-                                   vigil_error_t *error)
+vigil_status_t vigil_tc_parse_bool(vigil_tc_t *tc, vigil_value_t *dst, const vigil_value_t *src, vigil_error_t *error)
 {
     vigil_object_t *obj = vigil_value_as_object(src);
     const char *s = vigil_string_object_c_str(obj);
     size_t len = s ? vigil_string_object_length(obj) : 0;
 
     (void)error;
-    if ((len == 4 && memcmp(s, "true", 4) == 0) ||
-        (len == 1 && s[0] == '1'))
+    if ((len == 4 && memcmp(s, "true", 4) == 0) || (len == 1 && s[0] == '1'))
     {
         vigil_value_init_bool(&dst[0], 1);
         dst[1] = vigil_runtime_ok_error_value(tc->runtime);
         return VIGIL_STATUS_OK;
     }
-    if ((len == 5 && memcmp(s, "false", 5) == 0) ||
-        (len == 1 && s[0] == '0'))
+    if ((len == 5 && memcmp(s, "false", 5) == 0) || (len == 1 && s[0] == '0'))
     {
         vigil_value_init_bool(&dst[0], 0);
         dst[1] = vigil_runtime_ok_error_value(tc->runtime);
@@ -289,8 +283,7 @@ vigil_status_t vigil_tc_parse_bool(vigil_tc_t *tc, vigil_value_t *dst, const vig
     vigil_value_init_bool(&dst[0], 0);
     {
         vigil_object_t *err_obj = NULL;
-        vigil_status_t st =
-            vigil_error_object_new_cstr(tc->runtime, "parse_bool: invalid input", 1, &err_obj, error);
+        vigil_status_t st = vigil_error_object_new_cstr(tc->runtime, "parse_bool: invalid input", 1, &err_obj, error);
         if (st != VIGIL_STATUS_OK)
             return st;
         vigil_value_init_object(&dst[1], &err_obj);
@@ -311,9 +304,8 @@ static vigil_status_t tc_ensure_frame(vigil_tc_t *tc, vigil_error_t *error)
     return VIGIL_STATUS_OK;
 }
 
-vigil_status_t vigil_tc_defer(vigil_tc_t *tc, vigil_value_t *regs, uint8_t defer_op,
-                              uint8_t top_reg, uint32_t operand_a, uint32_t operand_b,
-                              uint32_t operand_c, vigil_error_t *error)
+vigil_status_t vigil_tc_defer(vigil_tc_t *tc, vigil_value_t *regs, uint8_t defer_op, uint8_t top_reg,
+                              uint32_t operand_a, uint32_t operand_b, uint32_t operand_c, vigil_error_t *error)
 {
     vigil_vm_t *vm = tc->vm;
     vigil_vm_frame_t *frame;
@@ -352,7 +344,11 @@ vigil_status_t vigil_tc_defer(vigil_tc_t *tc, vigil_value_t *regs, uint8_t defer
     if (val_count > 0U)
     {
         size_t start = (size_t)top_reg + 1U - val_count;
-        { void *_m = NULL; vigil_runtime_alloc(tc->runtime, val_count * sizeof(*vals), &_m, error); vals = (vigil_value_t *)_m; }
+        {
+            void *_m = NULL;
+            vigil_runtime_alloc(tc->runtime, val_count * sizeof(*vals), &_m, error);
+            vals = (vigil_value_t *)_m;
+        }
         if (vals == NULL)
         {
             vigil_error_set_literal(error, VIGIL_STATUS_OUT_OF_MEMORY, "defer capture alloc failed");
@@ -374,14 +370,16 @@ vigil_status_t vigil_tc_defer(vigil_tc_t *tc, vigil_value_t *regs, uint8_t defer
         {
             /* Initial allocation — realloc rejects NULL input. */
             void *_m = NULL;
-            if (vigil_runtime_alloc(tc->runtime, new_cap * sizeof(vigil_vm_defer_action_t), &_m, error) != VIGIL_STATUS_OK)
+            if (vigil_runtime_alloc(tc->runtime, new_cap * sizeof(vigil_vm_defer_action_t), &_m, error) !=
+                VIGIL_STATUS_OK)
                 _m = NULL;
             nd = (vigil_vm_defer_action_t *)_m;
         }
         else
         {
             void *_rm = (void *)frame->defers;
-            if (vigil_runtime_realloc(tc->runtime, &_rm, new_cap * sizeof(vigil_vm_defer_action_t), error) != VIGIL_STATUS_OK)
+            if (vigil_runtime_realloc(tc->runtime, &_rm, new_cap * sizeof(vigil_vm_defer_action_t), error) !=
+                VIGIL_STATUS_OK)
                 _rm = NULL;
             nd = (vigil_vm_defer_action_t *)_rm;
         }
@@ -391,7 +389,11 @@ vigil_status_t vigil_tc_defer(vigil_tc_t *tc, vigil_value_t *regs, uint8_t defer
             {
                 for (size_t i = 0; i < val_count; i++)
                     tc_safe_release(&vals[i]);
-                { void *_f = (void *)vals; vigil_runtime_free(tc->runtime, &_f); vals = NULL; }
+                {
+                    void *_f = (void *)vals;
+                    vigil_runtime_free(tc->runtime, &_f);
+                    vals = NULL;
+                }
             }
             vigil_error_set_literal(error, VIGIL_STATUS_OUT_OF_MEMORY, "defer array grow failed");
             return VIGIL_STATUS_OUT_OF_MEMORY;
@@ -443,16 +445,13 @@ vigil_status_t vigil_tc_drain_defers(vigil_tc_t *tc, vigil_error_t *error)
         {
             switch (action.kind)
             {
-            case VIGIL_VM_DEFER_CALL:
-            {
-                const vigil_object_t *callee =
-                    vigil_vm_function_sibling(frame->function, (size_t)action.operand_a);
+            case VIGIL_VM_DEFER_CALL: {
+                const vigil_object_t *callee = vigil_vm_function_sibling(frame->function, (size_t)action.operand_a);
                 if (callee != NULL)
                     status = vigil_vm_execute_call(vm, callee, action.arg_count, error);
                 break;
             }
-            case VIGIL_VM_DEFER_CALL_NATIVE:
-            {
+            case VIGIL_VM_DEFER_CALL_NATIVE: {
                 const vigil_value_t *nval = &tc->constants[action.operand_a];
                 vigil_object_t *nobj = (nval != NULL && vigil_nanbox_has_object(*nval))
                                            ? (vigil_object_t *)vigil_nanbox_decode_ptr(*nval)
@@ -468,8 +467,7 @@ vigil_status_t vigil_tc_drain_defers(vigil_tc_t *tc, vigil_error_t *error)
                 }
                 break;
             }
-            case VIGIL_VM_DEFER_CALL_VALUE:
-            {
+            case VIGIL_VM_DEFER_CALL_VALUE: {
                 size_t total = action.arg_count;
                 if (total > 0U && vm->stack_count >= total)
                 {
@@ -490,8 +488,7 @@ vigil_status_t vigil_tc_drain_defers(vigil_tc_t *tc, vigil_error_t *error)
                 }
                 break;
             }
-            case VIGIL_VM_DEFER_CALL_INTERFACE:
-            {
+            case VIGIL_VM_DEFER_CALL_INTERFACE: {
                 size_t total = action.arg_count;
                 if (total > 0U && vm->stack_count >= total)
                 {
@@ -520,7 +517,10 @@ vigil_status_t vigil_tc_drain_defers(vigil_tc_t *tc, vigil_error_t *error)
 
         for (size_t i = 0; i < action.value_count; i++)
             tc_safe_release(&action.values[i]);
-        { void *_f = (void *)action.values; vigil_runtime_free(tc->runtime, &_f); }
+        {
+            void *_f = (void *)action.values;
+            vigil_runtime_free(tc->runtime, &_f);
+        }
 
         for (size_t i = 0; i < vm->stack_count; i++)
             tc_safe_release(&vm->stack[i]);
@@ -538,7 +538,8 @@ vigil_status_t vigil_tc_drain_defers(vigil_tc_t *tc, vigil_error_t *error)
    otherwise nanbox-encodes it as an integer. */
 static inline uint64_t tc_to_nanbox(uint64_t v)
 {
-    if (vigil_nanbox_is_object(v) || vigil_nanbox_is_int(v) || vigil_nanbox_is_uint(v) || vigil_nanbox_is_bool(v) || v == VIGIL_NANBOX_NIL)
+    if (vigil_nanbox_is_object(v) || vigil_nanbox_is_int(v) || vigil_nanbox_is_uint(v) || vigil_nanbox_is_bool(v) ||
+        v == VIGIL_NANBOX_NIL)
         return v;
     /* Check if this is a raw double (not a small raw integer).
        Doubles have exponent bits in the upper bytes. Raw ints from
@@ -585,9 +586,8 @@ static inline int tc_compare_strings(vigil_value_t lhs, vigil_value_t rhs, int *
     return 1;
 }
 
-static vigil_status_t tc_sync_and_call(vigil_tc_t *tc, vigil_value_t *regs, uint8_t top_reg,
-                                        uint8_t pop_count, uint8_t dst_reg, uint8_t ret_count,
-                                        vm_op_fn op, vigil_error_t *error)
+static vigil_status_t tc_sync_and_call(vigil_tc_t *tc, vigil_value_t *regs, uint8_t top_reg, uint8_t pop_count,
+                                       uint8_t dst_reg, uint8_t ret_count, vm_op_fn op, vigil_error_t *error)
 {
     vigil_vm_t *vm = tc->vm;
     vigil_status_t status;
@@ -654,8 +654,8 @@ static vigil_status_t tc_sync_and_call(vigil_tc_t *tc, vigil_value_t *regs, uint
 }
 
 // NOLINTNEXTLINE(readability-function-cognitive-complexity)
-vigil_status_t vigil_tc_vm_op(vigil_tc_t *tc, vigil_value_t *regs, uint8_t opcode,
-                              uint8_t a, uint8_t b, uint8_t c, vigil_error_t *error)
+vigil_status_t vigil_tc_vm_op(vigil_tc_t *tc, vigil_value_t *regs, uint8_t opcode, uint8_t a, uint8_t b, uint8_t c,
+                              vigil_error_t *error)
 {
     vigil_vm_t *vm = tc->vm;
     vigil_status_t status;
@@ -668,8 +668,7 @@ vigil_status_t vigil_tc_vm_op(vigil_tc_t *tc, vigil_value_t *regs, uint8_t opcod
     switch (opcode)
     {
     /* ── Core collection ops ─────────────────────────────────── */
-    case VREG_NEW_ARRAY:
-    {
+    case VREG_NEW_ARRAY: {
         uint16_t count = (uint16_t)((uint16_t)b << 8 | (uint16_t)c);
         vigil_object_t *arr = NULL;
         /* The register file may contain raw int64_t values from Phase 1
@@ -692,8 +691,7 @@ vigil_status_t vigil_tc_vm_op(vigil_tc_t *tc, vigil_value_t *regs, uint8_t opcod
         vigil_value_init_object(&regs[a], &arr);
         return VIGIL_STATUS_OK;
     }
-    case VREG_NEW_MAP:
-    {
+    case VREG_NEW_MAP: {
         uint16_t pair_count = (uint16_t)((uint16_t)b << 8 | (uint16_t)c);
         vigil_object_t *map = NULL;
         status = vigil_map_object_new(vm->runtime, &map, error);
@@ -722,11 +720,12 @@ vigil_status_t vigil_tc_vm_op(vigil_tc_t *tc, vigil_value_t *regs, uint8_t opcod
         return tc_sync_and_call(tc, regs, top, 2, a, 1, vigil_vm_op_get_index, error);
     case VREG_SET_INDEX:
         top = a;
-        if (b > top) top = b;
-        if (c > top) top = c;
+        if (b > top)
+            top = b;
+        if (c > top)
+            top = c;
         return tc_sync_and_call(tc, regs, top, 3, a, 0, vigil_vm_op_set_index, error);
-    case VREG_COLLECTION_SIZE:
-    {
+    case VREG_COLLECTION_SIZE: {
         if (c == 1)
             status = tc_sync_and_call(tc, regs, b, 1, a, 1, vigil_vm_op_get_string_size, error);
         else
@@ -751,7 +750,8 @@ vigil_status_t vigil_tc_vm_op(vigil_tc_t *tc, vigil_value_t *regs, uint8_t opcod
         return tc_sync_and_call(tc, regs, c, 3, a, 1, vigil_vm_op_array_set_safe, error);
     case VREG_ARRAY_SLICE:
         top = c;
-        if (b > top) top = b;
+        if (b > top)
+            top = b;
         return tc_sync_and_call(tc, regs, top, 3, a, 1, vigil_vm_op_array_slice, error);
     case VREG_ARRAY_CONTAINS:
         top = b > c ? b : c;
@@ -780,56 +780,90 @@ vigil_status_t vigil_tc_vm_op(vigil_tc_t *tc, vigil_value_t *regs, uint8_t opcod
         return tc_sync_and_call(tc, regs, c, 3, a, 2, vigil_vm_op_map_remove_safe, error);
     case VREG_MAP_HAS:
         return tc_sync_and_call(tc, regs, c, 2, a, 1, vigil_vm_op_map_has, error);
-    case VREG_MAP_KEYS:
-    {
+    case VREG_MAP_KEYS: {
         uint8_t keys_op = VIGIL_OPCODE_MAP_KEYS;
         size_t needed = (size_t)b + 1;
         status = tc_ensure_frame(tc, error);
-        if (status != VIGIL_STATUS_OK) return status;
+        if (status != VIGIL_STATUS_OK)
+            return status;
         if (vm->stack_capacity < needed)
-        { status = vigil_vm_grow_stack(vm, needed, error); if (status != VIGIL_STATUS_OK) return status; }
+        {
+            status = vigil_vm_grow_stack(vm, needed, error);
+            if (status != VIGIL_STATUS_OK)
+                return status;
+        }
         for (size_t i = 0; i <= (size_t)b; i++)
         {
             uint64_t v = regs[i];
             if (v == 0 || vigil_nanbox_is_int(v) || vigil_nanbox_is_bool(v))
                 vm->stack[i] = v;
             else if (vigil_nanbox_is_object(v))
-            { vigil_object_retain((vigil_object_t *)vigil_nanbox_decode_ptr(v)); vm->stack[i] = v; }
+            {
+                vigil_object_retain((vigil_object_t *)vigil_nanbox_decode_ptr(v));
+                vm->stack[i] = v;
+            }
             else
                 vm->stack[i] = tc_to_nanbox(v);
         }
         vm->stack_count = needed;
-        { vigil_vm_frame_t *frame = &vm->frames[vm->frame_count - 1U];
-          frame->ip = 0;
-          status = vigil_vm_op_map_keys_values(vm, frame, &keys_op, error); }
-        if (status != VIGIL_STATUS_OK) return status;
-        { size_t rb = (size_t)b; if (rb < vm->stack_count) { regs[a] = vm->stack[rb]; vm->stack[rb] = 0; } }
+        {
+            vigil_vm_frame_t *frame = &vm->frames[vm->frame_count - 1U];
+            frame->ip = 0;
+            status = vigil_vm_op_map_keys_values(vm, frame, &keys_op, error);
+        }
+        if (status != VIGIL_STATUS_OK)
+            return status;
+        {
+            size_t rb = (size_t)b;
+            if (rb < vm->stack_count)
+            {
+                regs[a] = vm->stack[rb];
+                vm->stack[rb] = 0;
+            }
+        }
         return VIGIL_STATUS_OK;
     }
-    case VREG_MAP_VALUES:
-    {
+    case VREG_MAP_VALUES: {
         uint8_t vals_op = VIGIL_OPCODE_MAP_VALUES;
         size_t needed = (size_t)b + 1;
         status = tc_ensure_frame(tc, error);
-        if (status != VIGIL_STATUS_OK) return status;
+        if (status != VIGIL_STATUS_OK)
+            return status;
         if (vm->stack_capacity < needed)
-        { status = vigil_vm_grow_stack(vm, needed, error); if (status != VIGIL_STATUS_OK) return status; }
+        {
+            status = vigil_vm_grow_stack(vm, needed, error);
+            if (status != VIGIL_STATUS_OK)
+                return status;
+        }
         for (size_t i = 0; i <= (size_t)b; i++)
         {
             uint64_t v = regs[i];
             if (v == 0 || vigil_nanbox_is_int(v) || vigil_nanbox_is_bool(v))
                 vm->stack[i] = v;
             else if (vigil_nanbox_is_object(v))
-            { vigil_object_retain((vigil_object_t *)vigil_nanbox_decode_ptr(v)); vm->stack[i] = v; }
+            {
+                vigil_object_retain((vigil_object_t *)vigil_nanbox_decode_ptr(v));
+                vm->stack[i] = v;
+            }
             else
                 vm->stack[i] = tc_to_nanbox(v);
         }
         vm->stack_count = needed;
-        { vigil_vm_frame_t *frame = &vm->frames[vm->frame_count - 1U];
-          frame->ip = 0;
-          status = vigil_vm_op_map_keys_values(vm, frame, &vals_op, error); }
-        if (status != VIGIL_STATUS_OK) return status;
-        { size_t rb = (size_t)b; if (rb < vm->stack_count) { regs[a] = vm->stack[rb]; vm->stack[rb] = 0; } }
+        {
+            vigil_vm_frame_t *frame = &vm->frames[vm->frame_count - 1U];
+            frame->ip = 0;
+            status = vigil_vm_op_map_keys_values(vm, frame, &vals_op, error);
+        }
+        if (status != VIGIL_STATUS_OK)
+            return status;
+        {
+            size_t rb = (size_t)b;
+            if (rb < vm->stack_count)
+            {
+                regs[a] = vm->stack[rb];
+                vm->stack[rb] = 0;
+            }
+        }
         return VIGIL_STATUS_OK;
     }
     case VREG_MAP_KEY_AT:
@@ -854,8 +888,7 @@ vigil_status_t vigil_tc_vm_op(vigil_tc_t *tc, vigil_value_t *regs, uint8_t opcod
         /* Handled specially by the transpiler (two-word instruction). */
         vigil_error_set_literal(error, VIGIL_STATUS_UNSUPPORTED, "transpile_rt: NEW_INSTANCE via vm_op not supported");
         return VIGIL_STATUS_UNSUPPORTED;
-    case VREG_GET_FIELD:
-    {
+    case VREG_GET_FIELD: {
         vigil_object_t *obj;
         vigil_value_t fv = 0;
         if (!vigil_nanbox_is_object(regs[b]))
@@ -877,8 +910,7 @@ vigil_status_t vigil_tc_vm_op(vigil_tc_t *tc, vigil_value_t *regs, uint8_t opcod
             regs[a] = fv;
         return VIGIL_STATUS_OK;
     }
-    case VREG_SET_FIELD:
-    {
+    case VREG_SET_FIELD: {
         vigil_object_t *obj;
         vigil_value_t val = regs[c];
         if (!vigil_nanbox_is_object(regs[a]))
@@ -897,8 +929,7 @@ vigil_status_t vigil_tc_vm_op(vigil_tc_t *tc, vigil_value_t *regs, uint8_t opcod
         return tc_sync_and_call(tc, regs, b, 1, a, 1, vigil_vm_op_char_from_int, error);
 
     /* ── Phase 5: Globals, captures, closures ────────────────── */
-    case VREG_GET_GLOBAL:
-    {
+    case VREG_GET_GLOBAL: {
         uint16_t gidx = (uint16_t)((uint16_t)b << 8 | (uint16_t)c);
         vigil_value_t gval = 0;
         if (!vigil_function_object_get_global(tc->function, (size_t)gidx, &gval))
@@ -910,15 +941,13 @@ vigil_status_t vigil_tc_vm_op(vigil_tc_t *tc, vigil_value_t *regs, uint8_t opcod
         regs[a] = vigil_nanbox_is_int(gval) ? (uint64_t)vigil_nanbox_decode_int(gval) : gval;
         return VIGIL_STATUS_OK;
     }
-    case VREG_SET_GLOBAL:
-    {
+    case VREG_SET_GLOBAL: {
         uint16_t gidx = (uint16_t)((uint16_t)b << 8 | (uint16_t)c);
         vigil_value_t val = regs[a];
         val = tc_to_nanbox(val);
         return vigil_function_object_set_global(tc->function, (size_t)gidx, &val, error);
     }
-    case VREG_GET_FUNCTION:
-    {
+    case VREG_GET_FUNCTION: {
         uint16_t fidx = (uint16_t)((uint16_t)b << 8 | (uint16_t)c);
         const vigil_object_t *fn = vigil_function_object_sibling(tc->function, (size_t)fidx);
         if (!fn)
@@ -931,8 +960,7 @@ vigil_status_t vigil_tc_vm_op(vigil_tc_t *tc, vigil_value_t *regs, uint8_t opcod
         vigil_value_init_object(&regs[a], (vigil_object_t **)&fn);
         return VIGIL_STATUS_OK;
     }
-    case VREG_NEW_CLOSURE:
-    {
+    case VREG_NEW_CLOSURE: {
         const vigil_object_t *fn = vigil_function_object_sibling(tc->function, (size_t)b);
         vigil_object_t *closure = NULL;
         vigil_value_t caps[256];
@@ -965,9 +993,8 @@ vigil_status_t vigil_tc_vm_op(vigil_tc_t *tc, vigil_value_t *regs, uint8_t opcod
     }
 }
 
-vigil_status_t vigil_tc_new_instance(vigil_tc_t *tc, vigil_value_t *regs, uint8_t dest,
-                                     uint16_t class_idx, uint8_t fields_base, uint8_t field_count,
-                                     vigil_error_t *error)
+vigil_status_t vigil_tc_new_instance(vigil_tc_t *tc, vigil_value_t *regs, uint8_t dest, uint16_t class_idx,
+                                     uint8_t fields_base, uint8_t field_count, vigil_error_t *error)
 {
     vigil_object_t *inst = NULL;
     vigil_value_t fields_buf[256];
@@ -993,8 +1020,8 @@ vigil_status_t vigil_tc_new_instance(vigil_tc_t *tc, vigil_value_t *regs, uint8_
     return VIGIL_STATUS_OK;
 }
 
-vigil_status_t vigil_tc_call_value(vigil_tc_t *tc, vigil_value_t *regs, uint8_t ret,
-                                   uint16_t arg_count, uint8_t arg_base, vigil_error_t *error)
+vigil_status_t vigil_tc_call_value(vigil_tc_t *tc, vigil_value_t *regs, uint8_t ret, uint16_t arg_count,
+                                   uint8_t arg_base, vigil_error_t *error)
 {
     vigil_vm_t *vm = tc->vm;
     vigil_status_t status;
@@ -1055,9 +1082,8 @@ vigil_status_t vigil_tc_call_value(vigil_tc_t *tc, vigil_value_t *regs, uint8_t 
     return VIGIL_STATUS_OK;
 }
 
-vigil_status_t vigil_tc_call_extern(vigil_tc_t *tc, vigil_value_t *regs, uint8_t ret,
-                                    uint8_t const_idx, uint8_t arg_count, uint8_t arg_base,
-                                    vigil_error_t *error)
+vigil_status_t vigil_tc_call_extern(vigil_tc_t *tc, vigil_value_t *regs, uint8_t ret, uint8_t const_idx,
+                                    uint8_t arg_count, uint8_t arg_base, vigil_error_t *error)
 {
     vigil_vm_t *vm = tc->vm;
     vigil_status_t status;
@@ -1118,10 +1144,8 @@ vigil_status_t vigil_tc_call_extern(vigil_tc_t *tc, vigil_value_t *regs, uint8_t
     return VIGIL_STATUS_OK;
 }
 
-vigil_status_t vigil_tc_call_interface(vigil_tc_t *tc, vigil_value_t *regs, uint8_t ret,
-                                       uint8_t iface_idx, uint8_t arg_count,
-                                       uint32_t method_idx, uint8_t arg_base,
-                                       vigil_error_t *error)
+vigil_status_t vigil_tc_call_interface(vigil_tc_t *tc, vigil_value_t *regs, uint8_t ret, uint8_t iface_idx,
+                                       uint8_t arg_count, uint32_t method_idx, uint8_t arg_base, vigil_error_t *error)
 {
     vigil_vm_t *vm = tc->vm;
     vigil_status_t status;
@@ -1161,8 +1185,7 @@ vigil_status_t vigil_tc_call_interface(vigil_tc_t *tc, vigil_value_t *regs, uint
         vigil_error_set_literal(error, VIGIL_STATUS_INVALID_ARGUMENT, "interface call requires instance");
         return VIGIL_STATUS_INVALID_ARGUMENT;
     }
-    size_t class_index = vigil_instance_object_class_index(
-        (vigil_object_t *)vigil_nanbox_decode_ptr(receiver));
+    size_t class_index = vigil_instance_object_class_index((vigil_object_t *)vigil_nanbox_decode_ptr(receiver));
     const vigil_object_t *callee = vigil_function_object_resolve_interface_method(
         tc->function, class_index, (size_t)iface_idx, (size_t)method_idx);
     if (!callee)
@@ -1184,8 +1207,8 @@ vigil_status_t vigil_tc_call_interface(vigil_tc_t *tc, vigil_value_t *regs, uint
     return VIGIL_STATUS_OK;
 }
 
-vigil_status_t vigil_tc_format_spec(vigil_tc_t *tc, vigil_value_t *dst, const vigil_value_t *val,
-                                    uint32_t word1, uint32_t word2, vigil_error_t *error)
+vigil_status_t vigil_tc_format_spec(vigil_tc_t *tc, vigil_value_t *dst, const vigil_value_t *val, uint32_t word1,
+                                    uint32_t word2, vigil_error_t *error)
 {
     vigil_value_t nanboxed = *val;
     vigil_value_t result = 0;
@@ -1281,7 +1304,7 @@ int vigil_tc_values_le(const vigil_value_t *regs, uint8_t b, uint8_t c)
 }
 
 vigil_status_t vigil_tc_generic_add(vigil_tc_t *tc, vigil_value_t *dst, const vigil_value_t *lhs,
-                                     const vigil_value_t *rhs, vigil_error_t *error)
+                                    const vigil_value_t *rhs, vigil_error_t *error)
 {
     /* String concatenation when both are objects. */
     if (vigil_nanbox_is_object(*lhs) && vigil_nanbox_is_object(*rhs))
@@ -1376,9 +1399,8 @@ vigil_value_t vigil_tc_negate(vigil_value_t src)
     return (uint64_t)(-(int64_t)src);
 }
 
-vigil_status_t vigil_tc_call_self(vigil_tc_t *tc, vigil_value_t *regs, uint8_t ret,
-                                   size_t func_idx, uint16_t arg_count, uint8_t arg_base,
-                                   vigil_error_t *error)
+vigil_status_t vigil_tc_call_self(vigil_tc_t *tc, vigil_value_t *regs, uint8_t ret, size_t func_idx, uint16_t arg_count,
+                                  uint8_t arg_base, vigil_error_t *error)
 {
     /* Save and restore per-function constants around the call. */
     const vigil_value_t *saved_constants = tc->constants;
@@ -1454,8 +1476,8 @@ void vigil_tc_move_reg(vigil_value_t *dst, vigil_value_t src)
     *dst = src;
 }
 
-vigil_status_t vigil_tc_string_op(vigil_tc_t *tc, vigil_value_t *regs, uint8_t dest,
-                                   uint8_t top_reg, uint8_t sub_op, vigil_error_t *error)
+vigil_status_t vigil_tc_string_op(vigil_tc_t *tc, vigil_value_t *regs, uint8_t dest, uint8_t top_reg, uint8_t sub_op,
+                                  vigil_error_t *error)
 {
     vigil_vm_t *vm = tc->vm;
     vigil_status_t status;
@@ -1492,66 +1514,102 @@ vigil_status_t vigil_tc_string_op(vigil_tc_t *tc, vigil_value_t *regs, uint8_t d
     uint8_t code_byte = sub_op;
     switch (sub_op)
     {
-    case 64: case 65: case 66: /* CONTAINS, STARTS_WITH, ENDS_WITH */
-        status = vigil_vm_op_string_search(vm, frame, &code_byte, error); break;
-    case 67: case 68: case 69: /* TRIM, TO_UPPER, TO_LOWER */
-        status = vigil_vm_op_string_transform(vm, frame, &code_byte, error); break;
+    case 64:
+    case 65:
+    case 66: /* CONTAINS, STARTS_WITH, ENDS_WITH */
+        status = vigil_vm_op_string_search(vm, frame, &code_byte, error);
+        break;
+    case 67:
+    case 68:
+    case 69: /* TRIM, TO_UPPER, TO_LOWER */
+        status = vigil_vm_op_string_transform(vm, frame, &code_byte, error);
+        break;
     case 70: /* REPLACE */
-        status = vigil_vm_op_string_replace(vm, frame, error); break;
+        status = vigil_vm_op_string_replace(vm, frame, error);
+        break;
     case 71: /* SPLIT */
-        status = vigil_vm_op_string_split(vm, frame, error); break;
+        status = vigil_vm_op_string_split(vm, frame, error);
+        break;
     case 72: /* INDEX_OF */
-        status = vigil_vm_op_string_index_of(vm, frame, error); break;
+        status = vigil_vm_op_string_index_of(vm, frame, error);
+        break;
     case 73: /* SUBSTR */
-        status = vigil_vm_op_string_substr(vm, frame, error); break;
+        status = vigil_vm_op_string_substr(vm, frame, error);
+        break;
     case 74: /* BYTES */
-        status = vigil_vm_op_string_bytes(vm, frame, error); break;
+        status = vigil_vm_op_string_bytes(vm, frame, error);
+        break;
     case 75: /* CHAR_AT */
-        status = vigil_vm_op_string_char_at(vm, frame, error); break;
-    case 134: case 135: /* TRIM_LEFT, TRIM_RIGHT */
-        status = vigil_vm_op_string_trim_dir(vm, frame, &code_byte, error); break;
+        status = vigil_vm_op_string_char_at(vm, frame, error);
+        break;
+    case 134:
+    case 135: /* TRIM_LEFT, TRIM_RIGHT */
+        status = vigil_vm_op_string_trim_dir(vm, frame, &code_byte, error);
+        break;
     case 136: /* REPEAT */
-        status = vigil_vm_op_string_repeat(vm, frame, error); break;
+        status = vigil_vm_op_string_repeat(vm, frame, error);
+        break;
     case 137: /* REVERSE */
-        status = vigil_vm_op_string_reverse(vm, frame, error); break;
+        status = vigil_vm_op_string_reverse(vm, frame, error);
+        break;
     case 138: /* IS_EMPTY */
-        status = vigil_vm_op_string_is_empty(vm, frame, error); break;
+        status = vigil_vm_op_string_is_empty(vm, frame, error);
+        break;
     case 139: /* COUNT */
-        status = vigil_vm_op_string_count(vm, frame, error); break;
+        status = vigil_vm_op_string_count(vm, frame, error);
+        break;
     case 140: /* LAST_INDEX_OF */
-        status = vigil_vm_op_string_last_index_of(vm, frame, error); break;
-    case 141: case 142: /* TRIM_PREFIX, TRIM_SUFFIX */
-        status = vigil_vm_op_string_trim_affix(vm, frame, &code_byte, error); break;
+        status = vigil_vm_op_string_last_index_of(vm, frame, error);
+        break;
+    case 141:
+    case 142: /* TRIM_PREFIX, TRIM_SUFFIX */
+        status = vigil_vm_op_string_trim_affix(vm, frame, &code_byte, error);
+        break;
     case 144: /* TO_C */
-        status = vigil_vm_op_string_to_c(vm, frame, error); break;
+        status = vigil_vm_op_string_to_c(vm, frame, error);
+        break;
     case 145: /* JOIN */
-        status = vigil_vm_op_string_join(vm, frame, error); break;
+        status = vigil_vm_op_string_join(vm, frame, error);
+        break;
     case 146: /* CUT */
-        status = vigil_vm_op_string_cut(vm, frame, error); break;
+        status = vigil_vm_op_string_cut(vm, frame, error);
+        break;
     case 147: /* FIELDS */
-        status = vigil_vm_op_string_fields(vm, frame, error); break;
+        status = vigil_vm_op_string_fields(vm, frame, error);
+        break;
     case 148: /* EQUAL_FOLD */
-        status = vigil_vm_op_string_equal_fold(vm, frame, error); break;
+        status = vigil_vm_op_string_equal_fold(vm, frame, error);
+        break;
     case 149: /* CHAR_COUNT */
-        status = vigil_vm_op_string_char_count(vm, frame, error); break;
+        status = vigil_vm_op_string_char_count(vm, frame, error);
+        break;
     case 189: /* NEXT_CHAR */
-        status = vigil_vm_op_string_next_char(vm, frame, error); break;
+        status = vigil_vm_op_string_next_char(vm, frame, error);
+        break;
     case 198: /* PAD_LEFT */
-        status = vigil_vm_op_string_pad_left(vm, frame, error); break;
+        status = vigil_vm_op_string_pad_left(vm, frame, error);
+        break;
     case 199: /* PAD_RIGHT */
-        status = vigil_vm_op_string_pad_right(vm, frame, error); break;
+        status = vigil_vm_op_string_pad_right(vm, frame, error);
+        break;
     case 200: /* IS_DIGIT */
-        status = vigil_vm_op_string_is_digit(vm, frame, error); break;
+        status = vigil_vm_op_string_is_digit(vm, frame, error);
+        break;
     case 201: /* IS_ALPHA */
-        status = vigil_vm_op_string_is_alpha(vm, frame, error); break;
+        status = vigil_vm_op_string_is_alpha(vm, frame, error);
+        break;
     case 202: /* IS_ALNUM */
-        status = vigil_vm_op_string_is_alnum(vm, frame, error); break;
+        status = vigil_vm_op_string_is_alnum(vm, frame, error);
+        break;
     case 203: /* IS_SPACE */
-        status = vigil_vm_op_string_is_space(vm, frame, error); break;
+        status = vigil_vm_op_string_is_space(vm, frame, error);
+        break;
     case 204: /* IS_UPPER */
-        status = vigil_vm_op_string_is_upper(vm, frame, error); break;
+        status = vigil_vm_op_string_is_upper(vm, frame, error);
+        break;
     case 205: /* IS_LOWER */
-        status = vigil_vm_op_string_is_lower(vm, frame, error); break;
+        status = vigil_vm_op_string_is_lower(vm, frame, error);
+        break;
     default:
         vigil_error_set_literal(error, VIGIL_STATUS_UNSUPPORTED, "unsupported string sub-op");
         return VIGIL_STATUS_UNSUPPORTED;

@@ -295,8 +295,8 @@ typedef enum
 /* Parsed new-command options. */
 typedef struct
 {
-    const char *display_name;  /* Original name from user */
-    char dir_name[256];        /* Filesystem-safe derived name */
+    const char *display_name; /* Original name from user */
+    char dir_name[256];       /* Filesystem-safe derived name */
     const char *description;
     const char *org;
     const char *version;
@@ -308,9 +308,9 @@ typedef struct
 /* Windows reserved device names (case-insensitive). */
 static int new_is_windows_reserved(const char *name)
 {
-    static const char *reserved[] = {"con",  "prn",  "aux",  "nul",  "com1", "com2", "com3",
-                                     "com4", "com5", "com6", "com7", "com8", "com9", "lpt1",
-                                     "lpt2", "lpt3", "lpt4", "lpt5", "lpt6", "lpt7", "lpt8", "lpt9"};
+    static const char *reserved[] = {"con",  "prn",  "aux",  "nul",  "com1", "com2", "com3", "com4",
+                                     "com5", "com6", "com7", "com8", "com9", "lpt1", "lpt2", "lpt3",
+                                     "lpt4", "lpt5", "lpt6", "lpt7", "lpt8", "lpt9"};
     char lower[16];
     size_t len = strlen(name);
     if (len == 0 || len >= sizeof(lower))
@@ -542,64 +542,64 @@ static int new_write_manifest(const char *dir, const new_opts_t *opts, vigil_err
     else
         platforms = new_default_platforms(opts->type);
 
-    snprintf(content, sizeof(content),
-             "# ── Project ──────────────────────────────────────────────\n"
-             "name = \"%s\"\n"
-             "description = \"%s\"\n"
-             "version = \"%s\"\n"
-             "type = \"%s\"                          # cli, gui, library, or workspace\n"
-             "\n"
-             "# ── Organization ─────────────────────────────────────────\n"
-             "org = \"%s\"                   # Reverse-domain identifier, used for bundle IDs\n"
-             "author = \"\"                           # Author or team name\n"
-             "license = \"\"                          # SPDX license identifier (e.g. \"MIT\", \"Apache-2.0\")\n"
-             "homepage = \"\"                         # Project homepage URL\n"
-             "repository = \"\"                       # Source code repository URL\n"
-             "readme = \"README.md\"                  # Path to README file\n"
-             "keywords = []                         # Keywords for package registry search\n"
-             "\n"
-             "# ── Platforms ────────────────────────────────────────────\n"
-             "platforms = [%s]\n"
-             "\n"
-             "# ── Icons ────────────────────────────────────────────────\n"
-             "# Platform-specific icon paths. Used by packager/transpiler for\n"
-             "# app bundles, desktop shortcuts, and store listings.\n"
-             "[icon]\n"
-             "windows = \"\"                          # .ico file for Windows executables and Explorer\n"
-             "macos = \"\"                            # .icns file for macOS app bundles\n"
-             "linux = \"\"                            # .png or .svg for .desktop files and AppImage\n"
-             "ios = \"\"                              # .png for iOS app icon (1024x1024 recommended)\n"
-             "android = \"\"                          # .png for Android launcher icon\n"
-             "\n"
-             "# ── macOS ────────────────────────────────────────────────\n"
-             "[platform.macos]\n"
-             "min-os-version = \"\"                   # Minimum macOS version (e.g. \"13.0\")\n"
-             "category = \"\"                         # LSApplicationCategoryType (e.g. \"public.app-category.utilities\")\n"
-             "entitlements = []                     # macOS entitlements (e.g. [\"com.apple.security.network.client\"])\n"
-             "\n"
-             "# ── iOS ──────────────────────────────────────────────────\n"
-             "[platform.ios]\n"
-             "min-os-version = \"\"                   # Minimum iOS version (e.g. \"16.0\")\n"
-             "orientation = \"both\"                  # portrait, landscape, or both\n"
-             "permissions = []                      # iOS permissions (e.g. [\"camera\", \"photos\", \"location\"])\n"
-             "\n"
-             "# ── Android ──────────────────────────────────────────────\n"
-             "[platform.android]\n"
-             "min-sdk-version = 26                  # Minimum Android SDK version\n"
-             "permissions = []                      # Android permissions (e.g. [\"CAMERA\", \"INTERNET\"])\n"
-             "\n"
-             "# ── Windows ──────────────────────────────────────────────\n"
-             "[platform.windows]\n"
-             "manifest = true                       # Embed a UAC application manifest\n"
-             "\n"
-             "# ── Linux ────────────────────────────────────────────────\n"
-             "[platform.linux]\n"
-             "category = \"\"                         # Freedesktop .desktop category (e.g. \"Utility\", \"Development\")\n"
-             "\n"
-             "# ── Dependencies ─────────────────────────────────────────\n"
-             "[dependencies]\n",
-             opts->display_name, opts->description, opts->version, new_type_string(opts->type),
-             opts->org, platforms);
+    snprintf(
+        content, sizeof(content),
+        "# ── Project ──────────────────────────────────────────────\n"
+        "name = \"%s\"\n"
+        "description = \"%s\"\n"
+        "version = \"%s\"\n"
+        "type = \"%s\"                          # cli, gui, library, or workspace\n"
+        "\n"
+        "# ── Organization ─────────────────────────────────────────\n"
+        "org = \"%s\"                   # Reverse-domain identifier, used for bundle IDs\n"
+        "author = \"\"                           # Author or team name\n"
+        "license = \"\"                          # SPDX license identifier (e.g. \"MIT\", \"Apache-2.0\")\n"
+        "homepage = \"\"                         # Project homepage URL\n"
+        "repository = \"\"                       # Source code repository URL\n"
+        "readme = \"README.md\"                  # Path to README file\n"
+        "keywords = []                         # Keywords for package registry search\n"
+        "\n"
+        "# ── Platforms ────────────────────────────────────────────\n"
+        "platforms = [%s]\n"
+        "\n"
+        "# ── Icons ────────────────────────────────────────────────\n"
+        "# Platform-specific icon paths. Used by packager/transpiler for\n"
+        "# app bundles, desktop shortcuts, and store listings.\n"
+        "[icon]\n"
+        "windows = \"\"                          # .ico file for Windows executables and Explorer\n"
+        "macos = \"\"                            # .icns file for macOS app bundles\n"
+        "linux = \"\"                            # .png or .svg for .desktop files and AppImage\n"
+        "ios = \"\"                              # .png for iOS app icon (1024x1024 recommended)\n"
+        "android = \"\"                          # .png for Android launcher icon\n"
+        "\n"
+        "# ── macOS ────────────────────────────────────────────────\n"
+        "[platform.macos]\n"
+        "min-os-version = \"\"                   # Minimum macOS version (e.g. \"13.0\")\n"
+        "category = \"\"                         # LSApplicationCategoryType (e.g. \"public.app-category.utilities\")\n"
+        "entitlements = []                     # macOS entitlements (e.g. [\"com.apple.security.network.client\"])\n"
+        "\n"
+        "# ── iOS ──────────────────────────────────────────────────\n"
+        "[platform.ios]\n"
+        "min-os-version = \"\"                   # Minimum iOS version (e.g. \"16.0\")\n"
+        "orientation = \"both\"                  # portrait, landscape, or both\n"
+        "permissions = []                      # iOS permissions (e.g. [\"camera\", \"photos\", \"location\"])\n"
+        "\n"
+        "# ── Android ──────────────────────────────────────────────\n"
+        "[platform.android]\n"
+        "min-sdk-version = 26                  # Minimum Android SDK version\n"
+        "permissions = []                      # Android permissions (e.g. [\"CAMERA\", \"INTERNET\"])\n"
+        "\n"
+        "# ── Windows ──────────────────────────────────────────────\n"
+        "[platform.windows]\n"
+        "manifest = true                       # Embed a UAC application manifest\n"
+        "\n"
+        "# ── Linux ────────────────────────────────────────────────\n"
+        "[platform.linux]\n"
+        "category = \"\"                         # Freedesktop .desktop category (e.g. \"Utility\", \"Development\")\n"
+        "\n"
+        "# ── Dependencies ─────────────────────────────────────────\n"
+        "[dependencies]\n",
+        opts->display_name, opts->description, opts->version, new_type_string(opts->type), opts->org, platforms);
     return write_text_file(dir, "vigil.toml", content, error) == VIGIL_STATUS_OK;
 }
 
@@ -735,9 +735,9 @@ static void new_print_summary(const char *dir, const new_opts_t *opts)
 /* Result of workspace root detection. */
 typedef struct
 {
-    char root_path[4096];       /* Absolute path to workspace root directory */
+    char root_path[4096];      /* Absolute path to workspace root directory */
     char toml_path[4096 + 16]; /* Absolute path to workspace vigil.toml */
-    int found;                  /* 1 if a workspace root was found */
+    int found;                 /* 1 if a workspace root was found */
 } workspace_info_t;
 
 /* Walk up from cwd to find the nearest vigil.toml containing [workspace]. */
@@ -830,9 +830,8 @@ static int new_glob_match(const char *pattern, const char *name, char *prefix, s
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wformat-truncation"
 #endif
-static int new_workspace_resolve_path(const workspace_info_t *ws, const char *dir_name,
-                                       char *create_path, size_t create_path_size,
-                                       int *needs_registration, vigil_error_t *error)
+static int new_workspace_resolve_path(const workspace_info_t *ws, const char *dir_name, char *create_path,
+                                      size_t create_path_size, int *needs_registration, vigil_error_t *error)
 {
     char *file_data = NULL;
     size_t file_len = 0;
@@ -897,8 +896,7 @@ cleanup:
 #endif
 
 /* Append a member name to the workspace vigil.toml [workspace] members list. */
-static int new_workspace_register_member(const workspace_info_t *ws, const char *member_path,
-                                          vigil_error_t *error)
+static int new_workspace_register_member(const workspace_info_t *ws, const char *member_path, vigil_error_t *error)
 {
     char *file_data = NULL;
     size_t file_len = 0;
@@ -916,8 +914,7 @@ static int new_workspace_register_member(const workspace_info_t *ws, const char 
     }
 
     const vigil_toml_value_t *workspace = vigil_toml_table_get(root, "workspace");
-    vigil_toml_value_t *members = (vigil_toml_value_t *)
-        (workspace ? vigil_toml_table_get(workspace, "members") : NULL);
+    vigil_toml_value_t *members = (vigil_toml_value_t *)(workspace ? vigil_toml_table_get(workspace, "members") : NULL);
 
     if (members == NULL)
         goto cleanup;
@@ -947,8 +944,7 @@ cleanup:
 }
 
 /* Read metadata from workspace root vigil.toml for inheritance. */
-static void new_workspace_inherit_metadata(const workspace_info_t *ws, new_opts_t *opts,
-                                            vigil_error_t *error)
+static void new_workspace_inherit_metadata(const workspace_info_t *ws, new_opts_t *opts, vigil_error_t *error)
 {
     char *file_data = NULL;
     size_t file_len = 0;
@@ -1039,8 +1035,7 @@ static int cmd_new(const new_opts_t *opts)
     }
     if (new_is_windows_reserved(resolved.dir_name))
     {
-        fprintf(stderr, "error: project name '%s' conflicts with a Windows reserved device name\n",
-                resolved.dir_name);
+        fprintf(stderr, "error: project name '%s' conflicts with a Windows reserved device name\n", resolved.dir_name);
         return 1;
     }
 
@@ -1074,8 +1069,7 @@ static int cmd_new(const new_opts_t *opts)
     /* Validate platforms. */
     if (resolved.platforms_str && resolved.platforms_str[0] && !new_validate_platforms(resolved.platforms_str))
     {
-        fprintf(stderr,
-                "error: invalid --platforms '%s' (valid: windows, linux, macos, ios, android, web)\n",
+        fprintf(stderr, "error: invalid --platforms '%s' (valid: windows, linux, macos, ios, android, web)\n",
                 resolved.platforms_str);
         return 1;
     }
@@ -1100,8 +1094,8 @@ static int cmd_new(const new_opts_t *opts)
             new_workspace_inherit_metadata(&ws, &resolved, &error);
 
             /* Determine creation path (glob-aware). */
-            if (!new_workspace_resolve_path(&ws, resolved.dir_name, ws_create_path,
-                                             sizeof(ws_create_path), &ws_needs_registration, &error))
+            if (!new_workspace_resolve_path(&ws, resolved.dir_name, ws_create_path, sizeof(ws_create_path),
+                                            &ws_needs_registration, &error))
             {
                 fprintf(stderr, "error: failed to resolve workspace member path\n");
                 return 1;
@@ -1132,8 +1126,7 @@ static int cmd_new(const new_opts_t *opts)
     }
     if (resolved.type != NEW_TYPE_WORKSPACE)
     {
-        if (make_subdir(dir, "lib", &error) != VIGIL_STATUS_OK ||
-            make_subdir(dir, "test", &error) != VIGIL_STATUS_OK)
+        if (make_subdir(dir, "lib", &error) != VIGIL_STATUS_OK || make_subdir(dir, "test", &error) != VIGIL_STATUS_OK)
         {
             fprintf(stderr, "error: %s\n", vigil_error_message(&error));
             return 1;
@@ -1165,8 +1158,7 @@ static int cmd_new(const new_opts_t *opts)
     if (ws.found && ws_needs_registration)
     {
         if (!new_workspace_register_member(&ws, resolved.dir_name, &error))
-            fprintf(stderr, "warning: failed to register member in workspace: %s\n",
-                    vigil_error_message(&error));
+            fprintf(stderr, "warning: failed to register member in workspace: %s\n", vigil_error_message(&error));
     }
 
     new_print_summary(dir, &resolved);
@@ -2326,15 +2318,15 @@ static int fmt_toml_file(const char *file_path, int check_only)
     out_len = 0;
 
 #define TOML_APPEND(s, l)                                                                                              \
-    do                                                                                                                  \
-    {                                                                                                                   \
+    do                                                                                                                 \
+    {                                                                                                                  \
         if (out_len + (l) >= out_cap)                                                                                  \
-        {                                                                                                               \
+        {                                                                                                              \
             out_cap = (out_cap + (l)) * 2;                                                                             \
-            out = realloc(out, out_cap);                                                                                \
-        }                                                                                                               \
+            out = realloc(out, out_cap);                                                                               \
+        }                                                                                                              \
         memcpy(out + out_len, (s), (l));                                                                               \
-        out_len += (l);                                                                                                 \
+        out_len += (l);                                                                                                \
     } while (0)
 
     const char *p = data;
@@ -4496,7 +4488,8 @@ static const char *transpile_cmake_template =
     "    list(FILTER VIGIL_PLUGIN_SOURCES EXCLUDE REGEX \"sysquery_stub\\.c$\")\n"
     "endif()\n"
     "# Exclude complex sources not needed for basic transpilation\n"
-    "list(FILTER VIGIL_RT_SOURCES EXCLUDE REGEX \"(dap|debugger|lsp|editor|embed|package|pkg|coverage|cli_test)\\.c$\")\n"
+    "list(FILTER VIGIL_RT_SOURCES EXCLUDE REGEX "
+    "\"(dap|debugger|lsp|editor|embed|package|pkg|coverage|cli_test)\\.c$\")\n"
     "list(FILTER VIGIL_PLUGIN_SOURCES EXCLUDE REGEX \"gui_sdl\\.c$\")\n"
     "# Exclude plugins that need external deps not yet available\n"
     "if(NOT EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/vigil_rt/NEEDS_AUDIO)\n"
@@ -4666,23 +4659,44 @@ static void escape_c_string(vigil_string_t *out, const char *text, size_t len, v
         char esc[8];
         unsigned char ch = (unsigned char)text[i];
         if (ch == '"' || ch == '\\')
-        { esc[0] = '\\'; esc[1] = (char)ch; esc[2] = '\0'; }
+        {
+            esc[0] = '\\';
+            esc[1] = (char)ch;
+            esc[2] = '\0';
+        }
         else if (ch == '\n')
-        { esc[0] = '\\'; esc[1] = 'n'; esc[2] = '\0'; }
+        {
+            esc[0] = '\\';
+            esc[1] = 'n';
+            esc[2] = '\0';
+        }
         else if (ch == '\r')
-        { esc[0] = '\\'; esc[1] = 'r'; esc[2] = '\0'; }
+        {
+            esc[0] = '\\';
+            esc[1] = 'r';
+            esc[2] = '\0';
+        }
         else if (ch == '\t')
-        { esc[0] = '\\'; esc[1] = 't'; esc[2] = '\0'; }
+        {
+            esc[0] = '\\';
+            esc[1] = 't';
+            esc[2] = '\0';
+        }
         else if (ch < 0x20)
-        { snprintf(esc, sizeof(esc), "\\x%02x", ch); }
+        {
+            snprintf(esc, sizeof(esc), "\\x%02x", ch);
+        }
         else
-        { esc[0] = (char)ch; esc[1] = '\0'; }
+        {
+            esc[0] = (char)ch;
+            esc[1] = '\0';
+        }
         vigil_string_append_cstr(out, esc, error);
     }
 }
 
-static void embed_source_files(vigil_string_t *out, const vigil_source_registry_t *registry,
-                                size_t src_count, vigil_error_t *error)
+static void embed_source_files(vigil_string_t *out, const vigil_source_registry_t *registry, size_t src_count,
+                               vigil_error_t *error)
 {
     for (size_t i = 0; i < src_count; i++)
     {
@@ -4709,8 +4723,8 @@ static int transpile_write_cmake_and_runtime(const char *output_dir, vigil_runti
     vigil_string_append_cstr(&cmake_buf, transpile_cmake_template, error);
     vigil_string_append_cstr(&cmake_buf, transpile_cmake_template_2, error);
     vigil_string_append_cstr(&cmake_buf, transpile_cmake_template_3, error);
-    result = write_transpile_file(output_dir, "CMakeLists.txt",
-                                  vigil_string_c_str(&cmake_buf), vigil_string_length(&cmake_buf), error);
+    result = write_transpile_file(output_dir, "CMakeLists.txt", vigil_string_c_str(&cmake_buf),
+                                  vigil_string_length(&cmake_buf), error);
     vigil_string_free(&cmake_buf);
     if (result)
     {
@@ -4722,9 +4736,8 @@ static int transpile_write_cmake_and_runtime(const char *output_dir, vigil_runti
 }
 
 static int transpile_write_project(const char *output_dir, const vigil_string_t *transpiled,
-                                    const vigil_object_t *function,
-                                    const vigil_source_registry_t *registry,
-                                    vigil_runtime_t *runtime, vigil_error_t *error)
+                                   const vigil_object_t *function, const vigil_source_registry_t *registry,
+                                   vigil_runtime_t *runtime, vigil_error_t *error)
 {
     size_t entry_idx = vigil_transpile_entry_index(function);
     size_t func_count = vigil_transpile_func_count(function);
@@ -4739,7 +4752,8 @@ static int transpile_write_project(const char *output_dir, const vigil_string_t 
     for (size_t si = 0; si < src_count; si++)
     {
         const vigil_source_file_t *sf = vigil_source_registry_get(registry, (vigil_source_id_t)(si + 1));
-        if (!sf) continue;
+        if (!sf)
+            continue;
         const char *txt = vigil_string_c_str(&sf->text);
         if (strstr(txt, "import \"sdl\"") || strstr(txt, "import \"gui\""))
             needs_sdl = 1;
@@ -4751,16 +4765,17 @@ static int transpile_write_project(const char *output_dir, const vigil_string_t 
 
     vigil_string_init(&main_src, runtime);
     vigil_string_append_cstr(&main_src,
-        "/* Generated by vigil transpile -- do not edit. */\n"
-        "#include \"vigil_generated.h\"\n"
-        "#include <stdio.h>\n"
-        "#include <stdlib.h>\n"
-        "#include \"vigil/transpile_rt.h\"\n"
-        "#include \"vigil/vigil.h\"\n"
-        "#include \"vigil/stdlib.h\"\n"
-        "#include \"vigil/compiler.h\"\n"
-        "#include \"internal/vigil_internal.h\"\n"
-        "#include \"plugin_registry.h\"\n\n", error);
+                             "/* Generated by vigil transpile -- do not edit. */\n"
+                             "#include \"vigil_generated.h\"\n"
+                             "#include <stdio.h>\n"
+                             "#include <stdlib.h>\n"
+                             "#include \"vigil/transpile_rt.h\"\n"
+                             "#include \"vigil/vigil.h\"\n"
+                             "#include \"vigil/stdlib.h\"\n"
+                             "#include \"vigil/compiler.h\"\n"
+                             "#include \"internal/vigil_internal.h\"\n"
+                             "#include \"plugin_registry.h\"\n\n",
+                             error);
 
     /* Embed all source files as C string literals. */
     embed_source_files(&main_src, registry, src_count, error);
@@ -4768,22 +4783,22 @@ static int transpile_write_project(const char *output_dir, const vigil_string_t 
     {
         char tail[2048];
         snprintf(tail, sizeof(tail),
-            "\nint main(void)\n"
-            "{\n"
-            "    vigil_runtime_t *runtime = NULL;\n"
-            "    vigil_vm_t *vm = NULL;\n"
-            "    vigil_error_t error = {0};\n"
-            "    vigil_source_registry_t registry;\n"
-            "    vigil_diagnostic_list_t diagnostics;\n"
-            "    vigil_object_t *function = NULL;\n"
-            "    vigil_source_id_t sid = 0;\n"
-            "    vigil_tc_t tc = {0};\n"
-            "    if (vigil_runtime_open(&runtime, NULL, &error) != 0) return 1;\n"
-            "    if (vigil_vm_open(&vm, runtime, NULL, &error) != 0)\n"
-            "    { vigil_runtime_close(&runtime); return 1; }\n"
-            "    vigil_vm_set_aot_enabled(vm, 0);\n"
-            "    vigil_source_registry_init(&registry, runtime);\n"
-            "    vigil_diagnostic_list_init(&diagnostics, runtime);\n");
+                 "\nint main(void)\n"
+                 "{\n"
+                 "    vigil_runtime_t *runtime = NULL;\n"
+                 "    vigil_vm_t *vm = NULL;\n"
+                 "    vigil_error_t error = {0};\n"
+                 "    vigil_source_registry_t registry;\n"
+                 "    vigil_diagnostic_list_t diagnostics;\n"
+                 "    vigil_object_t *function = NULL;\n"
+                 "    vigil_source_id_t sid = 0;\n"
+                 "    vigil_tc_t tc = {0};\n"
+                 "    if (vigil_runtime_open(&runtime, NULL, &error) != 0) return 1;\n"
+                 "    if (vigil_vm_open(&vm, runtime, NULL, &error) != 0)\n"
+                 "    { vigil_runtime_close(&runtime); return 1; }\n"
+                 "    vigil_vm_set_aot_enabled(vm, 0);\n"
+                 "    vigil_source_registry_init(&registry, runtime);\n"
+                 "    vigil_diagnostic_list_init(&diagnostics, runtime);\n");
         vigil_string_append_cstr(&main_src, tail, error);
     }
 
@@ -4802,37 +4817,37 @@ static int transpile_write_project(const char *output_dir, const vigil_string_t 
     {
         char tail2[2048];
         snprintf(tail2, sizeof(tail2),
-            "    { vigil_native_registry_t natives;\n"
-            "      vigil_native_registry_init(&natives);\n"
-            "      vigil_stdlib_register_all(&natives, &error);\n"
-            "      vigil_plugin_register_all(&natives, &error);\n"
-            "      vigil_compile_source_with_natives(&registry, sid, &natives, &function, &diagnostics, &error);\n"
-            "      vigil_native_registry_free(&natives); }\n"
-            "    if (!function) { vigil_diagnostic_list_free(&diagnostics);\n"
-            "      vigil_source_registry_free(&registry); vigil_vm_close(&vm);\n"
-            "      vigil_runtime_close(&runtime); return 1; }\n"
-            "    tc.vm = vm; tc.runtime = runtime;\n"
-            "    tc.function = function;\n"
-            "    { size_t _fi;\n"
-            "      for (_fi = 0; _fi < %zu; _fi++) {\n"
-            "        const vigil_object_t *_fn = vigil_function_object_sibling(function, _fi);\n"
-            "        if (!_fn) _fn = function;\n"
-            "        const vigil_chunk_t *_ch = vigil_function_object_chunk(_fn);\n"
-            "        vigil_fn_constants[_fi] = _ch ? (vigil_value_t*)vigil_chunk_constant(_ch, 0) : NULL;\n"
-            "        vigil_fn_constant_counts[_fi] = _ch ? vigil_chunk_constant_count(_ch) : 0;\n"
-            "      }\n"
-            "    }\n"
-            "    tc.constants = vigil_fn_constants[%zu];\n"
-            "    tc.constant_count = vigil_fn_constant_counts[%zu];\n"
-            "    vigil_reg_t result = vigil_fn_%zu(&tc);\n"
-            "    vigil_vm_close(&vm);\n"
-            "    vigil_object_release(&function);\n"
-            "    vigil_diagnostic_list_free(&diagnostics);\n"
-            "    vigil_source_registry_free(&registry);\n"
-            "    vigil_runtime_close(&runtime);\n"
-            "    return (int)result.i;\n"
-            "}\n",
-            func_count, entry_idx, entry_idx, entry_idx);
+                 "    { vigil_native_registry_t natives;\n"
+                 "      vigil_native_registry_init(&natives);\n"
+                 "      vigil_stdlib_register_all(&natives, &error);\n"
+                 "      vigil_plugin_register_all(&natives, &error);\n"
+                 "      vigil_compile_source_with_natives(&registry, sid, &natives, &function, &diagnostics, &error);\n"
+                 "      vigil_native_registry_free(&natives); }\n"
+                 "    if (!function) { vigil_diagnostic_list_free(&diagnostics);\n"
+                 "      vigil_source_registry_free(&registry); vigil_vm_close(&vm);\n"
+                 "      vigil_runtime_close(&runtime); return 1; }\n"
+                 "    tc.vm = vm; tc.runtime = runtime;\n"
+                 "    tc.function = function;\n"
+                 "    { size_t _fi;\n"
+                 "      for (_fi = 0; _fi < %zu; _fi++) {\n"
+                 "        const vigil_object_t *_fn = vigil_function_object_sibling(function, _fi);\n"
+                 "        if (!_fn) _fn = function;\n"
+                 "        const vigil_chunk_t *_ch = vigil_function_object_chunk(_fn);\n"
+                 "        vigil_fn_constants[_fi] = _ch ? (vigil_value_t*)vigil_chunk_constant(_ch, 0) : NULL;\n"
+                 "        vigil_fn_constant_counts[_fi] = _ch ? vigil_chunk_constant_count(_ch) : 0;\n"
+                 "      }\n"
+                 "    }\n"
+                 "    tc.constants = vigil_fn_constants[%zu];\n"
+                 "    tc.constant_count = vigil_fn_constant_counts[%zu];\n"
+                 "    vigil_reg_t result = vigil_fn_%zu(&tc);\n"
+                 "    vigil_vm_close(&vm);\n"
+                 "    vigil_object_release(&function);\n"
+                 "    vigil_diagnostic_list_free(&diagnostics);\n"
+                 "    vigil_source_registry_free(&registry);\n"
+                 "    vigil_runtime_close(&runtime);\n"
+                 "    return (int)result.i;\n"
+                 "}\n",
+                 func_count, entry_idx, entry_idx, entry_idx);
         vigil_string_append_cstr(&main_src, tail2, error);
     }
 
@@ -4842,9 +4857,11 @@ static int transpile_write_project(const char *output_dir, const vigil_string_t 
         return 0;
     }
 
-    result = write_transpile_file(output_dir, "vigil_generated.c", vigil_string_c_str(transpiled), vigil_string_length(transpiled), error) &&
+    result = write_transpile_file(output_dir, "vigil_generated.c", vigil_string_c_str(transpiled),
+                                  vigil_string_length(transpiled), error) &&
              write_transpile_file(output_dir, "vigil_generated.h", hdr, strlen(hdr), error) &&
-             write_transpile_file(output_dir, "vigil_main.c", vigil_string_c_str(&main_src), vigil_string_length(&main_src), error);
+             write_transpile_file(output_dir, "vigil_main.c", vigil_string_c_str(&main_src),
+                                  vigil_string_length(&main_src), error);
 
     if (result)
         result = transpile_write_cmake_and_runtime(output_dir, runtime, error);

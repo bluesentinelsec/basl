@@ -458,7 +458,8 @@ TEST(DocRegistryTest, DescriptorBackedDocsRenderDerivedSignaturesForCrypto)
     EXPECT_STREQ(pbkdf2->signature, "crypto.pbkdf2(password: string, salt: string, iterations: i32, key_len: i32) -> "
                                     "(string, err)");
     EXPECT_STREQ(pbkdf2->summary, "PBKDF2 key derivation.");
-    EXPECT_STREQ(encrypt->signature, "crypto.encrypt(key: string, nonce: string, plaintext: string, aad: string) -> (string, err)");
+    EXPECT_STREQ(encrypt->signature,
+                 "crypto.encrypt(key: string, nonce: string, plaintext: string, aad: string) -> (string, err)");
     EXPECT_STREQ(encrypt->summary, "AES-256-GCM encryption.");
 }
 
@@ -467,8 +468,9 @@ TEST(DocRegistryTest, DescriptorBackedDocsRenderDerivedSignaturesForThreadAndCom
     const vigil_doc_entry_t *compress_zip = vigil_doc_lookup("compress.zip_create_level");
 
     ASSERT_NE(compress_zip, NULL);
-    EXPECT_STREQ(compress_zip->signature,
-                 "compress.zip_create_level(names: array<string>, contents: array<string>, level: i32) -> (string, err)");
+    EXPECT_STREQ(
+        compress_zip->signature,
+        "compress.zip_create_level(names: array<string>, contents: array<string>, level: i32) -> (string, err)");
     EXPECT_STREQ(compress_zip->summary, "Create ZIP archive at level.");
 
 #ifdef VIGIL_HAS_STDLIB_THREAD

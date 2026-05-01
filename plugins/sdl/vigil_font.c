@@ -6,8 +6,8 @@
 
 #define STB_TRUETYPE_IMPLEMENTATION
 
-#include "../../deps/stb/stb_truetype.h"
 #include "vigil_font.h"
+#include "../../deps/stb/stb_truetype.h"
 
 #include <math.h>
 #include <stdio.h>

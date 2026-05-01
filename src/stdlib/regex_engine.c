@@ -888,7 +888,11 @@ static bool fragment_copy(parser_t *p, const fragment_t *src, fragment_t *dst, s
 
     /* Pre-compute patch list info BEFORE any realloc that might
      * invalidate the pointers in src->patch_list. */
-    struct { size_t state_id; int field; } patch_info[64];
+    struct
+    {
+        size_t state_id;
+        int field;
+    } patch_info[64];
     size_t patch_info_count = 0;
     for (size_t i = 0; i < src->patch_count && i < 64; i++)
     {
@@ -896,8 +900,20 @@ static bool fragment_copy(parser_t *p, const fragment_t *src, fragment_t *dst, s
         for (size_t id = base_id; id < end_id; id++)
         {
             nfa_state_t *st = &re->states[id];
-            if (ptr == &st->out1) { patch_info[patch_info_count].state_id = id; patch_info[patch_info_count].field = 1; patch_info_count++; break; }
-            if (ptr == &st->out2) { patch_info[patch_info_count].state_id = id; patch_info[patch_info_count].field = 2; patch_info_count++; break; }
+            if (ptr == &st->out1)
+            {
+                patch_info[patch_info_count].state_id = id;
+                patch_info[patch_info_count].field = 1;
+                patch_info_count++;
+                break;
+            }
+            if (ptr == &st->out2)
+            {
+                patch_info[patch_info_count].state_id = id;
+                patch_info[patch_info_count].field = 2;
+                patch_info_count++;
+                break;
+            }
         }
     }
 
@@ -908,8 +924,8 @@ static bool fragment_copy(parser_t *p, const fragment_t *src, fragment_t *dst, s
         while (new_cap < re->state_count + copy_count)
             new_cap *= 2;
         nfa_state_t *old_states = re->states;
-        nfa_state_t *new_states = (nfa_state_t *)re->allocator.reallocate(
-            re->allocator.user_data, re->states, new_cap * sizeof(nfa_state_t));
+        nfa_state_t *new_states =
+            (nfa_state_t *)re->allocator.reallocate(re->allocator.user_data, re->states, new_cap * sizeof(nfa_state_t));
         if (!new_states)
         {
             RE_FREE(re, map);
@@ -1091,8 +1107,8 @@ static bool build_bounded_brace_quantifier(parser_t *p, fragment_t *atom, fragme
         while (new_cap < needed)
             new_cap *= 2;
         size_t atom_id = atom->start->id;
-        nfa_state_t *new_states = (nfa_state_t *)p->re->allocator.reallocate(
-            p->re->allocator.user_data, p->re->states, new_cap * sizeof(nfa_state_t));
+        nfa_state_t *new_states = (nfa_state_t *)p->re->allocator.reallocate(p->re->allocator.user_data, p->re->states,
+                                                                             new_cap * sizeof(nfa_state_t));
         if (!new_states)
         {
             parser_error(p, "out of memory");
@@ -1118,7 +1134,8 @@ static bool build_bounded_brace_quantifier(parser_t *p, fragment_t *atom, fragme
     {
         if (!build_exact_brace_quantifier(p, atom, &result, min))
         {
-            if (max > min) fragment_free(&atom_saved);
+            if (max > min)
+                fragment_free(&atom_saved);
             return false;
         }
     }
@@ -1138,7 +1155,11 @@ static bool build_bounded_brace_quantifier(parser_t *p, fragment_t *atom, fragme
 
     /* Store skip patch info as (state_id, field) pairs instead of raw
      * pointers, because fragment_copy may realloc re->states. */
-    struct { size_t state_id; int field; /* 1=out1, 2=out2 */ } skip_info[128];
+    struct
+    {
+        size_t state_id;
+        int field; /* 1=out1, 2=out2 */
+    } skip_info[128];
 
     for (size_t i = min; i < max; i++)
     {
@@ -1777,7 +1798,8 @@ vigil_regex_t *vigil_regex_compile(const vigil_allocator_t *allocator, const cha
      * parsing (which would invalidate fragment patch list pointers). */
     {
         size_t initial_cap = pattern_len * 200 + 256;
-        if (initial_cap < 256) initial_cap = 256;
+        if (initial_cap < 256)
+            initial_cap = 256;
         re->states = (nfa_state_t *)a.allocate(a.user_data, initial_cap * sizeof(nfa_state_t));
         if (!re->states)
         {
@@ -1870,8 +1892,8 @@ vigil_regex_t *vigil_regex_compile(const vigil_allocator_t *allocator, const cha
 }
 
 vigil_regex_t *vigil_regex_compile_with_flags(const vigil_allocator_t *allocator, const char *pattern,
-                                               size_t pattern_len, const char *flags, size_t flags_len,
-                                               char *error_buf, size_t error_buf_size)
+                                              size_t pattern_len, const char *flags, size_t flags_len, char *error_buf,
+                                              size_t error_buf_size)
 {
     vigil_regex_t *re = vigil_regex_compile(allocator, pattern, pattern_len, error_buf, error_buf_size);
     if (!re)
